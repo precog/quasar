@@ -126,5 +126,28 @@ class FileSystemApi(fs: FSTable[Backend]) {
         (dataSource, relPath) = t
       } yield jsonStream(dataSource.scan(relPath, offset, limit))).getOrElse(NotFound)
     }
+    
+    // API to write data:
+    case x @ POST(PathP(path0)) if path0 startsWith ("/data/fs/") => AccessControlAllowOriginAll ~> {
+      val path = Path(path0.substring("/data/fs".length))
+      
+      def sequenceStrs[A](vs: Seq[String \/ A]): String \/ List[A] =
+        vs.toList.map(_.validation.toValidationNel).sequenceU.leftMap(_.list.mkString("; ")).disjunction
+
+      def parseJsonLines(str: String): String \/ List[Json] =
+        sequenceStrs(str.split("\n").map(Parse.parse(_)))
+
+      (for {
+          body <- notEmpty(Body.string(x)) \/> (BadRequest ~> ResponseString("The body of the POST must contain data"))
+          t     <- dataSourceFor(path)
+          (dataSource, relPath) = t
+          
+          json  <- parseJsonLines(body).leftMap(e => BadRequest ~> ResponseString(e))
+          jsonStrs = json.map(j => RenderedJson(j.toString))
+          _     <- dataSource.write(relPath, jsonStrs).attemptRun.leftMap(e => InternalServerError ~> errorResponse(e))
+        } yield ResponseString("")
+      ).fold(identity, identity)
+      
+    }
   }
 }

@@ -37,6 +37,25 @@ sealed trait MongoDbFileSystem extends FileSystem {
     )
   }
 
+  def write(path: Path, values: List[RenderedJson]) = Collection.fromPath(path).fold(
+      e => Task.fail(e),
+      col => Task.delay({
+        val mongoCol = db.getCollection(col.name)
+
+        // First parse all the values before writing anything:
+        val objs = for {
+          json <- values
+        } yield com.mongodb.util.JSON.parse(json.value) match {
+          case obj: DBObject => obj
+          case x => throw new RuntimeException("parse error?: " + x)
+        }
+        
+        // Now save values, in order:
+        for (o <- objs) mongoCol.save(o)
+
+        ()
+      }))
+
   def delete(path: Path): Task[Unit] = Collection.fromPath(path).fold(
     e => Task.fail(e),
     col => Task.delay(db.getCollection(col.name).drop())

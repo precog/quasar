@@ -21,6 +21,8 @@ trait FileSystem {
 
   final def scanFrom(path: Path, offset: Long) = scan(path, Some(offset), None)
 
+  def write(path: Path, values: List[RenderedJson]): Task[Unit]
+
   def delete(path: Path): Task[Unit]
 
   def ls(dir: Path): Task[List[Path]]
@@ -31,6 +33,8 @@ trait FileSystem {
 object FileSystem {
   val Null = new FileSystem {
     def scan(path: Path, offset: Option[Long], limit: Option[Long]): Process[Task, RenderedJson] = Process.halt
+
+    def write(path: Path, values: List[RenderedJson]) = Task.now(())
 
     def delete(path: Path): Task[Unit] = Task.now(())
 

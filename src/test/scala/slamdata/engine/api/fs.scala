@@ -17,7 +17,7 @@ import unfiltered.util.{StartableServer}
 import argonaut._, Argonaut._
 
 import dispatch._, Defaults._
-import com.ning.http.client.{/*AsyncHandler, Request,*/ Response}
+import com.ning.http.client.{Response}
 
 class ApiSpecs extends Specification with DisjunctionMatchers {
   sequential  // Each test binds an arbitrary port
@@ -29,7 +29,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers {
   down the server.
   */
   def withServer[A](fs: Map[Path, Backend])(body: => A): A = {
-    val api = new FileSystemApi(fs).api
+    val api = new FileSystemApi(FSTable(fs)).api
     val srv = unfiltered.netty.Http(port).chunked(1024*1024).plan(api)
 
     srv.start
@@ -63,6 +63,8 @@ class ApiSpecs extends Specification with DisjunctionMatchers {
       def scan(path: Path, offset: Option[Long], limit: Option[Long]) = 
         files.get(path).map(js => Process.emitAll(js))
           .getOrElse(Process.fail(FileSystem.FileNotFoundError(path)))
+      
+      def write(path: Path, values: List[RenderedJson]) = Task.now(())
       
       def delete(path: Path): Task[Unit] = ???  // Not used yet
       
@@ -161,13 +163,13 @@ class ApiSpecs extends Specification with DisjunctionMatchers {
 
         meta() must beRightDisj(List(
           Json("children" := List(
-            Json("name" := "./bar", "type" := "file")))))
+            Json("name" := "bar", "type" := "file")))))
       }
     }
 
   }
   
-  "/data/fs" should {
+  "GET /data/fs" should {
     val root = svc / "data" / "fs" / ""
 
     "be 404 for missing backend" in {
@@ -197,5 +199,42 @@ class ApiSpecs extends Specification with DisjunctionMatchers {
       }
     }
     
+    "POST /data/fs" should {
+      "be 404 for missing backend" in {
+        withServer(Map()) {
+          val path = root / "missing"
+          val meta = Http(path > code)
+
+          meta() must_== 404
+        }
+      }
+    
+      "be 400 with no body" in {
+        withServer(backends1) {
+          val path = root / "foo" / "bar"
+          val meta = Http(path.POST > code)
+
+          meta() must_== 400
+        }
+      }
+    
+      "be 400 with invalid JSON" in {
+        withServer(backends1) {
+          val path = root / "foo" / "bar"
+          val meta = Http(path.POST.setBody("{") > code)
+
+          meta() must_== 400
+        }
+      }
+    
+      "accept valid JSON" in {
+        withServer(backends1) {
+          val path = root / "foo" / "bar"
+          val meta = Http(path.POST.setBody("{\"a\": 1}\n{\"b\": 2}") OK as.String)
+
+          meta() must_== ""
+        }
+      }
+    }
   }
 }

@@ -192,6 +192,18 @@ Retrieves data from the specified path, formatted as one JSON object per line. T
 {"id":6,"guid":"a2863ec1-9652-46d3-aa12-aa92308de055","isActive":false,"balance":"$1,621.67","picture":"http://placehold.it/32x32","age":34,"eyeColor":"blue","latitude":-83.908456,"longitude":67.190633}
 ```
 
+
+### POST /data/fs/[path]
+
+Saves/updates data to the specified path, formatted as one JSON object per line in the same format as above.
+
+It's possible to overwrite data in a MongoDB collection by supplying the `_id` field, using this special syntax
+for ObjectIds:
+```json
+{ "_id": { "$oid": "53dff0773004a2d5686f94df"}, ... }
+````
+
+
 ## Troubleshooting
 
 First, make sure that the slamdata/slamengine Github repo is building correctly (the status is displayed at the top of the README). Then, you can use

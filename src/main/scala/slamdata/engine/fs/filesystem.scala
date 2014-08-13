@@ -44,6 +44,8 @@ trait FileSystem {
    */
   def append(path: Path, values: Process[Task, RenderedJson]): Process[Task, JsonWriteError]
 
+  def move(src: Path, dst: Path): Task[Unit]
+
   def delete(path: Path): Task[Unit]
 
   def ls(dir: Path): Task[List[Path]]
@@ -60,6 +62,8 @@ object FileSystem {
     def append(path: Path, values: Process[Task, RenderedJson]) = Process.halt
 
     def delete(path: Path): Task[Unit] = Task.now(())
+
+    def move(src: Path, dst: Path) = Task.now(())
 
     def ls(dir: Path): Task[List[Path]] = Task.now(Nil)
   }

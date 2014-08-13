@@ -76,6 +76,8 @@ class ApiSpecs extends Specification with DisjunctionMatchers {
 
       def delete(path: Path): Task[Unit] = Task.now(())
 
+      def move(src: Path, dst: Path): Task[Unit] = Task.now(())
+
       def ls(dir: Path): Task[List[Path]] = {
         val childrenOpt = files.keys.toList.map(_.relativeTo(dir)).sequenceU
         childrenOpt.map(Task.now(_)).getOrElse(Task.fail(FileSystem.FileNotFoundError(dir)))

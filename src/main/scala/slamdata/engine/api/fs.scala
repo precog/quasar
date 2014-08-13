@@ -153,14 +153,8 @@ class FileSystemApi(fs: FSTable[Backend]) {
   }
 
   private def upload[A](req: HttpRequest[A], path: Path, f: (FileSystem, Path, Process[Task, RenderedJson]) => List[Throwable] \/ Unit) = {
-    def partition[A, B](vs: List[A \/ B]): (List[A], List[B]) =
-      vs.foldLeft((List[A](), List[B]())) {
-        case ((as, bs), -\/ (a)) => (a :: as, bs)
-        case ((as, bs),  \/-(b)) => (as, b :: bs)
-      }
-
     def parseJsonLines(str: String): (List[JsonWriteError], List[RenderedJson]) =
-      partition(str.split("\n").map(line => Parse.parse(line).bimap(
+      unzipDisj(str.split("\n").map(line => Parse.parse(line).bimap(
         e => JsonWriteError(RenderedJson(line), Some(e)),
         _ => RenderedJson(line)
       )).toList)

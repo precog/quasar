@@ -2,6 +2,7 @@ package slamdata.engine.physical.mongodb
 
 import slamdata.engine._
 import slamdata.engine.fs._
+import slamdata.engine.fp._
 
 import scalaz._
 import scalaz.stream._
@@ -46,22 +47,13 @@ sealed trait MongoDbFileSystem extends FileSystem {
           start <- SequenceNameGenerator.startUnique
         } yield SequenceNameGenerator.Gen.generateTempName.eval(start)
 
-        def rename(src: Collection, dst: Collection): Task[Unit] = Task.delay {
-          db.getCollection(src.name).rename(dst.name, true)
-          ()
-        }
-
-        def delete(col: Collection): Task[Unit] = Task.delay {
-          db.getCollection(col.name).drop
-        }
-
         for {
           tmp <- genTempName
           _   <- append(tmp.asPath, values).runLog.flatMap(_.toList match {
-                    case e :: _ => (delete(tmp) or Task.now(())).flatMap(_ => Task.fail(e))
+                    case e :: _ => delete(tmp.asPath) ignoreAndThen Task.fail(e)
                     case _      => Task.now(())
                   })
-          _   <- rename(tmp, col).onFinish(_.map(_ => delete(tmp) or Task.now()).getOrElse(Task.now(())))
+          _   <- move(tmp.asPath, col.asPath) onFailure delete(tmp.asPath)
         } yield ()
       })
 
@@ -71,8 +63,6 @@ sealed trait MongoDbFileSystem extends FileSystem {
         import process1._
         import scala.collection.JavaConversions._
 
-        val mongoCol = db.getCollection(col.name)
-
         def parse(json: RenderedJson): Option[DBObject] = com.mongodb.util.JSON.parse(json.value) match {
           case obj: DBObject => Some(obj)
           case x => None
@@ -81,25 +71,43 @@ sealed trait MongoDbFileSystem extends FileSystem {
         val chunks: Process[Task, Vector[(RenderedJson, Option[DBObject])]] = values.map(json => json -> parse(json)) pipe chunk(ChunkSize)
 
         chunks.flatMap { vs => 
-          val parseErrors = vs.collect { case (json, None)      => JsonWriteError(json, Some("parse error")) }
-          val objs        = vs.collect { case (json, Some(obj)) => json -> obj }
+          Process.eval(Task.delay {
+            \/.fromTryCatchNonFatal(db.getCollection(col.name)).map(
+              mongoCol => {
+                val parseErrors = vs.collect { case (json, None)      => JsonWriteError(json, Some("parse error")) }
+                val objs        = vs.collect { case (json, Some(obj)) => json -> obj }
 
-          val insertErrors = \/.fromTryCatchNonFatal(mongoCol.insert(objs.map(_._2))).fold(
-            e => objs.map { case (json, _) => JsonWriteError(json, Some(e.getMessage)) },
-            _ => Nil
-          )
-          Process.emitAll(parseErrors ++ insertErrors)
+                val insertErrors = \/.fromTryCatchNonFatal(mongoCol.insert(objs.map(_._2))).fold(
+                  e => objs.map { case (json, _) => JsonWriteError(json, Some(e.getMessage)) },
+                  _ => Nil
+                )
+              
+                parseErrors ++ insertErrors
+              }
+            )
+          }).flatMap(_.fold(Process.fail(_), errs => Process.emitAll(errs)))
         }
       })
 
-  def delete(path: Path): Task[Unit] = Collection.fromPath(path).fold(
-    e => Task.fail(e),
-    col => Task.delay(db.getCollection(col.name).drop)
-  )
+    def move(src: Path, dst: Path): Task[Unit] = (for {
+      srcCol <- Collection.fromPath(src)
+      dstCol <- Collection.fromPath(dst)
+    } yield (srcCol, dstCol)).fold(
+      e => Task.fail(e),
+      { case (srcCol, dstCol) => Task.delay {
+        db.getCollection(srcCol.name).rename(dstCol.name, true)
+        ()
+      }}
+    )
+
+    def delete(path: Path): Task[Unit] = Collection.fromPath(path).fold(
+      e => Task.fail(e),
+      col => Task.delay(db.getCollection(col.name).drop)
+    )
 
   // Note: a mongo db can contain a collection named "foo" as well as "foo.bar" and "foo.baz", 
   // in which case "foo" acts as both a directory and a file, as far as slamengine is concerned.
-  def ls(dir: Path): Task[List[Path]] = {
+  def ls(dir: Path): Task[List[Path]] = Task.delay {
     val colls = db.getCollectionNames().asScala.toList.map(Collection(_))
     val allPaths = colls.map(_.asPath)
     val children = allPaths.map { p => 
@@ -107,7 +115,7 @@ sealed trait MongoDbFileSystem extends FileSystem {
         rel <- p.relativeTo(dir)
       } yield rel.head
     }.flatten.sorted.distinct
-    Task.delay(children)
+    children
   }
 }
 

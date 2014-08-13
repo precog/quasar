@@ -32,7 +32,7 @@ trait FileSystem {
 
   /**
    Save a collection of documents at the given path, replacing any previous contents,
-   atomically. If any error occurs while consuming input values, fails with JsonWriteError
+   atomically. If any error occurs while consuming input values, nothing is written 
    and any previous values are unaffected.
    */
   def save(path: Path, values: Process[Task, RenderedJson]): Task[Unit]

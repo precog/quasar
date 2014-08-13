@@ -30,16 +30,16 @@ import slamdata.java.JavaUtil
 object Repl {
   sealed trait Command
   object Command {
-    val ExitPattern         = "(?:exit)|(?:quit)".r
-    val HelpPattern         = "(?:help)|(?:commands)|\\?".r
-    val CdPattern           = "cd(?: +(.+))?".r
-    val SelectPattern       = "(select +.+)".r
-    val NamedSelectPattern  = "(\\w+) *:= *(select +.+)".r
-    val LsPattern           = "ls(?: +(.+))?".r
-    val SavePattern         = "save ([\\S]+) (.+)".r
-    val AppendPattern       = "append ([\\S]+) (.+)".r
-    val DeletePattern       = "delete ([\\S]+)".r
-    val DebugPattern        = "set debug *= *(0|1|2)".r
+    val ExitPattern         = "(?i)(?:exit)|(?:quit)".r
+    val HelpPattern         = "(?i)(?:help)|(?:commands)|\\?".r
+    val CdPattern           = "(?i)cd(?: +(.+))?".r
+    val SelectPattern       = "(?i)(select +.+)".r
+    val NamedSelectPattern  = "(?i)(\\w+) *:= *(select +.+)".r
+    val LsPattern           = "(?i)ls(?: +(.+))?".r
+    val SavePattern         = "(?i)save ([\\S]+) (.+)".r
+    val AppendPattern       = "(?i)append ([\\S]+) (.+)".r
+    val DeletePattern       = "(?i)rm ([\\S]+)".r
+    val DebugPattern        = "(?i)set debug *= *(0|1|2)".r
 
     case object Exit extends Command
     case object Unknown extends Command
@@ -135,7 +135,7 @@ object Repl {
          |   ls [path]
          |   save [path] [value]
          |   append [path] [value]
-         |   delete [path]
+         |   rm [path]
          |   set debug = [level]""".stripMargin
     )
   )

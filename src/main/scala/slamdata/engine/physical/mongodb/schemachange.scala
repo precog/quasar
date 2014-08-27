@@ -2,6 +2,7 @@ package slamdata.engine.physical.mongodb
 
 import collection.immutable.ListMap
 import slamdata.engine.fp._
+import slamdata.engine.analysis.fixplate._
 
 import scalaz._
 import Scalaz._
@@ -265,21 +266,21 @@ object SchemaChange {
   final case class IndexProject(source: SchemaChange, index: Int) extends SchemaChange
 
   final case class MakeObject(fields: ListMap[String, SchemaChange]) extends SchemaChange {
-    def shift(src: WorkflowOp, base: DocVar): ProjectOp = {
-      ProjectOp(src,
+    def shift(src: Term[WorkflowOp], base: DocVar): Term[WorkflowOp] = {
+      Term(ProjectOp(src,
         Reshape.Doc(fields.map {
           case (name, _) =>
             BsonField.Name(name) -> -\/ (base \ BsonField.Name(name))
-      }))
+        })))
     }
   }
   final case class MakeArray(elements: ListMap[Int, SchemaChange]) extends SchemaChange {
-    def shift(src: WorkflowOp, base: DocVar): ProjectOp = {
-      ProjectOp(src,
+    def shift(src: Term[WorkflowOp], base: DocVar): Term[WorkflowOp] = {
+      Term(ProjectOp(src,
         Reshape.Arr(elements.map {
           case (index, _) =>
             BsonField.Index(index) -> -\/ (base \ BsonField.Index(index))
-      }))
+        })))
     }
   }
 }

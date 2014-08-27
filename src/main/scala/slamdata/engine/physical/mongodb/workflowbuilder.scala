@@ -6,6 +6,9 @@ import slamdata.engine.fs.Path
 import slamdata.engine.{Error}
 import WorkflowTask._
 
+import slamdata.engine.analysis._
+import fixplate._
+
 import scalaz._
 import Scalaz._
 import monocle.Macro._
@@ -25,7 +28,7 @@ object WorkflowBuilderError {
   case object NotGrouped extends WorkflowBuilderError {
     def message = "The pipeline builder has not been grouped by another set, so a group op doesn't make sense"
   }
-  case class InvalidGroup(op: WorkflowOp) extends WorkflowBuilderError {
+  case class InvalidGroup(op: Term[WorkflowOp]) extends WorkflowBuilderError {
     def message = "Can not group " + op
                                                             }
   case object InvalidSortBy extends WorkflowBuilderError {
@@ -41,7 +44,7 @@ object WorkflowBuilderError {
  * base mod for that structure.
  */
 final case class WorkflowBuilder private (
-  graph: WorkflowOp,
+  graph: Term[WorkflowOp],
   base: ExprOp.DocVar,
   struct: SchemaChange,
   groupBy: List[WorkflowBuilder] = Nil) { self =>
@@ -51,7 +54,7 @@ final case class WorkflowBuilder private (
   import ExprOp.{DocVar}
 
   def build: Error \/ Workflow = base match {
-    case DocVar.ROOT(None) => \/-(graph.finish)
+    case DocVar.ROOT(None) => \/-(finish(graph))
     case base =>
       struct match {
         case s @ SchemaChange.MakeObject(_) =>
@@ -66,7 +69,7 @@ final case class WorkflowBuilder private (
   def asLiteral = asExprOp.collect { case (x @ ExprOp.Literal(_)) => x }
 
   def expr1(f: DocVar => Error \/ ExprOp): Error \/ WorkflowBuilder = f(base).map { expr =>
-    val that = WorkflowBuilder.fromExpr(graph, expr)
+    val that = WorkflowBuilder.fromExpr(graph.unFix, expr)
     copy(graph = that.graph, base = that.base)
   }
 
@@ -77,7 +80,7 @@ final case class WorkflowBuilder private (
         case expr =>
           mergeGroups(this.groupBy, that.groupBy).map { mergedGroups =>
             WorkflowBuilder(
-              ProjectOp(list, Reshape.Doc(ListMap(ExprName -> -\/ (expr)))).coalesce,
+              coalesce(Term(ProjectOp(list, Reshape.Doc(ListMap(ExprName -> -\/ (expr)))))),
               ExprVar,
               SchemaChange.Init,
               mergedGroups)
@@ -87,10 +90,10 @@ final case class WorkflowBuilder private (
   }
 
   def expr3(p2: WorkflowBuilder, p3: WorkflowBuilder)(f: (DocVar, DocVar, DocVar) => Error \/ ExprOp): Error \/ WorkflowBuilder = {
-    val nest = (lbase: DocVar, rbase: DocVar, list: WorkflowOp) => {
+    val nest = (lbase: DocVar, rbase: DocVar, list: Term[WorkflowOp]) => {
       mergeGroups(this.groupBy, p2.groupBy, p3.groupBy).map { mergedGroups =>
         WorkflowBuilder(
-          ProjectOp(list, Reshape.Doc(ListMap(LeftName -> -\/ (lbase), RightName -> -\/ (rbase)))).coalesce,
+          coalesce(Term(ProjectOp(list, Reshape.Doc(ListMap(LeftName -> -\/ (lbase), RightName -> -\/(rbase)))))),
           DocVar.ROOT(),
           SchemaChange.Init,
           mergedGroups)
@@ -106,7 +109,8 @@ final case class WorkflowBuilder private (
     } yield pfinal
   }
 
-  def map(f: (WorkflowOp, ExprOp.DocVar) => Error \/ WorkflowBuilder): Error \/ WorkflowBuilder =
+  def map(f: (Term[WorkflowOp], ExprOp.DocVar) => Error \/ WorkflowBuilder):
+      Error \/ WorkflowBuilder =
     f(graph, base)
 
   def makeObject(name: String): Error \/ WorkflowBuilder = {
@@ -118,15 +122,16 @@ final case class WorkflowBuilder private (
           case b :: bs =>
             val (construct, inner) = ExprOp.GroupOp.decon(x)
 
-            graph match {
-              case me: WPipelineOp =>
+            graph.unFix match {
+              case me: WPipelineOp[_] =>
+                val cast: WPipelineOp[Term[WorkflowOp]] = me
                 val rewritten =
                   copy(
-                    graph = ProjectOp(me.src, Reshape.Doc(ListMap(ExprName -> -\/(inner)))).coalesce)
+                    graph = coalesce(Term(ProjectOp(cast.src, Reshape.Doc(ListMap(ExprName -> -\/(inner)))))))
 
                 rewritten.merge(b) { (grouped, by, list) =>
                   \/- (WorkflowBuilder(
-                    GroupOp(list, Grouped(ListMap(BsonField.Name(name) -> construct(grouped))), -\/ (by)).coalesce,
+                    coalesce(Term(GroupOp(list, Grouped(ListMap(BsonField.Name(name) -> construct(grouped))), -\/ (by)))),
                     DocVar.ROOT(),
                     self.struct.makeObject(name),
                     bs))
@@ -137,7 +142,7 @@ final case class WorkflowBuilder private (
     }.getOrElse {
       \/- {
         copy(
-          graph = ProjectOp(graph, Reshape.Doc(ListMap(BsonField.Name(name) -> -\/ (base)))).coalesce,
+          graph = coalesce(Term(ProjectOp(graph, Reshape.Doc(ListMap(BsonField.Name(name) -> -\/ (base)))))),
           base = DocVar.ROOT(),
           struct = struct.makeObject(name))
       }
@@ -146,7 +151,7 @@ final case class WorkflowBuilder private (
 
   def makeArray: Error \/ WorkflowBuilder = {
     \/-(copy(
-      graph = ProjectOp(graph, Reshape.Arr(ListMap(BsonField.Index(0) -> -\/ (base)))).coalesce,
+      graph = coalesce(Term(ProjectOp(graph, Reshape.Arr(ListMap(BsonField.Index(0) -> -\/ (base)))))),
       base = DocVar.ROOT(),
       struct = struct.makeArray(0)))
     
@@ -165,7 +170,7 @@ final case class WorkflowBuilder private (
 
                     mergeGroups(this.groupBy, that.groupBy).map { mergedGroups =>
                       WorkflowBuilder(
-                        ProjectOp(list, Reshape.Doc(ListMap((leftTuples ++ rightTuples): _*))).coalesce,
+                        coalesce(Term(ProjectOp(list, Reshape.Doc(ListMap((leftTuples ++ rightTuples): _*))))),
                         DocVar.ROOT(),
                         SchemaChange.MakeObject(m1 ++ m2),
                         mergedGroups)
@@ -195,7 +200,7 @@ final case class WorkflowBuilder private (
 
             mergeGroups(this.groupBy, that.groupBy).map { mergedGroups =>
               WorkflowBuilder(
-                ProjectOp(list, Reshape.Arr(ListMap((leftTuples ++ rightTuples): _*))).coalesce,
+                coalesce(Term(ProjectOp(list, Reshape.Arr(ListMap((leftTuples ++ rightTuples): _*))))),
                 DocVar.ROOT(),
                 SchemaChange.MakeArray(m1 ++ m2.map(t => (t._1 + rightShift) -> t._2)),
                 mergedGroups)
@@ -210,12 +215,12 @@ final case class WorkflowBuilder private (
   }
 
   def flattenArray: Error \/ WorkflowBuilder =
-    \/- (copy(graph = UnwindOp(graph, base).coalesce))
+    \/- (copy(graph = coalesce(Term(UnwindOp(graph, base)))))
 
   def projectField(name: String): Error \/ WorkflowBuilder =
     \/- {
       copy(
-        graph = ProjectOp(graph, Reshape.Doc(ListMap(ExprName -> -\/ (base \ BsonField.Name(name))))).coalesce,
+        graph = coalesce(Term(ProjectOp(graph, Reshape.Doc(ListMap(ExprName -> -\/ (base \ BsonField.Name(name))))))),
         base = ExprVar, 
         struct = struct.projectField(name))
     }
@@ -223,7 +228,7 @@ final case class WorkflowBuilder private (
   def projectIndex(index: Int): Error \/ WorkflowBuilder =
     \/- {
       copy(
-        graph = ProjectOp(graph, Reshape.Doc(ListMap(ExprName -> -\/ (base \ BsonField.Index(index))))).coalesce,
+        graph = coalesce(Term(ProjectOp(graph, Reshape.Doc(ListMap(ExprName -> -\/ (base \ BsonField.Index(index))))))),
         base = ExprVar,
         struct = struct.projectIndex(index))
     }
@@ -262,7 +267,7 @@ final case class WorkflowBuilder private (
               case x :: xs => 
                 mergeGroups(this.groupBy, that.groupBy).map { mergedGroups => // ???
                   WorkflowBuilder(
-                    SortOp(list, NonEmptyList.nel(x, xs)),
+                    coalesce(Term(SortOp(list, NonEmptyList.nel(x, xs)))),
                     sort,
                     self.struct,
                     mergedGroups)
@@ -276,8 +281,9 @@ final case class WorkflowBuilder private (
     }
   }
 
-  def &&& (op: WorkflowOp => WorkflowOp): Error \/ WorkflowBuilder = {
-    this.merge(WorkflowBuilder(op(DummyOp), DocVar.ROOT(), SchemaChange.Init)) {
+  def &&& (op: Term[WorkflowOp] => WorkflowOp[Term[WorkflowOp]]):
+      Error \/ WorkflowBuilder = {
+    this.merge(WorkflowBuilder(Term(op(Term[WorkflowOp](DummyOp))), DocVar.ROOT(), SchemaChange.Init)) {
       (lbase, rbase, list) =>
       \/-(copy(
         graph = list,
@@ -286,60 +292,73 @@ final case class WorkflowBuilder private (
     }
   }
 
-  def >>> (op: WorkflowOp => WorkflowOp): Error \/ WorkflowBuilder =
-    \/-(copy(graph = op(graph)))
+  def >>> (op: Term[WorkflowOp] => WorkflowOp[Term[WorkflowOp]]):
+      Error \/ WorkflowBuilder =
+    \/-(copy(graph = Term(op(graph))))
 
   def squash: Error \/ WorkflowBuilder = {
-    if (graph.vertices.collect { case UnwindOp(_, _) => () }.isEmpty) \/-(this)
-    else {
+    println("squashing")
+    if (graph.cata[Boolean] { _ match {
+      case UnwindOp(_, _) => true
+      case x => x.srcs.foldLeft(false)(_ || _)
+    }}) {
+      println("found unwind")
       val _Id = BsonField.Name("_id")
 
       struct match {
         case s @ SchemaChange.MakeObject(_) =>
           \/-(copy(
-            graph = s.shift(graph, base).set(_Id, -\/ (ExprOp.Exclude)),
+            graph = s.shift(graph, base).restructure(_ match {
+              case x@ProjectOp(_, _) => x.set(_Id, -\/(ExprOp.Exclude))
+              case x                 => x
+            }),
             base = DocVar.ROOT()))
         case s @ SchemaChange.MakeArray(_) =>
           \/-(copy(
-            graph = s.shift(graph, base).set(_Id, -\/ (ExprOp.Exclude)),
+            graph = s.shift(graph, base).restructure(_ match {
+              case x@ProjectOp(_, _) => x.set(_Id, -\/(ExprOp.Exclude))
+              case x                 => x
+            }),
             base = DocVar.ROOT()))
         case _ =>
           \/-(this)
           //-\/(WorkflowBuilderError.UnknownStructure)
       }
-    }
+    } else \/-(this)
   }
 
-  def asExprOp = this applyLens _graph modify (_.coalesce) match {
-    case WorkflowBuilder(ProjectOp(_, Reshape.Doc(fields)), `ExprVar`, _, _) =>
+  def asExprOp = this applyLens _graph modify (coalesce) match {
+    case WorkflowBuilder(Term(ProjectOp(_, Reshape.Doc(fields))), `ExprVar`, _, _) =>
       fields.toList match {
         case (`ExprName`, -\/ (e)) :: Nil => Some(e)
         case _ => None
       }
-    case WorkflowBuilder(PureOp(bson), _, _, _) =>
+    case WorkflowBuilder(Term(PureOp(bson)), _, _, _) =>
       Some(ExprOp.Literal(bson))
     case _ => None
   }
 
   // TODO: At least some of this should probably be deferred to
   //       WorkflowOp.coalesce.
-  private def merge[A](that: WorkflowBuilder)(f: (DocVar, DocVar, WorkflowOp) => Error \/ A):
+  private def merge[A](that: WorkflowBuilder)(f: (DocVar, DocVar, Term[WorkflowOp]) => Error \/ A):
       Error \/ A = {
-    type Out = Error \/ ((DocVar, DocVar), WorkflowOp)
 
-    def rewrite[A <: WorkflowOp](op: A, base: DocVar): (A, DocVar) = {
+    def rewrite[A <: WorkflowOp[Term[WorkflowOp]]](op: A, base: DocVar):
+        (A, DocVar) = {
       (op.rewriteRefs(PartialFunction(base \\ _))) -> (op match {
-        case _ : GroupOp   => DocVar.ROOT()
-        case _ : ProjectOp => DocVar.ROOT()
-          
-        case _ => base
+        case _: GroupOp[_]   => DocVar.ROOT()
+        case _: ProjectOp[_] => DocVar.ROOT()
+        case _               => base
       })
     }
 
-    def step(left: (WorkflowOp, DocVar), right: (WorkflowOp, DocVar)): Out = {
+    def step(
+      left: (Term[WorkflowOp], DocVar),
+      right: (Term[WorkflowOp], DocVar)):
+        Error \/ ((DocVar, DocVar), WorkflowOp[Term[WorkflowOp]]) = {
       def delegate =
         step(right, left).map { case ((r, l), merged) => ((l, r), merged) }
-      (left, right) match {
+      ((left._1.unFix, left._2), (right._1.unFix, right._2)) match {
         case ((DummyOp, lbase), (right, rbase)) => \/-((lbase, rbase) -> right)
         case (_, (DummyOp, _)) => delegate
         case ((left @ PureOp(lval), lbase), (PureOp(rval), rbase))
@@ -350,26 +369,27 @@ final case class WorkflowBuilder private (
           \/-((lbase, rbase) -> left)
         case ((PureOp(lval), lbase), (right @ ReadOp(_), rbase)) =>
           val builder = WorkflowBuilder.fromExpr(right, ExprOp.Literal(lval))
-          \/-((builder.base, rbase) -> builder.graph)
+          \/-((builder.base, rbase) -> builder.graph.unFix)
         case ((ReadOp(_), _), (PureOp(_), _)) => delegate
         case ((_: SourceOp, _), (_: SourceOp, _)) =>
           -\/(WorkflowBuilderError.CouldNotPatchRoot) // -\/("incompatible sources")
-        case ((left : GeoNearOp, lbase), (r : WPipelineOp, rbase)) =>
-          step((left, lbase), (r.src, rbase)).map {
+        case ((left @ GeoNearOp(_, _, _, _, _, _, _, _, _, _), lbase),
+              (r : WPipelineOp[_], rbase)) =>
+          step((Term[WorkflowOp](left), lbase), (r.src, rbase)).map {
             case ((lb, rb), src) =>
-              val (left0, lb0) = rewrite(left, lb)
-              val (right0, rb0) = rewrite(r, rb)
-              ((lb0, rb), right0.reparent(src))
+              val (left0, lb0) = rewrite[GeoNearOp[Term[WorkflowOp]]](left, lb)
+              val (right0, rb0) = rewrite[WPipelineOp[Term[WorkflowOp]]](r, rb)
+              ((lb0, rb), right0.reparent(Term(src)))
           }
-        case (_, (_ : GeoNearOp, _)) => delegate
-        case ((left: WorkflowOp.ShapePreservingOp, lbase), (r: WPipelineOp, rbase)) =>
-          step((left, lbase), (r.src, rbase)).map {
+        case (_, (GeoNearOp(_, _, _, _, _, _, _, _, _, _), _)) => delegate
+        case ((left: WorkflowOp.ShapePreservingOp[_], lbase), (r: WPipelineOp[_], rbase)) =>
+          step((Term[WorkflowOp](left), lbase), (r.src, rbase)).map {
             case ((lb, rb), src) =>
-              val (left0, lb0) = rewrite(left, lb)
-              val (right0, rb0) = rewrite(r, rb)
-              ((lb0, rb), right0.reparent(src))
+              val (left0, lb0) = rewrite[WorkflowOp.ShapePreservingOp[Term[WorkflowOp]]](left, lb)
+              val (right0, rb0) = rewrite[WPipelineOp[Term[WorkflowOp]]](r, rb)
+              ((lb0, rb), right0.reparent(Term(src)))
           }
-        case ((_: WPipelineOp, _), (_: WorkflowOp.ShapePreservingOp, _)) => delegate
+        case ((_: WPipelineOp[_], _), (_: WorkflowOp.ShapePreservingOp[_], _)) => delegate
         case ((left @ GroupOp(lsrc, Grouped(_), b1), lbase), (right @ GroupOp(rsrc, Grouped(_), b2), rbase)) if (b1 == b2) =>
           step((lsrc, lbase), (rsrc, rbase)).map {
             case ((lb, rb), src) =>
@@ -387,21 +407,21 @@ final case class WorkflowBuilder private (
                 BsonField.Index(1) -> b2)))
 
               ((lb0, rb0),
-                ProjectOp.EmptyDoc(GroupOp(src, Grouped(g), b).coalesce).setAll(to.mapValues(f => -\/ (DocVar.ROOT(f)))).coalesce)
+                chain(src, GroupOp(_, Grouped(g), b), ProjectOp.EmptyDoc(_).setAll(to.mapValues(f => -\/(DocVar.ROOT(f))))).unFix)
           }
-        case ((left @ GroupOp(_, Grouped(_), _), lbase), (r: WPipelineOp, rbase)) =>
-          step((left.src, lbase), (r, rbase)).map {
+        case ((left @ GroupOp(_, Grouped(_), _), lbase), (r: WPipelineOp[_], rbase)) =>
+          step((left.src, lbase), (Term[WorkflowOp](r), rbase)).map {
             case ((lb, rb), src) =>
               val (GroupOp(_, Grouped(g1_), b1), lb0) = rewrite(left, lb)
               val uniqName = BsonField.genUniqName(g1_.keys.map(_.toName))
               val uniqVar = DocVar.ROOT(uniqName)
 
               ((lb0, uniqVar) ->
-                chain(src,
+                coalesce(chain(src,
                   GroupOp(_, Grouped(g1_ + (uniqName -> ExprOp.Push(rb))), b1),
-                  UnwindOp(_, uniqVar)).coalesce)
+                  UnwindOp(_, uniqVar))).unFix)
           }
-        case ((_: WPipelineOp, _), (GroupOp(_, _, _), _)) => delegate
+        case ((_: WPipelineOp[_], _), (GroupOp(_, _, _), _)) => delegate
         case (
           (left @ ProjectOp(lsrc, _), lbase),
           (right @ ProjectOp(rsrc, _), rbase)) =>
@@ -410,66 +430,69 @@ final case class WorkflowBuilder private (
               val (left0, lb0) = rewrite(left, lb)
               val (right0, rb0) = rewrite(right, rb)
               ((LeftVar \\ lb0, RightVar \\ rb0) ->
-                ProjectOp(src,
+                coalesce(Term(ProjectOp(Term(src),
                   Reshape.Doc(ListMap(
                     LeftName -> \/-(left0.shape),
-                    RightName -> \/-(right0.shape)))).coalesce)
+                    RightName -> \/-(right0.shape)))))).unFix)
           }
-        case ((left @ ProjectOp(lsrc, _), lbase), (r: WPipelineOp, rbase)) =>
+        case ((left @ ProjectOp(lsrc, _), lbase), (r: WPipelineOp[_], rbase)) =>
           step((lsrc, lbase), (r.src, rbase)).map {
             case ((lb, rb), op) =>
               val (left0, lb0) = rewrite(left, lb)
               ((LeftVar \\ lb0, RightVar \\ rb) ->
-                ProjectOp(op,
+                coalesce(Term(ProjectOp(Term(op),
                   Reshape.Doc(ListMap(
                     LeftName -> \/- (left0.shape),
-                    RightName -> -\/ (DocVar.ROOT())))).coalesce)
+                    RightName -> -\/ (DocVar.ROOT())))))).unFix)
           }
-        case ((_: WPipelineOp, _), (ProjectOp(_, _), _)) => delegate
+        case ((_: WPipelineOp[_], _), (ProjectOp(_, _), _)) => delegate
         case ((left @ RedactOp(lsrc, _), lbase), (right @ RedactOp(rsrc, _), rbase)) =>
           step((lsrc, lbase), (rsrc, rbase)).map {
             case ((lb, rb), src) =>
               val (left0, lb0) = rewrite(left, lb)
               val (right0, rb0) = rewrite(right, rb)
-              ((lb0, rb0), RedactOp(RedactOp(src, left0.value).coalesce, right0.value).coalesce)
+              ((lb0, rb0),
+                coalesce(chain(src, RedactOp(_, left0.value), RedactOp(_, right0.value))).unFix)
           }
         case ((left @ UnwindOp(lsrc, lfield), lbase), (right @ UnwindOp(rsrc, rfield), rbase)) if lfield == rfield =>
           step((lsrc, lbase), (rsrc, rbase)).map {
             case ((lb, rb), src) =>
               val (left0, lb0) = rewrite(left, lb)
               val (right0, rb0) = rewrite(right, rb)
-              ((lb0, rb0), UnwindOp(src, left0.field))
+              ((lb0, rb0), UnwindOp(Term(src), left0.field))
           }
         case ((left @ UnwindOp(lsrc, _), lbase), (right @ UnwindOp(rsrc, _), rbase)) =>
           step((lsrc, lbase), (rsrc, rbase)).map {
             case ((lb, rb), src) =>
               val (left0, lb0) = rewrite(left, lb)
               val (right0, rb0) = rewrite(right, rb)
-              ((lb0, rb0), UnwindOp(UnwindOp(src, left0.field).coalesce, right0.field).coalesce)
+              ((lb0, rb0),
+                coalesce(chain(src, UnwindOp(_, left0.field), UnwindOp(_, right0.field))).unFix)
           }
         case ((left @ UnwindOp(lsrc, lfield), lbase), (right @ RedactOp(_, _), rbase)) =>
-          step((lsrc, lbase), (right, rbase)).map {
+          step((lsrc, lbase), (Term(right), rbase)).map {
             case ((lb, rb), src) =>
               val (left0, lb0) = rewrite(left, lb)
               val (right0, rb0) = rewrite(right, rb)
-              ((lb0, rb0), left0.reparent(src))
+              ((lb0, rb0), left0.reparent(Term(src)))
           }
         case ((RedactOp(_, _), _), (UnwindOp(_, _), _)) => delegate
-        case ((left: WorkflowOp, lbase), (right: WPipelineOp, rbase)) =>
-          step((left, lbase), (right.src, rbase)).map {
+        case ((left: WorkflowOp[_], lbase), (right: WPipelineOp[_], rbase)) =>
+          step((Term[WorkflowOp](left), lbase), (right.src, rbase)).map {
             case ((lb, rb), src) =>
-              val (left0, lb0) = rewrite(left, lb)
-              val (right0, rb0) = rewrite(right, rb)
-              ((lb0, rb0), right0.reparent(src))
+              val (left0, lb0) = rewrite[WorkflowOp[Term[WorkflowOp]]](left, lb)
+              val (right0, rb0) = rewrite[WPipelineOp[Term[WorkflowOp]]](right, rb)
+              ((lb0, rb0), right0.reparent(Term(src)))
           }
-        case ((_: WPipelineOp, _), (_: WorkflowOp, _)) => delegate
+        case ((_: WPipelineOp[A], _), (_: WorkflowOp[A], _)) => delegate
         case _ =>
           -\/(WorkflowBuilderError.UnknownStructure) // -\/("we’re screwed")
       }
     }
 
     step((this.graph, DocVar.ROOT()), (that.graph, DocVar.ROOT())).flatMap {
-      case ((lbase, rbase), op) => f(lbase \\ this.base, rbase \\ that.base, op)
+      case ((lbase, rbase), op) =>
+        f(lbase \\ this.base, rbase \\ that.base, Term(op))
     }
   }
 
@@ -533,7 +556,8 @@ object WorkflowBuilder {
   private val LeftVar   = DocVar.ROOT(LeftName)
   private val RightVar  = DocVar.ROOT(RightName)
 
-  def read(coll: Collection) = WorkflowBuilder(ReadOp(coll), DocVar.ROOT(), SchemaChange.Init)
+  def read(coll: Collection) =
+    WorkflowBuilder(Term[WorkflowOp](ReadOp(coll)), DocVar.ROOT(), SchemaChange.Init)
   def pure(bson: Bson) =
     // NB: Pre-convert pure ops, until merging works better.
     WorkflowBuilder.fromExpr(DummyOp, ExprOp.Literal(bson))
@@ -561,13 +585,15 @@ object WorkflowBuilder {
         ExprOp.DocField(side),
         ExprOp.Literal(Bson.Arr(List(Bson.Null))))
 
-    def buildProjection(src: WorkflowOp, l: ExprOp, r: ExprOp): WorkflowOp =
-      ProjectOp(src, Reshape.Doc(ListMap(leftField -> -\/(l), rightField -> -\/(r))))
+    def buildProjection(src: WorkflowOp[Term[WorkflowOp]], l: ExprOp, r: ExprOp):
+        WorkflowOp[Term[WorkflowOp]] =
+      ProjectOp(Term(src), Reshape.Doc(ListMap(leftField -> -\/(l), rightField -> -\/(r))))
 
-    def buildJoin(src: WorkflowOp, tpe: JoinType): WorkflowOp =
+    def buildJoin(src: Term[WorkflowOp], tpe: JoinType):
+        WorkflowOp[Term[WorkflowOp]] =
       tpe match {
         case FullOuter => 
-          buildProjection(src, padEmpty(leftField), padEmpty(rightField))
+          buildProjection(src.unFix, padEmpty(leftField), padEmpty(rightField))
         case LeftOuter =>           
           buildProjection(
             MatchOp(src, Selector.Doc(ListMap(leftField.asInstanceOf[BsonField] -> nonEmpty))),
@@ -610,7 +636,7 @@ object WorkflowBuilder {
       chain(
         FoldLeftOp(NonEmptyList(
           chain(
-            left.graph,
+            left.graph.unFix,
             ProjectOp(_,
               Reshape.Doc(ListMap(
                 joinOnField -> -\/(leftKey),
@@ -618,11 +644,11 @@ object WorkflowBuilder {
             WorkflowOp.GroupOp(_,
               Grouped(ListMap(leftField -> ExprOp.AddToSet(ExprOp.DocVar(ExprOp.DocVar.ROOT, Some(leftField))))),
               -\/(ExprOp.DocVar(ExprOp.DocVar.ROOT, Some(joinOnField))))),
-          MapReduceOp(right.graph,
+          Term(MapReduceOp(right.graph,
             MapReduce(
               buildRightMap(rightKey),
               buildRightReduce,
-              Some(MapReduce.WithAction(MapReduce.Action.Reduce)))))),
+              Some(MapReduce.WithAction(MapReduce.Action.Reduce))))))),
         buildJoin(_, tpe),
         UnwindOp(_, ExprOp.DocVar(ExprOp.DocVar.ROOT, Some(leftField))),
         UnwindOp(_, ExprOp.DocVar(ExprOp.DocVar.ROOT, Some(rightField)))),
@@ -630,13 +656,14 @@ object WorkflowBuilder {
       SchemaChange.Init)
   }
 
-  def fromExpr(src: WorkflowOp, expr: ExprOp): WorkflowBuilder =
+  def fromExpr(src: WorkflowOp[Term[WorkflowOp]], expr: ExprOp):
+      WorkflowBuilder =
     WorkflowBuilder(
-      ProjectOp(src, PipelineOp.Reshape.Doc(ListMap(ExprName -> -\/ (expr)))).coalesce,
+      coalesce(Term(ProjectOp(Term(src), PipelineOp.Reshape.Doc(ListMap(ExprName -> -\/ (expr)))))),
       ExprVar,
       SchemaChange.Init)  
 
-  val _graph  = mkLens[WorkflowBuilder, WorkflowOp]("graph")
+  val _graph  = mkLens[WorkflowBuilder, Term[WorkflowOp]]("graph")
   val _base   = mkLens[WorkflowBuilder, DocVar]("base")
   val _struct = mkLens[WorkflowBuilder, SchemaChange]("struct")
 }

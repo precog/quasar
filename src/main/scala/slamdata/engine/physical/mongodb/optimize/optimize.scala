@@ -1,6 +1,7 @@
 package slamdata.engine.physical.mongodb
 
 import slamdata.engine.fp._
+import slamdata.engine.analysis.fixplate._
 import scala.collection.immutable.ListMap
 
 import scalaz._
@@ -10,7 +11,40 @@ import Liskov._
 package object optimize {
   object pipeline {
     import ExprOp._
+    import WorkflowOp._
     import PipelineOp._
+
+    def deleteUnusedFields(op: Term[WorkflowOp], usedRefs: Set[DocVar]):
+        Term[WorkflowOp] = {
+      def getRefs[A](op: WorkflowOp[A]): Set[DocVar] = (op match {
+        // Don't count unwinds (if the var isn't referenced elsewhere, it's effectively unused)
+        case UnwindOp(_, _) => Nil
+        case _ => op.refs
+      }).toSet
+
+      def unused(defs: Set[DocVar], refs: Set[DocVar]): Set[DocVar] = {
+        defs.filterNot(d => refs.exists(ref => d.startsWith(ref) || ref.startsWith(d)))
+      }
+
+      def getDefs[A](op: WorkflowOp[A]): Set[DocVar] = (op match {
+        case p @ ProjectOp(_, _) => p.getAll.map(_._1)
+        case g @ WorkflowOp.GroupOp(_, _, _) => g.getAll.map(_._1)
+        case _ => Nil
+      }).map(DocVar.ROOT(_)).toSet
+
+      val pruned =
+        if (!usedRefs.isEmpty) {
+          val unusedRefs =
+            unused(getDefs(op.unFix), usedRefs).toList.flatMap(_.deref.toList)
+          op.unFix match {
+            case p @ ProjectOp(_, _) => p.deleteAll(unusedRefs)
+            case g @ WorkflowOp.GroupOp(_, _, _) => g.deleteAll(unusedRefs.map(_.flatten.head))
+            case _ => op.unFix
+          }
+        }
+        else op.unFix
+      Term(pruned.map(deleteUnusedFields(_, usedRefs ++ getRefs(pruned))))
+    }
 
     def get0(leaves: List[BsonField.Leaf], rs: List[Reshape]): Option[ExprOp \/ Reshape] = {
       (leaves, rs) match {
@@ -55,10 +89,11 @@ package object optimize {
       map.map(vs => p.empty.setAll(vs).shape)
     }
 
-    def inlineGroupProjects(g: WorkflowOp.GroupOp): Option[WorkflowOp.GroupOp] = {
+    def inlineGroupProjects(g: WorkflowOp.GroupOp[Term[WorkflowOp]]):
+        Option[WorkflowOp.GroupOp[Term[WorkflowOp]]] = {
       import ExprOp._
 
-      val (rs, src) = g.src.collectShapes
+      val (rs, src) = collectShapes(g.src)
 
       type MapField[X] = ListMap[BsonField.Leaf, X]
 
@@ -87,7 +122,8 @@ package object optimize {
 
       val by = g.by.fold(e => fixExpr(rs, e).map(-\/ apply), r => inlineProject(r, rs).map(\/- apply))
 
-      (grouped |@| by)((grouped, by) => WorkflowOp.GroupOp(src, Grouped(grouped), by))
+      (grouped |@| by)((grouped, by) =>
+        WorkflowOp.GroupOp(src, Grouped(grouped), by))
     }
   }
 }

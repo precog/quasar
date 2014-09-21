@@ -73,7 +73,7 @@ resolvers ++= Seq(
 
 instrumentSettings
 
-ScoverageKeys.minimumCoverage := 57
+ScoverageKeys.minimumCoverage := 58
 
 ScoverageKeys.failOnMinimumCoverage := true
 

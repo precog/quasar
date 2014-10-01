@@ -35,23 +35,31 @@ case class RenderedTree(label: String, children: List[RenderedTree], nodeType: L
 
     (this, that) match {
       case (RenderedTree(l1, children1, nodeType1), RenderedTree(l2, children2, nodeType2)) => {
-        val (newLabel, newType) = if (l1 != l2) ((l1 + " -> " + l2) -> prefixedType(this, "[Changed]")) else (label -> nodeType1)
-        def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
-          case (Nil, Nil)     => Nil
-          case (x :: xs, Nil) => prefixType(x, "[Deleted]") :: matchChildren(xs, Nil)
-          case (Nil, x :: xs) => prefixType(x, "[Added]") :: matchChildren(Nil, xs)
+        if (nodeType1 != nodeType2)
+          RenderedTree("", 
+            prefixType(this, "[Deleted]") ::
+            prefixType(that, "[Added]") ::
+            Nil,
+            List("[Root differs]"))
+        else {
+          val (newLabel, newType) = if (l1 != l2) ((l1 + " -> " + l2) -> prefixedType(this, "[Changed]")) else (label -> nodeType1)
+          def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
+            case (Nil, Nil)     => Nil
+            case (x :: xs, Nil) => prefixType(x, "[Deleted]") :: matchChildren(xs, Nil)
+            case (Nil, x :: xs) => prefixType(x, "[Added]") :: matchChildren(Nil, xs)
 
-          case (a :: as, b :: bs)        if a.label == b.label  => a.diff(b) :: matchChildren(as, bs)
-          case (a1 :: a2 :: as, b :: bs) if a2.label == b.label => prefixType(a1, "[Deleted]") :: a2.diff(b) :: matchChildren(as, bs)
-          case (a :: as, b1 :: b2 :: bs) if a.label == b2.label => prefixType(b1, "[Added]") :: a.diff(b2) :: matchChildren(as, bs)
+            case (a :: as, b :: bs)        if a.label == b.label  => a.diff(b) :: matchChildren(as, bs)
+            case (a1 :: a2 :: as, b :: bs) if a2.label == b.label => prefixType(a1, "[Deleted]") :: a2.diff(b) :: matchChildren(as, bs)
+            case (a :: as, b1 :: b2 :: bs) if a.label == b2.label => prefixType(b1, "[Added]") :: a.diff(b2) :: matchChildren(as, bs)
 
-          case (RenderedTree(al, Nil, _) :: as, RenderedTree(bl, Nil, _) :: bs)           => RenderedTree(al + " -> " + bl, Nil, "[Changed]" :: Nil) :: matchChildren(as, bs)
-          case (RenderedTree(al, ac, _) :: as, RenderedTree(bl, bc, _) :: bs) if ac == bc => RenderedTree(al + " -> " + bl, ac, "[Changed]" :: Nil) :: matchChildren(as, bs)
+            case (RenderedTree(al, Nil, _) :: as, RenderedTree(bl, Nil, _) :: bs)           => RenderedTree(al + " -> " + bl, Nil, "[Changed]" :: Nil) :: matchChildren(as, bs)
+            case (RenderedTree(al, ac, _) :: as, RenderedTree(bl, bc, _) :: bs) if ac == bc => RenderedTree(al + " -> " + bl, ac, "[Changed]" :: Nil) :: matchChildren(as, bs)
 
-          // Note: will get here if more than one node is added/deleted:
-          case (a :: as, b :: bs) => prefixType(a, "[Deleted]") :: prefixType(b, "[Added]") :: matchChildren(as, bs)
-        }
+            // Note: will get here if more than one node is added/deleted:
+            case (a :: as, b :: bs) => prefixType(a, "[Deleted]") :: prefixType(b, "[Added]") :: matchChildren(as, bs)
+          }
         RenderedTree(newLabel, matchChildren(children1, children2), newType)
+        }
       }
 
       // Terminal/non-terminal mis-match (currently not handled well):

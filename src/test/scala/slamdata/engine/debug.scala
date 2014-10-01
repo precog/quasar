@@ -1,11 +1,11 @@
 package slamdata.engine
 
+import org.specs2.mutable._
+
 import scalaz._
 
 import argonaut._ 
 import Argonaut._
-
-import org.specs2.mutable._
 
 class RenderedTreeSpec extends Specification {
   "RenderedTree.diff" should {
@@ -49,7 +49,12 @@ class RenderedTreeSpec extends Specification {
     "find multiple changed children" in {
       val t1 = NonTerminal("A", Terminal("B") :: Terminal("C") :: Terminal("D") :: Nil)
       val t2 = NonTerminal("A", Terminal("C") :: Terminal("C1") :: Terminal("D") :: Nil)
-      t1.diff(t2) must_== NonTerminal("A", Terminal("B", "[Deleted]" :: Nil) :: Terminal("C") :: Terminal("C1", "[Added]" :: Nil) :: Terminal("D"):: Nil)
+      t1.diff(t2) must_==
+        NonTerminal("A", 
+          Terminal("B", "[Deleted]" :: Nil) :: 
+            Terminal("C") :: 
+            Terminal("C1", "[Added]" :: Nil) :: 
+            Terminal("D") :: Nil)
     }
 
     "find added grand-child" in {
@@ -64,10 +69,25 @@ class RenderedTreeSpec extends Specification {
       t1.diff(t2) must_== NonTerminal("A", NonTerminal("B", Terminal("C", "[Deleted]" :: Nil) :: Nil) :: Nil)
     }
 
-    "ignore simple difference in nodeType (and keep the left type)" in {
+    "find different nodeType at root" in {
       val t1 = Terminal("A", List("green"))
       val t2 = Terminal("A", List("blue"))
-      t1.diff(t2) must_== t1
+      t1.diff(t2) must_== NonTerminal("",
+                            Terminal("A", List("[Deleted] green")) ::
+                              Terminal("A", List("[Added] blue")) :: 
+                              Nil,
+                            List("[Root differs]"))
+    }
+
+    "find different nodeType" in {
+      val t1 = NonTerminal("", Terminal("A", List("green")) :: Nil, List("root"))
+      val t2 = NonTerminal("", Terminal("A", List("blue")) :: Nil, List("root"))
+      println(t1.diff(t2).draw.mkString("\n"))
+      t1.diff(t2) must_== NonTerminal("",
+                            Terminal("A", List("[Deleted] green")) ::
+                              Terminal("A", List("[Added] blue")) :: 
+                              Nil,
+                            List("root"))
     }
 
   }

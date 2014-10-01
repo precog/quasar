@@ -981,7 +981,7 @@ object WorkflowOp {
                                     nodeType("MatchOp"))
       case ProjectOp(src, shape) => NonTerminal("",
                                       WorkflowOpRenderTree.render(src) :: 
-                                        PipelineOp.renderReshape("Fields", "", shape) ::
+                                        PipelineOp.renderReshape("Shape", "", shape) ::
                                         Nil,
                                       nodeType("ProjectOp"))
       case RedactOp(src, value) => NonTerminal("", 

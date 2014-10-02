@@ -312,7 +312,7 @@ sealed trait WorkflowOp {
           val ((lb, rb), src) = l merge rsrc
           ((ExprVar \\ LeftVar \\ lb, ExprVar \\ RightVar) ->
             // TODO: we’re using src in 2 places here. Need #347’s `ForkOp`.
-            FoldLeftOp.make(NonEmptyList(
+            foldLeftOp(
               chain(src,
                 projectOp(Reshape.Doc(ListMap(
                     LeftName -> -\/(DocVar.ROOT())))),
@@ -324,7 +324,7 @@ sealed trait WorkflowOp {
                 mapOp(fn),
                 projectOp(Reshape.Doc(ListMap(
                   RightName -> -\/(DocVar.ROOT())))),
-                reduceOp(JsGen.foldLeftReduce)))))
+                reduceOp(JsGen.foldLeftReduce))))
         case (MapOp(_, _), ReadOp(_)) => delegate
 
         case (left @ MapOp(_, _), r @ ProjectOp(rsrc, shape)) =>
@@ -347,7 +347,7 @@ sealed trait WorkflowOp {
 
         case (l, r) =>
           ((ExprVar \\ LeftVar, ExprVar \\ RightVar) ->
-            FoldLeftOp.make(NonEmptyList(
+            foldLeftOp(
               chain(l,
                 projectOp(Reshape.Doc(ListMap(
                   LeftName -> -\/(DocVar.ROOT())))),
@@ -356,7 +356,7 @@ sealed trait WorkflowOp {
               chain(r,
                 projectOp(Reshape.Doc(ListMap(
                     RightName -> -\/(DocVar.ROOT())))),
-                reduceOp(JsGen.foldLeftReduce)))))
+                reduceOp(JsGen.foldLeftReduce))))
       }
   }
 }
@@ -957,7 +957,7 @@ object WorkflowOp {
   object FoldLeftOp {
     def make(lsrcs: NonEmptyList[WorkflowOp]): FoldLeftOp = FoldLeftOp(lsrcs).coalesce
   }
-  val foldLeftOp = FoldLeftOp.make _
+  def foldLeftOp(head: WorkflowOp, tail: WorkflowOp*) = FoldLeftOp.make(NonEmptyList.nel(head, tail.toList))
 
   case class JoinOp private (ssrcs: Set[WorkflowOp]) extends WorkflowOp {
     def srcs = ssrcs.toList
@@ -968,16 +968,15 @@ object WorkflowOp {
   }
   val joinOp = JoinOp.make _
   
-  implicit def WorkflowOpRenderTree(implicit RS: RenderTree[Selector], RE: RenderTree[ExprOp], RG: RenderTree[PipelineOp.Grouped]): RenderTree[WorkflowOp] = new RenderTree[WorkflowOp] {
+  implicit def WorkflowOpRenderTree(implicit RS: RenderTree[Selector], RE: RenderTree[ExprOp], RG: RenderTree[PipelineOp.Grouped], RJ: RenderTree[Js]): RenderTree[WorkflowOp] = new RenderTree[WorkflowOp] {
     def nodeType(subType: String) = "WorkflowOp" :: subType :: Nil
 
-    def chain(op: WPipelineOp): List[WorkflowOp] = {
-      def loop(op: WPipelineOp, acc: List[WorkflowOp]): List[WorkflowOp] = {
+    def chain(op: SingleSourceOp): List[WorkflowOp] = {
+      def loop(op: SingleSourceOp, acc: List[WorkflowOp]): List[WorkflowOp] = {
         val foo = op :: acc
         op.src match {
-          case src: SourceOp => src :: foo
-          case src: WPipelineOp => loop(src, foo)  // TODO: use SingleSourceOp when it's merged
-          case _ => Nil
+          case src: SingleSourceOp => loop(src, foo)
+          case src                 => src :: foo
         }
       }
       loop(op, Nil)
@@ -1030,19 +1029,21 @@ object WorkflowOp {
                                         Terminal(uniqueDocs.toString, nodeType("GeoNearOp") :+ "UniqueDocs") ::
                                         Nil,
                                     nodeType("GeoNearOp"))
-      case _ => ???
+
+      case MapOp(src, fn)       => NonTerminal("", RJ.render(fn) :: Nil, nodeType("MapOp"))
+      case FlatMapOp(src, fn)   => NonTerminal("", RJ.render(fn) :: Nil, nodeType("FlatMapOp"))
+      case ReduceOp(src, fn)    => NonTerminal("", RJ.render(fn) :: Nil, nodeType("ReduceOp"))
+
+      case op                   => render(op)
     }
 
     def render(v: WorkflowOp) = v match {
       case op: SourceOp         => renderFlat(op)
-      case op: WPipelineOp      => NonTerminal("Chain",  // TODO: use SingleSourceOp when it's merged
-                                    chain(op).map(renderFlat(_)))
-      // TODO: move to renderFlat when SingleSourceOp is merged
-      case MapOp(src, fn) => NonTerminal("", WorkflowOpRenderTree.render(src) :: Terminal(fn.toString, nodeType("MapReduce")) :: Nil, nodeType("MapOp"))
-      case FlatMapOp(src, fn) => NonTerminal("", WorkflowOpRenderTree.render(src) :: Terminal(fn.toString, nodeType("MapReduce")) :: Nil, nodeType("FlatMapOp"))
-      case ReduceOp(src, fn) => NonTerminal("", WorkflowOpRenderTree.render(src) :: Terminal(fn.toString, nodeType("MapReduce")) :: Nil, nodeType("ReduceOp"))
 
-      case FoldLeftOp(lsrcs)    => NonTerminal("", lsrcs.toList.map(WorkflowOpRenderTree.render(_)), nodeType("LeftFoldOp"))
+      case op: SingleSourceOp   => NonTerminal("Chain",
+                                    chain(op).map(renderFlat(_)))
+
+      case FoldLeftOp(lsrcs)    => NonTerminal("", lsrcs.toList.map(WorkflowOpRenderTree.render(_)), nodeType("FoldLeftOp"))
       case JoinOp(ssrcs)        => NonTerminal("", ssrcs.toList.map(WorkflowOpRenderTree.render(_)), nodeType("JoinOp"))
     }
   }

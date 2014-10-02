@@ -47,7 +47,7 @@ class WorkflowOpSpec extends Specification {
               ExprOp.DocField(BsonField.Name("__sd_tmp_1"))))
     }
   }
-  
+
   "RenderTree[WorkflowOp]" should {
     val RW = RenderTree[WorkflowOp]
 
@@ -61,15 +61,13 @@ class WorkflowOpSpec extends Specification {
         projectOp( 
           Reshape.Doc(ListMap(
             BsonField.Name("bar") -> -\/ (ExprOp.DocField(BsonField.Name("baz")))))))
- 
-      RW.render(op) must_==
-        NonTerminal("",
-          Terminal("foo", List("WorkflowOp", "ReadOp")) ::
-            NonTerminal("",
-              Terminal("bar -> $baz", List("PipelineOp", "Project", "Name")) :: Nil,
-              List("PipelineOp", "Project", "Shape")) ::
-            Nil,
-          List("WorkflowOp", "ProjectOp"))
+
+      RW.render(op).draw.mkString("\n") must_==
+        """Chain
+          |├─ ReadOp(foo)
+          |╰─ ProjectOp
+          |   ╰─ Shape
+          |      ╰─ Name(bar -> $baz)""".stripMargin
     }
 
     "render array project" in {
@@ -77,35 +75,29 @@ class WorkflowOpSpec extends Specification {
         projectOp(
           Reshape.Arr(ListMap(
             BsonField.Index(0) -> -\/ (ExprOp.DocField(BsonField.Name("baz")))))))
- 
-      RW.render(op) must_==
-        NonTerminal("",
-          Terminal("foo", List("WorkflowOp", "ReadOp")) ::
-            NonTerminal("",
-              Terminal("0 -> $baz", List("PipelineOp", "Project", "Index")) :: Nil,
-              List("PipelineOp", "Project", "Shape")) ::
-            Nil,
-          List("WorkflowOp", "ProjectOp"))
+
+      RW.render(op).draw.mkString("\n") must_==
+        """Chain
+          |├─ ReadOp(foo)
+          |╰─ ProjectOp
+          |   ╰─ Shape
+          |      ╰─ Index(0 -> $baz)""".stripMargin
     }
-    
+
     "render nested project" in {
       val op = chain(readFoo,
         projectOp(
           Reshape.Doc(ListMap(
             BsonField.Name("bar") -> \/- (Reshape.Arr(ListMap(
               BsonField.Index(0) -> -\/ (ExprOp.DocField(BsonField.Name("baz"))))))))))
- 
-      RW.render(op) must_==
-        NonTerminal("",
-          Terminal("foo", List("WorkflowOp", "ReadOp")) ::
-            NonTerminal("",
-              NonTerminal("bar",
-                Terminal("0 -> $baz", List("PipelineOp", "Project", "Index")) :: Nil,
-                List("PipelineOp", "Project", "Shape")) ::
-              Nil,
-              List("PipelineOp", "Project", "Shape")) ::
-            Nil,
-          List("WorkflowOp", "ProjectOp"))
+
+      RW.render(op).draw.mkString("\n") must_==
+        """Chain
+          |├─ ReadOp(foo)
+          |╰─ ProjectOp
+          |   ╰─ Shape
+          |      ╰─ Shape(bar)
+          |         ╰─ Index(0 -> $baz)""".stripMargin
     }
   }
 }

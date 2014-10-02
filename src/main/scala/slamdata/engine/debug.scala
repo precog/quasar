@@ -80,11 +80,29 @@ case class RenderedTree(label: String, children: List[RenderedTree], nodeType: L
       (first #:: Stream.continually(other)).zip(s).map {
         case (a, b) => a + b
       }
+    def mapParts[A, B](as: Stream[A])(f: (A, Boolean, Boolean) => B): Stream[B] = {
+      def loop(as: Stream[A], first: Boolean): Stream[B] =
+        if (as.isEmpty)           Stream.empty
+        else if (as.tail.isEmpty) f(as.head, first, true) #:: Stream.empty
+        else                      f(as.head, first, false) #:: loop(as.tail, false)
+      loop(as, true)
+    }
 
-    typeAndLabel.split("\n").toStream ++ drawSubTrees(children)
+    val (prefix, body, suffix) = (simpleType, label) match {
+      case (None, label)             => ("", label, "")
+      case (Some(simpleType), "")    => ("", simpleType, "")
+      case (Some(simpleType), label) => (simpleType + "(",  label, ")")
+    }
+    val indent = " " * (prefix.length-2)
+    val lines = body.split("\n").toStream
+    mapParts(lines) { (a, first, last) => 
+      val pre = if (first) prefix else indent
+      val suf = if (last) suffix else ""
+      pre + a + suf
+    } ++ drawSubTrees(children)
   }
   
-  def typeAndLabel: String = (simpleType, label) match {
+  private def typeAndLabel: String = (simpleType, label) match {
     case (None, label) => label
     case (Some(simpleType), "") => simpleType
     case (Some(simpleType), label) => simpleType + "(" + label + ")"

@@ -58,9 +58,6 @@ case class RenderedTree(label: String, children: List[RenderedTree], nodeType: L
           RenderedTree(l1, matchChildren(children1, children2), nodeType1)
         }
       }
-
-      // // Terminal/non-terminal mis-match (currently not handled well):
-      // case (l, r) => RenderedTree("[Unmatched]", prefixType(l, "[Old]") :: prefixType(r, "[New]") :: Nil, Nil)
     }
   }
 

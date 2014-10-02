@@ -1040,8 +1040,7 @@ object WorkflowOp {
     def render(v: WorkflowOp) = v match {
       case op: SourceOp         => renderFlat(op)
 
-      case op: SingleSourceOp   => NonTerminal("Chain",
-                                    chain(op).map(renderFlat(_)))
+      case op: SingleSourceOp   => NonTerminal("", chain(op).map(renderFlat(_)), nodeType("Chain"))
 
       case FoldLeftOp(lsrcs)    => NonTerminal("", lsrcs.toList.map(WorkflowOpRenderTree.render(_)), nodeType("FoldLeftOp"))
       case JoinOp(ssrcs)        => NonTerminal("", ssrcs.toList.map(WorkflowOpRenderTree.render(_)), nodeType("JoinOp"))

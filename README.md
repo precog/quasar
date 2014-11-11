@@ -30,10 +30,11 @@ The build process will ask
 ```
 Multiple main classes detected, select one to run:
 
- [1] slamdata.engine.repl.Repl
- [2] slamdata.engine.api.Server
+ [1] slamdata.engine.api.Server
+ [2] slamdata.engine.repl.Repl
+ 
 ```
-Choose `1` for a jar that offers a standalone interactive session, or `2` for a server that the SlamData front-end (or any HTTP client) can talk to.
+Choose `1` for a server that the SlamData front-end (or any HTTP client) can talk to, or `2` for a jar that offers a standalone interactive session.
 
 The path of the JAR will be `./target/scala-2.10/slamengine_2.10-[version]-SNAPSHOT-one-jar.jar`, where `[version]` is the SlamEngine version number.
 

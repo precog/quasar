@@ -10,7 +10,11 @@ val scalazVersion     = "7.1.0"
 val monocleVersion    = "0.5.0"
 val unfilteredVersion = "0.8.1"
 
-fork in run := true
+fork in test := true
+
+parallelExecution in Test := false
+
+javaOptions in test += "-Xmx8G"
 
 libraryDependencies ++= Seq(
   "org.scalaz"        %% "scalaz-core"               % scalazVersion              % "test",

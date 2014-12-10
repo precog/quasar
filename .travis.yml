@@ -1,8 +1,9 @@
 language: scala
 scala:
   - 2.11.2
-script:         "./scripts/jenkins"
-after_success:  "./scripts/jenkinsSuccess"
+script:         "./scripts/build"
+after_success:  "./scripts/buildSuccess"
+after_failure:  "./scripts/buildFailure"
 notifications:
   irc:
     channels:

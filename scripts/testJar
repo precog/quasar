@@ -24,6 +24,8 @@ KILL_STATUS=$?
 
 echo "Status code from killing SlamData: $KILL_STATUS"
 
+cat $SLAMDATA_LOG_FILE | echo
+
 if [[ $(cat "$SLAMDATA_LOG_FILE") == *"$SLAMDATA_SUCCESS_OUTPUT"* ]]
 then
   echo "SlamData successfully started"

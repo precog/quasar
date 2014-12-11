@@ -12,6 +12,7 @@ notifications:
       - "chat.freenode.net#slamdata"
     template:
       - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author}) %{build_url}"
-env:
-  - TRAVIS_BUILD=true
-  - "SLAMDATA_MONGODB=\"{\\\"mongodb\":{\\\"database\\\": \\\"test\\\", \\\"connectionUri\\\": \\\"mongodb://localhost:127.0.0.1\\\"}}\""
+env: 
+  global:
+    - TRAVIS_BUILD=true
+    - "SLAMDATA_MONGODB=\"{\\\"mongodb\":{\\\"database\\\": \\\"test\\\", \\\"connectionUri\\\": \\\"mongodb://localhost:127.0.0.1\\\"}}\""

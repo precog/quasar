@@ -18,7 +18,12 @@ echo "Web Jar Path: $SLAM_WEB_JAR_PATH"
 if [[ "$TRAVIS_BUILD" == "true" ]] ; then 
   echo "Travis detected, using local MongoDB config"
 
-  export SLAMDATA_MONGODB='{"mongodb":{"database": "test", "connectionUri": "mongodb://localhost:127.0.0.1"}}'
+  export SLAMDATA_MONGODB='{"mongodb":{"database": "test", "connectionUri": "mongodb://127.0.0.1"}}'
+
+  # TODO: Move to code
+  echo "Importing zips data set for integration tests"
+
+  mongoimport --db test --collection zips --file "$WS_DIR/it/src/test/resources/tests/zips.data"
 fi 
 
 SLAM_TEMP_JAR="$TEMP_DIR/$SLAM_WEB_JAR"

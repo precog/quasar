@@ -11,7 +11,7 @@ TEMP_DIR="$WS_DIR/tmp"
 mkdir -p "$TEMP_DIR"
 
 # slamengine version, from build.sbt:
-SLAM_VERSION=$(cat $WS_DIR/build.sbt | sed -n -e 's/^ *version := "(.*)"[^n]*/1/p')
+SLAM_VERSION=$(cat $WS_DIR/build.sbt | sed -n -e 's/^ *version := "\(.*\)"[^\n]*/\1/p')
 
 SLAM_WEB_JAR="web_2.11-$SLAM_VERSION-one-jar.jar"
 SLAM_WEB_JAR_DIR="$WS_DIR/web/target/scala-2.11"

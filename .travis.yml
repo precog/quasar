@@ -15,4 +15,4 @@ notifications:
 env: 
   global:
     - TRAVIS_BUILD=true
-    - "SLAMDATA_MONGODB=\"{\\\"mongodb\":{\\\"database\\\": \\\"test\\\", \\\"connectionUri\\\": \\\"mongodb://localhost:127.0.0.1\\\"}}\""
+    - "SLAMDATA_MONGODB=\"{\\\"mongodb\\\":{\\\"database\\\": \\\"test\\\", \\\"connectionUri\\\": \\\"mongodb://localhost:127.0.0.1\\\"}}\""

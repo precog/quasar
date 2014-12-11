@@ -15,7 +15,7 @@ SLAM_PID=$!
 
 echo "SlamData PID: $SLAM_PID"
 
-sleep 5s
+sleep 10s
 
 echo "Killing SlamData JAR..."
 
@@ -24,7 +24,7 @@ KILL_STATUS=$?
 
 echo "Status code from killing SlamData: $KILL_STATUS"
 
-cat $SLAMDATA_LOG_FILE | echo
+cat $SLAMDATA_LOG_FILE
 
 if [[ $(cat "$SLAMDATA_LOG_FILE") == *"$SLAMDATA_SUCCESS_OUTPUT"* ]]
 then
@@ -32,8 +32,6 @@ then
 
   exit 0
 else 
-  echo "SlamData failed to start"
-
   >&2 echo "SlamData failed to start"
 
   exit 1

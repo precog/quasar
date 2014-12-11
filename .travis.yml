@@ -14,4 +14,4 @@ notifications:
       - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author}) %{build_url}"
 env:
   - TRAVIS_BUILD=true
-  - SLAMDATA_MONGODB="{\"mongodb\":{\"database\": \"test\", \"connectionUri\": \"mongodb://localhost:127.0.0.1\"}}"
+  - "SLAMDATA_MONGODB={\"mongodb\":{\"database\": \"test\", \"connectionUri\": \"mongodb://localhost:127.0.0.1\"}}"

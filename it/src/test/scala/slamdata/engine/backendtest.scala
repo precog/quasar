@@ -21,8 +21,20 @@ object TestConfig {
 
   lazy val AllBackends: List[String] = defaultConfig.keys.toList
 
-  def loadConfig(name: String): Task[BackendConfig] = 
-    defaultConfig.get(name).fold[Task[BackendConfig]](Task.fail(new RuntimeException("No config for: " + name)))(Task.delay(_))
+  private def fail[A](msg: String): Task[A] = Task.fail(new RuntimeException(msg))
+
+  private def envName(backend: String): String = "SLAMDATA_" + backend.toUpperCase
+
+  def loadConfig(name: String): Task[BackendConfig] = {
+    for {
+      env <-  Task.delay(System.getenv())
+      cfg <-  Option(env.get(envName(name))).map { value =>
+                Parse.decodeEither[BackendConfig](value).fold(fail(_), Task.now(_))
+              }.getOrElse {
+                defaultConfig.get(name).fold[Task[BackendConfig]](fail("No config for: " + name))(Task.delay(_))
+              }
+    } yield cfg    
+  }
 }
 
 trait BackendTest extends Specification {

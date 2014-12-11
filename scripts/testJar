@@ -17,14 +17,14 @@ echo "SlamData PID: $SLAM_PID"
 
 sleep 10s
 
+cat $SLAMDATA_LOG_FILE
+
 echo "Killing SlamData JAR..."
 
 kill -9 $SLAM_PID
 KILL_STATUS=$?
 
 echo "Status code from killing SlamData: $KILL_STATUS"
-
-cat $SLAMDATA_LOG_FILE
 
 if [[ $(cat "$SLAMDATA_LOG_FILE") == *"$SLAMDATA_SUCCESS_OUTPUT"* ]]
 then

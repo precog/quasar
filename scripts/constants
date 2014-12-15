@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 WS_DIR="$SCRIPT_DIR/.."

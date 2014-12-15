@@ -8,6 +8,8 @@ before_install:
   - echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' | sudo tee /etc/apt/sources.list.d/mongodb.list
   - sudo apt-get update -q
   - sudo apt-get install -y mongodb-org=2.6.4 mongodb-org-server=2.6.4 mongodb-org-shell=2.6.4 mongodb-org-mongos=2.6.4 mongodb-org-tools=2.6.4
+  - sudo mkdir -p /data/db/
+  - sudo chown `id -u` /data/db
   - mongo --version  
   - mongod &
 script:         "./scripts/build"

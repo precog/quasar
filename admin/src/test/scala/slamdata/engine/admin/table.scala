@@ -44,7 +44,7 @@ class TableSpecs extends Specification {
         List("arr", "0", "a") -> "foo",
         List("arr", "1", "a") -> "bar")
     }
-    
+
     "handle encoded date" in {
       val json = Json("date" := Json("$date" := "2014-08-17T06:00:00.000Z"))
       Values.flatten(json) must_== ListMap(List("date") -> "2014-08-17T06:00:00.000Z")

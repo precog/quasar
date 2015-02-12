@@ -11,7 +11,7 @@ class ConfigSpec extends Specification {
       Path.Root -> MongoDbConfig("slamengine-test-01", "mongodb://slamengine:slamengine@ds045089.mongolab.com:45089/slamengine-test-01")
     )
   )
-  
+
   // TODO: Add ScalaCheck to verify round-trippability of serialization
 
   "fromString" should {

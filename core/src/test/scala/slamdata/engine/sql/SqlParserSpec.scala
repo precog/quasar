@@ -13,7 +13,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
   import SqlQueries._
 
   implicit def stringToQuery(s: String): Query = Query(s)
-  
+
   "SQLParser" should {
     "parse query1" in {
       val parser = new SQLParser
@@ -29,7 +29,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse query3" in {
       val parser = new SQLParser
-      val r = parser.parse(q3).toOption 
+      val r = parser.parse(q3).toOption
       r should beSome
     }
 
@@ -164,31 +164,31 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse simple query with two variables" in {
       val parser = new SQLParser
       parser.parse("""SELECT * FROM zips WHERE zips.dt > :start_time AND zips.dt <= :end_time """).toOption should beSome
-    }    
+    }
 
     "parse true and false literals" in {
       val parser = new SQLParser
 
       parser.parse("""SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
     }
-    
+
     "parse date, time, timestamp, and id literals" in {
-      val q = """select * from foo 
+      val q = """select * from foo
                   where dt < date '2014-11-16'
                   and tm < time '03:00:00'
                   and ts < timestamp '2014-11-16T03:00:00Z' + interval 'PT1H'
                   and _id != oid 'abc123'"""
-      
+
       (new SQLParser).parse(q) must beAnyRightDisj
     }
 
     "parse IS and IS NOT" in {
-      val q = """select * from foo 
+      val q = """select * from foo
                   where a IS NULL
                   and b IS NOT NULL
                   and c IS TRUE
                   and d IS NOT FALSE"""
-      
+
       (new SQLParser).parse(q) must beAnyRightDisj
     }
 
@@ -203,14 +203,14 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       parsed must beRightDisjOrDiff(node)
     }
   }
-  
+
   import org.scalacheck._
   import Gen._
   import org.threeten.bp.{Duration,Instant}
   import slamdata.engine.sql._
-  
+
   implicit def arbitraryNode: Arbitrary[Node] = Arbitrary { selectGen(4) }
-  
+
   def selectGen(depth: Int): Gen[SelectStmt] = for {
     isDistinct <- Gen.oneOf(SelectDistinct, SelectAll)
     projs      <- smallNonEmptyListOf(projGen)
@@ -221,15 +221,15 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     limit      <- Gen.option(choose(1L, 100L))
     offset     <- Gen.option(choose(1L, 100L))
   } yield SelectStmt(isDistinct, projs, relations, filter, groupBy, orderBy, limit, offset)
-  
+
   def projGen: Gen[Proj] =
-    exprGen(1).flatMap(x => 
+    exprGen(1).flatMap(x =>
       Gen.oneOf(
-        Gen.const(Proj.Anon(x)), 
+        Gen.const(Proj.Anon(x)),
         for {
           n <- Gen.alphaChar.map(_.toString)  // TODO: generate names requiring quotes, etc.
         } yield Proj.Named(x, n)))
-  
+
   def relationGen(depth: Int): Gen[SqlRelation] = {
     val simple = for {
         n <- Gen.alphaChar.map(_.toString)  // TODO: paths with '/', '.', etc.
@@ -269,7 +269,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     if (depth <= 0) simpleExprGen
     else complexExprGen(depth-1)
   }
-  
+
   def simpleExprGen: Gen[Expr] =
     Gen.frequency(
       2 -> (for {
@@ -307,18 +307,18 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       1 -> (for {
         l <- exprGen(depth)
         n <- Gen.alphaChar
-      } yield Binop(l, StringLiteral(n.toString), FieldDeref)),  // parser has trouble with complex "{...}" syntax 
+      } yield Binop(l, StringLiteral(n.toString), FieldDeref)),  // parser has trouble with complex "{...}" syntax
       1 -> (for {
         l <- exprGen(depth)
         i <- Gen.choose(1, 100)
-      } yield Binop(l, IntLiteral(i), IndexDeref)),  // parser has trouble with complex expressions inside "[...]" 
+      } yield Binop(l, IntLiteral(i), IndexDeref)),  // parser has trouble with complex expressions inside "[...]"
       2 -> (for {
         x  <- exprGen(depth)
         op <- Gen.oneOf(
           Not, Exists, Positive, Negative, Distinct,
           //YearFrom, MonthFrom, DayFrom, HourFrom, MinuteFrom, SecondFrom,  // FIXME: all generate wrong SQL
           ToDate, ToInterval,
-          ObjectFlatten, ArrayFlatten, 
+          ObjectFlatten, ArrayFlatten,
           IsNull)
       } yield Unop(x, op)),
       2 -> (for {
@@ -338,14 +338,14 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
         dflt  <- Gen.option(exprGen(depth))
       } yield Switch(cases, dflt))
     )
-    
+
   def casesGen(depth: Int): Gen[List[Case]] =
     smallNonEmptyListOf(for {
         cond <- exprGen(depth)
         expr <- exprGen(depth)
       } yield Case(cond, expr))
-    
-  def constGen: Gen[LiteralExpr] = 
+
+  def constGen: Gen[LiteralExpr] =
     Gen.oneOf(
       Gen.chooseNum(0, 100).flatMap(IntLiteral(_)),       // Note: negative numbers are parsed as Unop(-, _)
       Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),  // Note: negative numbers are parsed as Unop(-, _)
@@ -353,9 +353,9 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       Gen.const(NullLiteral()),
       Gen.const(BoolLiteral(true)),
       Gen.const(BoolLiteral(false)))
-  
+
   /**
-   Generates non-empty lists which grow based on the `size` parameter, but 
+   Generates non-empty lists which grow based on the `size` parameter, but
    slowly (log), so that trees built out of the lists don't get
    exponentially big.
    */

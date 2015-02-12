@@ -68,7 +68,7 @@ package object optimize {
         case (l :: ls, r :: rs) => r.get(l).flatMap {
           case -\/ (Include)          => get0(leaves, rs)
           case -\/ (d @ DocVar(_, _)) => get0(d.path ++ ls, rs)
-          case -\/ (e)                => 
+          case -\/ (e)                =>
             if (ls.isEmpty) fixExpr(rs, e).map(-\/ apply) else None
           case  \/-(r)                => get0(ls, r :: rs)
         }
@@ -81,7 +81,7 @@ package object optimize {
       def lift[A](o: Option[A]): OptionTramp[A] = OptionT(o.point[Free.Trampoline])
 
       (e.mapUpM[OptionTramp] {
-        case ref @ DocVar(_, _) => 
+        case ref @ DocVar(_, _) =>
           lift {
             get0(ref.path, rs).flatMap(_.fold(Some.apply, κ(None)))
           }
@@ -127,7 +127,7 @@ package object optimize {
 
       s.sequenceU.map(multiListMap)
     }
-    
+
     def inlineProjectGroup(r: Reshape, g: Grouped): Option[Grouped] = {
       for {
         names   <- renameProjectGroup(r, g)
@@ -145,7 +145,7 @@ package object optimize {
             case Some(n :: Nil) => Some(DocField(n))
             case _ => None
           }
-          case _ => None 
+          case _ => None
         }
         values1 = names.flatMap {
           case (oldName, ts) => ts.map((_: BsonField.Leaf) -> g.value(oldName))

@@ -67,7 +67,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
         $read(Collection("zips")),
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
-      
+
       MongoDbEvaluator.toJS(wf) must beRightDisj(
         """db.zips.aggregate([
           |    { "$match" : { "pop" : { "$gte" : 1000}}},
@@ -76,7 +76,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |  { allowDiskUse: true })
           |db.tmp.gen_0.find()""".stripMargin)
     }
-    
+
     "write chained pipeline workflow to JS" in {
       val wf = chain(
         $read(Collection("zips")),
@@ -85,7 +85,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
         $sort(NonEmptyList(BsonField.Name("city") -> Ascending)))
-      
+
       MongoDbEvaluator.toJS(wf) must beRightDisj(
         """db.zips.aggregate([
           |    { "$match" : { "$and" : [ { "pop" : { "$lte" : 1000}} , { "pop" : { "$gte" : 100}}]}},
@@ -95,7 +95,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |  { allowDiskUse: true })
           |db.tmp.gen_0.find()""".stripMargin)
     }
-    
+
     "write map-reduce Workflow to JS" in {
       val wf = chain(
         $read(Collection("zips")),

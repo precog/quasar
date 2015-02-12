@@ -19,7 +19,7 @@ object Data {
     def dataType = Type.Null
     def toJs = JsCore.Literal(Js.Null).fix
   }
-  
+
   case class Str(value: String) extends Data {
     def dataType = Type.Str
     def toJs = JsCore.Literal(Js.Str(value)).fix
@@ -76,7 +76,7 @@ object Data {
   }
 
   case class Set(value: List[Data]) extends Data {
-    def dataType = (value.headOption.map { head => 
+    def dataType = (value.headOption.map { head =>
       value.drop(1).map(_.dataType).foldLeft(head.dataType)(Type.lub _)
     }).getOrElse(Type.Bottom) // TODO: ???
     def toJs = JsCore.Arr(value.map(_.toJs)).fix
@@ -101,7 +101,7 @@ object Data {
     def dataType = Type.Interval
     def toJs = JsCore.Literal(Js.Num(value.getSeconds*1000 + value.getNano*1e-6, true)).fix
   }
-  
+
   case class Binary(value: Array[Byte]) extends Data {
     def dataType = Type.Binary
     def toJs =

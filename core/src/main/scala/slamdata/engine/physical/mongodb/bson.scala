@@ -32,7 +32,7 @@ object Bson {
   def fromData(data: Data): ConversionError \/ Bson = {
     data match {
       case Data.Null => \/ right (Bson.Null)
-      
+
       case Data.Str(value) => \/ right (Bson.Text(value))
 
       case Data.True => \/ right (Bson.Bool(true))
@@ -41,7 +41,7 @@ object Bson {
       case Data.Dec(value) => \/ right (Bson.Dec(value.toDouble))
       case Data.Int(value) => \/ right (Bson.Int64(value.toLong))
 
-      case Data.Obj(value) => 
+      case Data.Obj(value) =>
         type MapF[X] = Map[String, X]
         type Right[X] = ConversionError \/ X
 
@@ -233,7 +233,7 @@ object BsonField {
 
     def flatten: List[Leaf] = this :: Nil
 
-    // Distinction between these is artificial as far as BSON concerned so you 
+    // Distinction between these is artificial as far as BSON concerned so you
     // can always translate a leaf to a Name (but not an Index since the key might
     // not be numeric).
     def toName: Name = this match {
@@ -252,13 +252,13 @@ object BsonField {
   private case class Path(values: NonEmptyList[Leaf]) extends BsonField {
     def flatten: List[Leaf] = values.list
 
-    def asText = (values.list.zipWithIndex.map { 
+    def asText = (values.list.zipWithIndex.map {
       case (Name(value), 0) => value
       case (Name(value), _) => "." + value
       case (Index(value), 0) => value.toString
       case (Index(value), _) => "." + value.toString
     }).mkString("")
-    
+
     override def toString = values.list.mkString(" \\ ")
   }
 

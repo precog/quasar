@@ -43,7 +43,7 @@ sealed trait MongoDbFileSystem extends FileSystem {
     )
   }
 
-  def count(path: Path): Task[Long] = 
+  def count(path: Path): Task[Long] =
     Collection.fromPath(path).fold(
       err => Task.fail(err),
       col => db.get(col).map(_.count))
@@ -70,7 +70,7 @@ sealed trait MongoDbFileSystem extends FileSystem {
 
         val chunks: Process[Task, Vector[(RenderedJson, Option[com.mongodb.DBObject])]] = values.map(json => json -> db.parse(json)) pipe chunk(ChunkSize)
 
-        chunks.flatMap { vs => 
+        chunks.flatMap { vs =>
           Process.eval(Task.delay {
                 val parseErrors = vs.collect { case (json, None)      => JsonWriteError(json, Some("parse error")) }
                 val objs        = vs.collect { case (json, Some(obj)) => json -> obj }
@@ -79,7 +79,7 @@ sealed trait MongoDbFileSystem extends FileSystem {
                   e => objs.map { case (json, _) => JsonWriteError(json, Some(e.getMessage)) },
                   _ => Nil
                 )
-              
+
                 parseErrors ++ insertErrors
               }
           ).flatMap(errs => Process.emitAll(errs))
@@ -111,7 +111,7 @@ sealed trait MongoDbFileSystem extends FileSystem {
     deletes <- cols.map(db.drop).sequenceU
   } yield ()
 
-  // Note: a mongo db can contain a collection named "foo" as well as "foo.bar" and "foo.baz", 
+  // Note: a mongo db can contain a collection named "foo" as well as "foo.bar" and "foo.baz",
   // in which case "foo" acts as both a directory and a file, as far as slamengine is concerned.
   def ls(dir: Path): Task[List[Path]] = for {
     cols <- db.list
@@ -152,7 +152,7 @@ sealed trait MongoWrapper {
     c <- get(col)
     _ = c.insert(data)
   } yield ()
-  
+
   val list: Task[List[Collection]] = Task.delay { db.getCollectionNames().asScala.map(Collection.apply).toList }
 }
 
@@ -160,7 +160,7 @@ sealed trait MongoWrapper {
 object MongoDbFileSystem {
   def apply(db0: com.mongodb.DB): MongoDbFileSystem = new MongoDbFileSystem {
     protected def db = new MongoWrapper {
-      protected def db = db0 
+      protected def db = db0
     }
   }
 }

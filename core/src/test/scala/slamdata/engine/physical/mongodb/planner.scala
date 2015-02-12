@@ -1597,7 +1597,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               BsonField.Name("address") -> -\/(DocField(BsonField.Name("right") \ BsonField.Name("address"))))),
               IgnoreId))))  // Note: becomes ExcludeId in conversion to WorkflowTask
     }
- 
+
     "plan 3-way right equi-join" in {
       plan(
         "select foo.name, bar.address, baz.zip " +

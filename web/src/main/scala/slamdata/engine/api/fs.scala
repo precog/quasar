@@ -46,7 +46,7 @@ class FileSystemApi(fs: FSTable[Backend]) {
   object AsDirPath {
     def unapply(segs: List[String]): Option[Path] = AsPath.unapply(segs).map(_.asDir)
   }
-  
+
   private def notEmpty(string0: String): Option[String] = {
     val string = string0.trim
 
@@ -59,10 +59,10 @@ class FileSystemApi(fs: FSTable[Backend]) {
     }
   }
 
-  private def lookupBackend(path: Path): ResponseFunction[Any] \/ (Backend, Path, Path) = 
+  private def lookupBackend(path: Path): ResponseFunction[Any] \/ (Backend, Path, Path) =
     fs.lookup(path) \/> (NotFound ~> ResponseString("No data source is mounted to the path " + path))
 
-  private def backendFor(path: Path): ResponseFunction[Any] \/ (Backend, Path) = 
+  private def backendFor(path: Path): ResponseFunction[Any] \/ (Backend, Path) =
     lookupBackend(path).map { case (backend, mountPath, _) => (backend, mountPath) }
 
   private def dataSourceFor(path: Path): ResponseFunction[Any] \/ (FileSystem, Path) =
@@ -73,7 +73,7 @@ class FileSystemApi(fs: FSTable[Backend]) {
       ResponseJson(Json.obj(
         "error"  := causedBy.getMessage,
         "phases" := phases))
-        
+
     case _ => ResponseString(e.getMessage)
   }
 
@@ -94,12 +94,12 @@ class FileSystemApi(fs: FSTable[Backend]) {
         query <- x.parameterValues("q").headOption.map(_.toString) \/> QueryParameterMustContainQuery
         b     <- backendFor(path)
         (backend, mountPath) = b
-        
+
         (phases, resultT) = backend.eval(QueryRequest(Query(query), None, mountPath, path))
         result <- resultT.attemptRun.leftMap(e => BadRequest ~> errorResponse(e))
       } yield jsonStream(result)).fold(identity, identity)
     }
-    
+
     // API to create synchronous queries, storing the result:
     case x @ POST(PathP(Decode("query" :: "fs" :: AsDirPath(path)))) => AccessControlAllowOriginAll ~>
       (for {
@@ -196,8 +196,8 @@ class FileSystemApi(fs: FSTable[Backend]) {
           _ <- dataSource.delete(relPath).attemptRun.leftMap(e => InternalServerError ~> errorResponse(e))
         } yield ResponseString("")
       ).fold(identity, identity)
-    
-    case x @ OPTIONS(PathP(Seg("query" :: _))) => 
+
+    case x @ OPTIONS(PathP(Seg("query" :: _))) =>
       AccessControlAllowOriginAll ~>
       AccessControlAllowMethods("GET, POST, OPTIONS") ~>
       AccessControlMaxAge((20*24*60*60).toString) ~> {
@@ -206,8 +206,8 @@ class FileSystemApi(fs: FSTable[Backend]) {
           case _ => Ok
         }
       }
-    
-    case x @ OPTIONS(PathP(Seg("data" :: _))) => 
+
+    case x @ OPTIONS(PathP(Seg("data" :: _))) =>
       AccessControlAllowOriginAll ~>
       AccessControlAllowMethods("GET, PUT, POST, DELETE, MOVE, OPTIONS") ~>
       AccessControlMaxAge((20*24*60*60).toString) ~> {
@@ -225,9 +225,9 @@ class FileSystemApi(fs: FSTable[Backend]) {
         _ => RenderedJson(line)
       )).toList)
 
-    def errorBody(errs: List[Throwable])(implicit EJ: EncodeJson[JsonWriteError]) = 
+    def errorBody(errs: List[Throwable])(implicit EJ: EncodeJson[JsonWriteError]) =
       ResponseJson(Json(
-        "errors" := errs.map { 
+        "errors" := errs.map {
           case e @ JsonWriteError(_, _) => EJ.encode(e)
           case e: slamdata.engine.Error => Json("detail" := e.message)
           case e => Json("detail" := e.toString)

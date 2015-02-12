@@ -66,7 +66,7 @@ object Repl {
     case object Silent extends DebugLevel
     case object Normal extends DebugLevel
     case object Verbose extends DebugLevel
-    
+
     def fromInt(code: Int): Option[DebugLevel] = code match {
       case 0 => Some(Silent)
       case 1 => Some(Normal)
@@ -76,10 +76,10 @@ object Repl {
   }
 
   case class RunState(
-    printer:    Printer, 
-    mounted:    FSTable[Backend], 
-    path:       Path = Path.Root, 
-    unhandled:  Option[Command] = None, 
+    printer:    Printer,
+    mounted:    FSTable[Backend],
+    path:       Path = Path.Root,
+    unhandled:  Option[Command] = None,
     debugLevel: DebugLevel = DebugLevel.Normal,
     variables:  Map[String, String] = Map())
 
@@ -88,7 +88,7 @@ object Repl {
 
   private def parseCommand(input: String): Command = {
     import Command._
-    
+
     input match {
       case ExitPattern()                   => Exit
       case CdPattern(path)                 =>
@@ -178,7 +178,7 @@ object Repl {
       val a = t.run
       val endTime = Instant.now
       a -> secondsAndTenths(Duration.between(startTime, endTime))
-    } 
+    }
 
     state.mounted.lookup(state.path).map { case (backend, mountPath, _) =>
       import state.printer
@@ -189,10 +189,10 @@ object Repl {
         case DebugLevel.Normal  => printer(log.takeRight(1).mkString("\n\n") + "\n")
         case DebugLevel.Verbose => printer(log.mkString("\n\n") + "\n")
       }) ++
-      Process.eval(timeIt(resultT) flatMap { case (results, elapsed) => 
+      Process.eval(timeIt(resultT) flatMap { case (results, elapsed) =>
         for {
             _ <- printer("Query time: " + elapsed + "s")
-          
+
             preview <- (results |> process1.take(10 + 1)).runLog
 
             _ <- printer(summarize(10)(preview))

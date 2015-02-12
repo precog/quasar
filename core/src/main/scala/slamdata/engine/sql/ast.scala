@@ -272,10 +272,10 @@ sealed trait Proj extends Node {
   def children = expr :: Nil
 }
 object Proj {
-  case class Anon(expr: Expr) extends Proj {  
+  case class Anon(expr: Expr) extends Proj {
     def sql = expr.sql
   }
-  case class Named(expr: Expr, alias: String) extends Proj {  
+  case class Named(expr: Expr, alias: String) extends Proj {
     def sql = expr.sql + " as " + alias
   }
 }
@@ -364,7 +364,7 @@ final case class Unop(expr: Expr, op: UnaryOperator) extends Expr {
       val s = List(op.sql, "(", expr.sql, ")") mkString " "
       if (op == Distinct) "(" + s + ")" else s  // Note: dis-ambiguates the query in case this is the leading projection
   }
-  
+
   def children = expr :: Nil
 }
 
@@ -404,7 +404,7 @@ final case class Ident(name: String) extends Expr {
 
 final case class InvokeFunction(name: String, args: List[Expr]) extends Expr {
   import slamdata.engine.std.StdLib.string
-  
+
   def sql = (name, args) match {
     case (string.Like.name, value :: pattern :: StringLiteral("") :: Nil) => "(" + value.sql + ") like (" + pattern.sql + ")"
     case (string.Like.name, value :: pattern :: esc :: Nil) => "(" + value.sql + ") like (" + pattern.sql + ") escape (" + esc + ")"

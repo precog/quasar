@@ -101,6 +101,17 @@ class FileSystemApi(fs: FSTable[Backend]) {
       } yield jsonStream(result)).fold(identity, identity)
     }
     
+    // API to create synchronous queries, returning the compiled query:
+    case x @ GET(PathP(Decode("compile" :: "fs" :: AsDirPath(path)))) => AccessControlAllowOriginAll ~> {
+      (for {
+        query <- x.parameterValues("q").headOption.map(_.toString) \/> QueryParameterMustContainQuery
+        b     <- backendFor(path)
+        (backend, mountPath) = b
+        
+        phases = backend.compile(QueryRequest(Query(query), None, mountPath, path))
+      } yield ResponseString(phases.last.toValue)).fold(identity, identity)
+    }
+    
     // API to create synchronous queries, storing the result:
     case x @ POST(PathP(Decode("query" :: "fs" :: AsDirPath(path)))) => AccessControlAllowOriginAll ~>
       (for {

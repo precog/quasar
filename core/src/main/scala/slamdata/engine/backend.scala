@@ -18,6 +18,7 @@ import slamdata.engine.config._
 
 sealed trait PhaseResult {
   def name: String
+  def toValue = "name = " + name
 }
 object PhaseResult {
   import argonaut._
@@ -27,12 +28,15 @@ object PhaseResult {
 
   case class Error(name: String, value: SDError) extends PhaseResult {
     override def toString = name + "\n" + value.toString
+    override def toValue = value.toString
   }
   case class Tree(name: String, value: RenderedTree) extends PhaseResult {
     override def toString = name + "\n" + Show[RenderedTree].shows(value)
+    override def toValue = Show[RenderedTree].shows(value)
   }
   case class Detail(name: String, value: String) extends PhaseResult {
     override def toString = name + "\n" + value
+    override def toValue = value
   }
 
   implicit def PhaseResultEncodeJson: EncodeJson[PhaseResult] = EncodeJson {
@@ -64,6 +68,11 @@ sealed trait Backend {
    * can be found.
    */
   def run(req: QueryRequest): (Vector[PhaseResult], Task[ResultPath])
+
+  /**
+   * Compiles a query, producing a compilation log and the query plan.
+   */
+  def compile(req: QueryRequest): (Vector[PhaseResult])
 
   /**
    * Executes a query, placing the output in the specified resource, returning both
@@ -104,6 +113,22 @@ object Backend {
     val queryPlanner = planner.queryPlanner(evaluator.compile(_))
     
     def checkCompatibility = evaluator.checkCompatibility
+    
+    def compile(req: QueryRequest): (Vector[PhaseResult]) = {
+      import Process.{logged => _, _}
+
+      def loggedTask[A](log: Vector[PhaseResult], t: Task[A]): Task[(Vector[PhaseResult], A)] =
+        new Task(t.get.map(_.bimap(
+          {
+            case e : Error => PhaseError(log :+ PhaseResult.Error("Execution", e), e)
+            case e => e
+          },
+          log -> _)))
+
+      val (phases, physical) = queryPlanner(req)
+      
+      phases
+    }
 
     def run(req: QueryRequest): (Vector[PhaseResult], Task[ResultPath]) = {
       import Process.{logged => _, _}

@@ -264,7 +264,17 @@ object Selector {
   }
 
   final case class And(left: Selector, right: Selector) extends Abstract("$and")
+  object And {
+    def apply(first: Selector, rest: Selector*): Selector =
+      rest.foldLeft(first)(And(_, _))
+  }
+
   final case class Or(left: Selector, right: Selector) extends Abstract("$or")
+  object Or {
+    def apply(first: Selector, rest: Selector*): Selector =
+      rest.foldLeft(first)(Or(_, _))
+  }
+
   final case class Nor(left: Selector, right: Selector) extends Abstract("$nor")
 
   implicit val SelectorAndSemigroup: Semigroup[Selector] = new Semigroup[Selector] {

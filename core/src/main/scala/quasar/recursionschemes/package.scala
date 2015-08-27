@@ -48,10 +48,17 @@ package object recursionschemes {
   //   def embed[F[_]: Functor](t: F[Free[F, A]]) = Free.liftF(t).join
   // }
 
+  def cofCataM[S[_]: Traverse, M[_]: Monad, A, B](t: Cofree[S, A])(f: (A, S[B]) => M[B]): M[B] =
+    t.tail.map(cofCataM(_)(f)).sequence.flatMap(f(t.head, _))
+
   // refolds
 
   def hylo[F[_]: Functor, A, B](a: A)(f: F[B] => B, g: A => F[A]): B =
     f(g(a).map(hylo(_)(f, g)))
+
+  def hyloM[M[_]: Monad, F[_]: Traverse, A, B](a: A)(f: F[B] => M[B], g: A => M[F[A]]):
+      M[B] =
+    g(a).flatMap(_.map(hyloM(_)(f, g)).sequence.flatMap(f))
 
   def ghylo[F[_]: Functor, W[_]: Comonad, M[_], A, B](
     a: A)(
@@ -300,7 +307,7 @@ package object recursionschemes {
     Cofree((lattr, rattr), fabs)
   }
 
-  trait Binder[F[_]] {
+  @typeclass trait Binder[F[_]] {
     type G[A]
 
     def initial[A]: G[A]
@@ -320,6 +327,12 @@ package object recursionschemes {
 
     loop(t.unFix, B.initial)
   }
+
+  // This removes any bound variables from the Fix, replacing it with the
+  // expression bound to it. Any variables left are necessarily free.
+  def expandBindings[F[_]: Functor](t: Fix[F])(implicit B: Binder[F]):
+      Fix[F] =
+    boundCata(t)((unfixed: F[Fix[F]]) => Fix(unfixed))
 
   def boundPara[F[_]: Functor, A](t: Fix[F])(f: F[(Fix[F], A)] => A)(implicit B: Binder[F]): A = {
     def loop(t: F[Fix[F]], b: B.G[A]): A = {

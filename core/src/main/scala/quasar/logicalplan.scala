@@ -21,7 +21,7 @@ import quasar.recursionschemes._, Recursive.ops._
 import quasar.fp._
 import quasar.fs.Path
 
-import scalaz._, Scalaz._
+import scalaz._, Scalaz._, Validation.{success, failure}, Validation.FlatMap._
 import shapeless.contrib.scalaz.instances.deriveEqual
 
 sealed trait LogicalPlan[A]
@@ -40,6 +40,8 @@ object LogicalPlan {
         case FreeF(v) => G.point(FreeF(v))
         case LetF(ident, form0, in0) =>
           G.apply2(f(form0), f(in0))(LetF(ident, _, _))
+        case TypecheckF(expr, typ, cont) =>
+          G.apply2(f(expr), f(cont))(TypecheckF(_, typ, _))
       }
     }
 
@@ -50,6 +52,7 @@ object LogicalPlan {
         case InvokeF(func, values) => InvokeF(func, values.map(f))
         case FreeF(v) => FreeF(v)
         case LetF(ident, form, in) => LetF(ident, f(form), f(in))
+        case TypecheckF(expr, typ, cont) => TypecheckF(f(expr), typ, f(cont))
       }
     }
 
@@ -59,9 +62,8 @@ object LogicalPlan {
         case ConstantF(_) => F.zero
         case InvokeF(func, values) => Foldable[List].foldMap(values)(f)
         case FreeF(_) => F.zero
-        case LetF(_, form, in) => {
-          F.append(f(form), f(in))
-        }
+        case LetF(_, form, in) => F.append(f(form), f(in))
+        case TypecheckF(expr, _, cont) => F.append(f(expr), f(cont))
       }
     }
 
@@ -72,6 +74,7 @@ object LogicalPlan {
         case InvokeF(func, values) => Foldable[List].foldRight(values, z)(f)
         case FreeF(_) => z
         case LetF(ident, form, in) => f(form, f(in, z))
+        case TypecheckF(expr, _, cont) => f(expr, f(cont, z))
       }
     }
   }
@@ -85,6 +88,7 @@ object LogicalPlan {
       case InvokeF(func, _     )       => Terminal(func.mappingType.toString :: "Invoke" :: nodeType, Some(func.name))
       case FreeF(name)                 => Terminal("Free" :: nodeType, Some(name.toString))
       case LetF(ident, _, _)           => Terminal("Let" :: nodeType, Some(ident.toString))
+      case TypecheckF(_, typ, _)       => Terminal("Typecheck" :: nodeType, Some(typ.toString))
     }
   }
   implicit val EqualFLogicalPlan = new EqualF[LogicalPlan] {
@@ -95,6 +99,8 @@ object LogicalPlan {
       case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
       case (LetF(ident1, form1, in1), LetF(ident2, form2, in2)) =>
         ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
+      case (TypecheckF(expr1, typ1, cont1), TypecheckF(expr2, typ2, cont2)) =>
+        expr1 ≟ expr2 && typ1 == typ2 && cont1 ≟ cont2
       case _ => false
     }
   }
@@ -137,6 +143,18 @@ object LogicalPlan {
       Fix[LogicalPlan](LetF(let, form, in))
   }
 
+  // NB: This should only be inserted by the type checker. In future, this
+  //     should only exist in SlamScript – the checker will annotate nodes
+  //     where runtime checks are necessary, then they will be added during
+  //     compilation to SlamScript.
+  final case class TypecheckF[A](expr: A, typ: Type, cont: A)
+      extends LogicalPlan[A]
+  object Typecheck {
+    def apply(expr: Fix[LogicalPlan], typ: Type, cont: Fix[LogicalPlan]):
+        Fix[LogicalPlan] =
+      Fix[LogicalPlan](TypecheckF(expr, typ, cont))
+  }
+
   implicit val LogicalPlanUnzip = new Unzip[LogicalPlan] {
     def unzip[A, B](f: LogicalPlan[(A, B)]) = (f.map(_._1), f.map(_._2))
   }
@@ -164,16 +182,15 @@ object LogicalPlan {
     case x           => x.fold
   }
 
+  // FIXME: Don’t ever let anyone see this
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
+  var countNum = 0
+
   def freshName[F[_]: Functor: Foldable](
     prefix: String, plans: F[Fix[LogicalPlan]]):
       Symbol = {
-    val existingNames = plans.map(_.cata(namesƒ)).fold
-    def loop(pre: String): Symbol =
-      if (existingNames.contains(Symbol(prefix)))
-        loop(pre + "_")
-      else Symbol(prefix)
-
-    loop(prefix)
+    countNum += 1
+    Symbol(prefix + countNum.toString)
   }
 
   val shapeƒ: LogicalPlan[(Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]])] => Option[List[Fix[LogicalPlan]]] = {
@@ -197,8 +214,114 @@ object LogicalPlan {
     case InvokeF(Distinct, List(src, _)) => src._2
     case InvokeF(DistinctBy, List(src, _)) => src._2
     case InvokeF(Squash, List(src)) => src._2
+    case TypecheckF(_, _, cont) => cont._2
     case _ => None
   }
+
+  type TypeFree[F[_]] = Cofree[F, Type]
+  type NamedConstraint = (Symbol, Type, Fix[LogicalPlan])
+  type ConstrainedPlan = (Type, List[NamedConstraint], Fix[LogicalPlan])
+  type NameValidation[A] = ValidationNel[SemanticError, A]
+
+  def inferTypes(typ: Type, term: Fix[LogicalPlan]):
+      NameValidation[TypeFree[LogicalPlan]] =
+    (term.unFix match {
+      case ReadF(c)          => success(ReadF[TypeFree[LogicalPlan]](c))
+      case ConstantF(d)      => success(ConstantF[TypeFree[LogicalPlan]](d))
+      case InvokeF(f, args)  => for {
+        types <- f.untype(typ)
+        args0 <- types.zip(args).map((inferTypes(_, _)).tupled).sequenceU
+      } yield InvokeF[TypeFree[LogicalPlan]](f, args0)
+      case FreeF(n)          => success(FreeF[TypeFree[LogicalPlan]](n))
+      case LetF(n, form, in) =>
+        inferTypes(typ, in).flatMap { in0 =>
+          val fTyp = in0.collect {
+            case Cofree(typ0, FreeF(n0)) if n0 == n => typ0
+          }.concatenate(Type.TypeGlbMonoid)
+          inferTypes(fTyp, form).map(LetF[TypeFree[LogicalPlan]](n, _, in0))
+        }
+      case TypecheckF(expr, t, cont) =>
+        (inferTypes(t, expr) |@| inferTypes(typ, cont))(
+          TypecheckF[TypeFree[LogicalPlan]](_, t, _))
+    }).map(Cofree(typ, _))
+
+  /** This function compares the inferred (required) type with the possible type
+    * from the collection.
+    * • if it’s a const type, replace the node with a constant
+    * • if the possible is a subtype of the inferred, we’re good
+    * • if the inferred is a subtype of the possible, we need a runtime check
+    * • otherwise, we fail
+    */
+  private def maybeWrap(inf: Type, poss: Type, term: Fix[LogicalPlan]):
+      NameValidation[ConstrainedPlan] = {
+    if (inf.contains(poss))
+      success((poss, Nil, poss match {
+        case Type.Const(d) => Constant(d)
+        case _ => term
+      }))
+    else if (poss.contains(inf)) {
+      val name = freshName("check", term.point[Id])
+      success((inf, List((name, inf, term)), Free(name)))
+    }
+    else failure(NonEmptyList(SemanticError.GenericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term")))
+  }
+
+  private def appConst(constraints: ConstrainedPlan) =
+    constraints._2.foldLeft(constraints._3)((acc, con) =>
+      Let(con._1, con._3, Typecheck(Free(con._1), con._2, acc)))
+
+  // TODO: This can perhaps be decomposed into separate folds for annotating
+  //       with “found” types, folding constants, and adding runtime checks.
+  val checkTypesƒ:
+      (Type, LogicalPlan[ConstrainedPlan]) => NameValidation[ConstrainedPlan] =
+    (inf, term) => {
+      def applyConstraints(
+        poss: Type, constraints: ConstrainedPlan)
+        (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
+        maybeWrap(inf, poss, f(appConst(constraints)))
+
+      term match {
+        case ReadF(c)         => maybeWrap(inf, Type.Top, Read(c))
+        case ConstantF(d)     => maybeWrap(inf, Type.Const(d), Constant(d))
+        case InvokeF(MakeObject, List(name, value)) =>
+          MakeObject.apply(List(name._1, value._1)).flatMap(
+            applyConstraints(_, value)(MakeObject(name._3, _)))
+        case InvokeF(MakeArray, List(value)) =>
+          MakeArray.apply(List(value._1)).flatMap(
+            applyConstraints(_, value)(MakeArray(_)))
+        // TODO: Move this case to the Mongo planner once type information is
+        //       available there.
+        case InvokeF(ConcatOp, args) =>
+          val (types, constraints, terms) = args.unzip3
+          ConcatOp.apply(types).flatMap(poss => poss match {
+            case Type.Str         => maybeWrap(inf, poss, Invoke(string.Concat, terms))
+            case t if t.arrayLike => maybeWrap(inf, poss, Invoke(ArrayConcat, terms))
+            case _                => failure(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types")))
+          }).map {
+            case (a, b, c) => (a, constraints.foldLeft(b)(_ ++ _), c)
+          }
+        case InvokeF(relations.Or, args) =>
+          relations.Or.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(relations.Or, args.map(appConst))))
+
+        case InvokeF(f @ Mapping(_, _, _, _, _, _, _), args) =>
+          val (types, constraints, terms) = args.unzip3
+          f.apply(types).flatMap(maybeWrap(inf, _, Invoke(f, terms))).map {
+            case (a, b, c) => (a, constraints.foldLeft(b)(_ ++ _), c)
+          }
+        case InvokeF(f, args) =>
+          f.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(f, args.map(appConst))))
+        case TypecheckF(expr, typ, cont) => maybeWrap(inf, Type.glb(cont._1, typ), Typecheck(expr._3, typ, cont._3))
+        case LetF(name, value, in) =>
+          maybeWrap(inf, in._1, Let(name, appConst(value), appConst(in)))
+        // TODO: Get the possible type from the LetF
+        case FreeF(v) => success((inf, Nil, Free(v)))
+      }
+    }
+
+  def ensureCorrectTypes(term: Fix[LogicalPlan]):
+      ValidationNel[SemanticError, Fix[LogicalPlan]] =
+    inferTypes(Type.Top, term)
+      .flatMap(cofCataM[LogicalPlan, NonEmptyList[SemanticError] \/ ?, Type, ConstrainedPlan](_)(checkTypesƒ(_, _).disjunction).validation.map(appConst))
 
   // TODO: Generalize this to Binder
   def lpParaZygoHistoM[M[_]: Monad, A, B](

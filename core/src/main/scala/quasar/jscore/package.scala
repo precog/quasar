@@ -44,31 +44,6 @@ package object jscore {
   def Select(expr: JsCore, name: String): JsCore =
     Access(expr, Literal(Js.Str(name)))
 
-
-  private[jscore] def toUnsafeJs(expr: JsCore): Js.Expr = expr.simplify match {
-    case Literal(value)      => value
-    case Ident(name)         => Js.Ident(name.value)
-    case Access(expr, key)   => smartDeref(toUnsafeJs(expr), toUnsafeJs(key))
-    case Call(callee, args)  => Js.Call(toUnsafeJs(callee), args.map(toUnsafeJs))
-    case New(name, args)     => Js.New(Js.Call(Ident(name).toJs, args.map(toUnsafeJs(_))))
-    case If(cond, cons, alt) => Js.Ternary(toUnsafeJs(cond), toUnsafeJs(cons), toUnsafeJs(alt))
-
-    case UnOp(op, arg)       => Js.UnOp(op.js, toUnsafeJs(arg))
-    case BinOp(op, left, right) =>
-      Js.BinOp(op.js, toUnsafeJs(left), toUnsafeJs(right))
-    case Arr(values)         => Js.AnonElem(values.map(toUnsafeJs(_)))
-    case Fun(params, body)   =>
-      Js.AnonFunDecl(params.map(_.value), List(Js.Return(toUnsafeJs(body))))
-    case Obj(values)         =>
-      Js.AnonObjDecl(values.toList.map { case (k, v) => k.value -> toUnsafeJs(v) })
-
-    case Let(name, expr, body) =>
-      Js.Let(ListMap(name.value -> toUnsafeJs(expr)), Nil, toUnsafeJs(body))
-
-    case SpliceObjects(_)    => expr.toJs
-    case SpliceArrays(_)     => expr.toJs
-  }
-
   val findFunctionsƒ: JsCoreF[(Fix[JsCoreF], Set[String])] => Set[String] = {
     case CallF((Fix(IdentF(Name(name))), _), args) =>
       Foldable[List].fold(args.map(_._2)) + name
@@ -84,89 +59,34 @@ package object jscore {
         None))
   }
 
-  private def whenDefined(expr: JsCore, body: Js.Expr => Js.Expr, default: => Js.Expr):
-      Js.Expr = {
-    expr.simplify match {
-      case Literal(Js.Null) => default
-      case Literal(_)       => body(expr.toJs)
-      case Arr(_)       => body(expr.toJs)
-      case Fun(_, _)    => body(expr.toJs)
-      case Obj(_)       => body(expr.toJs)
-      case Access(x, y) =>
-        val bod = body(toUnsafeJs(expr))
-        val test = Js.BinOp("&&", Js.BinOp("!=", toUnsafeJs(x), Js.Null),
-                                  Js.BinOp("!=", toUnsafeJs(expr), Js.Null))
-        Js.Ternary(test, bod, default)
-      case _      =>
-        // NB: expr is duplicated here, which generates redundant code if expr is
-        // a function call, for example. See #581.
-        val bod = body(toUnsafeJs(expr))
-        val test = Js.BinOp("!=", expr.toJs, Js.Null)
-        bod match {
-          case Js.Ternary(cond, cons, default0) if default0 == default =>
-            Js.Ternary(Js.BinOp("&&", test, cond), cons, default)
-          case _ =>
-            Js.Ternary(test, bod, default)
-        }
-    }
-  }
-
   private def smartDeref(expr: Js.Expr, key: Js.Expr): Js.Expr =
     key match {
-      case Js.Str(name @ Js.SimpleNamePattern()) =>
-        Js.Select(expr, name)
-      case _ => Js.Access(expr, key)
-    }
-
-  // TODO: Remove this once we have actually functionalized everything
-  def safeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
-    lhs.simplify match {
-      case Access(obj, key) =>
-        whenDefined(obj,
-          obj => Js.BinOp("=", smartDeref(obj, key.toJs), rhs.toJs),
-          Js.Undefined)
-      case _ => Js.BinOp("=", lhs.toJs, rhs.toJs)
+      case Js.Str(name @ Js.SimpleNamePattern()) => Js.Select(expr, name)
+      case _                                     => Js.Access(expr, key)
     }
 
   // Check the RHS, but assume the LHS is known to be defined:
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
-    Js.BinOp("=", toUnsafeJs(lhs), rhs.toJs)
+    Js.BinOp("=", lhs.toJs, rhs.toJs)
 
   implicit class JsCoreOps(expr: JsCore) {
     def toJs: Js.Expr = expr.simplify match {
       case Literal(value)      => value
       case Ident(name)         => Js.Ident(name.value)
 
-      case Access(expr, key)   =>
-        whenDefined(
-          expr,
-          smartDeref(_, key.toJs),
-          Js.Undefined)
+      case Access(expr, key)   => smartDeref(expr.toJs, key.toJs)
 
       case Call(Access(New(name, args1), Literal(Js.Str(mName))), args2)  =>
         // NB: if we are explicitly constructing a value, we presumably know its fields,
         // so no need to check them, but the args may still come from an unreliable source.
         Js.Call(Js.Select(Js.New(Js.Call(Ident(name).toJs, args1.map(_.toJs))), mName), args2.map(_.toJs))
-      case Call(Access(arr @ Arr(_), Literal(Js.Str(mName))), args) =>
-        // NB: if we are explicitly constructing a value, we presumably know its fields,
-        // so no need to check them.
-        Js.Call(Js.Select(arr.toJs, mName), args.map(_.toJs))
-      case Call(expr @ Access(_, _), args) =>
-        // NB: check any other access and the callee together.
-        whenDefined(expr, Js.Call(_, args.map(_.toJs)), Js.Undefined)
       case Call(callee, args)  => Js.Call(callee.toJs, args.map(_.toJs))
 
       case New(name, args)     => Js.New(Js.Call(Ident(name).toJs, args.map(_.toJs)))
       case If(cond, cons, alt) => Js.Ternary(cond.toJs, cons.toJs, alt.toJs)
 
-      case UnOp(op, arg)       =>
-        whenDefined(arg, Js.UnOp(op.js, _), Js.Null)
-      case BinOp(op, left, right) =>
-        whenDefined(
-          left,
-          l => whenDefined(right, r => Js.BinOp(op.js, l, r), Js.Null),
-          Js.Null)
-
+      case UnOp(op, arg)       => Js.UnOp(op.js, arg.toJs)
+      case BinOp(op, left, right) => Js.BinOp(op.js, left.toJs, right.toJs)
       case Arr(values)         => Js.AnonElem(values.map(_.toJs))
       case Fun(params, body)   =>
         Js.AnonFunDecl(params.map(_.value), List(Js.Return(body.toJs)))
@@ -203,28 +123,53 @@ package object jscore {
             Ident(tmp).toJs)
     }
 
-    def simplify: JsCore = {
-      expr.rewrite(_ match {
-        case Access(Obj(values), Literal(Js.Str(name))) =>
-          values.get(Name(name))
-        case If(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
-          Some(If(BinOp(And, cond0, cond1), cons, alt0))
-
-        // NB: inline simple names and selects (e.g. `x`, `x.y`, and `x.y.z`)
-        case Let(name, expr @ Ident(_), body) =>
-          Some(body.substitute(Ident(name), expr))
-        case Let(name, expr @ Access(Ident(_), Literal(Js.Str(_))), body) =>
-          Some(body.substitute(Ident(name), expr))
-        case Let(name, expr @ Access(Access(Ident(_), Literal(Js.Str(_))), Literal(Js.Str(_))), body) =>
-          Some(body.substitute(Ident(name), expr))
-
-        // NB: inline object constructors where the body only extracts one field
-        case Let(bound, Obj(values), Access(name, Literal(Js.Str(key))))
-          if bound == name => values.get(Name(key))
-
-        case x => None
-      })
+    def maybeRewrite(expr: JsCore): Option[JsCore] = expr match {
+      case Access(Obj(values), Literal(Js.Str(name))) =>
+        values.get(Name(name))
+      case If(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
+        Some(If(BinOp(And, cond0, cond1), cons, alt0))
+      case Let(name, expr, body) =>
+        maybeReplace(Ident(name), expr, body).fold(expr match {
+          case Obj(values) =>
+            // TODO: inline _part_ of the object when possible
+            values.toList.foldRightM(body)((v, bod) =>
+              maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.para(count(Ident(name))) match {
+                case 0 => finalBody.some
+                case _ => None
+              })
+          case _ => None
+        })(
+          _.some)
+      case x => None
     }
+
+    def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore) =
+      in.para(count(oldForm)) match {
+        case 0 => in.some
+        case 1 => in.substitute(oldForm, newForm).some
+        case _ => None
+      }
+
+    def maybeReplace(oldForm: JsCore, newForm: JsCore, in: JsCore) =
+      newForm match {
+        // NB: inline simple names and selects (e.g. `x`, `x.y`, and `x.y.z`)
+        case Literal(_)
+           | Ident(_)
+           | Access(Ident(_), Literal(Js.Str(_)))
+           | Access(Access(Ident(_), Literal(Js.Str(_))), Literal(Js.Str(_))) =>
+          in.substitute(oldForm, newForm).some
+        // NB: Inline other cases if the oldForm only occurs once
+        case _ => replaceSolitary(oldForm, newForm, in)
+      }
+
+
+    def simplify: JsCore = {
+      expr.rewrite(maybeRewrite)
+    }
+
+    // NB: This is a generic fold
+    def count(form: JsCore): JsCoreF[(JsCore, Int)] => Int =
+      e => e.foldRight(if (e.map(_._1) == form.unFix) 1 else 0)(_._2 + _)
 
     def substitute(oldExpr: JsCore, newExpr: JsCore): JsCore = {
       def loop(x: JsCore, inScope: Set[JsCore]): JsCore =
@@ -295,7 +240,7 @@ package object jscore {
     }
 
     def renderSimple(v: JsCore): Option[RenderedTree] =
-      if (v.cata(simpleƒ)) Some(Terminal(nodeType, Some(toUnsafeJs(v).pprint(0))))
+      if (v.cata(simpleƒ)) Some(Terminal(nodeType, Some(v.toJs.pprint(0))))
       else None
 
     def render(v: JsCore) = v match {
@@ -320,7 +265,7 @@ package object jscore {
       case Obj(values)           =>
         NonTerminal("Obj" :: nodeType, None,
           values.toList.map { case (n, v) =>
-            if (v.cata(simpleƒ)) Terminal("Key" :: nodeType, Some(n.value + ": " + toUnsafeJs(v).pprint(0)))
+            if (v.cata(simpleƒ)) Terminal("Key" :: nodeType, Some(n.value + ": " + v.toJs.pprint(0)))
             else NonTerminal("Key" :: nodeType, Some(n.value), List(render(v)))
           })
       case SpliceArrays(srcs)    => NonTerminal("SpliceArrays" :: nodeType, None, srcs.map(render))

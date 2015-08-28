@@ -344,14 +344,21 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $match(Selector.Where(
           If(
             BinOp(And,
-              BinOp(Instance, Select(ident("this"), "loc"), ident("Array")),
-              BinOp(Or, BinOp(Or, BinOp(Or,
-                BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Number")),
-                BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("String"))),
-                BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date"))),
-                BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Boolean")))),
+              Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
+              BinOp(Or,
+                BinOp(Or,
+                  BinOp(jscore.Or, BinOp(jscore.Or,
+                    Call(ident("isNumber"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))))),
+                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberInt"))),
+                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong"))),
+                  Call(ident("isString"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))))),
+                BinOp(Or,
+                  BinOp(Or,
+                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
+                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Timestamp"))),
+                  BinOp(Eq, UnOp(TypeOf, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))), jscore.Literal(Js.Str("boolean")))))),
             BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
-            Literal(Js.Null)).toJs)),
+            ident("undefined")).toJs)),
         $project(
           reshape("loc" -> $field("loc")),
           IgnoreId)))
@@ -459,6 +466,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Type(BsonType.Text)),
              Selector.Or(
                Selector.Doc(BsonField.Name("bar") ->
+                 Selector.Type(BsonType.Date)),
+               Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Timestamp)),
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Bool)))),
@@ -482,6 +491,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Type(BsonType.Text)),
              Selector.Or(
                Selector.Doc(BsonField.Name("bar") ->
+                 Selector.Type(BsonType.Date)),
+               Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Timestamp)),
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Bool)))),
@@ -504,6 +515,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
              Selector.Doc(BsonField.Name("bar") ->
                Selector.Type(BsonType.Text)),
              Selector.Or(
+               Selector.Doc(BsonField.Name("bar") ->
+                 Selector.Type(BsonType.Date)),
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Timestamp)),
                Selector.Doc(BsonField.Name("bar") ->
@@ -572,6 +585,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Type(BsonType.Text)),
             Selector.Or(
               Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
+                Selector.Type(BsonType.Date)),
+              Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Timestamp)),
               Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Bool)))),
@@ -602,6 +617,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Text)),
                Selector.Or(
+                 Selector.Doc(BsonField.Name("bar") ->
+                   Selector.Type(BsonType.Date)),
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("bar") ->
@@ -738,6 +755,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Type(BsonType.Text)),
                Selector.Or(
                  Selector.Doc(BsonField.Name("baz") ->
+                   Selector.Type(BsonType.Date)),
+                 Selector.Doc(BsonField.Name("baz") ->
                    Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("baz") ->
                    Selector.Type(BsonType.Bool)))),
@@ -752,6 +771,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Text)),
                  Selector.Or(
+                   Selector.Doc(BsonField.Name("bar") ->
+                     Selector.Type(BsonType.Date)),
                    Selector.Doc(BsonField.Name("bar") ->
                      Selector.Type(BsonType.Timestamp)),
                    Selector.Doc(BsonField.Name("bar") ->
@@ -779,6 +800,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Text)),
                Selector.Or(
+                 Selector.Doc(BsonField.Name("bar") ->
+                   Selector.Type(BsonType.Date)),
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("bar") ->
@@ -810,6 +833,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Type(BsonType.Text)),
                Selector.Or(
                  Selector.Doc(BsonField.Name("pop") ->
+                   Selector.Type(BsonType.Date)),
+                 Selector.Doc(BsonField.Name("pop") ->
                    Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("pop") ->
                    Selector.Type(BsonType.Bool)))),
@@ -824,6 +849,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Doc(BsonField.Name("pop") ->
                    Selector.Type(BsonType.Text)),
                  Selector.Or(
+                   Selector.Doc(BsonField.Name("pop") ->
+                     Selector.Type(BsonType.Date)),
                    Selector.Doc(BsonField.Name("pop") ->
                      Selector.Type(BsonType.Timestamp)),
                    Selector.Doc(BsonField.Name("pop") ->
@@ -954,6 +981,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Type(BsonType.Text)),
             Selector.Or(
               Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
+                Selector.Type(BsonType.Date)),
+              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
                 Selector.Type(BsonType.Timestamp)),
               Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
                 Selector.Type(BsonType.Bool)))),
@@ -968,6 +997,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
                 Selector.Type(BsonType.Text)),
               Selector.Or(
+                Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
+                  Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
@@ -1001,6 +1032,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Type(BsonType.Text)),
             Selector.Or(
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+                Selector.Type(BsonType.Date)),
+              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Timestamp)),
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Bool)))),
@@ -1016,6 +1049,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Type(BsonType.Text)),
               Selector.Or(
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
+                  Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
                   Selector.Type(BsonType.Bool)))),
@@ -1029,6 +1064,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
                 Selector.Type(BsonType.Text)),
               Selector.Or(
+                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
+                  Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
@@ -1124,9 +1161,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               "baz"    -> $field("baz"),
               "__tmp2" ->
                 $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("bar")),
-                    $lt($field("bar"), $literal(Bson.Text("")))),
+                  $or(
+                    $and(
+                      $lt($literal(Bson.Null), $field("bar")),
+                      $lt($field("bar"), $literal(Bson.Text("")))),
+                    $and(
+                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("bar")),
+                      $lt($field("bar"), $literal(Bson.Regex("", ""))))),
                   $divide($field("bar"), $literal(Bson.Int64(10))),
                   $literal(Bson.Undefined))),
             IgnoreId),
@@ -1195,6 +1236,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Type(BsonType.Text)),
               Selector.Or(
                 Selector.Doc(BsonField.Name("pop") ->
+                  Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
@@ -1228,7 +1271,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               obj(
                 "__sd__0" ->
                   jscore.If(
-                    Call(ident("isNumber"), List(Select(ident("__val"), "pop"))),
+                    BinOp(jscore.Or, BinOp(jscore.Or, BinOp(jscore.Or,
+                      Call(ident("isNumber"), List(Select(ident("__val"), "pop"))),
+                      BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberInt"))),
+                      BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberLong"))),
+                      BinOp(jscore.Or,
+                        BinOp(Instance, Select(ident("__val"), "pop"), ident("Date")),
+                        BinOp(Instance, Select(ident("__val"), "pop"), ident("Timestamp")))),
                     BinOp(Div, Select(ident("__val"), "pop"), jscore.Literal(Js.Num(10, false))),
                     ident("undefined")))))))),
             ListMap()),
@@ -1268,9 +1317,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             reshape(
               "popInK" ->
                 $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $or(
+                    $and(
+                      $lt($literal(Bson.Null), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Text("")))),
+                    $and(
+                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int64(1000))),
                   $literal(Bson.Undefined))),
             IgnoreId),
@@ -1292,6 +1345,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("pop") ->
                 Selector.Type(BsonType.Text)),
               Selector.Or(
+                Selector.Doc(BsonField.Name("pop") ->
+                  Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("pop") ->
@@ -1324,6 +1379,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Type(BsonType.Text)),
               Selector.Or(
                 Selector.Doc(BsonField.Name("pop") ->
+                  Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
@@ -1333,9 +1390,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             reshape(
               "popInK" ->
                 $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $or(
+                    $and(
+                      $lt($literal(Bson.Null), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Text("")))),
+                    $and(
+                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int64(1000))),
                   $literal(Bson.Undefined))),
             ExcludeId),
@@ -1625,9 +1686,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               grouped(
                 "__tmp3" ->
                   $max($cond(
-                    $and(
-                      $lt($literal(Bson.Null), $field("pop")),
-                      $lt($field("pop"), $literal(Bson.Text("")))),
+                    $or(
+                      $and(
+                        $lt($literal(Bson.Null), $field("pop")),
+                        $lt($field("pop"), $literal(Bson.Text("")))),
+                      $and(
+                        $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                        $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                     $field("pop"),
                     $literal(Bson.Undefined))),
                 "pop"    -> $push($field("pop"))),
@@ -1699,9 +1764,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               "pop" -> $field("pop"),
               "2"   ->
                 $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $or(
+                    $and(
+                      $lt($literal(Bson.Null), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Text("")))),
+                    $and(
+                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int64(1000))),
                   $literal(Bson.Undefined))),
             "__tmp6" -> reshape(
@@ -1863,7 +1932,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   "__tmp2" ->
                   If(Call(ident("isObject"), List(Select(ident("x"), "geo"))),
                     Select(ident("x"), "geo"),
-                    ident("undefined"))))),
+                    Obj(ListMap(Name("") -> ident("undefined"))))))),
                 FlatExpr(JsFn(Name("x"), Select(ident("x"), "__tmp2")))),
               ListMap()),
             $project(
@@ -1931,7 +2000,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lte($literal(Bson.Arr(List())), $field("loc")),
                       $lt($field("loc"), $literal(Bson.Binary(scala.Array[Byte]())))),
                     $field("loc"),
-                    $literal(Bson.Undefined))),
+                    $literal(Bson.Arr(List(Bson.Undefined))))),
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp2"))),
             $project(
@@ -1979,7 +2048,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lte($literal(Bson.Arr(List())), $field("loc")),
                       $lt($field("loc"), $literal(Bson.Binary(scala.Array[Byte]())))),
                     $field("loc"),
-                    $literal(Bson.Undefined)),
+                    $literal(Bson.Arr(List(Bson.Undefined)))),
                 "__tmp3" -> $$ROOT),
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp2"))),
@@ -2004,7 +2073,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $lte($literal(Bson.Arr(List())), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined))),
+                $literal(Bson.Arr(List(Bson.Undefined))))),
           IgnoreId),
         $unwind(DocField(BsonField.Name("__tmp5"))),
         $match(Selector.Doc(
@@ -2026,7 +2095,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $lte($literal(Bson.Arr(List())), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)),
+                $literal(Bson.Arr(List(Bson.Undefined)))),
             "__tmp3" -> $$ROOT),
           IgnoreId),
         $unwind(DocField(BsonField.Name("__tmp2"))),
@@ -2050,7 +2119,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $lte($literal(Bson.Arr(List())), $field("comments")),
                   $lt($field("comments"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("comments"),
-                $literal(Bson.Undefined)),
+                $literal(Bson.Arr(List(Bson.Undefined)))),
             "__tmp15" -> $$ROOT),
           IgnoreId),
         $unwind(DocField(BsonField.Name("__tmp14"))),
@@ -2062,7 +2131,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $lte($literal(Bson.Arr(List())), $field("__tmp14", "replyTo")),
                   $lt($field("__tmp14", "replyTo"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("__tmp14", "replyTo"),
-                $literal(Bson.Undefined)),
+                $literal(Bson.Arr(List(Bson.Undefined)))),
             "__tmp22" -> $$ROOT),
           IgnoreId),
         $unwind(DocField(BsonField.Name("__tmp21"))),
@@ -2413,6 +2482,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Type(BsonType.Text)),
               Selector.Or(
                 Selector.Doc(BsonField.Name("pop") ->
+                  Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
@@ -2507,8 +2578,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Type(BsonType.Int64)),
                 Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                   Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                  Selector.Type(BsonType.Timestamp))),
+                Selector.Or(
+                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
+                    Selector.Type(BsonType.Date)),
+                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
+                    Selector.Type(BsonType.Timestamp)))),
               Selector.And(
                 Selector.Or(
                   Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
@@ -2520,6 +2594,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                     Selector.Type(BsonType.Text)),
                   Selector.Or(
+                    Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
+                      Selector.Type(BsonType.Date)),
                     Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                       Selector.Type(BsonType.Timestamp)),
                     Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
@@ -2564,6 +2640,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Type(BsonType.Text)),
                 Selector.Or(
                   Selector.Doc(BsonField.Name("ts") ->
+                    Selector.Type(BsonType.Date)),
+                  Selector.Doc(BsonField.Name("ts") ->
                     Selector.Type(BsonType.Timestamp)),
                   Selector.Doc(BsonField.Name("ts") ->
                     Selector.Type(BsonType.Bool)))),
@@ -2579,6 +2657,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     Selector.Type(BsonType.Text)),
                   Selector.Or(
                     Selector.Doc(BsonField.Name("ts") ->
+                      Selector.Type(BsonType.Date)),
+                    Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Timestamp)),
                     Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Bool)))),
@@ -2593,6 +2673,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Text)),
                     Selector.Or(
+                      Selector.Doc(BsonField.Name("ts") ->
+                        Selector.Type(BsonType.Date)),
                       Selector.Doc(BsonField.Name("ts") ->
                         Selector.Type(BsonType.Timestamp)),
                       Selector.Doc(BsonField.Name("ts") ->
@@ -2675,7 +2757,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Select(Select(ident("x"), "name"), "length"),
                   ident("undefined")),
               "1" ->
-                If(Call(ident("isNumber"), List(Select(ident("x"), "epoch"))),
+                If(
+                  BinOp(jscore.Or, BinOp(jscore.Or,
+                    Call(ident("isNumber"), List(Select(ident("x"), "epoch"))),
+                    BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberInt"))),
+                    BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberLong"))),
                   New(Name("Date"), List(Select(ident("x"), "epoch"))),
                   ident("undefined")))))),
             ListMap()),
@@ -2935,9 +3021,37 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField(BsonField.Name("left"))),
             $project(
               reshape(
-                "name"    -> $field("left", "left", "name"),
-                "address" -> $field("left", "right", "address"),
-                "zip"     -> $field("right", "zip")),
+                "name"    ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $cond(
+                      $and(
+                        $lte($literal(Bson.Doc(ListMap())), $field("left", "left")),
+                        $lt($field("left", "left"), $literal(Bson.Arr(Nil)))),
+                      $field("left", "left", "name"),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined)),
+                "address" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $cond(
+                      $and(
+                        $lte($literal(Bson.Doc(ListMap())), $field("left", "right")),
+                        $lt($field("left", "right"), $literal(Bson.Arr(Nil)))),
+                      $field("left", "right", "address"),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined)),
+                "zip"     ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $field("right", "zip"),
+                    $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
     }
@@ -2970,10 +3084,44 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField(BsonField.Name("right"))),
             $project(
               reshape(
-                "child"  -> $field("left", "sha"),
-                "c_auth" -> $field("left", "author", "login"),
-                "parent" -> $field("right", "sha"),
-                "p_auth" -> $field("right", "author", "login")),
+                "child"  ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $field("left", "sha"),
+                    $literal(Bson.Undefined)),
+                "c_auth" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $cond(
+                      $and(
+                        $lte($literal(Bson.Doc(ListMap())), $field("left", "author")),
+                        $lt($field("left", "author"), $literal(Bson.Arr(Nil)))),
+                      $field("left", "author", "login"),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined)),
+                "parent" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $field("right", "sha"),
+                    $literal(Bson.Undefined)),
+                "p_auth" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $cond(
+                      $and(
+                        $lte($literal(Bson.Doc(ListMap())), $field("right", "author")),
+                        $lt($field("right", "author"), $literal(Bson.Arr(Nil)))),
+                      $field("right", "author", "login"),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined))),
               IgnoreId)),
         false).op)
     }

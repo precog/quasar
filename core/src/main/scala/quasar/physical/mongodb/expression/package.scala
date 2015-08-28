@@ -290,7 +290,7 @@ package object expression {
         Nil)
           if f1 == f2 =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
-          jscore.Call(jscore.ident("isNumber"), List(f(jscore.Ident(JsFn.defaultName))))))
+          jscore.isAnyNumber(f(jscore.Ident(JsFn.defaultName)))))
       case (
         $lte($literal(Bson.Text("")), f1),
         $lt(f2, $literal(Bson.Doc(m1))),
@@ -369,7 +369,7 @@ package object expression {
             jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Date"))),
             jscore.BinOp(jscore.Or,
               jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Timestamp"))),
-              jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Boolean")))))))
+              jscore.BinOp(jscore.Eq, jscore.UnOp(jscore.TypeOf, f(jscore.Ident(JsFn.defaultName))), jscore.Literal(Js.Str("boolean")))))))
       case (
         $lt($literal(Bson.Null), f1),
         $lt(f2, $literal(Bson.Doc(m1))),
@@ -377,8 +377,8 @@ package object expression {
           if f1 == f2 && m1 == ListMap() =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
           jscore.BinOp(jscore.Or,
-            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Number"))),
-            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("String"))))))
+            jscore.isAnyNumber(f(jscore.Ident(JsFn.defaultName))),
+            jscore.Call(jscore.ident("isString"), List(f(jscore.Ident(JsFn.defaultName)))))))
       // Regex
       // MaxKey
       case _ =>

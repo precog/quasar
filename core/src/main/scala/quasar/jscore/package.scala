@@ -37,6 +37,12 @@ package object jscore {
     case h :: t => BinOp(op, a1, binop(op, h, t: _*))
   }
 
+  def isAnyNumber(expr: JsCore) =
+    BinOp(jscore.Or, BinOp(jscore.Or,
+      Call(ident("isNumber"), List(expr)),
+      BinOp(Instance, expr, ident("NumberInt"))),
+      BinOp(Instance, expr, ident("NumberLong")))
+
   def obj(values: (String, JsCore)*): JsCore =
     Obj(ListMap(values.map { case (k, v) => Name(k) -> v }: _*))
 

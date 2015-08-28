@@ -77,7 +77,7 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
                | Type.Coproduct(Type.FlexArr(_, _, _), Type.Set(_))  =>
               generateTypeCheck(or)(f)(Type.AnyArray)
             case Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time) =>
-              generateTypeCheck(or)(f)(Type.Timestamp)
+              generateTypeCheck(or)(f)(Type.Coproduct(Type.Date, Type.Timestamp))
             case Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time), Type.Interval) =>
               // Just repartition to match the right cases
               generateTypeCheck(or)(f)(
@@ -288,15 +288,17 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(here)))
       case LogicalPlan.LetF(_, _, body) => body
-      case x @ TypecheckF(expr, typ, cont) =>
+      case x @ TypecheckF(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
-            case Type.Null => ((expr: JsCore) => BinOp(jscore.Eq, Literal(Js.Null), expr))
+            case Type.Null =>
+              ((expr: JsCore) => BinOp(jscore.Eq, Literal(Js.Null), expr))
+            case Type.Dec =>
+              ((expr: JsCore) => Call(ident("isNumber"), List(expr)))
             case Type.Int
-               | Type.Dec
                | Type.Coproduct(Type.Int, Type.Dec)
                | Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval) =>
-              ((expr: JsCore) => Call(ident("isNumber"), List(expr)))
+              isAnyNumber(_)
             case Type.Str =>
               ((expr: JsCore) => Call(ident("isString"), List(expr)))
             case Type.Obj(_, _) =>
@@ -306,21 +308,23 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
             // case Type.Binary =>
             // case Type.Id =>
             case Type.Bool =>
-              ((expr: JsCore) => BinOp(Instance, expr, ident("Boolean")))
+              ((expr: JsCore) => BinOp(jscore.Eq, UnOp(TypeOf, expr), jscore.Literal(Js.Str("boolean"))))
             case Type.Date =>
               ((expr: JsCore) => BinOp(Instance, expr, ident("Date")))
+            case Type.Timestamp =>
+              ((expr: JsCore) => BinOp(Instance, expr, ident("Timestamp")))
           }
         jsCheck(typ).fold[OutputM[PartialJs[B]]](
           -\/(UnsupportedPlan(x, None)))(
           f =>
-          (HasJs(expr) |@| HasJs(cont)) {
-            case ((f1, p1), (f2, p2)) =>
+          (HasJs(expr) |@| HasJs(cont) |@| HasJs(fallback)) {
+            case ((f1, p1), (f2, p2), (f3, p3)) =>
               ({ case list => JsFn(JsFn.defaultName,
                 If(f(f1(list.take(p1.size))(Ident(JsFn.defaultName))),
-                  f2(list.drop(p1.size))(Ident(JsFn.defaultName)),
-                  ident("undefined")))
+                  f2(list.drop(p1.size).take(p2.size))(Ident(JsFn.defaultName)),
+                  f3(list.drop(p1.size + p2.size))(Ident(JsFn.defaultName))))
               },
-                p1.map(there(0, _)) ++ p2.map(there(1, _)))
+                p1.map(there(0, _)) ++ p2.map(there(1, _)) ++ p3.map(there(2, _)))
           })
       case x => -\/(UnsupportedPlan(x, None))
     }
@@ -508,7 +512,7 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
       case ConstantF(_)   => \/-(default)
       case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
       case LetF(_, _, in) => in._2
-      case TypecheckF(expr, typ, cont) =>
+      case TypecheckF(_, typ, cont, _) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -906,7 +910,7 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
       case LetF(_, _, in) => state(in.head._2)
-      case TypecheckF(expr, typ, cont) =>
+      case TypecheckF(expr, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully SlamScript will eliminate the need for this.
@@ -988,9 +992,9 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
         val v =
           exprCheck(typ).fold(
             lift(HasWorkflow(cont)))(
-            f => lift((HasWorkflow(expr) |@| HasWorkflow(cont))(
-              (expr, cont) => {
-                expr1(expr)(f).flatMap(cond(_, cont, pure(Bson.Undefined)))
+            f => lift((HasWorkflow(expr) |@| HasWorkflow(cont) |@| HasWorkflow(fallback))(
+              (expr, cont, fallback) => {
+                expr1(expr)(f).flatMap(cond(_, cont, fallback))
               })).join)
 
         State(s => v.run(s).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
@@ -1003,17 +1007,17 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
     selectorƒ[OutputM[WorkflowBuilder]],
     liftPara(jsExprƒ[OutputM[WorkflowBuilder]]))
 
-  def cleanTypechecksƒ: LogicalPlan[Fix[LogicalPlan]] => Fix[LogicalPlan] = {
-    case LetF(n, r @ Fix(ReadF(_)),
-      Fix(TypecheckF(Fix(FreeF(nf)), Type.Obj(m, Some(Type.Top)), cont)))
-        if n == nf && m == ListMap() =>
-      Let(n, r, cont)
-    case x @ LetF(_, Fix(ReadF(_)), Fix(TypecheckF(_, Type.Obj(_, _), _))) =>
-      Fix(x)
-    case LetF(_, Fix(ReadF(_)), Fix(TypecheckF(_, _, _))) =>
-      Constant(Data.Bool(false))
-    case x => Fix(x)
-  }
+  // FIXME: This removes all type checks from join conditions. Shouldn’t do
+  //        this, but currently need it in order to align the joins.
+  // NB: This is an apomorphism, a -\/ means that branch is processed, \/- means
+  //     that it still needs to be handled recursively.
+  val elideJoinCheckƒ:
+      Fix[LogicalPlan] => LogicalPlan[Fix[LogicalPlan] \/ Fix[LogicalPlan]] =
+    _.unFix match {
+      case InvokeF(j @ (set.InnerJoin | set.LeftOuterJoin | set.RightOuterJoin | set.FullOuterJoin), List(l, r, cond)) =>
+        InvokeF(j, List(\/-(l), \/-(r), -\/(cond.cata(Optimizer.elideTypeCheckƒ))))
+      case x => x.map(\/-(_))
+    }
 
   def alignJoinsƒ:
       LogicalPlan[Fix[LogicalPlan]] => OutputM[Fix[LogicalPlan]] = {
@@ -1023,8 +1027,8 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
     def alignCondition(lt: Fix[LogicalPlan], rt: Fix[LogicalPlan]):
         Fix[LogicalPlan] => OutputM[Fix[LogicalPlan]] =
       _.unFix match {
-        case TypecheckF(expr, typ, cont) =>
-          alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _))
+        case TypecheckF(expr, typ, cont, fb) =>
+          alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _, fb))
         case InvokeF(And, terms) =>
           terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(And, _))
         case InvokeF(Or, terms) =>
@@ -1079,11 +1083,14 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
     def stateT[F[_]: Functor, S, A](fa: F[A]) =
       StateT[F, S, A](s => fa.map((s, _)))
 
-    val wfƒ = workflowƒ andThen (s => s.map(_.map(normalize)))
+    def liftError[A](ea: PlannerError \/ A): M[A] =
+      swizzle(stateT[PlannerError \/ ?, NameGen, A](ea))
+
+    val wfƒ = workflowƒ andThen (_.map(_.map(normalize)))
 
     (for {
-      cleaned <- log("Logical Plan (reduced typechecks)")(logical.cata(cleanTypechecksƒ).point[M])
-      align <- log("Logical Plan (aligned joins)")       (swizzle(stateT(cleaned.cataM(alignJoinsƒ))))
+      cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
+      align <- log("Logical Plan (aligned joins)")       (liftError(Corecursive[Fix].apo[LogicalPlan, Fix[LogicalPlan]](cleaned)(elideJoinCheckƒ).cataM(alignJoinsƒ)))
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))

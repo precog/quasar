@@ -182,19 +182,19 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
 
     "parse simple URI" in {
       "mongodb://localhost" match {
-        case ParsedUri(_, _, host, _, _, _, _) => host must_== "localhost"
+        case ParsedUri(_, _, hosts, _, _) => hosts.head._1 must_== "localhost"
       }
     }
 
     "parse simple URI with trailing slash" in {
       "mongodb://localhost/" match {
-        case ParsedUri(_, _, host, _, _, _, _) => host must_== "localhost"
+        case ParsedUri(_, _, hosts, _, _) => hosts.head._1 must_== "localhost"
       }
     }
 
     "parse user/password" in {
       "mongodb://me:pwd@localhost" match {
-        case ParsedUri(user, pwd, _, _, _, _, _) =>
+        case ParsedUri(user, pwd, _, _, _) =>
           user must beSome("me")
           pwd must beSome("pwd")
       }
@@ -202,38 +202,53 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
 
     "parse port" in {
       "mongodb://localhost:5555" match {
-        case ParsedUri(_, _, _, port, _, _, _) => port must beSome(5555)
+        case ParsedUri(_, _, hosts, _, _) => hosts.head._2 must beSome(5555)
       }
     }
 
     "parse database" in {
       "mongodb://localhost/test" match {
-        case ParsedUri(_, _, _, _, _, db, _) => db must beSome("test")
+        case ParsedUri(_, _, _, db, _) => db must beSome("test")
       }
     }
 
     "parse additional host(s)" in {
       "mongodb://host1,host2,host3:5555" match {
-        case ParsedUri(_, _, _, _, hosts, _, _) => hosts must beSome(",host2,host3:5555")
+        case ParsedUri(_, _, hosts, _, _) => hosts must_== NonEmptyList(
+          ("host1", None), ("host2", None), ("host3", Some(5555))
+        )
       }
     }
 
     "parse options" in {
-      "mongodb://host/?option1=foo&option2=bar" match {
-        case ParsedUri(_, _, _, _, _, _, options) => options must beSome("option1=foo&option2=bar")
+      "mongodb://host/?replicaSet=a&ssl=true&" match {
+        case ParsedUri(_, _, _, _, options) => 
+          options.requiredReplicaSetName must beSome("a")
+          options.ssl must beSome(true)
       }
     }
 
     "parse all of the above" in {
-      "mongodb://me:pwd@host1:5555,host2:5559,host3/test?option1=foo&option2=bar" match {
-        case ParsedUri(user, pwd, host, port, extraHosts, db, options) =>
+      "mongodb://me:pwd@host1:5555,host2:5559,host3/test?ssl=true" match {
+        case ParsedUri(user, pwd, hosts, db, options) =>
           user must beSome("me")
           pwd must beSome("pwd")
-          host must_== "host1"
-          port must beSome(5555)
-          extraHosts must beSome(",host2:5559,host3")
+          hosts must_== NonEmptyList(
+            ("host1", Some(5555)), ("host2", Some(5559)), ("host3", None)
+          )
           db must beSome("test")
-          options must beSome("option1=foo&option2=bar")
+          options.ssl must beSome(true)
+      }
+    }
+
+    "ParsedUri" should {
+      "validate uri" in {
+        MongoDbConfig.ParsedUri.validate("mongodb://localhost:8080//test") must_== 
+          \/-((None,None,NonEmptyList(("localhost",Some(8080))),Some("test"),
+            MongoConnectionOption(None,None,None,None,None,None,None,None,None,None,None,None)))
+      }
+      "invalidate uri without host" in {
+        MongoDbConfig.ParsedUri.validate("mongodb://-") must_== -\/("at least one host required")
       }
     }
   }

@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar.fp._
 import quasar.fs.Path
+import quasar.namegen._
 
 import scalaz._, Scalaz._, Validation.{success, failure}, Validation.FlatMap._
 import shapeless.contrib.scalaz.instances.deriveEqual
@@ -91,7 +92,7 @@ object LogicalPlan {
       case InvokeF(func, _     )    => Terminal(func.mappingType.toString :: "Invoke" :: nodeType, Some(func.name))
       case FreeF(name)              => Terminal("Free" :: nodeType, Some(name.toString))
       case LetF(ident, _, _)        => Terminal("Let" :: nodeType, Some(ident.toString))
-      case TypecheckF(_, typ, _, _) => Terminal("Typecheck" :: nodeType, Some(typ.toString))
+      case TypecheckF(_, typ, _, fb) => Terminal("Typecheck" :: nodeType, Some(typ.toString + " ∨ " + fb.toString))
     }
   }
   implicit val EqualFLogicalPlan = new EqualF[LogicalPlan] {
@@ -180,21 +181,8 @@ object LogicalPlan {
         }
     }
 
-  val namesƒ: LogicalPlan[Set[Symbol]] => Set[Symbol] = {
-    case FreeF(name) => Set(name)
-    case x           => x.fold
-  }
-
-  // FIXME: Don’t ever let anyone see this
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
-  var countNum = 0
-
-  def freshName[F[_]: Functor: Foldable](
-    prefix: String, plans: F[Fix[LogicalPlan]]):
-      Symbol = {
-    countNum += 1
-    Symbol(prefix + countNum.toString)
-  }
+  def freshName(prefix: String): State[NameGen, Symbol] =
+    quasar.namegen.freshName(prefix).map(Symbol(_))
 
   val shapeƒ: LogicalPlan[(Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]])] => Option[List[Fix[LogicalPlan]]] = {
     case LetF(_, _, body) => body._2
@@ -224,10 +212,11 @@ object LogicalPlan {
   type TypeFree[F[_]] = Cofree[F, Type]
   type NamedConstraint = (Symbol, Type, Fix[LogicalPlan])
   type ConstrainedPlan = (Type, List[NamedConstraint], Fix[LogicalPlan])
-  type NameValidation[A] = ValidationNel[SemanticError, A]
+  type SemValidation[A] = ValidationNel[SemanticError, A]
+  type SemDisj[A] = NonEmptyList[SemanticError] \/ A
 
   def inferTypes(typ: Type, term: Fix[LogicalPlan]):
-      NameValidation[TypeFree[LogicalPlan]] =
+      SemValidation[TypeFree[LogicalPlan]] =
     (term.unFix match {
       case ReadF(c)          => success(ReadF[TypeFree[LogicalPlan]](c))
       case ConstantF(d)      => success(ConstantF[TypeFree[LogicalPlan]](d))
@@ -248,6 +237,9 @@ object LogicalPlan {
           TypecheckF[TypeFree[LogicalPlan]](_, t, _, _))
     }).map(Cofree(typ, _))
 
+  private def lift[A](v: SemDisj[A]): NameT[SemDisj, A] =
+    quasar.namegen.lift[SemDisj](v)
+
   /** This function compares the inferred (required) type with the possible type
     * from the collection.
     * • if it’s a const type, replace the node with a constant
@@ -256,17 +248,17 @@ object LogicalPlan {
     * • otherwise, we fail
     */
   private def maybeWrap(inf: Type, poss: Type, term: Fix[LogicalPlan]):
-      NameValidation[ConstrainedPlan] = {
+      NameT[SemDisj, ConstrainedPlan] = {
     if (inf.contains(poss))
-      success((poss, Nil, poss match {
+      emit((poss, Nil, poss match {
         case Type.Const(d) => Constant(d)
         case _ => term
       }))
     else if (poss.contains(inf)) {
-      val name = freshName("check", term.point[Id])
-      success((inf, List((name, inf, term)), Free(name)))
+      emitName(freshName("check").map(name =>
+        (inf, List((name, inf, term)), Free(name))))
     }
-    else failure(NonEmptyList(SemanticError.GenericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term")))
+    else lift(-\/(NonEmptyList(SemanticError.GenericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term"))))
   }
 
   private def appConst(constraints: ConstrainedPlan, fallback: Fix[LogicalPlan]) =
@@ -276,7 +268,7 @@ object LogicalPlan {
   // TODO: This can perhaps be decomposed into separate folds for annotating
   //       with “found” types, folding constants, and adding runtime checks.
   val checkTypesƒ:
-      (Type, LogicalPlan[ConstrainedPlan]) => NameValidation[ConstrainedPlan] =
+      (Type, LogicalPlan[ConstrainedPlan]) => NameT[SemDisj, ConstrainedPlan] =
     (inf, term) => {
       def applyConstraints(
         poss: Type, constraints: ConstrainedPlan)
@@ -287,48 +279,50 @@ object LogicalPlan {
         case ReadF(c)         => maybeWrap(inf, Type.Top, Read(c))
         case ConstantF(d)     => maybeWrap(inf, Type.Const(d), Constant(d))
         case InvokeF(MakeObject, List(name, value)) =>
-          MakeObject.apply(List(name._1, value._1)).flatMap(
+          lift(MakeObject.apply(List(name._1, value._1)).disjunction).flatMap(
             applyConstraints(_, value)(MakeObject(name._3, _)))
         case InvokeF(MakeArray, List(value)) =>
-          MakeArray.apply(List(value._1)).flatMap(
+          lift(MakeArray.apply(List(value._1)).disjunction).flatMap(
             applyConstraints(_, value)(MakeArray(_)))
         // TODO: Move this case to the Mongo planner once type information is
         //       available there.
         case InvokeF(ConcatOp, args) =>
           val (types, constraints, terms) = args.unzip3
-          ConcatOp.apply(types).flatMap(poss => poss match {
+          lift(ConcatOp.apply(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
             case Type.Str         => maybeWrap(inf, poss, Invoke(string.Concat, terms))
             case t if t.arrayLike => maybeWrap(inf, poss, Invoke(ArrayConcat, terms))
-            case _                => failure(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types")))
+            case _                => lift(-\/(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types"))))
           }).map {
             case (a, b, c) => (a, constraints.foldLeft(b)(_ ++ _), c)
           }
         case InvokeF(relations.Or, args) =>
-          relations.Or.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
+          lift(relations.Or.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
         case InvokeF(structural.FlattenArray, args) =>
-          structural.FlattenArray.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenArray, args.map(appConst(_, Constant(Data.Arr(List(Data.NA))))))))
+          lift(structural.FlattenArray.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenArray, args.map(appConst(_, Constant(Data.Arr(List(Data.NA))))))))
         case InvokeF(structural.FlattenObject, args) =>
-          structural.FlattenObject.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenObject, args.map(appConst(_, Constant(Data.Obj(Map("" -> Data.NA))))))))
+          lift(structural.FlattenObject.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenObject, args.map(appConst(_, Constant(Data.Obj(Map("" -> Data.NA))))))))
         case InvokeF(f @ Mapping(_, _, _, _, _, _, _), args) =>
           val (types, constraints, terms) = args.unzip3
-          f.apply(types).flatMap(maybeWrap(inf, _, Invoke(f, terms))).map {
+          lift(f.apply(types).disjunction).flatMap(maybeWrap(inf, _, Invoke(f, terms))).map {
             case (a, b, c) => (a, constraints.foldLeft(b)(_ ++ _), c)
           }
         case InvokeF(f, args) =>
-          f.apply(args.map(_._1)).flatMap(maybeWrap(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
+          lift(f.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
         case TypecheckF(expr, typ, cont, fallback) =>
           maybeWrap(inf, Type.glb(cont._1, typ), Typecheck(expr._3, typ, cont._3, fallback._3))
         case LetF(name, value, in) =>
           maybeWrap(inf, in._1, Let(name, appConst(value, Constant(Data.NA)), appConst(in, Constant(Data.NA))))
         // TODO: Get the possible type from the LetF
-        case FreeF(v) => success((inf, Nil, Free(v)))
+        case FreeF(v) => emit((inf, Nil, Free(v)))
       }
     }
 
+  type SemNames[A] = NameT[SemDisj, A]
+
   def ensureCorrectTypes(term: Fix[LogicalPlan]):
       ValidationNel[SemanticError, Fix[LogicalPlan]] =
-    inferTypes(Type.Top, term)
-      .flatMap(cofCataM[LogicalPlan, NonEmptyList[SemanticError] \/ ?, Type, ConstrainedPlan](_)(checkTypesƒ(_, _).disjunction).validation.map(appConst(_, Constant(Data.NA))))
+    inferTypes(Type.Top, term).flatMap(
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ(_, _)).map(appConst(_, Constant(Data.NA))).evalZero.validation)
 
   // TODO: Generalize this to Binder
   def lpParaZygoHistoM[M[_]: Monad, A, B](

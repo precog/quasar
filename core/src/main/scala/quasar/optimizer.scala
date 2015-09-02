@@ -17,15 +17,14 @@
 package quasar
 
 import quasar.Predef._
-
 import quasar.recursionschemes._, Recursive.ops._
 
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 
 object Optimizer {
   import LogicalPlan._
   import quasar.std.StdLib._
+  import set._
   import structural._
   import Planner._
 
@@ -57,6 +56,47 @@ object Optimizer {
     case x => Fix(x)
   }
 
+  val namesƒ: LogicalPlan[Set[Symbol]] => Set[Symbol] = {
+    case FreeF(name) => Set(name)
+    case x           => x.fold
+  }
+
+  def freshName[F[_]: Functor: Foldable](
+    prefix: String, plans: F[Fix[LogicalPlan]]):
+      Symbol = {
+    val existingNames = plans.map(_.cata(namesƒ)).fold
+    def loop(pre: String): Symbol =
+      if (existingNames.contains(Symbol(prefix)))
+        loop(pre + "_")
+      else Symbol(prefix)
+
+    loop(prefix)
+  }
+
+  val shapeƒ: LogicalPlan[(Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]])] => Option[List[Fix[LogicalPlan]]] = {
+    case LetF(_, _, body) => body._2
+    case ConstantF(Data.Obj(map)) =>
+      Some(map.keys.map(n => Constant(Data.Str(n))).toList)
+    case InvokeF(DeleteField, List(src, field)) =>
+      src._2.map(_.filterNot(_ == field._1))
+    case InvokeF(MakeObject, List(field, src)) => Some(List(field._1))
+    case InvokeF(ObjectConcat, srcs) => srcs.map(_._2).sequence.map(_.flatten)
+    // NB: the remaining InvokeF cases simply pass through or combine shapes
+    //     from their inputs. It would be great if this information could be
+    //     handled generically by the type system.
+    case InvokeF(OrderBy, List(src, _, _)) => src._2
+    case InvokeF(Take, List(src, _)) => src._2
+    case InvokeF(Drop, List(src, _)) => src._2
+    case InvokeF(Filter, List(src, _)) => src._2
+    case InvokeF(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _)
+        => Some(List(Constant(Data.Str("left")), Constant(Data.Str("right"))))
+    case InvokeF(GroupBy, List(src, _)) => src._2
+    case InvokeF(Distinct, List(src, _)) => src._2
+    case InvokeF(DistinctBy, List(src, _)) => src._2
+    case InvokeF(identity.Squash, List(src)) => src._2
+    case _ => None
+  }
+
   // TODO: implement `preferDeletions` for other backends that may have more
   //       efficient deletes. Even better, a single function that takes a
   //       function parameter deciding which way each case should be converted.
@@ -85,7 +125,7 @@ object Optimizer {
       shapeƒ(node.map(_._2)))
   }
 
-  def preferProjections(t: Fix[LogicalPlan]): Fix [LogicalPlan] =
+  def preferProjections(t: Fix[LogicalPlan]): Fix[LogicalPlan] =
     boundPara(t)(preferProjectionsƒ)._1.cata(simplify)
 
 

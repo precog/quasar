@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.RenderTree
 import quasar.fp._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.namegen._
 
 import quasar._
 import quasar.fs.Path

@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.namegen._
 import quasar._, Planner._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar.fs.Path
@@ -445,15 +446,10 @@ object WorkflowBuilder {
   type M[X] = StateT[EitherE, NameGen, X]
 
   // Wrappers for results that don't use state:
-  def emit[A](a: A): M[A] = lift(\/-(a))
+  def emit[A](a: A): M[A] = quasar.namegen.emit[EitherE, A](a)
   def fail[A](e: PlannerError): M[A] = lift(-\/(e))
-  def lift[A](v: PlannerError \/ A): M[A] =
-    StateT[EitherE, NameGen, A](s => v.map(s -> _))
-
-  // Wrappers for results that don't fail:
-  def emitSt[A](v: State[NameGen, A]): M[A] =
-    StateT[EitherE, NameGen, A](s => \/-(v.run(s)))
-
+  def lift[A](v: EitherE[A]): M[A] = quasar.namegen.lift[EitherE](v)
+  def emitSt[A](v: State[NameGen, A]): M[A] = emitName[EitherE, A](v)
   def swapM[A](v: State[NameGen, PlannerError \/ A]): M[A] =
     StateT[EitherE, NameGen, A](s => { val (s1, x) = v.run(s); x.map(s1 -> _) })
 

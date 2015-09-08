@@ -24,27 +24,24 @@ import scalaz.Foldable
 import scalaz.std.list._
 
 object BackendDefinitions {
-  val MongoDB: BackendDefinition = BackendDefinition({
+  val MongoDB: BackendDefinition = BackendDefinition {
     case config : MongoDbConfig =>
       import quasar.physical.mongodb._
       import Workflow._
-
-      val tclient = util.createMongoClient(config) // FIXME: This will leak because Task will be re-run every time. Cache the DB for a given config.
 
       val defaultDb = config.connectionUri match {
         case MongoDbConfig.ParsedUri(_, _, _, _, _, authDb, _) => authDb
         case _ => None
       }
 
-      for {
-        client <- tclient
-      } yield new MongoDbFileSystem {
-        val planner = MongoDbPlanner
-        val evaluator = MongoDbEvaluator(client, defaultDb)
-        val RP = RenderTree[Crystallized]
-        protected def server = MongoWrapper(client, defaultDb)
-      }
-  })
+      util.createMongoClient(config) map (client =>
+        new MongoDbFileSystem {
+          val planner = MongoDbPlanner
+          val evaluator = MongoDbEvaluator(client)
+          val RP = RenderTree[Crystallized]
+          protected def server = MongoWrapper(client)
+        })
+  }
 
   val All = Foldable[List].foldMap(MongoDB :: Nil)(ι)
 }

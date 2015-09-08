@@ -349,16 +349,15 @@ object Backend {
       _       <- testWrite(backend)
     } yield ()
 
-  private def testWrite(backend: Backend): ETask[EnvironmentError, Unit] = {
-    val data = Data.Obj(ListMap("a" -> Data.Int(1)))
+  private def testWrite(backend: Backend): ETask[EnvironmentError, Unit] =
     for {
       files <- backend.ls.leftMap(EnvPathError(_))
-      dir = files.map(_.path).find(_.pureDir).getOrElse(Path.Root)
-      tmp = dir ++ Path(".quasar_tmp_connection_test")
-      _ <- backend.save(tmp, Process.emit(data)).leftMap(EnvWriteError(_))
-      _ <- backend.delete(tmp).leftMap(EnvPathError(_))
+      dir   =  files.map(_.path).find(_.pureDir).getOrElse(Path.Root)
+      tmp   =  dir ++ Path(".quasar_tmp_connection_test")
+      data  =  Data.Obj(ListMap("a" -> Data.Int(1)))
+      _     <- backend.save(tmp, Process.emit(data)).leftMap(EnvWriteError(_))
+      _     <- backend.delete(tmp).leftMap(EnvPathError(_))
     } yield ()
-  }
 
   private def wrap(description: String)(e: Throwable): EnvironmentError =
     EnvEvalError(CommandFailed(description + ": " + e.getMessage))

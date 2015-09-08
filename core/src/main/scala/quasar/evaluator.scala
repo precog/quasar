@@ -104,6 +104,7 @@ object Evaluator {
       def format(message: String, detail: Option[String]) =
         Json(("error" := message) :: detail.toList.map("errorDetail" := _): _*)
 
+      // TODO: These seem to be rather MongoDB-specific
       EncodeJson[EnvironmentError] {
         case MissingDatabase              => format("Authentication database not specified in connection URI.", None)
         case ConnectionFailed(msg)        => format("Invalid server and / or port specified.", Some(msg))

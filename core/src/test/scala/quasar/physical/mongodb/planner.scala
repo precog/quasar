@@ -1972,13 +1972,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))),
             $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
               "0" ->
-                jscore.If(
+                If(
                   BinOp(jscore.Or,
                     Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
                     Call(ident("isString"), List(Select(ident("x"), "loc")))),
                   SpliceArrays(List(
-                    Select(ident("x"), "loc"),
-                    jscore.Arr(List(Select(ident("x"), "pop"))))),
+                    jscore.Select(ident("x"), "loc"),
+                    jscore.Arr(List(jscore.Select(ident("x"), "pop"))))),
                   ident("undefined")))))),
               ListMap()),
             $project(
@@ -2449,8 +2449,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField("state")),
             $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending)),
             $group(
-              grouped(
-                "__tmp7"     -> $first($$ROOT)),
+              grouped("__tmp7" -> $first($$ROOT)),
               -\/(reshape(
                 "0" -> $field("totalPop"),
                 "1" -> $field("city"),
@@ -2493,8 +2492,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "city"   -> Select(ident("x"), "city"),
             "pop"    -> Select(ident("x"), "pop"),
             "__tmp4" ->
-              jscore.If(
-                Call(ident("isString"), List(Select(ident("x"), "city"))),
+              If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 Select(Select(ident("x"), "city"), "length"),
                 ident("undefined")))))),
             ListMap()),
@@ -2709,8 +2707,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               NonEmptyList(MapExpr(JsFn(Name("x"),
                 obj(
                   "0" ->
-                    jscore.If(
-                      Call(ident("isString"), List(Select(ident("x"), "city"))),
+                    If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                       Select(Select(ident("x"), "city"), "length"),
                       ident("undefined")),
                   "1" ->

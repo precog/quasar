@@ -302,8 +302,14 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
               isAnyNumber(_)
             case Type.Str =>
               ((expr: JsCore) => Call(ident("isString"), List(expr)))
-            case Type.Obj(_, _) =>
+            case Type.Coproduct(Type.Obj(_, _), Type.FlexArr(_, _, _)) =>
               ((expr: JsCore) => Call(ident("isObject"), List(expr)))
+            case Type.Obj(_, _) =>
+              ((expr: JsCore) =>
+                BinOp(jscore.And,
+                  Call(ident("isObject"), List(expr)),
+                  UnOp(jscore.Not,
+                    Call(Select(ident("Array"), "isArray"), List(expr)))))
             case Type.FlexArr(_, _, _) =>
               ((expr: JsCore) => Call(Select(ident("Array"), "isArray"), List(expr)))
             // case Type.Binary =>

@@ -888,10 +888,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             If(
               BinOp(jscore.And,
                 Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "parents"))),
-                Call(ident("isObject"), List(
-                  Access(
-                    Select(ident("this"), "parents"),
-                    jscore.Literal(Js.Num(0, false)))))),
+                BinOp(jscore.And,
+                  Call(ident("isObject"), List(
+                    Access(
+                      Select(ident("this"), "parents"),
+                      jscore.Literal(Js.Num(0, false))))),
+                  UnOp(jscore.Not,
+                    Call(Select(ident("Array"), "isArray"), List(
+                      Access(
+                        Select(ident("this"), "parents"),
+                        jscore.Literal(Js.Num(0, false)))))))),
               BinOp(jscore.Eq,
                 Select(
                   Access(
@@ -1930,9 +1936,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               NonEmptyList(
                 MapExpr(JsFn(Name("x"), obj(
                   "__tmp2" ->
-                  If(Call(ident("isObject"), List(Select(ident("x"), "geo"))),
-                    Select(ident("x"), "geo"),
-                    Obj(ListMap(Name("") -> ident("undefined"))))))),
+                    If(
+                      BinOp(jscore.And,
+                        Call(ident("isObject"), List(Select(ident("x"), "geo"))),
+                        UnOp(jscore.Not,
+                          Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "geo"))))),
+                      Select(ident("x"), "geo"),
+                      Obj(ListMap(Name("") -> ident("undefined"))))))),
                 FlatExpr(JsFn(Name("x"), Select(ident("x"), "__tmp2")))),
               ListMap()),
             $project(
@@ -2923,9 +2933,15 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Obj(ListMap(
                     Name("__tmp7") ->
                       If(
-                        Call(ident("isObject"), List(Select(ident("x"), "right"))),
+                        BinOp(jscore.And,
+                          Call(ident("isObject"), List(Select(ident("x"), "right"))),
+                          UnOp(jscore.Not,
+                            Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "right"))))),
                         If(
-                          Call(ident("isObject"), List(Select(ident("x"), "left"))),
+                          BinOp(jscore.And,
+                            Call(ident("isObject"), List(Select(ident("x"), "left"))),
+                            UnOp(jscore.Not,
+                              Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "left"))))),
                           SpliceObjects(List(
                             Select(ident("x"), "left"),
                             Select(ident("x"), "right"))),

@@ -300,12 +300,21 @@ package object expression {
           jscore.Call(jscore.ident("isString"), List(f(jscore.Ident(JsFn.defaultName))))))
       case (
         $lte($literal(Bson.Doc(m1)), f1),
+        $lt(f2, $literal(b1)),
+        Nil)
+          if f1 == f2 && b1 == Bson.Binary(scala.Array[Byte]()) =>
+        toJs(f1).map(f => JsFn(JsFn.defaultName,
+          jscore.Call(jscore.ident("isObject"), List(f(jscore.Ident(JsFn.defaultName))))))
+      case (
+        $lte($literal(Bson.Doc(m1)), f1),
         $lt(f2, $literal(Bson.Arr(Nil))),
         Nil)
           if f1 == f2 && m1 == ListMap() =>
-        // Object
         toJs(f1).map(f => JsFn(JsFn.defaultName,
-          jscore.Call(jscore.ident("isObject"), List(f(jscore.Ident(JsFn.defaultName))))))
+          jscore.BinOp(jscore.And,
+            jscore.Call(jscore.ident("isObject"), List(f(jscore.Ident(JsFn.defaultName)))),
+            jscore.UnOp(jscore.Not,
+              jscore.Call(jscore.Select(jscore.ident("Array"), "isArray"), List(f(jscore.Ident(JsFn.defaultName))))))))
       case (
         $lte($literal(Bson.Arr(Nil)), f1),
         $lt(f2, $literal(b1)),

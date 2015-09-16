@@ -128,7 +128,6 @@ object Optimizer {
   def preferProjections(t: Fix[LogicalPlan]): Fix[LogicalPlan] =
     boundPara(t)(preferProjectionsƒ)._1.cata(simplify)
 
-
   val elideTypeCheckƒ: LogicalPlan[Fix[LogicalPlan]] => Fix[LogicalPlan] = {
     case LetF(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
         if n == nf =>

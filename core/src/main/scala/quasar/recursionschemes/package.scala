@@ -328,12 +328,6 @@ package object recursionschemes {
     loop(t.unFix, B.initial)
   }
 
-  // This removes any bound variables from the Fix, replacing it with the
-  // expression bound to it. Any variables left are necessarily free.
-  def expandBindings[F[_]: Functor](t: Fix[F])(implicit B: Binder[F]):
-      Fix[F] =
-    boundCata(t)((unfixed: F[Fix[F]]) => Fix(unfixed))
-
   def boundPara[F[_]: Functor, A](t: Fix[F])(f: F[(Fix[F], A)] => A)(implicit B: Binder[F]): A = {
     def loop(t: F[Fix[F]], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))

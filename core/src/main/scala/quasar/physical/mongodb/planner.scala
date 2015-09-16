@@ -1057,8 +1057,7 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
 
     {
       case InvokeF(f @ (InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin), List(l, r, cond)) =>
-        alignCondition(l, r)(expandBindings(cond)).map(c =>
-          Invoke(f, List(l, r, c)))
+        alignCondition(l, r)(cond).map(c => Invoke(f, List(l, r, c)))
       case x => \/-(Fix(x))
     }
   }
@@ -1097,7 +1096,7 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(Corecursive[Fix].apo[LogicalPlan, Fix[LogicalPlan]](cleaned)(elideJoinCheckƒ).cataM(alignJoinsƒ)))
+      align <- log("Logical Plan (aligned joins)")       (liftError(Corecursive[Fix].apo[LogicalPlan, Fix[LogicalPlan]](cleaned)(elideJoinCheckƒ).cataM(alignJoinsƒ <<< Recursive[Fix].project <<< Optimizer.simplify)))
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))

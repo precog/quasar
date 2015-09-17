@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.recursionschemes._, Recursive.ops._
-import quasar.fp._
 import quasar._, Errors._, Evaluator._
 import quasar.javascript._
 import Workflow._
@@ -60,25 +59,21 @@ class MongoDbEvaluator(impl: MongoDbEvaluatorImpl[StateT[ETask[EvaluationError, 
 
   def compile(workflow: Crystallized) =
     "Mongo" -> MongoDbEvaluator.toJS(workflow).fold(e => "error: " + e.message, s => Cord(s))
-
-  private val MinVersion = List(2, 6, 0)
-
-  def checkCompatibility: ETask[EnvironmentError, Unit] = for {
-    nameSt  <- EitherT.right(SequenceNameGenerator.startUnique)
-    version <- impl.executor.version.eval(nameSt).leftMap(MongoDbEvaluator.mapError)
-    rez     <- EitherT(Task.now((version >= MinVersion) either (()) or UnsupportedVersion(this, version)))
-  } yield rez
 }
 
 object MongoDbEvaluator {
 
-  type ST[A] = StateT[ETask[EvaluationError, ?], SequenceNameGenerator.EvalState, A]
+  type EvalState = SequenceNameGenerator.EvalState
+  type ST[A] = StateT[EvaluationTask, EvalState, A]
 
-  def apply(client0: MongoClient): Task[Evaluator[Crystallized]] = {
+  private val MinVersion = List(2, 6, 0)
+
+  def apply(client0: MongoClient): EnvTask[Evaluator[Crystallized]] = {
     val nameGen = SequenceNameGenerator.Gen
     val testDoc = Bson.Doc(ListMap("a" -> Bson.Int32(1))).repr
 
-    def canWriteToCol(col: Collection): EitherT[Task, String, Unit] = {
+    /** Returns the name of the database if a write succeeds. */
+    def canWriteToCol(col: Collection): OptionT[Task, String] = {
       val mongoCol = Task.delay(
         client0.getDatabase(col.databaseName)
           getCollection(col.collectionName))
@@ -89,19 +84,28 @@ object MongoDbEvaluator {
         _ <- Task.delay(c.drop())
       } yield col.databaseName
 
-      EitherT(inserted.attempt.map(_.swap.void))
+      EitherT(inserted.attempt).toOption
     }
 
+    def findWritableDb(dbNames: Set[String]): State[EvalState, OptionT[Task, String]] =
+      dbNames.toList.traverseS(nameGen.generateTempName).map(cols =>
+        cols.traverseU(col => canWriteToCol(col).toLeft(())).swap.toOption)
+
+    def validateVersion(exec: MongoDbExecutor[EvalState]): StateT[EnvTask, EvalState, Unit] =
+      exec.version.mapK[EnvTask, Unit, EvalState] { r =>
+        r.leftMap(MongoDbEvaluator.mapError).flatMapF { case (s, v) =>
+          Task.now((v >= MinVersion) either ((s, ())) or UnsupportedVersion("MongoDB", v))
+        }
+      }
+
     for {
-      dbNames <- MongoWrapper.databaseNames(client0)
-      genSeed <- SequenceNameGenerator.startUnique
-      cols    =  dbNames.toList.traverseS(nameGen.generateTempName)
-                   .eval(genSeed): List[Collection] // because Id[_]
-      writeDb <- cols.traverseU(canWriteToCol).swap.toOption.run
-      impl    =  MongoDbEvaluatorImpl[ST](new MongoDbExecutor(client0, nameGen, writeDb))
-    } yield {
-      new MongoDbEvaluator(impl): Evaluator[Crystallized]
-    }
+      dbNames     <- MongoWrapper.liftTask(MongoWrapper.databaseNames(client0))
+                       .leftMap(MongoDbEvaluator.mapError)
+      genSeed     <- SequenceNameGenerator.startUnique.liftM[EnvErrT]
+      (nxtS, wdb) =  findWritableDb(dbNames).run(genSeed)
+      exec        <- wdb.run.map(new MongoDbExecutor(client0, nameGen, _)).liftM[EnvErrT]
+      _           <- validateVersion(exec).eval(nxtS)
+    } yield new MongoDbEvaluator(MongoDbEvaluatorImpl[ST](exec))
   }
 
   def toJS(physical: Crystallized): EvaluationError \/ String = {
@@ -266,14 +270,13 @@ object SequenceNameGenerator {
 class MongoDbExecutor[S](client: MongoClient,
                          nameGen: NameGenerator[State[S, ?]],
                          val defaultWritableDB: Option[String])
-    extends Executor[StateT[ETask[EvaluationError, ?], S, ?]] {
+    extends Executor[StateT[EvaluationTask, S, ?]] {
 
   type MT[F[_], A] = StateT[F, S, A]
-  type M[A]        = MT[ETask[EvaluationError, ?], A]
+  type M[A]        = MT[EvaluationTask, A]
 
   def generateTempName(dbName: String): M[Collection] =
-    StateT[ETask[EvaluationError, ?], S, Collection](s =>
-      EitherT.right(Task.delay(nameGen.generateTempName(dbName)(s))))
+    nameGen.generateTempName(dbName).mapK(_.point[EvaluationTask])
 
   def insert(dst: Collection, value: Bson.Doc): M[Unit] =
     liftMongo(mongoCol(dst).insertOne(value.repr))
@@ -306,10 +309,10 @@ class MongoDbExecutor[S](client: MongoClient,
         new RenameCollectionOptions().dropTarget(true)))
 
   def fail[A](e: EvaluationError): M[A] =
-    StateT[ETask[EvaluationError, ?], S, A](κ(EitherT.left(Task.now(e))))
+    MonadError[ETask, EvaluationError].raiseError[A](e).liftM[MT]
 
   def version: M[List[Int]] = {
-    def lookupVersion(dbName: String): ETask[EvaluationError, List[Int]] = {
+    def lookupVersion(dbName: String): EvaluationTask[List[Int]] = {
       val cmd = Bson.Doc(ListMap("buildinfo" -> Bson.Int32(1))).repr
       MongoWrapper.delay(client.getDatabase(dbName).runCommand(cmd)) flatMapF { r =>
         Option(r getString "version")
@@ -319,8 +322,7 @@ class MongoDbExecutor[S](client: MongoClient,
       }
     }
 
-    // TODO: Need a better error here than "No Database"
-    def attemptVersion(dbNames: Set[String]): ETask[EvaluationError, List[Int]] =
+    def attemptVersion(dbNames: Set[String]): EvaluationTask[List[Int]] =
       EitherT(dbNames.toList.toNel.toRightDisjunction(NoDatabase()).point[Task])
         .flatMap(_.traverseU(dbName => lookupVersion(dbName).swap).map(_.head).swap)
 
@@ -330,15 +332,14 @@ class MongoDbExecutor[S](client: MongoClient,
       .liftM[MT]
   }
 
-  private def mongoCol(col: Collection) = client.getDatabase(col.databaseName).getCollection(col.collectionName)
+  private def mongoCol(col: Collection) =
+    client.getDatabase(col.databaseName).getCollection(col.collectionName)
 
   private def liftMongo[A](a: => A): M[A] =
-    StateT[ETask[EvaluationError, ?], S, A](s => MongoWrapper.delay(a).map((s, _)))
+    MongoWrapper.delay(a).liftM[MT]
 
   private def runMongoCommand(db: String, cmd: Bson.Doc): M[Unit] =
-    liftMongo {
-      ignore(client.getDatabase(db).runCommand(cmd.repr))
-    }
+    liftMongo(client.getDatabase(db).runCommand(cmd.repr)).void
 }
 
 // Convenient partially-applied type: LoggerT[X]#Rec

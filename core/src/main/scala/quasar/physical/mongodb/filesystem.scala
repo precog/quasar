@@ -229,7 +229,7 @@ object MongoWrapper {
   def liftTask: (Task ~> EvaluationTask) =
     new (Task ~> EvaluationTask) {
       def apply[A](t: Task[A]) =
-        EitherT(t.attempt.map(_.leftMap(e => CommandFailed(e.getMessage))))
+        EitherT(t.attempt).leftMap(e => CommandFailed(e.getMessage))
     }
 
   /**

@@ -18,18 +18,21 @@ package quasar
 
 import quasar.Predef._
 import quasar.config._
+import Evaluator.EnvironmentError
+import EnvironmentError.ConnectionFailed
 
-import scalaz.Foldable
+import scalaz.{EitherT, Foldable}
 import scalaz.std.list._
 
 object BackendDefinitions {
-  val MongoDB: BackendDefinition = BackendDefinition {
+  val MongoDB: BackendDefinition = BackendDefinition fromPF {
     case config : MongoDbConfig =>
       import quasar.physical.mongodb._
       import Workflow._
 
       for {
-        client    <- util.createMongoClient(config)
+        client    <- EitherT(util.createMongoClient(config).attempt)
+                       .leftMap[EnvironmentError](t => ConnectionFailed(t.getMessage))
         mongoEval <- MongoDbEvaluator(client)
       } yield new MongoDbFileSystem {
         val planner = MongoDbPlanner

@@ -33,9 +33,10 @@ object Mounter {
       backend match {
         case NestedBackend(base) => path match {
           case Nil =>
-            backendDef(conf).cata(
-              EitherT.right(_),
-              EitherT.left(Task.now(MissingFileSystem(Path(path, None), conf))))
+            backendDef(conf).leftMap {
+              case MissingBackend(_) => MissingFileSystem(Path(path, None), conf)
+              case otherwise         => otherwise
+            }
 
           case dir :: dirs =>
             rec0(base.get(dir).getOrElse(NestedBackend(Map())), dirs, conf)

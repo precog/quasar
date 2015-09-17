@@ -17,12 +17,11 @@ import specs2.DisjunctionMatchers
 
 class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers {
     // TODO: Consider getting ride of backendName in this API
-    backendShould { (dbPath, backend, name) =>
-      val databaseName = dbPath.toString
-      println(databaseName)
-      val initialQueryString = s"""select distinct count(_), state from "/$databaseName/zips" group by state"""
+    backendShould { (prefix, backend, name) =>
+      val zipsPath = prefix ++ Path("zips")
+      val initialQueryString = s"""select distinct count(_), state from "$zipsPath" group by state"""
       val outputValueName = "out0"
-      val destinationPath = dbPath ++ Path(outputValueName)
+      val destinationPath = prefix ++ Path(outputValueName)
       val secondaryQueryString = s"""select count(_) as total from "$destinationPath""""
       "work at the API  level" in {
         // When running an initial query that stores its result in a temporary collection
@@ -68,11 +67,11 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
               List(Json("total" := 51))))
           }
         }
-        "slight variation" in {
+        "using relative path" in {
           api.Utils.withServer(backend, mongoServerConfig) { client =>
             val relativeQueryString = """select distinct count(_), state from zips group by state"""
             val initialQueryPath =
-              (client / "query" / "fs" / databaseName / "")
+              (client / "query" / "fs" / prefix.toString / "")
                 .POST
                 .setBody(relativeQueryString)
                 .setHeader("Destination", destinationPath.pathname)
@@ -89,7 +88,7 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
             } yield outStr) must beSome(destinationPath.pathname)
 
             val relativeSecondaryQueryString = s"select count(_) as total from $outputValueName"
-            val secondaryQueryPath = client / "query" / "fs" / databaseName / "" <<? Map("q" -> relativeSecondaryQueryString)
+            val secondaryQueryPath = client / "query" / "fs" / prefix.toString / "" <<? Map("q" -> relativeSecondaryQueryString)
             val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
             val secondaryResp = Await.result(secondaryReq, 10.seconds)
 

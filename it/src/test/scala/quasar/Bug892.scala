@@ -18,18 +18,21 @@ import specs2.DisjunctionMatchers
 class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers {
     // TODO: Consider getting ride of backendName in this API
     backendShould { (prefix, backend, name) =>
+      implicit val dataShowInstance = Show.showFromToString[Data]
       val zipsPath = prefix ++ Path("zips")
       val initialQueryString = s"""select distinct count(_), state from "$zipsPath" group by state"""
       val outputValueName = "out0"
-      val destinationPath = prefix ++ Path(outputValueName)
-      val secondaryQueryString = s"""select count(_) as total from "$destinationPath""""
-      "work at the API  level" in {
-        // When running an initial query that stores its result in a temporary collection
-        interactive.run(backend, initialQueryString, destinationPath).run
-        // A secondary query operating over that temporary collection is failing at
-        // the time of filling of this bug
-        val secondaryQueryResult = interactive.eval(backend, secondaryQueryString)
-        secondaryQueryResult.runLog.run.run.length should be_==(1)
+      def secondaryQueryString(tempPath: Path) = s"""select count(_) as total from "$tempPath""""
+      "work at the API level" in {
+        interactive.withTemp(backend, prefix) { tempPath =>
+          // When running an initial query that stores its result in a temporary collection
+          interactive.run(backend, initialQueryString, tempPath).run
+          // A secondary query operating over that temporary collection is failing at
+          // the time of filling of this bug
+          val secondaryQueryResult = interactive.eval(backend, secondaryQueryString(tempPath))
+          secondaryQueryResult.runLog.run.run.map(_.toList) should
+            beRightDisjunction[Backend.ProcessingError, List[Data]](List(Data.Obj(Map("total" -> Data.Int(51)))))
+        }
       }
       "work at the web server level" in {
         val mongoServerConfig = Config(
@@ -41,60 +44,104 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
         )
         "as described in the bug request" in {
           api.Utils.withServer(backend, mongoServerConfig) { client =>
-            val initialQueryPath =
-              (client / "query" / "fs" / "")
-                .POST
-                .setBody(initialQueryString)
-                .setHeader("Destination", destinationPath.pathname)
+            interactive.withTemp(backend, prefix) { tempPath =>
+              val initialQueryPath =
+                (client / "query" / "fs" / "")
+                  .POST
+                  .setBody(initialQueryString)
+                  .setHeader("Destination", tempPath.pathname)
 
-            val initialReq = Http(initialQueryPath)
+              val initialReq = Http(initialQueryPath)
 
-            val initialResp = Await.result(initialReq, 10.seconds)
+              val initialResp = Await.result(initialReq, 10.seconds)
 
-            initialResp.getStatusCode must_== 200
-            (for {
-              json <- Parse.parse(initialResp.getResponseBody).toOption
-              out <- json.field("out")
-              outStr <- out.string
-            } yield outStr) must beSome(destinationPath.pathname)
+              initialResp.getStatusCode must_== 200
+              (for {
+                json <- Parse.parse(initialResp.getResponseBody).toOption
+                out <- json.field("out")
+                outStr <- out.string
+              } yield outStr) must beSome(tempPath.pathname)
 
-            val secondaryQueryPath = client / "query" / "fs" / "" <<? Map("q" -> secondaryQueryString)
-            val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
-            val secondaryResp = Await.result(secondaryReq, 10.seconds)
+              val secondaryQueryPath = client / "query" / "fs" / "" <<? Map("q" -> secondaryQueryString(tempPath))
+              val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
+              val secondaryResp = Await.result(secondaryReq, 10.seconds)
 
-            secondaryResp must beRightDisjunction((
-              api.Utils.readableContentType,
-              List(Json("total" := 51))))
+              secondaryResp must beRightDisjunction((
+                api.Utils.readableContentType,
+                List(Json("total" := 51))))
+            }
           }
         }
         "using relative path" in {
           api.Utils.withServer(backend, mongoServerConfig) { client =>
-            val relativeQueryString = """select distinct count(_), state from zips group by state"""
-            val initialQueryPath =
-              (client / "query" / "fs" / prefix.toString / "")
-                .POST
-                .setBody(relativeQueryString)
-                .setHeader("Destination", destinationPath.pathname)
+            interactive.withTemp(backend, prefix) { tempPath =>
+              val relativeQueryString = """select distinct count(_), state from zips group by state"""
+              val initialQueryPath =
+                (client / "query" / "fs" / prefix.toString / "")
+                  .POST
+                  .setBody(relativeQueryString)
+                  .setHeader("Destination", tempPath.pathname)
 
-            val initialReq = Http(initialQueryPath)
+              val initialReq = Http(initialQueryPath)
 
-            val initialResp = Await.result(initialReq, 10.seconds)
+              val initialResp = Await.result(initialReq, 10.seconds)
 
-            initialResp.getStatusCode must_== 200
-            (for {
-              json <- Parse.parse(initialResp.getResponseBody).toOption
-              out <- json.field("out")
-              outStr <- out.string
-            } yield outStr) must beSome(destinationPath.pathname)
+              initialResp.getStatusCode must_== 200
+              (for {
+                json <- Parse.parse(initialResp.getResponseBody).toOption
+                out <- json.field("out")
+                outStr <- out.string
+              } yield outStr) must beSome(tempPath.pathname)
 
-            val relativeSecondaryQueryString = s"select count(_) as total from $outputValueName"
-            val secondaryQueryPath = client / "query" / "fs" / prefix.toString / "" <<? Map("q" -> relativeSecondaryQueryString)
-            val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
-            val secondaryResp = Await.result(secondaryReq, 10.seconds)
+              val relativeSecondaryQueryString = s"select count(_) as total from $outputValueName"
+              val secondaryQueryPath = client / "query" / "fs" / prefix.toString / "" <<? Map("q" -> relativeSecondaryQueryString)
+              val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
+              val secondaryResp = Await.result(secondaryReq, 10.seconds)
 
-            secondaryResp must beRightDisjunction((
-              api.Utils.readableContentType,
-              List(Json("total" := 51))))
+              secondaryResp must beRightDisjunction((
+                api.Utils.readableContentType,
+                List(Json("total" := 51))))
+            }
+          }
+        }
+        "using API level for original request and web for secondary request" in {
+          interactive.withTemp(backend, prefix) { tempPath =>
+            interactive.run(backend, initialQueryString, tempPath).run
+            api.Utils.withServer(backend, mongoServerConfig) { client =>
+              val secondaryQueryPath = client / "query" / "fs" / "" <<? Map("q" -> secondaryQueryString(tempPath))
+              val secondaryReq = Http(secondaryQueryPath OK api.Utils.asJson)
+              val secondaryResp = Await.result(secondaryReq, 10.seconds)
+
+              secondaryResp must beRightDisjunction((
+                api.Utils.readableContentType,
+                List(Json("total" := 51))))
+            }
+          }
+        }
+        "using server level for original request and API for secondary request" in {
+          interactive.withTemp(backend, prefix) { tempPath =>
+            api.Utils.withServer(backend, mongoServerConfig) { client =>
+              val initialQueryPath =
+                (client / "query" / "fs" / "")
+                  .POST
+                  .setBody(initialQueryString)
+                  .setHeader("Destination", tempPath.pathname)
+
+              val initialReq = Http(initialQueryPath)
+
+              val initialResp = Await.result(initialReq, 10.seconds)
+
+              initialResp.getStatusCode must_== 200
+              (for {
+                json <- Parse.parse(initialResp.getResponseBody).toOption
+                out <- json.field("out")
+                outStr <- out.string
+              } yield outStr) must beSome(tempPath.pathname)
+            }
+
+            val secondaryQueryResult = interactive.eval(backend, secondaryQueryString(tempPath))
+            secondaryQueryResult.runLog.run.run.map(_.toList) should
+              beRightDisjunction[Backend.ProcessingError, List[Data]](List(Data.Obj(Map("total" -> Data.Int(51)))))
           }
         }
       }

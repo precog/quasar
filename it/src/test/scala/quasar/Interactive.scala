@@ -54,4 +54,12 @@ package object interactive {
       )
     )
   }
+
+  def withTemp[A](backend: Backend, prefix: Path)(body: Path => A):A = {
+    val tempName = "out0" // TODO: Consider a unique path
+    val tempPath = prefix ++ Path(tempName)
+    val result = body(tempPath)
+    backend.delete(tempPath).run.run.getOrElse(throw new java.lang.AssertionError("Unable to delete temp dir"))
+    result
+  }
 }

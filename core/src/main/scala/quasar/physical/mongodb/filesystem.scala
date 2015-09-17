@@ -214,11 +214,11 @@ sealed trait MongoWrapper {
     _ = c.bulkWrite(data.map(new InsertOneModel(_)).asJava)
   } yield ()
 
-  def databaseNames: Task[List[String]] =
+  def databaseNames: Task[Set[String]] =
     MongoWrapper.databaseNames(client)
 
   def collections: Task[List[Collection]] =
-    databaseNames.flatMap(_.traverse(MongoWrapper.collections(_, client)))
+    databaseNames.flatMap(_.toList.traverse(MongoWrapper.collections(_, client)))
       .map(_.join)
 }
 
@@ -226,8 +226,8 @@ object MongoWrapper {
   def apply(client0: com.mongodb.MongoClient) =
     new MongoWrapper { val client = client0 }
 
-  def liftTask: (Task ~> ETask[EvaluationError, ?]) =
-    new (Task ~> ETask[EvaluationError, ?]) {
+  def liftTask: (Task ~> EvaluationTask) =
+    new (Task ~> EvaluationTask) {
       def apply[A](t: Task[A]) =
         EitherT(t.attempt.map(_.leftMap(e => CommandFailed(e.getMessage))))
     }
@@ -236,15 +236,15 @@ object MongoWrapper {
    Defer an action to be performed against MongoDB, capturing exceptions
    in EvaluationError.
    */
-  def delay[A](a: => A): ETask[EvaluationError, A] =
+  def delay[A](a: => A): EvaluationTask[A] =
     liftTask(Task.delay(a))
 
-  def databaseNames(client: MongoClient): Task[List[String]] =
+  def databaseNames(client: MongoClient): Task[Set[String]] =
     Task.delay(try {
-      client.listDatabaseNames.asScala.toList
+      client.listDatabaseNames.asScala.toSet
     } catch {
       case _: MongoCommandException =>
-        client.getCredentialsList.asScala.toList.map(_.getSource)
+        client.getCredentialsList.asScala.map(_.getSource).toSet
     })
 
   def collections(dbName: String, client: MongoClient): Task[List[Collection]] =

@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.config._
 
 import scalaz.Foldable
@@ -29,19 +28,16 @@ object BackendDefinitions {
       import quasar.physical.mongodb._
       import Workflow._
 
-      val defaultDb = config.connectionUri match {
-        case MongoDbConfig.ParsedUri(_, _, _, _, _, authDb, _) => authDb
-        case _ => None
+      for {
+        client    <- util.createMongoClient(config)
+        mongoEval <- MongoDbEvaluator(client)
+      } yield new MongoDbFileSystem {
+        val planner = MongoDbPlanner
+        val evaluator = mongoEval
+        val RP = RenderTree[Crystallized]
+        protected def server = MongoWrapper(client)
       }
-
-      util.createMongoClient(config) map (client =>
-        new MongoDbFileSystem {
-          val planner = MongoDbPlanner
-          val evaluator = MongoDbEvaluator(client)
-          val RP = RenderTree[Crystallized]
-          protected def server = MongoWrapper(client)
-        })
   }
 
-  val All = Foldable[List].foldMap(MongoDB :: Nil)(ι)
+  val All = Foldable[List].fold(MongoDB :: Nil)
 }

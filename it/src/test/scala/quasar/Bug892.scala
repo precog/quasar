@@ -17,14 +17,15 @@ import specs2.DisjunctionMatchers
 
 class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers {
     // TODO: Consider getting ride of backendName in this API
-    backendShould { (prefix, backend, name) =>
+    backendShould(interactive.zips) { (prefix, backend, name, files) =>
       implicit val dataShowInstance = Show.showFromToString[Data]
-      val zipsPath = prefix ++ Path("zips")
+      val zipsPath = files.head
       val initialQueryString = s"""select distinct count(_), state from "$zipsPath" group by state"""
       val outputValueName = "out0"
       def secondaryQueryString(tempPath: Path) = s"""select count(_) as total from "$tempPath""""
       "work at the API level" in {
-        interactive.withTemp(backend, prefix) { tempPath =>
+        interactive.withTemp(backend, prefix) { tempFile =>
+          val tempPath = prefix ++ tempFile
           // When running an initial query that stores its result in a temporary collection
           interactive.run(backend, initialQueryString, tempPath).run
           // A secondary query operating over that temporary collection is failing at
@@ -44,7 +45,8 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
         )
         "as described in the bug request" in {
           api.Utils.withServer(backend, mongoServerConfig) { client =>
-            interactive.withTemp(backend, prefix) { tempPath =>
+            interactive.withTemp(backend, prefix) { tempFile =>
+              val tempPath = prefix ++ tempFile
               val initialQueryPath =
                 (client / "query" / "fs" / "")
                   .POST
@@ -74,8 +76,9 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
         }
         "using relative path" in {
           api.Utils.withServer(backend, mongoServerConfig) { client =>
-            interactive.withTemp(backend, prefix) { tempPath =>
-              val relativeQueryString = """select distinct count(_), state from zips group by state"""
+            interactive.withTemp(backend, prefix) { tempFile =>
+              val tempPath = prefix ++ tempFile
+              val relativeQueryString = s"""select distinct count(_), state from ${zipsPath.file.get.value} group by state"""
               val initialQueryPath =
                 (client / "query" / "fs" / prefix.toString / "")
                   .POST
@@ -105,7 +108,8 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
           }
         }
         "using API level for original request and web for secondary request" in {
-          interactive.withTemp(backend, prefix) { tempPath =>
+          interactive.withTemp(backend, prefix) { tempFile =>
+            val tempPath = prefix ++ tempFile
             interactive.run(backend, initialQueryString, tempPath).run
             api.Utils.withServer(backend, mongoServerConfig) { client =>
               val secondaryQueryPath = client / "query" / "fs" / "" <<? Map("q" -> secondaryQueryString(tempPath))
@@ -119,7 +123,8 @@ class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers
           }
         }
         "using server level for original request and API for secondary request" in {
-          interactive.withTemp(backend, prefix) { tempPath =>
+          interactive.withTemp(backend, prefix) { tempFile =>
+            val tempPath = prefix ++ tempFile
             api.Utils.withServer(backend, mongoServerConfig) { client =>
               val initialQueryPath =
                 (client / "query" / "fs" / "")

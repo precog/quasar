@@ -31,10 +31,10 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
     case x => x must beNull
   }
 
-  backendShould { (prefix, fs, _) =>
+  backendShould(interactive.zips) { (prefix, fs, _, files) =>
     val relPrefix = prefix.asRelative
     val TestDir = relPrefix ++ testRootDir ++ genTempDir.run
-    val ZipsDir = relPrefix ++ Path("zips")
+    val ZipsDir = relPrefix ++ files.head
 
     "FileSystem" should {
       // Run the task to create a single FileSystem instance for each run (I guess)

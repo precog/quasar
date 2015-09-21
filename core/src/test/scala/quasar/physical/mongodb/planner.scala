@@ -3244,7 +3244,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
     def rootPushes(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op @ $Group(_, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) => List(op)
+        case op @ $Group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
         case _ => Nil
       }) aka "group ops pushing $$ROOT"
 

@@ -265,6 +265,19 @@ object LogicalPlan {
     constraints._2.foldLeft(constraints._3)((acc, con) =>
       Let(con._1, con._3, Typecheck(Free(con._1), con._2, acc, fallback)))
 
+  /** This inserts a constraint on a node that might not strictly require a type
+    * check. It protects operations (EG, array flattening) that need a certain
+    * shape.
+    */
+  private def ensureConstraint(constraints: ConstrainedPlan, fallback: Fix[LogicalPlan]): State[NameGen, Fix[LogicalPlan]] = {
+    val (typ, consts, term) = constraints
+      (consts match {
+        case Nil =>
+          freshName("check").map(name => (typ, List((name, typ, term)), Free(name)))
+        case _   => constraints.point[State[NameGen, ?]]
+      }).map(appConst(_, fallback))
+  }
+
   // TODO: This can perhaps be decomposed into separate folds for annotating
   //       with “found” types, folding constants, and adding runtime checks.
   val checkTypesƒ:
@@ -298,9 +311,16 @@ object LogicalPlan {
         case InvokeF(relations.Or, args) =>
           lift(relations.Or.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
         case InvokeF(structural.FlattenArray, args) =>
-          lift(structural.FlattenArray.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenArray, args.map(appConst(_, Constant(Data.Arr(List(Data.NA))))))))
-        case InvokeF(structural.FlattenObject, args) =>
-          lift(structural.FlattenObject.apply(args.map(_._1)).disjunction).flatMap(maybeWrap(inf, _, Invoke(structural.FlattenObject, args.map(appConst(_, Constant(Data.Obj(Map("" -> Data.NA))))))))
+          for {
+            types <- lift(structural.FlattenArray.apply(args.map(_._1)).disjunction)
+            consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))).sequenceU)
+            plan  <- maybeWrap(inf, types, Invoke(structural.FlattenArray, consts))
+          } yield plan
+        case InvokeF(structural.FlattenObject, args) => for {
+          types <- lift(structural.FlattenObject.apply(args.map(_._1)).disjunction)
+          consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Obj(Map("" -> Data.NA))))).sequenceU)
+          plan  <- maybeWrap(inf, types, Invoke(structural.FlattenObject, consts))
+        } yield plan
         case InvokeF(f @ Mapping(_, _, _, _, _, _, _), args) =>
           val (types, constraints, terms) = args.unzip3
           lift(f.apply(types).disjunction).flatMap(maybeWrap(inf, _, Invoke(f, terms))).map {

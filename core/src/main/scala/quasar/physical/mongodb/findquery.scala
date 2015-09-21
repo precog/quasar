@@ -21,8 +21,7 @@ import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.fp._
 import quasar.javascript._
 
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 
 final case class FindQuery(
   query:        Selector,

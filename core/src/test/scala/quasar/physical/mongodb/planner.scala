@@ -940,15 +940,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $group(
           grouped(
             "city" -> $first($field("city")),
-            "1"    ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined))),
-            "__tmp9"    ->
+            "1" ->
               $sum(
                 $cond(
                   $and(
@@ -958,12 +950,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $literal(Bson.Undefined)))),
           \/-($field("city"))),
         $match(Selector.Doc(
-          BsonField.Name("__tmp9") -> Selector.Gt(Bson.Int64(50000)))),
-        $project(
-          reshape(
-            "city" -> $field("city"),
-            "1" -> $field("1")),
-          ExcludeId)))
+          BsonField.Name("1") -> Selector.Gt(Bson.Int64(50000))))))
     }
 
     "prefer projection+filter over JS filter" in {
@@ -1476,13 +1463,22 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           \/-($field("city")))))
     }
 
+    "plan useless group by expression" in {
+      plan("select city from zips group by lower(city)") must
+      beWorkflow(chain(
+        $read(Collection("db", "zips")),
+        $project(
+          reshape("city" -> $field("city")),
+          IgnoreId)))
+    }
+
     "plan useful group by" in {
       plan("select city || ', ' || state, sum(pop) from zips group by city, state") must
       beWorkflow(chain(
         $read(Collection("db", "zips")),
         $group(
           grouped(
-            "__tmp8" ->
+            "__tmp10" ->
               $first(
                 $cond(
                   $or(
@@ -1494,7 +1490,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lt($field("city"), $literal(Bson.Doc(ListMap()))))),
                   $field("city"),
                   $literal(Bson.Undefined))),
-            "__tmp9" ->
+            "__tmp11" ->
               $first(
                 $cond(
                   $or(
@@ -1521,28 +1517,34 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           reshape(
             "0" ->
               $concat(
-                $concat($field("__tmp8"), $literal(Bson.Text(", "))),
-                $field("__tmp9")),
+                $concat($field("__tmp10"), $literal(Bson.Text(", "))),
+                $field("__tmp11")),
             "1" -> $field("1")),
           IgnoreId)))
     }
 
     "plan group by expression" in {
-      plan("select city from zips group by lower(city)") must
+      plan("select city, sum(pop) from zips group by lower(city)") must
       beWorkflow(chain(
         $read(Collection("db", "zips")),
-        $project(
-          reshape(
-            "__tmp4" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Text("")), $field("city")),
-                  $lt($field("city"), $literal(Bson.Doc(ListMap())))),
-                $toLower($field("city")),
-                $literal(Bson.Undefined)),
-            "city" -> $include()),
-          IgnoreId),
-        $group(grouped("city" -> $push($field("city"))), \/-($field("__tmp4"))),
+        $group(
+          grouped(
+            "city" -> $push($field("city")),
+            "1" ->
+              $sum(
+                $cond(
+                  $and(
+                    $lt($literal(Bson.Null), $field("pop")),
+                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $field("pop"),
+                  $literal(Bson.Undefined)))),
+          \/-(
+            $cond(
+              $and(
+                $lte($literal(Bson.Text("")), $field("city")),
+                $lt($field("city"), $literal(Bson.Doc(ListMap())))),
+              $toLower($field("city")),
+              $literal(Bson.Undefined)))),
         $unwind(DocField(BsonField.Name("city")))))
     }
 
@@ -1659,18 +1661,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "__tmp3" -> reshape(
               "city"  -> $field("city"),
               "state" -> $field("state")),
-            "__tmp4" -> reshape(
-              "__tmp2" ->
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
+            "__tmp4" -> $$ROOT),
           IgnoreId),
         $group(
           grouped(
-            "2"      -> $sum($field("__tmp4", "__tmp2")),
+            "2" ->
+              $sum(
+                $cond(
+                  $and(
+                    $lt($literal(Bson.Null), $field("__tmp4", "pop")),
+                    $lt($field("__tmp4", "pop"), $literal(Bson.Text("")))),
+                  $field("__tmp4", "pop"),
+                  $literal(Bson.Undefined))),
             "__tmp3" -> $push($field("__tmp3"))),
           \/-($literal(Bson.Null))),
         $unwind(DocField("__tmp3")),
@@ -1730,7 +1732,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                         $lt($field("city"), $literal(Bson.Regex("", ""))))),
                     $field("city"),
                     $literal(Bson.Undefined))),
-                "__tmp8" ->
+                "__tmp10" ->
                   $avg($cond(
                     $and(
                       $lt($literal(Bson.Null), $field("pop")),
@@ -1740,7 +1742,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               \/-($field("foo"))),
             $group(
               grouped(
-                "0" -> $sum($field("__tmp8")),
+                "0" -> $sum($field("__tmp10")),
                 "1" -> $push($field("1"))),
               \/-($literal(Bson.Null))),
             $unwind(DocField("1")))
@@ -1766,7 +1768,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read (Collection("db", "zips")),
         $project(
           reshape(
-            "__tmp5" -> reshape(
+            "__tmp6" -> reshape(
               "pop" -> $field("pop"),
               "2"   ->
                 $cond(
@@ -1779,26 +1781,26 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int64(1000))),
                   $literal(Bson.Undefined))),
-            "__tmp6" -> reshape(
-              "__tmp2" ->
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
+            "__tmp7" -> $$ROOT),
           IgnoreId),
         $group(
           grouped(
-            "1"      -> $sum($field("__tmp6", "__tmp2")),
-            "__tmp5" -> $push($field("__tmp5"))),
+            "1" ->
+              $sum(
+                $cond(
+                  $and(
+                    $lt($literal(Bson.Null), $field("__tmp7", "pop")),
+                    $lt($field("__tmp7", "pop"), $literal(Bson.Text("")))),
+                  $field("__tmp7", "pop"),
+                  $literal(Bson.Undefined))),
+            "__tmp6" -> $push($field("__tmp6"))),
           \/-($literal(Bson.Null))),
-        $unwind(DocField("__tmp5")),
+        $unwind(DocField("__tmp6")),
         $project(
           reshape(
-            "pop" -> $field("__tmp5", "pop"),
+            "pop" -> $field("__tmp6", "pop"),
             "1"   -> $field("1"),
-            "2"   -> $field("__tmp5", "2")),
+            "2"   -> $field("__tmp6", "2")),
           IgnoreId)))
     }
 
@@ -1809,7 +1811,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $group(
           grouped(
             "city"   -> $first($field("city")),
-            "__tmp5" ->
+            "__tmp6" ->
               $sum(
                 $cond(
                   $and(
@@ -1821,7 +1823,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $project(
           reshape(
             "city" -> $field("city"),
-            "1"    -> $divide($field("__tmp5"), $literal(Bson.Int64(1000)))),
+            "1"    -> $divide($field("__tmp6"), $literal(Bson.Int64(1000)))),
           IgnoreId)))
     }
 
@@ -1832,7 +1834,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $group(
             grouped(
               "state" -> $first($field("state")),
-              "__tmp5" ->
+              "__tmp6" ->
                 $min(
                   $cond(
                     $and(
@@ -1844,7 +1846,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $simpleMap(NonEmptyList(
             MapExpr(JsFn(Name("x"), obj(
               "state" -> Select(ident("x"), "state"),
-              "shortest" -> Select(Select(ident("x"), "__tmp5"), "length"))))),
+              "shortest" -> Select(Select(ident("x"), "__tmp6"), "length"))))),
             ListMap()),
           $project(
             reshape(
@@ -1860,19 +1862,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
               obj(
-                "__tmp2" -> Call(ident("isString"), List(Select(ident("x"), "city"))),
-                // FIXME: Don’t evaluate this outside of cond (#898)
-                "__tmp3" -> Select(Select(ident("x"), "city"), "length"),
-                "__tmp7" ->
+                "__tmp6" ->
                   If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                     Select(Select(ident("x"), "city"), "length"),
                     ident("undefined")))))),
             ListMap()),
           $group(
             grouped(
-              "len" -> $first($cond($field("__tmp2"), $field("__tmp3"), $literal(Bson.Undefined))),
+              "len" -> $first($field("__tmp6")),
               "cnt" -> $sum($literal(Bson.Int32(1)))),
-            \/-($field("__tmp7")))))
+            \/-($field("__tmp6")))))
     }
 
     "plan simple JS inside expression" in {
@@ -2091,6 +2090,40 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $project(
           reshape("loc" -> $field("__tmp5")),
           IgnoreId)))
+    }
+
+    "group by flattened field" in {
+      plan("select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)") must
+      beWorkflow(chain(
+        $read(Collection("db", "slamengine_commits")),
+        $project(
+          reshape(
+            "__tmp12" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr(List())), $field("parents")),
+                  $lt($field("parents"), $literal(Bson.Binary(scala.Array[Byte]())))),
+                $field("parents"),
+                $literal(Bson.Arr(List(Bson.Undefined))))),
+          IgnoreId),
+        $unwind(DocField(BsonField.Name("__tmp12"))),
+        $group(
+          grouped(
+            "0" ->
+              $first(
+                $cond(
+                  $and(
+                    $lte($literal(Bson.Text("")), $field("__tmp12", "sha")),
+                    $lt($field("__tmp12", "sha"), $literal(Bson.Doc(ListMap())))),
+                  $substr($field("__tmp12", "sha"), $literal(Bson.Int64(0)), $literal(Bson.Int64(1))),
+                  $literal(Bson.Undefined))),
+            "1" -> $sum($literal(Bson.Int32(1)))),
+          \/-($cond(
+            $and(
+              $lte($literal(Bson.Text("")), $field("__tmp12", "sha")),
+              $lt($field("__tmp12", "sha"), $literal(Bson.Doc(ListMap())))),
+            $substr($field("__tmp12", "sha"), $literal(Bson.Int64(0)), $literal(Bson.Int64(1))),
+            $literal(Bson.Undefined))))))
     }
 
     "unify flattened fields with unflattened field" in {
@@ -2425,16 +2458,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             \/-($field("city"))),
           $unwind(DocField("state")),
           $group(
-            grouped("__tmp6" -> $first($$ROOT)),
+            grouped("__tmp7" -> $first($$ROOT)),
             -\/(reshape(
               "0" -> $field("totalPop"),
               "1" -> $field("city"),
               "2" -> $field("state")))),
           $project(
             reshape(
-              "totalPop" -> $field("__tmp6", "totalPop"),
-              "city"     -> $field("__tmp6", "city"),
-              "state"    -> $field("__tmp6", "state")),
+              "totalPop" -> $field("__tmp7", "totalPop"),
+              "city"     -> $field("__tmp7", "city"),
+              "state"    -> $field("__tmp7", "state")),
             ExcludeId)))
     }
 
@@ -2459,18 +2492,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField("state")),
             $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending)),
             $group(
-              grouped("__tmp7" -> $first($$ROOT)),
+              grouped("__tmp8" -> $first($$ROOT)),
               -\/(reshape(
                 "0" -> $field("totalPop"),
                 "1" -> $field("city"),
                 "2" -> $field("state")))),
             $sort(NonEmptyList(
-              BsonField.Name("__tmp7") \ BsonField.Name("totalPop") -> Descending)),
+              BsonField.Name("__tmp8") \ BsonField.Name("totalPop") -> Descending)),
             $project(
               reshape(
-                "totalPop" -> $field("__tmp7", "totalPop"),
-                "city"     -> $field("__tmp7", "city"),
-                "state"    -> $field("__tmp7", "state")),
+                "totalPop" -> $field("__tmp8", "totalPop"),
+                "city"     -> $field("__tmp8", "city"),
+                "state"    -> $field("__tmp8", "state")),
               ExcludeId)))
 
     }

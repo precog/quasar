@@ -17,15 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar._, LogicalPlan._, SemanticError._
+import quasar.fp._
 
-import scalaz._
-import Scalaz._
-import Validation.{success, failure}
-import NonEmptyList.nel
-
-import quasar._
-
-import SemanticError._
+import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 trait StructuralLib extends Library {
   import Type._
@@ -158,7 +153,10 @@ trait StructuralLib extends Library {
     "({})",
     "Extracts a specified field of an object",
     Top, AnyObject :: Str :: Nil,
-    noSimplification,
+    {
+      case List(MakeObjectN(obj), field) => obj.toListMap.get(field)
+      case _ => None
+    },
     partialTyperV { case List(v1, v2) => v1.objectField(v2) },
     basicUntyper)
 

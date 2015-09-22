@@ -48,6 +48,9 @@ final case class Path(dir: List[DirNode], file: Option[FileNode]) {
     case _=> this
   }
 
+  // TODO: Consider adding documentation to this method/renaming/reimplementing because
+  // it's implementation seems approximately arbitrary. It should be called get rid of
+  // current directory, in what way does that make it absolute?
   def asAbsolute: Path = dir match {
     case DirNode.Current :: ds => Path(ds, file)
     case _ => this

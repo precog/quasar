@@ -111,7 +111,8 @@ trait BackendTest extends Specification {
     * @param runTests A function that accepts a path prefix under which both test
     *                 data may be found and tests may use as a sandbox, a backend
     *                 (filesystem) and an associated name for purposes of
-    *                 identifying the backend in messages.
+    *                 identifying the backend in messages as well as a list of fully qualified paths to the test data
+    *                 requested (in the same order as supplied)
     */
   def backendShould(data: Source*)(runTests: (Path, Backend, String, List[Path]) => Unit): Unit = {
     import interactive._

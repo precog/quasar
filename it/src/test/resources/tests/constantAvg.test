@@ -1,0 +1,12 @@
+{
+  "name": "constant query with avg",
+
+  "data": "zips.data",
+
+  "query": "select avg(0) from zips limit 1",
+
+  "predicate": "containsExactly",
+  "expected": [
+    { "0": 0.0 }
+  ]
+}

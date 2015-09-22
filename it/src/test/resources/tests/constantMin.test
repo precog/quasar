@@ -1,0 +1,12 @@
+{
+  "name": "constant query with min",
+
+  "data": "zips.data",
+
+  "query": "select min(0) from zips limit 1",
+
+  "predicate": "containsExactly",
+  "expected": [
+    { "0": 0 }
+  ]
+}

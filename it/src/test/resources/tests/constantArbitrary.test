@@ -1,0 +1,12 @@
+{
+  "name": "constant query with arbitrary",
+
+  "data": "zips.data",
+
+  "query": "select arbitrary(0) from zips limit 1",
+
+  "predicate": "containsExactly",
+  "expected": [
+    { "0": 0 }
+  ]
+}

@@ -30,6 +30,7 @@ trait AggLib extends Library {
     noSimplification,
     partialTyper {
       case List(Type.Const(Data.Set(Nil))) => Type.Const(Data.Int(0))
+      case List(Type.Const(_))             => Type.Const(Data.Int(1))
       case List(_)                         => Type.Int
     },
     κ(success(Type.Top :: Nil)))
@@ -45,22 +46,25 @@ trait AggLib extends Library {
 
   val Min = Reduction("MIN", "Finds the minimum in a set of values", Type.Comparable :: Nil,
     noSimplification,
-    reflexiveTyper,
+    identityTyper,
     reflexiveUnary(Type.Comparable))
 
   val Max = Reduction("MAX", "Finds the maximum in a set of values", Type.Comparable :: Nil,
     noSimplification,
-    reflexiveTyper,
+    identityTyper,
     reflexiveUnary(Type.Comparable))
 
   val Avg = Reduction("AVG", "Finds the average in a set of numeric values", Type.Numeric :: Nil,
     noSimplification,
-    constTyper(Type.Dec),
+    partialTyper {
+      case List(Type.Const(t))  => Type.Const(t)
+      case _                    => Type.Dec
+    },
     NumericUnary)
 
   val Arbitrary = Reduction("ARBITRARY", "Returns an arbitrary value from a set", Type.Top :: Nil,
     noSimplification,
-    reflexiveTyper,
+    identityTyper,
     reflexiveUnary(Type.Top))
 
   def functions = Count :: Sum :: Min :: Max :: Avg :: Arbitrary :: Nil

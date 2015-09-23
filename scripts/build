@@ -50,12 +50,6 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
     export QUASAR_MONGODB_3_0
 
   echo "Using local MongoDB config"
-elif [[ ${AMBIENT_MONGODB:-} == "true" ]] ; then
-    export QUASAR_TEST_PATH_PREFIX
-    export QUASAR_MONGODB_2_6
-    export QUASAR_MONGODB_3_0
-
-  echo "Using ambient MongoDB config (2.6:27018, 3.0:27019)"
 fi
 
 # Build and run all tests everywhere (including integration)

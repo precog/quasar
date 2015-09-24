@@ -10,17 +10,17 @@ outputStrategy := Some(StdoutOutput)
 
 import ScoverageSbtPlugin._
 
-ScoverageKeys.coverageExcludedPackages := "quasar.repl;.*RenderTree"
+scoverage.ScoverageKeys.coverageExcludedPackages := "quasar.repl;.*RenderTree"
 
-ScoverageKeys.coverageMinimum := 78
+scoverage.ScoverageKeys.coverageMinimum := 78
 
-ScoverageKeys.coverageFailOnMinimum := true
+scoverage.ScoverageKeys.coverageFailOnMinimum := true
 
-ScoverageKeys.coverageHighlighting := true
+scoverage.ScoverageKeys.coverageHighlighting := true
 
 sbtbuildinfo.BuildInfoPlugin.projectSettings
 
-buildInfoKeys := Seq[BuildInfoKey](version)
+buildInfoKeys := Seq[BuildInfoKey](version, scoverage.ScoverageKeys.coverageEnabled)
 
 buildInfoPackage := "quasar.build"
 

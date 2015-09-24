@@ -379,13 +379,15 @@ object WorkflowBuilder {
             expr => (cont match {
               case Expr(\/-($var(dv))) =>
                 Some(rewriteExprRefs(expr)(prefixBase(dv)))
-              case Expr(\/-(ex)) => Some(expr.cata[Expression] {
-                case $varF(DocVar.ROOT(None)) => ex
-                case x                     => Fix(x)
-              })
+              case Expr(\/-(ex)) => expr.cataM[Option, Expression] {
+                case $varF(DocVar.ROOT(None)) => ex.some
+                case $varF(_)                 => None
+                case x                        => Fix(x).some
+              }
               case Doc(map) => expr.cataM[Option, Expression] {
                 case $varF(DocField(field @ BsonField.Name(_))) =>
                   map.get(field).flatMap(_.toOption)
+                case $varF(_) => None // TODO: also handle BsonField.Path
                 case x => Some(Fix(x))
               }
               case _ => None

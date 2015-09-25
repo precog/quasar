@@ -52,10 +52,10 @@ object Utils {
 
     val updatedConfig = (lens[Config] >> 'server >> 'port0).set(config)(Some(port))
     def unexpectedRestart(config: Config) = Task.fail(new java.lang.AssertionError("Did not expect the server to be restarted with this config: " + config))
-    val api = FileSystemApi(".", updatedConfig, createBackend, tester,
+    val api = FileSystemApi(updatedConfig, createBackend, tester,
                             restartServer = unexpectedRestart,
                             configChanged = recordConfigChange)
-    val srv = Server.createServer(port, 1.seconds, api).run.run
+    val srv = Server.createServer(port, 1.seconds, api.AllServices).run.run
     try { body(client, () => reloads.toList) } finally { srv.traverse_(_.shutdown.void).run }
   }
 
@@ -65,7 +65,7 @@ object Utils {
       vs.toList.map(_.validation.toValidationNel).sequenceU.leftMap(_.list.mkString("; ")).disjunction
 
     private def parseJsonLines(str: String): String \/ List[Json] =
-      if (str == "") \/-(Nil)
+      if (str ≟ "") \/-(Nil)
       else sequenceStrs(str.split("\n").map(Parse.parse(_)))
 
     def apply(r: Response) =
@@ -97,10 +97,15 @@ object Mock {
 
   case class Plan(description: String)
 
+  object JournaledBackend {
+    def apply(files: Map[Path, Process[Task, Data]]): Backend =
+      new JournaledBackend(files)
+  }
+
   /**
    * A mock backend that records the actions taken on it and exposes this through the mutable `actions` buffer
    */
-  class Backend(files: Map[Path, Process[Task, Data]]) extends PlannerBackend[Plan] {
+  class JournaledBackend(files: Map[Path, Process[Task, Data]]) extends PlannerBackend[Plan] {
 
     private val pastActions = scala.collection.mutable.ListBuffer[Action]()
 
@@ -112,7 +117,6 @@ object Mock {
       def execute(physical: Plan) =
         EitherT.right(Task.now(ResultPath.Temp(Path("tmp/out"))))
       def compile(physical: Plan) = "Stub" -> Cord(physical.toString)
-      def checkCompatibility = ???
     }
     val RP = PlanRenderTree
 
@@ -164,7 +168,7 @@ object Mock {
   def simpleFiles(files: Map[Path, List[Data]]): Map[Path, Process[Task, Data]] =
     files ∘ { ds => Process.emitAll(ds) }
 
-  val emptyBackend = new Backend(ListMap())
+  val emptyBackend = JournaledBackend(ListMap())
 }
 
 class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAccurateCoverage with org.specs2.time.NoTimeConversions {
@@ -185,7 +189,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
   def errorFromBody(resp: Response): String \/ String = {
     val mt = resp.getContentType.split(";").head
     (for {
-      _      <- if (mt == "application/json" || mt == "application/ldjson") \/-(())
+      _      <- if (mt ≟ "application/json" || mt ≟ "application/ldjson") \/-(())
                 else -\/("bad content-type: " + mt + " (body: " + resp.getResponseBody + ")")
       json   <- Parse.parse(resp.getResponseBody)
       err    <- json.field("error") \/> ("`error` missing: " + json)
@@ -198,10 +202,8 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
    * the [[Config]].
    */
   val backendForConfig: Config => EnvTask[Backend] = {
-    val bdefn = BackendDefinition({
-      case _ => (new Mock.Backend(Map.empty.withDefault(_ => Process.halt))).point[Task]
-    })
-
+    val emptyFiles = Map.empty.withDefault((_: Path) => Process.halt)
+    val bdefn = BackendDefinition(_ => Mock.JournaledBackend(emptyFiles).point[EnvTask])
     Mounter.mount(_, bdefn)
   }
 
@@ -237,7 +239,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
       scalaz.stream.io.resource(acquire)(release)(step)
     })
   val noBackends = NestedBackend(Map())
-  val backends1 = createBackendsFromMock(new Mock.Backend(bigFiles), new Mock.Backend(Mock.simpleFiles(files1)))
+  val backends1 = createBackendsFromMock(Mock.JournaledBackend(bigFiles), Mock.JournaledBackend(Mock.simpleFiles(files1)))
 
   def createBackendsFromMock(large: Backend, normal: Backend) =
     NestedBackend(ListMap(
@@ -257,9 +259,9 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
   val corsMethods = header("Access-Control-Allow-Methods") andThen commaSep
   val corsHeaders = header("Access-Control-Allow-Headers") andThen commaSep
 
-  def mockTest[A](body: (Mock.Backend, Req) => A) = {
-    val mock = new Mock.Backend(Mock.simpleFiles(files1))
-    val backends = createBackendsFromMock(new Mock.Backend(bigFiles), mock)
+  def mockTest[A](body: (Mock.JournaledBackend, Req) => A) = {
+    val mock = new Mock.JournaledBackend(Mock.simpleFiles(files1))
+    val backends = createBackendsFromMock(Mock.JournaledBackend(bigFiles), mock)
     withServer(backends, config1) { client =>
       body(mock, client)
     }
@@ -689,7 +691,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
         def loop(acc: Int): Int = {
           val c = is.read()
           if (c < 0) acc
-          else if (c == '\n') loop(acc + 1)
+          else if (c ≟ '\n') loop(acc + 1)
           else loop(acc)
         }
         loop(0)
@@ -936,12 +938,12 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
 
           meta() must beRightDisjunction { (resp: (String, List[Json])) =>
             val (_, json) = resp
-            json.length == 1 &&
+            json.length ≟ 1 &&
             (for {
               obj <- json.head.obj
               errors <- obj("details")
               eArr <- errors.array
-            } yield eArr.length == 2).getOrElse(false)
+            } yield eArr.length ≟ 2).getOrElse(false)
           }
         }
       }
@@ -1812,7 +1814,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
 
       val client = dispatch.host("localhost", port)
 
-      val (servers, forCfg) = Server.servers("", 1.seconds, tester, mounter(backend), _ => Task.now(()))
+      val (servers, forCfg) = Server.servers(Nil, None, 1.seconds, tester, mounter(backend), _ => Task.now(()))
 
       val channel = Process[S => Task[A \/ B]](
         κ(Task.delay(\/.left(causeRestart(client)))),
@@ -1867,6 +1869,26 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
         val result3 = Http(req3 > code)
         result3() must_== 200
       })
+    }
+  }
+
+  "/welcome" should {
+    "show a welcome message" in {
+      withServer(backends1, config1) { client =>
+        val path = client / "welcome"
+        val result = Http(path OK as.String)
+
+        result() must contain("quasar-logo-vector.png")
+      }
+    }
+
+    "show the current version" in {
+      withServer(backends1, config1) { client =>
+        val path = client / "welcome"
+        val result = Http(path OK as.String)
+
+        result() must contain("Quasar " + quasar.build.BuildInfo.version)
+      }
     }
   }
 

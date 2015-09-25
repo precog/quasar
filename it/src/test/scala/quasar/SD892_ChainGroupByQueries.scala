@@ -15,9 +15,9 @@ import sql.{Query, SQLParser}
 import Errors._
 import specs2.DisjunctionMatchers
 
-class Bug892 extends BackendTest with NoTimeConversions with DisjunctionMatchers {
+class SD892_ChainGroupByQueries extends BackendTest with NoTimeConversions with DisjunctionMatchers {
     // TODO: Consider getting ride of backendName in this API
-    backendShould(interactive.zips) { (prefix, backend, name, files) =>
+    backendShould(interactive.zips.run) { (prefix, backend, name, files) =>
       implicit val dataShowInstance = Show.showFromToString[Data]
       val zipsPath = files.head
       val initialQueryString = s"""select distinct count(_), state from "$zipsPath" group by state"""

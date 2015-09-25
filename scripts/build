@@ -32,7 +32,6 @@ QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
 QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
 QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
 
-# TODO: Explain why we need to do this instead of just doing sbt clean oneJar at the end
 rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 

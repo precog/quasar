@@ -31,7 +31,7 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
     case x => x must beNull
   }
 
-  backendShould(interactive.zips) { (prefix, fs, _, files) =>
+  backendShould(interactive.zips.run) { (prefix, fs, _, files) =>
     val relPrefix = prefix.asRelative
     val TestDir = relPrefix ++ testRootDir ++ genTempDir.run
     val ZipsDir = files.head
@@ -41,12 +41,6 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
 
       "list root" in {
         fs.ls(Path(".")).map(_ must contain(FilesystemNode(relPrefix, Plain))).run.run must beRightDisjunction
-      }
-
-      "have zips" in {
-        // This is the collection we use for all of our examples, so might as well make sure it's there.
-        fs.ls(prefix).map(_ must contain(FilesystemNode(ZipsDir.rebase(prefix).getOrElse(scala.sys.error("")), Plain))).run.run must beRightDisjunction
-        fs.count(ZipsDir).run.run must beRightDisjunction(29353L)
       }
 
       "read zips with skip and limit" in {

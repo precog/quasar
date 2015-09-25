@@ -28,7 +28,7 @@ class InteractiveTest extends BackendTest with NoTimeConversions with Disjunctio
         interactive.withTemp(backend, prefix) { tempFile =>
           interactive.delete(backend, prefix ++ tempFile).run
           assertNotThere(tempFile)
-          interactive.loadData(backend, prefix ++ tempFile, interactive.zips).run.run
+          interactive.loadData(backend, prefix ++ tempFile, interactive.zips.run.content).run.run
           assertThere(tempFile)
         }
       }

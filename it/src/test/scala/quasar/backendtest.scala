@@ -8,6 +8,7 @@ import quasar.fs._
 import java.lang.System
 
 import org.specs2.mutable._
+import quasar.interactive.DataSource
 
 import scala.io.Source
 import scalaz._, Scalaz._
@@ -106,7 +107,7 @@ trait BackendTest extends Specification {
     *             Currently as well, the sources must have a non-empty [[String]] as a description
     *             in order for the fixture to derive a [[Path]] at which to store the data. Eventually, this path
     *             location could be randomized since we provide the paths as an argument for the body, so it should
-    *             not hardcode any [[String]]s in theory. Under such circumstances, a [[Source]] with a empty string
+    *             not hardcode any [[String]]s in theory. Under such circumstances, a [[DataSource]] with a empty string
     *             description would be accepted without issues.
     * @param runTests A function that accepts a path prefix under which both test
     *                 data may be found and tests may use as a sandbox, a backend
@@ -114,18 +115,18 @@ trait BackendTest extends Specification {
     *                 identifying the backend in messages as well as a list of fully qualified paths to the test data
     *                 requested (in the same order as supplied)
     */
-  def backendShould(data: Source*)(runTests: (Path, Backend, String, List[Path]) => Unit): Unit = {
+  def backendShould(data: DataSource*)(runTests: (Path, Backend, String, List[Path]) => Unit): Unit = {
     import interactive._
     val dataSources = data.toList
     val emptyNameMessage = "Every Source of data must have a name so that we know where to temporarly store it"
-    scala.Predef.require(dataSources.all(_.descr != ""), emptyNameMessage)
+    scala.Predef.require(dataSources.all(_.name != ""), emptyNameMessage)
     (TestConfig.testDataPathPrefix |@| AllBackends)((dir, backends) =>
       backends.traverse_ { case (n, b) =>
         val loadAll = dataSources.map(source =>
-          safeTaskToNormalTask[ProcessingError].apply(loadDataWithSourceName(b, dir,source))
+          safeTaskToNormalTask[ProcessingError].apply(loadData(b, dir,source))
         )
-        val deleteData = Monad[Task].sequence(dataSources.map(source => delete(b,dir ++ Path(source.descr))))
-        val filesPaths = dataSources.map(source => dir ++ Path(source.descr))
+        val deleteData = Monad[Task].sequence(dataSources.map(source => delete(b,dir ++ Path(source.name))))
+        val filesPaths = dataSources.map(source => dir ++ Path(source.name))
         for {
           _ <- Monad[Task].sequence(loadAll)
                                                                    // It would be nice to clean up after ourselves but

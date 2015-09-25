@@ -3,6 +3,7 @@ package quasar
 import java.io.File
 
 import Predef._
+import pathy.Path.FileName
 import quasar.Backend.{FilesystemNode, ProcessingError, PPathError, ProcessingTask}
 import fs.Path
 import quasar.fs.Path.PathError
@@ -29,21 +30,33 @@ package object interactive {
     ).join
   }
 
-  def dataResource(name: String) = Source.fromInputStream(getClass.getResourceAsStream(s"/tests/$name.data")).withDescription(name)
-  def cities = dataResource("cities")
-  def days = dataResource("days")
-  def jobs_jobinfo = dataResource("jobs_jobinfo")
-  def nested = dataResource("nested")
-  def nested_foo = dataResource("nested_foo")
-  def objectids = dataResource("objectids")
-  def olympics = dataResource("olympics")
-  def slamengine_commits = dataResource("slamengine_commits")
-  def smallZips = dataResource("smallZips")
-  def unicode = dataResource("unicode")
-  def usa_factbook = dataResource("usa_factbook")
-  def user_comments = dataResource("user_comments")
-  def webapp = dataResource("webapp")
-  def zips = dataResource("zips")
+  case class DataSource(content: Process[Task, String], name: String)
+  object DataSource {
+    def fromFile(file: File): DataSource = {
+      val content = scalaz.stream.io.linesR(Source.fromFile(file))
+      val name = FileName(file.getName).dropExtension.value
+      DataSource(content, name)
+    }
+  }
+
+  def loadDataSourceFromResources(name: String): Task[DataSource] = Task.delay {
+    val content = scalaz.stream.io.linesR(getClass.getResourceAsStream(s"/tests/$name.data"))
+    DataSource(content, name)
+  }
+  val cities = loadDataSourceFromResources("cities")
+  val days = loadDataSourceFromResources("days")
+  val jobs_jobinfo = loadDataSourceFromResources("jobs_jobinfo")
+  val nested = loadDataSourceFromResources("nested")
+  val nested_foo = loadDataSourceFromResources("nested_foo")
+  val objectids = loadDataSourceFromResources("objectids")
+  val olympics = loadDataSourceFromResources("olympics")
+  val slamengine_commits = loadDataSourceFromResources("slamengine_commits")
+  val smallZips = loadDataSourceFromResources("smallZips")
+  val unicode = loadDataSourceFromResources("unicode")
+  val usa_factbook = loadDataSourceFromResources("usa_factbook")
+  val user_comments = loadDataSourceFromResources("user_comments")
+  val webapp = loadDataSourceFromResources("webapp")
+  val zips = loadDataSourceFromResources("zips")
 
   /**
    * Execute an SQL query on the backend and store the result in the provided `destinationPath`
@@ -111,16 +124,15 @@ package object interactive {
    * Loads a collection of data into the provided backend if not already there
    * @param backend The backend into which to load the data
    * @param path The path of the collection (file) that will contain the loaded data.
-   * @param source source from which to extract data
+   * @param source Stream of Data to load into the backend
    */
-  def loadData(backend: Backend, path: Path, source: Source): ProcessingTask[Unit] = {
+  def loadData(backend: Backend, path: Path, source: Process[Task,String]): ProcessingTask[Unit] = {
     implicit val codec = DataCodec.Precise
     backend.exists(path).leftMap(PPathError(_)).flatMap { exists =>
       if (exists)
         ().point[ProcessingTask]
       else {
-        val lines = scalaz.stream.io.linesR(source)
-        val data = lines.flatMap(DataCodec.parse(_).fold(
+        val data = source.flatMap(DataCodec.parse(_).fold(
           err => Process.fail( new RuntimeException("error loading: " + err.message)),
           j => Process.eval(Task.now(j))
         ))
@@ -131,13 +143,13 @@ package object interactive {
 
   /**
    * Loads a collection of data into the provided backend if not already there
-   * Same as `loadData` but the source description is used for the collection name.
+   * Same as [[loadData]] but the source description is used for the collection name.
    * @param backend The backend into which to load the data
-   * @param prefix The path under which to store the collection materialized from the data file
+   * @param prefix The path under which to store the collection materialized from the [[DataSource]]
    * @param source source from which to extract data
    */
-  def loadDataWithSourceName(backend: Backend, prefix: Path, source: Source): ProcessingTask[Unit] =
-    loadData(backend, prefix ++ Path(source.descr), source)
+  def loadData(backend: Backend, prefix: Path, source: DataSource): ProcessingTask[Unit] =
+    loadData(backend, prefix ++ Path(source.name), source.content)
 
   /**
    * Loads a collection of data into the provided backend if not already there
@@ -149,7 +161,7 @@ package object interactive {
   def loadFile(backend: Backend, prefix: Path, file: File): ProcessingTask[Unit] = {
     for {
     _ <- liftE(Task.delay(println("loading: " + file)))
-    _ <- loadData(backend, prefix ++ Path(utils.removeExtension(file.getName)), Source.fromFile(file))
+    _ <- loadData(backend, prefix, DataSource.fromFile(file))
     } yield ()
   }
 }

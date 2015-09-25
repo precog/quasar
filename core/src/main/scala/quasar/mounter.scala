@@ -46,7 +46,7 @@ object Mounter {
     config.mountings.foldLeft[ETask[EnvironmentError, Backend]](
       EitherT.right(Task.now(NestedBackend(Map())))) {
       case (root, (path, config)) =>
-        root.flatMap(rec(_, path.asAbsolute.asDir.dir, config))
+        root.flatMap(rec(_, path.removeCurrentDir.asDir.dir, config))
     }
   }
 }

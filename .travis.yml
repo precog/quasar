@@ -19,3 +19,7 @@ env:
   global:
   - LOCAL_MONGODB=true
   - ISOLATED_ENV=true
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt/boot/

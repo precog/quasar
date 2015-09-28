@@ -3,10 +3,6 @@ import Keys._
 import de.heikoseeberger.sbtheader.license.Apache2_0
 import de.heikoseeberger.sbtheader.HeaderPlugin
 
-val scalazVersion  = "7.1.3"
-val slcVersion     = "0.4"
-val monocleVersion = "1.1.1"
-
 lazy val standardSettings = Defaults.defaultSettings ++ Seq(
   headers := Map(
     "scala" -> Apache2_0("2014 - 2015", "SlamData Inc."),
@@ -23,6 +19,7 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
   },
   autoCompilerPlugins := true,
   exportJars := true,
+  fullResolvers -= "jcenter" at "https://jcenter.bintray.com/", // until https://github.com/sbt/sbt/issues/2217 is figured out
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -54,27 +51,34 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
   ),
   console <<= console in Test, // console alias test:console
   initialCommands in (Test, console) := """ammonite.repl.Repl.run("prompt.update(\"λ \")")""",
-  libraryDependencies ++= Seq(
-    "com.lihaoyi"        % "ammonite-repl"             % "0.4.7"        % "test" cross CrossVersion.full,
-    "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test",
-    "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion  % "compile, test",
-    "org.scalaz.stream" %% "scalaz-stream"             % "0.7.1a"       % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion % "compile, test",
-    "com.github.scopt"  %% "scopt"                     % "3.3.0"        % "compile, test",
-    "org.threeten"      %  "threetenbp"                % "1.2"          % "compile, test",
-    "org.mongodb"       %  "mongo-java-driver"         % "3.0.2"        % "compile, test",
-    "io.argonaut"       %% "argonaut"                  % "6.1"          % "compile, test",
-    "org.jboss.aesh"    %  "aesh"                      % "0.55"         % "compile, test",
-    "org.typelevel"     %% "shapeless-scalaz"          % slcVersion     % "compile, test",
-    "com.slamdata"      %% "pathy"                     % "0.0.1-SNAPSHOT" % "compile, test",
-    "com.github.mpilquist" %% "simulacrum"             % "0.3.0"        % "compile, test",
-    "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion  % "test",
-    "org.specs2"        %% "specs2-core"               % "2.4"          % "test",
-    "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"        % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test",
-    "net.databinder.dispatch" %% "dispatch-core"       % "0.11.1"       % "test"),
+  libraryDependencies ++= {
+    val scalazVersion  = "7.1.3"
+    val slcVersion     = "0.4"
+    val monocleVersion = "1.1.1"
+    Seq(
+      "ch.qos.logback"              % "logback-classic"           % "1.1.3"          % "runtime",
+      "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
+      "com.github.julien-truffaut" %% "monocle-generic"           % monocleVersion,
+      "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+      "com.github.mpilquist"       %% "simulacrum"                % "0.3.0",
+      "com.github.scopt"           %% "scopt"                     % "3.3.0",
+      "com.lihaoyi"                 % "ammonite-repl"             % "0.4.7"          % "test" cross CrossVersion.full,
+      "com.slamdata"               %% "pathy"                     % "0.0.1-SNAPSHOT",
+      "io.argonaut"                %% "argonaut"                  % "6.1",
+      "org.jboss.aesh"              % "aesh"                      % "0.55",
+      "org.log4s"                  %% "log4s"                     % "1.1.5"          % "runtime",
+      "org.mongodb"                 % "mongo-java-driver"         % "3.0.2",
+      "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
+      "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
+      "org.scalaz"                 %% "scalaz-scalacheck-binding" % scalazVersion    % "test",
+      "org.scalaz.stream"          %% "scalaz-stream"             % "0.7.1a",
+      "org.specs2"                 %% "specs2-core"               % "2.4"            % "test",
+      "org.threeten"                % "threetenbp"                % "1.2",
+      "org.typelevel"              %% "scalaz-specs2"             % "0.3.0"          % "test",
+      "org.typelevel"              %% "shapeless-scalacheck"      % slcVersion       % "test",
+      "org.typelevel"              %% "shapeless-scalaz"          % slcVersion
+    )
+  },
   licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")))
 
 import github.GithubPlugin._

@@ -1637,16 +1637,19 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
         }
       }
 
-      "be 400 with invalid MongoDB URI (extra slash)" in {
+      "be 400 with invalid MongoDB URI" in {
         withServerRecordConfigChange(backendForConfig, config1) { (client, configs) =>
           val req = mount(client).POST
                     .setHeader("X-File-Name", "local/")
-                    .setBody("""{ "mongodb": { "connectionUri": "mongodb://localhost:8080//test" } }""")
+                    .setBody("""{ "mongodb": { "connectionUri": "invalid-mongodb://..." } }""")
           val meta = Http(req)
 
           val resp = meta()
           resp.getStatusCode must_== 400
-          errorFromBody(resp) must_== \/-("invalid connection URI: mongodb://localhost:8080//test")
+
+          errorFromBody(resp) must_== 
+            \/-("""|invalid connection URI: invalid-mongodb://...
+                   |java.lang.IllegalArgumentException: uri needs to start with mongodb://""".stripMargin)
           configs() must_== Nil
         }
       }
@@ -1763,12 +1766,15 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
       "be 400 with invalid MongoDB URI (extra slash)" in {
         withServerRecordConfigChange(backendForConfig, config1) { (client, configs) =>
           val req = (mount(client) / "local" / "").PUT
-                    .setBody("""{ "mongodb": { "connectionUri": "mongodb://localhost:8080//test" } }""")
+                    .setBody("""{ "mongodb": { "connectionUri": "invalid-mongodb://..." } }""")
           val meta = Http(req)
 
           val resp = meta()
           resp.getStatusCode must_== 400
-          errorFromBody(resp) must_== \/-("invalid connection URI: mongodb://localhost:8080//test")
+          errorFromBody(resp) must_==
+            \/-("""|invalid connection URI: invalid-mongodb://...
+                   |java.lang.IllegalArgumentException: uri needs to start with mongodb://""".stripMargin)
+
           configs() must_== Nil
         }
       }

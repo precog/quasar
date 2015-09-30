@@ -28,6 +28,8 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy._, Path._
 
+import com.mongodb._
+
 final case class SDServerConfig(port0: Option[Int]) {
   val port = port0.getOrElse(SDServerConfig.DefaultPort)
 }
@@ -49,41 +51,82 @@ sealed trait BackendConfig {
 }
 final case class MongoDbConfig(connectionUri: String) extends BackendConfig {
   def validate(path: EnginePath) = for {
-    _ <- MongoDbConfig.ParsedUri.unapply(connectionUri).map(κ(())) \/> (InvalidConfig("invalid connection URI: " + connectionUri))
+    _ <- MongoDbConfig.ParsedUri.validate(connectionUri).leftMap(cause => InvalidConfig(
+      s"""|invalid connection URI: $connectionUri
+          |$cause""".stripMargin))
     _ <- if (path.relative) -\/(InvalidConfig("Not an absolute path: " + path)) else \/-(())
     _ <- if (!path.pureDir) -\/(InvalidConfig("Not a directory path: " + path)) else \/-(())
   } yield ()
 }
+
+final case class MongoConnectionOption(
+  requiredReplicaSetName: Option[String],
+  readPreference: Option[ReadPreference],
+  writeConcern: Option[WriteConcern],
+  connectTimeout: Option[Int],
+  maxConnectionIdleTime: Option[Int],
+  maxConnectionLifeTime: Option[Int],
+  maxConnectionPoolSize: Option[Int],
+  maxWaitTime: Option[Int],
+  minConnectionPoolSize: Option[Int],
+  socketTimeout: Option[Int],
+  ssl: Option[Boolean],
+  threadsAllowedToBlockForConnectionMultiplier: Option[Int]
+)
+
 object MongoDbConfig {
   implicit def Codec = casecodec1(MongoDbConfig.apply, MongoDbConfig.unapply)("connectionUri")
 
   object ParsedUri {
-    /** This pattern is as lenient as possible, so that we can parse out the
-        parts of any possible URI. */
-    val UriPattern = (
-      "^mongodb://" +
-      "(?:" +
-        "([^:]+):([^@]+)" +  // 0: username, 1: password
-      "@)?" +
-      "([^:/@,]+)" +         // 2: (primary) host [required]
-      "(?::([0-9]+))?" +     // 3: (primary) port
-      "((?:,[^,/]+)*)" +     // 4: additional hosts
-      "(?:/" +
-        "([^/?]+)?" +        // 5: database
-        "(?:\\?(.+))?" +     // 6: options
-      ")?$").r
+    def validate(uri: String): \/[String, (
+      Option[String],                       // Username
+      Option[String],                       // Password
+      NonEmptyList[(String, Option[Int])],  // Host/Port
+      Option[String],                       // Database
+      MongoConnectionOption                 // Options
+    )] = {
+      import scala.collection.JavaConverters._
 
-    def orNone(s: String) = if (s == "") None else Some(s)
-
-    // TODO: Convert host/addHosts to NonEmptyList[(String, Option[Int])] and
-    //       opts to a Map[String, String]
-    def unapply(uri: String):
-        Option[(Option[String], Option[String], String, Option[Int], Option[String], Option[String], Option[String])] =
-      uri match {
-        case UriPattern(user, pass, host, port, addHosts, authDb, opts) =>
-          Some((Option(user), Option(pass), host, Option(port).flatMap(_.parseInt.toOption), orNone(addHosts), Option(authDb), Option(opts)))
-        case _ => None
+      @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Null"))
+      def splitHostPort(hps: List[String]) = {
+        hps.map(hp => \/.fromTryCatchNonFatal(new java.net.URI(s"//$hp")).leftMap(_.toString)).sequenceU.map( 
+          _.map{u => 
+            val port = if(u.getPort == -1) None else Some(u.getPort)
+            (u.getHost, port)
+          }.filter(_._1 != null)
+        )
       }
+      \/.fromTryCatchNonFatal(new ConnectionString(uri)).leftMap(_.toString).flatMap{cs =>
+        val hosts = splitHostPort(cs.getHosts.asScala.toList)
+        hosts.flatMap{
+          case hostsH :: hostsT => {
+            val options = MongoConnectionOption(
+              Option(cs.getRequiredReplicaSetName),
+              Option(cs.getReadPreference),
+              Option(cs.getWriteConcern),
+              Option(cs.getConnectTimeout).map(_.intValue),
+              Option(cs.getMaxConnectionIdleTime).map(_.intValue),
+              Option(cs.getMaxConnectionLifeTime).map(_.intValue),
+              Option(cs.getMaxConnectionPoolSize).map(_.intValue),
+              Option(cs.getMaxWaitTime).map(_.intValue),
+              Option(cs.getMinConnectionPoolSize).map(_.intValue),
+              Option(cs.getSocketTimeout).map(_.intValue),
+              Option(cs.getSslEnabled).map(_.booleanValue),
+              Option(cs.getThreadsAllowedToBlockForConnectionMultiplier).map(_.intValue)
+            )
+            \/-((
+              Option(cs.getUsername),
+              Option(cs.getPassword).map(_.mkString("")),
+              NonEmptyList(hostsH, hostsT: _*),
+              Option(cs.getDatabase),
+              options
+            ))  
+          }
+          case _ => -\/("at least one host required")
+        }
+      }
+    }
+    def unapply(uri: String) = validate(uri).toOption
   }
 }
 

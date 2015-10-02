@@ -67,10 +67,9 @@ trait Library {
       Func.Untyper =
     partialUntyperOV(codomain)(f.lift(_).map(success))
 
-  protected def reflexiveTyper: Func.Typer = {
-    case Type.Const(data) :: Nil => success(data.dataType)
+  protected def identityTyper: Func.Typer = {
     case x :: Nil => success(x)
-    case _ => failure(NonEmptyList(SemanticError.GenericError("Wrong number of arguments for reflexive typer")))
+    case _ => failure(NonEmptyList(SemanticError.GenericError("Wrong number of arguments for identity typer")))
   }
 
   protected val numericWidening = {

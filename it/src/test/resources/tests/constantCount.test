@@ -1,0 +1,12 @@
+{
+  "name": "constant query with count",
+
+  "data": "zips.data",
+
+  "query": "select count(7) from zips limit 1",
+
+  "predicate": "containsExactly",
+  "expected": [
+    { "0": 1 }
+  ]
+}

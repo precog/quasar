@@ -20,6 +20,8 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
 import scalaz.concurrent._
 
+import pathy.Path.FileName
+
 class RegressionSpec extends BackendTest {
 
   implicit val codec = DataCodec.Precise
@@ -31,8 +33,9 @@ class RegressionSpec extends BackendTest {
 
     val TestRoot = new File("it/src/main/resources/tests")
 
-    def dataPath(name: String): Path = {
-      tmpDir ++ Path(utils.removeExtension(name))
+    def dataPath(filename: String): Path = {
+      val name = FileName(filename).dropExtension.value
+      tmpDir ++ Path(name)
     }
 
     def runQuery(query: String, vars: Map[String, String]):

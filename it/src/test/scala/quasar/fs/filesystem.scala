@@ -43,6 +43,10 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
         fs.ls(Path(".")).map(_ must contain(FilesystemNode(relPrefix, Plain))).run.run must beRightDisjunction
       }
 
+      "count" in {
+        fs.count(ZipsDir).run.run must beRightDisjunction(29353L)
+      }
+
       "read zips with skip and limit" in {
         (for {
           cursor  <- fs.scan(ZipsDir, 100, Some(5)).runLog

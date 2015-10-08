@@ -32,7 +32,7 @@ import org.http4s.{Query => HQuery, _}, EntityEncoder._
 import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
 import org.http4s.headers._
-import org.http4s.server._, syntax.ServiceOps
+import org.http4s.server._, middleware.{CORS, GZip}, syntax.ServiceOps
 import org.http4s.util.{CaseInsensitiveString, Renderable}
 import scalaz._, Scalaz._
 import scalaz.concurrent._
@@ -626,8 +626,8 @@ final case class FileSystemApi(
     }
   }
 
-  def corsMiddleware(svc: HttpService): HttpService = middleware.CORS(
-    middleware.GZip(HeaderParam(svc)),
+  def cors(svc: HttpService): HttpService = CORS(
+    svc,
     middleware.CORSConfig(
       anyOrigin = true,
       allowCredentials = false,
@@ -651,11 +651,11 @@ final case class FileSystemApi(
           "/server"      -> serverService(cfg),
           "/welcome"     -> welcomeService
         ) ∘ { svc =>
-          corsMiddleware(svc.orElse {
+          cors(GZip(HeaderParam(svc.orElse {
             HttpService {
               case req if req.method == OPTIONS => Ok()
             }
-          })
+          })))
         }
       }
 }

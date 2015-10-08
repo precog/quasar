@@ -54,7 +54,7 @@ package object api {
     }
   }
 
-  object HeaderParam {
+  object HeaderParam extends HttpMiddleware {
     type HeaderValues = Map[CaseInsensitiveString, List[String]]
 
     def parse(param: String): String \/ HeaderValues = {

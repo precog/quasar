@@ -1661,18 +1661,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "__tmp3" -> reshape(
               "city"  -> $field("city"),
               "state" -> $field("state")),
-            "__tmp4" -> $$ROOT),
+            "__tmp4" -> reshape(
+              "__tmp2" ->
+                $cond(
+                  $and(
+                    $lt($literal(Bson.Null), $field("pop")),
+                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $field("pop"),
+                  $literal(Bson.Undefined)))),
           IgnoreId),
         $group(
           grouped(
-            "2" ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("__tmp4", "pop")),
-                    $lt($field("__tmp4", "pop"), $literal(Bson.Text("")))),
-                  $field("__tmp4", "pop"),
-                  $literal(Bson.Undefined))),
+            "2" -> $sum($field("__tmp4", "__tmp2")),
             "__tmp3" -> $push($field("__tmp3"))),
           \/-($literal(Bson.Null))),
         $unwind(DocField("__tmp3")),
@@ -1768,7 +1768,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read (Collection("db", "zips")),
         $project(
           reshape(
-            "__tmp6" -> reshape(
+            "__tmp5" -> reshape(
               "pop" -> $field("pop"),
               "2"   ->
                 $cond(
@@ -1781,26 +1781,26 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int64(1000))),
                   $literal(Bson.Undefined))),
-            "__tmp7" -> $$ROOT),
+            "__tmp6" -> reshape(
+              "__tmp2" ->
+                $cond(
+                  $and(
+                    $lt($literal(Bson.Null), $field("pop")),
+                    $lt($field("pop"), $literal(Bson.Text("")))),
+                  $field("pop"),
+                  $literal(Bson.Undefined)))),
           IgnoreId),
         $group(
           grouped(
-            "1" ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("__tmp7", "pop")),
-                    $lt($field("__tmp7", "pop"), $literal(Bson.Text("")))),
-                  $field("__tmp7", "pop"),
-                  $literal(Bson.Undefined))),
-            "__tmp6" -> $push($field("__tmp6"))),
+            "1" -> $sum($field("__tmp6", "__tmp2")),
+            "__tmp5" -> $push($field("__tmp5"))),
           \/-($literal(Bson.Null))),
-        $unwind(DocField("__tmp6")),
+        $unwind(DocField("__tmp5")),
         $project(
           reshape(
-            "pop" -> $field("__tmp6", "pop"),
+            "pop" -> $field("__tmp5", "pop"),
             "1"   -> $field("1"),
-            "2"   -> $field("__tmp6", "2")),
+            "2"   -> $field("__tmp5", "2")),
           IgnoreId)))
     }
 

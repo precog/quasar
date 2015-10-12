@@ -370,34 +370,43 @@ object WorkflowBuilder {
           })
     }
 
+    def inln(outerExpr: Expr, cont: DocContents[_ \/ Expression]) =
+      outerExpr.fold(
+        κ(None),
+        expr => (cont match {
+          case Expr(\/-($var(dv))) =>
+            Some(rewriteExprRefs(expr)(prefixBase(dv)))
+          case Expr(\/-(ex)) => expr.cataM[Option, Expression] {
+            case $varF(DocVar.ROOT(None)) => ex.some
+            case $varF(_)                 => None
+            case x                        => Fix(x).some
+          }
+          case Doc(map) => expr.cataM[Option, Expression] {
+            case $varF(DocField(field)) =>
+              field.flatten.toList match {
+                case (name @ BsonField.Name(_)) :: Nil =>
+                  map.get(name).flatMap(_.toOption)
+                case (name @ BsonField.Name(_)) :: tail =>
+                  map.get(name).flatMap {
+                    case \/-($var(dv)) => BsonField(tail).map(p => $var(dv \ p))
+                    case _ => None
+                  }
+                case _ => None
+              }
+            case $varF(_) => None
+            case x => Some(Fix(x))
+          }
+          case _ => None
+        }))
+
     def loop(w: WorkflowBuilderF[WorkflowBuilder]): Option[WorkflowBuilder] = w match {
       case ExprBuilderF(src, \/-($$ROOT)) => src.some
       case ExprBuilderF(src, outerExpr) =>
-        def inln(cont: DocContents[_ \/ Expression])(f: Expression => WorkflowBuilder) =
-          outerExpr.fold(
-            κ(None),
-            expr => (cont match {
-              case Expr(\/-($var(dv))) =>
-                Some(rewriteExprRefs(expr)(prefixBase(dv)))
-              case Expr(\/-(ex)) => expr.cataM[Option, Expression] {
-                case $varF(DocVar.ROOT(None)) => ex.some
-                case $varF(_)                 => None
-                case x                        => Fix(x).some
-              }
-              case Doc(map) => expr.cataM[Option, Expression] {
-                case $varF(DocField(field @ BsonField.Name(_))) =>
-                  map.get(field).flatMap(_.toOption)
-                case $varF(_) => None // TODO: also handle BsonField.Path
-                case x => Some(Fix(x))
-              }
-              case _ => None
-            }).map(f))
-
         src.unFix match {
           case ExprBuilderF(wb0, -\/(js1)) =>
             exprToJs(outerExpr).map(js => ExprBuilder(wb0, -\/(js1 >>> js))).toOption
           case ExprBuilderF(src0, contents) =>
-            inln(Expr(contents))(expr => ExprBuilder(src0, \/-(expr)))
+            inln(outerExpr, Expr(contents)).map(expr => ExprBuilder(src0, \/-(expr)))
           case DocBuilderF(src, innerShape) =>
             collapse(outerExpr, innerShape).map(ExprBuilder(src, _))
           case ShapePreservingBuilderF(src0, inputs, op) =>
@@ -412,39 +421,15 @@ object WorkflowBuilder {
               Expr(\/-($$ROOT)),
               id).some
           case GroupBuilderF(wb0, key, contents, id) =>
-            inln(contents)(expr => GroupBuilder(normalizeƒ(ExprBuilderF(wb0, \/-(expr))), key, Expr(\/-($$ROOT)), id))
+            inln(outerExpr, contents).map(expr => GroupBuilder(normalizeƒ(ExprBuilderF(wb0, \/-(expr))), key, Expr(\/-($$ROOT)), id))
           case _ => None
         }
       case DocBuilderF(Fix(DocBuilderF(src, innerShape)), outerShape) =>
         outerShape.traverse(collapse(_, innerShape)).map(DocBuilder(src, _))
+      case DocBuilderF(Fix(ExprBuilderF(src, innerExpr)), outerShape) =>
+        outerShape.traverse(inln(_, Expr(innerExpr))).map(exes => DocBuilder(src, exes ∘ (_.right)))
       case DocBuilderF(Fix(ShapePreservingBuilderF(src, inputs, op)), shape) =>
         ShapePreservingBuilder(normalizeƒ(DocBuilderF(src, shape)), inputs, op).some
-      case GroupBuilderF(_, _, Expr(\/-($$ROOT)), _) => None
-      case GroupBuilderF(Fix(DocBuilderF(src, innerShape)), keys, Expr(outerExpr), id) =>
-        outerExpr.fold(
-          _.traverse(e => collapse(\/-(e), innerShape).flatMap(_.toOption)).map(ex =>
-            GroupBuilder(src, keys, Expr(-\/(ex)), id)),
-          e => collapse(\/-(e), innerShape).map(ex =>
-            GroupBuilder(normalizeƒ(ExprBuilderF(src, ex)), keys, Expr(\/-($$ROOT)), id)))
-      case GroupBuilderF(Fix(DocBuilderF(src, innerShape)), keys, Doc(outerShape), id) =>
-        val exes = outerShape.traverse(_.bitraverse(
-          _.traverse(e => collapse(\/-(e), innerShape).flatMap(_.toOption)),
-          e => collapse(\/-(e), innerShape)))
-
-        exes.flatMap(_.sequenceU.toOption.fold(
-          exes.flatMap(_.traverse(_.traverse(_.fold(κ(None), _.some)))).map(
-            doc => GroupBuilder(src, keys, Doc(doc), id)))(
-          doc => GroupBuilder(normalizeƒ(DocBuilderF(src, doc)), keys, Expr(\/-($$ROOT)), id).some))
-      // TODO: This eliminates extraneous ExprBuilders after reducing a group,
-      //       but it currently pessimizes some queries (due to merging?).
-      // case GroupBuilderF(Fix(ExprBuilderF(src, \/-(expr))), keys, Expr(-\/(agg)), id) if agg.value == $$ROOT =>
-      //   GroupBuilder(src, keys, Expr(-\/(agg.map(κ(expr)))), id).some
-      case GroupBuilderF(src, keys, Expr(\/-(ex)), id) =>
-        GroupBuilder(normalizeƒ(ExprBuilderF(src, \/-(ex))), keys, Expr(\/-($$ROOT)), id).some
-      case GroupBuilderF(src, keys, Doc(contents), id) =>
-        contents.sequenceU.fold(
-          κ(None),
-          doc => GroupBuilder(normalizeƒ(DocBuilderF(src, doc ∘ (\/-(_)))), keys, Expr(\/-($$ROOT)), id).some)
       case _ => None
     }
 
@@ -1489,8 +1474,7 @@ object WorkflowBuilder {
       case ValueBuilderF(_) =>
         -\/(UnsupportedFunction(structural.ObjectProject, "value is not a document."))
       case GroupBuilderF(wb0, key, Expr(\/-($var(dv))), id) =>
-        // TODO: check structure of wb0 (#436)
-        \/-(GroupBuilder(wb0, key, Expr(\/-($var(dv \ BsonField.Name(name)))), id))
+        projectField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($var(dv))), id))
       case GroupBuilderF(wb0, key, Doc(doc), id) =>
         doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder](
           -\/(UnsupportedFunction(structural.ObjectProject, "group does not contain a field ‘" + name + "’.")))(

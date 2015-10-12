@@ -644,48 +644,51 @@ object WorkflowBuilder {
                     case (k, \/-(v)) =>
                       ((x: ListMap[BsonField.Name, Expression]) => x + (k -> v)).second(acc)
                   })
-              obj.keys.toList.toNel.fold[M[CollectionBuilderF]](
-                fail(InternalError("A shape with no fields does not make sense")))(
-                fields => workflow(wb).flatMap { case (wf, base0) =>
-                  emitSt(ungrouped.size match {
-                    case 0 =>
-                      state[NameGen, Workflow](chain(wf,
-                        $group(Grouped(grouped).rewriteRefs(prefixBase0(base0 \ base)), key(base0))))
-                    case 1 =>
-                      state[NameGen, Workflow](chain(wf,
-                        $group(Grouped(
-                          obj.transform {
-                            case (_, -\/(v)) =>
-                              accumulator.rewriteGroupRefs(v)(prefixBase0(base0 \ base))
-                            case (_, \/-(v)) =>
-                              $push(rewriteExprRefs(v)(prefixBase0(base0 \ base)))
-                          }),
-                          key(base0)),
-                        $unwind(DocField(ungrouped.head._1))))
-                    case _ => for {
-                      ungroupedName <- freshName
-                      groupedName <- freshName
-                    } yield
-                      chain(wf,
-                        $project(Reshape(ListMap(
-                          ungroupedName -> -\/(Reshape(ungrouped.map {
-                            case (k, v) => k -> \/-(rewriteExprRefs(v)(prefixBase0(base0 \ base)))
-                          })),
-                          groupedName -> \/-($$ROOT)))),
-                        $group(Grouped(
-                          (grouped ∘ (accumulator.rewriteGroupRefs(_)(prefixBase0(Field(groupedName) \ base0)))) +
-                            (ungroupedName -> $push($var(DocField(ungroupedName))))),
-                          key(Field(groupedName) \ base0)),
-                        $unwind(DocField(ungroupedName)),
-                        $project(Reshape(obj.transform {
-                          case (k, -\/ (_)) => \/-($var(DocField(k)))
-                          case (k,  \/-(_)) => \/-($var(DocField(ungroupedName \ k)))
-                        })))
-                  }).map(CollectionBuilderF(
-                    _,
-                    Root(),
-                    fields.some))
-                })
+              if (grouped.isEmpty)
+                toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
+              else
+                obj.keys.toList.toNel.fold[M[CollectionBuilderF]](
+                  fail(InternalError("A shape with no fields does not make sense")))(
+                  fields => workflow(wb).flatMap { case (wf, base0) =>
+                    emitSt(ungrouped.size match {
+                      case 0 =>
+                        state[NameGen, Workflow](chain(wf,
+                          $group(Grouped(grouped).rewriteRefs(prefixBase0(base0 \ base)), key(base0))))
+                      case 1 =>
+                        state[NameGen, Workflow](chain(wf,
+                          $group(Grouped(
+                            obj.transform {
+                              case (_, -\/(v)) =>
+                                accumulator.rewriteGroupRefs(v)(prefixBase0(base0 \ base))
+                              case (_, \/-(v)) =>
+                                $push(rewriteExprRefs(v)(prefixBase0(base0 \ base)))
+                            }),
+                            key(base0)),
+                          $unwind(DocField(ungrouped.head._1))))
+                      case _ => for {
+                        ungroupedName <- freshName
+                        groupedName <- freshName
+                      } yield
+                        chain(wf,
+                          $project(Reshape(ListMap(
+                            ungroupedName -> -\/(Reshape(ungrouped.map {
+                              case (k, v) => k -> \/-(rewriteExprRefs(v)(prefixBase0(base0 \ base)))
+                            })),
+                            groupedName -> \/-($$ROOT)))),
+                          $group(Grouped(
+                            (grouped ∘ (accumulator.rewriteGroupRefs(_)(prefixBase0(Field(groupedName) \ base0)))) +
+                              (ungroupedName -> $push($var(DocField(ungroupedName))))),
+                            key(Field(groupedName) \ base0)),
+                          $unwind(DocField(ungroupedName)),
+                          $project(Reshape(obj.transform {
+                            case (k, -\/ (_)) => \/-($var(DocField(k)))
+                            case (k,  \/-(_)) => \/-($var(DocField(ungroupedName \ k)))
+                          })))
+                    }).map(CollectionBuilderF(
+                      _,
+                      Root(),
+                      fields.some))
+                  })
           }
         }.join
       case FlatteningBuilderF(src, fields) =>

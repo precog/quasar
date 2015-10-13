@@ -1816,12 +1816,14 @@ object WorkflowBuilder {
       case (_, ExprBuilderF(src, \/-($var(DocField(_))))) if left ≟ src =>
         delegate
 
-      case (DocBuilderF(src1, shape1), ExprBuilderF(src2, expr2)) if src1 ≟ src2 =>
-        mergeContents(Doc(shape1), Expr(expr2)).map {
-          case ((lbase, rbase), cont) =>
-            (lbase, rbase, contentsToBuilder(cont)(src1))
+      case (DocBuilderF(src1, shape1), ExprBuilderF(src2, expr2)) =>
+        merge(src1, src2).flatMap { case (lb, rb, wb) =>
+          mergeContents(Doc(rewriteDocPrefix(shape1, lb)), Expr(rewriteExprPrefix(expr2, rb))).map {
+            case ((lbase, rbase), cont) =>
+              (lbase, rbase, contentsToBuilder(cont)(wb))
+          }
         }
-      case (ExprBuilderF(src1, _), DocBuilderF(src2, _)) if src1 ≟ src2 =>
+      case (ExprBuilderF(_, _), DocBuilderF(_, _)) =>
         delegate
 
       case (DocBuilderF(src1, shape1), DocBuilderF(src2, shape2)) =>

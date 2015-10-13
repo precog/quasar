@@ -2168,26 +2168,26 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $unwind(DocField(BsonField.Name("__tmp14"))),
         $project(
           reshape(
-            "__tmp21" ->
+            "__tmp18" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr(List())), $field("__tmp14", "replyTo")),
                   $lt($field("__tmp14", "replyTo"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("__tmp14", "replyTo"),
                 $literal(Bson.Arr(List(Bson.Undefined)))),
-            "__tmp22" -> $$ROOT),
+            "__tmp19" -> $$ROOT),
           IgnoreId),
-        $unwind(DocField(BsonField.Name("__tmp21"))),
+        $unwind(DocField(BsonField.Name("__tmp18"))),
         $match(Selector.Or(
           Selector.And(
             Selector.Doc(
-              BsonField.Name("__tmp22") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Type(BsonType.Text)),
+              BsonField.Name("__tmp19") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Type(BsonType.Text)),
             Selector.Doc(
-              BsonField.Name("__tmp22") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Regex("^.*Dr.*$", false, false, false, false))),
+              BsonField.Name("__tmp19") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Regex("^.*Dr.*$", false, false, false, false))),
           Selector.Doc(
-            BsonField.Name("__tmp21") -> Selector.Regex("^.*Dr.*$", false, false, false, false)))),
+            BsonField.Name("__tmp18") -> Selector.Regex("^.*Dr.*$", false, false, false, false)))),
         $project(
-          reshape("value" -> $field("__tmp22", "__tmp15")),
+          reshape("value" -> $field("__tmp19", "__tmp15")),
           ExcludeId)))
     }
 

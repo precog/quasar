@@ -78,19 +78,17 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
                | Type.Coproduct(Type.FlexArr(_, _, _), Type.Set(_))  =>
               generateTypeCheck(or)(f)(Type.AnyArray)
             case Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time) =>
-              generateTypeCheck(or)(f)(Type.Coproduct(Type.Date, Type.Timestamp))
+              generateTypeCheck(or)(f)(Type.Date)
             case Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time), Type.Interval) =>
               // Just repartition to match the right cases
               generateTypeCheck(or)(f)(
-                Type.Coproduct(
-                  Type.Interval,
-                  Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time)))
+                Type.Coproduct(Type.Interval, Type.Date))
             case Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval), Type.Str), Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time)), Type.Bool) =>
               // Just repartition to match the right cases
               generateTypeCheck(or)(f)(
                 Type.Coproduct(
                   Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval), Type.Str),
-                  Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time), Type.Bool)))
+                  Type.Coproduct(Type.Date, Type.Bool)))
             case Type.Coproduct(a, b) =>
               (generateTypeCheck(or)(f)(a) |@| generateTypeCheck(or)(f)(b))(
                 (a, b) => ((expr: In) => or(a(expr), b(expr))))
@@ -318,8 +316,6 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
               ((expr: JsCore) => BinOp(jscore.Eq, UnOp(TypeOf, expr), jscore.Literal(Js.Str("boolean"))))
             case Type.Date =>
               ((expr: JsCore) => BinOp(Instance, expr, ident("Date")))
-            case Type.Timestamp =>
-              ((expr: JsCore) => BinOp(Instance, expr, ident("Timestamp")))
           }
         jsCheck(typ).fold[OutputM[PartialJs[B]]](
           -\/(UnsupportedPlan(x, None)))(
@@ -542,9 +538,8 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
             case Type.Id =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
             case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
-            case Type.Date => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
-            case Type.Timestamp =>
-              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Timestamp)))
+            case Type.Date =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
           }
         selCheck(typ).fold[OutputM[PartialSelector[B]]](
           -\/(UnsupportedPlan(node, None)))(
@@ -971,10 +966,8 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
             case Type.Date =>
               ((expr: Expression) => $and(
                 $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), expr),
-                $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
-            case Type.Timestamp =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)), expr),
+                // TODO: in Mongo 3.0, we can distingush between Date and Timestamp, but not in older versions.
+                // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
                 $lt(expr, $literal(Bson.Regex("", "")))))
             // NB: Some explicit coproducts for adjacent types.
             case Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Str) =>
@@ -985,14 +978,13 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
               ((expr: Expression) => $and(
                 $lt($literal(Bson.Null), expr),
                 $lt(expr, $literal(Bson.Doc(ListMap())))))
-            case Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time) =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), expr),
-                $lt(expr, $literal(Bson.Regex("", "")))))
-            case Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time), Type.Bool) =>
+            case Type.Coproduct(Type.Date, Type.Bool) =>
               ((expr: Expression) =>
                 $and(
                   $lte($literal(Bson.Bool(false)), expr),
+                  // TODO: in Mongo 3.0, we can distingush between Date and Timestamp, but not in older versions.
+                  // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
+
                   $lt(expr, $literal(Bson.Regex("", "")))))
           }
 

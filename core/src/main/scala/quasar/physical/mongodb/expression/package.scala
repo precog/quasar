@@ -354,7 +354,7 @@ package object expression {
         $lte($literal(Bson.Timestamp(i, 0)), f1),
         $lt(f2, $literal(Bson.Regex("", ""))),
         Nil)
-          if f1 == f2 // && i == Instant.ofEpochMilli(0)
+          if f1 == f2 && i == Instant.ofEpochMilli(0)
           =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
           jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Timestamp")))))

@@ -353,9 +353,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong"))),
                   Call(ident("isString"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))))),
                 BinOp(Or,
-                  BinOp(Or,
-                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
-                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Timestamp"))),
+                  BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
                   BinOp(Eq, UnOp(TypeOf, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))), jscore.Literal(Js.Str("boolean")))))),
             BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
             ident("undefined")).toJs)),
@@ -468,8 +466,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Date)),
                Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Timestamp)),
-               Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Bool)))),
            Selector.Doc(BsonField.Name("bar") ->
              Selector.Gt(Bson.Int64(10)))))))
@@ -493,8 +489,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Date)),
                Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Timestamp)),
-               Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Bool)))),
            Selector.Doc(BsonField.Name("bar") ->
              Selector.Gt(Bson.Int64(10)))))))
@@ -517,8 +511,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
              Selector.Or(
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Date)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Timestamp)),
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Type(BsonType.Bool)))),
            Selector.Doc(BsonField.Name("bar") ->
@@ -587,8 +579,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Date)),
               Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Timestamp)),
-              Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Bool)))),
           Selector.And(
             Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("city") ->
@@ -619,8 +609,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Or(
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Bool)))),
              Selector.And(
@@ -757,8 +745,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Doc(BsonField.Name("baz") ->
                    Selector.Type(BsonType.Date)),
                  Selector.Doc(BsonField.Name("baz") ->
-                   Selector.Type(BsonType.Timestamp)),
-                 Selector.Doc(BsonField.Name("baz") ->
                    Selector.Type(BsonType.Bool)))),
              Selector.And(
                Selector.Or(
@@ -773,8 +759,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Or(
                    Selector.Doc(BsonField.Name("bar") ->
                      Selector.Type(BsonType.Date)),
-                   Selector.Doc(BsonField.Name("bar") ->
-                     Selector.Type(BsonType.Timestamp)),
                    Selector.Doc(BsonField.Name("bar") ->
                      Selector.Type(BsonType.Bool)))),
                Selector.And(
@@ -802,8 +786,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                Selector.Or(
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Timestamp)),
                  Selector.Doc(BsonField.Name("bar") ->
                    Selector.Type(BsonType.Bool)))),
              Selector.And(
@@ -835,8 +817,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Doc(BsonField.Name("pop") ->
                    Selector.Type(BsonType.Date)),
                  Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Timestamp)),
-                 Selector.Doc(BsonField.Name("pop") ->
                    Selector.Type(BsonType.Bool)))),
              Selector.And(
                Selector.Or(
@@ -851,8 +831,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Or(
                    Selector.Doc(BsonField.Name("pop") ->
                      Selector.Type(BsonType.Date)),
-                   Selector.Doc(BsonField.Name("pop") ->
-                     Selector.Type(BsonType.Timestamp)),
                    Selector.Doc(BsonField.Name("pop") ->
                      Selector.Type(BsonType.Bool)))),
                Selector.Or(
@@ -976,8 +954,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
                 Selector.Type(BsonType.Date)),
               Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Timestamp)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
                 Selector.Type(BsonType.Bool)))),
           Selector.And(
             Selector.Or(
@@ -992,8 +968,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Or(
                 Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Bool)))),
             Selector.Doc(
@@ -1027,8 +1001,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Date)),
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Timestamp)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Bool)))),
           Selector.And(
             Selector.Or(
@@ -1044,8 +1016,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
                   Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                  Selector.Type(BsonType.Timestamp)),
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
                   Selector.Type(BsonType.Bool)))),
             Selector.And(Selector.Or(
               Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
@@ -1059,8 +1029,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Or(
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
                   Selector.Type(BsonType.Bool)))),
               Selector.And(
@@ -1231,8 +1199,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Timestamp)),
-                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Lt(Bson.Int64(1000))))),
@@ -1341,8 +1307,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Timestamp)),
-                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000))))),
@@ -1373,8 +1337,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Selector.Or(
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Timestamp)),
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
 
@@ -2526,8 +2488,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Timestamp)),
-                Selector.Doc(BsonField.Name("pop") ->
                   Selector.Type(BsonType.Bool)))),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Gt(Bson.Int64(1000))))),
@@ -2619,11 +2579,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Type(BsonType.Int64)),
                 Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                   Selector.Type(BsonType.Dec)),
-                Selector.Or(
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Date)),
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Timestamp)))),
+                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
+                  Selector.Type(BsonType.Date))),
               Selector.And(
                 Selector.Or(
                   Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
@@ -2637,8 +2594,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Or(
                     Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                       Selector.Type(BsonType.Date)),
-                    Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                      Selector.Type(BsonType.Timestamp)),
                     Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
                       Selector.Type(BsonType.Bool)))),
                 Selector.And(
@@ -2683,8 +2638,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   Selector.Doc(BsonField.Name("ts") ->
                     Selector.Type(BsonType.Date)),
                   Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Timestamp)),
-                  Selector.Doc(BsonField.Name("ts") ->
                     Selector.Type(BsonType.Bool)))),
               Selector.And(
                 Selector.Or(
@@ -2700,8 +2653,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Date)),
                     Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Timestamp)),
-                    Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Bool)))),
                 Selector.And(
                   Selector.Or(
@@ -2716,8 +2667,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     Selector.Or(
                       Selector.Doc(BsonField.Name("ts") ->
                         Selector.Type(BsonType.Date)),
-                      Selector.Doc(BsonField.Name("ts") ->
-                        Selector.Type(BsonType.Timestamp)),
                       Selector.Doc(BsonField.Name("ts") ->
                         Selector.Type(BsonType.Bool)))),
                   Selector.And(

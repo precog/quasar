@@ -18,9 +18,7 @@ package quasar.physical.mongodb.accumulator
 
 import quasar.Predef._
 
-sealed trait AccumOp[A] {
-  def value: A
-}
+sealed trait AccumOp[A]
 object AccumOp {
   final case class $addToSet[A](value: A) extends AccumOp[A]
   final case class $push[A](value: A)     extends AccumOp[A]

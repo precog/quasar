@@ -329,27 +329,29 @@ package object expression {
         Nil)
           if f1 == f2 && b1 == Bson.Binary(scala.Array[Byte]()) && oid == scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
-          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Binary")))))
-      // case (
-      //   $lte($literal(Bson.ObjectId("000000000000000000000000")), f1),
-      //   $lt(f2, $literal(Bson.Bool(false))),
-      //   Nil)
-      //     if f1 == f2 =>
-      //   // ObjectId
-      // case (
-      //   $lte($literal(Bson.Bool(false)), f1),
-      //   $lte(f2, $literal(Bson.Bool(true))),
-      //   Nil)
-      //     if f1 == f2 =>
-      //   // Boolean
-      // Date
+          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Binary"))))
+      case (
+        $lte($literal(Bson.ObjectId(oid)), f1),
+        $lt(f2, $literal(Bson.Bool(false))),
+        Nil)
+          if f1 == f2 && oid == scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) =>
+        toJs(f1).map(f => JsFn(JsFn.defaultName,
+          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("ObjectId"))))
+      case (
+        $lte($literal(Bson.Bool(false)), f1),
+        $lte(f2, $literal(Bson.Bool(true))),
+        Nil)
+          if f1 == f2 =>
+        toJs(f1).map(f => JsFn(JsFn.defaultName,
+          jscore.BinOp(jscore.Eq, jscore.UnOp(jscore.TypeOf, f(jscore.Ident(JsFn.defaultName))), jscore.Literal(Js.Str("boolean")))))
       case (
         $lte($literal(Bson.Date(i1)), f1),
         $lt(f2, $literal(Bson.Timestamp(i2, 0))),
         Nil)
-          if f1 == f2 && i1 == Instant.ofEpochMilli(0) && i2  == Instant.ofEpochMilli(0) =>
+          if f1 == f2 && i1 == Instant.ofEpochMilli(0) && i2  == Instant.ofEpochMilli(0)
+          =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
-          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Date")))))
+          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Date"))))
       case (
         $lte($literal(Bson.Timestamp(i, 0)), f1),
         $lt(f2, $literal(Bson.Regex("", ""))),
@@ -357,17 +359,17 @@ package object expression {
           if f1 == f2 && i == Instant.ofEpochMilli(0)
           =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
-          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Timestamp")))))
+          jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Timestamp"))))
       case (
         $lte($literal(Bson.Date(i)), f1),
         $lt(f2, $literal(Bson.Regex("", ""))),
         Nil)
-          if f1 == f2 // && i == Instant.ofEpochMilli(0)
+          if f1 == f2 && i == Instant.ofEpochMilli(0)
           =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
           jscore.BinOp(jscore.Or,
-            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Date"))),
-            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Timestamp"))))))
+            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Date")),
+            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Timestamp")))))
       case (
         $lte($literal(Bson.Bool(false)), f1),
         $lt(f2, $literal(Bson.Regex("", ""))),
@@ -375,9 +377,9 @@ package object expression {
           if f1 == f2 =>
         toJs(f1).map(f => JsFn(JsFn.defaultName,
           jscore.BinOp(jscore.Or,
-            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Date"))),
+            jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Date")),
             jscore.BinOp(jscore.Or,
-              jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.Ident(jscore.Name("Timestamp"))),
+              jscore.BinOp(jscore.Instance, f(jscore.Ident(JsFn.defaultName)), jscore.ident("Timestamp")),
               jscore.BinOp(jscore.Eq, jscore.UnOp(jscore.TypeOf, f(jscore.Ident(JsFn.defaultName))), jscore.Literal(Js.Str("boolean")))))))
       case (
         $lt($literal(Bson.Null), f1),
@@ -396,12 +398,14 @@ package object expression {
     }
   }
 
-  /** "Idiomatic" translation to JS, accounting for patterns needing special handling. */
+  /** "Idiomatic" translation to JS, accounting for patterns needing special
+    * handling. */
   def toJsƒ(t: ExprOp[(Fix[ExprOp], PlannerError \/ JsFn)]): PlannerError \/ JsFn = {
     def expr = Fix(t.map(_._1))
     def js = t.map(_._2).sequenceU
     translate.lift(expr).getOrElse(js.flatMap(toJsSimpleƒ))
   }
 
-  def toJs(expr: Expression): PlannerError \/ JsFn = expr.para[PlannerError \/ JsFn](toJsƒ)
+  def toJs(expr: Expression): PlannerError \/ JsFn =
+    expr.para[PlannerError \/ JsFn](toJsƒ)
 }

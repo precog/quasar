@@ -129,26 +129,6 @@ package object jscore {
             Ident(tmp).toJs)
     }
 
-    def maybeRewrite(expr: JsCore): Option[JsCore] = expr match {
-      case Access(Obj(values), Literal(Js.Str(name))) =>
-        values.get(Name(name))
-      case If(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
-        Some(If(BinOp(And, cond0, cond1), cons, alt0))
-      case Let(name, expr, body) =>
-        maybeReplace(Ident(name), expr, body).fold(expr match {
-          case Obj(values) =>
-            // TODO: inline _part_ of the object when possible
-            values.toList.foldRightM(body)((v, bod) =>
-              maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.para(count(Ident(name))) match {
-                case 0 => finalBody.some
-                case _ => None
-              })
-          case _ => None
-        })(
-          _.some)
-      case x => None
-    }
-
     def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore) =
       in.para(count(oldForm)) match {
         case 0 => in.some
@@ -168,9 +148,24 @@ package object jscore {
         case _ => replaceSolitary(oldForm, newForm, in)
       }
 
-
-    def simplify: JsCore = {
-      expr.rewrite(maybeRewrite)
+    def simplify: JsCore = expr.rewrite {
+      case Access(Obj(values), Literal(Js.Str(name))) =>
+        values.get(Name(name))
+      case If(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
+        Some(If(BinOp(And, cond0, cond1), cons, alt0))
+      case Let(name, expr, body) =>
+        maybeReplace(Ident(name), expr, body).fold(expr match {
+          case Obj(values) =>
+            // TODO: inline _part_ of the object when possible
+            values.toList.foldRightM(body)((v, bod) =>
+              maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.para(count(Ident(name))) match {
+                case 0 => finalBody.some
+                case _ => None
+              })
+          case _ => None
+        })(
+          _.some)
+      case x => None
     }
 
     // NB: This is a generic fold

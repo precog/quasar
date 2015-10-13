@@ -77,7 +77,9 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
                | Type.Set(_)
                | Type.Coproduct(Type.FlexArr(_, _, _), Type.Set(_))  =>
               generateTypeCheck(or)(f)(Type.AnyArray)
-            case Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time) =>
+            case Type.Timestamp
+               | Type.Coproduct(Type.Timestamp, Type.Date)
+               | Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time) =>
               generateTypeCheck(or)(f)(Type.Date)
             case Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time), Type.Interval) =>
               // Just repartition to match the right cases
@@ -310,8 +312,10 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
                     Call(Select(ident("Array"), "isArray"), List(expr)))))
             case Type.FlexArr(_, _, _) =>
               ((expr: JsCore) => Call(Select(ident("Array"), "isArray"), List(expr)))
-            // case Type.Binary =>
-            // case Type.Id =>
+            case Type.Binary =>
+              ((expr: JsCore) => BinOp(Instance, expr, ident("Binary")))
+            case Type.Id =>
+              ((expr: JsCore) => BinOp(Instance, expr, ident("ObjectId")))
             case Type.Bool =>
               ((expr: JsCore) => BinOp(jscore.Eq, UnOp(TypeOf, expr), jscore.Literal(Js.Str("boolean"))))
             case Type.Date =>
@@ -533,8 +537,8 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
             case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
             case Type.Obj(_, _) =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
-            // case Type.Arr(_) | Type.FlexArr(_, _, _) | Type.Set(_) =>
-            // case Type.Binary =>
+            case Type.Binary =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
             case Type.Id =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
             case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
@@ -960,13 +964,13 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
                 $lte($literal(Bson.ObjectId(Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))), expr),
                 $lt(expr, $literal(Bson.Bool(false)))))
             case Type.Bool =>
-              ((expr: Expression) => $or(
-                $eq($literal(Bson.Bool(false)), expr),
-                $eq($literal(Bson.Bool(true)), expr)))
+              ((expr: Expression) => $and(
+                $lte($literal(Bson.Bool(false)), expr),
+                $lte(expr, $literal(Bson.Bool(true)))))
             case Type.Date =>
               ((expr: Expression) => $and(
                 $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), expr),
-                // TODO: in Mongo 3.0, we can distingush between Date and Timestamp, but not in older versions.
+                // TODO: in Mongo 3.0, we can have a tighter type check.
                 // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
                 $lt(expr, $literal(Bson.Regex("", "")))))
             // NB: Some explicit coproducts for adjacent types.
@@ -982,9 +986,8 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
               ((expr: Expression) =>
                 $and(
                   $lte($literal(Bson.Bool(false)), expr),
-                  // TODO: in Mongo 3.0, we can distingush between Date and Timestamp, but not in older versions.
+                  // TODO: in Mongo 3.0, we can have a tighter type check.
                   // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
-
                   $lt(expr, $literal(Bson.Regex("", "")))))
           }
 
@@ -1008,8 +1011,6 @@ object MongoDbPlanner extends Planner[Crystallized] with Conversions {
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.
-  // NB: This is an apomorphism, a -\/ means that branch is processed, \/- means
-  //     that it still needs to be handled recursively.
   val elideJoinCheckƒ:
       Fix[LogicalPlan] => LogicalPlan[Fix[LogicalPlan] \/ Fix[LogicalPlan]] =
     _.unFix match {

@@ -197,25 +197,27 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF](new GroupBuilderF(src, keys, contents, id))
   }
 
-  // TODO: This should be a functor, then `rewrite` is generalized to `map`.
-  sealed trait StructureType {
-    val field: DocVar
-
-    def rewrite(f: DocVar => DocVar): StructureType
+  sealed trait StructureType[A] {
+    val field: A
   }
   object StructureType {
-    final case class Array(field: DocVar) extends StructureType {
-      def rewrite(f: DocVar => DocVar) = Array(f(field))
-    }
-    final case class Object(field: DocVar) extends StructureType {
-      def rewrite(f: DocVar => DocVar) = Object(f(field))
+    final case class Array[A](field: A) extends StructureType[A]
+    final case class Object[A](field: A) extends StructureType[A]
+
+    implicit val StructureTypeTraverse = new Traverse[StructureType] {
+      def traverseImpl[G[_], A, B](fa: StructureType[A])(f: A => G[B])(implicit G: Applicative[G]):
+          G[StructureType[B]] =
+        fa match {
+          case Array(field) => f(field).map(Array(_))
+          case Object(field) => f(field).map(Object(_))
+        }
     }
   }
 
-  final case class FlatteningBuilderF[A](src: A, fields: Set[StructureType])
+  final case class FlatteningBuilderF[A](src: A, fields: Set[StructureType[DocVar]])
       extends WorkflowBuilderF[A]
   object FlatteningBuilder {
-    def apply(src: WorkflowBuilder, fields: Set[StructureType]) =
+    def apply(src: WorkflowBuilder, fields: Set[StructureType[DocVar]]) =
       Fix[WorkflowBuilderF](new FlatteningBuilderF(src, fields))
   }
 
@@ -820,7 +822,6 @@ object WorkflowBuilder {
   //     parameters. In future, generalizing non-strict parameters could be
   //     useful.
   def cond(test: WorkflowBuilder, con: WorkflowBuilder, alt: WorkflowBuilder) =
-    // expr(List(test, con, alt)) { case List(t, c, a) => $cond(t, c, a) }
     (con.unFix, alt.unFix) match {
       case (ExprBuilderF(w1, e1), ExprBuilderF(w2, e2)) => for {
         t1 <- foldBuilders(test, List(w1, w2))
@@ -1197,7 +1198,7 @@ object WorkflowBuilder {
             if id1 == id1 =>
           mergeGroups(s1, s2, c1, c2, keys, id1).map { case ((glbase, grbase), g) =>
             DocBuilder(
-              FlatteningBuilder(g, struct1.map(_.rewrite(glbase.toDocVar \\ _))),
+              FlatteningBuilder(g, struct1.map(_.map(glbase.toDocVar \\ _))),
               combine(
                 shape1 ∘ (rewriteExprPrefix(_, glbase)),
                 d2.transform { case (n, _) => \/-($var(DocField(n))) })(_ ++ _))
@@ -1912,22 +1913,22 @@ object WorkflowBuilder {
         left.cata(branchLengthƒ) cmp right.cata(branchLengthƒ) match {
           case Ordering.LT =>
             merge(left, src1).map { case (lbase, rbase, wb) =>
-              (lbase, rbase, FlatteningBuilder(wb, fields1.map(_.rewrite(rbase.toDocVar \\ _))))
+              (lbase, rbase, FlatteningBuilder(wb, fields1.map(_.map(rbase.toDocVar \\ _))))
             }
           case Ordering.EQ =>
             merge(src0, src1).map { case (lbase, rbase, wb) =>
-              val lfields = fields0.map(_.rewrite(lbase.toDocVar \\ _))
-              val rfields = fields1.map(_.rewrite(rbase.toDocVar \\ _))
+              val lfields = fields0.map(_.map(lbase.toDocVar \\ _))
+              val rfields = fields1.map(_.map(rbase.toDocVar \\ _))
               (lbase, rbase, FlatteningBuilder(wb, lfields union rfields))
             }
           case Ordering.GT =>
             merge(src0, right).map { case (lbase, rbase, wb) =>
-              (lbase, rbase, FlatteningBuilder(wb, fields0.map(_.rewrite(lbase.toDocVar \\ _))))
+              (lbase, rbase, FlatteningBuilder(wb, fields0.map(_.map(lbase.toDocVar \\ _))))
             }
         }
       case (FlatteningBuilderF(src, fields), _) =>
         merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          val lfields = fields.map(_.rewrite(lbase.toDocVar \\ _))
+          val lfields = fields.map(_.map(lbase.toDocVar \\ _))
           if (lfields.exists(x => x.field.startsWith(rbase.toDocVar) || rbase.toDocVar.startsWith(x.field)))
             for {
               lName <- emitSt(freshName)
@@ -1938,7 +1939,7 @@ object WorkflowBuilder {
                   DocBuilder(wb, ListMap(
                     lName -> \/-($var(lbase.toDocVar)),
                     rName -> \/-($var(rbase.toDocVar)))),
-                  fields.map(_.rewrite(DocField(lName) \\ _))))
+                  fields.map(_.map(DocField(lName) \\ _))))
           else emit((lbase, rbase, FlatteningBuilder(wb, lfields)))
         }
       case (_, FlatteningBuilderF(_, _)) => delegate

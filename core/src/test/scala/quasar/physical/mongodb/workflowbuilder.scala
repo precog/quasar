@@ -6,6 +6,7 @@ import quasar.fp._
 import quasar._; import Planner._
 import quasar.javascript._
 import quasar.specs2._
+import quasar.mongo.Collection
 
 import org.specs2.execute.{Result}
 import org.specs2.mutable._

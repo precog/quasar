@@ -17,7 +17,6 @@
 package quasar.recursionschemes
 
 import quasar.Predef._
-import quasar.fp._
 import Recursive.ops._
 
 import scalaz._, Scalaz._

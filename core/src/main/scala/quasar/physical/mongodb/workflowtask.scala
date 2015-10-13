@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.fp._
 import quasar.javascript._
+import quasar.mongo.Collection
 import IdHandling._
 
 import scalaz._, Scalaz._

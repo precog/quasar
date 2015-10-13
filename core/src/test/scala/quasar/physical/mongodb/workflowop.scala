@@ -5,6 +5,7 @@ import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.TreeMatchers
 import quasar.fp._
 import quasar.javascript._
+import quasar.mongo.Collection
 
 import org.scalacheck._
 import org.scalacheck.Arbitrary

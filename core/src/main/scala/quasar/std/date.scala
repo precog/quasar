@@ -18,7 +18,6 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Data, Func, Type, Mapping, SemanticError}, SemanticError._
-import quasar.fp._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, NonEmptyList.nel, Validation.{success, failure}

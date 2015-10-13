@@ -9,6 +9,7 @@ import scala.collection.immutable.ListMap
 import scalaz._
 
 import quasar.{TreeMatchers}
+import quasar.mongo.Collection
 
 class OptimizeSpecs extends Specification with TreeMatchers {
   import quasar.physical.mongodb.accumulator._

@@ -25,6 +25,7 @@ import quasar._
 import quasar.fs.Path
 import quasar.std.StdLib._
 import quasar.javascript._
+import quasar.mongo.Collection
 import Workflow._
 
 import org.threeten.bp.{Duration, Instant}

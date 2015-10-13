@@ -16,12 +16,11 @@
 
 package quasar
 
-import scala.{Predef => P}
-import scala.{collection => C}
 import scala.collection.{immutable => I}
+import scala.{Predef => P, collection => C}
 import scala.inline
 
-object Predef extends LowPriorityImplicits {
+object Predef extends LowPriorityImplicits with SKI {
   type tailrec = scala.annotation.tailrec
   type SuppressWarnings = java.lang.SuppressWarnings
 
@@ -98,8 +97,37 @@ object Predef extends LowPriorityImplicits {
   type Nothing = scala.Nothing // make functors invariant
   type Throwable = java.lang.Throwable
   type RuntimeException = java.lang.RuntimeException
+
+  /** Accept a value (forcing the argument expression to be evaluated for its
+    * effects), and then discard it, returning Unit. Makes it explicit that
+    * you're discarding the result, and effectively suppresses the
+    * "NonUnitStatement" warning from wartremover.
+    */
+  def ignore[A](a: A): Unit = ()
 }
 
 abstract class LowPriorityImplicits {
   implicit def genericWrapArray[T] = P.genericWrapArray[T] _
 }
+
+trait SKI {
+  // NB: Unicode has double-struck and bold versions of the letters, which might
+  //     be more appropriate, but the code points are larger than 2 bytes, so
+  //     Scala doesn't handle them.
+
+  /** Probably not useful; implemented here mostly because it's amusing. */
+  def σ[A, B, C](x: A => B => C, y: A => B, z: A): C = x(z)(y(z))
+
+  /**
+   A shorter name for the constant function of 1, 2, 3, or 6 args.
+   NB: the argument is eager here, so use `_ => ...` instead if you need it to be thunked.
+   */
+  def κ[A, B](x: B): A => B                                 = _ => x
+  def κ[A, B, C](x: C): (A, B) => C                         = (_, _) => x
+  def κ[A, B, C, D](x: D): (A, B, C) => D                   = (_, _, _) => x
+  def κ[A, B, C, D, E, F, G](x: G): (A, B, C, D, E, F) => G = (_, _, _, _, _, _) => x
+
+  /** A shorter name for the identity function. */
+  def ι[A]: A => A = x => x
+}
+object SKI extends SKI

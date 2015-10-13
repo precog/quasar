@@ -6,6 +6,7 @@ import quasar.fp._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar._
 import quasar.fs.Path
+import quasar.mongo.Collection
 import quasar.javascript._
 import quasar.sql.{ParsingError, SQLParser, Query}
 import quasar.std._

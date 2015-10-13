@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar.SemanticError._
 import quasar.analysis._

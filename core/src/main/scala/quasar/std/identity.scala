@@ -19,7 +19,6 @@ package quasar.std
 import quasar.Predef._
 
 import scalaz._
-import quasar.fp._
 import quasar._
 
 trait IdentityLib extends Library {

@@ -19,7 +19,6 @@ package quasar.std
 import quasar.Predef._
 
 import scalaz._
-import quasar.fp._
 import quasar.{Func, LogicalPlan, Type, SemanticError}
 import quasar.recursionschemes._
 

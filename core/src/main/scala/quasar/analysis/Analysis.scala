@@ -17,7 +17,6 @@
 package quasar.analysis
 
 import quasar.Predef._
-import quasar.fp._
 
 import Function.untupled
 

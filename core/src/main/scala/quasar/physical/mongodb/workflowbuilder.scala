@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar._, Planner._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar.fs.Path
+import quasar.mongo.Collection
 import quasar.javascript._
 import quasar.std.StdLib._
 import quasar.jscore, jscore.{JsCore, JsFn}

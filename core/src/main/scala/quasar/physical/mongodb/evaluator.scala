@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar._, Errors._, Evaluator._
 import quasar.javascript._
+import quasar.mongo._
 import Workflow._
 
 import com.mongodb._

@@ -2,7 +2,6 @@ package quasar.config
 
 import com.mongodb.ConnectionString
 import quasar.Predef._
-import quasar.fp._
 import quasar.fs.{Path => EnginePath}
 
 import pathy._, Path._

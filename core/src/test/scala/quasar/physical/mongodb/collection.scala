@@ -8,6 +8,7 @@ import org.specs2.ScalaCheck
 import org.scalacheck._
 
 import quasar.fs.{Path}
+import quasar.mongo.Collection
 
 class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatchers {
 

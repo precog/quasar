@@ -1,7 +1,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.specs2._
 
 import org.specs2.mutable._

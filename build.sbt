@@ -125,10 +125,14 @@ lazy val oneJarSettings = {
   ))
 }
 
-lazy val root = Project("root", file(".")) aggregate(core, web, it) enablePlugins(AutomateHeaderPlugin)
+lazy val root = Project("root", file(".")) aggregate(core, web, it, mongoDriver) enablePlugins(AutomateHeaderPlugin)
 
-lazy val core = (project in file("core")) settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+lazy val core = (project in file("core")) dependsOn (fp, mongoDriver) settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val web = (project in file("web")) dependsOn (core % "test->test;compile->compile") settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin)
 
 lazy val it = (project in file("it")) dependsOn (core % "test->test;compile->compile", web % "test->test;compile->compile") settings (standardSettings: _*) enablePlugins(AutomateHeaderPlugin)
+
+lazy val mongoDriver = (project in file("mongo-driver")) dependsOn (fp) settings(oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin)
+
+lazy val fp = (project in file("fp")) settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin)

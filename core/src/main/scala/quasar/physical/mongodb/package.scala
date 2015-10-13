@@ -17,10 +17,14 @@
 package quasar.physical
 
 import quasar.Predef._
+import quasar.fs.Path.PathError
+import quasar.fs.Path.PathError.{PathTypeError, InvalidPathError}
+import quasar.fs.{FileNode, DirNode, Path}
+import quasar.mongo.Collection
 
-import scalaz._
+import scalaz._, Scalaz._
 
-import quasar.jscore
+import quasar.{Terminal, RenderTree, jscore}
 
 package object mongodb {
 
@@ -39,4 +43,44 @@ package object mongodb {
   // TODO: parameterize over label (#510)
   def freshName: State[NameGen, BsonField.Name] =
     freshId("tmp").map(BsonField.Name)
+
+  implicit class AugmentedCollection(a: Collection) {
+    def asPath: Path = {
+      val first = Collection.DatabaseNameUnparser(a.databaseName)
+      val rest = Collection.CollectionNameUnparser(a.collectionName)
+      val segs = NonEmptyList(first, rest: _*)
+      Path(DirNode.Current :: segs.list.dropRight(1).map(DirNode(_)), Some(FileNode(segs.last)))
+    }
+  }
+
+  implicit class AugmentedCollectionCompanion(a: Collection.type) {
+    import PathError._
+
+    def foldPath[A](path: Path)(clusterF: => A, dbF: String => A, collF: Collection => A):
+    PathError \/ A = {
+      val abs = path.asAbsolute
+      val segs = abs.dir.map(_.value) ++ abs.file.map(_.value).toList
+      segs match {
+        case Nil => \/-(clusterF)
+        case first :: rest => for {
+          db       <- Collection.DatabaseNameParser(first).leftMap(InvalidPathError(_))
+          collSegs = rest.map(Collection.CollectionSegmentParser(_))
+          coll     =  collSegs.mkString(".")
+          _        <- if (Collection.utf8length(db) + 1 + Collection.utf8length(coll) > 120)
+            -\/(InvalidPathError("database/collection name too long (> 120 bytes): " + db + "." + coll))
+          else \/-(())
+        } yield if (collSegs.isEmpty) dbF(db) else collF(Collection(db, coll))
+      }
+    }
+
+    def fromPath(path: Path): PathError \/ Collection =
+      foldPath[PathError \/ Collection](path)(
+        -\/(PathTypeError(path, Some("has no segments"))),
+        κ(-\/(InvalidPathError("path names a database, but no collection: " + path))),
+        \/-(_)).join
+  }
+
+  implicit val CollectionRenderTree = new RenderTree[Collection] {
+    def render(v: Collection) = Terminal(List("Collection"), Some(v.databaseName + "; " + v.collectionName))
+  }
 }

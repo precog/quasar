@@ -17,7 +17,6 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.recursionschemes.Fix
 import quasar.fs._, Path._
 import quasar.std._

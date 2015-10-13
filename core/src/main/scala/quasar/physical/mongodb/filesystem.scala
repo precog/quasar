@@ -29,6 +29,7 @@ import scalaz.stream.io._
 import com.mongodb.{WriteError => _, _}
 import com.mongodb.client._
 import com.mongodb.client.model._
+import quasar.mongo.Collection
 import org.bson._
 import scala.collection.JavaConverters._
 

@@ -24,6 +24,7 @@ import quasar.fs.Path
 import optimize.pipeline._
 import quasar.javascript._, Js._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.mongo.Collection
 import WorkflowTask._
 
 import monocle.syntax._

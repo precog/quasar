@@ -17,7 +17,6 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.fp._
 import quasar._
 
 import scalaz._, NonEmptyList.nel, Validation.{success, failure}

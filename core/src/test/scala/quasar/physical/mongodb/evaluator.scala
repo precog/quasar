@@ -3,6 +3,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._
 import quasar.javascript._
+import quasar.mongo.Collection
 
 import scala.collection.immutable.ListMap
 

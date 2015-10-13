@@ -18,7 +18,6 @@ package quasar.config
 
 import com.mongodb.ConnectionString
 import quasar.Predef._
-import quasar.fp._
 import quasar._, Evaluator._, Errors._
 import quasar.fs.{Path => EnginePath}
 

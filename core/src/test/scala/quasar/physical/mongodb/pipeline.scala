@@ -8,6 +8,7 @@ import org.specs2.ScalaCheck
 import scalaz._
 
 import quasar._
+import quasar.mongo.Collection
 import quasar.specs2._
 
 class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with PendingWithAccurateCoverage {

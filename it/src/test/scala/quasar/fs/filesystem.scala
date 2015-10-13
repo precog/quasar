@@ -1,7 +1,6 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.specs2.SkippedOnUserEnv
 import quasar._
 import quasar.fs._, Path._

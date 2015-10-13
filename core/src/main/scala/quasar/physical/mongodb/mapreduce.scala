@@ -23,6 +23,7 @@ import monocle.macros.{GenLens}
 import com.mongodb._
 
 import quasar.javascript._
+import quasar.mongo.Collection
 
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.DefaultArguments"))
 final case class MapReduce(

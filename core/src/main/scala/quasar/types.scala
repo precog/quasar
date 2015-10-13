@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
 import SemanticError.{TypeError, MissingField, MissingIndex}
 
 import scala.Any

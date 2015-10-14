@@ -128,19 +128,16 @@ package object api {
     def unapply(p: HPath): Option[Path] = AsPath.unapply(p).map(_.asDir)
   }
 
-  object staticFileService {
-    import FileService.Config
-
-    def pathCollector(file: File, config: Config, req: Request): Task[Option[Response]] = Task.now {
+  def staticFileService(basePath: String): HttpService = {
+    def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
       if (file.isDirectory) StaticFile.fromFile(new File(file, "index.html"), Some(req))
       else if (!file.isFile) None
       else StaticFile.fromFile(file, Some(req))
     }
 
-    def apply(basePath: String): HttpService =
-      fileService(Config(
-        systemPath = basePath,
-        pathCollector = pathCollector))
+    fileService(FileService.Config(
+      systemPath = basePath,
+      pathCollector = pathCollector))
   }
 
   def fileMediaType(file: String): Option[MediaType] =

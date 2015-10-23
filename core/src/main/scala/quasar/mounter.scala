@@ -23,12 +23,18 @@ import quasar.fs._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
+import shapeless.{ :: => _, Path => _, _}, ops.record._
 
-object Mounter {
-  def defaultMount(config: Config): EnvTask[Backend] =
-    mount(config, BackendDefinitions.All)
+final case class Mounter
+  [C, L <: HList]
+  (config: C)
+  (implicit
+  LGC: LabelledGeneric.Aux[C, L],
+  SM: Selector.Aux[L, Ev.mountingsWitness.T, Map[Path, BackendConfig]]) {
 
-  def mount(config: Config, backendDef: BackendDefinition): EnvTask[Backend] = {
+  def defaultMount: EnvTask[Backend] = mount(BackendDefinitions.All)
+
+  def mount(backendDef: BackendDefinition): EnvTask[Backend] = {
     def rec0(backend: Backend, path: List[DirNode], conf: BackendConfig): EnvTask[Backend] =
       backend match {
         case NestedBackend(base) => path match {
@@ -50,6 +56,6 @@ object Mounter {
       case (path, config) => rec0(backend, path.asAbsolute.asDir.dir, config)
     }
 
-    config.mountings.toList.foldLeftM(NestedBackend(Map()): Backend)(rec)
+    generic.rec(config).mountings.toList.foldLeftM(NestedBackend(Map()): Backend)(rec)
   }
 }

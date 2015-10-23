@@ -24,7 +24,7 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
   val validURI = new ConnectionString(s"$host/$dbName")
   val invalidURI = new ConnectionString(s"$invalidHost/$dbName")
   def sampleConfig(uri: ConnectionString) = Config(
-    server = SDServerConfig(Some(92)),
+    server = SDServerConfig(92),
     mountings = Map(
       EnginePath.Root -> MongoDbConfig(uri)))
   val TestConfig = sampleConfig(validURI)
@@ -101,17 +101,17 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
 
   "fromString" should {
     "parse valid config" in {
-      Config.fromString(ConfigStr) must beRightDisjunction(TestConfig)
+      configConfOps.fromString(ConfigStr) must beRightDisjunction(TestConfig)
     }
 
     "parse previous config" in {
-      Config.fromString(OldConfigStr) must beRightDisjunction(TestConfig)
+      configConfOps.fromString(OldConfigStr) must beRightDisjunction(TestConfig)
     }
   }
 
   "toString" should {
     "render same config" in {
-      Config.toString(TestConfig) must_== ConfigStr
+      TestConfig.shows must_== ConfigStr
     }
   }
 
@@ -123,27 +123,27 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
     val posixp = ".config"
 
     "mac when home dir" in {
-      val p = withProp("user.home", "/home/foo", Config.defaultPathForOS(file("quasar-config.json"))(OS.mac))
+      val p = withProp("user.home", "/home/foo", configConfOps.defaultPathForOS(file("quasar-config.json"))(OS.mac))
       printPosix(p.run) ==== s"/home/foo/$macp/$comp"
     }
 
     "mac no home dir" in {
-      val p = withoutProp("user.home", Config.defaultPathForOS(file("quasar-config.json"))(OS.mac))
+      val p = withoutProp("user.home", configConfOps.defaultPathForOS(file("quasar-config.json"))(OS.mac))
       printPosix(p.run) ==== s"./$macp/$comp"
     }
 
     "posix when home dir" in {
-      val p = withProp("user.home", "/home/bar", Config.defaultPathForOS(file("quasar-config.json"))(OS.posix))
+      val p = withProp("user.home", "/home/bar", configConfOps.defaultPathForOS(file("quasar-config.json"))(OS.posix))
       printPosix(p.run) ==== s"/home/bar/$posixp/$comp"
     }
 
     "posix when home dir with trailing slash" in {
-      val p = withProp("user.home", "/home/bar/", Config.defaultPathForOS(file("quasar-config.json"))(OS.posix))
+      val p = withProp("user.home", "/home/bar/", configConfOps.defaultPathForOS(file("quasar-config.json"))(OS.posix))
       printPosix(p.run) ==== s"/home/bar/$posixp/$comp"
     }
 
     "posix no home dir" in {
-      val p = withoutProp("user.home", Config.defaultPathForOS(file("quasar-config.json"))(OS.posix))
+      val p = withoutProp("user.home", configConfOps.defaultPathForOS(file("quasar-config.json"))(OS.posix))
       printPosix(p.run) ==== s"./$posixp/$comp"
     }
   }
@@ -151,8 +151,8 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
   "toFile" should {
     "create loadable config" in {
       withTestConfigFile(fp =>
-        Config.toFile(TestConfig, Some(fp)) *>
-        Config.fromFile(fp).run
+        configConfOps.toFile(TestConfig, Some(fp)) *>
+        configConfOps.fromFile(fp).run
       ).run must beRightDisjunction(TestConfig)
     }
   }
@@ -160,23 +160,23 @@ class ConfigSpec extends Specification with DisjunctionMatchers {
   "fromFileOrEmpty" should {
     "result in empty config when file not found" in {
       withTestConfigFile(fp =>
-        Config.fromFileOrEmpty(Some(fp)).run
-      ).run must beRightDisjunction(Config.empty)
+        configConfOps.fromFileOrEmpty(Some(fp)).run
+      ).run must beRightDisjunction(Empty[Config].empty)
     }
   }
 
   "loadAndTest" should {
     "load a correct config" in {
       withTestConfigFile(fp =>
-        Config.toFile(TestConfig, Some(fp)) *>
-        Config.loadAndTest(fp).run
+        configConfOps.toFile(TestConfig, Some(fp)) *>
+        configConfOps.loadAndTest(fp).run
       ).run must beRightDisjunction(TestConfig)
     }
 
     "fail on a config with incorrect mounting" in {
       withTestConfigFile(fp =>
-        Config.toFile(BrokenTestConfig, Some(fp)) *>
-        Config.loadAndTest(fp).run
+        configConfOps.toFile(BrokenTestConfig, Some(fp)) *>
+        configConfOps.loadAndTest(fp).run
       ).run must beLeftDisjunction
     }
   }

@@ -1,6 +1,6 @@
 name := "Web"
 
-mainClass in Compile := Some("quasar.api.Server")
+mainClass in Compile := Some("quasar.api.server")
 
 val http4sVersion     = "0.10.1"
 

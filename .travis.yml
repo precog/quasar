@@ -13,7 +13,7 @@ after_success:
 - "./sbt 'project core' coveralls"
 # Upload coverage information to codecov.io (BETA)
 # Unsure about whether it will do coverage for all the code base as opposed to just core
-- pip install --user codecov && codecov
+- pip install --user git+https://github.com/codecov/codecov-python.git@master && codecov
 notifications:
   irc:
     template:

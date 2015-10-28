@@ -8,7 +8,7 @@ import org.specs2.scalaz._
 import scalaz._
 
 class ServerSpecs extends Specification with DisjunctionMatchers {
-  import quasar.api.server._
+  import server._
 
   val defaultOpts = Options(None, None, None, false, false, None)
 

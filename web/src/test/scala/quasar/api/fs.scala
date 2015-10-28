@@ -5,7 +5,7 @@ import quasar.Predef._
 import quasar.api.Mock.ActionType
 import quasar.recursionschemes.Fix
 import quasar.fp._
-import quasar._, Backend._, Evaluator._
+import quasar._, Backend._, Evaluator._, generic._
 import quasar.config._
 import quasar.fs._, Path._
 import quasar.specs2._
@@ -206,7 +206,7 @@ class ApiSpecs extends Specification with DisjunctionMatchers with PendingWithAc
   val backendForConfig: Config => EnvTask[Backend] = {
     val emptyFiles = Map.empty.withDefault((_: Path) => Process.halt)
     val bdefn = BackendDefinition(_ => Mock.JournaledBackend(emptyFiles).point[EnvTask])
-    Mounter(_).mount(bdefn)
+    cfg => Mounter.mount((rec(cfg).mountings), bdefn)
   }
 
   val files1 = ListMap(

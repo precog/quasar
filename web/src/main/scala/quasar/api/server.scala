@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fs.{Path => EnginePath}
 import quasar.console._
-import quasar._, Errors._, Evaluator._
+import quasar._, Errors._, Evaluator._, generic._
 import quasar.config._
 
 import java.io.File
@@ -221,7 +221,8 @@ class ServerOps
       config         <- configOps.fromFileOrEmpty(cfgPath)
       port           =  opts.port getOrElse portL.get(config)
       updCfg         =  portL.set(config)(port)
-      (proc, useCfg) =  servers(content.toList, Some(redirect), idleTimeout, Backend.test, Mounter(_).defaultMount,
+      (proc, useCfg) =  servers(content.toList, Some(redirect), idleTimeout, Backend.test,
+                                cfg => Mounter.defaultMount(rec(cfg).mountings),
                                 cfg => configOps.toFile(cfg, cfgPath))
       _              <- Task.gatherUnordered(List(
                           proc.observe(reactToFirstServerStarted(opts.openClient)).run,

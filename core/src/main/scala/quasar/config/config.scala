@@ -219,54 +219,23 @@ object Ev {
   val mountingsWitness = Witness('mountings)
   val portWitness = Witness('port)
 
-  def construct
-    [C, S, LC <: HList, LS <: HList](
-    config: C,
-    server: S)
-    (implicit
-    _SC: Show[C],
-    _EC: Empty[C],
-    _ES: Empty[S],
-    _CC: CodecJson[C],
-    _LGC: LabelledGeneric.Aux[C, LC],
-    _LGS: LabelledGeneric.Aux[S, LS],
-    _SM: Selector.Aux[LC, Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]],
-    _SS: Selector.Aux[LC, Ev.serverWitness.T, S],
-    _SP: Selector.Aux[LS, Ev.portWitness.T, Int],
-    _US: Updater.Aux[LC, FieldType[Ev.serverWitness.T, S], LC],
-    _UM: Updater.Aux[LC, FieldType[Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]], LC],
-    _UP: Updater.Aux[LS, FieldType[Ev.portWitness.T, Int], LS]) =
-    new Ev[C, S, LC, LS] {
-    implicit val SC = _SC
-    implicit val EC = _EC
-    implicit val ES = _ES
-    implicit val CC = _CC
-    implicit val LGC = _LGC
-    implicit val LGS = _LGS
-    implicit val SM = _SM
-    implicit val SS = _SS
-    implicit val SP = _SP
-    implicit val US = _US
-    implicit val UM = _UM
-    implicit val UP = _UP
-    }
-
-  val ev = Ev.construct(Empty[Config].empty, Empty[SDServerConfig].empty)
+  val ev = new Ev(Empty[Config].empty, Empty[SDServerConfig].empty)
 }
 
-trait Ev[C, S, LC <: HList, LS <: HList] {
-  implicit def SC: Show[C]
-  implicit def EC: Empty[C]
-  implicit def ES: Empty[S]
-  implicit def CC: CodecJson[C]
-  implicit def LGC: LabelledGeneric.Aux[C, LC]
-  implicit def LGS: LabelledGeneric.Aux[S, LS]
-  implicit def SM: Selector.Aux[LC, Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]]
-  implicit def SS: Selector.Aux[LC, Ev.serverWitness.T, S]
-  implicit def SP: Selector.Aux[LS, Ev.portWitness.T, Int]
-  implicit def US: Updater.Aux[LC, FieldType[Ev.serverWitness.T, S], LC]
-  implicit def UM: Updater.Aux[LC, FieldType[Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]], LC]
-  implicit def UP: Updater.Aux[LS, FieldType[Ev.portWitness.T, Int], LS]
-}
+class Ev[C, S, LC <: HList, LS <: HList]
+  (config: C, server: S)
+  (implicit
+  val SC: Show[C],
+  val EC: Empty[C],
+  val ES: Empty[S],
+  val CC: CodecJson[C],
+  val LGC: LabelledGeneric.Aux[C, LC],
+  val LGS: LabelledGeneric.Aux[S, LS],
+  val SM: Selector.Aux[LC, Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]],
+  val SS: Selector.Aux[LC, Ev.serverWitness.T, S],
+  val SP: Selector.Aux[LS, Ev.portWitness.T, Int],
+  val US: Updater.Aux[LC, FieldType[Ev.serverWitness.T, S], LC],
+  val UM: Updater.Aux[LC, FieldType[Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]], LC],
+  val UP: Updater.Aux[LS, FieldType[Ev.portWitness.T, Int], LS])
 
 object configConfOps extends ConfigOps(Ev.ev)

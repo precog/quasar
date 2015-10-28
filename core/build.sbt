@@ -16,8 +16,6 @@ ScoverageKeys.coverageMinimum := 78
 
 ScoverageKeys.coverageFailOnMinimum := true
 
-ScoverageKeys.coverageHighlighting := true
-
 sbtbuildinfo.BuildInfoPlugin.projectSettings
 
 buildInfoKeys := Seq[BuildInfoKey](version)

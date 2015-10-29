@@ -222,6 +222,9 @@ object Ev {
   val ev = new Ev(Empty[Config].empty, Empty[SDServerConfig].empty)
 }
 
+/**
+ * Various config related evidence including those required for LabelledGeneric operations.
+ */
 class Ev[C, S, LC <: HList, LS <: HList]
   (config: C, server: S)
   (implicit

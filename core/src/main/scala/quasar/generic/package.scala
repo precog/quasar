@@ -18,6 +18,9 @@ package quasar
 
 import shapeless._, labelled._, record._, ops.record._
 
+/**
+ * Convenience methods for common LabelledGeneric operations.
+ */
 package object generic {
 
   def rec[A, L <: HList](a: A)(implicit LG: LabelledGeneric.Aux[A, L]): shapeless.syntax.DynamicRecordOps[L] =

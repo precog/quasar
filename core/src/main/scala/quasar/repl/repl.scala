@@ -17,7 +17,7 @@
 package quasar.repl
 
 import quasar.Predef._
-import quasar._, Backend._, Errors._, Planner._
+import quasar._, Backend._, Errors._, generic._, Planner._
 import quasar.config._
 import quasar.fs._, Path._
 import quasar.physical.mongodb.util
@@ -365,8 +365,8 @@ object Repl {
       for {
         pathStr <- Task.now(args.headOption)
         fsPath  <- pathStr.fold[Task[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](Task.now(None))(s => parsePath(s).map(Some(_)))
-        cfg     <- (Config.fromFileOrEmpty(fsPath)
-                      .flatMap(Mounter.defaultMount(_))
+        cfg     <- (configConfOps.fromFileOrEmpty(fsPath)
+                      .flatMap(c => Mounter.defaultMount(rec(c).mountings))
                       .fold(e => Task.fail(new RuntimeException(e.message)), Task.now _)
                       .join)
                     .onFinish(_.cata(printErrorAndFail, Task.now(())))

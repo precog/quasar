@@ -18,27 +18,36 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.fs.{Path => EnginePath}
 import quasar.console._
-import quasar._, Errors._, Evaluator._
+import quasar._, Errors._, Evaluator._, generic._
 import quasar.config._
 
 import java.io.File
 import java.lang.System
 import scala.concurrent.duration._
 
+import argonaut.CodecJson
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 import scalaz.stream._
+import shapeless._
 
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
 
-object Server {
+class ServerOps
+  [C, S, LC <: HList, LS <: HList]
+  (configOps: ConfigOps[C, S, LC, LS], ev: Ev[C, S, LC, LS]) {
+  import ev._
+
+  val portL = lens[C].server.port
+
   // NB: This is a terrible thing.
   //     Is there a better way to find the path to a jar?
   val jarPath: Task[String] =
     Task.delay {
-      val uri = Server.getClass.getProtectionDomain.getCodeSource.getLocation.toURI
+      val uri = getClass.getProtectionDomain.getCodeSource.getLocation.toURI
       val path0 = uri.getPath
       val path =
         java.net.URLDecoder.decode(
@@ -72,17 +81,19 @@ object Server {
                        anyAvailablePort)
       .getOrElse(requested)
 
-  def createServer(port: Int, idleTimeout: Duration, svcs: EnvTask[ListMap[String, HttpService]]): EnvTask[Http4sServer] = {
+  def createServer(config: C, idleTimeout: Duration, svcs: EnvTask[ListMap[String, HttpService]])
+    : EnvTask[Http4sServer] = {
+
     val builder = BlazeBuilder
                   .withIdleTimeout(idleTimeout)
-                  .bindHttp(port, "0.0.0.0")
+                  .bindHttp(portL.get(config), "0.0.0.0")
 
     svcs.flatMap(_.toList.reverse.foldLeft(builder) {
       case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
     }.start.liftM[EnvErrT])
   }
 
- final case class StaticContent(loc: String, path: String)
+  case class StaticContent(loc: String, path: String)
 
   /**
    * Returns a process of (port, server) and an effectful function which will
@@ -97,20 +108,21 @@ object Server {
    */
   def servers(staticContent: List[StaticContent], redirect: Option[String],
               idleTimeout: Duration, tester: BackendConfig => EnvTask[Unit],
-              mounter: Config => EnvTask[Backend], configWriter: Config => Task[Unit])
-             : (Process[Task, (Int, Http4sServer)], Option[(Int, Config)] => Task[Unit]) = {
+              mounter: C => EnvTask[Backend], configWriter: C => Task[Unit])
+             : (Process[Task, (Int, Http4sServer)], Option[C] => Task[Unit]) = {
 
-    val configQ = async.boundedQueue[Option[(Int, Config)]](2)(Strategy.DefaultStrategy)
-    val reload = (cfg: Config) => configQ.enqueueOne(Some((cfg.server.port, cfg)))
+    val configQ = async.boundedQueue[Option[C]](2)(Strategy.DefaultStrategy)
+    val reload = (cfg: C) => configQ.enqueueOne(Some(cfg))
 
     val fileSvcs = staticContent.map { case StaticContent(l, p) => l -> staticFileService(p) }.toListMap
     val redirSvc = ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
 
-    def start(port0: Int, config: Config): EnvTask[(Int, Http4sServer)] =
+    def start(config: C): EnvTask[(Int, Http4sServer)] =
       for {
-        port    <- choosePort(port0).liftM[EnvErrT]
-        fsApi   =  FileSystemApi(config, mounter, tester, reload, configWriter)
-        server  <- createServer(port, idleTimeout, fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc))
+        port    <- choosePort(portL.get(config)).liftM[EnvErrT]
+        fsApi   =  FileSystemApi(config, mounter, tester, reload, configWriter)(ev)
+        updCfg  =  portL.set(config)(port)
+        server  <- createServer(updCfg, idleTimeout, fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc))
         _       <- stdout("Server started listening on port " + port).liftM[EnvErrT]
       } yield (port, server)
 
@@ -121,8 +133,8 @@ object Server {
 
     def go(prevServer: Option[(Int, Http4sServer)]): Process[Task, (Int, Http4sServer)] =
       configQ.dequeue.take(1) flatMap {
-        case Some((port, cfg)) =>
-          Process.await(shutdown(prevServer, true) *> start(port, cfg).run)(_.fold(
+        case Some(cfg) =>
+          Process.await(shutdown(prevServer, true) *> start(cfg).run)(_.fold(
             err => Process.halt.causedBy(Cause.Error(new RuntimeException(err.message))),
             tpl => Process.emit(tpl) ++ go(Some(tpl))
           ))
@@ -206,13 +218,15 @@ object Server {
       cfgPath        <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
           liftE(Task.now(None)))(
           cfg => FsPath.parseSystemFile(cfg).toRight(InvalidConfig("Invalid path to config file: " + cfg)).map(Some(_)))
-      config         <- Config.fromFileOrEmpty(cfgPath)
-      port           =  opts.port getOrElse config.server.port
-      (proc, useCfg) =  servers(content.toList, Some(redirect), idleTimeout, Backend.test, Mounter.defaultMount,
-                                cfg => Config.toFile(cfg, cfgPath))
+      config         <- configOps.fromFileOrEmpty(cfgPath)
+      port           =  opts.port getOrElse portL.get(config)
+      updCfg         =  portL.set(config)(port)
+      (proc, useCfg) =  servers(content.toList, Some(redirect), idleTimeout, Backend.test,
+                                cfg => Mounter.defaultMount(rec(cfg).mountings),
+                                cfg => configOps.toFile(cfg, cfgPath))
       _              <- Task.gatherUnordered(List(
                           proc.observe(reactToFirstServerStarted(opts.openClient)).run,
-                          useCfg(Some((port, config))),
+                          useCfg(Some(updCfg)),
                           waitForInput *> useCfg(None)
                         )).liftM[EnvErrT]
     } yield ()
@@ -224,3 +238,5 @@ object Server {
       .run
   }
 }
+
+object server extends ServerOps(configConfOps, Ev.ev)

@@ -19,7 +19,7 @@ package quasar.config
 import com.mongodb.ConnectionString
 import quasar.Predef._
 import quasar.fp._
-import quasar._, Evaluator._, Errors._
+import quasar._, Evaluator._, Errors._, generic._
 import quasar.fs.{Path => EnginePath}
 
 import java.io.{File => JFile}
@@ -27,16 +27,24 @@ import scala.util.Properties._
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import shapeless.{Path => _, _}, labelled._, ops.record._
+import simulacrum.typeclass
 import pathy._, Path._
 
-final case class SDServerConfig(port0: Option[Int]) {
-  val port = port0.getOrElse(SDServerConfig.DefaultPort)
-}
+final case class SDServerConfig(port: Int)
 
 object SDServerConfig {
   val DefaultPort = 20223
 
-  implicit def Codec = casecodec1(SDServerConfig.apply, SDServerConfig.unapply)("port")
+  implicit def Codec = CodecJson(
+      (s: SDServerConfig) =>
+        ("port" := s.port) ->:
+        jEmptyObject,
+      c => for {
+        port <- (c --\ "port").as[Option[Int]]
+      } yield SDServerConfig(port.getOrElse(DefaultPort)))
+
+  implicit object empty extends Empty[SDServerConfig] { def empty = SDServerConfig(SDServerConfig.DefaultPort) }
 }
 
 final case class Credentials(username: String, password: String)
@@ -83,15 +91,32 @@ final case class Config(
   mountings: Map[EnginePath, BackendConfig])
 
 object Config {
-  import FsPath._
-
-  val empty = Config(SDServerConfig(None), Map())
-
-  private implicit val MapCodec = CodecJson[Map[EnginePath, BackendConfig]](
+  implicit val MapCodec = CodecJson[Map[EnginePath, BackendConfig]](
     encoder = map => map.map(t => t._1.pathname -> t._2).asJson,
     decoder = cursor => implicitly[DecodeJson[Map[String, BackendConfig]]].decode(cursor).map(_.map(t => EnginePath(t._1) -> t._2)))
 
-  implicit def configCodecJson = casecodec2(Config.apply, Config.unapply)("server", "mountings")
+  implicit val configCodecJson = casecodec2(Config.apply, Config.unapply)("server", "mountings")
+
+  implicit object empty extends Empty[Config] { def empty = Config(Empty[SDServerConfig].empty, Map()) }
+
+  implicit val show = ConfigOps.show[Config]
+}
+
+@typeclass trait Empty[A] {
+  def empty: A
+}
+
+object ConfigOps {
+  def show[C: EncodeJson] = new Show[C] {
+    override def shows(f: C): String = EncodeJson.of[C].encode(f).pretty(quasar.fp.multiline)
+  }
+}
+
+class ConfigOps
+  [C, S, LC <: HList, LS <: HList]
+  (ev: Ev[C, S, LC, LS]) {
+  import ev._
+  import FsPath._
 
   def defaultPathForOS(file: RelFile[Sandboxed])(os: OS): Task[FsPath[File, Sandboxed]] = {
     def localAppData: OptionT[Task, FsPath.Aux[Abs, Dir, Sandboxed]] =
@@ -127,7 +152,7 @@ object Config {
   private def alternatePath: Task[FsPath[File, Sandboxed]] =
     OS.currentOS >>= defaultPathForOS(dir("SlamData") </> file("slamengine-config.json"))
 
-  def fromFile(path: FsPath[File, Sandboxed]): EnvTask[Config] = {
+  def fromFile(path: FsPath[File, Sandboxed]): EnvTask[C] = {
     import java.nio.file._
     import java.nio.charset._
 
@@ -143,16 +168,16 @@ object Config {
     } yield config
   }
 
-  def fromFileOrEmpty(path: Option[FsPath[File, Sandboxed]]): EnvTask[Config] = {
-    def loadOr(path: FsPath[File, Sandboxed], alt: EnvTask[Config]): EnvTask[Config] = 
-      handleWith(fromFile(path)) { 
+  def fromFileOrEmpty(path: Option[FsPath[File, Sandboxed]]): EnvTask[C] = {
+    def loadOr(path: FsPath[File, Sandboxed], alt: EnvTask[C]): EnvTask[C] =
+      handleWith(fromFile(path)) {
         case _: java.nio.file.NoSuchFileException => alt
       }
-    
-    val empty = liftE[EnvironmentError](Task.now(Config.empty))
-    
+
+    val empty = liftE[EnvironmentError](Task.now(Empty[C].empty))
+
     path match {
-      case Some(path) => 
+      case Some(path) =>
         loadOr(path, empty)
       case None =>
         liftE(defaultPath).flatMap { p =>
@@ -163,12 +188,12 @@ object Config {
     }
   }
 
-  def loadAndTest(path: FsPath[File, Sandboxed]): EnvTask[Config] = for {
+  def loadAndTest(path: FsPath[File, Sandboxed]): EnvTask[C] = for {
     config <- fromFile(path)
-    _      <- config.mountings.values.toList.map(Backend.test).sequenceU
+    _      <- rec(config).mountings.values.toList.map(Backend.test).sequenceU
   } yield config
 
-  def toFile(config: Config, path: Option[FsPath[File, Sandboxed]])(implicit encoder: EncodeJson[Config]): Task[Unit] = {
+  def toFile(config: C, path: Option[FsPath[File, Sandboxed]])(implicit encoder: EncodeJson[C]): Task[Unit] = {
     import java.nio.file._
     import java.nio.charset._
 
@@ -176,7 +201,7 @@ object Config {
       codec <- systemCodec
       p1    <- path.fold(defaultPath)(Task.now)
       cfg   <- Task.delay {
-        val text = toString(config)
+        val text = config.shows
         val p = Paths.get(printFsPath(codec, p1))
         ignore(Option(p.getParent).map(Files.createDirectories(_)))
         ignore(Files.write(p, text.getBytes(StandardCharsets.UTF_8)))
@@ -185,13 +210,35 @@ object Config {
     } yield cfg
   }
 
-  def fromString(value: String): EnvironmentError \/ Config =
-    Parse.decodeEither[Config](value).leftMap(InvalidConfig(_))
-
-  def toString(config: Config)(implicit encoder: EncodeJson[Config]): String =
-    encoder.encode(config).pretty(quasar.fp.multiline)
-
-  implicit val ShowConfig = new Show[Config] {
-    override def shows(f: Config) = Config.toString(f)
-  }
+  def fromString(value: String): EnvironmentError \/ C =
+    Parse.decodeEither[C](value).leftMap(InvalidConfig(_))
 }
+
+object Ev {
+  val serverWitness = Witness('server)
+  val mountingsWitness = Witness('mountings)
+  val portWitness = Witness('port)
+
+  val ev = new Ev(Empty[Config].empty, Empty[SDServerConfig].empty)
+}
+
+/**
+ * Various config related evidence including those required for LabelledGeneric operations.
+ */
+class Ev[C, S, LC <: HList, LS <: HList]
+  (config: C, server: S)
+  (implicit
+  val SC: Show[C],
+  val EC: Empty[C],
+  val ES: Empty[S],
+  val CC: CodecJson[C],
+  val LGC: LabelledGeneric.Aux[C, LC],
+  val LGS: LabelledGeneric.Aux[S, LS],
+  val SM: Selector.Aux[LC, Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]],
+  val SS: Selector.Aux[LC, Ev.serverWitness.T, S],
+  val SP: Selector.Aux[LS, Ev.portWitness.T, Int],
+  val US: Updater.Aux[LC, FieldType[Ev.serverWitness.T, S], LC],
+  val UM: Updater.Aux[LC, FieldType[Ev.mountingsWitness.T, Map[EnginePath, BackendConfig]], LC],
+  val UP: Updater.Aux[LS, FieldType[Ev.portWitness.T, Int], LS])
+
+object configConfOps extends ConfigOps(Ev.ev)

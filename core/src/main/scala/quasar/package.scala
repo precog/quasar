@@ -1,6 +1,6 @@
-import quasar.Predef.{Long, String, Vector, Unit}
+import quasar.Predef.{Long, String, Vector}
 import quasar.fp._
-import quasar.recursionschemes._, Fix._, FunctorT.ops._
+import quasar.recursionschemes._, Fix._, Recursive.ops._, FunctorT.ops._
 
 import scalaz._
 import scalaz.syntax.monad._
@@ -26,7 +26,7 @@ package object quasar {
 
   /** Returns the `LogicalPlan` for the given SQL^2 query. */
   def queryPlan(query: sql.Expr, vars: Variables): CompileM[Fix[LogicalPlan]] = {
-    import SemanticAnalysis.{tree, AllPhases}
+    import SemanticAnalysis.AllPhases
 
     def phase[A: RenderTree](label: String, r: SemanticErrors \/ A): CompileM[A] =
       EitherT(r.point[PhaseResultW]) flatMap { a =>
@@ -37,8 +37,9 @@ package object quasar {
     for {
       ast         <- phase("SQL AST", query.right)
       substAst    <- phase("Variables Substituted",
-                           Variables.substVars[Unit](tree(ast), vars) leftMap (_.wrapNel))
-      annTree     <- phase("Annotated Tree", AllPhases(substAst).disjunction)
+                           ast.cataM[SemanticError \/ ?, sql.Expr](Variables.substVarsƒ(vars))
+                             .leftMap(_.wrapNel))
+      annTree     <- phase("Annotated Tree", AllPhases(substAst))
       logical     <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
       simplified  <- phase("Simplified", logical.transCata(repeatedly(Optimizer.simplifyƒ)).right)
       typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(simplified).disjunction)

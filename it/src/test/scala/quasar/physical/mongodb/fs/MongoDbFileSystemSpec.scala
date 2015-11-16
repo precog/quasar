@@ -53,6 +53,26 @@ class MongoDbFileSystemSpec
   val testPrefix: Task[AbsDir[Sandboxed]] =
     TestConfig.testDataPrefix
 
+  /** This is necessary b/c the mongo server is shared global state and we
+    * delete it all in this test, including the user-provided directory that
+    * other tests expect to exist, which can cause failures depending on which
+    * order the tests are run in =(
+    *
+    * The purpose of this function is to restore the testDir (i.e. database)
+    * so that other tests aren't affected.
+    */
+  def restoreTestDir(run: Run): Task[Unit] = {
+    val tmpFile: Task[AbsFile[Sandboxed]] =
+      (testPrefix |@| NameGenerator.salt.map(file))(_ </> _)
+
+    tmpFile flatMap { f =>
+      val p = write.saveF(f, oneDoc).terminated *>
+              manage.deleteFile(f).liftM[Process]
+
+      rethrow[Task, FileSystemError].apply(execT(run, p))
+    }
+  }
+
   fileSystemShould { _ => implicit run =>
     "MongoDB" should {
 
@@ -142,6 +162,8 @@ class MongoDbFileSystemSpec
               .map(_.headOption getOrElse ko)
           ).join.run
         }.skippedOnUserEnv("Would destroy user data.")
+
+        step(restoreTestDir(run).run)
       }
 
       /** TODO: Testing this here closes the tests to the existence of

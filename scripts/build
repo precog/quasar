@@ -28,6 +28,14 @@ QUASAR_MONGODB_TESTDB="quasar-test"
 QUASAR_MONGODB_HOST_2_6="localhost:27018"
 QUASAR_MONGODB_HOST_3_0="localhost:27019"
 
+# Enables running tests for a single mongo release by specifying an argument of
+# "2_6" or "3_0" for the MongoDB 2.6.x and 3.0.x releases.
+if [[ "$#" == "1" ]]; then
+  QUASAR_MONGODB_RELEASE="$1"
+else
+  QUASAR_MONGODB_RELEASE="ALL"
+fi
+
 rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 
@@ -44,9 +52,9 @@ cp "$QUASAR_WEB_JAR_PATH" "$QUASAR_TEMP_JAR"
 if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
   if [[ "$1" == "2_6" ]]; then
-    export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://localhost:27018\"}}"
+    export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
   elif [[ "$1" == "3_0" ]]; then
-    export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://localhost:27018\"}}"
+    export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
   else
     export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
     export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
@@ -59,7 +67,7 @@ fi
 # Note: scoverage is brain-dead, so each project's tests have to be run
 # separately, and 'core' should be last, so that its report will include
 # coverage in the core code provided by tests in other projects.
-"$SBT" -DisCoverageRun=true -DisIsolatedEnv=${ISOLATED_ENV:=false} doc coverage 'project it' test exclusive:test 'project web' test 'project core' test
+"$SBT" -DisCoverageRun=true -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc 'project it' test exclusive:test 'project web' test 'project core' test
 
 # Build completed, copy oneJar to right location:
 mkdir -p $QUASAR_WEB_JAR_DIR

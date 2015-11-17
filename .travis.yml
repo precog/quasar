@@ -8,13 +8,7 @@ script:
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT}
   - ./scripts/build $MONGO_RELEASE
-after_success:
-- "./scripts/publishJarIfMaster"
-# Upload coverage information to coveralls.io
-- "./sbt 'project core' coveralls"
-# Upload coverage information to codecov.io (BETA)
-# Unsure about whether it will do coverage for all the code base as opposed to just core
-- pip install --user codecov && codecov
+after_success: ./scripts/afterSuccess
 notifications:
   irc:
     template:

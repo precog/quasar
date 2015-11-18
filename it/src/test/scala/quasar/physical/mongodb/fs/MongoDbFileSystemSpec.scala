@@ -12,17 +12,13 @@ import quasar.specs2._
 import quasar.sql
 
 import com.mongodb.MongoException
-
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import monocle.function.Field1
 import monocle.std.tuple2._
-
 import org.specs2.ScalaCheck
 import org.specs2.execute.{AsResult, SkipException}
-
 import pathy.Path._
-
 import scalaz.{Optional => _, _}, Id._
 import scalaz.stream._
 import scalaz.std.vector._

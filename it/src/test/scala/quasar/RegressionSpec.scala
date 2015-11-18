@@ -7,6 +7,7 @@ import quasar.Errors._
 import quasar.Evaluator._
 import quasar.fs._
 import quasar.sql._
+import quasar.specs2._
 import quasar.regression._
 
 import java.io.File
@@ -22,7 +23,7 @@ import scalaz.concurrent._
 
 import pathy.Path.FileName
 
-class RegressionSpec extends BackendTest {
+class RegressionSpec extends BackendTest with ExclusiveExecution {
 
   implicit val codec = DataCodec.Precise
   implicit val ED = EncodeJson[Data](codec.encode(_).fold(err => scala.sys.error(err.message), ι))

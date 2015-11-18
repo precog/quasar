@@ -41,9 +41,9 @@ fi
 # Perform setup for integration tests:
 if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
-  if [[ "$1" == "2_6" ]]; then
+  if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
     export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
-  elif [[ "$1" == "3_0" ]]; then
+  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
     export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
   else
     export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
@@ -70,7 +70,9 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Note: scoverage is brain-dead, so each project's tests have to be run
   # separately, and 'core' should be last, so that its report will include
   # coverage in the core code provided by tests in other projects.
-  "$SBT" -DisCoverageRun=true -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc 'project it' test exclusive:test 'project web' test 'project core' test
+  "$SBT" -DisCoverageRun=true -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc test exclusive:test
+  "$SBT" coverageReport
+  "$SBT" coverageAggregate
 
   # Build completed, copy oneJar to right location:
   mkdir -p $QUASAR_WEB_JAR_DIR

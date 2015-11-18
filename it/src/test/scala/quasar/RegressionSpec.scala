@@ -7,7 +7,6 @@ import quasar.Errors._
 import quasar.Evaluator._
 import quasar.fs._
 import quasar.sql._
-import quasar.specs2._
 import quasar.regression._
 
 import java.io.File
@@ -17,13 +16,12 @@ import argonaut._, Argonaut._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.specification.{Example}
+import pathy.Path.FileName
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
 import scalaz.concurrent._
 
-import pathy.Path.FileName
-
-class RegressionSpec extends BackendTest with ExclusiveExecution {
+class RegressionSpec extends BackendTest {
 
   implicit val codec = DataCodec.Precise
   implicit val ED = EncodeJson[Data](codec.encode(_).fold(err => scala.sys.error(err.message), ι))

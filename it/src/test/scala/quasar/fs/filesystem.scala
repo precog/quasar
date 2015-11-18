@@ -2,7 +2,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.specs2._
+import quasar.specs2.SkippedOnUserEnv
 import quasar._
 import quasar.fs._, Path._
 
@@ -12,11 +12,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent._
 import scalaz.stream._
 
-class FileSystemSpecs
-  extends BackendTest
-  with ExclusiveExecution
-  with DisjunctionMatchers
-  with SkippedOnUserEnv {
+class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserEnv {
 
   import Backend._
   import Errors._

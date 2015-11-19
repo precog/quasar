@@ -49,13 +49,14 @@ object MongoConnectionString {
   def decode(uri: String): DecodeResult[ConnectionString] = {
     DecodeResult(parse(uri).leftMap(κ((s"invalid connection URI: $uri", CursorHistory(Nil)))))
   }
-  implicit val codec: CodecJson[ConnectionString] =
+
+  implicit val connectionStringCodecJson: CodecJson[ConnectionString] =
     CodecJson[ConnectionString](
-      c => jString(c.getURI),
+      c => jString(c.getConnectionString),
       _.as[String].flatMap(decode))
 }
 object MongoDbConfig {
-  import MongoConnectionString.codec
+  import MongoConnectionString._
   implicit def Codec: CodecJson[MongoDbConfig] =
     casecodec1(MongoDbConfig.apply, MongoDbConfig.unapply)("connectionUri")
 }

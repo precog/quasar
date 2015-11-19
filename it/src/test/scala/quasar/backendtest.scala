@@ -2,73 +2,19 @@ package quasar
 
 import quasar.Backend.ProcessingError
 import quasar.Predef._
-import quasar.config._
 import quasar.fs._
-
-import java.lang.System
-
-import org.specs2.mutable._
+import quasar.specs2._
 import quasar.interactive.DataSource
 
+import java.lang.System
 import scala.io.Source
+
+import org.specs2.mutable._
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
-import argonaut._
+trait BackendTest extends Specification with ExclusiveExecution {
 
-object TestConfig {
-
-  /** The path prefix under which test data may be found as well as where tests
-    * can write test data/output.
-    */
-  val DefaultTestPathPrefix = Path("/quasar-test/")
-
-  /** The environment variable used to externally specify the test path prefix.
-    *
-    * NB: The same path prefix is used for all backends under test.
-    */
-  val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
-
-  val MONGO_2_6 = "mongodb_2_6"
-  val MONGO_3_0 = "mongodb_3_0"
-  lazy val backendNames: List[String] = List(MONGO_2_6, MONGO_3_0)
-
-  private def fail[A](msg: String): Task[A] = Task.fail(new RuntimeException(msg))
-
-  def backendEnvName(backend: String): String = "QUASAR_" + backend.toUpperCase
-
-  /** Read the value of an environment variable. */
-  def readEnv(name: String): OptionT[Task, String] =
-    Task.delay(System.getenv).liftM[OptionT]
-      .flatMap(env => OptionT(Task.delay(Option(env.get(name)))))
-
-  /** Load backend config from environment variable.
-    *
-    * Fails if it cannot parse the config and returns None if there is no config.
-    */
-  def loadConfig(name: String): OptionT[Task, MountConfig] =
-    readEnv(backendEnvName(name)).flatMapF(value =>
-      Parse.decodeEither[MountConfig](value).fold(
-        e => fail("Failed to parse $" + backendEnvName(name) + ": " + e),
-        _.point[Task]))
-
-  /** Returns the absolute path within a backend to the directory containing test
-    * data.
-    *
-    * One may specify this externally by setting the [[TestPathPrefixEnvName]].
-    * The returned [[Task]] will fail if an invalid path is provided from the
-    * environment and return the [[DefaultTestPathPrefix]] if nothing is provided.
-    */
-  def testDataPathPrefix: Task[Path] =
-    readEnv(TestPathPrefixEnvName).map(Path(_)).flatMapF { path =>
-      if (path.absolute) Task.now(path)
-      else fail("Test path prefix must be an absolute dir, got: " + path.shows)
-    } getOrElse DefaultTestPathPrefix
-
-}
-
-trait BackendTest extends Specification {
-  sequential  // makes it easier to clean up
   args.report(showtimes=true)
 
   lazy val AllBackends: Task[NonEmptyList[(String, Backend)]] = {

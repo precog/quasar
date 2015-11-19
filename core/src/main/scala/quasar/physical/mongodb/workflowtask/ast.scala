@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.workflowtask
+package quasar
+package physical
+package mongodb
+package workflowtask
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
-import quasar.physical.mongodb._
 
 import scalaz._, Scalaz._
 
 /** A WorkflowTask approximately represents one request to MongoDB. */
 sealed trait WorkflowTaskF[A]
 object WorkflowTaskF {
+  import Workflow._
+
   /** A task that returns a necessarily small amount of raw data. */
   final case class PureTaskF[A](value: Bson) extends WorkflowTaskF[A]
 
@@ -76,10 +80,14 @@ object WorkflowTaskF {
         }
     }
 
-  implicit def WorkflowTaskRenderTree(implicit RC: RenderTree[Collection], RO: RenderTree[WorkflowF[Unit]], RJ: RenderTree[Js], RS: RenderTree[Selector]):
-      RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
+  implicit def WorkflowTaskRenderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
     new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
+        val RC = RenderTree[Collection]
+        val RO = RenderTree[WorkflowF[Unit]]
+        val RJ = RenderTree[Js]
+        val RS = RenderTree[Selector]
+
         val WorkflowTaskNodeType = "WorkflowTask" :: "Workflow" :: Nil
 
         def render(task: WorkflowTaskF[α]) = task match {

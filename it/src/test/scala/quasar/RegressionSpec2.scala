@@ -226,7 +226,7 @@ object RegressionSpec2 {
 
   lazy val knownFileSystems = TestConfig.backendNames.toSet
 
-  def externalFS: Task[NonEmptyList[FileSystemUT[FileSystemIO]]] = {
+  def externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
     val extFs = TestConfig.externalFileSystems {
       case (MongoDbConfig(cs), dir) =>
         lazy val f = mongofs.testFileSystemIO(cs, dir).run

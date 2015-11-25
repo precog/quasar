@@ -56,7 +56,7 @@ object TestConfig {
     */
   def externalFileSystems[S[_]](
     pf: PartialFunction[(MountConfig, ADir), Task[S ~> Task]]
-  ): Task[NonEmptyList[FileSystemUT[S]]] = {
+  ): Task[IList[FileSystemUT[S]]] = {
     def fileSystemNamed(
       n: BackendName,
       p: ADir
@@ -74,10 +74,18 @@ object TestConfig {
       TestConfig.backendNames.map(TestConfig.backendEnvName).mkString(", ")
     )
 
-    TestConfig.testDataPrefix flatMap (prefix =>
-      TestConfig.readWriteBackends
-        .traverse(n => fileSystemNamed(n, prefix).run)
-        .flatMap(_.flatten.toNel.cata(Task.now, Task.fail(noBackendsFound))))
+    /** NB: We only fail if no backends are found, regardless if they're RW
+      * or RO, even though we currently only use RW ones here as, if
+      * the RW were omitted but a RO is specified, it was likely intentional.
+      */
+    TestConfig.testDataPrefix flatMap { prefix =>
+      if (TestConfig.backendNames.isEmpty)
+        Task.fail(noBackendsFound)
+      else
+        TestConfig.readWriteBackends.toIList
+          .traverse(n => fileSystemNamed(n, prefix).run)
+          .map(_.unite)
+    }
   }
 
   /** Read the value of an envrionment variable. */

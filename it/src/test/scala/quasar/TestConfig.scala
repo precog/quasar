@@ -32,15 +32,24 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
-  val MONGO_2_6 = "mongodb_2_6"
-  val MONGO_3_0 = "mongodb_3_0"
-  lazy val backendNames: List[String] = List(MONGO_2_6, MONGO_3_0)
+  val MONGO_2_6 = BackendName("mongodb_2_6")
+  val MONGO_3_0 = BackendName("mongodb_3_0")
+  val MONGO_READ_ONLY = BackendName("mongodb_read_only")
+
+  lazy val readWriteBackends: List[BackendName] = List(MONGO_2_6, MONGO_3_0)
+  lazy val readOnlyBackends: List[BackendName]  = List(MONGO_READ_ONLY)
+  lazy val backendNames: List[BackendName]      = readWriteBackends ::: readOnlyBackends
 
   /** Returns the name of the environment variable used to configure the
     * given backend.
     */
-  def backendEnvName(backendName: String): String =
-    "QUASAR_" + backendName.toUpperCase
+  def backendEnvName(backendName: BackendName): String =
+    "QUASAR_" + backendName.name.toUpperCase
+
+  /** The name of the environment variable to configure the insert connection
+    * for a read-only backend.
+    */
+  def insertEnvName(b: BackendName) = backendEnvName(b) + "_INSERT"
 
   /** Returns the list of filesystems to test, using the provided function
     * to select an interpreter for a given config.
@@ -49,10 +58,10 @@ object TestConfig {
     pf: PartialFunction[(MountConfig, ADir), Task[S ~> Task]]
   ): Task[NonEmptyList[FileSystemUT[S]]] = {
     def fileSystemNamed(
-      n: String,
+      n: BackendName,
       p: ADir
     ): OptionT[Task, FileSystemUT[S]] =
-      TestConfig.loadConfig(n) flatMapF { c =>
+      TestConfig.loadConfig(backendEnvName(n)) flatMapF { c =>
         val run = pf.lift((c, p)) getOrElse Task.fail(new RuntimeException(
           s"Unsupported filesystem config: $c"
         ))
@@ -66,25 +75,35 @@ object TestConfig {
     )
 
     TestConfig.testDataPrefix flatMap (prefix =>
-      TestConfig.backendNames
+      TestConfig.readWriteBackends
         .traverse(n => fileSystemNamed(n, prefix).run)
         .flatMap(_.flatten.toNel.cata(Task.now, Task.fail(noBackendsFound))))
   }
-
-  /** Load backend config from environment variable.
-    *
-    * Fails if it cannot parse the config and returns None if there is no config.
-    */
-  def loadConfig(name: String): OptionT[Task, MountConfig] =
-    readEnv(backendEnvName(name)).flatMapF(value =>
-      Parse.decodeEither[MountConfig](value).fold(
-        e => fail("Failed to parse $" + backendEnvName(name) + ": " + e),
-        _.point[Task]))
 
   /** Read the value of an envrionment variable. */
   def readEnv(name: String): OptionT[Task, String] =
     Task.delay(System.getenv).liftM[OptionT]
       .flatMap(env => OptionT(Task.delay(Option(env.get(name)))))
+
+  /** Load backend config from environment variable.
+    *
+    * Fails if it cannot parse the config and returns None if there is no config.
+    */
+  def loadConfig(envName: String): OptionT[Task, MountConfig] =
+    readEnv(envName).flatMapF(value =>
+      Parse.decodeEither[MountConfig](value).fold(
+        e => fail("Failed to parse $" + envName + ": " + e),
+        _.point[Task]))
+
+  /** Load a pair of backend configs, the first for inserting test data, and
+    * the second for actually running tests. If no config is specified for
+    * inserting, then the test config is just returned twice.
+    */
+  def loadConfigPair(name: BackendName): OptionT[Task, (MountConfig, MountConfig)] = {
+    OptionT((loadConfig(insertEnvName(name)).run |@| loadConfig(backendEnvName(name)).run) { (c1, c2) =>
+      c2.map(c2 => (c1.getOrElse(c2), c2))
+    })
+  }
 
   /** Returns the absolute path within a backend to the directory containing test
     * data.

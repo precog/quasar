@@ -37,9 +37,9 @@ abstract class FileSystemTest[S[_]: Functor](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: String => Run => Unit): Unit =
+  def fileSystemShould(examples: BackendName => Run => Unit): Unit =
     fileSystems.map(_ foreach { case FileSystemUT(name, f, prefix) =>
-      s"$name FileSystem" should examples(name)(hoistFree(f)); ()
+      s"${name.name} FileSystem" should examples(name)(hoistFree(f)); ()
     }).run
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
@@ -106,6 +106,6 @@ object FileSystemTest {
                    .map(_ compose InMemory.fileSystem)
                    .run
 
-    Task.delay(FileSystemUT("in-memory", f, rootDir))
+    Task.delay(FileSystemUT(BackendName("in-memory"), f, rootDir))
   }
 }

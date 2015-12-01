@@ -94,9 +94,9 @@ abstract class ServerOps[WC: CodecJson, SC](
                        anyAvailablePort)
       .getOrElse(requested)
 
-  def builders(config: WC, idleTimeout: Duration): Task[Builders]
+  def builders(config: WC, idleTimeout: Duration, fsApi: FileSystemApi[WC, SC]): Task[Builders]
 
-  def createServers(config: WC, idleTimeout: Duration, svcs: EnvTask[Services])
+  def createServers(config: WC, idleTimeout: Duration, fsApi: FileSystemApi[WC, SC], svcs: EnvTask[Services])
     : EnvTask[ServersErrors] = {
 
     def servicesBuilder(services: Services, builders: Builders): Builders =
@@ -110,7 +110,7 @@ abstract class ServerOps[WC: CodecJson, SC](
       }
     }
 
-    (svcs ⊛ EitherT.right(builders(config, idleTimeout)))(servicesBuilder) >>= startBuilder
+    (svcs ⊛ EitherT.right(builders(config, idleTimeout, fsApi)))(servicesBuilder) >>= startBuilder
   }
 
   case class StaticContent(loc: String, path: String)
@@ -144,7 +144,7 @@ abstract class ServerOps[WC: CodecJson, SC](
         port <- choosePort(wcPort.get(config)).liftM[EnvErrT]
         fsApi = fileSystemApi(config, mounter, tester, reload, configWriter, webConfigLens)
         updCfg =  wcPort.set(port)(config)
-        serversErrors <- createServers(updCfg, idleTimeout, fsApi.AllServices.map(_.toList ++ fileSvcs ++ redirSvc))
+        serversErrors <- createServers(updCfg, idleTimeout, fsApi, fsApi.AllServices.map(_.toList ++ fileSvcs ++ redirSvc))
         servers <- serversErrors.traverseM {
           case (p, -\/(ex)) => Task.now(List()) <* stdout(s"Server failed to start listening on port $p. ${ex.getMessage}")
           case (p, \/-(s)) => Task.now(List((p, s))) <* stdout(s"Server started listening on port $p")
@@ -270,7 +270,7 @@ object Server extends ServerOps(
     ServerConfig.port)) {
   import webConfigLens._
 
-  def builders(config: WebConfig, idleTimeout: Duration): Task[Builders] = Task.now(List(
+  def builders(config: WebConfig, idleTimeout: Duration, fsApi: FileSystemApi[WebConfig, ServerConfig]): Task[Builders] = Task.now(List(
     wcPort.get(config) -> BlazeBuilder
       .withIdleTimeout(idleTimeout)
       .bindHttp(wcPort.get(config), "0.0.0.0")))

@@ -64,6 +64,7 @@ object Utils {
     val srv = Server.createServers(
       Server.webConfigLens.wcPort.set(port)(config),
       5.seconds,
+      api,
       api.AllServices.map(_.toList)).run.run
     try { body(client, () => reloads.toList) } finally {
       Traverse[EnvironmentError \/ ?].compose[List].compose[(Int, ?)].compose[Throwable \/ ?]

@@ -99,7 +99,7 @@ class FileSystemApi[WC, SC](
         .as(mountings.get(cfg).keySet contains path)
     }
 
-  protected def updateWebServerConfig(config: Task[WC]): Task[Unit] =
+  def updateWebServerConfig(config: Task[WC]): Task[Unit] =
     for {
       cfg <- config
       _   <- configChanged(cfg)

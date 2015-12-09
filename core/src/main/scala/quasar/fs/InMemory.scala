@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.fp._
+import numeric.{Natural, Positive}
 import quasar.recursionschemes.{Fix, Recursive}
 import quasar.Planner.UnsupportedPlan
 

@@ -16,24 +16,32 @@
 
 package quasar.api
 
+import quasar.fp.numeric._
+
 import org.specs2.ScalaCheck
 import org.specs2.scalaz.ScalazMatchers
 import pathy.Path
 import quasar.Predef._
 
 import org.specs2.mutable._
-import quasar.fs.{Natural, Positive}
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
-import scalaz.stream.{Process}
+import scalaz.stream.Process
 
 import scodec.bits._
 import scodec.interop.scalaz._
 
 import pathy.Path._
-import quasar.fs.NumericArbitrary._
+import quasar.fp.numeric._
+import quasar.fp.numeric.scalacheck._
 import pathy.scalacheck.PathyArbitrary._
+
+import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.numeric.Greater
+import shapeless.Nat
+import shapeless.tag.@@
+import eu.timepit.refined.auto._
 
 class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
   args.report(showtimes=true)
@@ -63,8 +71,8 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
     // ZipInputStream, and capture just the size of the contents of each file.
     def counts(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], Natural)]] = {
       def count(is: java.io.InputStream): Natural = {
-        def loop(n: Natural): Natural = if (is.read ≟ -1) n else loop(n + Natural._1)
-        loop(Natural._0)
+        def loop(n: Long @@ NonNegative): Natural = if (is.read ≟ -1) n else loop(add(n, 1L))
+        loop(0L)
       }
       unzip(count)(p)
     }
@@ -86,7 +94,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(byte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
+      counts(z).run must_== filesAndSize.toList
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
@@ -94,7 +102,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
+      counts(z).run must_== filesAndSize.toList
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip many large files of random bytes (100 MB)" in {

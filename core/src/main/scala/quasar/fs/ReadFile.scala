@@ -17,6 +17,10 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.fp.numeric.{Natural, Positive}
+import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
+import shapeless.tag.@@
 
 import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
@@ -64,7 +68,7 @@ object ReadFile {
       * at the specified offset. An optional limit may be supplied to restrict
       * the maximum amount of data read.
       */
-    def scan(file: AFile, offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+    def scan(file: AFile, offset: Long @@ NonNegative, limit: Option[Positive]): Process[M, Data] = {
       def readUntilEmpty(h: ReadHandle): Process[M, Data] =
         Process.await(unsafe.read(h)) { data =>
           if (data.isEmpty)
@@ -81,13 +85,13 @@ object ReadFile {
       * given file.
       */
     def scanAll(file: AFile): Process[M, Data] =
-      scan(file, Natural._0, None)
+      scan(file, 0L, None)
 
     /** Returns a process that produces at most `limit` items from the beginning
       * of the given file.
       */
     def scanTo(file: AFile, limit: Positive): Process[M, Data] =
-      scan(file, Natural._0, Some(limit))
+      scan(file, 0L, Some(limit))
 
     /** Returns a process that produces data from the given file, beginning
       * at the specified offset.

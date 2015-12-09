@@ -20,6 +20,8 @@ package services
 
 import Predef._
 import quasar.fp._
+import numeric._
+import quasar.fp.numeric.scalacheck._
 
 import argonaut._, Argonaut._
 
@@ -38,7 +40,6 @@ import quasar.fs.InMemory._
 import quasar.recursionschemes._
 
 import Fixture._
-import NumericArbitrary._
 import quasar.std.IdentityLib
 
 import scalaz.concurrent.Task
@@ -47,6 +48,8 @@ import scalaz.stream.Process
 import scalaz._, Scalaz._
 
 import query._
+
+import eu.timepit.refined.scalacheck.numeric._
 
 class CompileAndQueryServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
 
@@ -202,7 +205,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
           status = Status.Ok,
           response = (a: String) => a must_==
             jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
-              .drop(offset.value.toInt).take(limit.value.toInt).mkString("")
+              .drop(offset.toInt).take(limit.toInt).mkString("")
         )
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: AbsFileOf[AlphaCharacters]) =>

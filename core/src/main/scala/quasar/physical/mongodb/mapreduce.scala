@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.fs.Positive
+import quasar.fp.numeric.Positive
 import quasar.javascript._
 
 import com.mongodb._

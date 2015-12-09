@@ -17,6 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.fp.numeric.Positive
 import quasar.SKI._
 import quasar.{EnvironmentError2, EnvErr2T}
 import quasar.fp.prism._

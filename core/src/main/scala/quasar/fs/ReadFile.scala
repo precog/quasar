@@ -122,7 +122,7 @@ object ReadFile {
       * Care must be taken to `close` the returned handle in order to avoid
       * potential resource leaks.
       */
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): M[ReadHandle] =
+    def open(file: AFile, offset: Long @@ NonNegative, limit: Option[Positive]): M[ReadHandle] =
       EitherT(lift(Open(file, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.

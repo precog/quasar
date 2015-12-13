@@ -54,7 +54,8 @@ import quasar.api.MessageFormatGen._
 
 import org.scalacheck.{Arbitrary, Gen}
 
-import eu.timepit.refined.numeric.Negative
+import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
+import eu.timepit.refined.auto._
 import shapeless.tag.@@
 
 import Fixture._
@@ -158,13 +159,16 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" ! prop {
-            (filesystem: SingleFileMemState, offset: Natural, limit: Positive, format: MessageFormat) =>
+            (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: Int @@ RPositive, format: MessageFormat) =>
               val request = Request(
                 uri = Uri(path = filesystem.path).+?("offset", offset.shows).+?("limit", limit.shows),
                 headers = Headers(Accept(format.mediaType)))
               val response = service(filesystem.state)(request).run
-              isExpectedResponse(filesystem.contents.drop(offset.toInt).take(limit.toInt), response, format)
-          }
+              isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
+          }(implicitly,implicitly,implicitly,implicitly,implicitly,
+            greaterArbitraryMax(10000000), // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding
+                                           // values of limit that are close to Int.MaxValue
+            implicitly,implicitly,implicitly)
           "return 400 if provided with" >> {
             "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
               (limit < 1) ==> {

@@ -20,6 +20,7 @@ import quasar.fp.numeric._
 
 import org.specs2.ScalaCheck
 import org.specs2.scalaz.ScalazMatchers
+import org.scalacheck.Arbitrary
 import pathy.Path
 import quasar.Predef._
 
@@ -34,7 +35,7 @@ import scodec.interop.scalaz._
 
 import pathy.Path._
 import quasar.fp.numeric._
-import quasar.fp.numeric.scalacheck._
+import quasar.fp.numeric.scalacheck.{greaterArbitraryMax, notLessArbitraryMax}
 import pathy.scalacheck.PathyArbitrary._
 
 import eu.timepit.refined.numeric.NonNegative
@@ -48,6 +49,11 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
 
   "zipFiles" should {
     import Zip._
+
+    // Provide instances of Arbitrary Positive and Natural that allow the computation to complete in a reasonable
+    // amount of time and without Java heap space errors.
+    implicit val reasonablePositive: Arbitrary[Positive] = greaterArbitraryMax(1000L)
+    implicit val reasonableNatural: Arbitrary[Natural] = notLessArbitraryMax(1000L)
 
     def rand = new java.util.Random
     def randBlock = Array.fill[Byte](1000)(rand.nextInt.toByte)

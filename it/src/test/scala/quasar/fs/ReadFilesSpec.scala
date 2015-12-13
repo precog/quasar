@@ -28,15 +28,16 @@ import scala.annotation.tailrec
 import monocle.std.{disjunction => D}
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream._
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{Greater, NonNegative}
 import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.W
 import quasar.fp.numeric._
 import quasar.fp.numeric.scalacheck._
 import shapeless.tag.@@
+import shapeless.Nat
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
   import ReadFilesSpec._, FileSystemError._, PathError2._
@@ -137,19 +138,19 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
       "scan with offset k and limit j takes j data, starting from k" ! prop { (j: Positive, k: Natural) =>
         val r = runLogT(run, read.scan(largeFile.file, k, Some(j)))
         val d = largeFile.data.zip(EStream.iterate(0)(_ + 1))
-                  .dropWhile(_._2 < j.toInt).map(_._1)
-                  .take(k.toInt)
+                  .dropWhile(_._2 < k.toInt).map(_._1)
+                  .take(j.toInt)
 
         r.runEither must beRight(d.toIndexedSeq)
-      }.set(minTestsOk = 1)
+      }(implicitly, // In order to keep test execution relatively fast
+        greaterArbitraryMax[@@,Long,Nat._0](200L), implicitly,
+        notLessArbitraryMax[@@,Long,Nat._0](200L), implicitly).set(minTestsOk = 5)
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Positive =>
-        j > smallFileSize ==> {
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Long @@ Greater[W.`100L`.T] =>
           val r = runLogT(run, read.scan(smallFile.file, 0L, Some(j)))
 
           (j.toInt must beGreaterThan(smallFile.data.length)) and
             (r.runEither must beRight(smallFile.data.toIndexedSeq))
-        }
       }.set(minTestsOk = 1)
 
       "scan very long file is stack-safe" >> {

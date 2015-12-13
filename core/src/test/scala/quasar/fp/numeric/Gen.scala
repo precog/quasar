@@ -1,7 +1,5 @@
 package quasar.fp.numeric
 
-import quasar.Predef._
-
 import scala.Numeric
 
 import org.scalacheck.Gen.Choose
@@ -18,17 +16,17 @@ import eu.timepit.refined.scalacheck.arbitraryRefType
 
 package object scalacheck {
 
+  // TODO: Consider contributing back to refined
 
-
-  // It is very annoying that Numeric does not have a MaxValue function
-//  implicit def greaterArbitrary[F[_, _], T:Choose, N <: Nat](
-//     implicit
-//     rt: RefType[F],
-//     num: Numeric[T]
-//  ): Arbitrary[F[T, Greater[N]]] = {
-//    val gen = Gen.chooseNum(num.plus(num.fromInt(Nat.toInt[N]), num.one), num.MaxValue)
-//    arbitraryRefType(gen)
-//  }
+  implicit def greaterArbitraryNat[F[_, _], T:Choose, N <: Nat:ToInt](
+     implicit
+     rt: RefType[F],
+     num: Numeric[T],
+     bound: Bounded[T]
+  ): Arbitrary[F[T, Greater[N]]] = {
+    val gen = Gen.chooseNum(num.plus(num.fromInt(Nat.toInt[N]), num.one), bound.maxValue)
+    arbitraryRefType(gen)
+  }
 
   def greaterArbitraryRange[F[_,_], T:Choose, N <: Nat](min: F[T,Greater[N]], max: F[T,Greater[N]])
                                                   (implicit rt: RefType[F], num: Numeric[T]): Arbitrary[F[T,Greater[N]]] = {
@@ -42,34 +40,23 @@ package object scalacheck {
     arbitraryRefType(gen)
   }
 
-  implicit def greaterArbitraryInt[F[_, _], N <: Nat](implicit rt: RefType[F], toInt:ToInt[N]): Arbitrary[F[Int, Greater[N]]] = {
-    val gen = Gen.chooseNum(Nat.toInt[N] + 1, Int.MaxValue)
+  implicit def lessArbitraryNat[F[_,_], T:Choose, N <: Nat:ToInt](
+    implicit
+    rt: RefType[F],
+    num: Numeric[T],
+    bound: Bounded[T]
+  ): Arbitrary[F[T,Less[N]]] = {
+    val gen = Gen.chooseNum(bound.minValue,num.minus(num.fromInt(Nat.toInt[N]), num.one))
     arbitraryRefType(gen)
   }
 
-  implicit def greaterArbitraryLong[F[_, _], N <: Nat](implicit rt: RefType[F], toInt:ToInt[N]): Arbitrary[F[Long, Greater[N]]] = {
-    val gen = Gen.chooseNum(Nat.toInt[N].toLong + 1, Long.MaxValue)
-    arbitraryRefType(gen)
-  }
-//
-  implicit def greaterArbitraryShort[F[_, _], N <: Nat](implicit rt: RefType[F], toInt:ToInt[N]): Arbitrary[F[Short, Greater[N]]] = {
-    val num = implicitly[Numeric[Short]]
-    val gen = Gen.chooseNum(num.plus(Nat.toInt[N].toShort, num.one), Short.MaxValue)
-    arbitraryRefType(gen)
-  }
-
-  implicit def lessArbitraryLong[F[_, _]:RefType, N <: Nat:ToInt]: Arbitrary[F[Long, Less[N]]] = {
-    val gen = Gen.chooseNum(Long.MinValue, Nat.toInt[N].toLong - 1)
-    arbitraryRefType(gen)
-  }
-
-  implicit def notLessArbitraryLong[F[_,_]:RefType,N <: Nat:ToInt]: Arbitrary[F[Long,Not[Less[N]]]] = {
-    val gen = Gen.chooseNum(Nat.toInt[N].toLong,Long.MaxValue)
-    arbitraryRefType(gen)
-  }
-
-  implicit def notLessArbitraryInt[F[_,_]:RefType,N <: Nat:ToInt]: Arbitrary[F[Int,Not[Less[N]]]] = {
-    val gen = Gen.chooseNum(Nat.toInt[N], Int.MaxValue)
+  implicit def notLessArbitraryNat[F[_,_], T:Choose, N <: Nat:ToInt](
+     implicit
+     rt: RefType[F],
+     num: Numeric[T],
+     bound: Bounded[T]
+   ): Arbitrary[F[T,Not[Less[N]]]] = {
+    val gen = Gen.chooseNum(num.fromInt(Nat.toInt[N]),bound.maxValue)
     arbitraryRefType(gen)
   }
 

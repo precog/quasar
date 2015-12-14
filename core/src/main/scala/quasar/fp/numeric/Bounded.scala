@@ -2,7 +2,7 @@ package quasar.fp.numeric
 
 import quasar.Predef._
 
-trait Bounded[T] extends {
+trait Bounded[T] {
   def minValue:T
   def maxValue:T
 }

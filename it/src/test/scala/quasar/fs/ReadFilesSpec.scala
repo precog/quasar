@@ -31,7 +31,7 @@ import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.{Greater, NonNegative}
+import eu.timepit.refined.numeric.{Positive => RPositive,_}
 import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
 import quasar.fp.numeric._
@@ -117,7 +117,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         *       for erroring instead of returning nothing.
         */
       "scan with offset k, where k > |file|, and no limit succeeds with empty result" >> {
-        val r = runLogT(run, read.scan(smallFile.file, add(smallFileSize, 1L), None))
+        val r = runLogT(run, read.scan(smallFile.file, smallFileSize |+| 1L, None))
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
@@ -129,7 +129,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight(d.toIndexedSeq)
       }.set(minTestsOk = 1)
 
-      "scan with offset zero and limit j stops after j data" ! prop { j: Positive =>
+      "scan with offset zero and limit j stops after j data" ! prop { j: Int @@ RPositive =>
         val r = runLogT(run, read.scan(smallFile.file, 0L, Some(j)))
 
         r.runEither must beRight(smallFile.data.take(j.toInt).toIndexedSeq)
@@ -151,7 +151,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
 
           (j.toInt must beGreaterThan(smallFile.data.length)) and
             (r.runEither must beRight(smallFile.data.toIndexedSeq))
-      }.set(minTestsOk = 1)
+      }.set(minTestsOk = 10)
 
       "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(veryLongFile.file).foldMap(_ => 1))

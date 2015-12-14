@@ -77,7 +77,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
     // ZipInputStream, and capture just the size of the contents of each file.
     def counts(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], Natural)]] = {
       def count(is: java.io.InputStream): Natural = {
-        def loop(n: Long @@ NonNegative): Natural = if (is.read ≟ -1) n else loop(add(n, 1L))
+        def loop(n: Long @@ NonNegative): Natural = if (is.read ≟ -1) n else loop(n |+| 1L)
         loop(0L)
       }
       unzip(count)(p)

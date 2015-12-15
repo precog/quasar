@@ -90,11 +90,11 @@ object InMemory {
             fileL(f).st flatMap {
               case Some(xs) =>
                 val rIdx =
-                  st.toInt + pos
+                  st.get.toInt + pos
 
                 val rCount =
                   rChunkSize                          min
-                  lim.cata(_.toInt - pos, rChunkSize) min
+                  lim.cata(_.get.toInt - pos, rChunkSize) min
                   (xs.length - rIdx)
 
                 if (rCount <= 0)

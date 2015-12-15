@@ -18,9 +18,7 @@ package quasar.api.services
 
 import java.nio.charset.StandardCharsets
 
-import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.auto._
-import shapeless.tag.@@
 import quasar.fp._
 import numeric.{Natural, Positive}
 
@@ -91,7 +89,7 @@ object data {
       case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
         handleOffsetLimitParams(offsetParam,limitParam){ (offset, limit) =>
           val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-          download(requestedFormat, path, offset.getOrElse(0L: Long @@ NonNegative), limit)
+          download(requestedFormat, path, offset.getOrElse(0L), limit)
         }
       }
       case req @ POST -> AsFilePath(path) => upload(req, W.append(path,_))

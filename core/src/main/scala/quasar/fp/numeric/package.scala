@@ -2,20 +2,19 @@ package quasar.fp
 
 import quasar.Predef._
 
-import shapeless.tag.@@
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
-import eu.timepit.refined.refineT
-import eu.timepit.refined.api.RefType
+import eu.timepit.refined.refineV
+import eu.timepit.refined.api.{RefType, Refined}
 import scalaz.{Equal, Show, Monoid}
 import scalaz.syntax.show._
 
 package object numeric {
 
-  type Natural = Long @@ NonNegative
-  type Positive = Long @@ RPositive
+  type Natural = Long Refined NonNegative
+  type Positive = Long Refined RPositive
 
-  def Positive(a: Long): Option[Positive] = refineT[RPositive](a).right.toOption
-  def Natural(a: Long): Option[Natural] = refineT[NonNegative](a).right.toOption
+  def Positive(a: Long): Option[Positive] = refineV[RPositive](a).right.toOption
+  def Natural(a: Long): Option[Natural] = refineV[NonNegative](a).right.toOption
 
   implicit def widenInt[F[_,_],M](a: F[Int,M])(implicit rt: RefType[F]): F[Long,M] = rt.unsafeWrap(rt.unwrap(a).toLong)
 

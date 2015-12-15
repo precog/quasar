@@ -34,9 +34,9 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{Positive => RPositive,_}
 import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
+import eu.timepit.refined.api.Refined
 import quasar.fp.numeric._
 import quasar.fp.numeric.scalacheck._
-import shapeless.tag.@@
 import shapeless.Nat
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
@@ -121,35 +121,35 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
-      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Natural =>
+      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Int Refined NonNegative =>
         val r = runLogT(run, read.scan(smallFile.file, k, None))
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
-                  .dropWhile(_._2 < k.toInt).map(_._1)
+                  .dropWhile(_._2 < k.get).map(_._1)
 
         r.runEither must beRight(d.toIndexedSeq)
       }.set(minTestsOk = 1)
 
-      "scan with offset zero and limit j stops after j data" ! prop { j: Int @@ RPositive =>
+      "scan with offset zero and limit j stops after j data" ! prop { j: Int Refined RPositive =>
         val r = runLogT(run, read.scan(smallFile.file, 0L, Some(j)))
 
-        r.runEither must beRight(smallFile.data.take(j.toInt).toIndexedSeq)
+        r.runEither must beRight(smallFile.data.take(j.get).toIndexedSeq)
       }.set(minTestsOk = 1)
 
-      "scan with offset k and limit j takes j data, starting from k" ! prop { (j: Positive, k: Natural) =>
+      "scan with offset k and limit j takes j data, starting from k" ! prop { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
         val r = runLogT(run, read.scan(largeFile.file, k, Some(j)))
         val d = largeFile.data.zip(EStream.iterate(0)(_ + 1))
-                  .dropWhile(_._2 < k.toInt).map(_._1)
-                  .take(j.toInt)
+                  .dropWhile(_._2 < k.get).map(_._1)
+                  .take(j.get)
 
         r.runEither must beRight(d.toIndexedSeq)
       }(implicitly, // In order to keep test execution relatively fast
-        greaterArbitraryMax[@@,Long,Nat._0](200L), implicitly,
-        notLessArbitraryMax[@@,Long,Nat._0](200L), implicitly).set(minTestsOk = 5)
+        greaterArbitraryMax[Refined,Int,Nat._0](200), implicitly,
+        notLessArbitraryMax[Refined,Int,Nat._0](200), implicitly).set(minTestsOk = 5)
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Long @@ Greater[W.`100L`.T] =>
-          val r = runLogT(run, read.scan(smallFile.file, 0L, Some(j)))
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[W.`100`.T] =>
+          val r = runLogT(run, read.scan(smallFile.file, 0L, Some(widenInt(j))))
 
-          (j.toInt must beGreaterThan(smallFile.data.length)) and
+          (j.get must beGreaterThan(smallFile.data.length)) and
             (r.runEither must beRight(smallFile.data.toIndexedSeq))
       }.set(minTestsOk = 10)
 
@@ -182,7 +182,7 @@ object ReadFilesSpec {
     readsPrefix </> file("empty"),
     EStream())
 
-  val smallFileSize: Long @@ NonNegative = 100L
+  val smallFileSize: Natural = 100L
 
   val smallFile = TestDatum(
     readsPrefix </> file("small"),

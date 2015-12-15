@@ -49,6 +49,8 @@ import scalaz._, Scalaz._
 
 import query._
 
+import eu.timepit.refined.numeric.{Positive => RPositive, NonNegative}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.scalacheck.numeric._
 
 class CompileAndQueryServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
@@ -196,7 +198,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
       }
-      "GET" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive) =>
+      "GET" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Int Refined NonNegative, limit: Int Refined RPositive) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
         get(queryService)(
           path = filesystem.parent,
@@ -205,7 +207,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
           status = Status.Ok,
           response = (a: String) => a must_==
             jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
-              .drop(offset.toInt).take(limit.toInt).mkString("")
+              .drop(offset.get).take(limit.get).mkString("")
         )
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: AbsFileOf[AlphaCharacters]) =>

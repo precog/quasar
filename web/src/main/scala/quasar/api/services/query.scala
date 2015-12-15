@@ -62,8 +62,8 @@ object query {
     case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
 
   def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
-    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o), sql.Offset))
-    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l), sql.Limit))
+    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.get), sql.Offset))
+    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.get), sql.Limit))
   }
 
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],

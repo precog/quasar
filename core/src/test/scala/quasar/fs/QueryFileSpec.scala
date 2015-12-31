@@ -8,6 +8,7 @@ import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import pathy.scalacheck._
 import scalaz.scalacheck.ScalazArbitrary._
 
 import scalaz._, Scalaz._
@@ -18,18 +19,18 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
   "QueryFile" should {
     "descendantFiles" >> {
       "returns all descendants of the given directory" ! prop {
-        (dp: ADir, dc1: RDir, dc2: RDir, od: ADir, fns: NonEmptyList[String]) =>
-          ((dp != od) && depth(dp) > 0 && depth(od) > 0) ==> {
+        (dp: AbsDirOf[AlphaCharacters], dc1: RelDirOf[AlphaCharacters], dc2: RelDirOf[AlphaCharacters], od: AbsDirOf[AlphaCharacters], fns: NonEmptyList[String]) =>
+          ((dp != od) && depth(dp.path) > 0 && depth(od.path) > 0) ==> {
             val body = Vector(Data.Str("foo"))
             val fs  = fns.list take 5 map file
-            val f1s = fs map (f => (dp </> dc1 </> f, body))
-            val f2s = fs map (f => (dp </> dc2 </> f, body))
-            val fds = fs map (f => (od </> f, body))
+            val f1s = fs map (f => (dp.path </> dc1.path </> f, body))
+            val f2s = fs map (f => (dp.path </> dc2.path </> f, body))
+            val fds = fs map (f => (od.path </> f, body))
 
             val state = InMemState fromFiles (f1s ::: f2s ::: fds).toMap
-            val expectedFiles = (fs.map(dc1 </> _) ::: fs.map(dc2 </> _)).distinct
+            val expectedFiles = (fs.map(dc1.path </> _) ::: fs.map(dc2.path </> _)).distinct
 
-            Mem.interpret(query.descendantFiles(dp)).eval(state).toEither must
+            Mem.interpret(query.descendantFiles(dp.path)).eval(state).toEither must
               beRight(containTheSameElementsAs(expectedFiles))
         }
       }

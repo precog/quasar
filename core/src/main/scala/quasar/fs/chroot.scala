@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
@@ -104,7 +120,6 @@ object chroot {
   /** Rebases paths in `QueryFile` onto the given prefix. */
   def queryFile(prefix: ADir): QueryFileF ~> QueryFileF = {
     import QueryFile._
-    import ResultFile.resultFile
 
     val base = Path(posixCodec.printPath(prefix))
 
@@ -120,15 +135,29 @@ object chroot {
       def apply[A](qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) =>
           Coyoneda.lift(ExecutePlan(lp.translate(rebasePlan), rebase(out, prefix)))
-            .map(_.map(_.bimap(stripPathError(prefix), resultFile.modify(stripPrefix(prefix)))))
+            .map(_.map(_.bimap(stripPathError(prefix), stripPrefix(prefix))))
 
-        case Explain(lp, out) =>
-          Coyoneda.lift(Explain(lp.translate(rebasePlan), rebase(out, prefix)))
-            .map(_.map(_ map stripPathError(prefix)))
+        case EvaluatePlan(lp) =>
+          Coyoneda.lift(EvaluatePlan(lp.translate(rebasePlan)))
+            .map(_.map(_ leftMap stripPathError(prefix)))
+
+        case More(h) =>
+          Coyoneda.lift(More(h))
+            .map(_ leftMap stripPathError(prefix))
+
+        case Close(h) =>
+          Coyoneda.lift(Close(h))
+
+        case Explain(lp) =>
+          Coyoneda.lift(Explain(lp.translate(rebasePlan)))
+            .map(_.map(_ leftMap stripPathError(prefix)))
 
         case ListContents(d) =>
           Coyoneda.lift(ListContents(rebase(d, prefix)))
             .map(_.bimap(stripPathError(prefix), _ map stripNodePrefix(prefix)))
+
+        case FileExists(f) => Coyoneda.lift(FileExists(rebase(f,prefix)))
+            .map(_.leftMap(stripPathError(prefix)))
       }
     }
 
@@ -187,7 +216,8 @@ object chroot {
   private def stripNodePrefix(prefix: ADir): Node => Node =
     _.fold(
       Node.Mount compose stripRelPrefix(prefix),
-      Node.Plain compose stripRPathPrefix(prefix))
+      Node.Plain compose stripRPathPrefix(prefix),
+      Node.View  compose stripRelPrefix(prefix))
 
   private def stripAPathPrefix(prefix: ADir): APath => APath =
     p => stripPrefix(prefix)(p)

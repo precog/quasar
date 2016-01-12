@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package physical
 package mongodb
@@ -7,7 +23,6 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fs._
 
-import org.bson.Document
 import com.mongodb.async.client.MongoClient
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -26,7 +41,7 @@ object writefile {
         Collection.fromPathy(file) fold (
           err => PathError(err).left.point[MongoWrite],
           col => ensureCollection(col).liftM[WriteStateT] *>
-                 recordCollection(col) map \/.right)
+                 recordCollection(file, col) map \/.right)
 
       case Write(h, data) =>
         val (errs, docs) = data foldMap { d =>
@@ -36,7 +51,7 @@ object writefile {
         }
 
         lookupCollection(h) flatMap (_ cata (
-          c => insertAny(c, docs)
+          c => insertAny(c, docs.map(_.repr))
                  .filter(_ < docs.size)
                  .map(n => PartialWrite(docs.size - n))
                  .run.map(errs ++ _.toList)
@@ -78,20 +93,20 @@ object writefile {
   private def writeState: MongoWrite[WriteState] =
     MongoWrite(_.read)
 
-  private def freshHandle: MongoWrite[WriteHandle] =
-    MongoWrite(seqL <%= (_ + 1)) map (WriteHandle(_))
+  private def freshHandle(f: AFile): MongoWrite[WriteHandle] =
+    MongoWrite(seqL <%= (_ + 1)) map (WriteHandle(f, _))
 
-  private def recordCollection(c: Collection): MongoWrite[WriteHandle] =
-    freshHandle flatMap (h => MongoWrite(collectionL(h) := Some(c)) as h)
+  private def recordCollection(f: AFile, c: Collection): MongoWrite[WriteHandle] =
+    freshHandle(f) flatMap (h => MongoWrite(collectionL(h) := Some(c)) as h)
 
   private def lookupCollection(h: WriteHandle): MongoWrite[Option[Collection]] =
     writeState map (collectionL(h).get)
 
-  private def dataToDocument(d: Data): FileSystemError \/ Document =
+  private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
     BsonCodec.fromData(d)
       .leftMap(err => WriteFailed(d, err.toString))
       .flatMap {
-        case doc @ Bson.Doc(_) => doc.repr.right
+        case doc @ Bson.Doc(_) => doc.right
         case otherwise         => WriteFailed(d, "MongoDB is only able to store documents").left
       }
 }

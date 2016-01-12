@@ -64,7 +64,9 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
       todo // The current in-memory filesystem does not support empty directories
 
     "respond with list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
-      val childNodes = s.ls.map(Node.Plain(_))
+      val childNodes = s.ls.map(_.fold(
+        f => Node.Plain(currentDir </> file1(f)),
+        d => Node.Plain(currentDir </> dir1(d))))
 
       service(s.state)(Request(uri = Uri(path = printPath(s.dir))))
         .as[Json].run must_== Json("children" := childNodes)

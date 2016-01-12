@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
 import quasar.Predef._
+import quasar.effect.LiftedOps
 import quasar.fp._
 
 import scala.Ordering
@@ -76,6 +93,10 @@ object ManageFile {
         case Case.DirToDir(sd, dd)   => d2d(sd, dd)
         case Case.FileToFile(sf, df) => f2f(sf, df)
       }
+
+    def src: APath
+
+    def dst: APath
   }
 
   object MoveScenario {
@@ -110,8 +131,10 @@ object ManageFile {
 
   // TODO{scalaz}: Refactor, dropping Coyoneda and Functor constraint once we
   //               update to scalaz-7.2
-  final class Ops[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S) {
-    type F[A] = Free[S, A]
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Ops[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S)
+    extends LiftedOps[ManageFile, S] {
+
     type M[A] = FileSystemErrT[F, A]
 
     /** Request the given move scenario be applied to the file system, using the
@@ -154,11 +177,6 @@ object ManageFile {
       */
     def tempFileNear(file: AFile): F[AFile] =
       tempFile(Some(file))
-
-    ////
-
-    private def lift[A](fs: ManageFile[A]): F[A] =
-      Free.liftF(S1.inj(Coyoneda.lift(fs)))
   }
 
   object Ops {

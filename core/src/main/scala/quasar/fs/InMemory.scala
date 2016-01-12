@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
@@ -23,7 +39,8 @@ object InMemory {
   type FileMap = Map[AFile, Vector[Data]]
   type RM = Map[ReadHandle, Reading]
   type WM = Map[WriteHandle, AFile]
-  type QueryResponses = Map[Fix[LogicalPlan],Vector[Data]]
+  type QueryResponses = Map[Fix[LogicalPlan], Vector[Data]]
+  type ResultMap = Map[ResultHandle, Vector[Data]]
 
   type InMemoryFs[A]  = State[InMemState, A]
   type InMemStateR[A] = (InMemState, A)
@@ -36,10 +53,16 @@ object InMemory {
     * @param rm Currently open [[quasar.fs.ReadFile.ReadHandle]]s
     * @param wm Currently open [[quasar.fs.WriteFile.WriteHandle]]s
     */
-  final case class InMemState(seq: Long, contents: FileMap, rm: RM, wm: WM, queryResps: QueryResponses)
+  final case class InMemState(
+    seq: Long,
+    contents: FileMap,
+    rm: RM,
+    wm: WM,
+    queryResps: QueryResponses,
+    resultMap: ResultMap)
 
   object InMemState {
-    val empty = InMemState(0, Map.empty, Map.empty, Map.empty, Map.empty)
+    val empty = InMemState(0, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
     def fromFiles(files: FileMap): InMemState =
       empty copy (contents = files)
@@ -52,7 +75,7 @@ object InMemory {
           case Some(_) =>
             for {
               i <- nextSeq
-              h =  ReadHandle(i)
+              h =  ReadHandle(f, i)
               _ <- readingL(h) := Reading(f, off, lim, 0).some
             } yield h.right
 
@@ -97,7 +120,7 @@ object InMemory {
       case WriteFile.Open(f) =>
         for {
           i <- nextSeq
-          h =  WriteHandle(i)
+          h =  WriteHandle(f, i)
           _ <- wFileL(h) := Some(f)
           _ <- fileL(f) %= (_ orElse Some(Vector()))
         } yield h.right
@@ -134,43 +157,75 @@ object InMemory {
   val queryFile: QueryFile ~> InMemoryFs = new (QueryFile ~> InMemoryFs) {
     def apply[A](qf: QueryFile[A]) = qf match {
       case ExecutePlan(lp, out) =>
-        val noSupportMsg = "In Memory interpreter does not currently support this plan"
-        queryResponsesL.st.flatMap { queryResponses =>
-          val queryResponse = simpleEvaluation(lp)
-          val result = queryResponse.flatMap(_.cata(
-            data => fileL(out) assigno Some(data) map(
-              previousData => (previousData ? ResultFile.User(out) | ResultFile.Temp(out)).right[FileSystemError]),
-            PlannerError(lp, UnsupportedPlan(lp.unFix, Some(noSupportMsg))).left[ResultFile].point[InMemoryFs]))
-          val phase = lookup(lp,queryResponses)
-          result.map((Vector(phase),_))
+        evalPlan(lp) { data =>
+          (fileL(out) := some(data)) as out
         }
 
-      case Explain(lp, _) =>
-        queryResponsesL.st.map( queryResps =>
-          (Vector(lookup(lp, queryResps)), none[FileSystemError])
-        )
+      case EvaluatePlan(lp) =>
+        evalPlan(lp) { data =>
+          for {
+            n <- nextSeq
+            h =  ResultHandle(n)
+            _ <- resultL(h) := some(data)
+          } yield h
+        }
+
+      case More(h) =>
+        resultL(h) flatMap {
+          case Some(xs) =>
+            (resultL(h) := some(Vector())) as xs.right
+
+          case None =>
+            UnknownResultHandle(h).left.point[InMemoryFs]
+        }
+
+      case QueryFile.Close(h) =>
+        (resultL(h) := none).void
+
+      case Explain(lp) =>
+        phaseResults(lp)
+          .tuple(queryResponsesL.st map (qrs => executionPlan(lp, qrs).right))
 
       case ListContents(dir) =>
         ls(dir)
+
+      case FileExists(file) =>
+        contentsL.st.map(_.contains(file).right)
     }
 
-    private def lookup(lp: Fix[LogicalPlan],queries: QueryResponses): PhaseResult =
-      PhaseResult.Detail("Lookup in Memory", s"Lookup $lp in $queries")
+    private def evalPlan[A](lp: Fix[LogicalPlan])
+                           (f: Vector[Data] => InMemoryFs[A])
+                           : InMemoryFs[(PhaseResults, FileSystemError \/ A)] = {
+      phaseResults(lp)
+        .tuple(simpleEvaluation(lp).flatMapF(f).toRight(unsupported(lp)).run)
+    }
 
-    private def simpleEvaluation(lp: Fix[LogicalPlan]): InMemoryFs[Option[Vector[Data]]] = {
-      State.gets{ mem =>
+    private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
+      queryResponsesL.st map (qrs =>
+        Vector(PhaseResult.Detail("Lookup in Memory", executionPlan(lp, qrs).description)))
+
+    private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
+      ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
+
+    private def simpleEvaluation(lp: Fix[LogicalPlan]): OptionT[InMemoryFs, Vector[Data]] = {
+      OptionT[InMemoryFs, Vector[Data]](State.gets { mem =>
         import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
-        Recursive[Fix].para[LogicalPlan, Option[Vector[Data]]](lp){
+        Recursive[Fix].para[LogicalPlan, Option[Vector[Data]]](lp) {
           case ReadF(path) => convertToAFile(path).flatMap{ pathyPath => fileL(pathyPath).get(mem)}
           case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) => src.map(_.drop(skip.toInt))
           case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) => src.map(_.take(limit.toInt))
           case InvokeF(Squash,(_,src) :: Nil) => src
           case other => queryResponsesL.get(mem).get(Fix(other.map(_._1)))
         }
-      }
+      })
     }
+
+    private def unsupported(lp: Fix[LogicalPlan]) =
+      PlannerError(lp, UnsupportedPlan(
+        lp.unFix,
+        some("In Memory interpreter does not currently support this plan")))
   }
 
   val fileSystem: FileSystem ~> InMemoryFs =
@@ -282,6 +337,14 @@ object InMemory {
 
   private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
     (fileL(f) <:= None) map (_.void \/> PathError(PathNotFound(f)))
+
+  //----
+
+  private val resultMapL: InMemState @> ResultMap =
+    Lens.lensg(s => m => s.copy(resultMap = m), _.resultMap)
+
+  private def resultL(h: ResultHandle): InMemState @> Option[Vector[Data]] =
+    Lens.mapVLens(h) <=< resultMapL
 
   private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[Node]] =
     contentsL.st map (

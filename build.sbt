@@ -13,6 +13,8 @@ val ExclusiveTest = Tags.Tag("exclusive-test")
 def exclusiveTasks(tasks: Scoped*) =
   tasks flatMap (inTask(_)(tags := Seq(ExclusiveTest -> 1)))
 
+lazy val checkHeaders = taskKey[Unit]("Fail the build if createHeaders is not up-to-date")
+
 lazy val standardSettings = Defaults.defaultSettings ++ Seq(
   headers := Map(
     "scala" -> Apache2_0("2014 - 2015", "SlamData Inc."),
@@ -75,8 +77,8 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
   concurrentRestrictions in Global := Seq(
     Tags.exclusive(ExclusiveTest)
   ),
+
   console <<= console in Test, // console alias test:console
-  initialCommands in (Test, console) := """ammonite.repl.Repl.run("prompt.update(\"λ \")")""",
 
   scalazVersion  := "7.1.4",
   slcVersion     := "0.4",
@@ -108,7 +110,13 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     "org.scalacheck"    %% "scalacheck"                % "1.11.6"             % "test" force(),
     "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"              % "test",
     "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion.value     % "test"),
-  licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")))
+
+  licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")),
+
+  checkHeaders := {
+    if ((createHeaders in Compile).value.nonEmpty) error("headers not all present")
+  }
+)
 
 // Using a Seq of desired warts instead of Warts.allBut due to an incremental compilation issue.
 // https://github.com/puffnfresh/wartremover/issues/202

@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.mount
 
 import quasar.Predef._
 import quasar.Variables
+import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fs.{Path => _, _}
 import quasar.sql._
@@ -29,10 +46,12 @@ object Mounting {
   final case class Unmount(path: APath)
     extends Mounting[MountingError \/ Unit]
 
-  final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S) {
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
+    extends LiftedOps[Mounting, S] {
+
     import MountConfig2._
 
-    type F[A] = Free[S, A]
     type M[A] = EitherT[F, MountingError, A]
 
     /** Returns the mount configuration for the given mount path or nothing
@@ -111,9 +130,6 @@ object Mounting {
                }
       } yield ()
     }
-
-    private def lift[A](m: Mounting[A]): F[A] =
-      Free.liftF(S1.inj(Coyoneda.lift(m)))
   }
 
   object Ops {

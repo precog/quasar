@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
@@ -14,26 +30,28 @@ import scalaz._, Scalaz._
 sealed trait Node {
   import Node._
 
-  def fold[X](mnt: RDir => X, pln: RPath => X): X =
+  def fold[X](mnt: RDir => X, pln: RPath => X, viw: RFile => X): X =
     this match {
       case Case.Mount(d) => mnt(d)
       case Case.Plain(p) => pln(p)
+      case Case.View(p)  => viw(p)
     }
 
   def dir: Option[RDir] =
-    fold(some, p => refineType(p).swap.toOption)
+    fold(some, p => refineType(p).swap.toOption, κ(none[RDir]))
 
   def file: Option[RFile] =
-    fold(κ(none[RFile]), p => refineType(p).toOption)
+    fold(κ(none[RFile]), p => refineType(p).toOption, some)
 
   def path: RPath =
-    fold(ι, ι)
+    fold(ι, ι, ι)
 }
 
 object Node {
   object Case {
     final case class Mount(d: RDir) extends Node
     final case class Plain(p: RPath) extends Node
+    final case class View(p: RFile) extends Node
   }
 
   val Mount: RDir => Node =
@@ -42,11 +60,17 @@ object Node {
   val Plain: RPath => Node =
     Case.Plain(_)
 
+  val View: RFile => Node =
+    Case.View(_)
+
   val mount: Prism[Node, RDir] =
-    Prism((_: Node).fold(_.some, κ(none)))(Mount)
+    Prism((_: Node).fold(_.some, κ(none), κ(none)))(Mount)
 
   val plain: Prism[Node, RPath] =
-    Prism((_: Node).fold(κ(none), _.some))(Plain)
+    Prism((_: Node).fold(κ(none), _.some, κ(none)))(Plain)
+
+  val view: Prism[Node, RFile] =
+    Prism((_: Node).fold(κ(none), κ(none), _.some))(View)
 
   def fromFirstSegmentOf(f: RFile): Option[Node] =
     flatten(none, none, none,
@@ -56,9 +80,9 @@ object Node {
 
   implicit val nodeEncodeJson: EncodeJson[Node] =
     EncodeJson(node => Json(
-      "name" := posixCodec.printPath(node.path),
-      "type" := node.fold(κ("mount"), p => refineType(p).fold(κ("directory"), κ("file")))
-    ))
+      ("name" := posixCodec.printPath(node.path)) ::
+        ("type" := node.fold(κ("directory"), p => refineType(p).fold(κ("directory"), κ("file")), κ("file"))) ::
+        node.fold(κ("mongodb".some), κ(none), κ("view".some)).map("mount" := _).toList: _*))
 
   implicit val nodeOrdering: Ordering[Node] =
     Ordering.by(n => posixCodec.printPath(n.path))

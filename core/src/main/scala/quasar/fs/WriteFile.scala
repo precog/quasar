@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
 import quasar.Predef._
+import quasar.effect.LiftedOps
 import quasar.fp._
 
 import scalaz._, Scalaz._
@@ -10,14 +27,15 @@ import scalaz.stream._
 sealed trait WriteFile[A]
 
 object WriteFile {
-  final case class WriteHandle(run: Long) extends scala.AnyVal
+  final case class WriteHandle(file: AFile, id: Long)
 
   object WriteHandle {
     implicit val writeHandleShow: Show[WriteHandle] =
       Show.showFromToString
 
-    implicit val writeHandleOrder: Order[WriteHandle] =
-      Order.orderBy(_.run)
+    // TODO: Switch to order once Order[Path[B,T,S]] exists
+    implicit val writeHandleEqual: Equal[WriteHandle] =
+      Equal.equalBy(h => (h.file, h.id))
   }
 
   final case class Open(file: AFile)
@@ -107,7 +125,7 @@ object WriteFile {
       def shouldNotExist: M[FileSystemError] =
         MonadError[G, FileSystemError].raiseError(PathError(PathExists(dst)))
 
-      fileExistsM(dst).liftM[Process].ifM(
+      QF.fileExists(dst).liftM[Process].ifM(
         shouldNotExist.liftM[Process],
         saveChunked0(dst, src, MoveSemantics.FailIfExists))
     }
@@ -128,7 +146,7 @@ object WriteFile {
       def shouldExist: M[FileSystemError] =
         MonadError[G, FileSystemError].raiseError(PathError(PathNotFound(dst)))
 
-      fileExistsM(dst).liftM[Process].ifM(
+      QF.fileExists(dst).liftM[Process].ifM(
         saveChunked0(dst, src, MoveSemantics.FailIfMissing),
         shouldExist.liftM[Process])
     }
@@ -144,13 +162,6 @@ object WriteFile {
     }
 
     ////
-
-    private def fileExistsM(file: AFile)
-                           (implicit QF: QueryFile.Ops[S])
-                           : M[Boolean] = {
-
-      QF.fileExists(file).liftM[FileSystemErrT]
-    }
 
     private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])
@@ -185,8 +196,10 @@ object WriteFile {
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S) {
-    type F[A] = Free[S, A]
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Unsafe[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S)
+    extends LiftedOps[WriteFile, S] {
+
     type M[A] = FileSystemErrT[F, A]
 
     /** Returns a write handle for the specified file which may be used to
@@ -210,11 +223,6 @@ object WriteFile {
     /** Close the write handle, freeing any resources it was using. */
     def close(h: WriteHandle): F[Unit] =
       lift(Close(h))
-
-    ////
-
-    private def lift[A](wf: WriteFile[A]): F[A] =
-      Free.liftF(S1.inj(Coyoneda.lift(wf)))
   }
 
   object Unsafe {

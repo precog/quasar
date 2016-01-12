@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.fp
 
 import scalaz._
@@ -11,6 +27,16 @@ package object free {
     new (G ~> G) {
       def apply[A](ga: G[A]) = G.prj(ga).fold(ga)(fa => G.inj(f(fa)))
     }
+
+  def restrict[M[_], S[_], T[_]](f: T ~> M)(implicit S: Coyoneda[S, ?] :<: T) =
+    new (S ~> M) {
+      def apply[A](fa: S[A]): M[A] = f(S.inj(Coyoneda.lift(fa)))
+    }
+
+  def foldMapNT[F[_]: Functor, G[_]: Monad](f: F ~> G) = new (Free[F, ?] ~> G) {
+    def apply[A](fa: Free[F, A]): G[A] =
+      fa.foldMap(f)
+  }
 
   def interpret2[F[_], G[_], M[_]](f: F ~> M, g: G ~> M): Coproduct[F, G, ?] ~> M =
     new (Coproduct[F, G, ?] ~> M) {

@@ -58,10 +58,11 @@ object ServerOps {
 }
 
 abstract class ServerOps[WC: CodecJson, SC](
-  configOps: ConfigOps[WC],
-  defaultWC: WC,
-  val webConfigLens: WebConfigLens[WC, SC]) {
+    configOps: ConfigOps[WC],
+    defaultWC: WC,
+    val webConfigLens: WebConfigLens[WC, SC]) {
   import ServerOps._
+  import webConfigLens._
 
   // NB: This is a terrible thing.
   //     Is there a better way to find the path to a jar?
@@ -109,7 +110,7 @@ abstract class ServerOps[WC: CodecJson, SC](
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServer(blueprint : ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
       builder <- Task.delay {
@@ -138,10 +139,10 @@ abstract class ServerOps[WC: CodecJson, SC](
   def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess{ case (_,port) =>
-        stdout("Server started. Listening on port " + port)})
+      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
+        stdout("Server started. Listening on port " + port) })
 
-    serversAndPort.evalScan1{case ((oldServer, oldPort), newServerAndPort) =>
+    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
       oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
       Task.now(newServerAndPort)
     }.cleanUpWithA{ server =>
@@ -164,7 +165,7 @@ abstract class ServerOps[WC: CodecJson, SC](
                    produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
     def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
+      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceRoutes(startNew))
       configQ.enqueueOne(conf)
     }
     startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
@@ -226,10 +227,16 @@ abstract class ServerOps[WC: CodecJson, SC](
                           _.point[EnvTask],
                           EitherT.left(Task.now(InvalidConfig("couldn’t parse options"))))
       content <- interpretPaths(opts)
-      interpreter = runStatefully(InMemState.empty).run.compose(fileSystem)
       redirect = content.map(_.loc)
-      port           =  opts.port getOrElse 8080
-      produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) = reload => RestApi(content.toList,redirect,port,reload).AllServices(interpreter)
+      cfgPath        <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
+          liftE(Task.now(None)))(
+          cfg => FsPath.parseSystemFile(cfg).toRight(InvalidConfig("Invalid path to config file: " + cfg)).map(Some(_)))
+      config         <- configOps.fromFileOrDefaultPaths(cfgPath).fixedOrElse(EitherT.right(Task.now(defaultWC)))
+      port           =  opts.port getOrElse wcPort.get(config)
+      updCfg         =  wcPort.set(port)(config)
+      interpreter = runStatefully(InMemState.empty).run.compose(fileSystem)  // TEMP
+      produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) =
+        reload => RestApi(content.toList, redirect, port, reload).AllServices(interpreter)
       result <- startServers(port, produceRoutes).liftM[EnvErrT]
       (servers, shutdown) = result
       msg = stdout("Press Enter to stop.")

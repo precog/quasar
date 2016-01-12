@@ -101,9 +101,9 @@ object query {
                     translateSemanticErrors,
                     _.fold(
                       fileSystemErrorResponse,
-                      resultFile => {
+                      result => {
                         Ok(Json.obj(
-                          "out" := posixCodec.printPath(ResultFile.resultFile.get(resultFile)),
+                          "out" := posixCodec.printPath(result),
                           "phases" := phases
                         ))
                       }
@@ -128,14 +128,14 @@ object query {
     def explainQuery(expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Task[Response] =
       queryPlan(addOffsetLimit(expr, offset, limit), vars).run.value fold (
         translateSemanticErrors,
-        lp => Q.explain(lp).foldMap(f) flatMap {
-          case (phases, None) =>
+        lp => Q.explain(lp).run.run.foldMap(f).flatMap {
+          case (phases, \/-(_)) =>
             phaseResultsResponse(phases)
               .getOrElse(InternalServerError(
                 s"No explain output for plan: \n\n" + RenderTree[Fix[LogicalPlan]].render(lp).shows
               ))
 
-          case (_, Some(fsErr)) =>
+          case (_, -\/(fsErr)) =>
             fileSystemErrorResponse(fsErr)
         })
 

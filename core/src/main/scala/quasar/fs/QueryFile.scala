@@ -1,10 +1,27 @@
-package quasar
-package fs
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package quasar.fs
 
 import quasar.Predef._
+import quasar._
+import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fs.{Path => QPath}
-import quasar.recursionschemes._, Recursive.ops._
+import quasar.recursionschemes._
 
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -13,11 +30,30 @@ import scalaz.stream.Process
 sealed trait QueryFile[A]
 
 object QueryFile {
-  final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
-    extends QueryFile[(PhaseResults, FileSystemError \/ ResultFile)]
+  final case class ResultHandle(run: Long) extends scala.AnyVal
 
-  final case class Explain(lp: Fix[LogicalPlan], out: AFile)
-    extends QueryFile[(PhaseResults, Option[FileSystemError])]
+  object ResultHandle {
+    implicit val resultHandleShow: Show[ResultHandle] =
+      Show.showFromToString
+
+    implicit val resultHandleOrder: Order[ResultHandle] =
+      Order.orderBy(_.run)
+  }
+
+  final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
+    extends QueryFile[(PhaseResults, FileSystemError \/ AFile)]
+
+  final case class EvaluatePlan(lp: Fix[LogicalPlan])
+    extends QueryFile[(PhaseResults, FileSystemError \/ ResultHandle)]
+
+  final case class More(h: ResultHandle)
+    extends QueryFile[FileSystemError \/ Vector[Data]]
+
+  final case class Close(h: ResultHandle)
+    extends QueryFile[Unit]
+
+  final case class Explain(lp: Fix[LogicalPlan])
+    extends QueryFile[(PhaseResults, FileSystemError \/ ExecutionPlan)]
 
   /** TODO: While this is a bit better in one dimension here in `QueryFile`,
     *       `@mossprescott` points out it is still a bit of a stretch to include
@@ -31,17 +67,16 @@ object QueryFile {
   final case class ListContents(dir: ADir)
     extends QueryFile[FileSystemError \/ Set[Node]]
 
-  /** File used in explain output when a `LogicalPlan` does not contain any
-    * file references.
-    */
-  val DefaultExplainOut: AFile = rootDir </> dir("explain") </> file("out")
+  final case class FileExists(file: AFile)
+    extends QueryFile[FileSystemError \/ Boolean]
 
-  final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S) {
-    import ResultFile._
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
+    extends LiftedOps[QueryFile, S] {
 
-    type F[A] = Free[S, A]
     type M[A] = FileSystemErrT[F, A]
 
+    val unsafe = Unsafe[S]
     val transforms = Transforms[F]
     import transforms._
 
@@ -52,101 +87,64 @@ object QueryFile {
       * requested file if it is more efficient to do so (i.e. to avoid copying
       * lots of data for a plan consisting of a single `ReadF(...)`).
       */
-    def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[ResultFile] =
-      EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ ResultFile])
+    def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[AFile] =
+      EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])
 
-    /** Returns the path to the result of executing the given [[LogicalPlan]] */
-    def execute_(plan: Fix[LogicalPlan])
-                (implicit M: ManageFile.Ops[S]): ExecM[ResultFile] = {
-      for {
-        out <- toExec(firstFile(plan) cata (M.tempFileNear, M.anyTempFile))
-        rf0 <- execute(plan, out)
-        rf1 =  user.getOrModify(rf0)
-                 .map(usr => if (usr == out) Temp(usr) else User(usr))
-                 .merge
-      } yield rf1
-    }
-
-    /** Returns a description of how the the given logical plan will be executed
-      * along with any error encountered during planning.
-      */
-    def explain(plan: Fix[LogicalPlan])
-               (implicit M: ManageFile.Ops[S])
-               : F[(PhaseResults, Option[FileSystemError])] = {
-
-      firstFile(plan)
-        .cata(M.tempFileNear, M.anyTempFile)
-        .flatMap(f => lift(Explain(plan, f)))
-    }
-
-    /** Returns the source of values from the result of executing the given
+    /** Returns the stream of data resulting from evaluating the given
       * [[LogicalPlan]].
       */
-    def evaluate(plan: Fix[LogicalPlan])
-                (implicit R: ReadFile.Ops[S], M: ManageFile.Ops[S])
-                : Process[ExecM, Data] = {
-
-      val hoistFS: FileSystemErrT[F, ?] ~> ExecM =
+    def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
+      val f: M ~> ExecM =
         Hoist[FileSystemErrT].hoist[F, G](liftMT[F, PhaseResultT])
 
-      def values(f: AFile) =
-        R.scanAll(f).translate[ExecM](hoistFS)
+      def moreUntilEmpty(h: ResultHandle): Process[M, Data] =
+        Process.await(unsafe.more(h): M[Vector[Data]]) { data =>
+          if (data.isEmpty)
+            Process.halt
+          else
+            Process.emitAll(data) ++ moreUntilEmpty(h)
+        }
 
-      def handleTemp(tmp: AFile) = {
-        val cleanup = (hoistFS(M.delete(tmp)): ExecM[Unit])
-                        .liftM[Process].drain
-        values(tmp) onComplete cleanup
-      }
+      def close(h: ResultHandle): ExecM[Unit] =
+        toExec(unsafe.close(h))
 
-      execute_(plan).liftM[Process] flatMap {
-        case Case.User(f) => values(f)
-        case Case.Temp(f) => handleTemp(f)
-      }
+      Process.await(unsafe.eval(plan))(h =>
+        moreUntilEmpty(h).translate(f) onComplete Process.eval_(close(h)))
     }
+
+    /** Returns a description of how the the given logical plan will be
+      * executed.
+      */
+    def explain(plan: Fix[LogicalPlan]): ExecM[ExecutionPlan] =
+      EitherT(WriterT(lift(Explain(plan))): G[FileSystemError \/ ExecutionPlan])
 
     /** Returns the path to the result of executing the given SQL^2 query
       * using the given output file if possible.
       */
     def executeQuery(query: sql.Expr, vars: Variables, out: AFile)
-                    : CompExecM[ResultFile] = {
+                    : CompExecM[AFile] = {
 
       compileAnd(query, vars)(execute(_, out))
-    }
-
-    /** Returns the path to the result of executing the given SQL^2 query. */
-    def executeQuery_(query: sql.Expr, vars: Variables)
-                     (implicit M: ManageFile.Ops[S]): CompExecM[ResultFile] = {
-      compileAnd(query, vars)(execute_)
     }
 
     /** Returns the source of values from the result of executing the given
       * SQL^2 query.
       */
     def evaluateQuery(query: sql.Expr, vars: Variables)
-                     (implicit R: ReadFile.Ops[S], M: ManageFile.Ops[S])
                      : Process[CompExecM, Data] = {
 
-      def comp = compToCompExec(queryPlan(query, vars)).liftM[Process]
-
-      comp flatMap (lp => evaluate(lp).translate[CompExecM](execToCompExec))
+      compToCompExec(queryPlan(query, vars))
+        .liftM[Process]
+        .flatMap(lp => evaluate(lp).translate[CompExecM](execToCompExec))
     }
 
-    /** Returns a description of how the the given SQL^2 query will be executed
-      * along with any error encountered during planning.
+    /** Returns a description of how the the given SQL^2 query will be
+      * executed.
       */
     def explainQuery(query: sql.Expr, vars: Variables)
-                    (implicit M: ManageFile.Ops[S])
-                    : SemanticErrsT[F, (PhaseResults, Option[FileSystemError])] = {
+                    : CompExecM[ExecutionPlan] = {
 
-      type E[A, B] = EitherT[F, A, B]
-
-      queryPlan(query, vars).run.run match {
-        case (prs, \/-(lp)) =>
-          explain(lp).map(_.leftMap(prs ++ _)).liftM[SemanticErrsT]
-
-        case (_, -\/(semErrs)) =>
-          semErrs.raiseError[E, (PhaseResults, Option[FileSystemError])]
-      }
+      compileAnd(query, vars)(explain)
     }
 
     /** Returns immediate children of the given directory, fails if the
@@ -175,13 +173,8 @@ object QueryFile {
     }
 
     /** Returns whether the given file exists. */
-    def fileExists(file: AFile): F[Boolean] = {
-      val parent = fileParent(file)
-
-      ls(parent)
-        .map(_ flatMap (_.file.map(parent </> _).toSet) exists (identicalPath(file, _)))
-        .getOrElse(false)
-    }
+    def fileExists(file: AFile): M[Boolean] =
+      EitherT(lift(FileExists(file)))
 
     ////
 
@@ -191,31 +184,48 @@ object QueryFile {
       compToCompExec(queryPlan(query, vars))
         .flatMap(lp => execToCompExec(f(lp)))
     }
-
-    private def firstFile(lp: Fix[LogicalPlan]): Option[AFile] =
-    // This implementation, although more resource efficient, cannot be used right now because it triggers
-    // a compiler crash in conjunction with the scoverage compiler plugin. As a compromise in order to have
-    // code coverage, we currently have a less efficient implementation that sidesteps the compiler crash.
-    // https://github.com/scoverage/scalac-scoverage-plugin/issues/147
-    //  Tag.unwrap(lp foldMap[FirstOption[QPath]] {
-    //    case Fix(LogicalPlan.ReadF(p)) => Tag(Some(p))
-    //    case _                         => Tag(None)
-    //  }) flatMap pathToAbsFile
-    lp.collect{case Fix(LogicalPlan.ReadF(p)) => p}.headOption.flatMap(pathToAbsFile)
-
-    private def pathToAbsFile(p: QPath): Option[AFile] =
-      p.file map (fn =>
-        p.asAbsolute.dir
-          .foldLeft(rootDir[Sandboxed])((d, n) => d </> dir(n.value)) </>
-          file(fn.value))
-
-    private def lift[A](qf: QueryFile[A]): F[A] =
-      Free.liftF(S1.inj(Coyoneda.lift(qf)))
   }
 
   object Ops {
     implicit def apply[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S): Ops[S] =
       new Ops[S]
+  }
+
+  /** Low-level, unsafe operations. Clients are responsible for resource-safety
+    * when using these.
+    */
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Unsafe[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
+    extends LiftedOps[QueryFile, S] {
+
+    val transforms = Transforms[F]
+    import transforms._
+
+    /** Returns a handle to the results of evaluating the given [[LogicalPlan]]
+      * that can be used to read chunks of result data.
+      *
+      * Care must be taken to `close` the returned handle in order to avoid
+      * potential resource leaks.
+      */
+    def eval(lp: Fix[LogicalPlan]): ExecM[ResultHandle] =
+      EitherT(WriterT(lift(EvaluatePlan(lp))): G[FileSystemError \/ ResultHandle])
+
+    /** Read the next chunk of data from the result set represented by the given
+      * handle.
+      *
+      * An empty `Vector` signals that all data has been read.
+      */
+    def more(rh: ResultHandle): FileSystemErrT[F, Vector[Data]] =
+      EitherT(lift(More(rh)))
+
+    /** Closes the given result handle, freeing any resources it was using. */
+    def close(rh: ResultHandle): F[Unit] =
+      lift(Close(rh))
+  }
+
+  object Unsafe {
+    implicit def apply[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S): Unsafe[S] =
+      new Unsafe[S]
   }
 
   class Transforms[F[_]: Monad] {
@@ -236,6 +246,9 @@ object QueryFile {
 
     val toExec: F ~> ExecM =
       liftMT[G, FileSystemErrT] compose liftMT[F, PhaseResultT]
+
+    def fsErrToExec: FileSystemErrT[F, ?] ~> ExecM =
+      Hoist[FileSystemErrT].hoist[F, PhaseResultT[F, ?]](liftMT[F, PhaseResultT])
 
     val toCompExec: F ~> CompExecM =
       execToCompExec compose toExec

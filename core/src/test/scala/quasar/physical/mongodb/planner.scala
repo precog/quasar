@@ -3,7 +3,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.RenderTree, RenderTree.ops._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._, FunctorT.ops._, Fix._
+import quasar.recursionschemes._, Recursive.ops._, Fix._
 import quasar._
 import quasar.fs.Path
 import quasar.javascript._
@@ -58,7 +58,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] =
     (for {
-      simplified <- emit(Vector.empty, \/-(logical.transCata(repeatedly(Optimizer.simplifyƒ))))
+      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical)))
       phys       <- MongoDbPlanner.plan(simplified)
     } yield phys).run._2.toEither
 
@@ -2323,21 +2323,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       beWorkflow(
         chain(
           $read(Collection("db", "zips")),
-          $project(
-            reshape(
-              "city"  -> $field("city"),
-              "state" -> $field("state")),
-            IgnoreId),
           $group(
-            grouped("__tmp0" -> $first($$ROOT)),
+            grouped(),
             -\/(reshape(
               "0" -> $field("city"),
               "1" -> $field("state")))),
           $project(
             reshape(
-              "city"  -> $field("__tmp0", "city"),
-              "state" -> $field("__tmp0", "state")),
-            ExcludeId)))
+              "city"  -> $field("_id", "0"),
+              "state" -> $field("_id", "1")),
+            IgnoreId)))
     }
 
     "plan distinct as expression" in {
@@ -2420,13 +2415,12 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("city") -> Ascending)),
             $group(
-              grouped("__tmp1" -> $first($$ROOT)),
+              grouped(),
               -\/(reshape("0" -> $field("city")))),
-            $sort(NonEmptyList(
-              BsonField.Name("__tmp1") \ BsonField.Name("city") -> Ascending)),
             $project(
-              reshape("city" -> $field("__tmp1", "city")),
-              ExcludeId)))
+              reshape("city" -> $field("_id", "0")),
+              IgnoreId),
+            $sort(NonEmptyList(BsonField.Name("city") -> Ascending))))
     }
 
     "plan distinct with unrelated order by" in {
@@ -2493,19 +2487,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               "state"    -> $include()),
             IgnoreId),
           $unwind(DocField("state")),
-
           $group(
-            grouped("__tmp7" -> $first($$ROOT)),
+            grouped(),
             -\/(reshape(
               "0" -> $field("totalPop"),
               "1" -> $field("city"),
               "2" -> $field("state")))),
           $project(
             reshape(
-              "totalPop" -> $field("__tmp7", "totalPop"),
-              "city"     -> $field("__tmp7", "city"),
-              "state"    -> $field("__tmp7", "state")),
-            ExcludeId)))
+              "totalPop" -> $field("_id", "0"),
+              "city"     -> $field("_id", "1"),
+              "state"    -> $field("_id", "2")),
+            IgnoreId)))
     }
 
     "plan distinct with sum, group, and orderBy" in {
@@ -2534,19 +2527,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField("state")),
             $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending)),
             $group(
-              grouped("__tmp8" -> $first($$ROOT)),
+              grouped(),
               -\/(reshape(
                 "0" -> $field("totalPop"),
                 "1" -> $field("city"),
                 "2" -> $field("state")))),
-            $sort(NonEmptyList(
-              BsonField.Name("__tmp8") \ BsonField.Name("totalPop") -> Descending)),
             $project(
               reshape(
-                "totalPop" -> $field("__tmp8", "totalPop"),
-                "city"     -> $field("__tmp8", "city"),
-                "state"    -> $field("__tmp8", "state")),
-              ExcludeId)))
+                "totalPop" -> $field("_id", "0"),
+                "city"     -> $field("_id", "1"),
+                "state"    -> $field("_id", "2")),
+              IgnoreId),
+            $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending))))
 
     }
 
@@ -3207,7 +3199,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan simple cross" in {
-      plan("select zips2.city from zips, zips2 where zips._id = zips2._id") must
+      plan("select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
       beWorkflow(
         joinStructure(
           $read(Collection("db", "zips")), "__tmp0", $$ROOT,
@@ -3229,18 +3221,32 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                       $lt($field("right"), $literal(Bson.Arr(Nil)))),
                     $field("right", "city"),
                     $literal(Bson.Undefined)),
-                "__tmp7" -> $field("right"),
-                "__tmp8" -> $field("left"),
-                "__tmp9" -> $eq($field("left", "_id"), $field("right", "_id"))),
+                "__tmp11" -> $field("right"),
+                "__tmp12" -> $field("right", "pop"),
+                "__tmp13" -> $field("left"),
+                "__tmp14" -> $field("left", "pop"),
+                "__tmp15" -> $lt($field("left", "pop"), $field("right", "pop"))),
               IgnoreId),
             $match(Selector.And(
+              Selector.Doc(BsonField.Name("__tmp11") -> Selector.Type(BsonType.Doc)),
+              Selector.Or(
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Int32)),
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Int64)),
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Dec)),
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Text)),
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Bool))),
               Selector.Doc(
-                BsonField.Name("__tmp7") -> Selector.Type(BsonType.Doc)),
-              Selector.And(
-                Selector.Doc(
-                  BsonField.Name("__tmp8") -> Selector.Type(BsonType.Doc)),
-                Selector.Doc(
-                  BsonField.Name("__tmp9") -> Selector.Eq(Bson.Bool(true)))))),
+                BsonField.Name("__tmp13") -> Selector.Type(BsonType.Doc)),
+              Selector.Or(
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int32)),
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int64)),
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Dec)),
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Text)),
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Bool))),
+              Selector.Doc(
+                BsonField.Name("__tmp15") -> Selector.Eq(Bson.Bool(true))))),
             $project(
               reshape("city" -> $field("city")),
               ExcludeId)),
@@ -3672,7 +3678,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Annotated Tree",
-          "Logical Plan", "Simplified", "Typechecked",
+          "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)", "Workflow Builder",
           "Workflow (raw)", "Workflow (crystallized)", "Physical Plan", "Mongo"))
@@ -3681,15 +3687,14 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "include correct phases with type error" in {
       planLog("select 'a' + 0 from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Annotated Tree", "Logical Plan",
-          "Simplified"))
-    }
+          "SQL AST", "Variables Substituted", "Annotated Tree", "Logical Plan", "Optimized"))
+    }.pendingUntilFixed("SD-1249")
 
     "include correct phases with alignment error" in {
       planLog("select * from a join b on a.foo + b.bar < b.baz").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Annotated Tree",
-          "Logical Plan", "Simplified", "Typechecked",
+          "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)"))
     }
 
@@ -3697,7 +3702,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       planLog("select date_part('foo', bar) from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Annotated Tree",
-          "Logical Plan", "Simplified", "Typechecked",
+          "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)"))
     }

@@ -1,6 +1,22 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import quasar.Predef.{Long, String, Vector}
 import quasar.fp._
-import quasar.recursionschemes._, Fix._, FunctorT.ops._
+import quasar.recursionschemes._, Fix._
 import quasar.sql._
 
 import scalaz._
@@ -41,8 +57,8 @@ package object quasar {
                         Variables.substVars(ast, vars) leftMap (_.wrapNel))
       annTree     <- phase("Annotated Tree", AllPhases(substAst))
       logical     <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
-      simplified  <- phase("Simplified", logical.transCata(repeatedly(Optimizer.simplifyƒ)).right)
-      typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(simplified).disjunction)
+      optimized   <- phase("Optimized", \/-(Optimizer.optimize(logical)))
+      typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
     } yield typechecked
   }
 }

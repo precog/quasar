@@ -24,6 +24,7 @@ import scalaz.stream._
 import scalaz.std.vector._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
+import scalaz.syntax.either._
 import scalaz.concurrent.Task
 
 /** Unit tests for the MongoDB filesystem implementation. */
@@ -110,7 +111,7 @@ class MongoDbFileSystemSpec
               query.ls(rootDir).liftM[Process]           |@|
               write.save(f, oneDoc.toProcess).terminated |@|
               query.ls(rootDir).liftM[Process]           |@|
-              manage.delete(d).liftM[Process]         |@|
+              manage.delete(d).liftM[Process]            |@|
               query.ls(rootDir).liftM[Process]
             ) { (before, _, create, _, delete) =>
               val d0 = d.relativeTo(rootDir) getOrElse currentDir
@@ -139,7 +140,7 @@ class MongoDbFileSystemSpec
               write.save(f1, oneDoc.toProcess).terminated |@|
               write.save(f2, oneDoc.toProcess).terminated |@|
               query.ls(rootDir).liftM[Process]            |@|
-              manage.delete(rootDir).liftM[Process]    |@|
+              manage.delete(rootDir).liftM[Process]       |@|
               query.ls(rootDir).liftM[Process]
             ) { (_, _, before, _, after) =>
               val dA = d1.relativeTo(rootDir) getOrElse currentDir
@@ -198,15 +199,18 @@ class MongoDbFileSystemSpec
           }
 
           def check(file: AFile) = {
-            val errP: Prism[FileSystemError \/ ResultFile, APath] =
+            val errP: Prism[FileSystemError \/ AFile, APath] =
               D.left                    composePrism
               FileSystemError.pathError composePrism
               PathError2.pathNotFound
 
+            val out = renameFile(file, κ(FileName("out")))
+
             def check0(expr: sql.Expr) =
-              (run(query.fileExists(file)).run must beFalse) and
+              (run(query.fileExists(file).run).run ==== false.right) and
               (errP.getOption(
-                runExec(query.executeQuery_(expr, Variables.fromMap(Map()))).run.value.run
+                runExec(query.executeQuery(expr, Variables.fromMap(Map()), out))
+                  .run.value.run
               ) must beSome(file))
 
             parser.parse(sql.Query(f(posixCodec.printPath(file)))) fold (

@@ -451,7 +451,7 @@ object Workflow {
     case $Pure(Bson.Doc(value))          =>
       value.keys.toList.map(BsonField.Name).some
     case $Project(_, Reshape(value), id) =>
-      (if (id == IncludeId) BsonField.Name("_id") :: value.keys.toList
+      (if (id == IncludeId) IdName :: value.keys.toList
       else value.keys.toList).some
     case sm @ $SimpleMap(_, _, _)        =>
       def loop(expr: JsCore): Option[List[jscore.Name]] =
@@ -461,8 +461,7 @@ object Workflow {
           case _ => None
         }
       loop(sm.simpleExpr.expr).map(_.map(n => BsonField.Name(n.value)))
-    case $Group(_, Grouped(value), _)    =>
-      (BsonField.Name("_id") :: value.keys.toList).some
+    case $Group(_, Grouped(value), _)    => (IdName :: value.keys.toList).some
     case $Unwind(src, _)                 => simpleShape(src)
     case sp: ShapePreservingF[_]         => simpleShape(sp.src)
     case _                               => None
@@ -581,7 +580,7 @@ object Workflow {
     }
 
     Crystallized(
-      Corecursive[Fix].ana(promoteKnownShape(finished))(crystallizeƒ).transCata[WorkflowF](coalesce)
+      promoteKnownShape(finished).ana(crystallizeƒ).transCata[WorkflowF](coalesce)
         // TODO: this can coalesce more cases, but hasn’t been done thus far and
         //       requires rewriting many tests in a much less readable way.
         // .cata[Workflow](x => coalesce(uncleanƒ(x).unFix))

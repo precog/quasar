@@ -117,6 +117,7 @@ package object api {
     }
   }
 
+  // TODO: probably need a URL-specific codec here
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
       val str = "/" + p.toList.mkString("/")
@@ -124,6 +125,7 @@ package object api {
     }
   }
 
+  // TODO: probably need a URL-specific codec here
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
       val str = "/" + p.toList.mkString("/")
@@ -158,6 +160,7 @@ package object api {
     case GET -> path if path.startsWith(HPath(basePath)) => NotFound()
 
     case GET -> AsPath(path) =>
-      TemporaryRedirect(Uri(path = basePath + path.toString))
+      // TODO: probably need a URL-specific codec here
+      TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
 }

@@ -1,24 +1,43 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package fs
 
 import quasar.Predef._
+import quasar.effect.LiftedOps
 
 import scalaz._
 import scalaz.std.anyVal._
+import scalaz.std.tuple._
 import scalaz.syntax.monad._
 import scalaz.stream._
 
 sealed trait ReadFile[A]
 
 object ReadFile {
-  final case class ReadHandle(run: Long) extends scala.AnyVal
+  final case class ReadHandle(file: AFile, id: Long)
 
   object ReadHandle {
     implicit val readHandleShow: Show[ReadHandle] =
       Show.showFromToString
 
-    implicit val readHandleOrder: Order[ReadHandle] =
-      Order.orderBy(_.run)
+    // TODO: Switch to order once Order[Path[B,T,S]] exists
+    implicit val readHandleEqual: Equal[ReadHandle] =
+      Equal.equalBy(h => (h.file, h.id))
   }
 
   final case class Open(file: AFile, offset: Natural, limit: Option[Positive])
@@ -78,8 +97,10 @@ object ReadFile {
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S) {
-    type F[A] = Free[S, A]
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Unsafe[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S)
+    extends LiftedOps[ReadFile, S] {
+
     type M[A] = FileSystemErrT[F, A]
 
     /** Returns a read handle for the given file, positioned at the given
@@ -103,11 +124,6 @@ object ReadFile {
     /** Closes the given read handle, freeing any resources it was using. */
     def close(rh: ReadHandle): F[Unit] =
       lift(Close(rh))
-
-    ////
-
-    private def lift[A](rf: ReadFile[A]): F[A] =
-      Free.liftF(S1.inj(Coyoneda.lift(rf)))
   }
 
   object Unsafe {

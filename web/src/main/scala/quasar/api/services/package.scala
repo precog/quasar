@@ -21,12 +21,13 @@ package object services {
   // TODO: Polish this up
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error match {
-      case Case.PathError(e) => pathErrorResponse(e)
-      case Case.PlannerError(_, _) => BadRequest(error.shows)
-      case Case.UnknownReadHandle(handle) => InternalServerError(s"Unknown read handle: $handle")
-      case Case.UnknownWriteHandle(handle) => InternalServerError(s"Unknown write handle: $handle")
-      case Case.PartialWrite(numFailed) => InternalServerError(s"Failed to write $numFailed records")
-      case Case.WriteFailed(data, reason) => InternalServerError(s"Failed to write ${data.shows} because of $reason")
+      case Case.PathError(e)                => pathErrorResponse(e)
+      case Case.PlannerError(_, _)          => BadRequest(error.shows)
+      case Case.UnknownReadHandle(handle)   => InternalServerError(s"Unknown read handle: $handle")
+      case Case.UnknownWriteHandle(handle)  => InternalServerError(s"Unknown write handle: $handle")
+      case Case.UnknownResultHandle(handle) => InternalServerError(s"Unknown result handle: $handle")
+      case Case.PartialWrite(numFailed)     => InternalServerError(s"Failed to write $numFailed records")
+      case Case.WriteFailed(data, reason)   => InternalServerError(s"Failed to write ${data.shows} because of $reason")
     }
 
 

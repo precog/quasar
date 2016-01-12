@@ -19,13 +19,14 @@ object metadata {
 
   def service[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S]): HttpService = {
     def dirMetadata(d: ADir): Q.F[Task[Response]] =
-      Q.ls(d).bimap(
+      Q.ls(d).fold(
           fileSystemErrorResponse,
           nodes => Ok(Json.obj("children" := nodes.toList.sorted)))
-        .merge
 
     def fileMetadata(f: AFile): Q.F[Task[Response]] =
-      Q.fileExists(f) map (_ ? Ok(Json.obj()) | NotFound(Json("error" := s"File not found: ${posixCodec.printPath(f)}")))
+      Q.fileExists(f).fold(
+        fileSystemErrorResponse,
+        _ ? Ok(Json.obj()) | NotFound(Json("error" := s"File not found: ${posixCodec.printPath(f)}")))
 
     HttpService {
       case GET -> AsPath(path) =>

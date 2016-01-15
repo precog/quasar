@@ -19,10 +19,10 @@ package quasar
 import quasar.Predef._
 import quasar.fp.free._
 
-import monocle.Lens
 import pathy.{Path => PPath}, PPath._
-import scalaz._
-import scalaz.concurrent.Task
+import quasar.recursionschemes.Fix, Fix._
+import quasar.recursionschemes.Recursive.ops._
+import scalaz._, Scalaz._
 
 package object fs {
   type ReadFileF[A]    = Coyoneda[ReadFile, A]
@@ -72,4 +72,11 @@ package object fs {
       def apply[T](apath: AbsPath[T]) =
         apath.relativeTo(prefix).fold(apath)(rootDir </> _)
     }
+
+  def paths(lp: Fix[LogicalPlan]): Set[Path] =
+    lp.foldMap(_.cata[Set[Path]] {
+      case quasar.LogicalPlan.ReadF(p) => Set(p)
+      case other    => other.fold
+    })
+
 }

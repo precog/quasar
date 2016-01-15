@@ -266,12 +266,6 @@ private final class QueryFileInterpreter[C](
         .liftM[PhaseResultT])
   }
 
-  private def paths(lp: Fix[LogicalPlan]): Set[QPath] =
-    lp.foldMap(_.cata[Set[QPath]] {
-      case ReadF(p) => Set(p)
-      case other    => other.fold
-    })
-
   private def moreResults(h: ResultHandle): OptionT[MQ, Vector[Data]] = {
     def pureNextChunk(bsons: List[Bson]) =
       if (bsons.isEmpty)

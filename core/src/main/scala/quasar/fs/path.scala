@@ -67,10 +67,9 @@ final case class Path(dir: List[DirNode], file: Option[FileNode]) {
     */
   def asAPath: APath = {
     import PPath._
-    val abs = asAbsolute
-    val absDir = abs.dir.foldLeft(PPath.rootDir[Sandboxed])(
+    val absDir = this.dir.foldLeft(PPath.rootDir[Sandboxed])(
       (d, n) => d </> PPath.dir(n.value))
-    abs.file.map(n => absDir </> PPath.file(n.value)) getOrElse absDir
+    this.file.map(n => absDir </> PPath.file(n.value)) getOrElse absDir
   }
 
   def asADir: Option[ADir] =
@@ -153,8 +152,16 @@ object Path {
 
   def canonicalize(value: String): String = Path(value).pathname
 
-  def fromAPath(apath: APath): Path =
-    Path(PPath.posixCodec.printPath(apath))
+  def fromAPath(apath: APath): Path = {
+    val elements = PPath.flatten(
+      None, Some(DirNode(".")), Some(DirNode("..")), e => Some(DirNode(e)), e => Some(FileNode(e)), apath)
+        .toList.unite
+
+    val dirs = elements.collect { case e: DirNode => e }
+    val file = elements.collect { case e: FileNode => e }.headOption
+
+    Path(dirs, file)
+  }
 
   type PathErrT[F[_], A] = EitherT[F, PathError, A]
 

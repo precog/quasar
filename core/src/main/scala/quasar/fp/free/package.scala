@@ -41,6 +41,14 @@ package object free {
       fa.foldMap(f)
   }
 
+  def normalize[S[_]:Functor,A](program: Free[Coproduct[Scalaz.Id,S,?],A]): Free[S,A] =
+    program.flatMapSuspension(new (Coproduct[Scalaz.Id,S,?] ~> Free[S,?]) {
+      def apply[A](a: Coproduct[Scalaz.Id,S,A]): Free[S,A] = a.run match {
+        case -\/(a) => Free.point(a)
+        case \/-(b) => Free.liftF(b)
+      }
+    })(Coproduct.coproductFunctor[Scalaz.Id,S])
+
   /** Given `F[_]` and `S[_]` such that `F :<: S`, returns a natural
     * transformation, `S ~> G`, where `f` is used to transform an `F[_]` and `g`
     * used otherwise.

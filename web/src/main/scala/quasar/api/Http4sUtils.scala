@@ -103,9 +103,9 @@ object Http4sUtils {
     } yield (server, actualPort)
   }
 
-  /** Start `Server` of services with supplied [[ServerBuilder]]
+  /** Start `Server` of services with supplied `ServerBuilder`
     * @param services Map of [[HttpService]] indexed by where to mount them
-    * @return A running [[Http4sServer]]
+    * @return A running `org.http4s.server.Server`
     */
   def startServer(services: Map[String, HttpService], builder: ServerBuilder): Task[Http4sServer] = {
     val builderAll = services.toList.reverse.foldLeft(builder) {

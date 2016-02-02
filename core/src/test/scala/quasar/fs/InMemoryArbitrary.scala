@@ -14,3 +14,5 @@ trait InMemoryArbitrary {
   implicit val arbitraryInMemState: Arbitrary[InMemState] =
     Arbitrary(arb[Map[AFile, Vector[Data]]].map(InMemState(0, _, Map(), Map(), Map(), Map())))
 }
+
+object InMemoryArbitrary extends InMemoryArbitrary

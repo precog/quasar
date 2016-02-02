@@ -24,7 +24,7 @@ class RestApiSpecs extends Specification {
   }
 
   "OPTIONS" should {
-    val restApi = RestApi(Nil,None,8888,_ => Task.now(()))
+    val restApi = RestApi(8888,_ => Task.now(()))
     val mount = new (Mounting ~> Task) {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }

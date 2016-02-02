@@ -7,6 +7,7 @@ import quasar.effect.KeyValueStore
 import quasar.fp.free
 import quasar.fp.prism._
 import quasar.fs._
+import quasar.fs.InMemory._
 import quasar.fs.mount._
 import quasar.recursionschemes.Fix
 import quasar.sql._
@@ -50,7 +51,6 @@ object MetadataFixture {
 }
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import InMemory._
   import metadata.FsNode
   import VariablesArbitrary._, ExprArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._

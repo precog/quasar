@@ -25,18 +25,18 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fs.{FileSystem, QueryFile, APath, ADir, Empty}
 import quasar.fs.mount._
+import Http4sUtils._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.mongoDbFileSystemDef
 
 import java.io.File
 import java.lang.System
 
-import scala.concurrent.duration._
-
-import argonaut.CodecJson
-import monocle.Lens
+import argonaut.{CodecJson, EncodeJson}
+import org.http4s
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
+import monocle.Lens
 import scalaz.{Failure => _, Lens => _, _}
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -46,8 +46,6 @@ import scalaz.syntax.std.option._
 import scalaz.std.option._
 import scalaz.std.list._
 import scalaz.concurrent.Task
-import scalaz.stream._
-import shapeless.{Coproduct => _, _}, nat._, ops.nat._
 
 object ServerOps {
   type Builders = List[(Int, BlazeBuilder)]
@@ -66,13 +64,9 @@ object ServerOps {
   final case class StaticContent(loc: String, path: String)
 }
 
-abstract class ServerOps[WC: CodecJson, SC](
-  configOps: ConfigOps[WC],
-  defaultWC: WC,
-  val webConfigLens: WebConfigLens[WC, SC]) {
+object Server {
 
   import ServerOps._
-  import webConfigLens._
   import QueryFile.ResultHandle
   import FileSystemDef.DefinitionResult
   import hierarchical._
@@ -96,122 +90,6 @@ abstract class ServerOps[WC: CodecJson, SC](
           "UTF-8")
       (new java.io.File(path)).getParentFile().getPath() + "/"
     }
-
-  /** Returns why the given port is unavailable or None if it is available. */
-  def unavailableReason(port: Int): OptionT[Task, String] =
-    OptionT(Task.delay(new java.net.ServerSocket(port)).attempt.flatMap {
-      case -\/(err: java.net.BindException) => Task.now(Some(err.getMessage))
-      case -\/(err)                         => Task.fail(err)
-      case \/-(s)                           => Task.delay(s.close()).as(None)
-    })
-
-  /** An available port number. */
-  def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_.head)
-
-  /** Available port numbers. */
-  def anyAvailablePorts[A <: Nat: ToInt]: Task[Sized[IndexedSeq[Int], A]] = Task.delay {
-    Sized.wrap(
-      (1 to toInt[A])
-        .map(_ => { val s = new java.net.ServerSocket(0); (s, s.getLocalPort) })
-        .map { case (s, p) => { s.close; p } })
-  }
-
-  /** Returns the requested port if available, or the next available port. */
-  def choosePort(requested: Int): Task[Int] =
-    unavailableReason(requested)
-      .flatMapF(rsn => stderr("Requested port not available: " + requested + "; " + rsn) *>
-                       anyAvailablePort)
-      .getOrElse(requested)
-
-  case class ServerBlueprint(port: Int, idleTimeout: Duration, svcs: ListMap[String, HttpService])
-
-  /** Start `Server` with supplied [[ServerBlueprint]]
-    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
-    * @return Server that has been started along with the port on which it was started
-    */
-  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
-    for {
-      actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      builder <- Task.delay {
-        val initialBuilder = BlazeBuilder
-          .withIdleTimeout(blueprint.idleTimeout)
-          .bindHttp(actualPort, "0.0.0.0")
-
-        blueprint.svcs.toList.reverse.foldLeft(initialBuilder) {
-          case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
-        }
-      }
-      server <- Task.delay(builder.run)
-    } yield (server, actualPort)
-  }
-
-  /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.
-    *
-    * The returned process will emit each time a new server configuration is provided and ensures only
-    * one server is running at a time, i.e. providing a new Configuration ensures
-    * the previous server has been stopped.
-    *
-    * When the process of configurations terminates for any reason, the last server is shutdown and the
-    * process of servers will terminate.
-    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
-    */
-  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
-
-    val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout("Server started listening on port " + port) })
-
-    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
-      oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
-      Task.now(newServerAndPort)
-    }.cleanUpWithA{ server =>
-      server.map { case (lastServer, lastPort) =>
-        lastServer.shutdown.flatMap(_ => stdout("Stopped last server listening on port " + lastPort))
-      }.getOrElse(Task.now(()))
-    }
-  }
-
-  /** Produce a stream of servers that can be restarted on a supplied port
-    * @param initialPort The port on which to start the initial server
-    * @param produceRoutes A function that given a function to restart a server on a new port, supplies a server mapping
-    *                      from path to `Server`
-    * @return The `Task` will start the first server and provide a function to shutdown the active server.
-    *         It will also return a process of servers and ports. This `Process` must be run in order for servers
-    *         to actually be started and stopped. The `Process` must be run to completion in order for appropriate
-    *         clean up to occur.
-    */
-  def startServers(initialPort: Int,
-                   produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
-    val configQ = async.boundedQueue[ServerBlueprint](1)
-    def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceRoutes(startNew))
-      configQ.enqueueOne(conf)
-    }
-    startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
-      case None => throw new java.lang.AssertionError("should never happen")
-      case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
-    })
-  }
-
-  // Lifted from unfiltered.
-  // NB: available() returns 0 when the stream is closed, meaning the server
-  //     will run indefinitely when started from a script.
-  private def waitForInput: Task[Unit] = {
-    import java.lang.System
-    for {
-      _    <- Task.delay(java.lang.Thread.sleep(250))
-                  .handle { case _: java.lang.InterruptedException => () }
-      test <- Task.delay(Option(System.console).isEmpty || System.in.available() <= 0)
-                  .handle { case _ => true }
-      done <- if (test) waitForInput else Task.now(())
-    } yield done
-  }
-
-  private def openBrowser(port: Int): Task[Unit] = {
-    val url = "http://localhost:" + port + "/"
-    Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
-        .or(stderr("Failed to open browser, please navigate to " + url))
-  }
 
   // scopt's recommended OptionParser construction involves side effects
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
@@ -315,6 +193,12 @@ abstract class ServerOps[WC: CodecJson, SC](
         ref.read.map(free.foldMapNT(f) compose _).flatMap(_.apply(fs))
     }
 
+  final case class QuasarConfig(staticContent: List[StaticContent],
+                                redirect: Option[String],
+                                port: Option[Int],
+                                configPath: Option[FsFile],
+                                openClient: Boolean)
+
   type ApiEff[A] = Coproduct[MountingF, FileSystem, A]
   type TaskAndConfigs[A] = Coproduct[Task, MountConfigsF, A]
   type TaskAndConfigsM[A] = Free[TaskAndConfigs, A]
@@ -361,7 +245,7 @@ abstract class ServerOps[WC: CodecJson, SC](
     evalNT[Task, Map[APath, MountConfig2]](Map()) compose interpret
   }
 
-  def configsWithPersistence(ref: TaskRef[WC], loc: Option[FsFile])
+  def configsWithPersistence[C:EncodeJson](ref: TaskRef[C], loc: Option[FsFile])(implicit configOps: ConfigOps[C])
       : TaskAndConfigsM ~> Task =
     free.foldMapNT[TaskAndConfigs, Task](
       free.interpret2[Task, MountConfigsF, Task](
@@ -379,42 +263,49 @@ abstract class ServerOps[WC: CodecJson, SC](
     mc.toMap.toList.traverse_ { case (p, cfg) => toN(mnt.mount(p, cfg)) }.run
   }
 
+  def configuration(args: Array[String]): MainTask[QuasarConfig] = for {
+    opts <- optionParser.parse(args, Options(None, None, None, false, false, None))
+              .cata(_.point[MainTask], mainTask.raiseError("couldn't parse options"))
+    content <- interpretPaths(opts)
+    redirect = content.map(_.loc)
+    cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+                  FsPath.parseSystemFile(cfg)
+                    .toRight(s"Invalid path to config file: $cfg")
+                    .map(some))
+  } yield QuasarConfig(content.toList, redirect, opts.port, cfgPath, opts.openClient)
+
+  def startWebServer(initialPort: Int,
+                     staticContent: List[StaticContent],
+                     redirect: Option[String],
+                     openClient: Boolean,
+                     eval: Free[ApiEff, QuasarResponse[ApiEff]] => Task[http4s.Response]) = {
+    val produceRoutes = (reload: (Int => Task[Unit])) =>
+                      fullServer(RestApi(initialPort, reload).httpServices(eval), staticContent, redirect)
+    startAndWait(initialPort, produceRoutes, openClient)
+  }
+
+  def fullServer(services: Map[String, HttpService],
+                 staticContent: List[StaticContent],
+                 redirect: Option[String]): Map[String, HttpService] = {
+    services ++
+    staticContent.map { case StaticContent(loc, path) => loc -> staticFileService(path) }.toListMap ++
+    ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
+  }
+
   def main(args: Array[String]): Unit = {
+    implicit val configOps: ConfigOps[WebConfig] = WebConfig
     val exec: MainTask[Unit] = for {
-      opts          <- optionParser.parse(args, Options(None, None, None, false, false, None))
-                         .cata(_.point[MainTask], mainTask.raiseError("couldn't parse options"))
-      content       <- interpretPaths(opts)
-      redirect      =  content.map(_.loc)
-      cfgPath       <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-                         FsPath.parseSystemFile(cfg)
-                           .toRight(s"Invalid path to config file: $cfg")
-                           .map(some))
-      config        <- configOps.fromFileOrDefaultPaths(cfgPath)
-                         .leftMap(_.shows)
-                         .fixedOrElse(defaultWC.point[MainTask])
-      port          =  opts.port getOrElse wcPort.get(config)
-      api           <- evalApi.liftM[MainErrT]
-
-      _             <- EitherT(mountAll(mountings.get(config)) foldMap (configsAsState compose api))
-
-      cfgRef        <- TaskRef(config).liftM[MainErrT]
-      apiWithPersistence = configsWithPersistence(cfgRef, cfgPath) compose api
-
-      produceRoutes =  (reload: (Int => Task[Unit])) =>
-                         RestApi(content.toList, redirect, port, reload).AllServices(apiWithPersistence)
-      result        <- startServers(port, produceRoutes).liftM[MainErrT]
-      (servers, shutdown) = result
-      msg           =  stdout("Press Enter to stop.")
-      _             <- (if (opts.openClient) openBrowser(port) *> msg else msg).liftM[MainErrT]
-      _             <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[MainErrT]
-                    // We need to run the servers in order to make sure everything is cleaned up properly
-      _             <- servers.run.liftM[MainErrT]
+      qConfig     <- configuration(args)
+      config      <- WebConfig.get(qConfig.configPath).liftM[MainErrT]
+                    // TODO: Find better way to do this
+      updConfig   = config.copy(server = config.server.copy(qConfig.port.getOrElse(config.server.port)))
+      api         <- evalApi.liftM[MainErrT]
+      cfgRef      <- TaskRef(config).liftM[MainErrT]
+      apiWithPersistence = configsWithPersistence(cfgRef, qConfig.configPath) compose api
+      _           <- EitherT(mountAll(config.mountings) foldMap (configsAsState compose api))
+      _           <- startWebServer(updConfig.server.port, qConfig.staticContent, qConfig.redirect, qConfig.openClient, mkResponse(apiWithPersistence)).liftM[MainErrT]
     } yield ()
 
-    exec.swap
-      .flatMapF(e => stderr(e).map(_.right))
-      .merge
-      .handleWith { case err => stderr(err.getMessage) }
-      .run
+    logErrors(exec).run
   }
 }

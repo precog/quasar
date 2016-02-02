@@ -16,10 +16,12 @@
 
 package quasar.api.services
 
+import org.http4s
 import org.http4s.server.{middleware, HttpService}
 import org.http4s.server.middleware.{CORS, GZip}
 import org.http4s.server.syntax.ServiceOps
 import org.http4s.dsl._
+import org.http4s.Request
 import quasar.Predef._
 import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
@@ -29,18 +31,51 @@ import quasar.fs.mount.{Mounting}
 import scala.collection.immutable.ListMap
 import scalaz.concurrent.Task
 import scalaz._, Scalaz._
-import quasar.fp._
 
 import quasar.api._
 
 import scala.concurrent.duration._
 
-final case class RestApi(staticContent: List[StaticContent],
-                   redirect: Option[String],
-                   defaultPort: Int,
-                   restart: Int => Task[Unit]) {
+final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
+  import RestApi._
 
-  val fileSvcs = staticContent.map { case StaticContent(l, p) => l -> staticFileService(p) }.toListMap
+  def httpServices[S[_]: Functor](f: Free[S,QuasarResponse[S]] => Task[http4s.Response])
+        (implicit
+         R: ReadFile.Ops[S],
+         W: WriteFile.Ops[S],
+         M: ManageFile.Ops[S],
+         Q: QueryFile.Ops[S],
+         Mnt: Mounting.Ops[S]
+        ): Map[String, HttpService] =
+    AllServices[S].mapValues(fun => wrap(HttpService.lift(fun andThen f)))
+
+  def AllServices[S[_]: Functor]
+      (implicit
+        R: ReadFile.Ops[S],
+        W: WriteFile.Ops[S],
+        M: ManageFile.Ops[S],
+        Q: QueryFile.Ops[S],
+        Mnt: Mounting.Ops[S]
+      ): ListMap[String, Request => Free[S,QuasarResponse[S]]] = {
+    ListMap(
+      //"/compile/fs"   -> query.compileService(f),
+      //"/data/fs"      -> data.service(f),
+      "/metadata/fs"  -> metadata.service[S,S] _//,
+      //"/mount/fs"     -> mount.service(f),
+      //"/query/fs"     -> query.service(f),
+      //"/server"       -> server.service(defaultPort, restart),
+      //"/welcome"      -> welcome.service
+    )
+  }
+}
+
+object RestApi {
+  def wrap(service: HttpService) =
+    cors(GZip(HeaderParam(service.orElse {
+      HttpService {
+        case req if req.method == OPTIONS => Ok()
+      }
+    })))
 
   def cors(svc: HttpService): HttpService = CORS(
     svc,
@@ -50,33 +85,4 @@ final case class RestApi(staticContent: List[StaticContent],
       maxAge = 20.days.toSeconds,
       allowedMethods = Some(Set("GET", "PUT", "POST", "DELETE", "MOVE", "OPTIONS")),
       allowedHeaders = Some(Set(Destination.name.value)))) // NB: actually needed for POST only
-
-  def AllServices[S[_]: Functor]
-      (f: S ~> Task)
-      (implicit
-        R: ReadFile.Ops[S],
-        W: WriteFile.Ops[S],
-        M: ManageFile.Ops[S],
-        Q: QueryFile.Ops[S],
-        Mnt: Mounting.Ops[S]
-      ): ListMap[String, HttpService] = {
-    val apiServices = ListMap(
-      "/compile/fs"   -> query.compileService(f),
-      "/data/fs"      -> data.service(f),
-      "/metadata/fs"  -> metadata.service(f),
-      "/mount/fs"     -> mount.service(f),
-      "/query/fs"     -> query.service(f),
-      "/server"       -> server.service(defaultPort, restart),
-      "/welcome"      -> welcome.service
-    ) ∘ { service =>
-      cors(GZip(HeaderParam(service.orElse {
-        HttpService {
-          case req if req.method == OPTIONS => Ok()
-        }
-      })))
-    }
-    apiServices ++
-      staticContent.map{ case StaticContent(loc, path) => loc -> staticFileService(path)}.toListMap ++
-      ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
-  }
 }

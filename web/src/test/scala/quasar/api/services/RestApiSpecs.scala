@@ -29,7 +29,7 @@ class RestApiSpecs extends Specification {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).run
-    val serviceMap = restApi.AllServices(fs)
+    val serviceMap = restApi.httpServices(mkResponse(fs))
     val service = compositeService(serviceMap)
 
     def testAdvertise(path: String,

@@ -401,7 +401,7 @@ object Repl {
           new RuntimeException(s"Invalid path to config file: $s")))
 
       def configFromPath(fsPath: Option[FsPath[File, Sandboxed]]): Task[CoreConfig] =
-        CoreConfig.fromFileOrDefaultPaths(fsPath) | CoreConfig(MountingsConfig2.empty)
+        CoreConfig.get(fsPath)
 
       def backendFromConfig(config: CoreConfig): Task[Backend] =
         Mounter.defaultMount(MountingsConfig.fromMC2(config.mountings))

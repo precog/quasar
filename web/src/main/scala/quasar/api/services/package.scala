@@ -18,6 +18,7 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
+import quasar.Errors.flatten
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}, FileSystemError._
 
@@ -32,6 +33,9 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 package object services {
+
+  def fileSystemErrorResponse1[S[_]](error: FileSystemError): QuasarResponse[S] = ???
+
   // TODO: Polish this up
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error match {
@@ -63,11 +67,6 @@ package object services {
       -\/(errorResponse(BadRequest, "The '" + key.name + "' header must be specified")))
 
   type FilesystemTask[A] = FileSystemErrT[Task, A]
-  /** Flatten by inserting the `quasar.fs.FileSystemError` into the failure case of the `Task` */
-  val flatten = new (FilesystemTask ~> Task) {
-    def apply[A](t: FilesystemTask[A]): Task[A] =
-      t.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now).join
-  }
 
   def formatAsHttpResponse[S[_]: Functor,A: EntityEncoder](f: S ~> Task)(data: Process[FileSystemErrT[Free[S,?], ?], A],
                                                                          contentType: `Content-Type`,

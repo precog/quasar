@@ -167,4 +167,8 @@ package object api {
       // TODO: probably need a URL-specific codec here
       TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
+
+  def mkResponse[S[_]: Functor](f: S ~> Task)(program: Free[S,QuasarResponse[S]]): Task[Response] = {
+    program.foldMap(f).flatMap(QuasarResponse.toHttpResponse[S](_, f))
+  }
 }

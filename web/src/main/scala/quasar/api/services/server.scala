@@ -45,7 +45,7 @@ object server {
       req.as[String].flatMap(body =>
         body.parseInt.fold(
           e => BadRequest(e.getMessage),
-          portNum => Server.unavailableReason(portNum).run.flatMap { possibleReason =>
+          portNum => Http4sUtils.unavailableReason(portNum).run.flatMap { possibleReason =>
             possibleReason.map{ reason =>
               PreconditionFailed(s"Could not restart server on new port because $reason")
             }.getOrElse {

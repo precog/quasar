@@ -27,7 +27,7 @@ import java.nio.charset._
 import scala.util.Properties._
 
 import argonaut._, Argonaut._
-import monocle._
+import monocle.Lens
 import monocle.syntax.fields._
 import monocle.std.tuple2._
 import pathy._, Path._
@@ -37,6 +37,7 @@ import scalaz.concurrent.Task
 trait ConfigOps[C] {
   import ConfigOps._, ConfigError._
 
+  val default: C
   def mountingsLens: Lens[C, MountingsConfig2]
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] = {
@@ -65,8 +66,11 @@ trait ConfigOps[C] {
     def load(path: Task[FsFile]): CfgTask[C] =
       path.liftM[CfgErrT] flatMap fromFile
 
-    path.fold(load(defaultPath).fixedOrElse(load(alternatePath)))(fromFile)
+    path.cata(fromFile,load(defaultPath) orElse_bug_free load(alternatePath))
   }
+
+  def get(path: Option[FsFile])(implicit D: DecodeJson[C]): Task[C] =
+    fromFileOrDefaultPaths(path) getOrElse default
 
   def toFile(config: C, path: Option[FsFile])(implicit E: EncodeJson[C]): Task[Unit] =
     for {

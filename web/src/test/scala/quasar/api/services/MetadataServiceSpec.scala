@@ -1,6 +1,7 @@
 package quasar.api.services
 
 import quasar.Predef._
+import quasar.api._
 import quasar.{Variables, VariablesArbitrary}
 import quasar.effect.KeyValueStore
 import quasar.fp.free
@@ -12,6 +13,7 @@ import quasar.sql._
 
 import argonaut._, Argonaut._
 import monocle.Lens
+import org.http4s
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.server._
@@ -22,11 +24,7 @@ import pathy.scalacheck._
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
-class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import InMemory._
-  import metadata.FsNode
-  import VariablesArbitrary._, ExprArbitrary._
-  import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
+object MetadataFixture {
 
   type MetadataEff[A] = Coproduct[QueryFileF, MountingF, A]
 
@@ -46,9 +44,17 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
     }
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig2]): HttpService =
-    metadata.service[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
+    HttpService.lift((metadata.service[MetadataEff,MetadataEff] _) andThen mkResponse[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
       Coyoneda.liftTF(runQuery(mem)),
-      Coyoneda.liftTF(runMount(mnts))))
+      Coyoneda.liftTF(runMount(mnts)))))
+}
+
+class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
+  import InMemory._
+  import metadata.FsNode
+  import VariablesArbitrary._, ExprArbitrary._
+  import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
+  import MetadataFixture._
 
   import posixCodec.printPath
 

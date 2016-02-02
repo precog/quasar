@@ -376,8 +376,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "be 500 with server side error" ! prop {
           (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
-            import quasar.api.Server._
-            val port = quasar.api.Server.anyAvailablePort.run
+            val port = quasar.api.Http4sUtils.anyAvailablePort.run
             val destination = rootDir[Sandboxed] </> file1(fileName)
             val request = Request(
               uri = Uri(path = printPath(destination), authority = Some(Authority(port = Some(port)))),
@@ -386,8 +385,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
             }
             val service = data.service(failInter)
-            val serverBlueprint = ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
-            val (server, _) = startServer(serverBlueprint,true).run
+            val serverBlueprint = Http4sUtils.ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
+            val (server, _) = Http4sUtils.startServerFromBlueprint(serverBlueprint,true).run
             val client = org.http4s.client.blaze.defaultClient
             val response = client(request).onFinish(_ => server.shutdown.void).run
             response.status must_== Status.InternalServerError

@@ -16,7 +16,6 @@
 
 package quasar.config
 
-import quasar.Predef._
 import quasar.fs.mount.MountingsConfig2
 
 import argonaut._, Argonaut._
@@ -25,14 +24,10 @@ import monocle._, macros.Lenses
 @Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig2)
 
 object WebConfig extends ConfigOps[WebConfig] {
-  def mountingsLens = WebConfig.mountings
 
   implicit val codecJson: CodecJson[WebConfig] =
     casecodec2(WebConfig.apply, WebConfig.unapply)("server", "mountings")
-}
+  val mountingsLens = WebConfig.mountings
 
-final case class WebConfigLens[WC, SC](
-  server: Lens[WC, SC],
-  mountings: Lens[WC, MountingsConfig2],
-  wcPort: Lens[WC, Int],
-  scPort: Lens[SC, Int])
+  val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig2.empty)
+}

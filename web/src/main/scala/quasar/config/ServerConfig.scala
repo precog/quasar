@@ -21,14 +21,10 @@ import quasar.Predef.{Int, Option, Some}
 import argonaut._, Argonaut._
 import monocle.Lens
 
-final case class ServerConfig(port0: Option[Int]) {
-  val port = port0.getOrElse(ServerConfig.DefaultPort)
-}
+final case class ServerConfig(port: Int)
 
 object ServerConfig {
    val DefaultPort = 20223
-
-   val port = Lens[ServerConfig, Int](_.port)(p => c => c.copy(port0 = Some(p)))
 
    implicit def Codec: CodecJson[ServerConfig] =
      casecodec1(ServerConfig.apply, ServerConfig.unapply)("port")

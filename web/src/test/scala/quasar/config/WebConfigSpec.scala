@@ -12,7 +12,7 @@ class WebConfigSpec extends ConfigSpec[WebConfig] {
   def configOps: ConfigOps[WebConfig] = WebConfig
 
   def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
-    server = ServerConfig(Some(92)),
+    server = ServerConfig(92),
     mountings = MountingsConfig2(Map(
       rootDir -> MountConfig2.fileSystemConfig(MongoDBFsType, uri))))
 

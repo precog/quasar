@@ -17,7 +17,10 @@
 package quasar.api
 
 import quasar.Predef._
+import quasar.{EnvironmentError2, Planner}
+import quasar.SKI._
 import quasar.fs._
+import quasar.fs.mount.{Mounting, MountingError}
 
 import argonaut._, Argonaut._
 import org.http4s.Status, Status._
@@ -26,51 +29,78 @@ import scalaz._, syntax.show._
 import scalaz.concurrent.Task
 import simulacrum.typeclass
 
-// TODO: flip type param order
 trait ToQuasarResponse[A, S[_]] {
   def toResponse(v: A): QuasarResponse[S]
 }
 
-object ToQuasarResponse {
-
+object ToQuasarResponse extends ToQuasarResponseInstances {
   def apply[A, S[_]](implicit ev: ToQuasarResponse[A, S]): ToQuasarResponse[A, S] = ev
 
-  implicit def jsonQuasarResponse[A: EncodeJson, S[_]]: ToQuasarResponse[A, S] =
-    new ToQuasarResponse[A, S] {
-      def toResponse(v: A) = QuasarResponse.json(Ok, v)
-    }
+  def response[A, S[_]](f: A => QuasarResponse[S]): ToQuasarResponse[A, S] =
+    new ToQuasarResponse[A, S] { def toResponse(a: A) = f(a) }
+}
+
+abstract class ToQuasarResponseInstances extends ToQuasarResponseInstances0 {
+  import ToQuasarResponse._
 
   implicit def disjunctionQuasarResponse[A, B, S[_]]
     (implicit ev1: ToQuasarResponse[A, S], ev2: ToQuasarResponse[B, S])
     : ToQuasarResponse[A \/ B, S] =
-    new ToQuasarResponse[A \/ B, S] {
-      def toResponse(v: A \/ B) = v.fold(ev1.toResponse, ev2.toResponse)
+      response(_.fold(ev1.toResponse, ev2.toResponse))
+
+  implicit def environmentErrorQuasarResponse[S[_]]: ToQuasarResponse[EnvironmentError2, S] =
+    response(ee => QuasarResponse.error(InternalServerError, ee.shows))
+
+  implicit def fileSystemErrorResponse[S[_]]: ToQuasarResponse[FileSystemError, S] = {
+    import FileSystemError._
+
+    response {
+      case PathError(e)                => ToQuasarResponse[PathError2, S].toResponse(e)
+      case PlannerError(_, e)          => ToQuasarResponse[Planner.PlannerError, S].toResponse(e)
+      case UnknownReadHandle(handle)   => QuasarResponse.error(InternalServerError, s"Unknown read handle: $handle")
+      case UnknownWriteHandle(handle)  => QuasarResponse.error(InternalServerError, s"Unknown write handle: $handle")
+      case UnknownResultHandle(handle) => QuasarResponse.error(InternalServerError, s"Unknown result handle: $handle")
+      case PartialWrite(numFailed)     => QuasarResponse.error(InternalServerError, s"Failed to write $numFailed records")
+      case WriteFailed(data, reason)   => QuasarResponse.error(InternalServerError, s"Failed to write ${data.shows} because of $reason")
+    }
+  }
+
+  implicit def mountingErrorResponse[S[_]]: ToQuasarResponse[MountingError, S] = {
+    import MountingError._, PathError2.Case.InvalidPath
+
+    response {
+      case PathError(InvalidPath(p, rsn)) =>
+        QuasarResponse.error(Conflict, s"cannot mount at ${posixCodec.printPath(p)} because $rsn")
+
+      case PathError(e)             => ToQuasarResponse[PathError2, S].toResponse(e)
+      case EnvironmentError(e)      => ToQuasarResponse[EnvironmentError2, S].toResponse(e)
+      case InvalidConfig(cfg, rsns) => QuasarResponse.error(BadRequest, rsns.list.mkString("; "))
+    }
+  }
+
+  implicit def mountingPathTypeErrorResponse[S[_]]: ToQuasarResponse[Mounting.PathTypeMismatch, S] =
+    response { err =>
+      val expectedType = refineType(err.path).fold(κ("file"), κ("directory"))
+      QuasarResponse.error(
+        BadRequest,
+        s"wrong path type for mount: ${posixCodec.printPath(err.path)}; $expectedType path required")
     }
 
-  implicit def fileSystemErrorResponse[S[_]]: ToQuasarResponse[FileSystemError, S] =
-    new ToQuasarResponse[FileSystemError, S] {
-      import FileSystemError._
+  implicit def pathErrorResponse[S[_]]: ToQuasarResponse[PathError2, S] = {
+    import PathError2.Case._
 
-      def toResponse(v: FileSystemError): QuasarResponse[S] = v match {
-        case PathError(e)                => ToQuasarResponse[PathError2, S].toResponse(e)
-        case PlannerError(_, _)          => QuasarResponse.error(BadRequest, v.shows)
-        case UnknownReadHandle(handle)   => QuasarResponse.error(InternalServerError, s"Unknown read handle: $handle")
-        case UnknownWriteHandle(handle)  => QuasarResponse.error(InternalServerError, s"Unknown write handle: $handle")
-        case UnknownResultHandle(handle) => QuasarResponse.error(InternalServerError, s"Unknown result handle: $handle")
-        case PartialWrite(numFailed)     => QuasarResponse.error(InternalServerError, s"Failed to write $numFailed records")
-        case WriteFailed(data, reason)   => QuasarResponse.error(InternalServerError, s"Failed to write ${data.shows} because of $reason")
-      }
+    response {
+      case PathExists(path)          => QuasarResponse.error(Conflict, s"${posixCodec.printPath(path)} already exists")
+      case PathNotFound(path)        => QuasarResponse.error(NotFound, s"${posixCodec.printPath(path)} doesn't exist")
+      case InvalidPath(path, reason) => QuasarResponse.error(BadRequest, s"${posixCodec.printPath(path)} is an invalid path because $reason")
     }
+  }
 
-  implicit def pathErrorResponse[S[_]]: ToQuasarResponse[PathError2, S] =
-    new ToQuasarResponse[PathError2, S] {
-      import PathError2.Case._
+  implicit def plannerErrorQuasarResponse[S[_]]: ToQuasarResponse[Planner.PlannerError, S] =
+    response(pe => QuasarResponse.error(BadRequest, pe.shows))
+}
 
-      def toResponse(v: PathError2): QuasarResponse[S] = v match {
-        case PathExists(path) => QuasarResponse.error(Conflict, s"${posixCodec.printPath(path)} already exists")
-        case PathNotFound(path) => QuasarResponse.error(NotFound, s"${posixCodec.printPath(path)} doesn't exist")
-        case InvalidPath(path, reason) => QuasarResponse.error(BadRequest, s"${posixCodec.printPath(path)} is an invalid path because $reason")
-      }
-    }
-
+abstract class ToQuasarResponseInstances0 {
+  implicit def jsonQuasarResponse[A: EncodeJson, S[_]]: ToQuasarResponse[A, S] =
+    ToQuasarResponse.response(a => QuasarResponse.json(Ok, a))
 }

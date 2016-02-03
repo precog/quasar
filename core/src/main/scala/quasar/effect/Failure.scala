@@ -58,6 +58,10 @@ object Failure {
     def unattempt[A](fa: F[E \/ A]): F[A] =
       fa.flatMap(_.fold(fail, _.point[F]))
 
+    val unattemptT: EitherT[F, E, ?] ~> F = new (EitherT[F, E, ?] ~> F) {
+      def apply[A](v: EitherT[F, E, A]): F[A] = unattempt(v.run)
+    }
+
     ////
 
     private type Err[A]      = Failure[E, A]

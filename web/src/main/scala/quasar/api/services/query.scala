@@ -33,7 +33,6 @@ import org.http4s.argonaut._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.~>
 
 object query {
 

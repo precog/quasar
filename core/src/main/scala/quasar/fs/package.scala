@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.effect.FailureF
 import quasar.fp.free._
 
 import pathy.{Path => PPath}, PPath._
@@ -46,6 +47,7 @@ package object fs {
   type PathName = DirName \/ FileName
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
+  type FileSystemFailure[A] = FailureF[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
   def interpretFileSystem[M[_]: Functor](

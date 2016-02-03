@@ -26,6 +26,7 @@ import scalaz._, syntax.show._
 import scalaz.concurrent.Task
 import simulacrum.typeclass
 
+// TODO: flip type param order
 trait ToQuasarResponse[A, S[_]] {
   def toResponse(v: A): QuasarResponse[S]
 }

@@ -18,26 +18,28 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
+import quasar.effect.{Failure, FailureF}
 import quasar.fp._
 
 import argonaut._, Argonaut._
+import monocle._, macros.Lenses
 import org.http4s._
-// import org.http4s.argonaut._
-import org.http4s.headers.`Content-Type`
+import org.http4s.headers._
 import org.http4s.dsl._
 import scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 
+@Lenses
 final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector])
 
 object QuasarResponse {
 
   def json[A: EncodeJson, S[_]](status: Status, a: A): QuasarResponse[S] = {
     val response = string[S](status, a.asJson.pretty(minspace))
-    response.copy(headers = response.headers.put(
-      `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
+    headers.modify(_.put(
+      `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))(response)
   }
 
   def string[S[_]](status: Status, s: String): QuasarResponse[S] = QuasarResponse(
@@ -57,14 +59,22 @@ object QuasarResponse {
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S]))
 
   def streaming[S[_]: Functor, A]
-    (status: Status, p: Process[Free[S, ?], A])
+    (p: Process[Free[S, ?], A])
     (implicit E: EntityEncoder[A], S0: Task :<: S)
     : QuasarResponse[S] =
     QuasarResponse(
-      status,
+      Ok,
       E.headers,
       p.flatMap[Free[S, ?], ByteVector](a =>
         Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S])))
+
+  def streaming[S[_]: Functor, A, E]
+    (p: Process[EitherT[Free[S, ?], E, ?], A])
+    (implicit A: EntityEncoder[A], S0: Task :<: S, S1: FailureF[E, ?] :<: S)
+    : QuasarResponse[S] = {
+      val failure = Failure.Ops[E, S]
+      streaming(p.translate(failure.unattemptT))
+    }
 
   def toHttpResponse[S[_]:Functor](a: QuasarResponse[S], i: S ~> Task): Task[org.http4s.Response] =
     Response(status = a.status).withBody(a.body.translate(free.foldMapNT(i))).map(_.putHeaders(a.headers.toList: _*))

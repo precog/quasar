@@ -16,59 +16,59 @@
 
 package quasar.api.services
 
+import quasar.{DataCodec, Data}
+import quasar.api._
+import quasar.fp._
+import quasar.fs._
+import quasar.fs.ManageFile.{MoveSemantics, MoveScenario}
+import quasar.Predef._
+import quasar.repl.Prettify
+
 import java.nio.charset.StandardCharsets
 
-import quasar.fp._
-
-import argonaut.Json
 import argonaut.Argonaut._
+import argonaut.Json
 import org.http4s._
-import org.http4s.dsl._
 import org.http4s.argonaut._
+import org.http4s.dsl._
 import org.http4s.headers.{`Content-Type`, Accept}
 import org.http4s.server._
-import pathy.Path._
-import quasar.fs.ManageFile.{MoveSemantics, MoveScenario}
-import quasar.{DataCodec, Data}
-import quasar.repl.Prettify
-import quasar.Predef._
-import quasar.api._
-import quasar.fs._
-import scodec.bits.ByteVector
-
+import pathy.Path._, posixCodec._
 import scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
-import scalaz.syntax.TraverseOps
 import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
 import scalaz.syntax.show._
-
-import posixCodec._
+import scalaz.syntax.std.option._
+import scalaz.syntax.TraverseOps
+import scodec.bits.ByteVector
 
 object data {
 
+  // TODO: remove f
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
                                                     M: ManageFile.Ops[S],
-                                                    Q: QueryFile.Ops[S]): HttpService = {
+                                                    Q: QueryFile.Ops[S],
+                                                    S0: Task :<: S,
+                                                    S1: FileSystemFailure :<: S): HttpService = {
 
-    def download(format: MessageFormat, path: APath, offset: Natural, limit: Option[Positive]) = {
+    def download(format: MessageFormat, path: APath, offset: Natural, limit: Option[Positive])
+      : QuasarResponse[S] =
       refineType(path).fold(
-        dirPath => formatAsHttpResponse(f)(
-          data = zippedBytes[S](dirPath, format, offset, limit),
-          contentType = `Content-Type`(MediaType.`application/zip`),
-          disposition = format.disposition
-        ),
-        filePath => formatQuasarDataStreamAsHttpResponse(f)(
-          data = R.scan(filePath, offset, limit),
-          format = format
-        )
-      )
-    }
+        dirPath => {
+          val p = zippedBytes[S](dirPath, format, offset, limit)
+          val headers = `Content-Type`(MediaType.`application/zip`) :: format.disposition.toList
+          QuasarResponse.headers.modify(_.put(headers: _*))(QuasarResponse.streaming(p))
+        },
+        filePath => {
+          val p = format.encode[FileSystemErrT[Free[S,?], ?]](R.scan(filePath, offset, limit))
+          val headers = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`)) :: format.disposition.toList
+          QuasarResponse.headers.modify(_.put(headers: _*))(QuasarResponse.streaming(p))
+        })
 
     def upload(req: Request,
-               by: Process[Free[S,?], Data] => Process[FileSystemErrT[Free[S,?],?], FileSystemError]) = {
+               by: Process[Free[S,?], Data] => Process[FileSystemErrT[Free[S,?],?], FileSystemError]): Task[Response] = {
       handleMissingContentType(
         req.decode[Process[Task,DecodeError \/ Data]] { data =>
           for {
@@ -84,12 +84,13 @@ object data {
     }
 
     HttpService {
-      case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
-        handleOffsetLimitParams(offsetParam,limitParam){ (offset, limit) =>
-          val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-          download(requestedFormat, path, offset.getOrElse(Natural._0), limit)
-        }
-      }
+      case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => ???
+      // {
+      //   handleOffsetLimitParams(offsetParam,limitParam){ (offset, limit) =>
+      //     val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
+      //     download(requestedFormat, path, offset.getOrElse(Natural._0), limit)
+      //   }
+      // }
       case req @ POST -> AsFilePath(path) => upload(req, W.append(path,_))
       case req @ PUT -> AsFilePath(path) => upload(req, W.save(path,_))
       case req @ Method.MOVE -> AsPath(path) =>

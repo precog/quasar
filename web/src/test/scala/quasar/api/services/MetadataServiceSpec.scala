@@ -72,7 +72,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         val path:String = posixCodec.printPath(file.path)
         val response = service(InMemState.empty, Map())(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"File not found: $path")
+        response.as[Json].run must_== Json("error" := s"$path doesn't exist")
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -83,7 +83,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           val path = printPath(fileWithSameName)
           val response = service(s.state, Map())(Request(uri = Uri(path = path))).run
           response.status must_== Status.NotFound
-          response.as[Json].run must_== Json("error" := s"File not found: $path")
+          response.as[Json].run must_== Json("error" := s"$path doesn't exist")
         }
       }
     }

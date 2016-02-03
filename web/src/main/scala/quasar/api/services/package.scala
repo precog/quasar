@@ -34,7 +34,10 @@ import scalaz.stream.Process
 
 package object services {
 
-  def fileSystemErrorResponse1[S[_]](error: FileSystemError): QuasarResponse[S] = ???
+  def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQuasarResponse[A, F]): Free[S, QuasarResponse[F]] =
+    a.map(ev.toResponse)
+
+  // TODO: remove fileSystemErrorResponse, pathErrorResponse, and errorResponse once usages are removed
 
   // TODO: Polish this up
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =

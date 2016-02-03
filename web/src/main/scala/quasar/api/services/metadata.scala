@@ -19,7 +19,8 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.SKI._
 import quasar.api.AsPath
-import quasar.api.QuasarResponse
+import quasar.api.{QuasarResponse, ToQuasarResponse}
+import quasar.fp.prism._
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -77,15 +78,16 @@ object metadata {
         .run.map(cfg => FsNode(name, cfg map mountType))
         .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Free[S,QuasarResponse[T]] =
-      Q.ls(d).flatMap(_.toList.traverse(mkNode(d,_))).fold(
-        fileSystemErrorResponse1[T],
-        nodes => QuasarResponse.Json[T](Json.obj("children" := nodes.toList.sorted)))
+    def dirMetadata(d: ADir): Free[S, QuasarResponse[T]] = respond(
+      Q.ls(d)
+        .flatMap(_.toList.traverse(mkNode(d, _)))
+        .map(nodes => Json.obj("children" := nodes.toList.sorted))
+        .run)
 
-    def fileMetadata(f: AFile): Free[S, QuasarResponse[T]] =
-      Q.fileExists(f).fold(
-        fileSystemErrorResponse1[T],
-        _ ?[QuasarResponse[T]] QuasarResponse.Json(Json.obj()) | QuasarResponse.NotFound(Some(Json("error" := s"File not found: ${posixCodec.printPath(f)}"))))
+    def fileMetadata(f: AFile): Free[S, QuasarResponse[T]] = respond(
+      Q.fileExists(f)
+        .map(_ either Json() or PathError2.pathNotFound(f))
+        .run)
 
     req match {
       case GET -> AsPath(path) =>

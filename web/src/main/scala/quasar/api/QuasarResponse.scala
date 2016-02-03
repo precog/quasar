@@ -18,32 +18,57 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
+import quasar.fp._
 
-import org.http4s.Response
+import argonaut._, Argonaut._
+import org.http4s._
+// import org.http4s.argonaut._
+import org.http4s.headers.`Content-Type`
 import org.http4s.dsl._
-import org.http4s.argonaut._
 import scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
+import scodec.bits.ByteVector
 
-sealed trait QuasarResponse[S[_]]
+final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector])
 
 object QuasarResponse {
-  final case class Streaming[S[_]](p: Process[Free[S, ?], String]) extends QuasarResponse[S]
-  final case class Json[S[_]](json: argonaut.Json) extends QuasarResponse[S]
-  final case class Error[S[_]](responseCode: org.http4s.Status, a: String) extends QuasarResponse[S]
-  final case class NotFound[S[_]](json: Option[argonaut.Json]) extends QuasarResponse[S]
 
-  def toHttpResponse[S[_]:Functor](a: QuasarResponse[S], i: S ~> Task): Task[org.http4s.Response] = a match {
-    case Streaming(p) =>
-      val dataStream = p.translate(new (Free[S,?] ~> Task) {
-        def apply[A](pr: Free[S,A]): Task[A] = pr.foldMap(i)
-      })
-      Ok(dataStream)
-    case Json(json) => Ok(json)
-    case Error(status, s) => Response().withBody(s).withStatus(status)
-    case NotFound(json) =>
-      json.map(json => Response().withBody(json).withStatus(org.http4s.Status.NotFound)).getOrElse(
-        Task.now(Response().withStatus(org.http4s.Status.NotFound)))
+  def json[A: EncodeJson, S[_]](status: Status, a: A): QuasarResponse[S] = {
+    val response = string[S](status, a.asJson.pretty(minspace))
+    response.copy(headers = response.headers.put(
+      `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
   }
+
+  def string[S[_]](status: Status, s: String): QuasarResponse[S] = QuasarResponse(
+    status,
+    Headers(`Content-Type`(MediaType.`text/plain`, Some(Charset.`UTF-8`))),
+    Process.emit(ByteVector.view(s.getBytes(Charset.`UTF-8`.nioCharset))))
+
+  def error[S[_]](status: Status, s: String): QuasarResponse[S] = json(status, Json("error" := s))
+
+  def response[S[_]: Functor, A]
+    (status: Status, a: A)
+    (implicit E: EntityEncoder[A], S0: Task :<: S)
+    : QuasarResponse[S] =
+    QuasarResponse(
+      status,
+      E.headers,
+      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S]))
+
+  def streaming[S[_]: Functor, A]
+    (status: Status, p: Process[Free[S, ?], A])
+    (implicit E: EntityEncoder[A], S0: Task :<: S)
+    : QuasarResponse[S] =
+    QuasarResponse(
+      status,
+      E.headers,
+      p.flatMap[Free[S, ?], ByteVector](a =>
+        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S])))
+
+  def toHttpResponse[S[_]:Functor](a: QuasarResponse[S], i: S ~> Task): Task[org.http4s.Response] =
+    Response(status = a.status).withBody(a.body.translate(free.foldMapNT(i))).map(_.putHeaders(a.headers.toList: _*))
+
+  private def lift[S[_]: Functor](implicit S0: Task :<: S): Task ~> Free[S, ?] = liftFT[S] compose injectNT[Task, S]
+
 }

@@ -27,14 +27,36 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.dsl._
 import scalaz._
+import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 
 @Lenses
-final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector])
+final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
+  import QuasarResponse.HttpResponseStreamFailureException
+
+  def toHttpResponse(i: S ~> ResponseOr)(implicit S: Functor[S]): Task[Response] = {
+    val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
+      def apply[A](ror: ResponseOr[A]) =
+        ror.fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)), _.point[Task]).join
+    }
+
+    def handleRest(vec: ByteVector, rest: Process[ResponseOr, ByteVector]): Response =
+      Response(body = Process.emit(vec) ++ rest.translate(failTask))
+
+    body.translate[ResponseOr](free.foldMapNT(i))
+      .unconsOption.map(
+        _.fold(Response())((handleRest _).tupled)
+          .withStatus(status)
+          .putHeaders(headers.toList: _*)
+      ).merge
+  }
+}
 
 object QuasarResponse {
+  final class HttpResponseStreamFailureException(alternate: Response)
+    extends java.lang.Exception
 
   def json[A: EncodeJson, S[_]](status: Status, a: A): QuasarResponse[S] = {
     val response = string[S](status, a.asJson.pretty(minspace))
@@ -56,7 +78,7 @@ object QuasarResponse {
     QuasarResponse(
       status,
       E.headers,
-      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S]))
+      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT))
 
   def streaming[S[_]: Functor, A]
     (p: Process[Free[S, ?], A])
@@ -66,7 +88,7 @@ object QuasarResponse {
       Ok,
       E.headers,
       p.flatMap[Free[S, ?], ByteVector](a =>
-        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](lift[S])))
+        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT)))
 
   def streaming[S[_]: Functor, A, E]
     (p: Process[EitherT[Free[S, ?], E, ?], A])
@@ -75,10 +97,4 @@ object QuasarResponse {
       val failure = Failure.Ops[E, S]
       streaming(p.translate(failure.unattemptT))
     }
-
-  def toHttpResponse[S[_]:Functor](a: QuasarResponse[S], i: S ~> Task): Task[org.http4s.Response] =
-    Response(status = a.status).withBody(a.body.translate(free.foldMapNT(i))).map(_.putHeaders(a.headers.toList: _*))
-
-  private def lift[S[_]: Functor](implicit S0: Task :<: S): Task ~> Free[S, ?] = liftFT[S] compose injectNT[Task, S]
-
 }

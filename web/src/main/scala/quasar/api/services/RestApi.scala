@@ -39,7 +39,7 @@ import scala.concurrent.duration._
 final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
   import RestApi._
 
-  def httpServices[S[_]: Functor](f: Free[S,QuasarResponse[S]] => Task[http4s.Response])
+  def httpServices[S[_]: Functor](f: S ~> ResponseOr)
         (implicit
          R: ReadFile.Ops[S],
          W: WriteFile.Ops[S],
@@ -47,7 +47,7 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
          Q: QueryFile.Ops[S],
          Mnt: Mounting.Ops[S]
         ): Map[String, HttpService] =
-    AllServices[S].mapValues(fun => wrap(HttpService.lift(fun andThen f)))
+    AllServices[S].mapValues(qsvc => wrap(qsvc.toHttpService(f)))
 
   def AllServices[S[_]: Functor]
       (implicit
@@ -56,11 +56,11 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
         M: ManageFile.Ops[S],
         Q: QueryFile.Ops[S],
         Mnt: Mounting.Ops[S]
-      ): ListMap[String, Request => Free[S,QuasarResponse[S]]] = {
+      ): ListMap[String, QHttpService[S]] = {
     ListMap(
       //"/compile/fs"   -> query.compileService(f),
       //"/data/fs"      -> data.service(f),
-      "/metadata/fs"  -> metadata.service[S,S] _//,
+      "/metadata/fs"  -> metadata.service[S] //,
       //"/mount/fs"     -> mount.service(f),
       //"/query/fs"     -> query.service(f),
       //"/server"       -> server.service(defaultPort, restart),

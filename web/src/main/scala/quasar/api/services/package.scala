@@ -37,6 +37,9 @@ package object services {
   def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQuasarResponse[A, F]): Free[S, QuasarResponse[F]] =
     a.map(ev.toResponse)
 
+  def requiredHeader2[F[_]](key: HeaderKey.Extractable, request: Request): QuasarResponse[F] \/ key.HeaderT =
+    request.headers.get(key) \/> QuasarResponse.error(BadRequest, s"The '${key.name}' header must be specified")
+
   // TODO: remove fileSystemErrorResponse, pathErrorResponse, and errorResponse once usages are removed
 
   // TODO: Polish this up

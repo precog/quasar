@@ -40,7 +40,7 @@ object ToQuasarResponse extends ToQuasarResponseInstances {
     new ToQuasarResponse[A, S] { def toResponse(a: A) = f(a) }
 }
 
-abstract class ToQuasarResponseInstances extends ToQuasarResponseInstances0 {
+sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstances0 {
   import ToQuasarResponse._
 
   implicit def disjunctionQuasarResponse[A, B, S[_]]
@@ -98,9 +98,15 @@ abstract class ToQuasarResponseInstances extends ToQuasarResponseInstances0 {
 
   implicit def plannerErrorQuasarResponse[S[_]]: ToQuasarResponse[Planner.PlannerError, S] =
     response(pe => QuasarResponse.error(BadRequest, pe.shows))
+
+  implicit def stringQuasarResponse[S[_]]: ToQuasarResponse[String, S] =
+    response(QuasarResponse.string(Ok, _))
+
+  implicit def quasarResponseToQuasarResponse[S[_]]: ToQuasarResponse[QuasarResponse[S], S] =
+    response(ι)
 }
 
-abstract class ToQuasarResponseInstances0 {
+sealed abstract class ToQuasarResponseInstances0 {
   implicit def jsonQuasarResponse[A: EncodeJson, S[_]]: ToQuasarResponse[A, S] =
     ToQuasarResponse.response(a => QuasarResponse.json(Ok, a))
 }

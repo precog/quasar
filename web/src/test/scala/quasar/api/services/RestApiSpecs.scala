@@ -2,6 +2,7 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
+import quasar.fp.liftMT
 import quasar.fs.InMemory._
 import quasar.fs.mount._
 
@@ -29,7 +30,7 @@ class RestApiSpecs extends Specification {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).run
-    val serviceMap = restApi.httpServices(mkResponse(fs))
+    val serviceMap = restApi.httpServices(liftMT[Task, ResponseT] compose fs)
     val service = compositeService(serviceMap)
 
     def testAdvertise(path: String,

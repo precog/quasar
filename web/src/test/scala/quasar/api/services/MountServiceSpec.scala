@@ -62,10 +62,12 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
       val tf: MountingF ~> Task = Coyoneda.liftTF(hoistFree(mt) compose mounter)
 
-      val service = mount.service[MountingF](tf)
+      val eff: Eff ~> Task =
+        free.interpret2[Task, MountingF, Task](NaturalTransformation.refl, tf)
 
-      f(service.run andThen (free.lift(_).into[Eff]))
-        .foldMap(free.interpret2[Task, MountingF, Task](NaturalTransformation.refl, tf))
+      val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
+
+      f(service.run andThen (free.lift(_).into[Eff])).foldMap(eff)
     }.run.run
   }
 

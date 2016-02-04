@@ -36,6 +36,9 @@ import scalaz.concurrent._
 import pathy.Path, Path._
 
 package object api {
+  // TODO: Names
+  type ResponseT[F[_], A] = EitherT[F, Response, A]
+  type ResponseOr[A] = ResponseT[Task, A]
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header
@@ -168,7 +171,6 @@ package object api {
       TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
 
-  def mkResponse[S[_]: Functor](f: S ~> Task)(program: Free[S,QuasarResponse[S]]): Task[Response] = {
-    program.foldMap(f).flatMap(QuasarResponse.toHttpResponse[S](_, f))
-  }
+  // TODO: remove
+  def mkResponse[S[_]: Functor](f: S ~> Task)(program: Free[S,QuasarResponse[S]]): Task[Response] = ???
 }

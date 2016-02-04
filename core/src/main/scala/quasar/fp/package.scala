@@ -495,6 +495,12 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
       def apply[A](fa: F[A]) = I inj fa
     }
 
+  /** Convenience transformation to inject into a coproduct and lift into
+    * `Free`.
+    */
+  def injectFT[F[_], S[_]: Functor](implicit S: F :<: S): F ~> Free[S, ?] =
+    liftFT[S] compose injectNT[F, S]
+
   def evalNT[F[_]: Functor, S](initial: S): StateT[F, S, ?] ~> F =
     new (StateT[F, S, ?] ~> F) {
       def apply[A](sa: StateT[F, S, A]): F[A] =

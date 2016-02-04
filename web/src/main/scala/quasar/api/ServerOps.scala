@@ -278,7 +278,7 @@ object Server {
                      staticContent: List[StaticContent],
                      redirect: Option[String],
                      openClient: Boolean,
-                     eval: Free[ApiEff, QuasarResponse[ApiEff]] => Task[http4s.Response]) = {
+                     eval: ApiEff ~> ResponseOr) = {
     val produceRoutes = (reload: (Int => Task[Unit])) =>
                       fullServer(RestApi(initialPort, reload).httpServices(eval), staticContent, redirect)
     startAndWait(initialPort, produceRoutes, openClient)
@@ -303,7 +303,7 @@ object Server {
       cfgRef      <- TaskRef(config).liftM[MainErrT]
       apiWithPersistence = configsWithPersistence(cfgRef, qConfig.configPath) compose api
       _           <- EitherT(mountAll(config.mountings) foldMap (configsAsState compose api))
-      _           <- startWebServer(updConfig.server.port, qConfig.staticContent, qConfig.redirect, qConfig.openClient, mkResponse(apiWithPersistence)).liftM[MainErrT]
+      _           <- startWebServer(updConfig.server.port, qConfig.staticContent, qConfig.redirect, qConfig.openClient, liftMT[Task, ResponseT] compose apiWithPersistence).liftM[MainErrT]
     } yield ()
 
     logErrors(exec).run

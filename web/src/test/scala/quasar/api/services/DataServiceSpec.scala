@@ -41,13 +41,13 @@ import Fixture._
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import InMemory._
 
-  def service(mem: InMemState): HttpService =
-    data.service[FileSystem](runFs(mem).run)
+  def service(mem: InMemState): HttpService = ???
+//    data.service[FileSystem](runFs(mem).run)
 
-  def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
+  def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = ??? /*{
     val (inter, ref) = runInspect(mem).run
     (data.service[FileSystem](inter compose fileSystem), ref)
-  }
+  }*/
 
   implicit val arbFileName: Arbitrary[FileName] = Arbitrary(Gen.alphaStr.filter(_.nonEmpty).map(FileName(_)))
 
@@ -384,7 +384,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             val failInter = new (FileSystem ~> Task) {
               def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
             }
-            val service = data.service(failInter)
+            def service: HttpService = ??? //data.service(failInter)
             val serverBlueprint = Http4sUtils.ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
             val (server, _) = Http4sUtils.startServerFromBlueprint(serverBlueprint,true).run
             val client = org.http4s.client.blaze.defaultClient

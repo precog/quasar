@@ -18,8 +18,7 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.SKI._
-import quasar.api.AsPath
-import quasar.api.{QuasarResponse, ToQuasarResponse}
+import quasar.api._
 import quasar.fp.prism._
 import quasar.fs._
 import quasar.fs.mount._
@@ -66,8 +65,7 @@ object metadata {
       jdecode3L(FsNode.apply)("name", "type", "mount")
   }
 
-  def service[S[_]: Functor, T[_]](req: Request)
-                                  (implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): Free[S, QuasarResponse[T]] = {
+  def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
     val mountType: MountConfig2 => String = {
       case ViewConfig(_, _)         => "view"
       case FileSystemConfig(typ, _) => typ.value
@@ -78,18 +76,18 @@ object metadata {
         .run.map(cfg => FsNode(name, cfg map mountType))
         .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Free[S, QuasarResponse[T]] = respond(
+    def dirMetadata(d: ADir): Free[S, QuasarResponse[S]] = respond(
       Q.ls(d)
         .flatMap(_.toList.traverse(mkNode(d, _)))
         .map(nodes => Json.obj("children" := nodes.toList.sorted))
         .run)
 
-    def fileMetadata(f: AFile): Free[S, QuasarResponse[T]] = respond(
+    def fileMetadata(f: AFile): Free[S, QuasarResponse[S]] = respond(
       Q.fileExists(f)
         .map(_ either Json() or PathError2.pathNotFound(f))
         .run)
 
-    req match {
+    QHttpService {
       case GET -> AsPath(path) =>
         refineType(path).fold(dirMetadata, fileMetadata)
     }

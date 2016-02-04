@@ -4,7 +4,7 @@ import quasar.Predef._
 import quasar.api._
 import quasar.{Variables, VariablesArbitrary}
 import quasar.effect.KeyValueStore
-import quasar.fp.free
+import quasar.fp.{liftMT, free}
 import quasar.fp.prism._
 import quasar.fs._
 import quasar.fs.InMemory._
@@ -45,7 +45,8 @@ object MetadataFixture {
     }
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig2]): HttpService =
-    HttpService.lift((metadata.service[MetadataEff,MetadataEff] _) andThen mkResponse[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
+    metadata.service[MetadataEff].toHttpService(
+      liftMT[Task, ResponseT].compose[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
       Coyoneda.liftTF(runQuery(mem)),
       Coyoneda.liftTF(runMount(mnts)))))
 }

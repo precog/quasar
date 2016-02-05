@@ -16,7 +16,12 @@
 
 package quasar.fp
 
+import quasar.Predef._
+
 import scalaz._
+import scalaz.syntax.either._
+import scalaz.syntax.monad._
+import scalaz.concurrent.Task
 
 package object free {
   type Coproduct3[F[_], G[_], H[_], A] = Coproduct[F, Coproduct[G, H, ?], A]
@@ -72,5 +77,36 @@ package object free {
     new (Coproduct5[F, G, H, I, J, ?] ~> M) {
       def apply[A](fa: Coproduct5[F, G, H, I, J, A]) =
         fa.run.fold(f, interpret4(g, h, i, j)(_))
+    }
+
+  /** A `Catchable` instance for `Free[S, ?]` when `Task` can be injected into `S`. */
+  implicit def freeCatchable[S[_]: Functor](implicit S: Task :<: S): Catchable[Free[S, ?]] =
+    new Catchable[Free[S, ?]] {
+      type G[A] = Free[S, A]
+      private val injFT: Task ~> G = injectFT[Task, S]
+      private val lftFT: S ~> G = liftFT[S]
+
+      def attempt[A](fa: Free[S, A]): Free[S, Throwable \/ A] =
+        injFT(Task.delay(fa.resume match {
+          case \/-(a) =>
+            a.right[Throwable].point[G]
+
+          case -\/(sa) => S.prj(sa) match {
+            case Some(t) =>
+              injFT(t.attempt) flatMap {
+                case -\/(t)   => t.left[A].point[G]
+                case \/-(fa0) => attempt(fa0)
+              }
+
+            case None =>
+              lftFT(sa).flatMap(attempt)
+          }
+        }).attempt map {
+          case \/-(a) => a
+          case -\/(t) => t.left[A].point[G]
+        }).join
+
+      def fail[A](t: Throwable): Free[S, A] =
+        injFT(Task.fail(t))
     }
 }

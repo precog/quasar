@@ -17,11 +17,11 @@
 package quasar
 
 import quasar.Predef._
-import quasar.effect.FailureF
+import quasar.effect.Failure
 import quasar.fp.free._
 
 import pathy.{Path => PPath}, PPath._
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs {
   type ReadFileF[A]    = Coyoneda[ReadFile, A]
@@ -47,7 +47,8 @@ package object fs {
   type PathName = DirName \/ FileName
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
-  type FileSystemFailure[A] = FailureF[FileSystemError, A]
+  type FileSystemFailure[A] = Failure[FileSystemError, A]
+  type FileSystemFailureF[A] = Coyoneda[FileSystemFailure, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
   def interpretFileSystem[M[_]: Functor](

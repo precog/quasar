@@ -17,28 +17,51 @@
 package quasar
 
 import quasar.Predef._
+import quasar.Errors.{ETask, convertError}
+import quasar.api.ToQuasarResponse.ops._
+import quasar.effect.Failure
 import quasar.fs.{Path => QPath, _}
-
-import argonaut.{DecodeResult => _, _}
-import Argonaut._
 
 import java.io.File
 
+import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
 import org.http4s.server._
 import org.http4s.server.staticcontent._
 import org.http4s.util._
-
-import scalaz._, Scalaz._
-import scalaz.concurrent._
 import pathy.Path, Path._
+import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.concurrent.Task
 
 package object api {
   // TODO: Names
   type ResponseT[F[_], A] = EitherT[F, Response, A]
   type ResponseOr[A] = ResponseT[Task, A]
+
+  /** Interpret a `Failure` effect into `ResponseOr` given evidence the
+    * failure type can be converted to a `QuasarResponse`.
+    */
+  def failureResponseOr[E](implicit E: ToQuasarResponse[E, ResponseOr])
+                          : Failure[E, ?] ~> ResponseOr = {
+
+    def errToResp(e: E): Task[Response] =
+      e.toResponse[ResponseOr].toHttpResponse(NaturalTransformation.refl)
+
+    joinResponseOr.compose[Failure[E, ?]](
+      convertError[Task](errToResp).compose[Failure[E, ?]](
+        Failure.toError[ETask, E]))
+  }
+
+  /** Sequences the `Response` on the left with the outer `Task`. */
+  val joinResponseOr: EitherT[Task, Task[Response], ?] ~> ResponseOr =
+    new (EitherT[Task, Task[Response], ?] ~> ResponseOr) {
+      def apply[A](et: EitherT[Task, Task[Response], A]) =
+        EitherT(et.run.flatMap(_.fold(
+          _.map(_.left[A]),
+          _.right[Response].point[Task])))
+    }
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header
@@ -170,7 +193,4 @@ package object api {
       // TODO: probably need a URL-specific codec here
       TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
-
-  // TODO: remove
-  def mkResponse[S[_]: Functor](f: S ~> Task)(program: Free[S,QuasarResponse[S]]): Task[Response] = ???
 }

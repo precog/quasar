@@ -32,6 +32,7 @@ import scalaz.concurrent.Task
 
 object mount {
   import Mounting.PathTypeMismatch
+  import ToQuasarResponse.ops._
   import posixCodec._
 
   def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S): QHttpService[S] =
@@ -82,7 +83,6 @@ object mount {
       respond(M.remount[T](src, dst).as(s"moved ${printPath(src)} to $dstStr").run),
       QuasarResponse.error(BadRequest, s"Not an absolute $typeStr path: $dstStr").point[M.F])
 
-  // TODO: ToQuasarResponse.syntax
   private def mount[S[_]: Functor](
     path: APath,
     req: Request,
@@ -102,9 +102,8 @@ object mount {
                   (msg, _) => QuasarResponse.error[S](BadRequest, msg).left))
       exists <- EitherT.right(M.lookup(path).isDefined)
       mnt    =  if (replaceIfExists && exists) M.replace(path, bConf) else M.mount(path, bConf)
-      r      <- mnt.leftMap(ToQuasarResponse[MountingError, S].toResponse(_))
-      _      <- EitherT.fromDisjunction[FreeS](
-                  r.leftMap(ToQuasarResponse[PathTypeMismatch, S].toResponse(_)))
+      r      <- mnt.leftMap(_.toResponse[S])
+      _      <- EitherT.fromDisjunction[FreeS](r.leftMap(_.toResponse[S]))
     } yield exists
   }
 }

@@ -41,6 +41,7 @@ object server {
   def service(defaultPort: Int, restart: Int => Task[Unit]): HttpService = HttpService {
     case GET -> Root / "info" =>
       Ok(nameAndVersionInfo)
+
     case req @ PUT -> Root / "port" =>
       req.as[String].flatMap(body =>
         body.parseInt.fold(
@@ -56,6 +57,7 @@ object server {
           }
         )
       )
+
     case DELETE -> Root / "port" =>
       restart(defaultPort) *> Ok("Reverted to default port " + defaultPort)
   }

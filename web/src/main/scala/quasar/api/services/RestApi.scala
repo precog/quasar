@@ -48,7 +48,12 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
         S0: Task :<: S,
         S1: FileSystemFailureF :<: S
       ): Map[String, HttpService] =
-    AllServices[S].mapValues(qsvc => withDefaultMiddleware(qsvc.toHttpService(f)))
+    AllServices[S].mapValues(qsvc =>
+      qsvc.toHttpService(f)
+    ) ++ ListMap(
+      "/server"  -> server.service(defaultPort, restart),
+      "/welcome" -> welcome.service
+    ) mapValues withDefaultMiddleware
 
   def AllServices[S[_]: Functor]
       (implicit
@@ -63,25 +68,20 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
     ListMap(
       //"/compile/fs"   -> query.compileService(f),
       "/data/fs"      -> data.service[S],
-      "/metadata/fs"  -> metadata.service[S] //,
-      //"/mount/fs"     -> mount.service(f),
+      "/metadata/fs"  -> metadata.service[S],
+      "/mount/fs"     -> mount.service[S]//,
       //"/query/fs"     -> query.service(f),
-      //"/server"       -> server.service(defaultPort, restart),
-      //"/welcome"      -> welcome.service
     )
 }
 
 object RestApi {
   def withDefaultMiddleware(service: HttpService): HttpService =
-    cors(GZip(HeaderParam(service.orElse {
-      HttpService {
-        case req if req.method == OPTIONS => Ok()
-      }
+    cors(GZip(HeaderParam(service orElse HttpService {
+      case req if req.method == OPTIONS => Ok()
     })))
 
-  def cors(svc: HttpService): HttpService = CORS(
-    svc,
-    middleware.CORSConfig(
+  def cors(svc: HttpService): HttpService =
+    CORS(svc, middleware.CORSConfig(
       anyOrigin = true,
       allowCredentials = false,
       maxAge = 20.days.toSeconds,

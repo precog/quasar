@@ -16,38 +16,39 @@
 
 package quasar.api.services
 
+import quasar.Predef._
+import quasar.api._
+import quasar.api.ServerOps.StaticContent
+import quasar.api.{Destination, HeaderParam}
+import quasar.fs._
+import quasar.fs.mount.Mounting
+
+import scala.concurrent.duration._
+import scala.collection.immutable.ListMap
+
 import org.http4s
+import org.http4s.Request
+import org.http4s.dsl._
 import org.http4s.server.{middleware, HttpService}
 import org.http4s.server.middleware.{CORS, GZip}
 import org.http4s.server.syntax.ServiceOps
-import org.http4s.dsl._
-import org.http4s.Request
-import quasar.Predef._
-import quasar.api.ServerOps.StaticContent
-import quasar.api.{Destination, HeaderParam}
-import quasar.fs.{ReadFile, WriteFile, ManageFile, QueryFile}
-import quasar.fs.mount.{Mounting}
-
-import scala.collection.immutable.ListMap
-import scalaz.concurrent.Task
 import scalaz._, Scalaz._
-
-import quasar.api._
-
-import scala.concurrent.duration._
+import scalaz.concurrent.Task
 
 final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
   import RestApi._
 
   def httpServices[S[_]: Functor](f: S ~> ResponseOr)
-        (implicit
-         R: ReadFile.Ops[S],
-         W: WriteFile.Ops[S],
-         M: ManageFile.Ops[S],
-         Q: QueryFile.Ops[S],
-         Mnt: Mounting.Ops[S]
-        ): Map[String, HttpService] =
-    AllServices[S].mapValues(qsvc => wrap(qsvc.toHttpService(f)))
+      (implicit
+        R: ReadFile.Ops[S],
+        W: WriteFile.Ops[S],
+        M: ManageFile.Ops[S],
+        Q: QueryFile.Ops[S],
+        Mnt: Mounting.Ops[S],
+        S0: Task :<: S,
+        S1: FileSystemFailureF :<: S
+      ): Map[String, HttpService] =
+    AllServices[S].mapValues(qsvc => withDefaultMiddleware(qsvc.toHttpService(f)))
 
   def AllServices[S[_]: Functor]
       (implicit
@@ -55,22 +56,23 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
         W: WriteFile.Ops[S],
         M: ManageFile.Ops[S],
         Q: QueryFile.Ops[S],
-        Mnt: Mounting.Ops[S]
-      ): ListMap[String, QHttpService[S]] = {
+        Mnt: Mounting.Ops[S],
+        S0: Task :<: S,
+        S1: FileSystemFailureF :<: S
+      ): ListMap[String, QHttpService[S]] =
     ListMap(
       //"/compile/fs"   -> query.compileService(f),
-      //"/data/fs"      -> data.service(f),
+      "/data/fs"      -> data.service[S],
       "/metadata/fs"  -> metadata.service[S] //,
       //"/mount/fs"     -> mount.service(f),
       //"/query/fs"     -> query.service(f),
       //"/server"       -> server.service(defaultPort, restart),
       //"/welcome"      -> welcome.service
     )
-  }
 }
 
 object RestApi {
-  def wrap(service: HttpService) =
+  def withDefaultMiddleware(service: HttpService): HttpService =
     cors(GZip(HeaderParam(service.orElse {
       HttpService {
         case req if req.method == OPTIONS => Ok()

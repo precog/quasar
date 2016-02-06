@@ -27,11 +27,6 @@ import scalaz.syntax.show._
   *
   * @tparam E the reason/error describing why the computation failed
   */
-
-/** Provides the ability to indicate a computation has failed.
-  *
-  * @tparam E the reason/error describing why the computation failed
-  */
 sealed trait Failure[E, A]
 
 object Failure {

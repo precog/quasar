@@ -23,7 +23,7 @@ import quasar.console._
 import quasar.config._
 import quasar.effect._
 import quasar.fp._
-import quasar.fs.{FileSystem, QueryFile, APath, ADir, Empty}
+import quasar.fs._
 import quasar.fs.mount._
 import Http4sUtils._
 import quasar.physical.mongodb._
@@ -33,10 +33,10 @@ import java.io.File
 import java.lang.System
 
 import argonaut.{CodecJson, EncodeJson}
+import monocle.Lens
 import org.http4s
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
-import monocle.Lens
 import scalaz.{Failure => _, Lens => _, _}
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -139,6 +139,7 @@ object Server {
         Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toTaskFailure[WorkflowExecutionError]))))
   }
 
+  // TODO: Interpret HFSFailureF into `ResponseOr`
   def fsEffToTask(
     seqRef: TaskRef[Long],
     viewHandlesRef: TaskRef[ViewHandles],
@@ -199,10 +200,14 @@ object Server {
                                 configPath: Option[FsFile],
                                 openClient: Boolean)
 
-  type ApiEff[A] = Coproduct[MountingF, FileSystem, A]
+  type ApiEff0[A] = Coproduct[MountingF, FileSystem, A]
+  type ApiEff1[A] = Coproduct[FileSystemFailureF, ApiEff0, A]
+  type ApiEff[A]  = Coproduct[Task, ApiEff1, A]
+
   type TaskAndConfigs[A] = Coproduct[Task, MountConfigsF, A]
   type TaskAndConfigsM[A] = Free[TaskAndConfigs, A]
 
+  // TODO: Include failure effects in output coproduct
   val evalApi: Task[ApiEff ~> Free[TaskAndConfigs, ?]] =
     for {
       startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
@@ -217,7 +222,7 @@ object Server {
       val g: EvalEff ~> Task = evalEffToTask(evalFsRef, mntsRef, viewsRef)
 
       val liftTask: Task ~> TaskAndConfigsM =
-        liftFT[TaskAndConfigs] compose injectNT[Task, TaskAndConfigs]
+        injectFT[Task, TaskAndConfigs]
 
       val mnt: MntEff ~> TaskAndConfigsM =
         free.interpret2[EvalEffM, MountConfigsF, TaskAndConfigsM](
@@ -227,7 +232,15 @@ object Server {
       val mounting: MountingF ~> TaskAndConfigsM =
         Coyoneda.liftTF[Mounting, TaskAndConfigsM](free.foldMapNT(mnt) compose mounter)
 
-      free.interpret2(mounting, liftTask compose evalFromRef(evalFsRef, f))
+      val throwFailure: FileSystemFailureF ~> Task =
+        Coyoneda.liftTF[FileSystemFailure, Task](
+          Failure.toTaskFailure[FileSystemError])
+
+      free.interpret4[Task, FileSystemFailureF, MountingF, FileSystem, TaskAndConfigsM](
+        liftTask,
+        injectFT[Task, TaskAndConfigs] compose throwFailure,
+        mounting,
+        liftTask compose evalFromRef(evalFsRef, f))
     }
 
   def configsAsState: TaskAndConfigsM ~> Task = {

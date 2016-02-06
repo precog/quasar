@@ -2,8 +2,9 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
-import quasar.fp.liftMT
-import quasar.fs.InMemory._
+import quasar.effect.Failure
+import quasar.fp.{free, liftMT}
+import quasar.fs._
 import quasar.fs.mount._
 
 import org.http4s._, Method.MOVE
@@ -12,10 +13,14 @@ import org.http4s.dsl._
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.headers._
 import org.specs2.mutable.Specification
-import scalaz._
+import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 class RestApiSpecs extends Specification {
+  import InMemory._
+
+  type Eff0[A] = Coproduct[FileSystemFailureF, MountingFileSystem, A]
+  type Eff[A]  = Coproduct[Task, Eff0, A]
 
   def compositeService(serviceMap: Map[String,HttpService]) = HttpService {
     case req =>
@@ -30,7 +35,11 @@ class RestApiSpecs extends Specification {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).run
-    val serviceMap = restApi.httpServices(liftMT[Task, ResponseT] compose fs)
+    val eff = free.interpret3[Task, FileSystemFailureF, MountingFileSystem, Task](
+      NaturalTransformation.refl,
+      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toTaskFailure[FileSystemError]),
+      fs)
+    val serviceMap = restApi.httpServices(liftMT[Task, ResponseT].compose[Eff](eff))
     val service = compositeService(serviceMap)
 
     def testAdvertise(path: String,

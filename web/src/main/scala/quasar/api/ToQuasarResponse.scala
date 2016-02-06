@@ -23,7 +23,7 @@ import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
 
 import argonaut._, Argonaut._
-import org.http4s.Status, Status._
+import org.http4s._, Status._
 import pathy.Path._
 import scalaz._, syntax.show._
 import scalaz.concurrent.Task
@@ -38,6 +38,13 @@ object ToQuasarResponse extends ToQuasarResponseInstances {
 
   def response[A, S[_]](f: A => QuasarResponse[S]): ToQuasarResponse[A, S] =
     new ToQuasarResponse[A, S] { def toResponse(a: A) = f(a) }
+
+  object ops {
+    final implicit class ToQuasarResponseOps[A](val a: A) extends scala.AnyVal {
+      def toResponse[S[_]](implicit A: ToQuasarResponse[A, S]): QuasarResponse[S] =
+        A.toResponse(a)
+    }
+  }
 }
 
 sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstances0 {
@@ -96,14 +103,20 @@ sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstance
     }
   }
 
+  implicit def parseFailureQuasarResponse[S[_]]: ToQuasarResponse[ParseFailure, S] =
+    response(pf => QuasarResponse.error(BadRequest, pf.sanitized))
+
   implicit def plannerErrorQuasarResponse[S[_]]: ToQuasarResponse[Planner.PlannerError, S] =
     response(pe => QuasarResponse.error(BadRequest, pe.shows))
+
+  implicit def quasarResponseToQuasarResponse[S[_]]: ToQuasarResponse[QuasarResponse[S], S] =
+    response(ι)
 
   implicit def stringQuasarResponse[S[_]]: ToQuasarResponse[String, S] =
     response(QuasarResponse.string(Ok, _))
 
-  implicit def quasarResponseToQuasarResponse[S[_]]: ToQuasarResponse[QuasarResponse[S], S] =
-    response(ι)
+  implicit def unitQuasarResponse[S[_]]: ToQuasarResponse[Unit, S] =
+    response(κ(QuasarResponse.empty[S]))
 }
 
 sealed abstract class ToQuasarResponseInstances0 {

@@ -17,10 +17,11 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.{EnvironmentError2, Planner}
-import quasar.SKI._
+import quasar.{EnvironmentError2, Planner, SemanticErrors}
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.SKI._
+import quasar.sql.ParsingError
 
 import argonaut._, Argonaut._
 import org.http4s._, Status._
@@ -103,11 +104,17 @@ sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstance
     }
   }
 
+  implicit def parsingErrorQuasarResponse[S[_]]: ToQuasarResponse[ParsingError, S] =
+    response(pe => QuasarResponse.error(BadRequest, pe.message))
+
   implicit def parseFailureQuasarResponse[S[_]]: ToQuasarResponse[ParseFailure, S] =
     response(pf => QuasarResponse.error(BadRequest, pf.sanitized))
 
   implicit def plannerErrorQuasarResponse[S[_]]: ToQuasarResponse[Planner.PlannerError, S] =
     response(pe => QuasarResponse.error(BadRequest, pe.shows))
+
+  implicit def semanticErrorQuasarResponse[S[_]]: ToQuasarResponse[SemanticErrors, S] =
+    response(se => QuasarResponse.error(BadRequest, se.shows))
 
   implicit def quasarResponseToQuasarResponse[S[_]]: ToQuasarResponse[QuasarResponse[S], S] =
     response(ι)

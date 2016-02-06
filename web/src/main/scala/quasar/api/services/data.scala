@@ -63,7 +63,7 @@ object data {
     case req @ Method.MOVE -> AsPath(path) =>
       (for {
         dst <- EitherT.fromDisjunction[M.F](
-                 requiredHeader2[S](Destination, req) map (_.value))
+                 requiredHeader[S](Destination, req) map (_.value))
         scn <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
                  .leftMap(QuasarResponse.error[S](BadRequest, _))
         _   <- M.move(scn, MoveSemantics.FailIfExists)

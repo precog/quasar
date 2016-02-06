@@ -21,7 +21,7 @@ import quasar.api._
 import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
 import quasar.fs._
-import quasar.fs.mount.Mounting
+import quasar.fs.mount._
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -40,13 +40,13 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
 
   def httpServices[S[_]: Functor](f: S ~> ResponseOr)
       (implicit
-        R: ReadFile.Ops[S],
-        W: WriteFile.Ops[S],
-        M: ManageFile.Ops[S],
-        Q: QueryFile.Ops[S],
-        Mnt: Mounting.Ops[S],
         S0: Task :<: S,
-        S1: FileSystemFailureF :<: S
+        S1: ReadFileF :<: S,
+        S2: WriteFileF :<: S,
+        S3: ManageFileF :<: S,
+        S4: MountingF :<: S,
+        S5: QueryFileF :<: S,
+        S6: FileSystemFailureF :<: S
       ): Map[String, HttpService] =
     AllServices[S].mapValues(qsvc =>
       qsvc.toHttpService(f)
@@ -57,20 +57,20 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
 
   def AllServices[S[_]: Functor]
       (implicit
-        R: ReadFile.Ops[S],
-        W: WriteFile.Ops[S],
-        M: ManageFile.Ops[S],
-        Q: QueryFile.Ops[S],
-        Mnt: Mounting.Ops[S],
         S0: Task :<: S,
-        S1: FileSystemFailureF :<: S
+        S1: ReadFileF :<: S,
+        S2: WriteFileF :<: S,
+        S3: ManageFileF :<: S,
+        S4: MountingF :<: S,
+        S5: QueryFileF :<: S,
+        S6: FileSystemFailureF :<: S
       ): ListMap[String, QHttpService[S]] =
     ListMap(
-      //"/compile/fs"   -> query.compileService(f),
+      "/compile/fs"   -> query.compile.service[S],
       "/data/fs"      -> data.service[S],
       "/metadata/fs"  -> metadata.service[S],
-      "/mount/fs"     -> mount.service[S]//,
-      //"/query/fs"     -> query.service(f),
+      "/mount/fs"     -> mount.service[S],
+      "/query/fs"     -> query.execute.service[S]
     )
 }
 

@@ -204,6 +204,8 @@ object Server {
   type ApiEff1[A] = Coproduct[FileSystemFailureF, ApiEff0, A]
   type ApiEff[A]  = Coproduct[Task, ApiEff1, A]
 
+  type ApiEffM[A] = Free[ApiEff, A]
+
   type TaskAndConfigs[A] = Coproduct[Task, MountConfigsF, A]
   type TaskAndConfigsM[A] = Free[TaskAndConfigs, A]
 

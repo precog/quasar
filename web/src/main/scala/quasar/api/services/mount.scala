@@ -42,14 +42,14 @@ object mount {
         respond(M.lookup(path).toRight(QuasarResponse.error[S](NotFound, err)).run)
 
       case req @ MOVE -> AsPath(src) =>
-        requiredHeader2(Destination, req).map(_.value).fold(
+        requiredHeader(Destination, req).map(_.value).fold(
           (_: QuasarResponse[S]).point[Free[S, ?]],
           dst => refineType(src).fold(
             srcDir  => move(srcDir,  dst, parseAbsDir,  "directory"),
             srcFile => move(srcFile, dst, parseAbsFile, "file")))
 
       case req @ POST -> AsDirPath(parent) => respond((for {
-        hdr <- EitherT.fromDisjunction[M.F](requiredHeader2[S](XFileName, req))
+        hdr <- EitherT.fromDisjunction[M.F](requiredHeader[S](XFileName, req))
         fn  =  hdr.value
         dst <- EitherT.fromDisjunction[M.F](
                 (parseRelDir(fn) orElse parseRelFile(fn))

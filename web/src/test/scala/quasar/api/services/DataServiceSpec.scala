@@ -37,13 +37,11 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.server._
 import quasar.fp.numeric._
-import quasar.fp.numeric.scalacheck._
 import quasar.fs.{Path => _, _}
 import pathy.Path
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.scalacheck.ScalazArbitrary._
-import quasar.fs.NumericArbitrary._
 import quasar.DataArbitrary._
 
 import scalaz._, Scalaz._
@@ -56,6 +54,7 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 
 import Fixture._
@@ -166,8 +165,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               val response = service(filesystem.state)(request).run
               isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
           }(implicitly,implicitly,implicitly,implicitly,implicitly,
-            greaterArbitraryMax(10000000), // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding
-                                           // values of limit that are close to Int.MaxValue
+            // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding values of limit
+            // that are close to Int.MaxValue
+            Arbitrary(chooseRefinedNum[@@, Int, RPositive](1, 10000000)),
             implicitly,implicitly,implicitly)
           "return 400 if provided with" >> {
             "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>

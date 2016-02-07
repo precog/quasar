@@ -18,7 +18,7 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
-import quasar.fp._
+import quasar.fp._, numeric._
 import quasar.fs.{Path => QPath, _}, FileSystemError._
 
 import argonaut._, Argonaut._

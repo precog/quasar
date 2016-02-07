@@ -11,6 +11,7 @@ object Dependencies {
   private val pathyVersion   = "0.0.3"
   private val http4sVersion  = "0.10.1"
   private val mongoVersion   = "3.2.1"
+  private val refinedVersion = "0.3.4"
 
   val core = Seq(
     "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test",
@@ -34,7 +35,9 @@ object Dependencies {
     "org.specs2"        %% "specs2-core"               % "2.4"          % "test",
     "org.scalacheck"    %% "scalacheck"                % "1.11.6"       % "test" force(),
     "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"        % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test")
+    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test",
+    "eu.timepit"        %% "refined"                   % refinedVersion % "compile, test",
+    "eu.timepit"        %% "refined-scalacheck"        % refinedVersion % "test")
 
   val web = Seq(
     "org.http4s"           %% "http4s-dsl"          % http4sVersion % "compile, test",

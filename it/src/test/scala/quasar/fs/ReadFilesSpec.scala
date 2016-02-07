@@ -36,8 +36,8 @@ import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import quasar.fp.numeric._
-import quasar.fp.numeric.scalacheck._
 import shapeless.Nat
+import org.scalacheck.Arbitrary
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
   import ReadFilesSpec._, FileSystemError._, PathError2._
@@ -143,8 +143,8 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
 
         r.runEither must beRight(d.toIndexedSeq)
       }(implicitly, // In order to keep test execution relatively fast
-        greaterArbitraryMax[Refined,Int,Nat._0](200), implicitly,
-        notLessArbitraryMax[Refined,Int,Nat._0](200), implicitly).set(minTestsOk = 5)
+        Arbitrary(chooseRefinedNum[Refined, Int, RPositive](1, 200)), implicitly,
+        Arbitrary(chooseRefinedNum[Refined, Int, NonNegative](1, 200)), implicitly).set(minTestsOk = 5)
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[W.`100`.T] =>
           val r = runLogT(run, read.scan(smallFile.file, 0L, Some(widenInt(j))))

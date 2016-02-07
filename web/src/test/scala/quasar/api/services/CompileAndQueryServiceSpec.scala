@@ -21,7 +21,6 @@ package services
 import Predef._
 import quasar.fp._
 import numeric._
-import quasar.fp.numeric.scalacheck._
 
 import argonaut._, Argonaut._
 

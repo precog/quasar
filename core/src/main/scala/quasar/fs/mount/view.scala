@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.effect._
 import quasar.fp._
+import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError2._
 import quasar.recursionschemes._
 import quasar.std.StdLib._, set._
@@ -80,8 +81,8 @@ object view {
   }
 
   def limit(lp: Fix[LogicalPlan], off: Natural, lim: Option[Positive]): Fix[LogicalPlan] = {
-    val skipped = if (off.value != 0L) Fix(Drop(lp, LogicalPlan.Constant(Data.Int(off.value)))) else lp
-    val limited = lim.fold(skipped)(l => Fix(Take(skipped, LogicalPlan.Constant(Data.Int(l.value)))))
+    val skipped = if (off.get != 0L) Fix(Drop(lp, LogicalPlan.Constant(Data.Int(off.get)))) else lp
+    val limited = lim.fold(skipped)(l => Fix(Take(skipped, LogicalPlan.Constant(Data.Int(l.get)))))
     limited
   }
 

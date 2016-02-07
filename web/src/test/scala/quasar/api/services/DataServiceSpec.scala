@@ -167,6 +167,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           }(implicitly,implicitly,implicitly,implicitly,implicitly,
             // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding values of limit
             // that are close to Int.MaxValue
+            // TODO: Change back to Int.MaxValue after upgrade to Scala 2.11.8
             Arbitrary(chooseRefinedNum[@@, Int, RPositive](1, 10000000)),
             implicitly,implicitly,implicitly)
           "return 400 if provided with" >> {

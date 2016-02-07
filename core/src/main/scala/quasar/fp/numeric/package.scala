@@ -18,7 +18,7 @@ package quasar.fp
 
 import quasar.Predef._
 
-import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive, Greater}
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.{RefType, Refined}
 import scalaz.{Equal, Show, Monoid}
@@ -32,7 +32,14 @@ package object numeric {
   def Positive(a: Long): Option[Positive] = refineV[RPositive](a).right.toOption
   def Natural(a: Long): Option[Natural] = refineV[NonNegative](a).right.toOption
 
-  implicit def widenInt[F[_,_],M](a: F[Int,M])(implicit rt: RefType[F]): F[Long,M] = rt.unsafeWrap(rt.unwrap(a).toLong)
+  implicit def widenPositive[F[_,_],N](a: F[Int,Greater[N]])(implicit rt: RefType[F]): F[Long,Greater[N]] =
+    rt.unsafeWrap(rt.unwrap(a).toLong)
+
+  implicit def widenNatural[F[_,_]](a: F[Int, NonNegative])(implicit rt: RefType[F]): F[Long,NonNegative] =
+    rt.unsafeWrap(rt.unwrap(a).toLong)
+
+  implicit def positiveToNatural[F[_,_], A](a: F[A,RPositive])(implicit rt: RefType[F]): F[A, NonNegative] =
+    rt.unsafeWrap(rt.unwrap(a))
 
   implicit def monoid[F[_,_],T](implicit rt: RefType[F], num: scala.Numeric[T]): Monoid[F[T,NonNegative]] =
     Monoid.instance(

@@ -21,23 +21,22 @@ import org.specs2.ScalaCheck
 import quasar.Predef._
 import quasar.Data
 import quasar.fp._
+import quasar.fp.numeric._
 
 import java.lang.RuntimeException
 import scala.annotation.tailrec
-
-import monocle.std.{disjunction => D}
-import pathy.Path._
-import scalaz.{EphemeralStream => EStream, _}, Scalaz._
-import scalaz.stream._
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{Positive => RPositive,_}
 import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
-import quasar.fp.numeric._
-import shapeless.Nat
+import monocle.std.{disjunction => D}
 import org.scalacheck.Arbitrary
+import pathy.Path._
+import scalaz.{EphemeralStream => EStream, _}, Scalaz._
+import scalaz.stream._
+import shapeless.Nat
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
   import ReadFilesSpec._, FileSystemError._, PathError2._
@@ -121,8 +120,8 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
-      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Int Refined NonNegative =>
-        val r = runLogT(run, read.scan(smallFile.file, k, None))
+      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Int Refined RPositive =>
+        val r = runLogT(run, read.scan(smallFile.file, widenPositive(k), None))
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
                   .dropWhile(_._2 < k.get).map(_._1)
 
@@ -147,7 +146,8 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         Arbitrary(chooseRefinedNum[Refined, Int, NonNegative](1, 200)), implicitly).set(minTestsOk = 5)
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[W.`100`.T] =>
-          val r = runLogT(run, read.scan(smallFile.file, 0L, Some(widenInt(j))))
+          val limit = Some(Positive(j.get).get) // Not ideal, but simplest solution for now
+          val r = runLogT(run, read.scan(smallFile.file, 0L, limit))
 
           (j.get must beGreaterThan(smallFile.data.length)) and
             (r.runEither must beRight(smallFile.data.toIndexedSeq))

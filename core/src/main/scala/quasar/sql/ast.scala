@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,8 @@ object ExprF {
   final case class VariF[A](symbol: String) extends ExprF[A]
   final case class SetLiteralF[A](exprs: List[A]) extends ExprF[A]
   final case class ArrayLiteralF[A](exprs: List[A]) extends ExprF[A]
+  /** Can’t be a Map, because we need to arbitrarily transform the key */
+  final case class MapLiteralF[A](exprs: List[(A, A)]) extends ExprF[A]
   final case class SpliceF[A](expr: Option[A]) extends ExprF[A]
   final case class BinopF[A](lhs: A, rhs: A, op: BinaryOperator)
       extends ExprF[A]
@@ -229,6 +231,13 @@ object ArrayLiteralF {
   def unapply[A](obj: ExprF[A]): Option[List[A]] = obj match {
     case ExprF.ArrayLiteralF(exprs) => Some(exprs)
     case _                          => None
+  }
+}
+object MapLiteralF {
+  def apply[A](exprs: List[(A, A)]): ExprF[A] = ExprF.MapLiteralF(exprs)
+  def unapply[A](obj: ExprF[A]): Option[List[(A, A)]] = obj match {
+    case ExprF.MapLiteralF(exprs) => Some(exprs)
+    case _                        => None
   }
 }
 object SpliceF {

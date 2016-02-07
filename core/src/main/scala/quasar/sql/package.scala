@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.recursionschemes._, Recursive.ops._, TraverseT.ops._
+import quasar.fp._
 import quasar.fs._
 
 import scalaz._, Scalaz._
@@ -140,6 +141,9 @@ package object sql {
       case VariF(symbol) => ":" + symbol
       case SetLiteralF(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
       case ArrayLiteralF(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
+      case MapLiteralF(exprs) => exprs.map {
+        case (k, v) => k._2 + ": " + v._2
+      }.mkString("{", ", ", "}")
       case SpliceF(expr) => expr.fold("*")("(" + _._2 + ").*")
       case BinopF(lhs, rhs, op) => op match {
         case FieldDeref => rhs._1 match {
@@ -218,52 +222,39 @@ package object sql {
       implicit G: Applicative[G]):
         G[ExprF[B]] = {
       def traverseCase(c: Case[A]): G[Case[B]] =
-        G.apply2(f(c.cond), f(c.expr))(Case(_, _))
+        (f(c.cond) ⊛ f(c.expr))(Case(_, _))
 
       fa match {
         case SelectF(dist, proj, rel, filter, group, order) =>
-          G.apply5(
-            Traverse[List].sequence(proj.map(p => f(p.expr).map(Proj(_, p.alias)))),
-            Traverse[Option].sequence(rel.map(traverseRelation(_, f))),
-            Traverse[Option].sequence(filter.map(f)),
-            Traverse[Option].sequence(group.map(g =>
-              G.apply2(
-                Traverse[List].sequence(g.keys.map(f)),
-                Traverse[Option].sequence(g.having.map(f)))(
-                GroupBy(_, _)))),
-            Traverse[Option].sequence(order.map(o =>
-              G.apply(Traverse[List].sequence(o.keys.map(p =>
-                Traverse[(OrderType, ?)].sequence(p.map(f)))))(
-                OrderBy(_)))))(
+          (proj.traverse(p => f(p.expr).map(Proj(_, p.alias))) ⊛
+            rel.traverse(traverseRelation(_, f)) ⊛
+            filter.traverse(f) ⊛
+            group.traverse(g =>
+              (g.keys.traverse(f) ⊛ g.having.traverse(f))(GroupBy(_, _))) ⊛
+            order.traverse(_.keys.traverse(_.traverse(f)).map(OrderBy(_))))(
             SelectF(dist, _, _, _, _, _))
-        case VariF(symbol) => G.point(VariF(symbol))
-        case SetLiteralF(exprs) =>
-          G.map(Traverse[List].sequence(exprs.map(f)))(SetLiteralF(_))
-        case ArrayLiteralF(exprs) =>
-          G.map(Traverse[List].sequence(exprs.map(f)))(ArrayLiteralF(_))
-        case SpliceF(expr) =>
-          G.map(Traverse[Option].sequence(expr.map(f))) (SpliceF(_))
-        case BinopF(lhs, rhs, op) =>
-          G.apply2(f(lhs), f(rhs))(BinopF(_, _, op))
-        case UnopF(expr, op) =>
-          G.apply(f(expr))(UnopF(_, op))
+        case VariF(symbol) => VariF(symbol).point[G]
+        case SetLiteralF(exprs) => exprs.traverse(f).map(SetLiteralF(_))
+        case ArrayLiteralF(exprs) => exprs.traverse(f).map(ArrayLiteralF(_))
+        case MapLiteralF(exprs) =>
+          exprs.traverse(_.bitraverse(f, f)).map(MapLiteralF(_))
+        case SpliceF(expr) => expr.traverse(f).map(SpliceF(_))
+        case BinopF(lhs, rhs, op) => (f(lhs) ⊛ f(rhs))(BinopF(_, _, op))
+        case UnopF(expr, op) => f(expr).map(UnopF(_, op))
         case IdentF(name) => G.point(IdentF(name))
         case InvokeFunctionF(name, args) =>
-          G.map(Traverse[List].sequence(args.map(f)))(InvokeFunctionF(name, _))
-        case MatchF(expr, cases, default) => G.apply3(
-          f(expr),
-          Traverse[List].sequence(cases.map(traverseCase)),
-          Traverse[Option].sequence(default.map(f)))(
-          MatchF(_, _, _))
-        case SwitchF(cases, default) => G.apply2(
-          Traverse[List].sequence(cases.map(traverseCase)),
-          Traverse[Option].sequence(default.map(f)))(
-          SwitchF(_, _))
-        case IntLiteralF(v) => G.point(IntLiteralF(v))
-        case FloatLiteralF(v) => G.point(FloatLiteralF(v))
-        case StringLiteralF(v) => G.point(StringLiteralF(v))
-        case NullLiteralF() => G.point(NullLiteralF())
-        case BoolLiteralF(v) => G.point(BoolLiteralF(v))
+          args.traverse(f).map(InvokeFunctionF(name, _))
+        case MatchF(expr, cases, default) =>
+          (f(expr) ⊛ cases.traverse(traverseCase) ⊛ default.traverse(f))(
+            MatchF(_, _, _))
+        case SwitchF(cases, default) =>
+          (cases.traverse(traverseCase) ⊛ default.traverse(f))(
+            SwitchF(_, _))
+        case IntLiteralF(v) => IntLiteralF(v).point[G]
+        case FloatLiteralF(v) => FloatLiteralF(v).point[G]
+        case StringLiteralF(v) => StringLiteralF(v).point[G]
+        case NullLiteralF() => NullLiteralF().point[G]
+        case BoolLiteralF(v) => BoolLiteralF(v).point[G]
       }
     }
   }
@@ -314,6 +305,7 @@ package object sql {
 
           case SetLiteralF(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
           case ArrayLiteralF(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
+          case MapLiteralF(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
 
           case InvokeFunctionF(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
 

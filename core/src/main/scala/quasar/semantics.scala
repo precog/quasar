@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -323,6 +323,7 @@ trait SemanticAnalysis {
 
     case SetLiteralF(_)  => success(Provenance.Value)
     case ArrayLiteralF(_) => success(Provenance.Value)
+    case MapLiteralF(_) => success(Provenance.Value)
     case SpliceF(expr)       => success(expr.getOrElse(Provenance.Empty))
     case VariF(_)        => success(Provenance.Value)
     case BinopF(left, right, _) => success(left & right)

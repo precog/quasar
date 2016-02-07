@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -195,15 +195,23 @@ trait PlannerBackend[PhysicalPlan] extends Backend {
   def evaluator: Evaluator[PhysicalPlan]
   implicit def RP: RenderTree[PhysicalPlan]
 
-  lazy val queryPlanner = planner.queryPlanner(evaluator.compile(_))
+  lazy val compileToLP = planner.compileToLP
+  lazy val backendPlanner = planner.backendPlanner(evaluator.compile(_))
 
   def run0(req: QueryRequest, out: Path) =
-    queryPlanner(req).map(evaluator.executeTo(_, out))
+    compileToLP(req).flatMap(backendPlanner).map(evaluator.executeTo(_, out))
 
   def eval0(req: QueryRequest) =
-    queryPlanner(req).map(plan =>
-      evaluator.evaluate(plan)
-        .translate[Backend.ProcessingTask](convertError[Task](Backend.PEvalError(_))))
+    compileToLP(req).flatMap {
+      case Fix(LogicalPlan.ConstantF(data)) => EitherT[(Vector[PhaseResult], ?), CompilationError, Process[Backend.ProcessingTask, Data]]((Vector(), \/-(data match {
+        case Data.Set(records) => Process(records: _*)
+        case _                 => Process(data)
+      })))
+      case plan =>
+        backendPlanner(plan).map(
+          evaluator.evaluate(_)
+            .translate[Backend.ProcessingTask](convertError[Task](Backend.PEvalError(_))))
+    }
 }
 
 /** Wraps a backend which handles some or all requests via blocking network

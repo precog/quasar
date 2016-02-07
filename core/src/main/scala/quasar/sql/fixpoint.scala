@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,12 @@ object ArrayLiteral {
   def apply(exprs: List[Expr]): Expr = Fix[ExprF](ArrayLiteralF(exprs))
   def unapply(obj: Expr): Option[List[Expr]] =
     ArrayLiteralF.unapply(obj.unFix)
+}
+
+object MapLiteral {
+  def apply(exprs: List[(Expr, Expr)]): Expr = Fix[ExprF](MapLiteralF(exprs))
+  def unapply(obj: Expr): Option[List[(Expr, Expr)]] =
+    MapLiteralF.unapply(obj.unFix)
 }
 
 /** Represents the wildcard in a select projection

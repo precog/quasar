@@ -1,9 +1,4 @@
-project/project
-project/target
-target
-it/target
-core/target
-web/target
+target/
 .idea
 tmp
 **/.DS_Store

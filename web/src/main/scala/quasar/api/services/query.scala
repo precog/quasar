@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.api.services
 import quasar._
 import quasar.Predef._
 import quasar.api.{MessageFormat, Destination, AsDirPath}
+import quasar.fp.numeric._
 import quasar.{Variables, fs}
 import quasar.fs.{Path => QPath, _}
 import quasar.recursionschemes.Fix, Fix._
@@ -61,8 +62,8 @@ object query {
     case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
 
   def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
-    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.value), sql.Offset))
-    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.value), sql.Limit))
+    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.get), sql.Offset))
+    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.get), sql.Limit))
   }
 
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],

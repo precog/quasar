@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ trait StructuralLib extends Library {
     AnyObject, Str :: Top :: Nil,
     noSimplification,
     partialTyper {
+      case List(Const(Data.Str(name)), Const(Data.Set(data))) =>
+        Const(Data.Set(data.map(d => Data.Obj(Map(name -> d)))))
       case List(Const(Data.Str(name)), Const(data)) => Const(Data.Obj(Map(name -> data)))
       case List(Const(Data.Str(name)), valueType)   => Obj(Map(name -> valueType), None)
       case List(_, valueType)   => Obj(Map(), Some(valueType))
@@ -56,8 +58,10 @@ trait StructuralLib extends Library {
     AnyArray, Top :: Nil,
     noSimplification,
     partialTyper {
-      case Const(data) :: Nil => Const(Data.Arr(data :: Nil))
-      case valueType :: Nil   => Arr(List(valueType))
+      case Const(Data.Set(data)) :: Nil =>
+        Const(Data.Set(data.map(d => Data.Arr(d :: Nil))))
+      case Const(data)           :: Nil => Const(Data.Arr(data :: Nil))
+      case valueType             :: Nil => Arr(List(valueType))
     },
     partialUntyper {
       case Const(Data.Arr(List(elem))) => List(Const(elem))
@@ -200,6 +204,8 @@ trait StructuralLib extends Library {
     Set(Top), AnyObject :: Nil,
     noSimplification,
     partialTyperV {
+      case List(Const(Data.Obj(map))) =>
+        success(Const(Data.Set(map.values.toList)))
       case List(x) if x.objectLike =>
         x.objectType.fold[ValidationNel[SemanticError, Type]](
           failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
@@ -213,6 +219,7 @@ trait StructuralLib extends Library {
     Set(Top), AnyArray :: Nil,
     noSimplification,
     partialTyperV {
+      case List(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
       case List(x) if x.arrayLike =>
         x.arrayType.fold[ValidationNel[SemanticError, Type]](
           failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
@@ -225,7 +232,11 @@ trait StructuralLib extends Library {
     "Zooms in on the keys of a map, also extending the current dimension with the keys",
     Set(Top), AnyObject :: Nil,
     noSimplification,
-    partialTyper { case List(x) if x.objectLike => Str },
+    partialTyper {
+      case List(Const(Data.Obj(map))) =>
+        Const(Data.Set(map.keys.toList ∘ Data.Str))
+      case List(x) if x.objectLike => Str
+    },
     untyper(tpe => success(List(Obj(Map(), Some(Top))))))
 
   val FlattenArrayIndices = Expansion(

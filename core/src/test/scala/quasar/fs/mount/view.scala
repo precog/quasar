@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.fs.mount
 
 import quasar.Predef._
@@ -9,6 +25,7 @@ import quasar.fs._
 import quasar.recursionschemes._
 import quasar.std.StdLib._, set._
 
+import eu.timepit.refined.auto._
 import monocle.macros.GenLens
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
@@ -60,7 +77,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val views = Views(Map(p -> q))
 
       val f = (for {
-        h <- read.unsafe.open(p, Natural._0, None)
+        h <- read.unsafe.open(p, 0L, None)
         _ <- read.unsafe.read(h)
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
@@ -83,7 +100,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val views = Views(Map(p -> q))
 
       val f = (for {
-        h <- read.unsafe.open(p, Natural._5, Positive(10))
+        h <- read.unsafe.open(p, 5L, Some(10L))
         _ <- read.unsafe.read(h)
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
@@ -112,7 +129,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val views = Views(Map(p -> q))
 
       val f = (for {
-        h <- read.unsafe.open(p, Natural._0, None)
+        h <- read.unsafe.open(p, 0L, None)
         _ <- EitherT.right(read.unsafe.close(h))
         _ <- read.unsafe.read(h)
       } yield ()).run
@@ -127,7 +144,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val views = Views(Map(p -> q))
 
       val f = (for {
-        h <- read.unsafe.open(p, Natural._0, None)
+        h <- read.unsafe.open(p, 0L, None)
         _ <- EitherT.right(read.unsafe.close(h))
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run

@@ -1,16 +1,8 @@
-import CustomKeys._
+import quasar.project._
 
-name := "Web"
+import scala.Some
+import scala.collection.Seq
 
 mainClass in Compile := Some("quasar.api.Server")
 
-libraryDependencies ++= Seq(
-  "org.http4s"           %% "http4s-dsl"          % http4sVersion.value % "compile, test",
-  "org.http4s"           %% "http4s-argonaut"     % http4sVersion.value % "compile, test"
-    // TODO: remove once jawn-streamz is in agreement with http4s on scalaz-stream version
-    exclude("org.scalaz.stream", "scalaz-stream_2.11"),
-  "org.http4s"           %% "http4s-blaze-server" % http4sVersion.value % "compile, test",
-  "org.http4s"           %% "http4s-blaze-client" % http4sVersion.value % "test",
-  "com.github.tototoshi" %% "scala-csv"           % "1.1.2",
-  "org.scodec"           %% "scodec-scalaz"       % "1.1.0"
-)
+libraryDependencies ++= Dependencies.web

@@ -71,8 +71,9 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   "$SBT" checkHeaders
 
   # Build the pristine JAR without coverage:
-  # We cannot do this at the end is because it would require us to clean the project
-  # which would remove the coverage information that Jenkins expects to find in the workspace after the build
+  # NB: We cannot do this at the end because it would require us to clean the
+  #     project which would remove the coverage information that Jenkins expects
+  #     to find in the workspace after the build.
   "$SBT" clean oneJar
 
   # Save a copy of the "clean" oneJar, since running code coverage

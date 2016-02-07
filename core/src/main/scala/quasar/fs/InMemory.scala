@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.fp._
+import numeric.{Natural, Positive}
 import quasar.recursionschemes.{Fix, Recursive}
 import quasar.Planner.UnsupportedPlan
 
@@ -89,11 +90,11 @@ object InMemory {
             fileL(f).st flatMap {
               case Some(xs) =>
                 val rIdx =
-                  st.toInt + pos
+                  st.get.toInt + pos
 
                 val rCount =
                   rChunkSize                          min
-                  lim.cata(_.toInt - pos, rChunkSize) min
+                  lim.cata(_.get.toInt - pos, rChunkSize) min
                   (xs.length - rIdx)
 
                 if (rCount <= 0)
@@ -213,10 +214,18 @@ object InMemory {
         import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
+        // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding values of limit
+        // that are close to Int.MaxValue
+        // TODO: Change back to Int.MaxValue after upgrade to Scala 2.11.8
+        val safeIntMax = 10000000
         Recursive[Fix].para[LogicalPlan, Option[Vector[Data]]](lp) {
           case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem))
-          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) => src.map(_.drop(skip.toInt))
-          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) => src.map(_.take(limit.toInt))
+          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
+            val skipInt = if (skip > safeIntMax) safeIntMax else skip.toInt
+            src.map(_.drop(skipInt))
+          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
+            val limitInt = if (limit > safeIntMax) safeIntMax else limit.toInt
+            src.map(_.take(limitInt))
           case InvokeF(Squash,(_,src) :: Nil) => src
           case ConstantF(data) => Some(Vector(data))
           case other => queryResponsesL.get(mem).get(Fix(other.map(_._1)))

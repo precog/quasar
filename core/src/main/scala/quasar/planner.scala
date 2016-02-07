@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ trait Planner[PhysicalPlan] {
     EitherT[WriterResult, E, A]((Vector(PhaseResult.Detail(name, plan.toString)), \/-(a)))
   }
 
-  def queryPlanner(showNative: PhysicalPlan => (String, Cord))(implicit RA: RenderTree[PhysicalPlan]):
-      QueryRequest => EitherT[(Vector[quasar.PhaseResult], ?), CompilationError, PhysicalPlan] = { req =>
+  def compileToLP(implicit RA: RenderTree[PhysicalPlan]):
+      QueryRequest => EitherT[(Vector[quasar.PhaseResult], ?), CompilationError, Fix[LogicalPlan]] = { req =>
     // TODO: Factor these things out as individual WriterT functions that can be composed.
     for {
       select     <- withTree("SQL AST")(\/-(req.query))
@@ -45,7 +45,14 @@ trait Planner[PhysicalPlan] {
       logical    <- withTree("Logical Plan")(Compiler.compile(tree).leftMap(CSemanticError(_)))
       optimized  <- withTree("Optimized")(\/-(Optimizer.optimize(logical)))
       checked    <- withTree("Typechecked")(LogicalPlan.ensureCorrectTypes(optimized).disjunction.leftMap(ManyErrors(_)))
-      physical   <- plan(checked).leftMap(CPlannerError(_))
+    } yield checked
+  }
+
+  def backendPlanner(showNative: PhysicalPlan => (String, Cord))(implicit RA: RenderTree[PhysicalPlan]):
+      Fix[LogicalPlan] => EitherT[(Vector[quasar.PhaseResult], ?), CompilationError, PhysicalPlan] = { lp =>
+    // TODO: Factor these things out as individual WriterT functions that can be composed.
+    for {
+      physical   <- plan(lp).leftMap(CPlannerError(_))
       _          <- withTree("Physical Plan")(\/-(physical))
       _          <- withString(physical)(showNative)
     } yield physical

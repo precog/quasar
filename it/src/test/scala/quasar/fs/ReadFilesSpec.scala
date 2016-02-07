@@ -1,19 +1,44 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.fs
+
+import org.specs2.ScalaCheck
 
 import quasar.Predef._
 import quasar.Data
 import quasar.fp._
+import quasar.fp.numeric._
 
 import java.lang.RuntimeException
 import scala.annotation.tailrec
 
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.{Positive => RPositive,_}
+import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.W
+import eu.timepit.refined.api.Refined
 import monocle.std.{disjunction => D}
+import org.scalacheck.Arbitrary
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream._
+import shapeless.Nat
 
-class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
+class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
   import ReadFilesSpec._, FileSystemError._, PathError2._
   import ReadFile._
 
@@ -47,7 +72,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
 
       "open returns PathNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
-        read.unsafe.open(dne, Natural._0, None).run map { r =>
+        read.unsafe.open(dne, 0L, None).run map { r =>
           r.toEither must beLeft(pathError(PathNotFound(dne)))
         }
       }
@@ -61,7 +86,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
 
       "read closed file handle returns UnknownReadHandle" >>* {
         val r = for {
-          h  <- read.unsafe.open(smallFile.file, Natural._0, None)
+          h  <- read.unsafe.open(smallFile.file, 0L, None)
           _  <- read.unsafe.close(h).liftM[FileSystemErrT]
           xs <- read.unsafe.read(h)
         } yield xs
@@ -77,13 +102,12 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
       }
 
       "scan with offset zero and no limit reads entire file" >> {
-        val r = runLogT(run, read.scan(smallFile.file, Natural._0, None))
+        val r = runLogT(run, read.scan(smallFile.file, 0L, None))
         r.runEither must beRight(smallFile.data.toIndexedSeq)
       }
 
       "scan with offset = |file| and no limit yields no data" >> {
-        val off = Natural._5 * Natural._5 * Natural._4
-        val r = runLogT(run, read.scan(smallFile.file, off, None))
+        val r = runLogT(run, read.scan(smallFile.file, smallFileSize, None))
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
@@ -92,44 +116,42 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         *       for erroring instead of returning nothing.
         */
       "scan with offset k, where k > |file|, and no limit succeeds with empty result" >> {
-        val off = (Natural._5 * Natural._5 * Natural._4) + Natural._1
-        val r = runLogT(run, read.scan(smallFile.file, off, None))
+        val r = runLogT(run, read.scan(smallFile.file, smallFileSize |+| 1L, None))
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
-      "scan with offset k > 0 and no limit skips first k data" >> {
-        val k = Natural._9 * Natural._2
-        val r = runLogT(run, read.scan(smallFile.file, k, None))
+      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Int Refined RPositive =>
+        val r = runLogT(run, read.scan(smallFile.file, widenPositive(k), None))
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
-                  .dropWhile(_._2 < k.value.toInt).map(_._1)
+                  .dropWhile(_._2 < k.get).map(_._1)
 
         r.runEither must beRight(d.toIndexedSeq)
-      }
+      }.set(minTestsOk = 1)
 
-      "scan with offset zero and limit j stops after j data" >> {
-        val j = Positive._5
-        val r = runLogT(run, read.scan(smallFile.file, Natural._0, Some(j)))
+      "scan with offset zero and limit j stops after j data" ! prop { j: Int Refined RPositive =>
+        val r = runLogT(run, read.scan(smallFile.file, 0L, Some(j)))
 
-        r.runEither must beRight(smallFile.data.take(j.value.toInt).toIndexedSeq)
-      }
+        r.runEither must beRight(smallFile.data.take(j.get).toIndexedSeq)
+      }.set(minTestsOk = 1)
 
-      "scan with offset k and limit j takes j data, starting from k" >> {
-        val j = Positive._5 * Positive._5 * Positive._5
-        val r = runLogT(run, read.scan(largeFile.file, Natural.fromPositive(j), Some(j)))
+      "scan with offset k and limit j takes j data, starting from k" ! prop { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
+        val r = runLogT(run, read.scan(largeFile.file, k, Some(j)))
         val d = largeFile.data.zip(EStream.iterate(0)(_ + 1))
-                  .dropWhile(_._2 < j.value.toInt).map(_._1)
-                  .take(j.value.toInt)
+                  .dropWhile(_._2 < k.get).map(_._1)
+                  .take(j.get)
 
         r.runEither must beRight(d.toIndexedSeq)
-      }
+      }(implicitly, // In order to keep test execution relatively fast
+        Arbitrary(chooseRefinedNum[Refined, Int, RPositive](1, 200)), implicitly,
+        Arbitrary(chooseRefinedNum[Refined, Int, NonNegative](1, 200)), implicitly).set(minTestsOk = 5)
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
-        val j = Positive._5 * Positive._5 * Positive._5
-        val r = runLogT(run, read.scan(smallFile.file, Natural._0, Some(j)))
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[W.`100`.T] =>
+          val limit = Some(Positive(j.get).get) // Not ideal, but simplest solution for now
+          val r = runLogT(run, read.scan(smallFile.file, 0L, limit))
 
-        (j.value.toInt must beGreaterThan(smallFile.data.length)) and
-        (r.runEither must beRight(smallFile.data.toIndexedSeq))
-      }
+          (j.get must beGreaterThan(smallFile.data.length)) and
+            (r.runEither must beRight(smallFile.data.toIndexedSeq))
+      }.set(minTestsOk = 10)
 
       "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(veryLongFile.file).foldMap(_ => 1))
@@ -160,9 +182,11 @@ object ReadFilesSpec {
     readsPrefix </> file("empty"),
     EStream())
 
+  val smallFileSize: Natural = 100L
+
   val smallFile = TestDatum(
     readsPrefix </> file("small"),
-    manyDocs(100))
+    manyDocs(smallFileSize.toInt))
 
   val largeFile = {
     val sizeInMb = 10.0

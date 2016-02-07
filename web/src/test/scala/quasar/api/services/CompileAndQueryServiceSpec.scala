@@ -1,9 +1,26 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package api
 package services
 
 import Predef._
 import quasar.fp._
+import numeric._
 
 import argonaut._, Argonaut._
 
@@ -22,7 +39,6 @@ import quasar.fs.InMemory._
 import quasar.recursionschemes._
 
 import Fixture._
-import NumericArbitrary._
 import quasar.std.IdentityLib
 
 import scalaz.concurrent.Task
@@ -31,6 +47,10 @@ import scalaz.stream.Process
 import scalaz._, Scalaz._
 
 import query._
+
+import eu.timepit.refined.numeric.{Positive => RPositive, NonNegative}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.scalacheck.numeric._
 
 class CompileAndQueryServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
 
@@ -177,7 +197,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
       }
-      "GET" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive) =>
+      "GET" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Int Refined NonNegative, limit: Int Refined RPositive) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
         get(queryService)(
           path = filesystem.parent,
@@ -186,7 +206,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
           status = Status.Ok,
           response = (a: String) => a must_==
             jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
-              .drop(offset.value.toInt).take(limit.value.toInt).mkString("")
+              .drop(offset.get).take(limit.get).mkString("")
         )
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: AbsFileOf[AlphaCharacters]) =>

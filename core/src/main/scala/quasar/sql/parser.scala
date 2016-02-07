@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ class SQLParser extends StandardTokenParsers {
 
   ignore(lexical.delimiters += (
     "*", "+", "-", "%", "^", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
-    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ";", "...",
+    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ":", ";", "...",
     "{", "}", "{*}", "{:*}", "{*:}", "{_}", "{:_}", "{_:}",
     "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]"))
 
@@ -127,11 +127,13 @@ class SQLParser extends StandardTokenParsers {
   def projections: Parser[List[Proj[Expr]]] =
     repsep(projection, op(",")).map(_.toList)
 
-  def projection: Parser[Proj[Expr]] = expr ~ opt(keyword("as") ~> ident) ^^ {
-    case expr ~ ident => Proj(expr, ident)
-  }
+  def projection: Parser[Proj[Expr]] =
+    or_expr ~ opt(keyword("as") ~> ident) ^^ {
+      case expr ~ ident => Proj(expr, ident)
+    }
 
-  def variable: Parser[Expr] = elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => Vari(token.chars))
+  def variable: Parser[Expr] =
+    elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => Vari(token.chars))
 
   def command: Parser[Expr] = expr <~ opt(op(";"))
 
@@ -188,6 +190,13 @@ class SQLParser extends StandardTokenParsers {
 
   def array_literal: Parser[Expr] =
     (op("[") ~> repsep(expr, op(",")) <~ op("]")) ^^ (ArrayLiteral(_))
+
+  def pair: Parser[(Expr, Expr)] = expr ~ op(":") ~ expr ^^ {
+    case l ~ _ ~ r => (l,r)
+  }
+
+  def map_literal: Parser[Expr] =
+    (op("{") ~> repsep(pair, op(",")) <~ op("}")) ^^ (MapLiteral(_))
 
   def cmp_expr: Parser[Expr] =
     default_expr ~ rep(relational_suffix | negatable_suffix | is_suffix) ^^ {
@@ -278,6 +287,7 @@ class SQLParser extends StandardTokenParsers {
     } |
     ident ^^ (Ident(_)) |
     array_literal |
+    map_literal |
     unshift_expr |
     op("(") ~> repsep(expr, op(",")) <~ op(")") ^^ {
       case Nil      => SetLiteral(Nil)

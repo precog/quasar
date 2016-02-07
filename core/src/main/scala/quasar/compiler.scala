@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -403,6 +403,10 @@ trait Compiler[F[_]] {
 
       case ArrayLiteralF(exprs) =>
         exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
+
+      case MapLiteralF(exprs) =>
+        exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>
+          Fix(MakeObjectN(elems: _*)))
 
       case SpliceF(expr) =>
         expr.fold(

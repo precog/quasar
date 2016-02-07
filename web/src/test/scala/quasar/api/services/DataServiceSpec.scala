@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 package api
 package services
@@ -20,12 +36,12 @@ import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server._
+import quasar.fp.numeric._
 import quasar.fs.{Path => _, _}
 import pathy.Path
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.scalacheck.ScalazArbitrary._
-import quasar.fs.NumericArbitrary._
 import quasar.DataArbitrary._
 
 import scalaz._, Scalaz._
@@ -35,6 +51,11 @@ import scalaz.stream.Process
 import quasar.api.MessageFormatGen._
 
 import org.scalacheck.{Arbitrary, Gen}
+
+import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
+import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
+import shapeless.tag.@@
 
 import Fixture._
 
@@ -137,37 +158,39 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" ! prop {
-            (filesystem: SingleFileMemState, offset: Natural, limit: Positive, format: MessageFormat) =>
-            // Not sure why this precondition is necessary...
-            (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
+            (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: Int @@ RPositive, format: MessageFormat) =>
               val request = Request(
-                uri = Uri(path = filesystem.path).+?("offset", offset.value.toString).+?("limit", limit.value.toString),
+                uri = Uri(path = filesystem.path).+?("offset", offset.shows).+?("limit", limit.shows),
                 headers = Headers(Accept(format.mediaType)))
               val response = service(filesystem.state)(request).run
-              isExpectedResponse(filesystem.contents.drop(offset.value.toInt).take(limit.value.toInt), response, format)
-            }
-          }
+              isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
+          }(implicitly,implicitly,implicitly,implicitly,implicitly,
+            // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding values of limit
+            // that are close to Int.MaxValue
+            // TODO: Change back to Int.MaxValue after upgrade to Scala 2.11.8
+            Arbitrary(chooseRefinedNum[@@, Int, RPositive](1, 10000000)),
+            implicitly,implicitly,implicitly)
           "return 400 if provided with" >> {
             "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
               (limit < 1) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.toString))
+                  uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"invalid limit: $limit (must be >= 1)"
               }
             }
-            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Negative, limit: Positive) =>
+            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
               val request = Request(
-                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+                uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limit.shows))
               val response = service(InMemState.empty)(request).run
               response.status must_== Status.BadRequest
-              response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
+              response.as[String].run must_== s"invalid offset: $offset (must be >= 0)"
             }
             "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
               val limits = limit1 :: limit2 :: otherLimits
               val request = Request(
-                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
+                uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limits.map(_.shows)))
               val response = service(InMemState.empty)(request).run
               response.status must_== Status.BadRequest
               response.as[String].run must_== s"Two limits were provided, only supply one limit"
@@ -175,7 +198,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
               (offsets.length >= 2) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
+                  uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.shows)).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"Two offsets were provided, only supply one offset"
@@ -190,13 +213,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               response.status must_== Status.BadRequest
               response.as[String].run must_== s"""invalid limit: Query decoding Long failed (For input string: "a")"""
             }
-            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Negative) =>
+            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
               (limit < 1) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("limit", limit.toString).+?("offset", offset.value.toString))
+                  uri = Uri(path = printPath(path)).+?("limit", limit.shows).+?("offset", offset.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
-                response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)"
+                response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)"
               }
             }.pendingUntilFixed("SD-1083")
           }

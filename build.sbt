@@ -1,8 +1,16 @@
-import sbt._
-import Keys._
-import CustomKeys._
-import de.heikoseeberger.sbtheader.license.Apache2_0
+import github.GithubPlugin._
+import quasar.project.build._
+
+import java.lang.Integer
+import scala.{Predef, Some, sys, Unit}, Predef.{assert, augmentString}
+import scala.collection.Seq
+import scala.collection.immutable.Map
+
 import de.heikoseeberger.sbtheader.HeaderPlugin
+import de.heikoseeberger.sbtheader.license.Apache2_0
+import sbt._, Aggregation.KeyValue, Keys._
+import sbt.std.Transform.DummyTaskMap
+import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
 // Exclusive execution settings
@@ -11,23 +19,24 @@ lazy val ExclusiveTests = config("exclusive") extend Test
 val ExclusiveTest = Tags.Tag("exclusive-test")
 
 def exclusiveTasks(tasks: Scoped*) =
-  tasks flatMap (inTask(_)(tags := Seq(ExclusiveTest -> 1)))
+  tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
 
-lazy val checkHeaders = taskKey[Unit]("Fail the build if createHeaders is not up-to-date")
+lazy val checkHeaders =
+  taskKey[Unit]("Fail the build if createHeaders is not up-to-date")
 
-lazy val standardSettings = Defaults.defaultSettings ++ Seq(
+lazy val commonSettings = Seq(
   headers := Map(
-    "scala" -> Apache2_0("2014 - 2015", "SlamData Inc."),
-    "java"  -> Apache2_0("2014 - 2015", "SlamData Inc.")),
+    ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
+    ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
   scalaVersion := "2.11.7",
   logBuffered in Compile := false,
   logBuffered in Test := false,
   outputStrategy := Some(StdoutOutput),
   initialize := {
+    val version = sys.props("java.specification.version")
     assert(
-      Integer.parseInt(sys.props("java.specification.version").split("\\.")(1))
-        >= 8,
-      "Java 8 or above required")
+      Integer.parseInt(version.split("\\.")(1)) >= 8,
+      "Java 8 or above required, found " + version)
   },
   autoCompilerPlugins := true,
   autoAPIMappings := true,
@@ -38,85 +47,32 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
     "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
     "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.5.4"),
-  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full),
+  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.7.1"),
+  addCompilerPlugin("org.scalamacros" % "paradise"       % "2.1.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
 
-  scalacOptions ++= Seq(
-    "-deprecation",
-    "-encoding", "UTF-8",
-    "-feature",
-    "-language:existentials",
-    "-language:higherKinds",
-    "-language:implicitConversions",
-    "-unchecked",
-    "-Xfatal-warnings",
-    "-Xfuture",
-    // "-Xlint",
-    "-Yno-adapted-args",
-    "-Yno-imports",
-    "-Ywarn-dead-code", // N.B. doesn't work well with the ??? hole
-    // "-Ywarn-numeric-widen",
-    "-Ywarn-unused-import",
-    "-Ywarn-value-discard"),
+  // NB: this option needs scalac 2.11 ∴ sbt 0.14 for meta-project
+  scalacOptions ++= BuildInfo.scalacOptions ++ Seq("-Ywarn-unused-import"),
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
-    "-Ywarn-unused-import"
-  ),
+    "-Ywarn-unused-import"),
   wartremoverErrors in (Compile, compile) ++= warts,
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(
-    Tests.Argument("exclude", "exclusive")
-  ),
+  testOptions in Test := Seq(Tests.Argument("exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(
-    Tests.Argument("include", "exclusive")
-  ),
+  testOptions in ExclusiveTests := Seq(Tests.Argument("include", "exclusive")),
   // Tasks tagged with `ExclusiveTest` should be run exclusively.
-  concurrentRestrictions in Global := Seq(
-    Tags.exclusive(ExclusiveTest)
-  ),
+  concurrentRestrictions in Global := Seq(Tags.exclusive(ExclusiveTest)),
 
   console <<= console in Test, // console alias test:console
 
-  scalazVersion  := "7.1.4",
-  slcVersion     := "0.4",
-  monocleVersion := "1.1.1",
-  pathyVersion   := "0.0.3",
-  http4sVersion  := "0.10.1",
-
-  libraryDependencies ++= Seq(
-    "org.scalaz"        %% "scalaz-core"               % scalazVersion.value  % "compile, test",
-    "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion.value  % "compile, test",
-    "org.scalaz.stream" %% "scalaz-stream"             % "0.7.3a"             % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion.value % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion.value % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion.value % "compile, test",
-    "com.github.scopt"  %% "scopt"                     % "3.3.0"              % "compile, test",
-    "org.threeten"      %  "threetenbp"                % "1.2"                % "compile, test",
-    "org.mongodb"       %  "mongo-java-driver"         % "3.2.1"              % "compile, test",
-    "org.mongodb"       %  "mongodb-driver-async"      % "3.2.1"              % "compile, test",
-    "io.argonaut"       %% "argonaut"                  % "6.1"                % "compile, test",
-    "org.jboss.aesh"    %  "aesh"                      % "0.55"               % "compile, test",
-    "org.typelevel"     %% "shapeless-scalaz"          % slcVersion.value     % "compile, test",
-    "com.slamdata"      %% "pathy-core"                % pathyVersion.value   % "compile",
-    "com.github.mpilquist" %% "simulacrum"             % "0.4.0"              % "compile, test",
-    "org.http4s"        %% "http4s-core"               % http4sVersion.value  % "compile",
-    "org.http4s"        %% "http4s-blaze-client"       % http4sVersion.value  % "test",
-    "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion.value   % "test",
-    "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion.value  % "test",
-    "org.specs2"        %% "specs2-core"               % "2.4"                % "test",
-    "org.scalacheck"    %% "scalacheck"                % "1.11.6"             % "test" force(),
-    "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"              % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion.value     % "test"),
-
-  licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")),
+  licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
 
   checkHeaders := {
-    if ((createHeaders in Compile).value.nonEmpty) error("headers not all present")
-  }
-)
+    if ((createHeaders in Compile).value.nonEmpty)
+      sys.error("headers not all present")
+  })
 
 // Using a Seq of desired warts instead of Warts.allBut due to an incremental compilation issue.
 // https://github.com/puffnfresh/wartremover/issues/202
@@ -148,65 +104,46 @@ val warts = Seq(
   Wart.TryPartial,
   Wart.Var)
 
-import github.GithubPlugin._
+lazy val oneJarSettings =
+  com.github.retronym.SbtOneJar.oneJarSettings ++
+    commonSettings ++
+    githubSettings ++
+    releaseSettings ++
+    Seq(
+      GithubKeys.assets := { Seq(oneJar.value) },
+      GithubKeys.repoSlug := "quasar-analytics/quasar",
 
-lazy val oneJarSettings = {
-  import sbtrelease.ReleasePlugin._
-  import sbtrelease.ReleaseStateTransformations._
-  import sbtrelease._
+      ReleaseKeys.versionFile := file("version.sbt"),
+      ReleaseKeys.useGlobalVersion := true,
+      ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+        checkSnapshotDependencies,
+        inquireVersions,
+        runTest,
+        setReleaseVersion,
+        commitReleaseVersion,
+        pushChanges))
 
-  import sbt._
-  import sbt.Aggregation.KeyValue
-  import sbt.std.Transform.DummyTaskMap
-  import Utilities._
+lazy val root = project.in(file("."))
+  .settings(commonSettings: _*)
+  .aggregate(core, web, it)
+  .enablePlugins(AutomateHeaderPlugin)
 
-  def releaseHack[T](key: TaskKey[T]): ReleaseStep = { st: State =>
-    val extracted = st.extract
-    val ref = extracted.get(thisProjectRef)
-    extracted.runTask(key in ref, st)
-    st
-  }
+lazy val core = project
+  .settings(oneJarSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
-  com.github.retronym.SbtOneJar.oneJarSettings ++ standardSettings ++ githubSettings ++ releaseSettings ++ Seq(
-  GithubKeys.assets := { Seq(oneJar.value) },
-  GithubKeys.repoSlug := "quasar-analytics/quasar",
+lazy val web = project
+  .dependsOn(core % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin)
 
-  GithubKeys.versionRepo := "slamdata/slamdata.github.io",
-  GithubKeys.versionFile := "release.json",
-
-  ReleaseKeys.versionFile := file("version.sbt"),
-  ReleaseKeys.useGlobalVersion := true,
-  ReleaseKeys.commitMessage <<= (version in ThisBuild) map { v =>
-    if (v.matches(""".*SNAPSHOT.*""")) ("Setting version to %s" format v) + " [ci skip]"
-    else "Releasing %s" format v
-  },
-  ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-    checkSnapshotDependencies,              // : ReleaseStep
-    inquireVersions,                        // : ReleaseStep
-    runTest,                                // : ReleaseStep
-    setReleaseVersion,                      // : ReleaseStep
-    commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
-    pushChanges,                            // : ReleaseStep
-    // releaseHack(GithubKeys.githubUpdateVer),// : Don't update git version, have the installers task do that
-    // tagRelease,                             // : Don't tag release because Travis will do it
-    // releaseHack(GithubKeys.githubRelease),  // : Don't release because Travis will do it
-    setNextVersion,                         // : ReleaseStep
-    commitNextVersion,                      // : ReleaseStep
-    pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
-  ))
-}
-
-lazy val root = Project("root", file(".")) aggregate(core, web, it) enablePlugins(AutomateHeaderPlugin)
-
-lazy val core = (project in file("core")) settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
-
-lazy val web = (project in file("web")) dependsOn (core % "test->test;compile->compile") settings (oneJarSettings: _*) enablePlugins(AutomateHeaderPlugin)
-
-lazy val it = (project in file("it"))
-                .configs(ExclusiveTests)
-                .dependsOn(core % "test->test;compile->compile", web % "test->test;compile->compile")
-                .settings(standardSettings: _*)
-                // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-                .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-                .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-                .enablePlugins(AutomateHeaderPlugin)
+lazy val it = project
+  .configs(ExclusiveTests)
+  .dependsOn(
+    core % "test->test;compile->compile",
+    web  % "test->test;compile->compile")
+  .settings(commonSettings: _*)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .enablePlugins(AutomateHeaderPlugin)

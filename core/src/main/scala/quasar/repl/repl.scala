@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2015 SlamData Inc.
+ * Copyright 2014–2016 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,7 @@ import quasar.physical.mongodb.util
 import quasar.sql._
 import quasar.stacktrace.StackUtil
 
-import org.jboss.aesh.console.Console
-import org.jboss.aesh.console.AeshConsoleCallback
-import org.jboss.aesh.console.ConsoleOperation
-import org.jboss.aesh.console.Prompt
+import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
 import org.jboss.aesh.edit.actions.Action
@@ -45,8 +42,7 @@ object Repl {
     val ExitPattern         = "(?i)(?:exit)|(?:quit)".r
     val HelpPattern         = "(?i)(?:help)|(?:commands)|\\?".r
     val CdPattern           = "(?i)cd(?: +(.+))?".r
-    val SelectPattern       = "(?i)(select +.+)".r
-    val NamedSelectPattern  = "(?i)([^ :]+) *:= *(select +.+)".r
+    val NamedExprPattern    = "(?i)([^ :]+) *:= *(.+)".r
     val LsPattern           = "(?i)ls(?: +(.+))?".r
     val SavePattern         = "(?i)save +([\\S]+) (.+)".r
     val AppendPattern       = "(?i)append +([\\S]+) (.+)".r
@@ -58,7 +54,6 @@ object Repl {
     val ListVarPattern      = "(?i)env".r
 
     final case object Exit extends Command
-    final case object Unknown extends Command
     final case object Help extends Command
     final case object ListVars extends Command
     final case class Cd(dir: Path) extends Command
@@ -106,28 +101,27 @@ object Repl {
     import Command._
 
     input match {
-      case ExitPattern()                   => Exit
-      case CdPattern(path)                 =>
+      case ExitPattern()                 => Exit
+      case CdPattern(path)               =>
         Cd(
           if (path == null || path.trim.length == 0) Path.Root
           else Path(path.trim))
-      case SelectPattern(query)            => Select(None, query)
-      case NamedSelectPattern(name, query) => Select(Some(name), query)
-      case LsPattern(path)                 =>
+      case NamedExprPattern(name, query) => Select(Some(name), query)
+      case LsPattern(path)               =>
         Ls(
           if (path == null || path.trim.length == 0) None
           else Some(Path(path.trim)))
-      case SavePattern(path, value)        => Save(Path(path), value)
-      case AppendPattern(path, value)      => Append(Path(path), value)
-      case DeletePattern(path)             => Delete(Path(path))
-      case DebugPattern(code)              =>
+      case SavePattern(path, value)      => Save(Path(path), value)
+      case AppendPattern(path, value)    => Append(Path(path), value)
+      case DeletePattern(path)           => Delete(Path(path))
+      case DebugPattern(code)            =>
         Debug(DebugLevel.fromInt(code.toInt).getOrElse(DebugLevel.Normal))
-      case SummaryCountPattern(rows)       => SummaryCount(rows.toInt)
-      case HelpPattern()                   => Help
-      case SetVarPattern(name, value)      => SetVar(name, value)
-      case UnsetVarPattern(name)           => UnsetVar(name)
-      case ListVarPattern()                => ListVars
-      case _                               => Unknown
+      case SummaryCountPattern(rows)     => SummaryCount(rows.toInt)
+      case HelpPattern()                 => Help
+      case SetVarPattern(name, value)    => SetVar(name, value)
+      case UnsetVarPattern(name)         => UnsetVar(name)
+      case ListVarPattern()              => ListVars
+      case _                             => Select(None, input)
     }
   }
 

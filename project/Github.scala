@@ -1,10 +1,11 @@
 package github
 
-import sbt._
-import Keys._
+import java.lang.{String, System}
+import scala.{Boolean, Option, Predef}
+import scala.collection.{JavaConversions, Seq}, JavaConversions._
 
 import org.kohsuke.github._
-import scala.collection.JavaConversions._
+import sbt._, Keys._
 
 object GithubPlugin extends Plugin {
   object GithubKeys {
@@ -33,7 +34,7 @@ object GithubPlugin extends Plugin {
   }
 
   lazy val githubSettings: Seq[Setting[_]] = Seq(
-    repoSlug    := Travis.RepoSlug.fold(organization.value + "/" + normalizedName.value)(identity),
+    repoSlug    := Travis.RepoSlug.fold(organization.value + "/" + normalizedName.value)(Predef.identity),
     tag         := "v" + version.value +
                    (if (prerelease.value) Travis.BuildNumber.fold("")("-" + _) else "") +
                    "-" + normalizedName.value,
@@ -48,7 +49,7 @@ object GithubPlugin extends Plugin {
     githubAuth := {
       val log = streams.value.log
 
-      val token = Option(System.getenv("GITHUB_TOKEN")).getOrElse(sys.error("You must define GITHUB_TOKEN"))
+      val token = Option(System.getenv("GITHUB_TOKEN")).getOrElse(scala.sys.error("You must define GITHUB_TOKEN"))
 
       val github = GitHub.connectUsingOAuth(token)
 
@@ -81,7 +82,7 @@ object GithubPlugin extends Plugin {
           case "" => repo
           case v  => repo.commitish(v)
         }
-      }.create).getOrElse(sys.error("Could not create the Github release"))
+      }.create).getOrElse(scala.sys.error("Could not create the Github release"))
 
       log.info("Created Github release: " + release)
 

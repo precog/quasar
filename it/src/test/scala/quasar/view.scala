@@ -192,7 +192,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view referencing a view" in {
-      val query = """select max("1") from `/view/a/smallCityCounts1`"""
+      val query = """select max(`1`) from `/view/a/smallCityCounts1`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(
@@ -200,7 +200,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view referencing a view (absolute)" in {
-      val query = """select max("1") from `/view/b/smallCityCounts2`"""
+      val query = """select max(`1`) from `/view/b/smallCityCounts2`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(

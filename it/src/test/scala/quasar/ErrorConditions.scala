@@ -39,11 +39,11 @@ class ErrorConditions extends BackendTest with NoTimeConversions with Disjunctio
           results.run.run.run should beLeftDisjunction(Backend.PEvalError(EvalPathError(NonexistentPathError(missingCollectionPath,None))))
         }
         "in the case of a query that maps to a mapReduce in MongoDB" in {
-          def query(collectionPath: String) = s"""SELECT name FROM "$collectionPath" WHERE LENGTH(name) > 10"""
+          def query(collectionPath: String) = s"""SELECT name FROM `$collectionPath` WHERE LENGTH(name) > 10"""
           testQueryOnMissingCollection(query)
         }
         "in the case of a query that maps to an aggregation in MongoDB" in {
-          def query(collectionPath: String) = s"""SELECT name FROM "$collectionPath" WHERE name.field1 > 10"""
+          def query(collectionPath: String) = s"""SELECT name FROM `$collectionPath` WHERE name.field1 > 10"""
           testQueryOnMissingCollection(query)
         }
       }

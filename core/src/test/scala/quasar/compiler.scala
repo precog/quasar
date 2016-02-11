@@ -62,7 +62,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile simple constant with multiple named projections" in {
       testLogicalPlanCompile(
-        "select 1.0 as a, 'abc' as b",
+        "select 1.0 as a, \"abc\" as b",
         makeObj(
           "a" -> Constant(Data.Dec(1.0)),
           "b" -> Constant(Data.Str("abc"))))
@@ -207,7 +207,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile date field extraction" in {
       testLogicalPlanCompile(
-        "select date_part('day', baz) from foo",
+        "select date_part(\"day\", baz) from foo",
         Squash(
           makeObj(
             "0" ->
@@ -232,26 +232,26 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile conditional (match) without else" in {
       testLogicalPlanCompile(
-                   "select case when pop = 0 then 'nobody' end from zips",
-        compileExp("select case when pop = 0 then 'nobody' else null end from zips"))
+                   "select case when pop = 0 then \"nobody\" end from zips",
+        compileExp("select case when pop = 0 then \"nobody\" else null end from zips"))
     }
 
     "compile conditional (switch) without else" in {
       testLogicalPlanCompile(
-                   "select case pop when 0 then 'nobody' end from zips",
-        compileExp("select case pop when 0 then 'nobody' else null end from zips"))
+                   "select case pop when 0 then \"nobody\" end from zips",
+        compileExp("select case pop when 0 then \"nobody\" else null end from zips"))
     }
 
     "have ~~ as alias for LIKE" in {
       testLogicalPlanCompile(
-                   "select pop from zips where city ~~ '%BOU%'",
-        compileExp("select pop from zips where city LIKE '%BOU%'"))
+                   "select pop from zips where city ~~ \"%BOU%\"",
+        compileExp("select pop from zips where city LIKE \"%BOU%\""))
     }
 
     "have !~~ as alias for NOT LIKE" in {
       testLogicalPlanCompile(
-                   "select pop from zips where city !~~ '%BOU%'",
-        compileExp("select pop from zips where city NOT LIKE '%BOU%'"))
+                   "select pop from zips where city !~~ \"%BOU%\"",
+        compileExp("select pop from zips where city NOT LIKE \"%BOU%\""))
     }
 
     "compile array length" in {
@@ -267,7 +267,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile concat" in {
       testLogicalPlanCompile(
-        "select concat(foo, concat(' ', bar)) from baz",
+        "select concat(foo, concat(\" \", bar)) from baz",
         Let('__tmp0, read("baz"),
           Squash(
             makeObj(
@@ -308,7 +308,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile like" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar like 'a%'",
+        "select bar from foo where bar like \"a%\"",
         Let('__tmp0, read("foo"),
           Squash(
             makeObj(
@@ -325,7 +325,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile like with escape char" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar like 'a=%' escape '='",
+        "select bar from foo where bar like \"a=%\" escape \"=\"",
         Let('__tmp0, read("foo"),
           Squash(
             makeObj(
@@ -342,7 +342,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile not like" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar not like 'a%'",
+        "select bar from foo where bar not like \"a%\"",
         Let('__tmp0, read("foo"),
           Squash(makeObj("bar" -> ObjectProject[FLP](Filter[FLP](
             Free('__tmp0),
@@ -356,7 +356,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile ~" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar ~ 'a.$'",
+        "select bar from foo where bar ~ \"a.$\"",
         Let('__tmp0, read("foo"),
           Squash(
             makeObj(
@@ -580,37 +580,37 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "expand top-level map flatten" in {
       testLogicalPlanCompile(
                    "SELECT foo{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo) AS \"0\" FROM foo"))
+        compileExp("SELECT Flatten_Map(foo) AS `0` FROM foo"))
     }
 
     "expand nested map flatten" in {
       testLogicalPlanCompile(
                    "SELECT foo.bar{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo.bar) AS \"bar\" FROM foo"))
+        compileExp("SELECT Flatten_Map(foo.bar) AS `bar` FROM foo"))
     }
 
     "expand field map flatten" in {
       testLogicalPlanCompile(
                    "SELECT bar{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo.bar) AS \"bar\" FROM foo"))
+        compileExp("SELECT Flatten_Map(foo.bar) AS `bar` FROM foo"))
     }
 
     "expand top-level array flatten" in {
       testLogicalPlanCompile(
                    "SELECT foo[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo) AS \"0\" FROM foo"))
+        compileExp("SELECT Flatten_Array(foo) AS `0` FROM foo"))
     }
 
     "expand nested array flatten" in {
       testLogicalPlanCompile(
         "SELECT foo.bar[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo.bar) AS \"bar\" FROM foo"))
+        compileExp("SELECT Flatten_Array(foo.bar) AS `bar` FROM foo"))
     }
 
     "expand field array flatten" in {
       testLogicalPlanCompile(
                    "SELECT bar[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo.bar) AS \"bar\" FROM foo"))
+        compileExp("SELECT Flatten_Array(foo.bar) AS `bar` FROM foo"))
     }
 
     "compile top-level map flatten" in {
@@ -700,7 +700,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
-        "select name from person where gender = 'male' order by name, height",
+        "select name from person where gender = \"male\" order by name, height",
         Let('__tmp0, read("person"),
           Let('__tmp1,
             Filter[FLP](

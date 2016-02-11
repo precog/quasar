@@ -3,7 +3,7 @@
 
   "data": "days.data",
 
-  "query": "select \"day\", ts, to_timestamp(epoch) as converted from days where ts = to_timestamp(1408255200000) or to_timestamp(epoch) = timestamp '2014-08-18T07:00:00Z'",
+  "query": "select `day`, ts, to_timestamp(epoch) as converted from days where ts = to_timestamp(1408255200000) or to_timestamp(epoch) = timestamp \"2014-08-18T07:00:00Z\"",
 
   "predicate": "equalsExactly",
   "expected": [

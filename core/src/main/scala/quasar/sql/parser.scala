@@ -71,10 +71,10 @@ class SQLParser extends StandardTokenParsers {
     }
 
     def stringLitParser: Parser[Token] =
-      '\'' ~> rep(chrExcept('\'') | ('\'' ~ '\'') ^^ κ('\'')) <~ '\'' ^^ ( chars => StringLit(chars.mkString) )
+      '"' ~> rep(chrExcept('\\', '"') | ('\\' ~> '\\') | ('\\' ~> '"')) <~ '"' ^^ (chars => StringLit(chars.mkString))
 
     def quotedIdentParser: Parser[Token] =
-      '"' ~> rep(chrExcept('"') | ('"' ~ '"') ^^ κ('"')) <~ '"' ^^ (chars => Identifier(chars.mkString))
+      '`' ~> rep(chrExcept('\\', '`') | ('\\' ~> '\\') | ('\\' ~> '`')) <~ '`' ^^ (chars => Identifier(chars.mkString))
 
     override def whitespace: Parser[Any] = rep(
       whitespaceChar |
@@ -338,10 +338,10 @@ class SQLParser extends StandardTokenParsers {
     }
 
   def join_type: Parser[JoinType] =
-    (keyword("left") | keyword("right") | keyword("full")) ~ opt(keyword("outer")) ^^ {
-      case "left" ~ o  => LeftJoin
-      case "right" ~ o => RightJoin
-      case "full" ~ o => FullJoin
+    (keyword("left") | keyword("right") | keyword("full")) <~ opt(keyword("outer")) ^^ {
+      case "left"  => LeftJoin
+      case "right" => RightJoin
+      case "full"  => FullJoin
     } | keyword("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =

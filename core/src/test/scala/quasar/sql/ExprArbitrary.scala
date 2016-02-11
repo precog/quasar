@@ -21,10 +21,11 @@ import quasar.std.StdLib._
 
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Duration, Instant}
+import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz._, Scalaz._
 
 trait ExprArbitrary {
-  implicit val exprArbitrary: Arbitrary[Expr] =
-    Arbitrary(selectGen(4))
+  implicit val exprArbitrary: Arbitrary[Expr] = Arbitrary(selectGen(4))
 
   private def selectGen(depth: Int): Gen[Expr] = for {
     isDistinct <- Gen.oneOf(SelectDistinct, SelectAll)
@@ -38,15 +39,14 @@ trait ExprArbitrary {
   private def projGen: Gen[Proj[Expr]] =
     Gen.oneOf(
       Gen.const(Proj(Splice(None), None)),
-      exprGen(1).flatMap(x =>
+      exprGen(1) >>= (x =>
         Gen.oneOf(
           Gen.const(Proj(x, None)),
-          for {
-            n <- Gen.oneOf(
-              Gen.alphaChar.map(_.toString),
-              Gen.const("public enemy #1"),
-              Gen.const("I quote: \"foo\""))
-          } yield Proj(x, Some(n)))))
+          Gen.oneOf(
+            Gen.alphaChar.map(_.toString),
+            Gen.const("public enemy #1"),
+            Gen.const("I quote: \"foo\"")) ∘
+            (n => Proj(x, Some(n))))))
 
   private def relationGen(depth: Int): Gen[SqlRelation[Expr]] = {
     val simple = for {
@@ -58,32 +58,22 @@ trait ExprArbitrary {
     if (depth <= 0) simple
     else Gen.frequency(
       5 -> simple,
-      1 -> (for {
-        s <- selectGen(2)
-        c <- Gen.alphaChar
-      } yield ExprRelationAST(s, c.toString)),
-      1 -> (for {
-        l <- relationGen(depth-1)
-        r <- relationGen(depth-1)
-      } yield CrossRelation(l, r)),
-      1 -> (for {
-        l <- relationGen(depth-1)
-        r <- relationGen(depth-1)
-        t <- Gen.oneOf(LeftJoin, RightJoin, InnerJoin, FullJoin)
-        x <- exprGen(1)
-      } yield JoinRelation(l, r, t, x))
-    )
+      1 -> (selectGen(2) ⊛ Gen.alphaChar)((s, c) =>
+        ExprRelationAST(s, c.toString)),
+      1 -> (relationGen(depth-1) ⊛ relationGen(depth-1))(CrossRelation(_, _)),
+      1 -> (relationGen(depth-1) ⊛ relationGen(depth-1) ⊛
+        Gen.oneOf(LeftJoin, RightJoin, InnerJoin, FullJoin) ⊛
+        exprGen(1))(
+        JoinRelation(_, _, _, _)))
   }
 
-  private def groupByGen(depth: Int): Gen[GroupBy[Expr]] = for {
-    keys   <- smallNonEmptyListOf(exprGen(depth))
-    having <- Gen.option(exprGen(depth))
-  } yield GroupBy(keys, having)
+  private def groupByGen(depth: Int): Gen[GroupBy[Expr]] =
+    (smallNonEmptyListOf(exprGen(depth)) ⊛ Gen.option(exprGen(depth)))(
+      GroupBy(_, _))
 
-  private def orderByGen(depth: Int): Gen[OrderBy[Expr]] = smallNonEmptyListOf(for {
-    expr <- exprGen(depth)
-    ot   <- Gen.oneOf(ASC, DESC)
-  } yield (ot, expr)).map(OrderBy(_))
+  private def orderByGen(depth: Int): Gen[OrderBy[Expr]] =
+    smallNonEmptyListOf((Gen.oneOf(ASC, DESC) ⊛ exprGen(depth))((_, _))) ∘
+      (OrderBy(_))
 
   private def exprGen(depth: Int): Gen[Expr] = Gen.lzy {
     if (depth <= 0) simpleExprGen
@@ -99,12 +89,11 @@ trait ExprArbitrary {
         n  <- Gen.chooseNum(2, 5)  // Note: at least two, to be valid set syntax
         cs <- Gen.listOfN(n, constExprGen)
       } yield SetLiteral(cs)),
-      10 -> (for {
-        n <- Gen.oneOf(
-          Gen.alphaChar.map(_.toString),
-          Gen.const("name, address"),
-          Gen.const("q: \"a\""))
-      } yield Ident(n)),
+      10 -> Gen.oneOf(
+        Gen.alphaChar.map(_.toString),
+        Gen.const("name, address"),
+        Gen.const("q: `a`")) ∘
+        (Ident(_)),
       1 -> Unop(StringLiteral(Instant.now.toString), ToTimestamp),
       1 -> Gen.choose(0L, 10000000000L).map(millis => Unop(StringLiteral(Duration.ofMillis(millis).toString), ToInterval)),
       1 -> Unop(StringLiteral("2014-11-17"), ToDate),
@@ -116,36 +105,25 @@ trait ExprArbitrary {
     Gen.frequency(
       5 -> simpleExprGen,
       1 -> Gen.lzy(selectGen(depth-1)),
-      1 -> (for {
-        expr <- exprGen(depth)
-      } yield Splice(Some(expr))),
-      3 -> (for {
-        l  <- exprGen(depth)
-        r  <- exprGen(depth)
-        op <- Gen.oneOf(
+      1 -> exprGen(depth) ∘ (expr => Splice(Some(expr))),
+      3 -> (exprGen(depth) ⊛ exprGen(depth) ⊛
+        Gen.oneOf(
           Or, And, Eq, Neq, Ge, Gt, Le, Lt,
           Plus, Minus, Mult, Div, Mod, Pow,
-          In)
-      } yield Binop(l, r, op)),
-      1 -> (for {
-        l <- exprGen(depth)
-        n <- exprGen(depth)
-      } yield Binop(l, n, FieldDeref)),
-      1 -> (for {
-        l <- exprGen(depth)
-        i <- exprGen(depth)
-      } yield Binop(l, i, IndexDeref)),
-      2 -> (for {
-        x  <- exprGen(depth)
-        op <- Gen.oneOf(
+          In))(
+        Binop(_, _, _)),
+      1 -> (exprGen(depth) ⊛ exprGen(depth))(Binop(_, _, FieldDeref)),
+      1 -> (exprGen(depth) ⊛ exprGen(depth))(Binop(_, _, IndexDeref)),
+      2 -> (exprGen(depth) ⊛
+        Gen.oneOf(
           Not, Exists, Positive, Negative, Distinct,
           ToDate, ToInterval,
           FlattenMapKeys,   FlattenArrayIndices,
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
           ShiftMapValues,   ShiftArrayValues,
-          IsNull)
-      } yield Unop(x, op)),
+          IsNull))(
+        Unop(_, _)),
       2 -> (for {
         fn  <- Gen.oneOf(agg.Sum, agg.Count, agg.Avg, string.Length, structural.MakeArray)
         arg <- exprGen(depth)
@@ -176,10 +154,10 @@ trait ExprArbitrary {
       Gen.chooseNum(0, Long.MaxValue).flatMap(IntLiteral(_)),
       Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),
       Gen.alphaStr.flatMap(StringLiteral(_)),
-      // Note: only `'` gets special encoding; the rest should be accepted as is.
+      // Note: only `"` gets special encoding; the rest should be accepted as is.
       for {
         s  <- Gen.choose(1, 5)
-        cs <- Gen.listOfN(s, Gen.oneOf("'", "\\", " ", "\n", "\t", "a", "b", "c"))
+        cs <- Gen.listOfN(s, Gen.oneOf("\"", "\\", " ", "\n", "\t", "a", "b", "c"))
       } yield StringLiteral(cs.mkString),
       Gen.const(NullLiteral()),
       Gen.const(BoolLiteral(true)),

@@ -19,8 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.sql.ExprArbitrary
 
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.{arbitrary => arb}
+import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
 
 trait VariablesArbitrary {
   implicit val arbitraryVarName: Arbitrary[VarName] =

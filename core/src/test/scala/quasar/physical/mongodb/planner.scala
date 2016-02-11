@@ -119,7 +119,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     // TODO: currently, Data.Obj doesn’t maintain order. The result here will
     //       change once it does.
     "select complex constant" in {
-      plan("select {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5}{*} limit 3 offset 1") must
+      plan("select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1") must
         beWorkflow($pure(Bson.Arr(List(
           Bson.Doc(ListMap("0" -> Bson.Int64(1))),
           Bson.Doc(ListMap("0" -> Bson.Int64(2)))))))
@@ -129,7 +129,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     // TODO: currently, Data.Obj doesn’t maintain order. The result here will
     //       change once it does.
     "select complex constant 2" in {
-      plan("select {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5}{*:} limit 3 offset 1") must
+      plan("select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*:} limit 3 offset 1") must
       beWorkflow($pure(Bson.Arr(List(
         Bson.Doc(ListMap("0" -> Bson.Text("a"))),
         Bson.Doc(ListMap("0" -> Bson.Text("b")))))))
@@ -223,7 +223,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan concat strings with ||" in {
-      plan("select city || ', ' || state from zips") must
+      plan("select city || \", \" || state from zips") must
        beWorkflow(chain(
          $read(Collection("db", "zips")),
          $project(
@@ -254,7 +254,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan concat strings with ||, constant on the right" in {
-      plan("select a || b || '...' from foo") must
+      plan("select a || b || \"...\" from foo") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $project(
@@ -314,7 +314,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan date field extraction" in {
-      plan("select date_part('day', baz) from foo") must
+      plan("select date_part(\"day\", baz) from foo") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $project(
@@ -329,7 +329,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan complex date field extraction" in {
-      plan("select date_part('quarter', baz) from foo") must
+      plan("select date_part(\"quarter\", baz) from foo") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $project(
@@ -346,8 +346,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
            IgnoreId)))
     }
 
-    "plan date field extraction: 'dow'" in {
-      plan("select date_part('dow', baz) from foo") must
+    "plan date field extraction: \"dow\"" in {
+      plan("select date_part(\"dow\", baz) from foo") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $project(
@@ -362,8 +362,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
            IgnoreId)))
     }
 
-    "plan date field extraction: 'isodow'" in {
-      plan("select date_part('isodow', baz) from foo") must
+    "plan date field extraction: \"isodow\"" in {
+      plan("select date_part(\"isodow\", baz) from foo") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $project(
@@ -666,7 +666,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with like" in {
-      plan("select * from foo where bar like 'A.%'") must
+      plan("select * from foo where bar like \"A.%\"") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $match(Selector.And(
@@ -678,7 +678,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with LIKE and OR" in {
-      plan("select * from foo where bar like 'A%' or bar like 'Z%'") must
+      plan("select * from foo where bar like \"A%\" or bar like \"Z%\"") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $match(
@@ -696,7 +696,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with field in constant array" in {
-      plan("select * from zips where state in ('AZ', 'CO')") must
+      plan("select * from zips where state in (\"AZ\", \"CO\")") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
@@ -718,6 +718,22 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             ident("undefined")).toJs))))
     }
 
+    "filter field in single-element set" in {
+      plan("select * from zips where state in (\"NV\")") must
+        beWorkflow(chain(
+          $read(Collection("db", "zips")),
+          $match(Selector.Doc(BsonField.Name("state") ->
+            Selector.Eq(Bson.Text("NV"))))))
+    }
+
+    "filter field “in” a bare value" in {
+      plan("select * from zips where state in \"PA\"") must
+        beWorkflow(chain(
+          $read(Collection("db", "zips")),
+          $match(Selector.Doc(BsonField.Name("state") ->
+            Selector.Eq(Bson.Text("PA"))))))
+    }
+
     "plan filter with field containing other field" in {
       import jscore._
       plan("select * from zips where pop in loc") must
@@ -734,7 +750,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with ~" in {
-      plan("select * from zips where city ~ '^B[AEIOU]+LD.*'") must beWorkflow(chain(
+      plan("select * from zips where city ~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -744,7 +760,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with ~*" in {
-      plan("select * from zips where city ~* '^B[AEIOU]+LD.*'") must beWorkflow(chain(
+      plan("select * from zips where city ~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -754,7 +770,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with !~" in {
-      plan("select * from zips where city !~ '^B[AEIOU]+LD.*'") must beWorkflow(chain(
+      plan("select * from zips where city !~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -764,7 +780,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with !~*" in {
-      plan("select * from zips where city !~* '^B[AEIOU]+LD.*'") must beWorkflow(chain(
+      plan("select * from zips where city !~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -774,7 +790,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with alternative ~" in {
-      plan("select * from a where 'foo' ~ pattern or target ~ pattern") must beWorkflow(chain(
+      plan("select * from a where \"foo\" ~ pattern or target ~ pattern") must beWorkflow(chain(
         $read(Collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "__tmp10" -> Call(
@@ -851,7 +867,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan complex filter" in {
-      plan("select * from foo where bar > 10 and (baz = 'quux' or foop = 'zebra')") must
+      plan("select * from foo where bar > 10 and (baz = \"quux\" or foop = \"zebra\")") must
        beWorkflow(chain(
          $read(Collection("db", "foo")),
          $match(
@@ -931,7 +947,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               BsonField.Name("pop") -> Selector.NotExpr(Selector.Eq(Bson.Int64(0))))))))
     }
 
-    "plan filter with 'is not null'" in {
+    "plan filter with \"is not null\"" in {
       plan("select * from zips where city is not null") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
@@ -941,7 +957,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with both index and field projections" in {
-      plan("select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = '56d1caf5d082d1a6840090986e277d36d03f1859'") must
+      plan("select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = \"56d1caf5d082d1a6840090986e277d36d03f1859\"") must
         beWorkflow(chain(
           $read(Collection("db", "slamengine_commits")),
           $match(Selector.Where(
@@ -1137,7 +1153,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "select partially-applied substing" in {
-      plan ("select substring('abcdefghijklmnop', 5, pop / 10000) from zips") must
+      plan ("select substring(\"abcdefghijklmnop\", 5, pop / 10000) from zips") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $project(
@@ -1163,7 +1179,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "concat with empty string" in {
-      plan("select '' || city || '' from zips") must
+      plan("select \"\" || city || \"\" from zips") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $project(
@@ -1252,7 +1268,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan select with wildcard and two constants" in {
-      plan("select *, '1', '2' from zips") must
+      plan("select *, \"1\", \"2\" from zips") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $simpleMap(
@@ -1524,7 +1540,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan useful group by" in {
-      plan("select city || ', ' || state, sum(pop) from zips group by city, state") must
+      plan("select city || \", \" || state, sum(pop) from zips group by city, state") must
       beWorkflow(chain(
         $read(Collection("db", "zips")),
         $group(
@@ -1601,7 +1617,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan group by month" in {
-      plan("select avg(score) as a, DATE_PART('month', \"date\") as m from caloriesBurnedData group by DATE_PART('month', \"date\")") must
+      plan("select avg(score) as a, DATE_PART(\"month\", `date`) as m from caloriesBurnedData group by DATE_PART(\"month\", `date`)") must
         beWorkflow(chain(
           $read(Collection("db", "caloriesBurnedData")),
           $group(
@@ -1671,7 +1687,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan sum grouped by single field with filter" in {
-      plan("select sum(pop) as sm from zips where state='CO' group by city") must
+      plan("select sum(pop) as sm from zips where state=\"CO\" group by city") must
         beWorkflow {
           chain(
             $read(Collection("db", "zips")),
@@ -1962,7 +1978,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan expressions with ~"in {
-      plan("select foo ~ 'bar.*', 'abc' ~ 'a|b', 'baz' ~ regex, target ~ regex from a") must beWorkflow(chain(
+      plan("select foo ~ \"bar.*\", \"abc\" ~ \"a|b\", \"baz\" ~ regex, target ~ regex from a") must beWorkflow(chain(
         $read(Collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
@@ -2043,7 +2059,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan array concat with filter" in {
-      plan("select loc || [ pop ] from zips where city = 'BOULDER'") must
+      plan("select loc || [ pop ] from zips where city = \"BOULDER\"") must
         beWorkflow {
           chain(
             $read(Collection("db", "zips")),
@@ -2220,7 +2236,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "unify flattened with double-flattened" in {
-      plan("select * from user_comments where (comments[*].id LIKE '%Dr%' OR comments[*].replyTo[*] LIKE '%Dr%')") must
+      plan("select * from user_comments where (comments[*].id LIKE \"%Dr%\" OR comments[*].replyTo[*] LIKE \"%Dr%\")") must
       beWorkflow(chain(
         $read(Collection("db", "user_comments")),
         $project(
@@ -2332,7 +2348,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan implicit group by with filter" in {
-      plan("select avg(pop), min(city) from zips where state = 'CO'") must
+      plan("select avg(pop), min(city) from zips where state = \"CO\"") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Doc(
@@ -2667,7 +2683,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan expression with timestamp, date, time, and interval" in {
       import org.threeten.bp.{Instant, LocalDateTime, ZoneOffset}
 
-      plan("select timestamp '2014-11-17T22:00:00Z' + interval 'PT43M40S', date '2015-01-19', time '14:21'") must
+      plan("select timestamp \"2014-11-17T22:00:00Z\" + interval \"PT43M40S\", date \"2015-01-19\", time \"14:21\"") must
         beWorkflow(
           $pure(Bson.Doc(ListMap(
             "0" -> Bson.Date(Instant.parse("2014-11-17T22:43:40Z")),
@@ -2678,7 +2694,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan filter with timestamp and interval" in {
       import org.threeten.bp.Instant
 
-      plan("select * from days where \"date\" < timestamp '2014-11-17T22:00:00Z' and \"date\" - interval 'PT12H' > timestamp '2014-11-17T00:00:00Z'") must
+      plan("select * from days where `date` < timestamp \"2014-11-17T22:00:00Z\" and `date` - interval \"PT12H\" > timestamp \"2014-11-17T00:00:00Z\"") must
         beWorkflow(chain(
           $read(Collection("db", "days")),
           $project(
@@ -2736,8 +2752,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
-        "where ((ts > date '2015-01-22' and ts <= date '2015-01-27') and ts != date '2015-01-25') " +
-        "or ts = date '2015-01-29'") must
+        "where ((ts > date \"2015-01-22\" and ts <= date \"2015-01-27\") and ts != date \"2015-01-25\") " +
+        "or ts = date \"2015-01-29\"") must
         beWorkflow(chain(
           $read(Collection("db", "logs")),
           $match(Selector.Or(
@@ -2808,7 +2824,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan js and filter with id" in {
       Bson.ObjectId("0123456789abcdef01234567").fold[Result](
         failure("Couldn’t create ObjectId."))(
-        oid => plan("select length(city), foo = oid '0123456789abcdef01234567' from days where _id = oid '0123456789abcdef01234567'") must
+        oid => plan("select length(city), foo = oid \"0123456789abcdef01234567\" from days where _id = oid \"0123456789abcdef01234567\"") must
           beWorkflow(chain(
             $read(Collection("db", "days")),
             $match(Selector.Doc(

@@ -51,10 +51,10 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
 
     val views = Map(
       Path("/view/simpleZips") -> config.ViewConfig(
-        parse("select _id as zip, city, state from  \"/" + ZipsPath.simplePathname + "\""),
+        parse("select _id as zip, city, state from  `/" + ZipsPath.simplePathname + "`"),
         Variables(Map())),
       Path("/view/a/smallCities") -> config.ViewConfig(
-        parse("select city as City, state as St, sum(pop) as Size from \"/" + ZipsPath.simplePathname + "\" " +
+        parse("select city as City, state as St, sum(pop) as Size from `/" + ZipsPath.simplePathname + "` " +
               "group by city, state having sum(pop) <= :cutoff order by city, state"),
         Variables(Map(VarName("cutoff") -> VarValue("1000")))),
       // NB: this view refers to the previous view using a relative path
@@ -63,7 +63,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
         Variables(Map())),
       // ...and this one uses an absolute path, and lives in a different dir:
       Path("/view/b/smallCityCounts2") -> config.ViewConfig(
-        parse("select St, count(*) from \"/view/a/smallCities\" group by St order by count(*) desc, St"),
+        parse("select St, count(*) from `/view/a/smallCities` group by St order by count(*) desc, St"),
         Variables(Map())),
       Path("/view/badRef") -> config.ViewConfig(
         parse("""select foo from "/mnt/test/nonexistent""""),
@@ -72,7 +72,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
         parse("""select foo from "/mnt/test/nonexistent" where bar < :baz"""),
         Variables(Map())),
       Path("/mnt/overlayed") -> config.ViewConfig(
-        parse("select * from \"/" + ZipsPath.simplePathname + "\""),
+        parse("select * from `/" + ZipsPath.simplePathname + "`"),
         Variables(Map())))
 
     val root = ViewBackend(nested, views)

@@ -1,7 +1,7 @@
 {
     "name": "select aliased field sorted by original name",
     "data": "zips.data",
-    "query": "SELECT state AS \"Result Alias\", COUNT(*) FROM zips GROUP BY state ORDER BY state",
+    "query": "SELECT state AS `Result Alias`, COUNT(*) FROM zips GROUP BY state ORDER BY state",
     "predicate": "containsAtLeast",
     "expected": [{ "1":  195, "Result Alias": "AK" },
                  { "1":  567, "Result Alias": "AL" },

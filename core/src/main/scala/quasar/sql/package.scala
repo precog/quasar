@@ -90,15 +90,15 @@ package object sql {
 
   private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9$]*".r
 
-  private def _q(s: String): String = "'" + s.replace("'", "''") + "'"
+  private def _q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-  private def _qq(s: String): String = s match {
+  private def _qq(delimiter: String, s: String): String = s match {
     case SimpleNamePattern() => s
-    case _                   => "\"" + s.replace("\"", "\"\"") + "\""
+    case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
   }
 
   private def pprintRelationƒ(r: SqlRelation[(Expr, String)]): String = (r match {
-    case TableRelationAST(name, alias) => _qq(name) :: alias.toList
+    case TableRelationAST(name, alias) => _qq("`", name) :: alias.toList
     case ExprRelationAST(expr, aliasName) =>
       List(expr._2, aliasName)
     case JoinRelation(left, right, tpe, clause) =>
@@ -129,7 +129,7 @@ package object sql {
         List(
           Some("select"),
           isDistinct match { case `SelectDistinct` => Some("distinct"); case _ => None },
-          Some(projections.map(p => p.alias.foldLeft(p.expr._2)(_ + " as " + _qq(_))).mkString(", ")),
+          Some(projections.map(p => p.alias.foldLeft(p.expr._2)(_ + " as " + _qq("`", _))).mkString(", ")),
           relations.map(r => "from " + pprintRelationƒ(r)),
           filter.map("where " + _._2),
           groupBy.map(g =>
@@ -147,7 +147,7 @@ package object sql {
       case SpliceF(expr) => expr.fold("*")("(" + _._2 + ").*")
       case BinopF(lhs, rhs, op) => op match {
         case FieldDeref => rhs._1 match {
-          case StringLiteral(str) => "(" + lhs._2 + ")." + str
+          case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("\"", str)
           case _ => "(" + lhs._2 + "){" + rhs._2 + "}"
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
@@ -168,7 +168,7 @@ package object sql {
           // NB: dis-ambiguates the query in case this is the leading projection
           if (op == Distinct) "(" + s + ")" else s
       }
-      case IdentF(name) => _qq(name)
+      case IdentF(name) => _qq("`", name)
       case InvokeFunctionF(name, args) =>
         import quasar.std.StdLib.string
         (name, args) match {

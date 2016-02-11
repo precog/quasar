@@ -718,22 +718,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             ident("undefined")).toJs))))
     }
 
-    "filter field in single-element set" in {
-      plan("select * from zips where state in (\"NV\")") must
-        beWorkflow(chain(
-          $read(Collection("db", "zips")),
-          $match(Selector.Doc(BsonField.Name("state") ->
-            Selector.Eq(Bson.Text("NV"))))))
-    }
-
-    "filter field “in” a bare value" in {
-      plan("select * from zips where state in \"PA\"") must
-        beWorkflow(chain(
-          $read(Collection("db", "zips")),
-          $match(Selector.Doc(BsonField.Name("state") ->
-            Selector.Eq(Bson.Text("PA"))))))
-    }
-
     "plan filter with field containing other field" in {
       import jscore._
       plan("select * from zips where pop in loc") must

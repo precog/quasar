@@ -290,6 +290,25 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       )
     }
 
+    "should parse a single-quoted character" in {
+      val q = "'c'"
+      parser.parse(q) must beRightDisjunction(StringLiteral("c"))
+    }
+
+    "should parse escaped characters" in {
+      val q = "select '\\'', '\\\\', '\u1234'"
+      parser.parse(q) must beRightDisjunction(
+        Select(SelectAll, List(
+          Proj(StringLiteral("'"), None),
+          Proj(StringLiteral("\\"), None),
+          Proj(StringLiteral("ሴ"), None)),
+          None, None, None, None))
+    }
+    "should parse escaped characters in a string" in {
+      val q = """"\'\\\u1234""""
+      parser.parse(q) must beRightDisjunction(StringLiteral("'\\ሴ"))
+    }
+
     "should not parse multiple expressions seperated incorrectly" in {
       val q = "select foo from bar limit 6 select biz from baz"
       parser.parse(q) must beLeftDisjunction

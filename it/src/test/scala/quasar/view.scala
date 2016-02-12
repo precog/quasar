@@ -51,10 +51,10 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
 
     val views = Map(
       Path("/view/simpleZips") -> config.ViewConfig(
-        parse("select _id as zip, city, state from  \"/" + ZipsPath.simplePathname + "\""),
+        parse("select _id as zip, city, state from  `/" + ZipsPath.simplePathname + "`"),
         Variables(Map())),
       Path("/view/a/smallCities") -> config.ViewConfig(
-        parse("select city as City, state as St, sum(pop) as Size from \"/" + ZipsPath.simplePathname + "\" " +
+        parse("select city as City, state as St, sum(pop) as Size from `/" + ZipsPath.simplePathname + "` " +
               "group by city, state having sum(pop) <= :cutoff order by city, state"),
         Variables(Map(VarName("cutoff") -> VarValue("1000")))),
       // NB: this view refers to the previous view using a relative path
@@ -63,16 +63,16 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
         Variables(Map())),
       // ...and this one uses an absolute path, and lives in a different dir:
       Path("/view/b/smallCityCounts2") -> config.ViewConfig(
-        parse("select St, count(*) from \"/view/a/smallCities\" group by St order by count(*) desc, St"),
+        parse("select St, count(*) from `/view/a/smallCities` group by St order by count(*) desc, St"),
         Variables(Map())),
       Path("/view/badRef") -> config.ViewConfig(
-        parse("""select foo from "/mnt/test/nonexistent""""),
+        parse("""select foo from `/mnt/test/nonexistent`"""),
         Variables(Map())),
       Path("/view/unboundVar") -> config.ViewConfig(
-        parse("""select foo from "/mnt/test/nonexistent" where bar < :baz"""),
+        parse("""select foo from `/mnt/test/nonexistent` where bar < :baz"""),
         Variables(Map())),
       Path("/mnt/overlayed") -> config.ViewConfig(
-        parse("select * from \"/" + ZipsPath.simplePathname + "\""),
+        parse("select * from `/" + ZipsPath.simplePathname + "`"),
         Variables(Map())))
 
     val root = ViewBackend(nested, views)
@@ -93,7 +93,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
       root.ls(Path.Root).run.run.fold[Result](
         e => failure(e.toString),
         { ns =>
-          // NB: the view's parent is hidden by the mount:
+          // NB: the view’s parent is hidden by the mount:
           ns must contain(FilesystemNode(Path("mnt/"), Some("mongodb")))
           ns must not(contain(FilesystemNode(Path("mnt/"), None)))
         })
@@ -171,7 +171,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "trivial query referring to a view" in {
-      val query = """select * from "/view/a/smallCities""""
+      val query = """select * from `/view/a/smallCities`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.take(1).runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(
@@ -183,7 +183,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
 
     "less-trivial query referring to a view" in {
       // Refers to the shape created in the view query
-      val query = """select City || ', ' || St from "/view/a/smallCities" where Size < 500"""
+      val query = """select City || ", " || St from `/view/a/smallCities` where Size < 500"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.take(1).runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(
@@ -192,7 +192,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view referencing a view" in {
-      val query = """select max("1") from "/view/a/smallCityCounts1""""
+      val query = """select max(`1`) from `/view/a/smallCityCounts1`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(
@@ -200,7 +200,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view referencing a view (absolute)" in {
-      val query = """select max("1") from "/view/b/smallCityCounts2""""
+      val query = """select max(`1`) from `/view/b/smallCityCounts2`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beRightDisjunction(Vector(Data.Obj(ListMap(
@@ -210,7 +210,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     "query with un-renamed projection" in {
       // NB: the composed query ends up with references to city, state, and zip in
       // both the source table and the subquery result.
-      val query = """select zip from "/view/simpleZips" where city = 'BOULDER' and state = 'CO' order by zip"""
+      val query = """select zip from `/view/simpleZips` where city = "BOULDER" and state = "CO" order by zip"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beRightDisjunction(Vector(
@@ -221,7 +221,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view with bad reference" in {
-      val query = """select * from "/view/badRef""""
+      val query = """select * from `/view/badRef`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))).fold[Result](
         e => failure(e.toString),
         _.runLog.run.run must beLeftDisjunction(
@@ -229,7 +229,7 @@ class ViewSpecs extends BackendTest with DisjunctionMatchers with SkippedOnUserE
     }
 
     "query with view with unbound variable" in {
-      val query = """select * from "/view/unboundVar""""
+      val query = """select * from `/view/unboundVar`"""
       root.evalResults(QueryRequest(parse(query), Variables(Map.empty))) must beLeftDisjunction(
           CSemanticError(UnboundVariable(VarName("baz"))))
     }

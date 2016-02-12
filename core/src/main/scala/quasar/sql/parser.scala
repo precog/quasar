@@ -24,6 +24,7 @@ import quasar.std._
 
 import scala.Any
 import scala.util.matching.Regex
+import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
@@ -37,14 +38,15 @@ final case class ParsingPathError(error: PathError) extends ParsingError {
 }
 
 object ParsingError {
-  implicit val parsingErrorShow: Show[ParsingError] =
-    Show.showFromToString
+  implicit val parsingErrorShow: Show[ParsingError] = Show.showFromToString
 }
 
 final case class Query(value: String)
 
 class SQLParser extends StandardTokenParsers {
-  class SqlLexical extends StdLexical {
+  class SqlLexical extends StdLexical with RegexParsers {
+    override type Elem = super.Elem
+
     case class FloatLit(chars: String) extends Token {
       override def toString = chars
     }
@@ -52,7 +54,7 @@ class SQLParser extends StandardTokenParsers {
       override def toString = ":" + chars
     }
 
-    override def token: Parser[Token] = variParser | numLitParser | stringLitParser | quotedIdentParser | super.token
+    override def token: Parser[Token] = variParser | numLitParser | charLitParser | stringLitParser | quotedIdentParser | super.token
 
     override protected def processIdent(name: String) =
       if (reserved contains name.toLowerCase) Keyword(name.toLowerCase) else Identifier(name)
@@ -70,11 +72,25 @@ class SQLParser extends StandardTokenParsers {
       case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.getOrElse("") + e.mkString(""))
     }
 
-    def stringLitParser: Parser[Token] =
-      '\'' ~> rep(chrExcept('\'') | ('\'' ~ '\'') ^^ κ('\'')) <~ '\'' ^^ ( chars => StringLit(chars.mkString) )
+    val hexDigit: Parser[String] = """[0-9a-fA-F]""".r
+
+    def char(delim: Char): Parser[Char] =
+      chrExcept('\\', delim) |
+        ('\\' ~>
+          ('u' ~> repN(4, hexDigit) ^^
+            (x => java.lang.Integer.parseInt(x.mkString, 16).toChar) |
+            chrExcept(EofCh)))
+
+    def charLitParser: Parser[Token] =
+      '\'' ~> char('\'') <~ '\'' ^^ (c => StringLit(c.toString))
+
+    def delimitedString(delim: Char): Parser[String] =
+      delim ~> rep(char(delim)) <~ delim ^^ (_.mkString)
+
+    def stringLitParser: Parser[Token] = delimitedString('"') ^^ (StringLit(_))
 
     def quotedIdentParser: Parser[Token] =
-      '"' ~> rep(chrExcept('"') | ('"' ~ '"') ^^ κ('"')) <~ '"' ^^ (chars => Identifier(chars.mkString))
+      delimitedString('`') ^^ (Identifier(_))
 
     override def whitespace: Parser[Any] = rep(
       whitespaceChar |
@@ -338,10 +354,10 @@ class SQLParser extends StandardTokenParsers {
     }
 
   def join_type: Parser[JoinType] =
-    (keyword("left") | keyword("right") | keyword("full")) ~ opt(keyword("outer")) ^^ {
-      case "left" ~ o  => LeftJoin
-      case "right" ~ o => RightJoin
-      case "full" ~ o => FullJoin
+    (keyword("left") | keyword("right") | keyword("full")) <~ opt(keyword("outer")) ^^ {
+      case "left"  => LeftJoin
+      case "right" => RightJoin
+      case "full"  => FullJoin
     } | keyword("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =

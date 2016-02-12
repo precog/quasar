@@ -66,7 +66,7 @@ object queryFixture {
   def executeService(state: InMemState): HttpService =
     execute.service[Eff].toHttpService(effRespOr(runFs(state).run))
 
-  def selectAll(from: File) = "select * from \"" + printPath(from) + "\""
+  def selectAll(from: File) = "select * from `" + printPath(from) + "`"
   def selectAllWithVar(from: File, varName: String) = selectAll(from) + " where pop < :" + varName
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =

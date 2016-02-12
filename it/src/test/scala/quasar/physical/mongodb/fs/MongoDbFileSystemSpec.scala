@@ -239,13 +239,13 @@ class MongoDbFileSystemSpec
 
         "mapReduce query should fail when file DNE" >> {
           shouldFailWithPathNotFound { path =>
-            s"""SELECT name FROM "$path" WHERE LENGTH(name) > 10"""
+            s"""SELECT name FROM `$path` WHERE LENGTH(name) > 10"""
           }
         }
 
         "aggregation query should fail when file DNE" >> {
           shouldFailWithPathNotFound { path =>
-            s"""SELECT name FROM "$path" WHERE name.field1 > 10"""
+            s"""SELECT name FROM `$path` WHERE name.field1 > 10"""
           }
         }
       }

@@ -138,6 +138,18 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       r should beSome
     }
 
+    "parse keywords as identifiers" in {
+      parser.parse("select as as as from from as from where where group by group order by order") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("as"), "as".some)),
+            TableRelationAST("from", "from".some).some,
+            Ident("where").some,
+            GroupBy(List(Ident("group")), None).some,
+            OrderBy(List((ASC, Ident("order")))).some))
+    }
+
     "parse quoted literal" in {
       parser.parse("select * from foo where bar = 'abc'").toOption should beSome
     }
@@ -179,10 +191,10 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse date, time, timestamp, and id literals" in {
       val q = """select * from foo
-                  where dt < date '2014-11-16'
-                  and tm < time '03:00:00'
-                  and ts < timestamp '2014-11-16T03:00:00Z' + interval 'PT1H'
-                  and _id != oid 'abc123'"""
+                  where dt < date('2014-11-16')
+                  and tm < time('03:00:00')
+                  and ts < timestamp('2014-11-16T03:00:00Z') + interval('PT1H')
+                  and _id != oid('abc123')"""
 
       parser.parse(q) must beRightDisjunction
     }

@@ -91,15 +91,12 @@ class SQLParser extends StandardTokenParsers {
 
   override val lexical = new SqlLexical
 
+  def name(name: String) =
+    elem("identifier", v => v.chars.toLowerCase == name) ^^ (κ(name))
+
   def floatLit: Parser[String] = elem("decimal", _.isInstanceOf[lexical.FloatLit]) ^^ (_.chars)
 
-  ignore(lexical.reserved += (
-    "all", "and", "as", "asc", "between", "by", "case", "cross", "date", "delete", "desc", "distinct",
-    "else", "end", "escape", "except", "exists", "false", "for", "from", "full", "group", "having", "in",
-    "inner", "insert", "intersect", "interval", "into", "is", "join", "left", "like", "limit", "not", "null",
-    "offset", "oid", "on", "or", "order", "outer", "right", "select", "then", "time",
-    "timestamp", "true", "union", "update", "when", "where"
-  ))
+  ignore(lexical.reserved += ("true", "false", "null"))
 
   ignore(lexical.delimiters += (
     "*", "+", "-", "%", "^", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
@@ -117,7 +114,7 @@ class SQLParser extends StandardTokenParsers {
     else failure("You are trying to parse \""+op+"\" as an operator, but it is not contained in the operators list")
 
   def select: Parser[Expr] =
-    keyword("select") ~> opt(keyword("distinct")) ~ projections ~
+    name("select") ~> opt(name("distinct")) ~ projections ~
       opt(from) ~ opt(filter) ~
       opt(group_by) ~ opt(order_by) ^^ {
         case d ~ p ~ r ~ f ~ g ~ o =>
@@ -125,7 +122,7 @@ class SQLParser extends StandardTokenParsers {
       }
 
   def delete: Parser[Expr] =
-    keyword("delete") ~> from ~ filter ^^ { case r ~ f =>
+    name("delete") ~> from ~ filter ^^ { case r ~ f =>
       Select(SelectAll, List(Proj(Splice(None), None)), r, Not(f).some, None, None)
     }
 
@@ -135,7 +132,7 @@ class SQLParser extends StandardTokenParsers {
     repsep(projection, op(",")).map(_.toList)
 
   def projection: Parser[Proj[Expr]] =
-    or_expr ~ opt(keyword("as") ~> ident) ^^ {
+    or_expr ~ opt(name("as") ~> ident) ^^ {
       case expr ~ ident => Proj(expr, ident)
     }
 
@@ -144,9 +141,9 @@ class SQLParser extends StandardTokenParsers {
 
   def command: Parser[Expr] = expr <~ opt(op(";"))
 
-  def or_expr: Parser[Expr] = and_expr * (keyword("or") ^^^ Or)
+  def or_expr: Parser[Expr] = and_expr * (name("or") ^^^ Or)
 
-  def and_expr: Parser[Expr] = cmp_expr * (keyword("and") ^^^ And)
+  def and_expr: Parser[Expr] = cmp_expr * (name("and") ^^^ And)
 
   def relationalOp: Parser[BinaryOperator] =
     op("=")  ^^^ Eq  |
@@ -163,33 +160,33 @@ class SQLParser extends StandardTokenParsers {
     }
 
   def between_suffix: Parser[Expr => Expr] =
-    keyword("between") ~ default_expr ~ keyword("and") ~ default_expr ^^ {
+    name("between") ~ default_expr ~ name("and") ~ default_expr ^^ {
       case _ ~ lower ~ _ ~ upper =>
         lhs => InvokeFunction(StdLib.relations.Between.name,
           List(lhs, lower, upper))
     }
 
   def in_suffix: Parser[Expr => Expr] =
-    keyword("in") ~ default_expr ^^ { case _ ~ a => In(_, a) }
+    name("in") ~ default_expr ^^ { case _ ~ a => In(_, a) }
 
   private def LIKE(l: Expr, r: Expr, esc: Option[Expr]) =
     InvokeFunction(StdLib.string.Like.name,
       List(l, r, esc.getOrElse(StringLiteral("\\"))))
 
   def like_suffix: Parser[Expr => Expr] =
-    keyword("like") ~ default_expr ~ opt(keyword("escape") ~> default_expr) ^^ {
+    name("like") ~ default_expr ~ opt(name("escape") ~> default_expr) ^^ {
       case _ ~ a ~ esc => LIKE(_, a, esc)
     }
 
   def is_suffix: Parser[Expr => Expr] =
-    (keyword("is") ~ opt(keyword("not")) ~ (
+    (name("is") ~ opt(name("not")) ~ (
       keyword("null")    ^^^ (IsNull(_))
       | keyword("true")  ^^^ ((x: Expr) => Eq(x, BoolLiteral(true)))
       | keyword("false") ^^^ ((x: Expr) => Eq(x, BoolLiteral(false)))
     )) ^^ { case _ ~ n ~ f => (x: Expr) => val u = f(x); n.fold(u)(κ(Not(u))) }
 
   def negatable_suffix: Parser[Expr => Expr] = {
-    opt(keyword("not")) ~ (between_suffix | in_suffix | like_suffix) ^^ {
+    opt(name("not")) ~ (between_suffix | in_suffix | like_suffix) ^^ {
       case inv ~ suffix =>
         inv.fold(suffix)(κ(lhs => Not(suffix(lhs))))
     }
@@ -274,27 +271,14 @@ class SQLParser extends StandardTokenParsers {
   }
 
   def unary_operator: Parser[UnaryOperator] =
-    op("+")              ^^^ Positive |
-    op("-")              ^^^ Negative |
-    keyword("distinct")  ^^^ Distinct |
-    keyword("date")      ^^^ ToDate |
-    keyword("time")      ^^^ ToTime |
-    keyword("timestamp") ^^^ ToTimestamp |
-    keyword("interval")  ^^^ ToInterval |
-    keyword("oid")       ^^^ ToId
+    op("+")           ^^^ Positive |
+    op("-")           ^^^ Negative |
+    name("distinct") ^^^ Distinct
 
   def wildcard: Parser[Expr] = op("*") ^^^ Splice(None)
 
   def primary_expr: Parser[Expr] =
-    variable |
-    literal |
-    wildcard |
-    ident ~ (op("(") ~> repsep(expr, op(",")) <~ op(")")) ^^ {
-      case a ~ xs => InvokeFunction(a, xs)
-    } |
-    ident ^^ (Ident(_)) |
-    array_literal |
-    map_literal |
+    case_expr |
     unshift_expr |
     op("(") ~> repsep(expr, op(",")) <~ op(")") ^^ {
       case Nil      => SetLiteral(Nil)
@@ -304,17 +288,29 @@ class SQLParser extends StandardTokenParsers {
     unary_operator ~ primary_expr ^^ {
       case op ~ expr => op(expr)
     } |
-    keyword("not")        ~> cmp_expr ^^ Not |
-    keyword("exists")     ~> cmp_expr ^^ Exists |
-    case_expr
+    name("not")        ~> cmp_expr ^^ Not |
+    name("exists")     ~> cmp_expr ^^ Exists |
+    ident ~ (op("(") ~> repsep(expr, op(",")) <~ op(")")) ^^ {
+      case a ~ xs => InvokeFunction(a, xs)
+    } |
+    variable |
+    literal |
+    wildcard |
+    array_literal |
+    map_literal |
+    ident ^^ (Ident(_))
+
+  def cases: Parser[List[Case[Expr]] ~ Option[Expr]] =
+    rep1(name("when") ~> expr ~ name("then") ~ expr ^^ { case a ~ _ ~ b => Case(a, b) }) ~
+      opt(name("else") ~> expr) <~ name("end")
 
   def case_expr: Parser[Expr] =
-    keyword("case") ~>
-      opt(expr) ~ rep1(keyword("when") ~> expr ~ keyword("then") ~ expr ^^ { case a ~ _ ~ b => Case(a, b) }) ~
-      opt(keyword("else") ~> expr) <~ keyword("end") ^^ {
-      case Some(e) ~ cases ~ default => Match(e, cases, default)
-      case None ~ cases ~ default => Switch(cases, default)
-    }
+    name("case") ~> cases ^^ {
+      case cases ~ default => Switch(cases, default)
+    } |
+      name("case") ~> expr ~ cases ^^ {
+        case e ~ (cases ~ default) => Match(e, cases, default)
+      }
 
   def literal: Parser[Expr] =
     numericLit ^^ { case i => IntLiteral(i.toLong) } |
@@ -325,7 +321,7 @@ class SQLParser extends StandardTokenParsers {
     keyword("false") ^^^ BoolLiteral(false)
 
   def from: Parser[Option[SqlRelation[Expr]]] =
-    keyword("from") ~> relations
+    name("from") ~> relations
 
   def relations: Parser[Option[SqlRelation[Expr]]] =
     rep1sep(relation, op(",")).map(_.foldLeft[Option[SqlRelation[Expr]]](None) {
@@ -334,11 +330,11 @@ class SQLParser extends StandardTokenParsers {
     })
 
   def std_join_relation: Parser[SqlRelation[Expr] => SqlRelation[Expr]] =
-    opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ expr ^^
+    opt(join_type) ~ name("join") ~ simple_relation ~ name("on") ~ expr ^^
       { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(InnerJoin), e) }
 
   def cross_join_relation: Parser[SqlRelation[Expr] => SqlRelation[Expr]] =
-    keyword("cross") ~> keyword("join") ~> simple_relation ^^ {
+    name("cross") ~> name("join") ~> simple_relation ^^ {
       case r2 => r1 => CrossRelation(r1, r2)
     }
 
@@ -348,44 +344,44 @@ class SQLParser extends StandardTokenParsers {
     }
 
   def join_type: Parser[JoinType] =
-    (keyword("left") | keyword("right") | keyword("full")) ~ opt(keyword("outer")) ^^ {
+    (name("left") | name("right") | name("full")) ~ opt(name("outer")) ^^ {
       case "left" ~ o  => LeftJoin
       case "right" ~ o => RightJoin
       case "full" ~ o => FullJoin
-    } | keyword("inner") ^^^ (InnerJoin)
+    } | name("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =
-    ident ~ opt(keyword("as")) ~ opt(ident) ^^ {
-      case ident ~ _ ~ alias => TableRelationAST[Expr](ident, alias)
+    ident ~ opt(name("as") ~> ident) ^^ {
+      case ident ~ alias => TableRelationAST[Expr](ident, alias)
     } |
     op("(") ~> (
-      (expr ~ op(")") ~ opt(keyword("as")) ~ ident ^^ {
+      (expr ~ op(")") ~ name("as") ~ ident ^^ {
         case expr ~ _ ~ _ ~ alias => ExprRelationAST(expr, alias)
       }) |
       relation <~ op(")"))
 
-  def filter: Parser[Expr] = keyword("where") ~> or_expr
+  def filter: Parser[Expr] = name("where") ~> or_expr
 
   def group_by: Parser[GroupBy[Expr]] =
-    keyword("group") ~> keyword("by") ~> rep1sep(or_expr, op(",")) ~ opt(keyword("having") ~> or_expr) ^^ {
+    name("group") ~> name("by") ~> rep1sep(or_expr, op(",")) ~ opt(name("having") ~> or_expr) ^^ {
       case k ~ h => GroupBy(k, h)
     }
 
   def order_by: Parser[OrderBy[Expr]] =
-    keyword("order") ~> keyword("by") ~> rep1sep(or_expr ~ opt(keyword("asc") | keyword("desc")) ^^ {
+    name("order") ~> name("by") ~> rep1sep(or_expr ~ opt(name("asc") | name("desc")) ^^ {
       case i ~ (Some("asc") | None) => (ASC, i)
       case i ~ Some("desc") => (DESC, i)
     }, op(",")) ^^ (OrderBy(_))
 
   def expr: Parser[Expr] =
-    (or_expr | query) * (
-      keyword("limit")                        ^^^ Limit        |
-        keyword("offset")                     ^^^ Offset       |
-        keyword("union") ~ keyword("all")     ^^^ UnionAll     |
-        keyword("union")                      ^^^ Union        |
-        keyword("intersect") ~ keyword("all") ^^^ IntersectAll |
-        keyword("intersect")                  ^^^ Intersect    |
-        keyword("except")                     ^^^ Except)
+    (query | or_expr) * (
+      name("limit")                     ^^^ Limit        |
+        name("offset")                  ^^^ Offset       |
+        name("union") ~ name("all")     ^^^ UnionAll     |
+        name("union")                   ^^^ Union        |
+        name("intersect") ~ name("all") ^^^ IntersectAll |
+        name("intersect")               ^^^ Intersect    |
+        name("except")                  ^^^ Except)
 
   private def stripQuotes(s:String) = s.substring(1, s.length-1)
 

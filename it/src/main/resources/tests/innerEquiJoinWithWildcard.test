@@ -2,7 +2,7 @@
     "name": "perform inner equi-join with wildcard",
     "backends": { "mongodb_read_only": "pending" },
     "data": "largeZips.data",
-    "query": "select * from largeZips join largeZips z2 on largeZips._id = z2._id",
+    "query": "select * from largeZips join largeZips as z2 on largeZips._id = z2._id",
     "predicate": "containsAtLeast",
     "expected": [
         {"value": {"_id": "31794", "city": "ABAC",        "loc": [ -83.498867, 31.451722], "pop": 27906, "state": "GA"}},

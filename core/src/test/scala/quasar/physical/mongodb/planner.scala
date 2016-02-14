@@ -2667,7 +2667,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan expression with timestamp, date, time, and interval" in {
       import org.threeten.bp.{Instant, LocalDateTime, ZoneOffset}
 
-      plan("select timestamp '2014-11-17T22:00:00Z' + interval 'PT43M40S', date '2015-01-19', time '14:21'") must
+      plan("select timestamp('2014-11-17T22:00:00Z') + interval('PT43M40S'), date('2015-01-19'), time('14:21')") must
         beWorkflow(
           $pure(Bson.Doc(ListMap(
             "0" -> Bson.Date(Instant.parse("2014-11-17T22:43:40Z")),
@@ -2678,7 +2678,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan filter with timestamp and interval" in {
       import org.threeten.bp.Instant
 
-      plan("select * from days where \"date\" < timestamp '2014-11-17T22:00:00Z' and \"date\" - interval 'PT12H' > timestamp '2014-11-17T00:00:00Z'") must
+      plan("select * from days where date < timestamp('2014-11-17T22:00:00Z') and date - interval('PT12H') > timestamp('2014-11-17T00:00:00Z')") must
         beWorkflow(chain(
           $read(Collection("db", "days")),
           $project(
@@ -2736,8 +2736,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
-        "where ((ts > date '2015-01-22' and ts <= date '2015-01-27') and ts != date '2015-01-25') " +
-        "or ts = date '2015-01-29'") must
+        "where ((ts > date('2015-01-22') and ts <= date('2015-01-27')) and ts != date('2015-01-25')) " +
+        "or ts = date('2015-01-29')") must
         beWorkflow(chain(
           $read(Collection("db", "logs")),
           $match(Selector.Or(
@@ -2808,7 +2808,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "plan js and filter with id" in {
       Bson.ObjectId("0123456789abcdef01234567").fold[Result](
         failure("Couldn’t create ObjectId."))(
-        oid => plan("select length(city), foo = oid '0123456789abcdef01234567' from days where _id = oid '0123456789abcdef01234567'") must
+        oid => plan("select length(city), foo = oid('0123456789abcdef01234567') from days where _id = oid('0123456789abcdef01234567')") must
           beWorkflow(chain(
             $read(Collection("db", "days")),
             $match(Selector.Doc(
@@ -3172,7 +3172,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan join with multiple conditions" in {
-      plan("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits l join slamengine_commits r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
+      plan("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
       beWorkflow(
         joinStructure(
           chain(

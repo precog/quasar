@@ -98,9 +98,9 @@ package object sql {
   }
 
   private def pprintRelationƒ(r: SqlRelation[(Expr, String)]): String = (r match {
-    case TableRelationAST(name, alias) => _qq(name) :: alias.toList
+    case TableRelationAST(name, alias) => _qq(name) :: alias.map("as " + _).toList
     case ExprRelationAST(expr, aliasName) =>
-      List(expr._2, aliasName)
+      List(expr._2, "as", aliasName)
     case JoinRelation(left, right, tpe, clause) =>
       (tpe, clause._1) match {
         case (InnerJoin, BoolLiteral(true)) =>

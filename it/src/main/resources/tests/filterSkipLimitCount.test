@@ -3,7 +3,7 @@
 
     "data": "zips.data",
 
-    "query": "select count(*) from (select * from zips where city like 'BOU%' offset 15 limit 10) x",
+    "query": "select count(*) from (select * from zips where city like 'BOU%' offset 15 limit 10) as x",
 
     "predicate": "equalsExactly",
     "expected": [{ "0": 5 }]

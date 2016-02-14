@@ -193,7 +193,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           destination = Some(printPath(destination)),
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must_== Json("error" := "keyword 'case' expected; `where'")
+          response = _ must_== Json("error" := "end of input; ErrorToken(illegal character)")
         )
       }
     }

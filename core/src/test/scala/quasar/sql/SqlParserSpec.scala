@@ -150,6 +150,16 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
             OrderBy(List((ASC, Ident("order")))).some))
     }
 
+    "parse ambiguous keyword as identifier" in {
+      parser.parse("""select "false" from zips""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("false"), None)),
+            TableRelationAST("zips", None).some,
+            None, None, None))
+    }
+
     "parse quoted literal" in {
       parser.parse("select * from foo where bar = 'abc'").toOption should beSome
     }

@@ -45,6 +45,9 @@ final case class Query(value: String)
 
 class SQLParser extends StandardTokenParsers {
   class SqlLexical extends StdLexical {
+    case class QuotedIdentifier(chars: String) extends Token {
+      override def toString = chars
+    }
     case class FloatLit(chars: String) extends Token {
       override def toString = chars
     }
@@ -55,7 +58,9 @@ class SQLParser extends StandardTokenParsers {
     override def token: Parser[Token] = variParser | numLitParser | stringLitParser | quotedIdentParser | super.token
 
     override protected def processIdent(name: String) =
-      if (reserved contains name.toLowerCase) Keyword(name.toLowerCase) else Identifier(name)
+      if (reserved contains name.toLowerCase)
+        Keyword(name.toLowerCase)
+      else Identifier(name)
 
     def identifierString: Parser[String] =
       ((letter | elem('_')) ~ rep(digit | letter | elem('_'))) ^^ {
@@ -74,25 +79,26 @@ class SQLParser extends StandardTokenParsers {
       '\'' ~> rep(chrExcept('\'') | ('\'' ~ '\'') ^^ κ('\'')) <~ '\'' ^^ ( chars => StringLit(chars.mkString) )
 
     def quotedIdentParser: Parser[Token] =
-      '"' ~> rep(chrExcept('"') | ('"' ~ '"') ^^ κ('"')) <~ '"' ^^ (chars => Identifier(chars.mkString))
+      '"' ~> rep(chrExcept('"') | ('"' ~ '"') ^^ κ('"')) <~ '"' ^^ (chars => QuotedIdentifier(chars.mkString))
 
     override def whitespace: Parser[Any] = rep(
       whitespaceChar |
       '/' ~ '*' ~ comment |
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
-      '/' ~ '*' ~ failure("unclosed comment")
-    )
+      '/' ~ '*' ~ failure("unclosed comment"))
 
     override protected def comment: Parser[Any] = (
       '*' ~ '/'  ^^ κ(' ') |
-      chrExcept(EofCh) ~ comment
-    )
+      chrExcept(EofCh) ~ comment)
   }
 
   override val lexical = new SqlLexical
 
+  override def ident: Parser[String] =
+    super.ident | elem("quotedIdent", _.isInstanceOf[lexical.QuotedIdentifier]) ^^ (_.chars)
+
   def name(name: String) =
-    elem("identifier", v => v.chars.toLowerCase == name) ^^ (κ(name))
+    elem("keyword", v => v.isInstanceOf[lexical.Identifier] && v.chars.toLowerCase == name) ^^ (κ(name))
 
   def floatLit: Parser[String] = elem("decimal", _.isInstanceOf[lexical.FloatLit]) ^^ (_.chars)
 

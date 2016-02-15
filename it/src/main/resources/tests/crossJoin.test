@@ -4,7 +4,7 @@
 
   "data": "largeZips.data",
 
-  "query": "select a.city, b.state from largeZips a, largeZips b where a._id = b._id",
+  "query": "select a.city, b.state from largeZips as a, largeZips as b where a._id = b._id",
 
   "predicate": "containsAtLeast",
   "expected": [

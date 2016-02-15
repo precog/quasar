@@ -846,14 +846,14 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       // Note: not using wildcard here because the simple case is optimized
       //       differently
       testLogicalPlanCompile(
-                   "select foo from bar b order by b.baz",
-        compileExp("select foo from bar b order by baz"))
+                   "select foo from bar as b order by b.baz",
+        compileExp("select foo from bar as b order by baz"))
     }
 
     "compile order by with root projection a table ref with alias, mismatched" in {
       testLogicalPlanCompile(
-                   "select * from bar b order by bar.baz",
-        compileExp("select * from bar b order by b.bar.baz"))
+                   "select * from bar as b order by bar.baz",
+        compileExp("select * from bar as b order by b.bar.baz"))
     }
 
     "compile order by with root projection a table ref, embedded in expr" in {
@@ -1084,7 +1084,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile simple sub-select" in {
       testLogicalPlanCompile(
-        "select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) temp",
+        "select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) as temp",
         Let('__tmp0, read("zips"),
           Let('__tmp1,
             Squash(
@@ -1099,7 +1099,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "compile sub-select with same un-qualified names" in {
       testLogicalPlanCompile(
-        "select city, pop from (select city, pop from zips) temp",
+        "select city, pop from (select city, pop from zips) as temp",
         Let('__tmp0, read("zips"),
           Let('__tmp1,
             Squash(

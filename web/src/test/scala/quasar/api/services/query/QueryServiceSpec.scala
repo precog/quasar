@@ -69,7 +69,7 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             query = Some(Query("select date where")),
             state = filesystem.state,
             status = Status.BadRequest,
-            response = (_: Json) must_== Json("error" := "keyword 'case' expected; `where'")
+            response = (_: Json) must_== Json("error" := "end of input; ErrorToken(illegal character)")
           )
         }
       }

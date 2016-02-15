@@ -32,7 +32,7 @@ select
 from
   lineitem
 where
-  l_shipdate <= date '1998-12-01' - interval '5 day'
+  l_shipdate <= date('1998-12-01') - interval('5 day')
 group by
   l_returnflag,
   l_linestatus
@@ -101,8 +101,8 @@ where
   c_mktsegment = 'somesegment'
   and c_custkey = o_custkey
   and l_orderkey = o_orderkey
-  and o_orderdate < date '1999-01-01'
-  and l_shipdate > date '1999-01-01'
+  and o_orderdate < date('1999-01-01')
+  and l_shipdate > date('1999-01-01')
 group by
   l_orderkey,
   o_orderdate,
@@ -120,8 +120,8 @@ select
 from
   orders
 where
-  o_orderdate >= date '1999-01-01'
-  and o_orderdate < date '1999-01-01' + interval '3 month'
+  o_orderdate >= date('1999-01-01')
+  and o_orderdate < date('1999-01-01') + interval('3 month')
   and exists (
     select
       *
@@ -156,8 +156,8 @@ where
   and s_nationkey = n_nationkey
   and n_regionkey = r_regionkey
   and r_name = 'foo'
-  and o_orderdate >= date '1999-01-01'
-  and o_orderdate < date '1999-01-01' + interval '1 day'
+  and o_orderdate >= date('1999-01-01')
+  and o_orderdate < date('1999-01-01') + interval('1 day')
 group by
   n_name
 order by
@@ -170,8 +170,8 @@ select
 from
   lineitem
 where
-  l_shipdate >= date '1999-01-01'
-  and l_shipdate < date '1999-01-01' + interval '1 day'
+  l_shipdate >= date('1999-01-01')
+  and l_shipdate < date('1999-01-01') + interval('1 day')
   and l_discount between 2 - 0.01 and 2 + 0.01
   and l_quantity < 3;
 """
@@ -194,8 +194,8 @@ from
       lineitem,
       orders,
       customer,
-      nation n1,
-      nation n2
+      nation as n1,
+      nation as n2
     where
       s_suppkey = l_suppkey
       and o_orderkey = l_orderkey
@@ -206,7 +206,7 @@ from
         (n1.n_name = 'a' and n2.n_name = 'b')
         or (n1.n_name = 'b' and n2.n_name = 'a')
       )
-      and l_shipdate between date '1995-01-01' and date '1996-12-31'
+      and l_shipdate between date('1995-01-01') and date('1996-12-31')
   ) as shipping
 group by
   supp_nation,
@@ -237,8 +237,8 @@ from
       lineitem,
       orders,
       customer,
-      nation n1,
-      nation n2,
+      nation as n1,
+      nation as n2,
       region
     where
       p_partkey = l_partkey
@@ -249,7 +249,7 @@ from
       and n1.n_regionkey = r_regionkey
       and r_name = 'rname'
       and s_nationkey = n2.n_nationkey
-      and o_orderdate between date '1995-01-01' and date '1996-12-31'
+      and o_orderdate between date('1995-01-01') and date('1996-12-31')
       and p_type = 'ptype'
   ) as all_nations
 group by
@@ -311,8 +311,8 @@ from
 where
   c_custkey = o_custkey
   and l_orderkey = o_orderkey
-  and o_orderdate >= date '1999-01-01'
-  and o_orderdate < date '1999-01-01' + interval '3 month'
+  and o_orderdate >= date('1999-01-01')
+  and o_orderdate < date('1999-01-01') + interval('3 month')
   and l_returnflag = 'R'
   and c_nationkey = n_nationkey
 group by
@@ -380,8 +380,8 @@ where
   and l_shipmode in ('mode0', 'mode1')
   and l_commitdate < l_receiptdate
   and l_shipdate < l_commitdate
-  and l_receiptdate >= date '1998-01-01'
-  and l_receiptdate < date '1998-01-01' + interval '1 year'
+  and l_receiptdate >= date('1998-01-01')
+  and l_receiptdate < date('1998-01-01') + interval('1 year')
 group by
   l_shipmode
 order by
@@ -423,8 +423,8 @@ from
   part
 where
   l_partkey = p_partkey
-  and l_shipdate >= date '1999-01-01'
-  and l_shipdate < date '1999-01-01' + interval '1 month';
+  and l_shipdate >= date('1999-01-01')
+  and l_shipdate < date('1999-01-01') + interval('1 month');
 """
 
   val q16 = """
@@ -584,8 +584,8 @@ where
         where
           l_partkey = ps_partkey
           and l_suppkey = ps_suppkey
-          and l_shipdate >= date '1999-01-01'
-          and l_shipdate < date '1999-01-01' + interval '1 year'
+          and l_shipdate >= date('1999-01-01')
+          and l_shipdate < date('1999-01-01') + interval('1 year')
       )
   )
   and s_nationkey = n_nationkey
@@ -600,7 +600,7 @@ select
   count(*) as numwait
 from
   supplier,
-  lineitem l1,
+  lineitem as l1,
   orders,
   nation
 where
@@ -612,7 +612,7 @@ where
     select
       *
     from
-      lineitem l2
+      lineitem as l2
     where
       l2.l_orderkey = l1.l_orderkey
       and l2.l_suppkey <> l1.l_suppkey
@@ -621,7 +621,7 @@ where
     select
       *
     from
-      lineitem l3
+      lineitem as l3
     where
       l3.l_orderkey = l1.l_orderkey
       and l3.l_suppkey <> l1.l_suppkey

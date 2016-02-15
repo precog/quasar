@@ -160,6 +160,25 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
             None, None, None))
     }
 
+    "parse ambiguous expression as expression" in {
+      parser.parse("""select case from when where then and end""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Match(Ident("from"), List(Case(Ident("where"), Ident("and"))), None), None)),
+            None, None, None, None))
+    }
+
+    "parse partially-disambiguated expression" in {
+      parser.parse("""select "case" from when where then and end""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("case"), None)),
+            TableRelationAST("when", None).some,
+            Binop(Ident("then"), Ident("end"), And).some,
+            None, None))
+    }
     "parse quoted literal" in {
       parser.parse("select * from foo where bar = 'abc'").toOption should beSome
     }

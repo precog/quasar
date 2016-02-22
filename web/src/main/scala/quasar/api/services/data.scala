@@ -56,10 +56,10 @@ object data {
       }.merge.point[R.F]
 
     case req @ POST -> AsFilePath(path) =>
-      upload(req, W.append(path, _))
+      upload(req, W.appendThese(path, _))
 
     case req @ PUT -> AsFilePath(path) =>
-      upload(req, W.save(path, _))
+      upload(req, W.saveThese(path, _))
 
     case req @ Method.MOVE -> AsPath(path) =>
       (for {
@@ -113,10 +113,8 @@ object data {
   // TODO: Streaming
   private def upload[S[_]: Functor](
     req: Request,
-    by: Process[Free[S,?], Data] => Process[FileSystemErrT[Free[S,?],?], FileSystemError]
+    by: Vector[Data] => FileSystemErrT[Free[S,?], Vector[FileSystemError]]
   )(implicit S0: Task :<: S): Free[S, QResponse[S]] = {
-    import free._
-
     type FreeS[A] = Free[S, A]
     type FreeFS[A] = FileSystemErrT[FreeS, A]
     type QRespT[F[_], A] = EitherT[F, QResponse[S], A]
@@ -128,12 +126,12 @@ object data {
 
     def errorsResponse(
       decodeErrors: IndexedSeq[DecodeError],
-      persistErrors: Process[FreeFS, FileSystemError]
+      persistErrors: FreeFS[Vector[FileSystemError]]
     ): Free[S, QResponse[S]] =
       if (decodeErrors.nonEmpty)
         dataError(BadRequest, decodeErrors).point[FreeS]
       else
-        persistErrors.runLog.fold(_.toResponse[S], errs =>
+        persistErrors.fold(_.toResponse[S], errs =>
           if (errs.isEmpty) QResponse.ok[S]
           else dataError(InternalServerError, errs))
 
@@ -142,7 +140,7 @@ object data {
         QResponse.error(BadRequest, "Request has no body").point[FreeS]
       } else {
         val (errors, data) = xs.toVector.separate
-        errorsResponse(errors, by(Process.emitAll(data)))
+        errorsResponse(errors, by(data))
       }
 
       injectFT[Task,S].apply(

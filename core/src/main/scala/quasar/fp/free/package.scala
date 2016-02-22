@@ -27,6 +27,7 @@ package object free {
   type Coproduct3[F[_], G[_], H[_], A] = Coproduct[F, Coproduct[G, H, ?], A]
   type Coproduct4[F[_], G[_], H[_], I[_], A] = Coproduct[F, Coproduct3[G, H, I, ?], A]
   type Coproduct5[F[_], G[_], H[_], I[_], J[_], A] = Coproduct[F, Coproduct4[G, H, I, J, ?], A]
+  type Coproduct6[F[_], G[_], H[_], I[_], J[_], K[_], A] = Coproduct[F, Coproduct5[G, H, I, J, K, ?], A]
 
   /** Given `F[_]` and `G[_]` such that `F :<: G`, lifts a natural transformation
     * `F ~> F` to `G ~> G`.
@@ -87,6 +88,12 @@ package object free {
     new (Coproduct5[F, G, H, I, J, ?] ~> M) {
       def apply[A](fa: Coproduct5[F, G, H, I, J, A]) =
         fa.run.fold(f, interpret4(g, h, i, j)(_))
+    }
+
+  def interpret6[F[_], G[_], H[_], I[_], J[_], K[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M): Coproduct6[F, G, H, I, J, K, ?] ~> M =
+    new (Coproduct6[F, G, H, I, J, K, ?] ~> M) {
+      def apply[A](fa: Coproduct6[F, G, H, I, J, K, A]) =
+        fa.run.fold(f, interpret5(g, h, i, j, k)(_))
     }
 
   /** A `Catchable` instance for `Free[S, ?]` when `Task` can be injected into `S`. */

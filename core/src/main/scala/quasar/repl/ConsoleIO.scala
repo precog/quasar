@@ -14,14 +14,28 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.repl
 
-import scalaz.Coyoneda
+import quasar.Predef._
 
-package object effect {
-  type AtomicRefF[V, A] = Coyoneda[AtomicRef[V, ?], A]
-  type FailureF[E, A] = Coyoneda[Failure[E, ?], A]
-  type KeyValueStoreF[K, V, A] = Coyoneda[KeyValueStore[K, V, ?], A]
-  type MonotonicSeqF[A] = Coyoneda[MonotonicSeq, A]
-  type TimingF[A] = Coyoneda[Timing, A]
+import quasar.effect.LiftedOps
+
+import scalaz._
+
+sealed trait ConsoleIO[A]
+object ConsoleIO {
+  final case class PrintLn(message: String) extends ConsoleIO[Unit]
+
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  final class Ops[S[_]: Functor](implicit S: ConsoleIOF :<: S)
+    extends LiftedOps[ConsoleIO, S] {
+
+    def println(message: String): F[Unit] =
+      lift(PrintLn(message))
+  }
+
+  object Ops {
+    implicit def apply[S[_]: Functor](implicit S: ConsoleIOF :<: S): Ops[S] =
+      new Ops[S]
+  }
 }

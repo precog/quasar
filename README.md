@@ -77,7 +77,7 @@ The path of the JAR will be `./core/target/scala-2.11/core_2.11-[version]-SNAPSH
 To run the JAR, execute the following command:
 
 ```bash
-java -jar [<path to jar>] [<config file>]
+java -jar [<path to jar>] [-c <config file>]
 ```
 
 #### Web JAR

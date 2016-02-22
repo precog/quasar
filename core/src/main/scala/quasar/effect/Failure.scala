@@ -50,6 +50,9 @@ object Failure {
     def recover[A](fa: F[A], f: E => F[A]): F[A] =
       attempt(fa).flatMap(_.fold(f, _.point[F]))
 
+    def unattempt_[A](fa: E \/ A): F[A] =
+      unattempt(fa.point[F])
+
     def unattempt[A](fa: F[E \/ A]): F[A] =
       fa.flatMap(_.fold(fail, _.point[F]))
 

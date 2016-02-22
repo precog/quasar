@@ -42,8 +42,11 @@ object DataEncodingError {
     def message = cause
   }
 
-  implicit val EncoderDataEncodingError: EncodeJson[DataEncodingError] =
+  implicit val encodeJson: EncodeJson[DataEncodingError] =
     EncodeJson(err => Json.obj("error" := err.message))
+
+  implicit val show: Show[DataEncodingError] =
+    Show.showFromToString[DataEncodingError]
 }
 
 trait DataCodec {

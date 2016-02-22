@@ -29,9 +29,9 @@ object console {
   def stderr(msg: => String): Task[Unit] =
     Task.delay(System.err.println(msg))
 
-  def logErrors[E:Show](a: quasar.Errors.ETask[E,Unit]) =
+  def logErrors(a: quasar.Errors.ETask[String, Unit]): Task[Unit] =
     a.swap
-    .flatMapF(e => stderr(e.shows).map(_.right))
+    .flatMapF(e => stderr("Error: " + e).map(_.right))
     .merge
-    .handleWith { case err => stderr(err.getMessage) }
+    .handleWith { case err => stderr("Error: " + err.getMessage) }
 }

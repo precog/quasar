@@ -5,7 +5,7 @@ import scala.collection.Seq
 
 import scoverage._
 
-mainClass in Compile := Some("quasar.repl.Repl")
+mainClass in Compile := Some("quasar.repl.Main")
 
 libraryDependencies ++= Dependencies.core
 

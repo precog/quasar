@@ -34,6 +34,7 @@ object Dependencies {
     "com.slamdata"      %% "pathy-core"                % pathyVersion   % "compile",
     "com.github.mpilquist" %% "simulacrum"             % "0.7.0"        % "compile, test",
     "org.http4s"        %% "http4s-core"               % http4sVersion  % "compile",
+    "com.github.tototoshi" %% "scala-csv"              % "1.1.2"        % "compile",
     "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion   % "test",
     "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion  % "test",
     "org.specs2"        %% "specs2-core"               % "2.4"          % "test",
@@ -51,6 +52,5 @@ object Dependencies {
       exclude("org.scalaz.stream", "scalaz-stream_2.11"),
     "org.http4s"           %% "http4s-blaze-server" % http4sVersion % "compile, test",
     "org.http4s"           %% "http4s-blaze-client" % http4sVersion % "test",
-    "com.github.tototoshi" %% "scala-csv"           % "1.1.2",
     "org.scodec"           %% "scodec-scalaz"       % "1.1.0")
 }

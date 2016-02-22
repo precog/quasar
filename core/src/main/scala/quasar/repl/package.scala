@@ -16,12 +16,15 @@
 
 package quasar
 
-import scalaz.Coyoneda
+import quasar.Predef._
 
-package object effect {
-  type AtomicRefF[V, A] = Coyoneda[AtomicRef[V, ?], A]
-  type FailureF[E, A] = Coyoneda[Failure[E, ?], A]
-  type KeyValueStoreF[K, V, A] = Coyoneda[KeyValueStore[K, V, ?], A]
-  type MonotonicSeqF[A] = Coyoneda[MonotonicSeq, A]
-  type TimingF[A] = Coyoneda[Timing, A]
+import quasar.effect.Failure
+
+import scalaz.{Failure => _, _}
+
+package object repl {
+  type ConsoleIOF[A] = Coyoneda[ConsoleIO, A]
+
+  type ReplFail[A] = Failure[String, A]
+  type ReplFailF[A] = Coyoneda[ReplFail, A]
 }

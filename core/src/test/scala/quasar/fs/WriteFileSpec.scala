@@ -31,19 +31,36 @@ import scalaz.stream._
 class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
   import DataArbitrary._, FileSystemError._, PathError2._
 
+  type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
+
+  def withDataWriters[A](
+    streaming: (String, (AFile, Process[write.F, Data]) => Process[write.M, FileSystemError]),
+    nonStreaming: (String, (AFile, Vector[Data]) => write.M[Vector[FileSystemError]])
+  )(f: (String, DataWriter) => A): Unit = {
+    val st: DataWriter = (f, xs) =>
+      streaming._2(f, xs)
+
+    val ns: DataWriter = (f, xs) =>
+      nonStreaming._2(f, xs.toVector).liftM[Process].flatMap(Process.emitAll)
+
+    List((streaming._1, st), (nonStreaming._1, ns)) foreach f.tupled
+  }
+
   "WriteFile" should {
 
-    "append should consume input and close write handle when finished" ! prop {
-      (f: AFile, xs: Vector[Data]) =>
+    withDataWriters(("append", write.append), ("appendThese", write.appendThese)) { (n, wt) =>
+      s"$n should consume input and close write handle when finished" ! prop {
+        (f: AFile, xs: Vector[Data]) =>
 
-      val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
+        val p = wt(f, xs.toProcess).drain ++ read.scanAll(f)
 
-      type Result[A] = FileSystemErrT[MemStateTask,A]
+        type Result[A] = FileSystemErrT[MemStateTask,A]
 
-      p.translate[Result](MemTask.interpretT).runLog.run
-        .leftMap(_.wm)
-        .run(emptyMem)
-        .run must_== ((Map.empty, \/.right(xs)))
+        p.translate[Result](MemTask.interpretT).runLog.run
+          .leftMap(_.wm)
+          .run(emptyMem)
+          .run must_== ((Map.empty, \/.right(xs)))
+      }
     }
 
     "append should aggregate all `PartialWrite` errors and emit the sum" ! prop {
@@ -57,76 +74,81 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }
     }
 
-    "save should replace existing file" ! prop {
-      (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
+    withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
+      s"$n should replace existing file" ! prop {
+        (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-      val p = (write.append(f, xs.toProcess) ++ write.save(f, ys.toProcess)).drain ++ read.scanAll(f)
+        val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
 
-      MemTask.runLogEmpty(p).run must_== \/-(ys)
-    }
+        MemTask.runLogEmpty(p).run must_== \/-(ys)
+      }
 
-    "save with empty input should create an empty file" ! prop { f: AFile =>
-      val p = write.save(f, Process.empty) ++
-              (query.fileExists(f)).liftM[Process]
+      s"$n with empty input should create an empty file" ! prop { f: AFile =>
+        val p = wt(f, Process.empty) ++ query.fileExists(f).liftM[Process]
 
-      MemTask.runLogEmpty(p).run must_== \/-(Vector(true))
-    }
+        MemTask.runLogEmpty(p).run must_== \/-(Vector(true))
+      }
 
-    "save should leave existing file untouched on failure" ! prop {
-      (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
-        val err = writeFailed(Data.Str("bar"), "")
-        val ws = (xs ++ ys.init).as(Vector()) :+ Vector(err)
-        val p = (write.append(f, xs.toProcess) ++ write.save(f, ys.toProcess)).drain ++ read.scanAll(f)
+      s"$n should leave existing file untouched on failure" ! prop {
+        (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+          val err = writeFailed(Data.Str("bar"), "")
+          val ws = xs.as(Vector()) :+ Vector(err)
+          val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
 
-        MemFixTask.runLogWithWrites(ws.toList, p).run
-          .leftMap(_.contents.keySet)
-          .run(emptyMem)
-          .run must_== ((Set(f), \/.right(xs)))
+          MemFixTask.runLogWithWrites(ws.toList, p).run
+            .leftMap(_.contents.keySet)
+            .run(emptyMem)
+            .run must_== ((Set(f), \/.right(xs)))
+        }
       }
     }
 
-    "create should fail if file exists" ! prop {
-      (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
+    withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
+      s"$n should fail if file exists" ! prop {
+        (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-      val p = write.append(f, xs.toProcess) ++ write.create(f, ys.toProcess)
+        val p = write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)
 
-      MemTask.runLogEmpty(p).run.toEither must beLeft(pathError(pathExists(f)))
-    }
+        MemTask.runLogEmpty(p).run.toEither must beLeft(pathError(pathExists(f)))
+      }
 
-    "create should consume all input into a new file" ! prop {
-      (f: AFile, xs: Vector[Data]) =>
+      s"$n should consume all input into a new file" ! prop {
+        (f: AFile, xs: Vector[Data]) =>
 
-      val p = write.create(f, xs.toProcess) ++ read.scanAll(f)
+        val p = wt(f, xs.toProcess) ++ read.scanAll(f)
 
-      MemTask.runLogEmpty(p).run must_== \/-(xs)
-    }
-
-    "replace should fail if the file does not exist" ! prop {
-      (f: AFile, xs: Vector[Data]) =>
-
-      MemTask.runLogEmpty(write.replace(f, xs.toProcess))
-        .run.toEither must beLeft(pathError(pathNotFound(f)))
-    }
-
-    "replace should leave the existing file untouched on failure" ! prop {
-      (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
-        val err = writeFailed(Data.Int(42), "")
-        val ws = (xs ++ ys.init).as(Vector()) :+ Vector(err)
-        val p = (write.append(f, xs.toProcess) ++ write.replace(f, ys.toProcess)).drain ++ read.scanAll(f)
-
-        MemFixTask.runLogWithWrites(ws.toList, p).run
-          .leftMap(_.contents.keySet)
-          .run(emptyMem)
-          .run must_== ((Set(f), \/.right(xs)))
+        MemTask.runLogEmpty(p).run must_== \/-(xs)
       }
     }
 
-    "replace should overwrite the existing file with new data" ! prop {
-      (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
+    withDataWriters(("replace", write.replace), ("replaceWithThese", write.replaceWithThese)) { (n, wt) =>
+      s"$n should fail if the file does not exist" ! prop {
+        (f: AFile, xs: Vector[Data]) =>
 
-      val p = write.save(f, xs.toProcess) ++ write.replace(f, ys.toProcess) ++ read.scanAll(f)
+        MemTask.runLogEmpty(wt(f, xs.toProcess))
+          .run.toEither must beLeft(pathError(pathNotFound(f)))
+      }
 
-      MemTask.runLogEmpty(p).run must_== \/-(ys)
+      s"$n should leave the existing file untouched on failure" ! prop {
+        (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+          val err = writeFailed(Data.Int(42), "")
+          val ws = xs.as(Vector()) :+ Vector(err)
+          val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
+
+          MemFixTask.runLogWithWrites(ws.toList, p).run
+            .leftMap(_.contents.keySet)
+            .run(emptyMem)
+            .run must_== ((Set(f), \/.right(xs)))
+        }
+      }
+
+      s"$n should overwrite the existing file with new data" ! prop {
+        (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
+
+        val p = write.save(f, xs.toProcess) ++ wt(f, ys.toProcess) ++ read.scanAll(f)
+
+        MemTask.runLogEmpty(p).run must_== \/-(ys)
+      }
     }
   }
 }

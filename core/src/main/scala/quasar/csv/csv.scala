@@ -14,12 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.csv
 
 import quasar.Predef._
+
+import com.github.tototoshi.csv._
 import scala.math.Ordering
 import scalaz.{Ordering => _, _}
 import Scalaz._
+
+final case class CsvWriter(format: Option[CsvParser.Format]) {
+  def apply(values: List[String]): String = {
+    val w = new java.io.StringWriter
+    val cw = format.map(f => CSVWriter.open(w)(f)).getOrElse(CSVWriter.open(w))
+    cw.writeRow(values)
+    cw.close
+    w.toString
+  }
+}
 
 final case class Record(fields: List[String]) {
   def size = fields.length

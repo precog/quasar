@@ -16,19 +16,19 @@
 
 package quasar.api
 
-import argonaut.EncodeJson
-import org.http4s.parser.HttpHeaderParser
 import quasar.Predef._
-import quasar.fp._
-
-import org.http4s._
-import org.http4s.headers._
-import quasar.repl.Prettify
 
 import quasar.{DataEncodingError, Data, DataCodec}
+import quasar.csv._
+import quasar.fp._
+import quasar.repl.Prettify
 
-import scalaz.concurrent.Task
+import argonaut.EncodeJson
+import org.http4s._
+import org.http4s.parser.HttpHeaderParser
+import org.http4s.headers._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 sealed trait JsonPrecision {
@@ -143,18 +143,8 @@ object MessageFormat {
       Csv.mediaType.withExtensions(extensions)
     }
     override def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
-      import quasar.repl.Prettify
-      import com.github.tototoshi.csv._
-
-      val format = Some(CsvParser.Format(columnDelimiter,quoteChar,escapeChar,rowDelimiter))
-
-      Prettify.renderStream(data, CsvColumnsFromInitialRowsCount).map { v =>
-        val w = new java.io.StringWriter
-        val cw = format.map(f => CSVWriter.open(w)(f)).getOrElse(CSVWriter.open(w))
-        cw.writeRow(v)
-        cw.close
-        w.toString
-      }
+      val writer = CsvWriter(Some(CsvParser.Format(columnDelimiter, quoteChar, escapeChar, rowDelimiter)))
+      Prettify.renderStream(data, CsvColumnsFromInitialRowsCount).map(writer(_))
     }
     override def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] = Csv.decode(txt)
   }

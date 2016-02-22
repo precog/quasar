@@ -14,14 +14,24 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.repl
 
-import scalaz.Coyoneda
+import quasar.Predef._
 
-package object effect {
-  type AtomicRefF[V, A] = Coyoneda[AtomicRef[V, ?], A]
-  type FailureF[E, A] = Coyoneda[Failure[E, ?], A]
-  type KeyValueStoreF[K, V, A] = Coyoneda[KeyValueStore[K, V, ?], A]
-  type MonotonicSeqF[A] = Coyoneda[MonotonicSeq, A]
-  type TimingF[A] = Coyoneda[Timing, A]
+import scalaz._, Scalaz._
+
+sealed trait OutputFormat
+object OutputFormat {
+  case object Table extends OutputFormat
+  case object Precise extends OutputFormat
+  case object Readable extends OutputFormat
+  case object Csv extends OutputFormat
+
+  def fromString(str: String): Option[OutputFormat] = str.toLowerCase match {
+    case "table"    => Table.some
+    case "precise"  => Precise.some
+    case "readable" => Readable.some
+    case "csv"      => Csv.some
+    case _          => none
+  }
 }

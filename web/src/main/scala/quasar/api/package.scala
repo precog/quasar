@@ -20,7 +20,10 @@ import quasar.Predef._
 import quasar.Errors.{ETask, convertError}
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
+import quasar.fp._
 import quasar.fs.{Path => QPath, _}
+import quasar.fs.mount.hierarchical.{HierarchicalFileSystemError}
+import quasar.physical.mongodb.{WorkflowExecutionError}
 
 import java.io.File
 
@@ -62,6 +65,7 @@ package object api {
           _.map(_.left[A]),
           _.right[Response].point[Task])))
     }
+
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header

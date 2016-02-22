@@ -124,10 +124,9 @@ object Prettify {
     final case class Right[A](value: A) extends Aligned[A]
   }
 
-  /**
-   Render any atomic Data value to a String that should either left-aligned (Str values),
-   or right-aligned (all others).
-   */
+  /** Render any atomic Data value to a String that should either be left-aligned
+    * (Str values), or right-aligned (all others).
+    */
   def render(data: Data): Aligned[String] = data match {
     case Data.Str(str) => Aligned.Left(str)
     case _ => Aligned.Right(DataCodec.Readable.encode(data).fold(
@@ -231,5 +230,10 @@ object Prettify {
         val flat = flatten(row)
         cols.map(n => flat.get(n).fold("")(render(_).value))
       })
+  }
+
+  /** Pure version of `renderStream. */
+  def renderValues(src: List[Data]): List[List[String]] = {
+    renderStream(Process.emitAll(src), src.length).toList
   }
 }

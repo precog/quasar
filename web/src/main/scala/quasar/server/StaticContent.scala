@@ -17,6 +17,7 @@
 package quasar.server
 
 import quasar.Predef._
+import quasar.main._
 
 import java.net.{JarURLConnection, URI, URLDecoder}
 

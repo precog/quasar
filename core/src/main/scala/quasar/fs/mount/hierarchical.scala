@@ -56,7 +56,7 @@ object hierarchical {
     implicit val hierarchicalFSErrorShow: Show[HierarchicalFileSystemError] =
       Show.shows {
         case MultipleMountsApply(mnts, lp) =>
-          s"Multiple mounted filesystems can handle the plan: mounts=${mnts.shows}, plan=${lp.shows}"
+          s"""Multiple mounted filesystems can handle the plan; mounts: ${mnts.map(_.shows).mkString(", ")}, plan: ${lp.shows}"""
       }
   }
 
@@ -382,13 +382,14 @@ object hierarchical {
         case ReadF(p) => mountFor(p.asAPath)
         case _        => ().point[M]
       }.run.run(initMnt) match {
-        // TODO: If mnt is empty, then there were no `ReadF`, so we should
-        //       be able to get a result without needing an actual filesystem
-        //       Though, if that is the case, the plan shouldn't even be handed
-        //       to a filesystem in the first place.
+        // NB: If mnt is empty, then there were no `ReadF`, so we should
+        // be able to get a result without needing an actual filesystem,
+        // and we just pass it to an arbitrary mount, if there is at
+        // least one present.
         case (mntA, r) =>
           r.leftMap(_.right[HierarchicalFileSystemError]) *>
-            mntA.toRightDisjunction(multipleMountsApply(mounts.toMap.keySet, lp).left)
+            (mntA orElse mounts.toMap.toList.headOption)
+              .toRightDisjunction(multipleMountsApply(mounts.toMap.keySet, lp).left)
       })
   }
 

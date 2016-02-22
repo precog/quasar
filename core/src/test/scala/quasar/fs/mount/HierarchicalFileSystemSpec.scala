@@ -137,10 +137,10 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         .run.eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 
-  def failsWhenNoPaths[A](f: Fix[LogicalPlan] => ExecM[A]) =
-    "containing no paths fails with HFS error" >> {
-      runMntd(f(Constant(Data.Obj(Map("0" -> Data.Int(5))))).run.value)
-        .run.eval(emptyMS) must failDueToMultipleMnts
+  def succeedsForNoPaths[A](f: Fix[LogicalPlan] => ExecM[A]) =
+    "containing no paths succeeds" >> {
+      runMntd(f(Constant(Data.Int(0))).run.value)
+        .run.eval(emptyMS) must succeedH
     }
 
   def succeedsForMountedPath[A](f: Fix[LogicalPlan] => ExecM[A]) =
@@ -188,7 +188,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       "evaluating a plan" >> {
         failsForDifferentFs((lp, _) => unsafeq.eval(lp))
 
-        failsWhenNoPaths(unsafeq.eval)
+        succeedsForNoPaths(unsafeq.eval)
 
         succeedsForMountedPath(unsafeq.eval)
       }
@@ -196,7 +196,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       "explaining a plan" >> {
         failsForDifferentFs((lp, _) => query.explain(lp))
 
-        failsWhenNoPaths(query.explain)
+        succeedsForNoPaths(query.explain)
 
         succeedsForMountedPath(query.explain)
       }

@@ -14,14 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.repl
 
-import scalaz.Coyoneda
+import quasar.Predef._
 
-package object effect {
-  type AtomicRefF[V, A] = Coyoneda[AtomicRef[V, ?], A]
-  type FailureF[E, A] = Coyoneda[Failure[E, ?], A]
-  type KeyValueStoreF[K, V, A] = Coyoneda[KeyValueStore[K, V, ?], A]
-  type MonotonicSeqF[A] = Coyoneda[MonotonicSeq, A]
-  type TimingF[A] = Coyoneda[Timing, A]
+sealed trait DebugLevel
+object DebugLevel {
+  final case object Silent extends DebugLevel
+  final case object Normal extends DebugLevel
+  final case object Verbose extends DebugLevel
+
+  def fromInt(code: Int): Option[DebugLevel] = code match {
+    case 0 => Some(Silent)
+    case 1 => Some(Normal)
+    case 2 => Some(Verbose)
+    case _ => None
+  }
 }

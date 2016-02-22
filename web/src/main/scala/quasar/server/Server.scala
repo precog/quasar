@@ -21,28 +21,21 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr}
 import quasar.config._
 import quasar.console.{logErrors, stderr}
-import quasar.fs.mount._
 import quasar.fp.TaskRef
-import quasar.server.impl._
+import quasar.main._
 
 import argonaut.DecodeJson
 import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
 import scalaz._
-import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.string._
-import scalaz.syntax.either._
-import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
-import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.concurrent.Task
 
 object Server {
-  import Mounting.PathTypeMismatch
-
   final case class QuasarConfig(
     staticContent: List[StaticContent],
     redirect: Option[String],
@@ -119,21 +112,6 @@ object Server {
     Http4sUtils.startAndWait(initialPort, produceSvc, openClient)
   }
 
-  /** Mount all the mounts defined in the given configuration. */
-  def mountAll[S[_]: Functor]
-      (mc: MountingsConfig2)
-      (implicit mnt: Mounting.Ops[S])
-      : Free[S, String \/ Unit] = {
-
-    type MainF[A] = EitherT[mnt.F, String, A]
-
-    def toMainF(v: mnt.M[PathTypeMismatch \/ Unit]): MainF[Unit] =
-      EitherT[mnt.F, String, Unit](
-        v.fold(_.shows.left, _.fold(_.shows.left, _.right)))
-
-    mc.toMap.toList.traverse_ { case (p, cfg) => toMainF(mnt.mount(p, cfg)) }.run
-  }
-
   def main(args: Array[String]): Unit = {
     implicit val configOps: ConfigOps[WebConfig] = WebConfig
 
@@ -146,7 +124,7 @@ object Server {
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- mountAll[CoreEff](config.mountings) foldMap ephemeralApi
       cfgRef       <- TaskRef(config).liftM[MainErrT]
-      durableApi   =  CfgsErrsIO.toResponseOr(MntCfgsIO.durableFile(cfgRef, qConfig.configPath)) compose coreApi
+      durableApi   =  toResponseOr(MntCfgsIO.durableFile(cfgRef, qConfig.configPath)) compose coreApi
       _            <- startWebServer(
                         updConfig.server.port,
                         qConfig.staticContent,

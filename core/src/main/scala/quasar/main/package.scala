@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.server
+package quasar
 
 import quasar.Predef._
-import quasar.api.{failureResponseOr, ResponseOr, ResponseT}
+
 import quasar.config.{writeConfig, ConfigOps, FsFile}
 import quasar.effect._
 import quasar.fp._
@@ -29,15 +29,21 @@ import quasar.physical.mongodb.fs.mongoDbFileSystemDef
 
 import argonaut.EncodeJson
 import monocle.Lens
-import scalaz.{Failure => _, Lens => _, _}
+import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 /** Concrete effect types and their interpreters that implement the quasar
   * functionality.
   */
-object impl {
+package object main {
   import FileSystemDef.DefinitionResult
   import QueryFile.ResultHandle
+  import Mounting.PathTypeMismatch
+
+  type MainErrT[F[_], A] = EitherT[F, String, A]
+  type MainTask[A]       = MainErrT[Task, A]
+
+  val MainTask           = MonadError[EitherT[Task,?,?], String]
 
   /** Effects that physical filesystems require.
     *
@@ -175,7 +181,7 @@ object impl {
     Coproduct.coproductFunctor[MountConfigsF, CompFsEffM](implicitly, implicitly)
 
   val mounter: Mounting ~> CompleteFsEffM =
-    Mounter[CompFsEffM, CompleteFsEff](
+    quasar.fs.mount.Mounter[CompFsEffM, CompleteFsEff](
       mountHandler.mount[CompFsEff](_),
       mountHandler.unmount[CompFsEff](_))
 
@@ -226,7 +232,7 @@ object impl {
   type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
 
   object CfgsErrsIO {
-    /** Inteprets errors into strings. */
+    /** Interprets errors into strings. */
     def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
       val f = free.interpret4[FileSystemFailureF, WorkflowExecErrF, HFSFailureF, MntCfgsIO, Task](
         Coyoneda.liftTF[FileSystemFailure, Task](Failure.toTaskFailure[FileSystemError]),
@@ -240,17 +246,6 @@ object impl {
       }
 
       hoistFree(g)
-    }
-
-    /** Interpretes errors into `Response`s, for use in web services. */
-    def toResponseOr(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> ResponseOr = {
-      val f = free.interpret4[FileSystemFailureF, WorkflowExecErrF, HFSFailureF, MntCfgsIO, ResponseOr](
-        Coyoneda.liftTF[FileSystemFailure, ResponseOr](failureResponseOr[FileSystemError]),
-        Coyoneda.liftTF[WorkflowExecErr, ResponseOr](failureResponseOr[WorkflowExecutionError]),
-        Coyoneda.liftTF[HFSFailure, ResponseOr](failureResponseOr[HierarchicalFileSystemError]),
-        liftMT[Task, ResponseT] compose evalCfgsIO)
-
-      hoistFree(f: CfgsErrsIO ~> ResponseOr)
     }
   }
 
@@ -301,5 +296,20 @@ object impl {
           mounting,
           translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
       }
+  }
+
+  /** Mount all the mounts defined in the given configuration. */
+  def mountAll[S[_]: Functor]
+      (mc: MountingsConfig2)
+      (implicit mnt: Mounting.Ops[S])
+      : Free[S, String \/ Unit] = {
+
+    type MainF[A] = EitherT[mnt.F, String, A]
+
+    def toMainF(v: mnt.M[PathTypeMismatch \/ Unit]): MainF[Unit] =
+      EitherT[mnt.F, String, Unit](
+        v.fold(_.shows.left, _.fold(_.shows.left, _.right)))
+
+    mc.toMap.toList.traverse_ { case (p, cfg) => toMainF(mnt.mount(p, cfg)) }.run
   }
 }

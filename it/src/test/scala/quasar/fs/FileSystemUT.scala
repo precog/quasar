@@ -24,14 +24,24 @@ import scalaz.concurrent.Task
 /** FileSystem Under Test
   *
   * @param name the name of the filesystem
-  * @param run an interpreter of the filesystem into the `Task` monad
+  * @param testInterp an interpreter of the filesystem into the `Task` monad
+  * @param setupInterp a second interpreter which has the ability to insert
+  *   and otherwise write to the filesystem, even if `testInterp` does not
   * @param testDir a directory in the filesystem tests may use for temp data
   */
 final case class FileSystemUT[S[_]](
-  name: BackendName,
-  run: S ~> Task,
-  testDir: ADir
+  name:        BackendName,
+  testInterp:  S ~> Task,
+  setupInterp: S ~> Task,
+  testDir:     ADir
 ) {
+  import quasar.fp.hoistFree
+
+  type F[A] = Free[S, A]
+
   def contramap[T[_]](f: T ~> S): FileSystemUT[T] =
-    FileSystemUT(name, run compose f, testDir)
+    FileSystemUT(name, testInterp compose f, setupInterp compose f, testDir)
+
+  def testInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(testInterp)
+  def setupInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(setupInterp)
 }

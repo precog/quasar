@@ -50,12 +50,16 @@ object TestConfig {
   /** External Backends. */
   val MONGO_2_6 = BackendName("mongodb_2_6")
   val MONGO_3_0 = BackendName("mongodb_3_0")
-  val MONGO_READ_ONLY = BackendName("mongodb_read_only")
   val MONGO_3_2 = BackendName("mongodb_3_2")
+  val MONGO_READ_ONLY = BackendName("mongodb_read_only")
 
-  lazy val readWriteBackends: List[BackendName] = List(MONGO_2_6, MONGO_3_0, MONGO_3_2)
-  lazy val readOnlyBackends: List[BackendName]  = List(MONGO_READ_ONLY)
-  lazy val backendNames: List[BackendName]      = readWriteBackends ::: readOnlyBackends
+  lazy val backendNames: List[BackendName] = List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY)
+
+  /** True if this backend configuration is for a mongo connection where the
+    * user has the "read-only" role.
+    */
+  def isMongoReadOnly(backendName: BackendName): Boolean =
+    backendName == MONGO_READ_ONLY
 
   /** Returns the name of the environment variable used to configure the
     * given backend.
@@ -74,17 +78,21 @@ object TestConfig {
   def externalFileSystems[S[_]](
     pf: PartialFunction[(MountConfig, ADir), Task[S ~> Task]]
   ): Task[IList[FileSystemUT[S]]] = {
-    def fileSystemNamed(
-      n: BackendName,
+    def fs(
+      envName: String,
       p: ADir
-    ): OptionT[Task, FileSystemUT[S]] =
-      TestConfig.loadConfig(backendEnvName(n)) flatMapF { c =>
-        val run = pf.lift((c, p)) getOrElse Task.fail(new RuntimeException(
+    ): OptionT[Task, S ~> Task] =
+      TestConfig.loadConfig(envName) flatMapF(c =>
+        pf.lift((c, p)) getOrElse Task.fail(new RuntimeException(
           s"Unsupported filesystem config: $c"
-        ))
+        )))
 
-        (run |@| NameGenerator.salt)((r, s) => FileSystemUT(n, r, p </> dir(s)))
-      }
+    def fileSystemNamed(n: BackendName, p: ADir): OptionT[Task, FileSystemUT[S]] =
+      for {
+        test  <- fs(backendEnvName(n), p)
+        setup <- fs(insertEnvName(n), p).run.liftM[OptionT]
+        s   <- NameGenerator.salt.liftM[OptionT]
+      } yield FileSystemUT(n, test, setup.getOrElse(test), p </> dir(s))
 
     def noBackendsFound: Throwable = new RuntimeException(
       "No external backends to test. Consider setting one of these environment variables: " +
@@ -99,13 +107,13 @@ object TestConfig {
       if (TestConfig.backendNames.isEmpty)
         Task.fail(noBackendsFound)
       else
-        TestConfig.readWriteBackends.toIList
+        TestConfig.backendNames.toIList
           .traverse(n => fileSystemNamed(n, prefix).run)
           .map(_.unite)
     }
   }
 
-  /** Read the value of an envrionment variable. */
+  /** Read the value of an environment variable. */
   def readEnv(name: String): OptionT[Task, String] =
     Task.delay(System.getenv).liftM[OptionT]
       .flatMap(env => OptionT(Task.delay(Option(env.get(name)))))

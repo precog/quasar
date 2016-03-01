@@ -57,9 +57,9 @@ abstract class FileSystemTest[S[_]: Functor](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: BackendName => Run => Unit): Unit =
-    fileSystems.map(_ traverse_[Id] { case FileSystemUT(name, f, prefix) =>
-      s"${name.name} FileSystem" should examples(name)(hoistFree(f)); ()
+  def fileSystemShould(examples: FileSystemUT[S] => Unit): Unit =
+    fileSystems.map(_ traverse_[Id] { fs =>
+      s"${fs.name.name} FileSystem" should examples(fs); ()
     }).run
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
@@ -137,27 +137,31 @@ object FileSystemTest {
         interpretViewFileSystem(
           viewState,
           MonotonicSeq.fromTaskRef(seqRef),
-          mem.run)
+          mem.testInterp)
 
       val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem](Views(Map.empty))
 
-      FileSystemUT(BackendName("No-view"), fs, mem.testDir)
+      FileSystemUT(BackendName("No-view"), fs, fs, mem.testDir)
     }
 
   def hierarchicalUT: Task[FileSystemUT[FileSystem]] = {
     val mntDir: ADir = rootDir </> dir("mnt") </> dir("inmem")
 
+    def fs(f: HfsIO ~> Task, r: FileSystem ~> Task) =
+      foldMapNT[HfsIO, Task](f) compose
+        hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mntDir, r))
+
     (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(
         BackendName("hierarchical"),
-        foldMapNT[HfsIO, Task](f) compose hierarchical.fileSystem[Task, HfsIO](
-          Mounts.singleton(mntDir, mem.run)),
+        fs(f, mem.testInterp),
+        fs(f, mem.setupInterp),
         mntDir))
   }
 
   def inMemUT: Task[FileSystemUT[FileSystem]] = {
     InMemory.runStatefully(InMemory.InMemState.empty)
       .map(_ compose InMemory.fileSystem)
-      .map(FileSystemUT(BackendName("in-memory"), _, rootDir))
+      .map(f => FileSystemUT(BackendName("in-memory"), f, f, rootDir))
   }
 }

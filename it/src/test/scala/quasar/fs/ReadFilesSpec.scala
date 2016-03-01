@@ -66,10 +66,12 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
   def deleteForReading(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(readsPrefix))
 
-  fileSystemShould { _ => implicit run =>
+  fileSystemShould { fs =>
+    implicit val run = fs.testInterpM
+
     "Reading Files" should {
       // Load read-only data
-      step((deleteForReading(run).run.void *> loadForReading(run).run.void).run)
+      step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).run)
 
       "open returns PathNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
@@ -169,7 +171,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         (r.runEither must beRight(l)) and (r.runEither must beRight(l))
       }
 
-      step(deleteForReading(run).runVoid)
+      step(deleteForReading(fs.setupInterpM).runVoid)
     }; ()
   }
 }

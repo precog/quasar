@@ -17,7 +17,8 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.Data
+
+import quasar.{Data, TestConfig}
 import quasar.fp._
 
 import pathy.Path._
@@ -25,7 +26,8 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
+class ManageFilesSpec extends FileSystemTest[FileSystem](
+  FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
   import FileSystemTest._, FileSystemError._, PathError2._
   import ManageFile._
 
@@ -39,9 +41,11 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
   def deleteForManage(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(managePrefix))
 
-  fileSystemShould { _ => implicit run =>
+  fileSystemShould { fs =>
+    implicit val run = fs.testInterpM
+
     "Managing Files" should {
-      step(deleteForManage(run).runVoid)
+      step(deleteForManage(fs.setupInterpM).runVoid)
 
       "moving a file should make it available at the new path and not found at the old" >> {
         val f1 = managePrefix </> dir("d1") </> file("f1")
@@ -229,7 +233,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         runLogT(run, p).runEither must beRight(anotherDoc)
       }
 
-      step(deleteForManage(run).runVoid)
+      step(deleteForManage(fs.setupInterpM).runVoid)
     }; ()
   }
 }

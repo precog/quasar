@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package quasar
-package physical
-package mongodb
-package fs
+package quasar.physical.mongodb.fs
 
 import quasar.Predef._
+
+import quasar._
 import quasar.config._
 import quasar.fs._
 import quasar.fp._
@@ -35,17 +34,14 @@ import monocle.std.tuple2._
 import org.specs2.ScalaCheck
 import org.specs2.execute.{AsResult, SkipException}
 import pathy.Path._
-import scalaz.{Optional => _, _}
+import scalaz.{Optional => _, _}, Scalaz._
 import scalaz.stream._
-import scalaz.std.vector._
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.either._
 import scalaz.concurrent.Task
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec
-  extends FileSystemTest[FileSystemIO](MongoDbFileSystemSpec.mongoFsUT)
+  extends FileSystemTest[FileSystemIO](
+    MongoDbFileSystemSpec.mongoFsUT.map(_.filterNot(fs => quasar.TestConfig.isMongoReadOnly(fs.name))))
   with ScalaCheck
   with ExclusiveExecution
   with SkippedOnUserEnv {
@@ -86,9 +82,10 @@ class MongoDbFileSystemSpec
     }
   }
 
-  fileSystemShould { _ => implicit run =>
-    "MongoDB" should {
+  fileSystemShould { fs =>
+    val run = fs.testInterpM
 
+    "MongoDB" should {
       "Writing" >> {
         val invalidData = testPrefix.map(_ </> dir("invaliddata"))
                             .liftM[FileSystemErrT]
@@ -303,6 +300,6 @@ object MongoDbFileSystemSpec {
   def mongoFsUT: Task[IList[FileSystemUT[FileSystemIO]]] =
     TestConfig.externalFileSystems {
       case (MongoDbConfig(cs), dir) =>
-        mongodb.filesystems.testFileSystemIO(cs, dir)
+        quasar.physical.mongodb.filesystems.testFileSystemIO(cs, dir)
     }
 }

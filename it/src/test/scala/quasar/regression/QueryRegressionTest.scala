@@ -63,7 +63,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   val write  = WriteFile.Ops[S]
   val manage = ManageFile.Ops[S]
 
-  /** A name to idetify the suite in test output. */
+  /** A name to identify the suite in test output. */
   def suiteName: String
 
   /** Return the results of evaluating the given query as a stream. */
@@ -73,15 +73,15 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   lazy val tests = regressionTests(TestsRoot, knownFileSystems).run
 
-  fileSystemShould { name => implicit run =>
+  fileSystemShould { fs =>
     suiteName should {
-      step(prepareTestData(tests, run).run)
+      step(prepareTestData(tests, fs.setupInterpM).run)
 
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, name, run)
+        regressionExample(f, t, fs.name, fs.testInterpM)
       }
 
-      step(runT(run)(manage.delete(DataDir)).runVoid)
+      step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
     }; ()
   }
 
@@ -256,8 +256,8 @@ object QueryRegressionTest {
     for {
       uts    <- extFs
       mntDir =  rootDir </> dir("hfs-mnt")
-      hfsUts <- uts.traverse(ut => hierarchicalFSIO(mntDir, ut.run) map { f =>
-                  ut.copy(run = f).contramap(chroot.fileSystem[FileSystemIO](ut.testDir))
+      hfsUts <- uts.traverse(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f =>
+                  ut.copy(testInterp = f).contramap(chroot.fileSystem[FileSystemIO](ut.testDir))
                 })
     } yield hfsUts
   }

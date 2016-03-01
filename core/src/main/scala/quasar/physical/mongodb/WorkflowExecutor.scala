@@ -263,7 +263,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     }
   }
 
-  /** This tries to turn a Pipline into a simpler operation (eg, `count()` or
+  /** This tries to turn a Pipeline into a simpler operation (eg, `count()` or
     * `find()`) and falls back to a pipeline if it can’t.
     */
   // TODO: This should really be handled when building the WorkflowTask, but

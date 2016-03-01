@@ -36,9 +36,9 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
   def deleteForQuery(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(queryPrefix))
 
-  fileSystemShould { _ => implicit run =>
+  fileSystemShould { fs =>
     "Querying Files" should {
-      step(deleteForQuery(run).runVoid)
+      step(deleteForQuery(fs.setupInterpM).runVoid)
 
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lschildren")
@@ -47,12 +47,14 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val f2 = d1 </> dir("d2") </> file("f1")
         val expectedNodes = List[PathName](DirName("d2").left, FileName("f1").right)
 
-        val p = write.save(f1, oneDoc.toProcess).drain ++
-                write.save(f2, anotherDoc.toProcess).drain ++
-                query.ls(d1).liftM[Process]
+        val setup = write.save(f1, oneDoc.toProcess).drain ++
+                    write.save(f2, anotherDoc.toProcess).drain
+        execT(fs.setupInterpM, setup).runVoid
+
+        val p = query.ls(d1).liftM[Process]
                   .flatMap(ns => Process.emitAll(ns.toVector))
 
-        runLogT(run, p)
+        runLogT(fs.testInterpM, p)
           .runEither must beRight(containTheSameElementsAs(expectedNodes))
       }
 
@@ -64,27 +66,33 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")
-        runT(run)(query.ls(d)).runEither must beLeft(pathError(pathNotFound(d)))
+        runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathError(pathNotFound(d)))
       }
 
       "listing results should not contain deleted files" >> {
         val d = queryPrefix </> dir("lsdeleted")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
-        val p  = write.save(f1, oneDoc.toProcess).drain ++
-                 write.save(f2, anotherDoc.toProcess).drain ++
-                 query.ls(d).liftM[Process]
+
+        val setup = write.save(f1, oneDoc.toProcess).drain ++
+                    write.save(f2, anotherDoc.toProcess).drain
+        execT(fs.setupInterpM, setup).runVoid
+
+        val p = query.ls(d).liftM[Process]
                    .flatMap(ns => Process.emitAll(ns.toVector))
 
         val preDelete = List[PathName](FileName("f1").right, FileName("f2").right)
 
-        (runLogT(run, p)
-          .runEither must beRight(containTheSameElementsAs(preDelete))) and
-        (runT(run)(manage.delete(f1) *> query.ls(d))
+        (runLogT(fs.testInterpM, p)
+          .runEither must beRight(containTheSameElementsAs(preDelete)))
+
+        runT(fs.setupInterpM)(manage.delete(f1)).runVoid
+
+        (runT(fs.testInterpM)(query.ls(d))
           .runEither must beRight(containTheSameElementsAs(preDelete.tail)))
       }
 
-      step(deleteForQuery(run).runVoid)
+      step(deleteForQuery(fs.setupInterpM).runVoid)
     }; ()
   }
 }

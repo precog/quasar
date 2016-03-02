@@ -106,6 +106,20 @@ class MongoDbFileSystemSpec
           }
         }
 
+        "fail to save data to DB path" in {
+          val path = rootDir </> file("foo")
+
+          runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
+            -\/(FileSystemError.pathError(PathError2.invalidPath(path, "path names a database, but no collection")))
+        }
+
+        "fail to append data to DB path" in {
+          val path = rootDir </> file("foo")
+
+          runLogT(run, write.append(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
+            -\/(FileSystemError.pathError(PathError2.invalidPath(path, "path names a database, but no collection")))
+        }
+
         step(invalidData.flatMap(p => runT(run)(manage.delete(p))).runVoid)
       }
 

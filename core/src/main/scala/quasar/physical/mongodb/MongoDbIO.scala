@@ -341,7 +341,7 @@ object MongoDbIO {
       override def map[A, B](fa: MongoDbIO[A])(f: A => B) = fa map f
       def point[A](a: => A) = new MongoDbIO(Kleisli(_ => Task.now(a)))
       def bind[A, B](fa: MongoDbIO[A])(f: A => MongoDbIO[B]) = fa flatMap f
-      def fail[A](t: Throwable) = fail(t)
+      def fail[A](t: Throwable) = MongoDbIO.fail(t)
       def attempt[A](fa: MongoDbIO[A]) = fa.attempt
     }
 

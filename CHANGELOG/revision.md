@@ -1,0 +1,1 @@
+- update test configuration to latest MongoDB releases (3.0.9 and 3.2.3)

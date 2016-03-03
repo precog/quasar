@@ -26,7 +26,7 @@ import scalaz.syntax.std.map._
 case class RegressionTest(
   name:      String,
   backends:  Map[BackendName, SkipDirective],
-  data:      Option[String],
+  data:      List[String],
   query:     String,
   variables: Map[String, String],
   expected:  ExpectedResult
@@ -42,7 +42,7 @@ object RegressionTest {
                           (c --\ "backends").as[Map[String, SkipDirective]]
                             .map(_ mapKeys (BackendName(_)))
                         else ok(Map[BackendName, SkipDirective]())
-      data          <-  optional[String](c --\ "data")
+      data          <-  (c --\ "data").as[List[String]] ||| optional[String](c--\ "data").map(_.toList)
       query         <-  (c --\ "query").as[String]
       variables     <-  orElse(c --\ "variables", Map.empty[String, String])
       ignoredFields <-  orElse(c --\ "ignoredFields", List.empty[String])

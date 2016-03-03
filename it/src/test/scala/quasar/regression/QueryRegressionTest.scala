@@ -96,7 +96,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   ): Example = {
     def runTest = (for {
       _    <- Task.delay(println(test.query))
-      _    <- run(test.data.cata(verifyDataExists, success.point[F]))
+      _    <- run(test.data.traverse(verifyDataExists))
       data =  testQuery(test.query, test.variables)
       res  <- verifyResults(test.expected, data, run)
     } yield res).run

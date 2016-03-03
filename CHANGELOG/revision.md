@@ -1,0 +1,1 @@
+- [SD-1426] fix hang in the MongoDB backend in certain error conditions

@@ -1,0 +1,1 @@
+- Fix restarting server on new port through REST API

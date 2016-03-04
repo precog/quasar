@@ -40,6 +40,9 @@ object Http4sUtils {
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
   //     will run indefinitely when started from a script.
+  // jedesah (03/04/16):
+  // Consider breaking out of the loop when a script is detected (`Option(System.console).isEmpty == true`?)
+  // as it seems unecessary to constantly poll for user input in such a scenario.
   def waitForInput: Task[Unit] = {
     import java.lang.System
     for {
@@ -150,7 +153,7 @@ object Http4sUtils {
     (servers, shutdown) = result
     _ <- if(openClient) openBrowser(port) else Task.now(())
     _ <- stdout("Press Enter to stop.")
-    _ <- Task.delay(waitForInput.runAsync(_ => shutdown.run))
+    _ <- Task.delay(Task.fork(waitForInput).runAsync(_ => shutdown.run))
     _ <- servers.run // We need to run the servers in order to make sure everything is cleaned up properly
   } yield ()
 }

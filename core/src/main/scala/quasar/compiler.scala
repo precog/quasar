@@ -38,7 +38,8 @@ trait Compiler[F[_]] {
   // HELPERS
   private type M[A] = EitherT[F, SemanticError, A]
 
-  private type CompilerM[A] = StateT[M, CompilerState, A]
+  private type CompilerStateT[F[_],A] = StateT[F, CompilerState, A]
+  private type CompilerM[A] = CompilerStateT[M, A]
 
   private def syntheticOf(node: CoExpr): List[Option[Synthetic]] =
     node.head._1
@@ -315,82 +316,88 @@ trait Compiler[F[_]] {
             case (name, _)         => Some(name)
           }
 
-        val projs = projections.map(_.expr)
+        (names.flatten(Option.option2Iterable) diff names.flatten(Option.option2Iterable).distinct).headOption.cata(
+          duplicateFieldName =>
+            EitherT.left[F, SemanticError,Fix[LogicalPlan]]((SemanticError.DuplicateFieldName(duplicateFieldName):SemanticError).point[F]).liftM[CompilerStateT],
+        {
 
-        val syntheticNames: List[String] =
-          names.zip(syntheticOf(node)).flatMap {
-            case (Some(name), Some(_)) => List(name)
-            case (_,          _)       => Nil
-          }
+          val projs = projections.map(_.expr)
 
-        relations.fold(
-          projs.traverseU(compile0).map(buildRecord(names, _)))(
-          relations => {
-            val stepBuilder = step(relations)
-            stepBuilder(compileRelation(relations).some) {
-              val filtered = filter.map(filter =>
-                (CompilerState.rootTableReq ⊛ compile0(filter))((set, filt) =>
-                  Fix(Filter(set, filt))))
+          val syntheticNames: List[String] =
+            names.zip(syntheticOf(node)).flatMap {
+              case (Some(name), Some(_)) => List(name)
+              case (_, _) => Nil
+            }
 
-              stepBuilder(filtered) {
-                val grouped = groupBy.map(groupBy =>
-                  (CompilerState.rootTableReq ⊛
-                    groupBy.keys.traverseU(compile0))((src, keys) =>
-                    Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
+          relations.fold(
+            projs.traverseU(compile0).map(buildRecord(names, _)))(
+            relations => {
+              val stepBuilder = step(relations)
+              stepBuilder(compileRelation(relations).some) {
+                val filtered = filter.map(filter =>
+                  (CompilerState.rootTableReq ⊛ compile0(filter)) ((set, filt) =>
+                    Fix(Filter(set, filt))))
 
-                stepBuilder(grouped) {
-                  val having = groupBy.flatMap(_.having).map(having =>
-                    (CompilerState.rootTableReq ⊛ compile0(having))((set, filt) =>
-                      Fix(Filter(set, filt))))
+                stepBuilder(filtered) {
+                  val grouped = groupBy.map(groupBy =>
+                    (CompilerState.rootTableReq ⊛
+                      groupBy.keys.traverseU(compile0)) ((src, keys) =>
+                      Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
 
-                  stepBuilder(having) {
-                    val select =
-                      (CompilerState.rootTableReq ⊛ projs.traverseU(compile0))((t, projs) =>
-                        buildRecord(
-                          names,
-                          projs.map(p => p.unFix match {
-                            case LogicalPlan.ConstantF(_) => Fix(Constantly(p, t))
-                            case _                        => p
-                          })))
+                  stepBuilder(grouped) {
+                    val having = groupBy.flatMap(_.having).map(having =>
+                      (CompilerState.rootTableReq ⊛ compile0(having)) ((set, filt) =>
+                        Fix(Filter(set, filt))))
 
-                    val squashed = select.map(set => Fix(Squash(set)))
+                    stepBuilder(having) {
+                      val select =
+                        (CompilerState.rootTableReq ⊛ projs.traverseU(compile0)) ((t, projs) =>
+                          buildRecord(
+                            names,
+                            projs.map(p => p.unFix match {
+                              case LogicalPlan.ConstantF(_) => Fix(Constantly(p, t))
+                              case _ => p
+                            })))
 
-                    stepBuilder(squashed.some) {
-                      val sort = orderBy.map(orderBy =>
-                        for {
-                          t <- CompilerState.rootTableReq
-                          flat = names.foldMap(_.toList)
-                          keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
-                          orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
-                        } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
+                      val squashed = select.map(set => Fix(Squash(set)))
 
-                      stepBuilder(sort) {
-                        val distincted = isDistinct match {
-                          case SelectDistinct =>
-                            CompilerState.rootTableReq.map(t =>
-                              if (syntheticNames.nonEmpty)
-                                Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                  Fix(DeleteField(acc, LogicalPlan.Constant(Data.Str(field)))))))
-                              else Fix(Distinct(t))).some
-                          case _ => None
-                        }
+                      stepBuilder(squashed.some) {
+                        val sort = orderBy.map(orderBy =>
+                          for {
+                            t <- CompilerState.rootTableReq
+                            flat = names.foldMap(_.toList)
+                            keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
+                            orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
+                          } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
 
-                        stepBuilder(distincted) {
-                          val pruned =
-                            CompilerState.rootTableReq.map(
-                              syntheticNames.foldLeft(_)((acc, field) =>
-                                Fix(DeleteField(acc,
-                                  LogicalPlan.Constant(Data.Str(field))))))
+                        stepBuilder(sort) {
+                          val distincted = isDistinct match {
+                            case SelectDistinct =>
+                              CompilerState.rootTableReq.map(t =>
+                                if (syntheticNames.nonEmpty)
+                                  Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
+                                    Fix(DeleteField(acc, LogicalPlan.Constant(Data.Str(field)))))))
+                                else Fix(Distinct(t))).some
+                            case _ => None
+                          }
 
-                          pruned
+                          stepBuilder(distincted) {
+                            val pruned =
+                              CompilerState.rootTableReq.map(
+                                syntheticNames.foldLeft(_)((acc, field) =>
+                                  Fix(DeleteField(acc,
+                                    LogicalPlan.Constant(Data.Str(field))))))
+
+                            pruned
+                          }
                         }
                       }
                     }
                   }
                 }
               }
-            }
-          })
+            })
+        })
 
       case SetLiteralF(values0) =>
         val values = values0.map(_.tail).traverseU {

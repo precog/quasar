@@ -1,0 +1,1 @@
+- [SD-1338] Fix issue where a duplicated alias or fields with the same name would lead to a column being dropped from the output instead of producing a clear compilation error message

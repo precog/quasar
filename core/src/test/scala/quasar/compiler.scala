@@ -1244,6 +1244,21 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       compile("select (case when bar.a = 1 then 'ok' else foo end) from bar, baz") must beLeftDisjunction
     }
 
+    "fail with duplicate alias" in {
+      compile("select car.name as name, owner.name as name from owners as owner join cars as car on car._id = owner.carId") must
+        beLeftDisjunction("DuplicateFieldName(name)")
+    }
+
+    "fail when two projections have the same field name" in {
+      compile("select car.name, owner.name from owners as owner join cars as car on car._id = owner.carId") must
+        beLeftDisjunction("DuplicateFieldName(name)")
+    }
+
+    "fail when a field name conflicts with an alias" in {
+      compile("select car.name as name, owner.name from owners as owner join cars as car on car._id = owner.carId") must
+        beLeftDisjunction("DuplicateFieldName(name)")
+    }
+
     "translate free variable" in {
       testLogicalPlanCompile("select name from zips where age < :age",
         Let('__tmp0, read("zips"),

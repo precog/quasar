@@ -5,7 +5,7 @@
     "query": "SELECT owner.name, car.name from owners as owner join cars as car on car._id = owner.carId",
     "predicate": "containsExactly",
     "expected": [
-        { "owner.name": "emma", "car.name": "RangeRover-Evoque" },
-        { "owner.name": "scott", "car.name": "Honda-civic" },
-        { "owner.name": "scott", "car.name": "BMW-X5" }]
+        { "(owner)_name": "emma",  "car_name": "RangeRover-Evoque" },
+        { "owner_name": "scott", "car_name": "Honda-civic" },
+        { "owner_name": "scott", "car_name": "BMW-X5" }]
 }

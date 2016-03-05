@@ -32,7 +32,7 @@ package object expression {
   type Expression = Fix[ExprOp]
 
   def $field(field: String, others: String*): Expression =
-    $var(DocField(others.map(BsonField.Name).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))
+    $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))
 
   val $$ROOT = $var(DocVar.ROOT())
   val $$CURRENT = $var(DocVar.CURRENT())

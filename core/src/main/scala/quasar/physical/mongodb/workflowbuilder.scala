@@ -28,7 +28,6 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
-import shapeless.contrib.scalaz.instances.deriveEqual
 
 sealed trait WorkflowBuilderF[+A]
 

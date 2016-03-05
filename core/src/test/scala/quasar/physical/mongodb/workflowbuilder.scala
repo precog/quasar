@@ -462,8 +462,6 @@ class WorkflowBuilderSpec
         city   <- lift(projectField(read, "city"))
         filtered = filter(city, List(flat), { case p :: Nil => Selector.Doc(p -> Selector.Lt(Bson.Int32(1000))) })
 
-        _=println(filtered.show)
-
         rez    <- build(filtered)
       } yield rez).evalZero
 

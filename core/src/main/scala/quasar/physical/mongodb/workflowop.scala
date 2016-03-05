@@ -449,7 +449,7 @@ object Workflow {
 
   def simpleShape(op: Workflow): Option[List[BsonField.Name]] = op.unFix match {
     case $Pure(Bson.Doc(value))          =>
-      value.keys.toList.map(BsonField.Name).some
+      value.keys.toList.map(BsonField.Name(_)).some
     case $Project(_, Reshape(value), id) =>
       (if (id == IncludeId) IdName :: value.keys.toList
       else value.keys.toList).some

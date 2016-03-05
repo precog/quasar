@@ -308,6 +308,9 @@ object BsonField {
 
     override def toString = s"""BsonField.Name("$value")"""
   }
+  object Name {
+    implicit val equal: Equal[Name] = Equal.equalA
+  }
 
   final case class Path(values: NonEmptyList[Name]) extends BsonField {
     def flatten = values

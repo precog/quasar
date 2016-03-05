@@ -112,12 +112,14 @@ final case class Path(dir: List[DirNode], file: Option[FileNode]) {
 }
 
 object Path {
-  implicit def ShowPath: Show[Path] = new Show[Path] {
+  implicit def show: Show[Path] = new Show[Path] {
     override def show(v: Path) = Cord(v.pathname)
   }
 
-  implicit val PathOrder: scala.Ordering[Path] =
+  implicit val ordering: scala.Ordering[Path] =
     scala.Ordering[(String, Boolean)].on(p => (p.pathname, p.pureDir))
+
+  implicit val equal: Equal[Path] = Equal.equalA
 
   val Root = Path(Nil, None)
 

@@ -24,7 +24,6 @@ import quasar.namegen._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, Validation.{success, failure}, Validation.FlatMap._
-import shapeless.contrib.scalaz.instances.deriveEqual
 
 sealed trait LogicalPlan[A]
 object LogicalPlan {

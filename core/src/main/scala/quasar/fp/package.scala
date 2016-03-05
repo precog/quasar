@@ -114,6 +114,8 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
   implicit val StringRenderTree: RenderTree[String] =
     RenderTree.fromToString[String]("String")
 
+  implicit val SymbolEqual: Equal[Symbol] = Equal.equalA
+
   implicit def PathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
     new RenderTree[pathy.Path[B,T,S]] {
       // NB: the implicit Show instance in scope here ends up being a circular

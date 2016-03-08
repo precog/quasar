@@ -1377,4 +1377,46 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
   }
+
+  "constant folding" >> {
+    def testFolding(name: String, query: String, expected: String) = {
+      s"${name}" >> {
+        testTypedLogicalPlanCompile(query, fullCompileExp(expected))
+      }
+
+      s"${name} with collection" >> {
+        testTypedLogicalPlanCompile(s"$query from zips", fullCompileExp(expected))
+      }
+    }
+
+    testFolding("ARBITRARY",
+      "select arbitrary((3, 4, 5))",
+      "select 3")
+
+    testFolding("AVG",
+      "select avg((0.5, 1.0, 4.5))",
+      "select 2.0")
+
+    testFolding("COUNT",
+      """select count(("foo", "quux", "baz"))""",
+      "select 3")
+
+    testFolding("MAX",
+      "select max((4, 2, 1001, 17))",
+      "select 1001")
+
+    testFolding("MIN",
+      "select min((4, 2, 1001, 17))",
+      "select 2")
+
+    testFolding("SUM",
+      "select sum((1, 1, 1, 1, 1, 3, 4))",
+      "select 12")
+  }
+
+  List("avg", "sum") foreach { fn =>
+    s"passing a literal set of the wrong type to '${fn.toUpperCase}' fails" >> {
+      fullCompile(s"""select $fn(("one", "two", "three"))""") must beLeftDisjunction
+    }
+  }
 }

@@ -272,21 +272,50 @@ object LogicalPlan {
   type SemDisj[A] = NonEmptyList[SemanticError] \/ A
 
   def inferTypes(typ: Type, term: Fix[LogicalPlan]):
-      SemValidation[Typed[LogicalPlan]] =
+      SemValidation[Typed[LogicalPlan]] = {
+
+    def inferInvoke(
+      func: Func,
+      args: List[Fix[LogicalPlan]])(
+      argType: ((Type, Fix[LogicalPlan])) => Type
+    ): SemValidation[LogicalPlan[Typed[LogicalPlan]]] = for {
+      types <- func.untype(typ)
+      args0 <- types.align(args).traverseU(_.onlyBoth match {
+                 case Some(both @ (t, arg)) =>
+                   inferTypes(argType(both), arg).disjunction
+                 case None =>
+                   SemanticError.WrongArgumentCount(func, types.length, args.length)
+                     .wrapNel.left
+               }).validation
+    } yield InvokeF[Typed[LogicalPlan]](func, args0)
+
     (term.unFix match {
-      case ReadF(c)          => success(ReadF[Typed[LogicalPlan]](c))
-      case ConstantF(d)      => success(ConstantF[Typed[LogicalPlan]](d))
-      case InvokeF(f, args)  => for {
-        types <- f.untype(typ)
-        args0 <- types.align(args).traverseU(_.onlyBoth match {
-                   case Some((t, arg)) =>
-                     inferTypes(t, arg).disjunction
-                   case None =>
-                     SemanticError.WrongArgumentCount(f, types.length, args.length)
-                       .wrapNel.left
-                 }).validation
-      } yield InvokeF[Typed[LogicalPlan]](f, args0)
-      case FreeF(n)          => success(FreeF[Typed[LogicalPlan]](n))
+      case ReadF(c) =>
+        success(ReadF[Typed[LogicalPlan]](c))
+
+      case ConstantF(d) =>
+        success(ConstantF[Typed[LogicalPlan]](d))
+
+      case InvokeF(f @ Reduction(_, _, _, _, _, _, _), args) =>
+        // NB: In order to support folding of constant sets passed to reduction
+        //     functions, we change the expected type in these cases to be a
+        //     `Set(A)` instead of just `A` when the argument is a constant set
+        //     as otherwise unification will fail as the expected type will be
+        //     some non-Set-typed `A` and the type of `Const(Data.Set(A))` is
+        //     `Set(A)`. Note that unification will still fail as expected if
+        //     the constant set has members of the wrong type.
+        inferInvoke(f, args) {
+          case (t, arg @ Fix(ConstantF(Data.Set(_)))) if !Type.AnySet.contains(t) =>
+            Type.Set(t)
+          case (t, _) => t
+        }
+
+      case InvokeF(f, args) =>
+        inferInvoke(f, args)(_._1)
+
+      case FreeF(n) =>
+        success(FreeF[Typed[LogicalPlan]](n))
+
       case LetF(n, form, in) =>
         inferTypes(typ, in).flatMap { in0 =>
           val fTyp = in0.collect {
@@ -294,10 +323,13 @@ object LogicalPlan {
           }.concatenate(Type.TypeGlbMonoid)
           inferTypes(fTyp, form).map(LetF[Typed[LogicalPlan]](n, _, in0))
         }
+
       case TypecheckF(expr, t, cont, fallback) =>
         (inferTypes(t, expr) ⊛ inferTypes(typ, cont) ⊛ inferTypes(typ, fallback))(
           TypecheckF[Typed[LogicalPlan]](_, t, _, _))
+
     }).map(Cofree(typ, _))
+  }
 
   private def lift[A](v: SemDisj[A]): NameT[SemDisj, A] =
     quasar.namegen.lift[SemDisj](v)

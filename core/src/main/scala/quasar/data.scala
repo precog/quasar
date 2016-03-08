@@ -146,6 +146,45 @@ object Data {
     def toJs = jscore.ident(Js.Undefined.ident)
   }
 
+  final class Comparable private (val value: Data) extends scala.AnyVal
+
+  object Comparable {
+    def apply(data: Data): Option[Comparable] =
+      some(data)
+        .filter(d => Type.Comparable contains d.dataType)
+        .map(new Comparable(_))
+
+    def partialCompare(a: Comparable, b: Comparable): Option[Ordering] = {
+      (a.value, b.value) match {
+        case (Int(x), Int(y))             => Some(x cmp y)
+        case (Dec(x), Dec(y))             => Some(x cmp y)
+        case (Str(x), Str(y))             => Some(x cmp y)
+        case (Bool(x), Bool(y))           => Some(x cmp y)
+        case (Date(x), Date(y))           => Some(Ordering.fromInt(x compareTo y))
+        case (Time(x), Time(y))           => Some(Ordering.fromInt(x compareTo y))
+        case (Timestamp(x), Timestamp(y)) => Some(Ordering.fromInt(x compareTo y))
+        case (Interval(x), Interval(y))   => Some(Ordering.fromInt(x compareTo y))
+        case _                            => None
+      }
+    }
+
+    def min(a: Comparable, b: Comparable): Option[Comparable] = {
+      partialCompare(a, b) map {
+        case Ordering.LT => a
+        case Ordering.EQ => a
+        case Ordering.GT => b
+      }
+    }
+
+    def max(a: Comparable, b: Comparable): Option[Comparable] = {
+      partialCompare(a, b) map {
+        case Ordering.LT => b
+        case Ordering.EQ => a
+        case Ordering.GT => a
+      }
+    }
+  }
+
   implicit val dataShow: Show[Data] =
     Show.showFromToString
 }

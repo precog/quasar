@@ -1,0 +1,1 @@
+- [SD-837] Constant folding for aggregation functions

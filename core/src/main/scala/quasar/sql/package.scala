@@ -29,6 +29,7 @@ package object sql {
   def CrossRelation(left: SqlRelation[Expr], right: SqlRelation[Expr]) =
     JoinRelation(left, right, InnerJoin, BoolLiteral(true))
 
+  // Explore accepting projections
   def namedProjections(e: Expr, relName: Option[String]):
       List[(String, Expr)] = {
     def extractName(expr: Expr): Option[String] = expr match {
@@ -41,10 +42,18 @@ package object sql {
 
     e.unFix match {
       case SelectF(_, projections, _, _, _, _) =>
-        projections.zipWithIndex.map {
+        projections.zipWithIndex.foldLeft(List.empty[(String, Expr)]) { (result, proj) => proj match {
           case (Proj(expr, alias), index) =>
-            (alias <+> extractName(expr)).getOrElse(index.toString()) -> expr
-        }
+            val simpleName = alias orElse extractName(expr) getOrElse index.toString
+            val indexOfAlreadyExists = result.indexWhere(_._1 == simpleName)
+            if (indexOfAlreadyExists === -1) result :+ (simpleName -> expr)
+            else {
+              def makeOutputFriendly(a: String) = a.replace('.', '_')
+              val oldExpr = result(indexOfAlreadyExists)._2
+              val oldPair = (extractName(oldExpr).map(_ + index.toString).getOrElse(index.toString) -> oldExpr)
+              result.updated(indexOfAlreadyExists, oldPair) :+ ((simpleName + index.toString) -> expr)
+            }
+        }}
     }
   }
 

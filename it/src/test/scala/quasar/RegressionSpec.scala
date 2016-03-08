@@ -86,13 +86,12 @@ class RegressionSpec extends BackendTest {
       testFile <- StreamT.fromStream(files(TestRoot, """.*\.test"""r))
       example  <- StreamT((decodeTest(testFile) flatMap { test =>
                       // The data file should be in the same directory as the testFile
-                      val dataFile = test.data.map(name => new File(testFile.getParent, name))
-                      val loadDataFileIfProvided = dataFile.map(interactive.loadFile(insertBackend, tmpDir, _))
-                                                      .getOrElse(().point[ProcessingTask])
+                      val dataFiles = test.data.map(name => new File(testFile.getParent, name))
+                      val loadDataFiles = EitherT(Task.gatherUnordered(dataFiles.map(interactive.loadFile(insertBackend, tmpDir, _).run)).map(_.sequenceU))
                       Task.delay {
                         (test.name + " [" + testFile.getPath + "]") in {
                           def runTest = (for {
-                            _ <- loadDataFileIfProvided
+                            _ <- loadDataFiles
                             out <- liftE[EvaluationError](runQuery(test.query, test.variables)).leftMap(PEvalError(_))
                             (log, outP) = out
                             // _ = println(test.name + "\n" + log.last)

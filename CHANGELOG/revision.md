@@ -1,0 +1,1 @@
+- add regression tests for a read-only configuration

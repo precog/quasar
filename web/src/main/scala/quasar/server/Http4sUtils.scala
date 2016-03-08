@@ -54,7 +54,7 @@ object Http4sUtils {
     } yield done
   }
 
-  private def openBrowser(port: Int): Task[Unit] = {
+  def openBrowser(port: Int): Task[Unit] = {
     val url = "http://localhost:" + port + "/"
     Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
       .or(stderr("Failed to open browser, please navigate to " + url))

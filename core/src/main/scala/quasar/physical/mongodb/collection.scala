@@ -97,6 +97,10 @@ object Collection {
   def dbNameFromPath(path: APath): PathError2 \/ String =
     dbNameAndRest(path) bimap (PathError2.invalidPath(path, _), _._1)
 
+  /** Returns the directory name derived from the given database name. */
+  def dirNameFromDbName(dbName: String): DirName =
+    DirName(DatabaseNameUnparser(dbName))
+
   private def dbNameAndRest(path: APath): String \/ (String, IList[String]) =
     flatten(None, None, None, Some(_), Some(_), path)
       .toIList.unite.uncons(
@@ -192,7 +196,10 @@ object Collection {
     }
   }
 
-  implicit val CollectionRenderTree: RenderTree[Collection] =
+  implicit val order: Order[Collection] =
+    Order.orderBy(c => (c.databaseName, c.collectionName))
+
+  implicit val renderTree: RenderTree[Collection] =
     new RenderTree[Collection] {
       def render(v: Collection) =
         Terminal(List("Collection"), Some(v.databaseName + "; " + v.collectionName))

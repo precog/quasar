@@ -1,0 +1,1 @@
+- [SD-1329] Fix moving and deleting mongo databases via filesystem

@@ -22,6 +22,7 @@ import quasar._
 import quasar.config._
 import quasar.fs._
 import quasar.fp._
+import quasar.physical.mongodb.Collection
 import quasar.regression._
 import quasar.specs2._
 import quasar.sql
@@ -54,6 +55,8 @@ class MongoDbFileSystemSpec
   val write  = WriteFile.Ops[FileSystemIO]
   val manage = ManageFile.Ops[FileSystemIO]
 
+  type X[A] = Process[manage.M, A]
+
   /** The test prefix from the config.
     *
     * NB: This is a bit brittle as we're assuming this is the correct source
@@ -81,6 +84,9 @@ class MongoDbFileSystemSpec
       rethrow[Task, FileSystemError].apply(execT(run, p))
     }
   }
+
+  val tmpDir: Task[ADir] =
+    NameGenerator.salt map (s => rootDir </> dir(s))
 
   fileSystemShould { fs =>
     val run = fs.testInterpM
@@ -125,11 +131,6 @@ class MongoDbFileSystemSpec
         *     we're ok skipping them on an authorization error.
         */
       "Deletion" >> {
-        type X[A] = Process[manage.M, A]
-
-        val tmpDir: Task[ADir] =
-          NameGenerator.salt map (s => rootDir </> dir(s))
-
         "top-level directory should delete database" >> {
           def check(d: ADir)(implicit X: Apply[X]) = {
             val f = d </> file("deldb")
@@ -276,6 +277,50 @@ class MongoDbFileSystemSpec
 
           (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
             .runEither must beRight(contain(FileName("foobar").right[DirName]))
+        }
+      }
+
+      "Moving" >> {
+        "top-level directory should move database" >> {
+          def check(src: ADir, dst: ADir)(implicit X: Apply[X]) = {
+            val f1 = src </> file("movdb1")
+            val f2 = src </> file("movdb2")
+            val ovr = ManageFile.MoveSemantics.Overwrite
+
+            (
+              write.save(f1, oneDoc.toProcess).terminated |@|
+              write.save(f2, oneDoc.toProcess).terminated |@|
+              query.ls(src).liftM[Process]                |@|
+              manage.moveDir(src, dst, ovr).liftM[Process] |@|
+              query.ls(dst).liftM[Process]
+            ) { (_, _, create, _, moved) =>
+              val pn: Set[PathName] = Set(FileName("movdb1").right, FileName("movdb2").right)
+              (create must contain(allOf(pn))) and (moved must contain(allOf(pn)))
+            }
+          }
+
+          (tmpDir |@| tmpDir)((s, d) =>
+            rethrow[Task, FileSystemError]
+              .apply(
+                runLogT(run, check(s, d)) <*
+                runT(run)(manage.delete(s) *> manage.delete(d)))
+              .handleWith(skipIfUnauthorized)
+              .map(_.headOption getOrElse ko)
+          ).join.run
+        }
+      }
+
+      "Temp files" should {
+        Collection.DatabaseNameEscapes foreach { case (esc, _) =>
+          s"be in the same database when db name contains '$esc'" >> {
+            val pdir = rootDir </> dir(s"db${esc}name")
+
+            runT(run)(for {
+              tfile  <- manage.tempFile(pdir)
+              dbName <- EitherT.fromDisjunction[manage.F](
+                          Collection.dbNameFromPath(tfile).leftMap(pathError(_)))
+            } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
+          }
         }
       }
     }; ()

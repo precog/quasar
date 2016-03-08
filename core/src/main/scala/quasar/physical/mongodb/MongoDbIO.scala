@@ -245,7 +245,7 @@ object MongoDbIO {
       case FailIfExists => false
     }
 
-    if (src == dst)
+    if (src === dst)
       ().point[MongoDbIO]
     else
       collection(src)

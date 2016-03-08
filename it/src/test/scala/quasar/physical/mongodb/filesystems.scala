@@ -16,44 +16,61 @@
 
 package quasar.physical.mongodb
 
-import quasar.{EnvironmentError2, rethrow}
+import quasar.Predef._
+import quasar.{EnvironmentError, EnvErrF, EnvErr}
+import quasar.config.{CfgErr, CfgErrF, ConfigError}
 import quasar.effect.Failure
 import quasar.fp.free._
 import quasar.fs._
+import quasar.fs.mount.ConnectionUri
 import quasar.physical.mongodb.fs._
+import quasar.physical.mongodb.util.createAsyncMongoClient
 import quasar.regression._
 
-import com.mongodb.{ConnectionString, MongoException}
-import com.mongodb.async.client.MongoClients
+import com.mongodb.MongoException
 import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 object filesystems {
   def testFileSystem(
-    cs: ConnectionString,
+    uri: ConnectionUri,
     prefix: ADir
-  ): Task[FileSystem ~> Task] = for {
-    client   <- Task.delay(MongoClients create cs)
-    mongofs0 <- rethrow[Task, EnvironmentError2]
-                  .apply(mongoDbFileSystem[MongoEff](client, DefaultDb fromPath prefix))
-    mongofs  =  foldMapNT(mongoEffToTask) compose mongofs0
-  } yield mongofs
+  ): Task[FileSystem ~> Task] = {
+    val prg = for {
+      client   <- createAsyncMongoClient[MongoEff](uri)
+      mongofs0 =  mongoDbFileSystem[MongoEff](client, DefaultDb fromPath prefix)
+      mongofs  <- envErr.unattempt(lift(mongofs0.run).into[MongoEff])
+    } yield mongofs
+
+    mongoEffMToTask(prg) map (mongoEffMToTask compose _)
+  }
 
   def testFileSystemIO(
-    cs: ConnectionString,
+    uri: ConnectionUri,
     prefix: ADir
   ): Task[FileSystemIO ~> Task] =
-    testFileSystem(cs, prefix)
+    testFileSystem(uri, prefix)
       .map(interpret2(NaturalTransformation.refl[Task], _))
 
   ////
 
   private type MongoEff0[A] = Coproduct[MongoErrF, Task, A]
-  private type MongoEff[A]  = Coproduct[WorkflowExecErrF, MongoEff0, A]
+  private type MongoEff1[A] = Coproduct[WorkflowExecErrF, MongoEff0, A]
+  private type MongoEff2[A] = Coproduct[EnvErrF, MongoEff1, A]
+  private type MongoEff[A]  = Coproduct[CfgErrF, MongoEff2, A]
+  private type MongoEffM[A] = Free[MongoEff, A]
+
+  private val envErr =
+    Failure.Ops[EnvironmentError, MongoEff](implicitly, Inject[EnvErrF, MongoEff])
 
   private val mongoEffToTask: MongoEff ~> Task =
-    interpret3[WorkflowExecErrF, MongoErrF, Task, Task](
+    interpret5[CfgErrF, EnvErrF, WorkflowExecErrF, MongoErrF, Task, Task](
+      Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[ConfigError]),
+      Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[EnvironmentError]),
       Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toRuntimeError[WorkflowExecutionError]),
       Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
       NaturalTransformation.refl)
+
+  private val mongoEffMToTask: MongoEffM ~> Task =
+    foldMapNT(mongoEffToTask)
 }

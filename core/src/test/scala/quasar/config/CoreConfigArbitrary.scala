@@ -16,7 +16,7 @@
 
 package quasar.config
 
-import quasar.fs.mount.{MountingsConfig2, MountingsConfigArbitrary}
+import quasar.fs.mount.{MountingsConfig, MountingsConfigArbitrary}
 
 import org.scalacheck.Arbitrary
 
@@ -24,7 +24,7 @@ trait CoreConfigArbitrary {
   import MountingsConfigArbitrary._
 
   implicit val coreConfigArbitrary: Arbitrary[CoreConfig] =
-    Arbitrary(Arbitrary.arbitrary[MountingsConfig2] map (CoreConfig(_)))
+    Arbitrary(Arbitrary.arbitrary[MountingsConfig] map (CoreConfig(_)))
 }
 
 object CoreConfigArbitrary extends CoreConfigArbitrary

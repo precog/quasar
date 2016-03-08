@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.fp.numeric.Positive
 import quasar.SKI._
-import quasar.{EnvironmentError2, EnvErr2T}
+import quasar.{EnvironmentError, EnvErrT}
 import quasar.fp.prism._
 import quasar.physical.mongodb.execution._
 import quasar.physical.mongodb.workflowtask._
@@ -118,14 +118,14 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
 }
 
 private[mongodb] object MongoDbIOWorkflowExecutor {
-  import EnvironmentError2._
+  import EnvironmentError._
 
   /** The minimum MongoDbIO version required to be able to execute `Workflow`s. */
   val MinMongoDbVersion = List(2, 6, 0)
 
-  /** Catch MongoExceptions and attempt to convert to EnvironmentError2. */
-  val liftEnvErr: MongoDbIO ~> EnvErr2T[MongoDbIO, ?] =
-    new (MongoDbIO ~> EnvErr2T[MongoDbIO, ?]) {
+  /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
+  val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =
+    new (MongoDbIO ~> EnvErrT[MongoDbIO, ?]) {
       def apply[A](m: MongoDbIO[A]) = EitherT(m.attemptMongo.run flatMap {
         case -\/(ex: MongoSocketOpenException) =>
           connectionFailed(ex.getMessage).left.point[MongoDbIO]

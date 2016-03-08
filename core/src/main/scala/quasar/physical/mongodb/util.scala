@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvErrF, EnvironmentError2}
+import quasar.{EnvErrF, EnvironmentError}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp.free
@@ -28,16 +28,12 @@ import java.util.concurrent.{TimeUnit, TimeoutException}
 
 import com.mongodb._
 import com.mongodb.async.client.{MongoClient => AMongoClient, MongoClients, MongoClientSettings}
-import com.mongodb.connection.{ClusterSettings, SocketSettings, SslSettings}
 import scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.syntax.applicative._
 
 object util {
-  import ConfigError._, EnvironmentError2._
-
-  def createMongoClient(config: MongoDbConfig): Task[MongoClient] =
-    disableMongoLogging *> mongoClient(config.uri)
+  import ConfigError._, EnvironmentError._
 
   /** Returns an async `MongoClient` for the given `ConnectionUri`. Will fail
     * with a `ConfigError` if the uri is invalid and with an `EnvironmentError`
@@ -55,7 +51,7 @@ object util {
   ): Free[S, AMongoClient] = {
     type M[A] = Free[S, A]
     val cfgErr = Failure.Ops[ConfigError, S]
-    val envErr = Failure.Ops[EnvironmentError2, S]
+    val envErr = Failure.Ops[EnvironmentError, S]
 
     val disableLogging =
       free.lift(disableMongoLogging).into[S]
@@ -104,20 +100,6 @@ object util {
 
   // TODO: Externalize
   private val defaultTimeoutMillis: Int = 5000
-
-  private val DefaultOptions =
-    (new MongoClientOptions.Builder)
-      .serverSelectionTimeout(defaultTimeoutMillis)
-      .build
-
-  private val mongoClient: ConnectionString => Task[MongoClient] = {
-    val memo = Memo.mutableHashMapMemo[ConnectionString, MongoClient] { (uri: ConnectionString) =>
-      new MongoClient(
-        new MongoClientURI(uri.getConnectionString, new MongoClientOptions.Builder(DefaultOptions)))
-    }
-
-    uri => Task.delay { memo(uri) }
-  }
 
   private def disableMongoLogging: Task[Unit] = {
     import java.util.logging._

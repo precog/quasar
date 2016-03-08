@@ -29,7 +29,7 @@ import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
 object ViewMounter {
-  import MountingError._, MountConfig2._
+  import MountingError._, MountConfig._
 
   /** Attempts to mount a view at the given location. */
   def mount[S[_]: Functor]

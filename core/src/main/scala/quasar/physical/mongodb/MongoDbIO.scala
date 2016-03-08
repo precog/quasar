@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import scala.Predef.classOf
 import scala.collection.JavaConverters._
 
-import com.mongodb.{MongoClient => _, _}
+import com.mongodb._
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.client.model._
 import com.mongodb.async._

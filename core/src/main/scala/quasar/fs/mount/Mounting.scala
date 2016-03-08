@@ -32,7 +32,7 @@ sealed trait Mounting[A]
 
 object Mounting {
   final case class Lookup(path: APath)
-    extends Mounting[Option[MountConfig2]]
+    extends Mounting[Option[MountConfig]]
 
   final case class MountView(loc: AFile, query: Expr, vars: Variables)
     extends Mounting[MountingError \/ Unit]
@@ -60,14 +60,14 @@ object Mounting {
   final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
     extends LiftedOps[Mounting, S] {
 
-    import MountConfig2._
+    import MountConfig._
 
     type M[A] = EitherT[F, MountingError, A]
 
     /** Returns the mount configuration for the given mount path or nothing
       * if the path does not refer to a mount.
       */
-    def lookup(path: APath): OptionT[F, MountConfig2] =
+    def lookup(path: APath): OptionT[F, MountConfig] =
       OptionT(lift(Lookup(path)))
 
     /** Create a view mount at the given location. */
@@ -81,7 +81,7 @@ object Mounting {
     /** Attempt to create a mount described by the given configuration at the
       * given location.
       */
-    def mount(loc: APath, config: MountConfig2): M[PathTypeMismatch \/ Unit] =
+    def mount(loc: APath, config: MountConfig): M[PathTypeMismatch \/ Unit] =
       config match {
         case ViewConfig(query, vars) =>
           D.right.getOption(refineType(loc)) cata (
@@ -103,7 +103,7 @@ object Mounting {
     /** Replace the mount at the given path with one described by the
       * provided config.
       */
-    def replace(loc: APath, config: MountConfig2): M[PathTypeMismatch \/ Unit] =
+    def replace(loc: APath, config: MountConfig): M[PathTypeMismatch \/ Unit] =
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
@@ -132,7 +132,7 @@ object Mounting {
     private def modify[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],
-      f: MountConfig2 => MountConfig2
+      f: MountConfig => MountConfig
     ): M[PathTypeMismatch \/ Unit] = {
       val mErr = MonadError[ErrF, MountingError \/ PathTypeMismatch]
       import mErr._

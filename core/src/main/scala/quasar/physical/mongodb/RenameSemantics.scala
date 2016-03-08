@@ -14,21 +14,11 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.physical.mongodb
 
-import quasar.effect.Failure
+sealed trait RenameSemantics
 
-import pathy.Path.{File, Dir, Sandboxed}
-import scalaz.{Coyoneda, EitherT}
-import scalaz.concurrent.Task
-
-package object config {
-  type FsFile = FsPath[File, Sandboxed]
-  type FsDir  = FsPath[Dir, Sandboxed]
-
-  type CfgErr[A]  = Failure[ConfigError, A]
-  type CfgErrF[A] = Coyoneda[CfgErr, A]
-
-  type CfgErrT[F[_], A] = EitherT[F, ConfigError, A]
-  type CfgTask[A]       = CfgErrT[Task, A]
+object RenameSemantics {
+  case object Overwrite extends RenameSemantics
+  case object FailIfExists extends RenameSemantics
 }

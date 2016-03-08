@@ -55,15 +55,15 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
   def runTest[R: org.specs2.execute.AsResult](f: HttpSvc => M.F[R]): R = {
     type MEff[A] = Coproduct[Task, MountConfigsF, A]
 
-    TaskRef(Map[APath, MountConfig2]()).map { ref =>
+    TaskRef(Map[APath, MountConfig]()).map { ref =>
 
       val mounter: Mounting ~> Free[MEff, ?] = Mounter[Task, MEff](
         {
           case MountRequest.MountView(_, expr, Variables(vars)) if (vars.isEmpty) =>
-            Task.now(MountingError.invalidConfig(MountConfig2.viewConfig(expr, Variables(vars)),
+            Task.now(MountingError.invalidConfig(MountConfig.viewConfig(expr, Variables(vars)),
               "unbound variable (simulated)".wrapNel).left)
           case MountRequest.MountFileSystem(_, typ, uri @ ConnectionUri("invalid")) =>
-            Task.now(MountingError.invalidConfig(MountConfig2.fileSystemConfig(typ, uri),
+            Task.now(MountingError.invalidConfig(MountConfig.fileSystemConfig(typ, uri),
               "invalid connectionUri (simulated)".wrapNel).left)
           case _ =>
             Task.now(().right)
@@ -127,7 +127,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         !hasDot(f) ==> {
           runTest { service =>
             val cfg = viewConfig("select * from zips where pop > :cutoff", "cutoff" -> "1000")
-            val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
               _    <- M.mountView(f, cfg._1, cfg._2).run.flatMap(orFailF)
@@ -198,7 +198,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp.status must_== Status.Ok
 
               srcAfter must beNone
-              dstAfter must beSome(MountConfig2.fileSystemConfig(StubFs, ConnectionUri("foo")))
+              dstAfter must beSome(MountConfig.fileSystemConfig(StubFs, ConnectionUri("foo")))
             }
           }
         }
@@ -320,7 +320,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 resp.as[String].run must_== s"added ${printPath(parent </> fsDir)}"
                 resp.status must_== Status.Ok
 
-                after must beSome(MountConfig2.fileSystemConfig(StubFs, ConnectionUri("foo")))
+                after must beSome(MountConfig.fileSystemConfig(StubFs, ConnectionUri("foo")))
               }
             }
           }
@@ -330,7 +330,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           !hasDot(parent </> f) ==> {
             runTest { service =>
               val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
               for {
                 resp  <- service(reqBuilder(parent, f, cfgStr))
@@ -340,7 +340,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 resp.as[String].run must_== s"added ${printPath(parent </> f)}"
                 resp.status must_== Status.Ok
 
-                after must beSome(MountConfig2.viewConfig(cfg))
+                after must beSome(MountConfig.viewConfig(cfg))
               }
             }
           }
@@ -350,7 +350,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           !hasDot(fs </> viewSuffix) ==> {
             runTest { service =>
               val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
               val view = fs </> viewSuffix
 
@@ -366,7 +366,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 resp.status must_== Status.Ok
 
                 afterFs must beSome
-                afterView must beSome(MountConfig2.viewConfig(cfg))
+                afterView must beSome(MountConfig.viewConfig(cfg))
               }
             }
           }
@@ -379,7 +379,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               val fsCfg = ()
 
               val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
               val fs = d.path </> posixCodec.parseRelDir(printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
 
@@ -393,7 +393,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 resp.as[String].run must_== s"added ${printPath(d.path </> view)}"
                 resp.status must_== Status.Ok
 
-                after must beSome(MountConfig2.viewConfig(cfg))
+                after must beSome(MountConfig.viewConfig(cfg))
               }
             }
           }
@@ -405,7 +405,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             runTest { service =>
               val cfg = (StubFs, ConnectionUri("foo"))
 
-              val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.fileSystemConfig(cfg))
+              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.fileSystemConfig(cfg))
 
               val fs1 = d.path </> fs.path </> fsSuffix.path
 
@@ -443,7 +443,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         "be 400 with view config and dir path in X-File-Name header" ! prop { (parent: AbsDirOf[AlphaCharacters], viewDir: RelDirOf[AlphaCharacters]) =>
           runTest { service =>
             val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-            val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
               resp <- service(reqBuilder(parent.path, viewDir.path, cfgStr))
@@ -458,7 +458,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           !hasDot(parent </> f) ==> {
             runTest { service =>
               val cfg = viewConfig("select * from zips where pop < :cutoff")
-              val cfgStr = EncodeJson.of[MountConfig2].encode(MountConfig2.viewConfig(cfg))
+              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
               for {
                 resp <- service(reqBuilder(parent, f, cfgStr))
@@ -536,7 +536,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             resp.as[Json].run must_== Json("error" := s"${printPath(parent.path </> fsDir.path)} already exists")
             resp.status must_== Status.Conflict
 
-            after must beSome(MountConfig2.fileSystemConfig(previousCfg))
+            after must beSome(MountConfig.fileSystemConfig(previousCfg))
           }
         }
       }
@@ -580,7 +580,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp.as[String].run must_== s"updated ${printPath(fsDir)}"
               resp.status must_== Status.Ok
 
-              after must beSome(MountConfig2.fileSystemConfig(cfg))
+              after must beSome(MountConfig.fileSystemConfig(cfg))
             }
           }
         }

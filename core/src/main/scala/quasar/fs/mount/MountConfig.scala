@@ -29,17 +29,17 @@ import scalaz.syntax.std.option._
 import scalaz.syntax.std.boolean._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
-sealed trait MountConfig2
+sealed trait MountConfig
 
-object MountConfig2 {
+object MountConfig {
   final case class ViewConfig private[mount] (query: Expr, vars: Variables)
-    extends MountConfig2
+    extends MountConfig
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
-    extends MountConfig2
+    extends MountConfig
 
-  val viewConfig: Prism[MountConfig2, (Expr, Variables)] =
-    Prism[MountConfig2, (Expr, Variables)] {
+  val viewConfig: Prism[MountConfig, (Expr, Variables)] =
+    Prism[MountConfig, (Expr, Variables)] {
       case ViewConfig(query, vars) => Some((query, vars))
       case _                       => None
     } ((ViewConfig(_, _)).tupled)
@@ -47,13 +47,13 @@ object MountConfig2 {
   val viewConfigUri: Prism[String, (Expr, Variables)] =
     Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
 
-  val fileSystemConfig: Prism[MountConfig2, (FileSystemType, ConnectionUri)] =
-    Prism[MountConfig2, (FileSystemType, ConnectionUri)] {
+  val fileSystemConfig: Prism[MountConfig, (FileSystemType, ConnectionUri)] =
+    Prism[MountConfig, (FileSystemType, ConnectionUri)] {
       case FileSystemConfig(typ, uri) => Some((typ, uri))
       case _                          => None
     } ((FileSystemConfig(_, _)).tupled)
 
-  implicit val mountConfigShow: Show[MountConfig2] =
+  implicit val mountConfigShow: Show[MountConfig] =
     Show.shows {
       case ViewConfig(expr, vars) =>
         viewConfigUri.reverseGet((expr, vars))
@@ -62,14 +62,14 @@ object MountConfig2 {
     }
 
 /** TODO: Equal[sql.Expr]
-  implicit val mountConfigEqual: Equal[MountConfig2] =
-    Equal.equalBy[MountConfig2, Expr \/ (FileSystemType, Json)] {
+  implicit val mountConfigEqual: Equal[MountConfig] =
+    Equal.equalBy[MountConfig, Expr \/ (FileSystemType, Json)] {
       case ViewConfig(query)           => query.left
       case FileSystemConfig(typ, json) => (typ, json).right
     }
 */
 
-  implicit val mountConfigCodecJson: CodecJson[MountConfig2] =
+  implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({
       case ViewConfig(query, vars) =>
         Json("view" := Json("connectionUri" := viewCfgAsUri(query, vars)))

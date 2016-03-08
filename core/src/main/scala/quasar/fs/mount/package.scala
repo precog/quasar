@@ -28,7 +28,7 @@ package object mount {
   type MntErrT[F[_], A] = EitherT[F, MountingError, A]
   type MountingF[A] = Coyoneda[Mounting, A]
 
-  type MountConfigs[A]  = KeyValueStore[APath, MountConfig2, A]
+  type MountConfigs[A]  = KeyValueStore[APath, MountConfig, A]
   type MountConfigsF[A] = Coyoneda[MountConfigs, A]
 
   type MountingFileSystem[A] = Coproduct[MountingF, FileSystem, A]

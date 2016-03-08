@@ -28,8 +28,8 @@ import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 trait MountingsConfigArbitrary {
   import MountConfigArbitrary._, PathArbitrary._
 
-  implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig2] =
-    Arbitrary(arbitrary[Map[APath, MountConfig2]] map (MountingsConfig2(_)))
+  implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig] =
+    Arbitrary(arbitrary[Map[APath, MountConfig]] map (MountingsConfig(_)))
 }
 
 object MountingsConfigArbitrary extends MountingsConfigArbitrary

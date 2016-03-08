@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError2, EnvErr2T, EnvErr, EnvErrF}
+import quasar.{EnvironmentError, EnvErrT, EnvErr, EnvErrF}
 import quasar.{NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
@@ -57,16 +57,16 @@ package object fs {
     S0: Task :<: S,
     S1: MongoErrF :<: S,
     S2: WorkflowExecErrF :<: S
-  ): EnvErr2T[Task, FileSystem ~> Free[S, ?]] = {
-    val runM = Hoist[EnvErr2T].hoist(MongoDbIO.runNT(client))
+  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
+    val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
       runM(WorkflowExecutor.mongoDb)                 |@|
       queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErr2T]                             |@|
-      readfile.run[S](client).liftM[EnvErr2T]        |@|
-      writefile.run[S](client).liftM[EnvErr2T]       |@|
-      managefile.run[S](client).liftM[EnvErr2T]
+        .liftM[EnvErrT]                             |@|
+      readfile.run[S](client).liftM[EnvErrT]        |@|
+      writefile.run[S](client).liftM[EnvErrT]       |@|
+      managefile.run[S](client).liftM[EnvErrT]
     )((execMongo, qfile, rfile, wfile, mfile) =>
       interpretFileSystem[Free[S, ?]](
         qfile compose queryfile.interpret(execMongo),
@@ -120,12 +120,12 @@ package object fs {
 
     val evalEnvErr: EnvErrF ~> DefM =
       Coyoneda.liftTF[EnvErr, DefM](
-        convertError[M]((_: EnvironmentError2).right[NonEmptyList[String]])
-          .compose[EnvErr](Failure.toError[ME, EnvironmentError2]))
+        convertError[M]((_: EnvironmentError).right[NonEmptyList[String]])
+          .compose[EnvErr](Failure.toError[ME, EnvironmentError]))
 
     val evalCfgErr: CfgErrF ~> DefM =
       Coyoneda.liftTF[CfgErr, DefM](
-        convertError[M]((_: ConfigError).shows.wrapNel.left[EnvironmentError2])
+        convertError[M]((_: ConfigError).shows.wrapNel.left[EnvironmentError])
           .compose[CfgErr](Failure.toError[ME, ConfigError]))
 
     val liftTask: Task ~> DefM =

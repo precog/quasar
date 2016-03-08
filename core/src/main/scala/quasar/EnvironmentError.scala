@@ -23,43 +23,43 @@ import monocle._
 import scalaz._
 import scalaz.syntax.show._
 
-sealed trait EnvironmentError2
+sealed trait EnvironmentError
 
-object EnvironmentError2 {
+object EnvironmentError {
   final case class ConnectionFailed private[quasar] (message: String)
-    extends EnvironmentError2
+    extends EnvironmentError
   final case class InsufficientPermissions private[quasar] (message: String)
-    extends EnvironmentError2
+    extends EnvironmentError
   final case class InvalidCredentials private[quasar] (message: String)
-    extends EnvironmentError2
+    extends EnvironmentError
   final case class UnsupportedVersion private[quasar] (backendName: String, version: List[Int])
-    extends EnvironmentError2
+    extends EnvironmentError
 
-  val connectionFailed: Prism[EnvironmentError2, String] =
-    Prism[EnvironmentError2, String] {
+  val connectionFailed: Prism[EnvironmentError, String] =
+    Prism[EnvironmentError, String] {
       case ConnectionFailed(msg) => Some(msg)
       case _ => None
     } (ConnectionFailed(_))
 
-  val insufficientPermissions: Prism[EnvironmentError2, String] =
-    Prism[EnvironmentError2, String] {
+  val insufficientPermissions: Prism[EnvironmentError, String] =
+    Prism[EnvironmentError, String] {
       case InsufficientPermissions(msg) => Some(msg)
       case _ => None
     } (InsufficientPermissions(_))
 
-  val invalidCredentials: Prism[EnvironmentError2, String] =
-    Prism[EnvironmentError2, String] {
+  val invalidCredentials: Prism[EnvironmentError, String] =
+    Prism[EnvironmentError, String] {
       case InvalidCredentials(msg) => Some(msg)
       case _ => None
     } (InvalidCredentials(_))
 
-  val unsupportedVersion: Prism[EnvironmentError2, (String, List[Int])] =
-    Prism[EnvironmentError2, (String, List[Int])] {
+  val unsupportedVersion: Prism[EnvironmentError, (String, List[Int])] =
+    Prism[EnvironmentError, (String, List[Int])] {
       case UnsupportedVersion(name, version) => Some((name, version))
       case _ => None
     } ((UnsupportedVersion(_, _)).tupled)
 
-  implicit val environmentErrorShow: Show[EnvironmentError2] =
+  implicit val environmentErrorShow: Show[EnvironmentError] =
     Show.shows {
       case ConnectionFailed(msg) =>
         s"Connection failed: $msg"
@@ -71,11 +71,11 @@ object EnvironmentError2 {
         s"Unsupported $name version: ${version.mkString(".")}"
     }
 
-  implicit val environmentErrorEncodeJson: EncodeJson[EnvironmentError2] = {
+  implicit val environmentErrorEncodeJson: EncodeJson[EnvironmentError] = {
     def format(message: String, detail: Option[String]) =
       Json(("error" := message) :: detail.toList.map("errorDetail" := _): _*)
 
-    EncodeJson[EnvironmentError2] {
+    EncodeJson[EnvironmentError] {
       case ConnectionFailed(msg) =>
         format("Connection failed.", Some(msg))
       case InsufficientPermissions(msg) =>

@@ -29,8 +29,8 @@ class WebConfigSpec extends ConfigSpec[WebConfig] {
 
   def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
     server = ServerConfig(92),
-    mountings = MountingsConfig2(Map(
-      rootDir -> MountConfig2.fileSystemConfig(MongoDBFsType, uri))))
+    mountings = MountingsConfig(Map(
+      rootDir -> MountConfig.fileSystemConfig(MongoDBFsType, uri))))
 
   override val ConfigStr =
     s"""{

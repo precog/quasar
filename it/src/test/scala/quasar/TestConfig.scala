@@ -17,15 +17,13 @@
 package quasar
 
 import quasar.Predef._
-import quasar.config._
 import quasar.fs._
+import quasar.fs.mount.MountConfig
 
 import java.lang.System
 
 import argonaut._
-
 import pathy.Path._
-
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
@@ -91,7 +89,7 @@ object TestConfig {
       for {
         test  <- fs(backendEnvName(n), p)
         setup <- fs(insertEnvName(n), p).run.liftM[OptionT]
-        s   <- NameGenerator.salt.liftM[OptionT]
+        s     <- NameGenerator.salt.liftM[OptionT]
       } yield FileSystemUT(n, test, setup.getOrElse(test), p </> dir(s))
 
     def noBackendsFound: Throwable = new RuntimeException(

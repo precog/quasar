@@ -33,7 +33,7 @@ object writeConfig {
   def apply[Cfg](configOps: ConfigOps[Cfg])(ref: TaskRef[Cfg], loc: Option[FsFile])
       (implicit E: EncodeJson[Cfg]): MountConfigs ~> Task = {
 
-    type MRef[A] = AtomicRef[Map[APath, MountConfig2], A]
+    type MRef[A] = AtomicRef[Map[APath, MountConfig], A]
     type MRefF[A] = Coyoneda[MRef, A]
 
     type ConfigRef[A] = AtomicRef[Cfg, A]
@@ -60,10 +60,10 @@ object writeConfig {
       free.foldMapNT(refToTaskF).compose[ConfigRefF](Coyoneda.liftTF(writing))
     }
 
-    // AtomicRef[Map[APath, MountConfig2], ?] ~> Free[AtomicRef[Cfg, ?], ?]:
+    // AtomicRef[Map[APath, MountConfig], ?] ~> Free[AtomicRef[Cfg, ?], ?]:
     val mapToConfig: MRefF ~> ConfigRefM =  {
-      val mountingsLens: Lens[Cfg, Map[APath, MountConfig2]] =
-        configOps.mountingsLens composeIso MountingsConfig2.mapIso
+      val mountingsLens: Lens[Cfg, Map[APath, MountConfig]] =
+        configOps.mountingsLens composeIso MountingsConfig.mapIso
 
       Coyoneda.liftTF[MRef, ConfigRefM]{
         val aux = AtomicRef.zoom(mountingsLens)
@@ -71,8 +71,8 @@ object writeConfig {
       }
     }
 
-    // KeyValueStore[APath, MountConfig2, ?] ~> Free[AtomicRef[Map[APath, MountConfig2], ?]]:
-    val storeToMap: MountConfigs ~> Free[MRefF, ?] = KeyValueStore.toAtomicRef[APath, MountConfig2]()
+    // KeyValueStore[APath, MountConfig, ?] ~> Free[AtomicRef[Map[APath, MountConfig], ?]]:
+    val storeToMap: MountConfigs ~> Free[MRefF, ?] = KeyValueStore.toAtomicRef[APath, MountConfig]()
 
     free.foldMapNT(configRef) compose (free.foldMapNT(mapToConfig) compose storeToMap)
   }

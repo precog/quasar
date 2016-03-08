@@ -202,17 +202,17 @@ package object main {
       * backing store.
       */
     val ephemeral: MntCfgsIO ~> Task = {
-      type ST[A] = StateT[Task, Map[APath, MountConfig2], A]
+      type ST[A] = StateT[Task, Map[APath, MountConfig], A]
 
       val toState: MountConfigs ~> ST =
-        KeyValueStore.toState[StateT[Task, ?, ?]](Lens.id[Map[APath, MountConfig2]])
+        KeyValueStore.toState[StateT[Task, ?, ?]](Lens.id[Map[APath, MountConfig]])
 
       val interpret: MntCfgsIO ~> ST =
         free.interpret2[MountConfigsF, Task, ST](
           Coyoneda.liftTF(toState),
-          liftMT[Task, StateT[?[_], Map[APath, MountConfig2], ?]])
+          liftMT[Task, StateT[?[_], Map[APath, MountConfig], ?]])
 
-      evalNT[Task, Map[APath, MountConfig2]](Map()) compose interpret
+      evalNT[Task, Map[APath, MountConfig]](Map()) compose interpret
     }
 
     /** Interprets `MountConfigsF`, persisting changes to a config file. */
@@ -307,7 +307,7 @@ package object main {
 
   /** Mount all the mounts defined in the given configuration. */
   def mountAll[S[_]: Functor]
-      (mc: MountingsConfig2)
+      (mc: MountingsConfig)
       (implicit mnt: Mounting.Ops[S])
       : Free[S, String \/ Unit] = {
 

@@ -16,18 +16,18 @@
 
 package quasar.config
 
-import quasar.fs.mount.MountingsConfig2
+import quasar.fs.mount.MountingsConfig
 
 import argonaut._, Argonaut._
 import monocle.macros.Lenses
 
-@Lenses final case class CoreConfig(mountings: MountingsConfig2)
+@Lenses final case class CoreConfig(mountings: MountingsConfig)
 
 object CoreConfig extends ConfigOps[CoreConfig] {
 
   val mountingsLens = CoreConfig.mountings
 
-  val default = CoreConfig(MountingsConfig2.empty)
+  val default = CoreConfig(MountingsConfig.empty)
 
   implicit val codec = casecodec1(CoreConfig.apply, CoreConfig.unapply)("mountings")
 }

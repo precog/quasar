@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError2, EnvErr2T, SeqNameGeneratorT}
+import quasar.{EnvironmentError, EnvErrT, SeqNameGeneratorT}
 import quasar.{NameGenerator => QNameGenerator, _}
 import quasar.fp.prism._
 import quasar.fs.DataCursor
@@ -348,12 +348,12 @@ object WorkflowExecutor {
   }
 
   /** A `WorkflowExecutor` that executes a `Workflow` in the `MongoDbIO` monad. */
-  val mongoDb: EnvErr2T[MongoDbIO, WorkflowExecutor[MongoDbIO, BsonCursor]] = {
+  val mongoDb: EnvErrT[MongoDbIO, WorkflowExecutor[MongoDbIO, BsonCursor]] = {
     import MongoDbIOWorkflowExecutor._
-    import EnvironmentError2._
+    import EnvironmentError._
 
     type E[A, B] = EitherT[MongoDbIO, A, B]
-    type M[A]    = EnvErr2T[MongoDbIO, A]
+    type M[A]    = EnvErrT[MongoDbIO, A]
     type WFExec  = WorkflowExecutor[MongoDbIO, BsonCursor]
 
     liftEnvErr(MongoDbIO.serverVersion) flatMap { v =>

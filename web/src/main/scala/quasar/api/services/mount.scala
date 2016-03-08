@@ -97,7 +97,7 @@ object mount {
       body  <- EitherT.right(injectFT[Task, S].apply(EntityDecoder.decodeString(req)): FreeS[String])
       bConf <- EitherT.fromDisjunction[FreeS](Parse.decodeWith(
                   body,
-                  (_: MountConfig2).right[QResponse[S]],
+                  (_: MountConfig).right[QResponse[S]],
                   parseErrorMsg => QResponse.error[S](BadRequest, s"input error: $parseErrorMsg").left,
                   (msg, _) => QResponse.error[S](BadRequest, msg).left))
       exists <- EitherT.right(M.lookup(path).isDefined)

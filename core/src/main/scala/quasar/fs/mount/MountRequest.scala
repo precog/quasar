@@ -33,10 +33,10 @@ sealed trait MountRequest {
       case MountFileSystem(d, _, _) => d
     }
 
-  def toConfig: MountConfig2 =
+  def toConfig: MountConfig =
     this match {
-      case MountView(_, q, vs)      => MountConfig2.viewConfig(q, vs)
-      case MountFileSystem(_, t, u) => MountConfig2.fileSystemConfig(t, u)
+      case MountView(_, q, vs)      => MountConfig.viewConfig(q, vs)
+      case MountFileSystem(_, t, u) => MountConfig.fileSystemConfig(t, u)
     }
 }
 

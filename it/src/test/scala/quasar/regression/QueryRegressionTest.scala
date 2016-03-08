@@ -18,10 +18,10 @@ package quasar.regression
 
 import quasar._
 import quasar.Predef._
-import quasar.config._
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}
-import quasar.fs.mount.{Mounts, hierarchical}
+import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
+import quasar.physical.mongodb.fs.MongoDBFsType
 import quasar.sql._
 
 import java.io.{File, FileInputStream}
@@ -248,8 +248,8 @@ object QueryRegressionTest {
 
   def externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
     val extFs = TestConfig.externalFileSystems {
-      case (MongoDbConfig(cs), dir) =>
-        lazy val f = mongofs.testFileSystemIO(cs, dir).run
+      case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
+        lazy val f = mongofs.testFileSystemIO(uri, dir).run
         Task.delay(f)
     }
 

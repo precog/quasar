@@ -20,9 +20,8 @@ import quasar.Predef._
 import quasar.fp.numeric.Positive
 import quasar.javascript._
 
-import com.mongodb._
-import monocle.macros.{GenLens}
-import org.bson.conversions.{Bson => ToBson}
+import com.mongodb.client.model.MapReduceAction
+import monocle.macros.GenLens
 import scalaz._, Scalaz._
 
 /** Configuration parameters for MapReduce operations
@@ -113,9 +112,9 @@ object MapReduce {
       */
     def bsonFieldName(act: Action): String =
       (act match {
-        case Replace   => MapReduceCommand.OutputType.REPLACE
-        case Merge(_)  => MapReduceCommand.OutputType.MERGE
-        case Reduce(_) => MapReduceCommand.OutputType.REDUCE
+        case Replace   => MapReduceAction.REPLACE
+        case Merge(_)  => MapReduceAction.MERGE
+        case Reduce(_) => MapReduceAction.REDUCE
       }).name.toLowerCase
   }
 

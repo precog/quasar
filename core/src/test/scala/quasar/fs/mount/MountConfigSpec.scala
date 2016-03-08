@@ -26,7 +26,7 @@ import org.specs2.mutable
 import org.specs2.scalaz._
 
 class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
-  import MountConfig2._
+  import MountConfig._
 
   "View config codec" should {
     val read = sql.Select(
@@ -53,14 +53,14 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
     "decode" >> {
       "no vars" >> {
         viewJson("sql2:///?q=%28select+*+from+zips%29")
-          .as[MountConfig2].toDisjunction must
+          .as[MountConfig].toDisjunction must
             beRightDisjunction(ViewConfig(read, Variables(Map())))
       }
 
       "decode with var" in {
         // NB: the _last_ value for a given var name is used.
         viewJson("sql2:///?q=%28select+*+from+zips%29&var.a=1&var.b=2&var.b=3")
-          .as[MountConfig2].toDisjunction must
+          .as[MountConfig].toDisjunction must
             beRightDisjunction(
               ViewConfig(read, Variables(Map(
                 VarName("a") -> VarValue("1"),
@@ -69,25 +69,25 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
 
       "decode with missing query" in {
         viewJson("sql2:///?p=foo")
-          .as[MountConfig2].toDisjunction.leftMap(_._1) must
+          .as[MountConfig].toDisjunction.leftMap(_._1) must
             beLeftDisjunction("missing query: sql2:///?p=foo")
       }
 
       "decode with bad scheme" in {
         viewJson("foo:///?q=%28select+*+from+zips%29")
-          .as[MountConfig2].toDisjunction.leftMap(_._1) must
+          .as[MountConfig].toDisjunction.leftMap(_._1) must
             beLeftDisjunction("unrecognized scheme: foo")
       }
 
       "decode with unparseable URI" in {
         viewJson("?")
-          .as[MountConfig2].toDisjunction.leftMap(_._1) must
+          .as[MountConfig].toDisjunction.leftMap(_._1) must
             beLeftDisjunction("missing URI scheme: ?")
       }
 
       "decode with bad encoding" in {
         viewJson("sql2:///?q=%F%28select+*+from+zips%29")
-          .as[MountConfig2].toDisjunction.leftMap(_._1) must beLeftDisjunction
+          .as[MountConfig].toDisjunction.leftMap(_._1) must beLeftDisjunction
       }
     }
   }

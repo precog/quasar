@@ -30,8 +30,8 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
   def configOps: ConfigOps[CoreConfig] = CoreConfig
 
   def sampleConfig(uri: ConnectionUri): CoreConfig = {
-    CoreConfig(MountingsConfig2(Map(
-      rootDir -> MountConfig2.fileSystemConfig(MongoDBFsType, uri)
+    CoreConfig(MountingsConfig(Map(
+      rootDir -> MountConfig.fileSystemConfig(MongoDBFsType, uri)
     )))
   }
 

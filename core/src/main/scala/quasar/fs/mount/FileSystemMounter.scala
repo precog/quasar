@@ -27,7 +27,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.either._
 
 final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
-  import MountingError._, PathError2._, MountConfig2._, FileSystemDef._
+  import MountingError._, PathError2._, MountConfig._, FileSystemDef._
 
   type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[F]], A]
   type MountedFsF[A] = Coyoneda[MountedFs, A]

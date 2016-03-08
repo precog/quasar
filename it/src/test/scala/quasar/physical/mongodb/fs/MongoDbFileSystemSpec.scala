@@ -19,8 +19,8 @@ package quasar.physical.mongodb.fs
 import quasar.Predef._
 
 import quasar._
-import quasar.config._
 import quasar.fs._
+import quasar.fs.mount.MountConfig
 import quasar.fp._
 import quasar.physical.mongodb.Collection
 import quasar.regression._
@@ -344,7 +344,7 @@ object MongoDbFileSystemSpec {
   //     dirs (i.e. databases).
   def mongoFsUT: Task[IList[FileSystemUT[FileSystemIO]]] =
     TestConfig.externalFileSystems {
-      case (MongoDbConfig(cs), dir) =>
-        quasar.physical.mongodb.filesystems.testFileSystemIO(cs, dir)
+      case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
+        quasar.physical.mongodb.filesystems.testFileSystemIO(uri, dir)
     }
 }

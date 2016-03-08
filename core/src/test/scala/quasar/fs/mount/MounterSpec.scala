@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.EnvironmentError2
+import quasar.EnvironmentError
 import quasar.effect._
 import quasar.fp._
 import quasar.fs.APath
@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class MounterSpec extends MountingSpec[MountingF] {
-  import MountConfig2._, MountingError._, MountRequest._
+  import MountConfig._, MountingError._, MountRequest._
 
   type MEff[A]  = Coproduct[Task, MountConfigsF, A]
 
@@ -44,7 +44,7 @@ class MounterSpec extends MountingSpec[MountingF] {
 
   def interpret = {
     val mm = Mounter[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
-    val cfgRef = TaskRef(Map.empty[APath, MountConfig2]).run
+    val cfgRef = TaskRef(Map.empty[APath, MountConfig]).run
 
     val interpMnts: MountConfigsF ~> Task =
       Coyoneda.liftTF[MountConfigs, Task](KeyValueStore.fromTaskRef(cfgRef))
@@ -61,7 +61,7 @@ class MounterSpec extends MountingSpec[MountingF] {
   "Handling mounts" should {
     "fail when mount handler fails" >>* {
       val loc = rootDir </> dir("fs")
-      val cfg = MountConfig2.fileSystemConfig(dbType, invalidUri)
+      val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
       mnt.mountFileSystem(loc, dbType, invalidUri)
         .run.tuple(mnt.lookup(loc).run)

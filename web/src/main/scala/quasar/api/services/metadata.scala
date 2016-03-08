@@ -35,7 +35,7 @@ import scalaz.syntax.std.boolean._
 import scalaz.std.list._
 
 object metadata {
-  import MountConfig2._
+  import MountConfig._
 
   final case class FsNode(name: String, typ: String, mount: Option[String])
 
@@ -65,7 +65,7 @@ object metadata {
   }
 
   def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
-    val mountType: MountConfig2 => String = {
+    val mountType: MountConfig => String = {
       case ViewConfig(_, _)         => "view"
       case FileSystemConfig(typ, _) => typ.value
     }

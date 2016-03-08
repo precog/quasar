@@ -25,7 +25,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object Mounter {
-  import Mounting._, MountConfig2._
+  import Mounting._, MountConfig._
 
   /** `Mounting` interpreter interpreting into `KeyValueStore`, using the
     * supplied functions to handle mount and unmount requests.
@@ -45,7 +45,7 @@ object Mounter {
     type MntE[A]   = MntErrT[FreeS, A]
     type Err[E, A] = EitherT[FreeS, E, A]
 
-    val mountConfigs = KeyValueStore.Ops[APath, MountConfig2, S]
+    val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
     val merr = MonadError[Err, MountingError]
 
     def mount0(req: MountRequest): MntE[Unit] =
@@ -107,7 +107,7 @@ object Mounter {
   private val pathNotFound = MountingError.pathError composePrism PathError2.pathNotFound
   private val pathExists = MountingError.pathError composePrism PathError2.pathExists
 
-  private def mkMountRequest(path: APath, cfg: MountConfig2): Option[MountRequest] =
+  private def mkMountRequest(path: APath, cfg: MountConfig): Option[MountRequest] =
     refineType(path).fold(
       d => fileSystemConfig.getOption(cfg) map { case (t, u) =>
         MountRequest.mountFileSystem(d, t, u)

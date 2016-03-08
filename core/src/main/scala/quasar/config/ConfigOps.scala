@@ -21,7 +21,7 @@ import quasar.config.FsPath._
 import quasar.Errors.ETask
 import quasar.fp._
 import quasar.fs.{Path => _, _}
-import quasar.fs.mount.MountingsConfig2
+import quasar.fs.mount.MountingsConfig
 
 import java.nio.file.{Path => _, _}
 import java.nio.charset._
@@ -39,7 +39,7 @@ trait ConfigOps[C] {
   import ConfigOps._, ConfigError._
 
   val default: C
-  def mountingsLens: Lens[C, MountingsConfig2]
+  def mountingsLens: Lens[C, MountingsConfig]
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] = {
     def attemptReadFile(f: String): CfgTask[String] = {

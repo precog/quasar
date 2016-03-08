@@ -22,8 +22,8 @@ import quasar.fp.{eitherTCatchable, hoistFree, TaskRef}
 import quasar.fp.free._
 import quasar.fs.mount._
 import quasar.effect._
-import quasar.config.MongoDbConfig
 import quasar.physical.mongodb.{filesystems => mongofs}
+import quasar.physical.mongodb.fs.MongoDBFsType
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
@@ -117,8 +117,8 @@ object FileSystemTest {
     }
 
   def externalFsUT = TestConfig.externalFileSystems {
-    case (MongoDbConfig(cs), dir) =>
-      lazy val f = mongofs.testFileSystem(cs, dir).run
+    case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
+      lazy val f = mongofs.testFileSystem(uri, dir).run
       Task.delay(f)
   }
 

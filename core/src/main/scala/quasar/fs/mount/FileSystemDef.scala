@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef.{PartialFunction, String, Unit}
-import quasar.EnvironmentError2
+import quasar.EnvironmentError
 import quasar.fs.{FileSystem, FileSystemType}
 
 import scala.StringContext
@@ -39,7 +39,7 @@ final case class FileSystemDef[F[_]](run: FsCfg => DefErrT[F, DefinitionResult[F
 object FileSystemDef {
   type FsCfg                  = (FileSystemType, ConnectionUri)
   /** Reasons why the configuration is invalid or an environment error. */
-  type DefinitionError        = NonEmptyList[String] \/ EnvironmentError2
+  type DefinitionError        = NonEmptyList[String] \/ EnvironmentError
   type DefErrT[F[_], A]       = EitherT[F, DefinitionError, A]
   type DefinitionResult[F[_]] = (FileSystem ~> F, F[Unit])
 

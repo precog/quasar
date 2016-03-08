@@ -16,12 +16,12 @@
 
 package quasar.config
 
-import quasar.fs.mount.MountingsConfig2
+import quasar.fs.mount.MountingsConfig
 
 import argonaut._, Argonaut._
 import monocle._, macros.Lenses
 
-@Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig2)
+@Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig)
 
 object WebConfig extends ConfigOps[WebConfig] {
 
@@ -29,5 +29,5 @@ object WebConfig extends ConfigOps[WebConfig] {
     casecodec2(WebConfig.apply, WebConfig.unapply)("server", "mountings")
   val mountingsLens = WebConfig.mountings
 
-  val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig2.empty)
+  val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig.empty)
 }

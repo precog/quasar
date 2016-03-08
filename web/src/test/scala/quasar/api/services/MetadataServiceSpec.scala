@@ -50,16 +50,16 @@ object MetadataFixture {
         Task.now(queryFile(fs).eval(mem))
     }
 
-  def runMount(mnts: Map[APath, MountConfig2]): Mounting ~> Task =
+  def runMount(mnts: Map[APath, MountConfig]): Mounting ~> Task =
     new (Mounting ~> Task) {
-      type F[A] = State[Map[APath, MountConfig2], A]
+      type F[A] = State[Map[APath, MountConfig], A]
       val mntr = Mounter.trivial[MountConfigsF]
-      val kvf = KeyValueStore.toState[State](Lens.id[Map[APath, MountConfig2]])
+      val kvf = KeyValueStore.toState[State](Lens.id[Map[APath, MountConfig]])
       def apply[A](ma: Mounting[A]) =
         Task.now(mntr(ma).foldMap(Coyoneda.liftTF[MountConfigs, F](kvf)).eval(mnts))
     }
 
-  def service(mem: InMemState, mnts: Map[APath, MountConfig2]): HttpService =
+  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService =
     metadata.service[MetadataEff].toHttpService(
       liftMT[Task, ResponseT].compose[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
       Coyoneda.liftTF(runQuery(mem)),
@@ -126,9 +126,9 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         fsCfg: (FileSystemType, ConnectionUri)
       ) => (fName != vName && dName != mName) ==> {
         val parent: ADir = rootDir </> dir("foo")
-        val mnts = Map[APath, MountConfig2](
-          (parent </> file(vName.value), MountConfig2.viewConfig(vcfg)),
-          (parent </> dir(mName.value), MountConfig2.fileSystemConfig(fsCfg)))
+        val mnts = Map[APath, MountConfig](
+          (parent </> file(vName.value), MountConfig.viewConfig(vcfg)),
+          (parent </> dir(mName.value), MountConfig.fileSystemConfig(fsCfg)))
         val mem = InMemState fromFiles Map(
           (parent </> file(fName.value), Vector()),
           (parent </> dir(dName.value) </> file("quux"), Vector()),

@@ -37,7 +37,7 @@ import scalaz.concurrent.Task
 abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
   extends mutable.Specification with DisjunctionMatchers {
 
-  import MountConfig2.{viewConfig, fileSystemConfig}
+  import MountConfig.{viewConfig, fileSystemConfig}
 
   def interpName: String
   def interpret: S ~> Task
@@ -191,7 +191,7 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
       def mountFF(d1: ADir, d2: ADir): M[Unit] =
         mountFileSystem(d1, dbType, uriA) *> mountFileSystem(d2, dbType, uriB)
 
-      def mountVF(f: AFile, d: ADir): OptionT[F, MountConfig2] =
+      def mountVF(f: AFile, d: ADir): OptionT[F, MountConfig] =
         (mountViewNoVars(f, exprA) *> mountFileSystem(d, dbType, uriA))
           .toOption *> lookup(d)
 

@@ -3328,16 +3328,20 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
     }
 
+    def countAccumOps(wf: Workflow) = countOps(wf, { case $Group(_, _, _) => true })
+    def countUnwindOps(wf: Workflow) = countOps(wf, { case $Unwind(_, _) => true })
+    def countMatchOps(wf: Workflow) = countOps(wf, { case $Match(_, _) => true })
+
     def noConsecutiveProjectOps(wf: Workflow) =
       countOps(wf, { case $Project(Fix($Project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
     def noConsecutiveSimpleMapOps(wf: Workflow) =
       countOps(wf, { case $SimpleMap(Fix($SimpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
     def maxAccumOps(wf: Workflow, max: Int) =
-      countOps(wf, { case $Group(_, _, _) => true }) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
+      countAccumOps(wf) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
     def maxUnwindOps(wf: Workflow, max: Int) =
-      countOps(wf, { case $Unwind(_, _) => true }) aka "the number of $unwind ops:" must beLessThanOrEqualTo(max)
+      countUnwindOps(wf) aka "the number of $unwind ops:" must beLessThanOrEqualTo(max)
     def maxMatchOps(wf: Workflow, max: Int) =
-      countOps(wf, { case $Match(_, _) => true }) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
+      countMatchOps(wf) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
     def brokenProjectOps(wf: Workflow) =
       countOps(wf, { case $Project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
 
@@ -3386,6 +3390,24 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         rootPushes(wf) must_== Nil
       }
     }.set(maxSize = 3)  // FIXME: with more then a few keys in the order by, the planner gets *very* slow (see SD-658)
+
+    "SD-1263 specific case of plan multiple reducing projections (all, distinct, orderBy)" in {
+      val q = Query(
+        "select distinct loc || [pop - 1] as p1, pop - 1 as p2 from zips group by territory order by p2")
+
+      plan(q.value) must beRight.which { fop =>
+        val wf = fop.op
+        noConsecutiveProjectOps(wf)
+        noConsecutiveSimpleMapOps(wf)
+        countAccumOps(wf) must_== 1
+        countUnwindOps(wf) must_== 0
+        countMatchOps(wf) must_== 0
+        danglingReferences(wf) must_== Nil
+        brokenProjectOps(wf) must_== 0
+        appropriateColumns(wf, q)
+        rootPushes(wf) must_== Nil
+      }
+    }
 
     "plan multiple reducing projections (all, distinct)" ! Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>

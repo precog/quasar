@@ -122,7 +122,7 @@ object Server {
       updConfig    =  config.copy(server = config.server.copy(qConfig.port.getOrElse(config.server.port)))
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
-      _            <- mountAll[CoreEff](config.mountings) foldMap ephemeralApi
+      _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
       cfgRef       <- TaskRef(config).liftM[MainErrT]
       durableApi   =  toResponseOr(MntCfgsIO.durableFile(cfgRef, qConfig.configPath)) compose coreApi
       _            <- startWebServer(

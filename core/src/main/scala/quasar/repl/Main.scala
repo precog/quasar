@@ -137,7 +137,7 @@ object Main {
 
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
-      _            <- mountAll[CoreEff](config.mountings) foldMap ephemeralApi
+      _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
 
       cfgRef       <- TaskRef(config).liftM[MainErrT]
       durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durableFile(cfgRef, cfgPath)) compose coreApi

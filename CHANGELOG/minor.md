@@ -1,0 +1,2 @@
+- Improve support for SSL connections to MongoDB.
+- Log and exit if certain errors occur during mounting in the REPL and API server.

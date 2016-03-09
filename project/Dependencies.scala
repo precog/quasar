@@ -9,7 +9,7 @@ object Dependencies {
   private val slcVersion     = "0.4"
   private val monocleVersion = "1.1.1"
   private val pathyVersion   = "0.0.3"
-  private val http4sVersion  = "0.12.1"
+  private val http4sVersion  = "0.12.3"
   private val mongoVersion   = "3.2.1"
   private val nettyVersion   = "4.0.26.Final"
   private val refinedVersion = "0.3.6"
@@ -55,5 +55,6 @@ object Dependencies {
       exclude("org.scalaz.stream", "scalaz-stream_2.11"),
     "org.http4s"           %% "http4s-blaze-server" % http4sVersion % "compile, test",
     "org.http4s"           %% "http4s-blaze-client" % http4sVersion % "test",
-    "org.scodec"           %% "scodec-scalaz"       % "1.1.0")
+    "org.scodec"           %% "scodec-scalaz"       % "1.1.0",
+    "ch.qos.logback"       % "logback-classic"      % "1.1.3")
 }

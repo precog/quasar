@@ -18,24 +18,30 @@ package quasar.server
 
 import quasar.Predef._
 
-import org.http4s.Uri.Authority
-import org.http4s.{Status, Method, Uri, Request, Response}
-import org.specs2.mutable
+import scala.concurrent.duration._
+import scala.collection.Seq
 
-import argonaut.Json
+import org.http4s.Uri.Authority
+import org.http4s.client.Client
+import org.http4s.client.middleware.Retry
+import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.server.syntax._
+import org.specs2.mutable
+import org.specs2.time.NoTimeConversions
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
+import shapeless.nat._
 
-class ControlServiceSpec extends mutable.Specification {
+class ControlServiceSpec extends mutable.Specification with NoTimeConversions {
 
-  val client = org.http4s.client.blaze.defaultClient
+  val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 
   def withServerExpectingRestart[B](timeoutMillis: Long = 30000, initialPort: Int = 8888, defaultPort: Int = 8888)
                                       (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
     val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
-    val servers = Http4sUtils.startServers(initialPort, reload => control.service(defaultPort, reload))
+    val servers = Http4sUtils.startServers(initialPort, reload => control.service(defaultPort, reload) orElse info.service)
 
     (for {
       result <- servers
@@ -55,13 +61,13 @@ class ControlServiceSpec extends mutable.Specification {
 
   "Control Service" should {
     def checkRunningOn(port: Int) = {
-      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))) / "foobar", method = Method.GET)
-      client.fetch(req)(response => Task.now(response.status must_== Status.NotFound))
+      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))), method = Method.GET)
+      client.fetch(req)(response => Task.now(response.status must_== Status.Ok))
     }
     "restart on new port when PUT succeeds" in {
-      val newPort = 8889
+      val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].run.unsized
 
-      withServerExpectingRestart(){ baseUri: Uri =>
+      withServerExpectingRestart(initialPort = startPort){ baseUri: Uri =>
         for {
           req <- Request(uri = baseUri, method = Method.PUT).withBody(newPort.toString)
           _   <- client.fetch(req)(Task.now)
@@ -69,8 +75,9 @@ class ControlServiceSpec extends mutable.Specification {
       }{ checkRunningOn(newPort) }
     }
     "restart on default port when DELETE succeeds" in {
-      val defaultPort = 9001
-      withServerExpectingRestart(initialPort = 9000, defaultPort = defaultPort){ baseUri: Uri =>
+      val Seq(startPort, defaultPort) = Http4sUtils.anyAvailablePorts[_2].run.unsized
+
+      withServerExpectingRestart(initialPort = startPort, defaultPort = defaultPort){ baseUri: Uri =>
         val req = Request(uri = baseUri, method = Method.DELETE)
         client.fetch(req)(Task.now).void
       }{ checkRunningOn(defaultPort) }

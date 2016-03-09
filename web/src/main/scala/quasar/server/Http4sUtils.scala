@@ -72,11 +72,10 @@ object Http4sUtils {
   def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_.head)
 
   /** Available port numbers. */
-  def anyAvailablePorts[A <: Nat: ToInt]: Task[Sized[IndexedSeq[Int], A]] = Task.delay {
+  def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Int], N]] = Task.delay {
     Sized.wrap(
-      (1 to toInt[A])
-        .map(_ => { val s = new java.net.ServerSocket(0); (s, s.getLocalPort) })
-        .map { case (s, p) => { s.close; p } })
+      List.tabulate(toInt[N]){_ => val s = new java.net.ServerSocket(0); (s, s.getLocalPort)}
+          .map { case (s, p) => s.close; p})
   }
 
   /** Returns the requested port if available, or the next available port. */

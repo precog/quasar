@@ -1,0 +1,1 @@
+- Fix intermittent `ControlServiceSpec` failure on Travis-ci

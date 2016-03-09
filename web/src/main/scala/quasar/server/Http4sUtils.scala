@@ -150,7 +150,7 @@ object Http4sUtils {
   def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] = for {
     result <- startServers(port, service)
     (servers, shutdown) = result
-    _ <- if(openClient) openBrowser(port) else Task.now(())
+    _ <- openBrowser(port).whenM(openClient)
     _ <- stdout("Press Enter to stop.")
     _ <- Task.delay(Task.fork(waitForInput).runAsync(_ => shutdown.run))
     _ <- servers.run // We need to run the servers in order to make sure everything is cleaned up properly

@@ -1,0 +1,1 @@
+- Utilize whenM for a more concise usage of openBrowser

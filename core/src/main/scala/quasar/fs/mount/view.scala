@@ -187,7 +187,10 @@ object view {
           })
 
         case FileExists(file) =>
-          query.fileExists(file).map(_ || views.contains(file)).run
+          if (views.contains(file))
+            true.point[Free[S, ?]]
+          else
+            query.fileExists(file)
       }
     }
   }

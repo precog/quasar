@@ -290,7 +290,7 @@ object hierarchical {
         case FileExists(f) =>
           lookupMounted(mountedQfs, f)
             .map { case (_, g) => evalQuery(g, FileExists(f)) }
-            .getOrElse(pathError(pathNotFound(f)).left.point[M])
+            .getOrElse(false.point[M])
       }
 
       def resultForPlan[A](

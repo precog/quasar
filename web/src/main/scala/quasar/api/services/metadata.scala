@@ -83,8 +83,7 @@ object metadata {
 
     def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
       Q.fileExists(f)
-        .map(_ either Json() or PathError2.pathNotFound(f))
-        .run)
+        .map(_ either Json() or PathError2.pathNotFound(f)))
 
     QHttpService {
       case GET -> AsPath(path) =>

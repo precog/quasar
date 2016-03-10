@@ -53,7 +53,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
         val r = for {
           h <- write.unsafe.open(f)
           _ <- write.unsafe.close(h).liftM[FileSystemErrT]
-          p <- query.fileExists(f)
+          p <- query.fileExistsM(f)
         } yield p
 
         r.run map (_.toEither must beRight(true))
@@ -91,7 +91,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
       "append empty input should result in a new file" >> {
         val f = writesPrefix </> file("emptyfile")
         val p = write.append(f, Process.empty).drain ++
-                (query.fileExists(f)).liftM[Process]
+                (query.fileExistsM(f)).liftM[Process]
 
         runLogT(run, p).run.run must_== \/.right(Vector(true))
       }

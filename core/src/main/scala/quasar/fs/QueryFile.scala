@@ -67,7 +67,7 @@ object QueryFile {
     extends QueryFile[FileSystemError \/ Set[PathName]]
 
   final case class FileExists(file: AFile)
-    extends QueryFile[FileSystemError \/ Boolean]
+    extends QueryFile[Boolean]
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
@@ -173,8 +173,14 @@ object QueryFile {
     }
 
     /** Returns whether the given file exists. */
-    def fileExists(file: AFile): M[Boolean] =
-      EitherT(lift(FileExists(file)))
+    def fileExists(file: AFile): F[Boolean] =
+      lift(FileExists(file))
+
+    /** Returns whether the given file exists, lifted into the same monad as
+      * the rest of the functions here, for convenience.
+      */
+    def fileExistsM(file: AFile): M[Boolean] =
+      fileExists(file).liftM[FileSystemErrT]
 
     ////
 

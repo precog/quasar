@@ -193,7 +193,7 @@ object InMemory {
         ls(dir) map (r => if (dir === rootDir) r.getOrElse(Set()).right else r)
 
       case FileExists(file) =>
-        contentsL.st.map(_.contains(file).right)
+        contentsL.st.map(_.contains(file))
     }
 
     private def evalPlan[A](lp: Fix[LogicalPlan])

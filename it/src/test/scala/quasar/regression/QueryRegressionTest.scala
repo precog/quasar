@@ -112,7 +112,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   /** Verify that the given data file exists in the filesystem. */
   def verifyDataExists(dataFileName: String): F[Result] =
-    query.fileExists(dataFile(dataFileName)).run map (_ ==== true.right)
+    query.fileExists(dataFile(dataFileName)) map (_ ==== true)
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(

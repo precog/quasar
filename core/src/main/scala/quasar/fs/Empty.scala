@@ -102,7 +102,7 @@ object Empty {
             fsPathNotFound(d)
 
         case QueryFile.FileExists(_) =>
-          false.right.point[F]
+          false.point[F]
       }
     }
 

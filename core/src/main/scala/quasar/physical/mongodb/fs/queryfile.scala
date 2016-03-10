@@ -160,9 +160,9 @@ private final class QueryFileInterpreter[C](
       }).liftM[QRT].liftM[WorkflowExecErrT]
 
     case FileExists(file) =>
-      collFromPathM(file)
-        .flatMap(MongoDbIO.collectionExists(_).liftM[FileSystemErrT])
-        .run.liftM[QRT].liftM[WorkflowExecErrT]
+      Collection.fromPathy(file).fold(
+        κ(false.point[MQ]),
+        coll => MongoDbIO.collectionExists(coll).liftM[QRT].liftM[WorkflowExecErrT])
   }
 
   ////

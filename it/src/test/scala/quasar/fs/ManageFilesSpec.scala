@@ -53,7 +53,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
                 manage.moveFile(f1, f2, MoveSemantics.FailIfExists)
                   .liftM[Process].drain ++
                 read.scanAll(f2).map(_.left[Boolean]) ++
-                (query.fileExists(f1))
+                (query.fileExistsM(f1))
                   .liftM[Process]
                   .map(_.right[Data])
 
@@ -82,7 +82,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
                 manage.moveFile(f1, f2, MoveSemantics.Overwrite)
                   .liftM[Process].drain ++
                 read.scanAll(f2).map(_.left[Boolean]) ++
-                (query.fileExists(f1))
+                (query.fileExistsM(f1))
                   .liftM[Process]
                   .map(_.right[Data])
 

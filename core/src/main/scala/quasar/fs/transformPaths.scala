@@ -175,7 +175,6 @@ object transformPaths {
 
         case FileExists(f) =>
           Coyoneda.lift(FileExists(inPath(f)))
-            .map(_ leftMap transformErrorPath(outPath))
       }
     }
 

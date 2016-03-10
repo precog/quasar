@@ -145,7 +145,7 @@ object WriteFile {
                      (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                      : Process[M, FileSystemError] = {
 
-      QF.fileExists(dst).liftM[Process].ifM(
+      QF.fileExistsM(dst).liftM[Process].ifM(
         shouldNotExist(dst).liftM[Process],
         saveChunked0(dst, src, MoveSemantics.FailIfExists))
     }
@@ -163,7 +163,7 @@ object WriteFile {
                    (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                    : M[Vector[FileSystemError]] = {
 
-      QF.fileExists(dst).ifM(
+      QF.fileExistsM(dst).ifM(
         shouldNotExist(dst) map (Vector(_)),
         saveThese0(dst, data, MoveSemantics.FailIfExists))
     }
@@ -173,7 +173,7 @@ object WriteFile {
                       (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                       : Process[M, FileSystemError] = {
 
-      QF.fileExists(dst).liftM[Process].ifM(
+      QF.fileExistsM(dst).liftM[Process].ifM(
         saveChunked0(dst, src, MoveSemantics.FailIfMissing),
         shouldExist(dst).liftM[Process])
     }
@@ -195,7 +195,7 @@ object WriteFile {
                         (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                         : M[Vector[FileSystemError]] = {
 
-      QF.fileExists(dst).ifM(
+      QF.fileExistsM(dst).ifM(
         saveThese0(dst, data, MoveSemantics.FailIfMissing),
         shouldExist(dst) map (Vector(_)))
     }

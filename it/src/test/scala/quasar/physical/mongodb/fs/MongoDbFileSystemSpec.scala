@@ -235,7 +235,7 @@ class MongoDbFileSystemSpec
             val out = renameFile(file, κ(FileName("out")))
 
             def check0(expr: sql.Expr) =
-              (run(query.fileExists(file).run).run ==== false.right) and
+              (run(query.fileExists(file)).run ==== false) and
               (errP.getOption(
                 runExec(query.executeQuery(expr, Variables.fromMap(Map()), out))
                   .run.value.run
@@ -277,6 +277,24 @@ class MongoDbFileSystemSpec
 
           (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
             .runEither must beRight(contain(FileName("foobar").right[DirName]))
+        }
+      }
+
+      "File exists" >> {
+        "for missing file at root (i.e. a database path) should succeed" >> {
+          val tfile = rootDir </> file("foo")
+
+          val p = query.fileExists(tfile)
+
+          run(p).run must_== false
+        }
+
+        "for missing file not at the root (i.e. a collection path) should succeed" >> {
+          val tfile = rootDir </> dir("foo") </> file("bar")
+
+          val p = query.fileExists(tfile)
+
+          run(p).run must_== false
         }
       }
 

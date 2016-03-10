@@ -84,7 +84,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }
 
       s"$n with empty input should create an empty file" ! prop { f: AFile =>
-        val p = wt(f, Process.empty) ++ query.fileExists(f).liftM[Process]
+        val p = wt(f, Process.empty) ++ query.fileExistsM(f).liftM[Process]
 
         MemTask.runLogEmpty(p).run must_== \/-(Vector(true))
       }

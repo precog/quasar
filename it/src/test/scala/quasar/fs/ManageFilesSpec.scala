@@ -23,7 +23,6 @@ import quasar.fp._
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream._
 
 class ManageFilesSpec extends FileSystemTest[FileSystem](

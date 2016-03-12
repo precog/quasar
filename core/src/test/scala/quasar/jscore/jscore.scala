@@ -17,7 +17,6 @@
 package quasar.jscore
 
 import quasar.Predef._
-import quasar.RenderTree
 import quasar.javascript.Js
 import quasar.fp._
 import quasar.TreeMatchers

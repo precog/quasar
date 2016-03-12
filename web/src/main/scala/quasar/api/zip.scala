@@ -18,7 +18,6 @@ package quasar.api
 
 import pathy.Path._
 import quasar.Predef._
-import quasar.fs.{Path}
 
 import java.util.{zip => jzip}
 

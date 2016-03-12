@@ -24,12 +24,10 @@ import quasar.fs.InMemory._
 import argonaut._, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
-import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemFixture with PathUtils with ScalaCheck {
   import queryFixture._

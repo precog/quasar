@@ -25,8 +25,7 @@ import quasar.fs.mount._
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
 
-import org.http4s
-import org.http4s.{Request, HttpService}
+import org.http4s.HttpService
 import org.http4s.dsl._
 import org.http4s.server.HttpMiddleware
 import org.http4s.server.middleware.{CORS, CORSConfig, GZip}

@@ -28,9 +28,7 @@ import quasar.fs.mount._
 import quasar.sql._
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
 import monocle.Lens
-import org.http4s
 import org.http4s._
 import org.http4s.argonaut._
 import org.specs2.ScalaCheck

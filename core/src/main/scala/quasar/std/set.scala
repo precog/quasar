@@ -21,7 +21,7 @@ import quasar.fp._
 import quasar._, LogicalPlan._
 
 import matryoshka._, Recursive.ops._
-import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.success
 
 trait SetLib extends Library {
   // NB: MRA should make this go away, as we insert dimensiality adjustements

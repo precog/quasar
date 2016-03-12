@@ -21,9 +21,7 @@ import quasar.Errors.{ETask, convertError}
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fs.{Path => QPath, _}
-import quasar.fs.mount.hierarchical.{HierarchicalFileSystemError}
-import quasar.physical.mongodb.{WorkflowExecutionError}
+import quasar.fs._
 
 import java.io.File
 

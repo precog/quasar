@@ -21,7 +21,6 @@ import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
 import quasar.namegen._
 import quasar._, Planner._
-import quasar.fs.Path
 import quasar.javascript._
 import quasar.std.StdLib._
 import quasar.jscore, jscore.{JsCore, JsFn}

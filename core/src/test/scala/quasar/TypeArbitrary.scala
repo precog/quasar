@@ -21,7 +21,6 @@ import quasar.DataArbitrary._
 import quasar.Type._
 
 import org.scalacheck._, Gen._
-import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 
 trait TypeArbitrary {
   implicit def arbitraryType: Arbitrary[Type] = Arbitrary { Gen.sized(depth => typeGen(depth/25)) }

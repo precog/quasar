@@ -17,10 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._
+import quasar.{Data, Func, LogicalPlan, Type, Mapping}, LogicalPlan._
 
 import matryoshka._
-import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.success
 
 // TODO: Cleanup!
 trait RelationsLib extends Library {

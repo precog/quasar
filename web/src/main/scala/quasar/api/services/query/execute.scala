@@ -21,17 +21,14 @@ import quasar._
 import quasar.api._
 import quasar.api.services._
 import quasar.api.ToQResponse.ops._
-import quasar.{Variables, fs}
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}
-import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
+import quasar.sql.{SQLParser, Query}
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
 import org.http4s.headers.Accept
 import org.http4s._
 import org.http4s.dsl._
-import org.http4s.headers.`Content-Type`
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

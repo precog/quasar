@@ -22,7 +22,6 @@ import quasar.fp._
 
 import java.lang.{Boolean => JBoolean}
 import java.util.LinkedList
-import java.util.concurrent.TimeUnit
 import scala.Predef.classOf
 import scala.collection.JavaConverters._
 

@@ -19,7 +19,6 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._
 import quasar.fp._
-import quasar.fs.Path
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
@@ -28,7 +27,7 @@ import Type._
 import Workflow._
 
 import matryoshka._, Fix._, Recursive.ops._, TraverseT.ops._
-import org.threeten.bp.{Duration, Instant}
+import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
 object MongoDbPlanner extends Planner[Crystallized] with JsConversions {

@@ -23,7 +23,7 @@ import quasar.fs.Path
 import quasar.namegen._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
-import scalaz._, Scalaz._, Validation.{success, failure}, Validation.FlatMap._
+import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
 
 sealed trait LogicalPlan[A]
 object LogicalPlan {

@@ -23,14 +23,10 @@ import quasar.jscore, jscore.JsFn
 
 import scala.Any
 import scala.collection.JavaConverters._
-import scala.Predef.{
-  boolean2Boolean, double2Double, int2Integer, long2Long,
-  Boolean2boolean, Double2double, Integer2int, Long2long}
 
 import org.bson._
 import org.bson.types
-import org.threeten.bp.{Instant, ZoneOffset}
-import org.threeten.bp.temporal.{ChronoUnit}
+import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
 /**

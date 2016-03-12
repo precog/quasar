@@ -22,9 +22,9 @@ import quasar.config._
 import quasar.effect.Failure
 import quasar.fp.free
 import quasar.fp.prism._
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}
+import quasar.fs.mount.ConnectionUri
 
-import java.util.concurrent.{TimeUnit, TimeoutException}
+import java.util.concurrent.TimeoutException
 
 import com.mongodb._
 import com.mongodb.async.client.{MongoClient => AMongoClient, MongoClients, MongoClientSettings}

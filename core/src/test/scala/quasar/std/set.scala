@@ -21,21 +21,13 @@ import quasar.TypeArbitrary
 import quasar.fp._
 import quasar.specs2.PendingWithAccurateCoverage
 
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck.Gen
-import org.scalacheck.Prop
 import org.specs2.ScalaCheck
-import org.specs2.matcher.Matcher
 import org.specs2.mutable._
 import org.specs2.scalaz._
-import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 
 class SetSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import SetLib._
   import quasar.Data
-  import quasar.Data.{Bool, Date, Dec, Int, Null, Str}
-  import quasar.SemanticError
   import quasar.Type
   import quasar.Type.Const
 

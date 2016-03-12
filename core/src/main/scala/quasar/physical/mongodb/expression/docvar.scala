@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.{Bson, BsonField}
 
-import matryoshka.Fix
 import scalaz._, Scalaz._
 
 object DocField {

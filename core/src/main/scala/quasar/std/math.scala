@@ -21,7 +21,7 @@ import quasar.fp._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
 import matryoshka._, Recursive.ops._
-import scalaz._, NonEmptyList.nel, Scalaz._, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.{success, failure}
 
 trait MathLib extends Library {
   private val MathRel = Type.Numeric ⨿ Type.Interval

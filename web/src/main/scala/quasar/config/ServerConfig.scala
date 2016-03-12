@@ -16,10 +16,9 @@
 
 package quasar.config
 
-import quasar.Predef.{Int, Option, Some}
+import quasar.Predef.Int
 
 import argonaut._, Argonaut._
-import monocle.Lens
 
 final case class ServerConfig(port: Int)
 

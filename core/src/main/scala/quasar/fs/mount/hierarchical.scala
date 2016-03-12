@@ -17,20 +17,18 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults}
+import quasar.{LogicalPlan, PhaseResults}
 import quasar.effect._
 import quasar.fp._
 import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._
-import monocle.{Iso, Prism}
+import monocle.Prism
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle
-  import ReadFile.ReadHandle
-  import WriteFile.WriteHandle
   import FileSystemError._, PathError2._
 
   type HFSFailure[A]      = Failure[HierarchicalFileSystemError, A]

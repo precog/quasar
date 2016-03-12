@@ -22,7 +22,6 @@ import quasar.Planner.{PlannerError => PlannerErr}
 import quasar.fp._
 
 import matryoshka._
-import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._
 import scalaz.syntax.show._

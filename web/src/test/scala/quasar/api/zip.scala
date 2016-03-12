@@ -21,7 +21,6 @@ import quasar.fp.numeric._
 import org.specs2.ScalaCheck
 import org.specs2.scalaz.ScalazMatchers
 import org.scalacheck.Arbitrary
-import pathy.Path
 import quasar.Predef._
 
 import org.specs2.mutable._
@@ -37,11 +36,10 @@ import pathy.Path._
 import quasar.fp.numeric._
 import pathy.scalacheck.PathyArbitrary._
 
-import eu.timepit.refined.numeric.{Greater, Positive => RPositive, NonNegative}
+import eu.timepit.refined.numeric.{Positive => RPositive, NonNegative}
 import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import shapeless.Nat
 import eu.timepit.refined.auto._
 
 class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {

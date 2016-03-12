@@ -25,7 +25,6 @@ import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
 import matryoshka.{ToIdOps => toAllOps, _}, Fix._, Recursive.ops._, FunctorT.ops._
-import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 import scalaz.{Tree => _, _}, Scalaz._
 
 trait Compiler[F[_]] {

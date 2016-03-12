@@ -23,7 +23,7 @@ import quasar.fs.{APath, PathArbitrary}
 //     for scala collections.
 import scala.Predef._
 
-import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
+import org.scalacheck.Arbitrary, Arbitrary.arbitrary
 
 trait MountingsConfigArbitrary {
   import MountConfigArbitrary._, PathArbitrary._

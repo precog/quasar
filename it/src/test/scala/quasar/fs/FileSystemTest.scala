@@ -17,8 +17,8 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{BackendName, Data, TestConfig, NameGenerator}
-import quasar.fp.{eitherTCatchable, hoistFree, TaskRef}
+import quasar.{BackendName, Data, TestConfig}
+import quasar.fp.{eitherTCatchable, TaskRef}
 import quasar.fp.free._
 import quasar.fs.mount._
 import quasar.effect._

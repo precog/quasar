@@ -22,8 +22,6 @@ import quasar.fp._
 import scalaz._
 import scalaz.stream.Process
 
-import scala.collection.IndexedSeq
-
 /** Provides a range of natural transformations that can be derived from the natural transformation of a term
   * of an algebra into the desired `Monad`
   * @param interpretTerm A natural transformation from the Algebra into the desired `Monad` from which

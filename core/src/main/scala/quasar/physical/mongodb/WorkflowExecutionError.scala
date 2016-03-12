@@ -22,7 +22,6 @@ import quasar.fp._
 
 import quasar.physical.mongodb.workflowtask._
 
-import monocle.Prism
 import scalaz._
 import scalaz.syntax.show._
 

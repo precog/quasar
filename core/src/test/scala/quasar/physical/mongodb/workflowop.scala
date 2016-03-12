@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{RenderTree, Terminal, NonTerminal}
+import quasar.RenderTree
 import quasar.TreeMatchers
 import quasar.fp._
 import quasar.javascript._

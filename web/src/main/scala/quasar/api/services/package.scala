@@ -18,12 +18,12 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 import quasar.fp.numeric._
 
 import org.http4s._
-import org.http4s.dsl.{Path => HPath, _}
-import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
+import org.http4s.dsl._
+import org.http4s.headers.`Content-Type`
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process

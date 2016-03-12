@@ -17,7 +17,6 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.fp.numeric.Positive
 import quasar.SKI._
 import quasar.{EnvironmentError, EnvErrT}
 import quasar.fp.prism._
@@ -25,7 +24,6 @@ import quasar.physical.mongodb.execution._
 import quasar.physical.mongodb.workflowtask._
 import quasar.physical.mongodb.mongoiterable._
 
-import java.lang.IllegalArgumentException
 import java.lang.{Boolean => JBoolean}
 import scala.Predef.classOf
 
@@ -34,7 +32,6 @@ import com.mongodb.async.client._
 import com.mongodb.client.model.CountOptions
 import org.bson.{BsonDocument, BsonValue}
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 /** Implementation class for a WorkflowExecutor in the `MongoDbIO` monad. */
 // https://github.com/puffnfresh/wartremover/issues/149

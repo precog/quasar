@@ -22,8 +22,6 @@ import quasar.specs2._
 
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
-import scalaz.Validation.{success, failure}
-import scalaz.Monad
 
 class TypesSpec extends Specification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
   import Type._

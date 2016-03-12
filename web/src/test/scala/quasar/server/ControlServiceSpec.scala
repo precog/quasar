@@ -22,9 +22,8 @@ import scala.concurrent.duration._
 import scala.collection.Seq
 
 import org.http4s.Uri.Authority
-import org.http4s.client.Client
 import org.http4s.client.middleware.Retry
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Method, Request, Status, Uri}
 import org.http4s.server.syntax._
 import org.specs2.mutable
 import org.specs2.time.NoTimeConversions

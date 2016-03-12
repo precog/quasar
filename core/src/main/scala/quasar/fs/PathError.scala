@@ -20,7 +20,7 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
-import monocle.{Prism, Lens}
+import monocle.Lens
 import pathy.Path._
 import scalaz._
 

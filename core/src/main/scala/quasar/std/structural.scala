@@ -21,7 +21,7 @@ import quasar._, LogicalPlan._, SemanticError._
 import quasar.fp._
 
 import matryoshka._, Recursive.ops._
-import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.{success, failure}
 
 trait StructuralLib extends Library {
   import Type._

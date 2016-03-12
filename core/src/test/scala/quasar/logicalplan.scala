@@ -22,7 +22,6 @@ import quasar.fs._
 
 import matryoshka.Fix
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._

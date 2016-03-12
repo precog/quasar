@@ -2874,7 +2874,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan convert to timestamp in map-reduce" in {
-      import org.threeten.bp.Instant
 
       plan("select length(name), to_timestamp(epoch) from foo") must beWorkflow {
         chain(

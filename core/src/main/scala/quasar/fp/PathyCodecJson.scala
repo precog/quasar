@@ -16,7 +16,7 @@
 
 package quasar.fp
 
-import quasar.Predef.{Array, String}
+import quasar.Predef.String
 import quasar.fs.{APath, sandboxAbs}
 
 import argonaut._, Argonaut._

@@ -16,12 +16,11 @@
 
 package quasar.api.services
 
-import quasar.{DataCodec, Data}
+import quasar.Data
 import quasar.api._, ToQResponse.ops._
 import quasar.fp._, numeric._
 import quasar.fs._
 import quasar.Predef._
-import quasar.repl.Prettify
 
 import java.nio.charset.StandardCharsets
 

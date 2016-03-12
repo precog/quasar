@@ -220,7 +220,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   def loadRegressionTest: File => Task[RegressionTest] =
     file => textContents(file) flatMap { text =>
       decodeJson[RegressionTest](text) fold (
-        err => Task.fail(new RuntimeException(err)),
+        err => Task.fail(new RuntimeException(file.getName + ": " + err)),
         Task.now(_))
     }
 

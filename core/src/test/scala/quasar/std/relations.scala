@@ -21,18 +21,16 @@ import quasar.TypeArbitrary
 import quasar.specs2.PendingWithAccurateCoverage
 
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
-import org.specs2.matcher.Matcher
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
-import scalaz.{Failure, Success, Validation}, Validation.FlatMap._
+import scalaz.Validation, Validation.FlatMap._
 
 class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import RelationsLib._
   import quasar.Type
   import quasar.Type.Const
   import quasar.Data.Bool
-  import quasar.Data.Date
   import quasar.Data.Dec
   import quasar.Data.Int
   import quasar.Data.Null

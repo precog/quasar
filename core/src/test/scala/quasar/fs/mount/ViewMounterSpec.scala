@@ -19,7 +19,6 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{LogicalPlan, Variables}
 import quasar.effect.AtomicRef
-import quasar.fp.TaskRef
 import quasar.fs.{Path => QPath}
 import quasar.sql
 
@@ -27,7 +26,6 @@ import matryoshka.Fix
 import org.specs2.mutable
 import pathy.Path._
 import scalaz._
-import scalaz.concurrent.Task
 
 class ViewMounterSpec extends mutable.Specification {
   import MountingError._

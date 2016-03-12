@@ -22,7 +22,7 @@ import quasar.fp._
 
 import org.http4s.HttpService
 import org.http4s.server.blaze.BlazeBuilder
-import org.http4s.server.{Server => Http4sServer, ServerBuilder}
+import org.http4s.server.{Server => Http4sServer}
 import scalaz.concurrent.Task
 import scalaz._, Scalaz._
 import scala.concurrent.duration.Duration

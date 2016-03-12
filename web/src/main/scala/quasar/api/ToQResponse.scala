@@ -31,7 +31,6 @@ import org.http4s._, Status._
 import pathy.Path._
 import scalaz._, syntax.show._
 import scalaz.concurrent.Task
-import simulacrum.typeclass
 
 trait ToQResponse[A, S[_]] {
   def toResponse(v: A): QResponse[S]

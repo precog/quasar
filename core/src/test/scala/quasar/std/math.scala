@@ -21,13 +21,12 @@ import quasar.TypeArbitrary
 import quasar.specs2.PendingWithAccurateCoverage
 
 import matryoshka.Fix
-import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
-import org.specs2.matcher.Matcher
+import org.scalacheck.Arbitrary
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
-import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
-import scalaz.{Validation, ValidationNel, Success, Failure}
+import org.threeten.bp.{Instant, Duration}
+import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 
 class MathSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {

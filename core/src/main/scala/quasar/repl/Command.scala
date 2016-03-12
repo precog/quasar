@@ -19,7 +19,7 @@ package quasar.repl
 import quasar.Predef._
 import quasar.sql.{Query}
 
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 
 import scalaz._, Scalaz._
 import pathy.Path, Path._

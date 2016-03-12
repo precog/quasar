@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef.{implicitly, String}
-import quasar.fp.{free, TaskRef, liftMT}
+import quasar.fp.{free, liftMT}
 import quasar.fs.{FileSystem, FileSystemType, PathError2, ADir}
 import quasar.effect._
 
@@ -26,7 +26,6 @@ import monocle.std.tuple2._
 import pathy.Path._
 import org.specs2.mutable
 import scalaz.{Failure => _, _}
-import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
 
 class FileSystemMounterSpec extends mutable.Specification {

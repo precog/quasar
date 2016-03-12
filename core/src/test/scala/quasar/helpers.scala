@@ -23,7 +23,6 @@ import quasar.std._
 
 import matryoshka._
 import org.specs2.mutable._
-import org.specs2.matcher.{Matcher, Expectable}
 import scalaz._, Scalaz._
 
 trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {

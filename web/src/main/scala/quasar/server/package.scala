@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.api._
-import quasar.effect.Failure
 import quasar.fp._
 import quasar.fs.{FileSystemError, FileSystemFailure, FileSystemFailureF}
 import quasar.fs.mount.hierarchical.{HierarchicalFileSystemError, HFSFailure, HFSFailureF}

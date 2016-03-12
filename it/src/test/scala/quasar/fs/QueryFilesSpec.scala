@@ -21,7 +21,6 @@ import quasar.fp._
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream._
 
 class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {

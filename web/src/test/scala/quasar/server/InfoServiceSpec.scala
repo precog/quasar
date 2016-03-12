@@ -18,7 +18,7 @@ package quasar.server
 
 import quasar.Predef._
 
-import org.http4s.{Status, Method, Uri, Request}
+import org.http4s.{Status, Method, Request}
 import org.http4s.argonaut._
 import org.specs2.mutable
 

@@ -18,13 +18,11 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
-import quasar.fp.TaskRef
 
 import monocle.{Lens, Prism}
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.stream._
-import scalaz.concurrent.Task
-import simulacrum.{typeclass, op}
+import simulacrum.typeclass
 
 sealed trait LowerPriorityTreeInstances {
   implicit def Tuple2RenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):

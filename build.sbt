@@ -28,7 +28,7 @@ lazy val commonSettings = Seq(
   headers := Map(
     ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
     ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
-  scalaVersion := "2.11.7",
+  scalaVersion := "2.11.8",
   outputStrategy := Some(StdoutOutput),
   initialize := {
     val version = sys.props("java.specification.version")

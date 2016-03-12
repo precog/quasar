@@ -33,7 +33,7 @@ case class RegressionTest(
 )
 
 object RegressionTest {
-  import DecodeResult.{ok, fail}
+  import DecodeResult.ok
 
   implicit val RegressionTestDecodeJson: DecodeJson[RegressionTest] =
     DecodeJson(c => for {

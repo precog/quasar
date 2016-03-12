@@ -17,7 +17,6 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.fp.numeric.Positive
 import quasar.javascript._
 
 import com.mongodb.client.model.MapReduceAction

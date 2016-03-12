@@ -23,7 +23,6 @@ import quasar.fp._
 import monocle.std.{disjunction => D}
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream._
 
 class WriteFilesSpec extends FileSystemTest[FileSystem](

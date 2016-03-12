@@ -22,7 +22,7 @@ import quasar.api._
 import quasar.sql.{Expr}
 import quasar.effect.{KeyValueStore}
 import quasar.fp._
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._

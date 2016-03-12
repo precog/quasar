@@ -24,7 +24,6 @@ import quasar.javascript._
 import quasar.specs2._
 
 import matryoshka._, FunctorT.ops._
-import org.specs2.execute.{Result}
 import org.specs2.mutable._
 import scalaz._, Scalaz._
 

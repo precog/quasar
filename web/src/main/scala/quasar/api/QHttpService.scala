@@ -18,9 +18,8 @@ package quasar.api
 
 import quasar.Predef.PartialFunction
 import quasar.SKI._
-import org.http4s.{Request, Response, Status, HttpService}
+import org.http4s.{Request, Status, HttpService}
 import scalaz._
-import scalaz.concurrent.Task
 
 final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QResponse[S]]]) {
   def apply(req: Request): Free[S, QResponse[S]] =

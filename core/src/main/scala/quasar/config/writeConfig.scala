@@ -23,7 +23,6 @@ import quasar.fs.{APath}
 import quasar.fs.mount._
 
 import argonaut.{EncodeJson}
-import pathy.Path
 import monocle.{Lens}
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.{Task}

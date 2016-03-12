@@ -25,7 +25,6 @@ import quasar.fs.mount._
 
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
-import org.http4s.util.CaseInsensitiveString
 import org.http4s.headers._
 import org.specs2.mutable.Specification
 import scalaz.{Failure => _, _}

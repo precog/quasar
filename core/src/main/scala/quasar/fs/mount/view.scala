@@ -25,8 +25,6 @@ import quasar.fs._, FileSystemError._, PathError2._
 import quasar.std.StdLib._, set._
 
 import matryoshka._
-import monocle.Optional
-import monocle.function.Field1
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._
 

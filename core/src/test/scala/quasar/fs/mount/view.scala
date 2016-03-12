@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 
-import quasar._, LogicalPlan.{Free => LPFree, _}
+import quasar._, LogicalPlan._
 import quasar.effect._
 import quasar.fp._
 import quasar.fs._

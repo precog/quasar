@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, Type, Mapping, SemanticError}, SemanticError._
+import quasar.{Data, Type, Mapping, SemanticError}, SemanticError._
 
 import scalaz._, NonEmptyList.nel, Validation.{success, failure}
 

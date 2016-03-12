@@ -19,19 +19,17 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._
 import quasar.fp._
-import quasar.fs.{AbsPath, APath, PathError2, sandboxAbs}
+import quasar.fs.{AbsPath, APath, sandboxAbs}
 import quasar.fs.mount._
 
 import argonaut._
 import org.http4s._, Method.MOVE
-import org.http4s.headers.Accept
-import org.http4s.dsl.{Path => HPath, _}
+import org.http4s.dsl._
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object mount {
-  import Mounting.PathTypeMismatch
   import ToQResponse.ops._
   import posixCodec._
 

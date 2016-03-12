@@ -33,7 +33,7 @@ import monocle.std.{disjunction => D}
 import monocle.function.Field1
 import monocle.std.tuple2._
 import org.specs2.ScalaCheck
-import org.specs2.execute.{AsResult, SkipException}
+import org.specs2.execute.SkipException
 import pathy.Path._
 import scalaz.{Optional => _, _}, Scalaz._
 import scalaz.stream._

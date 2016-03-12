@@ -22,8 +22,6 @@ import quasar.fp._
 import quasar.fs.{AFile, ADir, Path, PathName, firstSegmentName}
 
 import matryoshka._, FunctorT.ops._
-import monocle.Optional
-import monocle.function.Field1
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._
 

@@ -17,7 +17,7 @@
 package quasar.specs2
 
 import quasar.Predef._
-import quasar.{RenderTree, RenderedTree}, RenderTree.ops._
+import quasar.RenderTree, RenderTree.ops._
 import quasar.fp._
 
 import scala.reflect.ClassTag

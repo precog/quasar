@@ -21,8 +21,6 @@ import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
 
-import scala.Ordering
-
 import monocle.Prism
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._

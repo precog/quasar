@@ -17,7 +17,6 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.EnvironmentError
 import quasar.effect._
 import quasar.fp._
 import quasar.fs.APath

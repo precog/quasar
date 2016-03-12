@@ -20,7 +20,7 @@ package services
 
 import Predef._
 
-import org.http4s.{Uri, Request}
+import org.http4s.Request
 import org.specs2.mutable.Specification
 
 class WelcomeServiceSpec extends Specification {

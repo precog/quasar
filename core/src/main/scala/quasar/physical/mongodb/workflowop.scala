@@ -19,7 +19,6 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{RenderTree, RenderedTree, Terminal, NonTerminal}, RenderTree.ops._
 import quasar.fp._
-import quasar.fs.Path
 import optimize.pipeline._
 import quasar.javascript._, Js._
 import quasar.jscore, jscore.{JsCore, JsFn}

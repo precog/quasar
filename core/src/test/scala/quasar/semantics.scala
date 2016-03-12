@@ -17,11 +17,9 @@
 package quasar
 
 import quasar.Predef._
-import quasar.sql.SQLParser
 import quasar.specs2._
 
 import matryoshka._, Recursive.ops._
-import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.mutable._
 
 class SemanticsSpec extends Specification with PendingWithAccurateCoverage with TreeMatchers {

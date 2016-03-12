@@ -80,7 +80,6 @@ private final class QueryFileInterpreter[C](
   import Planner.{PlannerError => PPlannerError}
   import Workflow._
   import FileSystemError._, PathError2._, fsops._
-  import LogicalPlan.ReadF
   import Recursive.ops._
   import queryfile._
 

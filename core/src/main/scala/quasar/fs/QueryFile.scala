@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
-import quasar.fs.{Path => QPath}
 
 import matryoshka._
 import pathy.Path._

@@ -18,11 +18,7 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.{Path => QPath}
-import quasar.fs.mount.{ConnectionUri, MountConfig, MountingsConfig}
-import quasar.physical.mongodb.fs.MongoDBFsType
-
-import scala.util.Properties
+import quasar.fs.mount.ConnectionUri
 
 import argonaut._, Argonaut._
 import org.specs2.mutable._

@@ -185,19 +185,31 @@ object Optimizer {
       case t                      => List(t)
     }
 
-    sealed trait Component[A]
+    sealed trait Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]): A
+    }
     // A condition that refers to left and right sources using equality, so may
     // be rewritten into the join condition:
-    final case class EquiCond[A](run: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A]
+    final case class EquiCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l,r)
+    }
     // A condition which refers only to the left source:
-    final case class LeftCond[A](run: Fix[LogicalPlan] => A) extends Component[A]
+    final case class LeftCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l)
+    }
     // A condition which refers only to the right source:
-    final case class RightCond[A](run: Fix[LogicalPlan] => A) extends Component[A]
+    final case class RightCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(r)
+    }
     // A condition which refers to both sources but doesn't have the right shape
     // to become the join condition:
-    final case class OtherCond[A](run: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A]
+    final case class OtherCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l,r)
+    }
     // An expression that doesn't refer to any source.
-    final case class NeitherCond[A](run: A) extends Component[A]
+    final case class NeitherCond[A](run0: A) extends Component[A] {
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0
+    }
 
     implicit val ComponentFunctor = new Functor[Component] {
       def map[A, B](fa: Component[A])(f: A => B) = fa match {
@@ -224,14 +236,16 @@ object Optimizer {
           ts.map(_._2).foldRight[Component[List[Fix[LogicalPlan]]]](NeitherCond(Nil)) {
             case (NeitherCond(h), NeitherCond(cs)) => NeitherCond(h :: cs)
 
-            case (LeftCond(h),    NeitherCond(cs)) => LeftCond(t => h(t) :: cs)
-            case (LeftCond(h),    LeftCond(cs))    => LeftCond(t => h(t) :: cs(t))
+            case (NeitherCond(h), LeftCond(cs))    => LeftCond(lp => h :: cs(lp))
+            case (NeitherCond(h), RightCond(cs))   => RightCond(lp => h :: cs(lp))
 
-            case (RightCond(h),   NeitherCond(cs)) => RightCond(t => h(t) :: cs)
-            case (RightCond(h),   RightCond(cs))   => RightCond(t => h(t) :: cs(t))
+            case (LeftCond(h),    NeitherCond(cs)) => LeftCond(lp => h(lp) :: cs)
+            case (LeftCond(h),    LeftCond(cs))    => LeftCond(lp => h(lp) :: cs(lp))
 
-            case (LeftCond(h),    RightCond(cs))   => OtherCond((l, r) => h(l) :: cs(r))
-            case (RightCond(h),   LeftCond(cs))    => OtherCond((l, r) => h(r) :: cs(l))
+            case (RightCond(h),   NeitherCond(cs)) => RightCond(lp => h(lp) :: cs)
+            case (RightCond(h),   RightCond(cs))   => RightCond(lp => h(lp) :: cs(lp))
+
+            case (h, cs)                           => OtherCond((l, r) => h.run(l,r) :: cs.run(l,r))
           }.map(ts => Fix(InvokeF(func, ts)))
 
         case t => NeitherCond(Fix(t.map(_._1)))
@@ -259,15 +273,15 @@ object Optimizer {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
           Let(lName, lSrc,
-            Let(lFName, Fix(Filter(Free(lName), assembleCond(lefts.map(_.run(Free(lName)))))),
+            Let(lFName, Fix(Filter(Free(lName), assembleCond(lefts.map(_.run0(Free(lName)))))),
               Let(rName, rSrc,
-                Let(rFName, Fix(Filter(Free(rName), assembleCond(rights.map(_.run(Free(rName)))))),
+                Let(rFName, Fix(Filter(Free(rName), assembleCond(rights.map(_.run0(Free(rName)))))),
                   Let(jName,
                     Fix(InnerJoin(Free(lFName), Free(rFName),
                       assembleCond(equis.map(_.run(Free(lFName), Free(rFName)))))),
                     Fix(Filter(Free(jName), assembleCond(
-                      others.map(_.run(JoinDir.Left.projectFrom(Free(jName)), JoinDir.Right.projectFrom(Free(jName)))) ++
-                      neithers.map(_.run))))))))))
+                      others.map(_.run0(JoinDir.Left.projectFrom(Free(jName)), JoinDir.Right.projectFrom(Free(jName)))) ++
+                      neithers.map(_.run0))))))))))
       }
     }
 

@@ -17,7 +17,6 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.Data
 import quasar.effect.{Failure, FailureF}
 import quasar.fp._
 

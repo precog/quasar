@@ -19,12 +19,9 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
-import quasar.DataCodec
-import quasar.Errors.convertError
 import quasar.api._
 import quasar.api.MessageFormat.JsonContentType
 import quasar.api.MessageFormatGen._
-import quasar.effect.Failure
 import quasar.fs.{Path => _, _}
 import quasar.fp.{evalNT, free, liftMT}
 import quasar.fp.numeric._
@@ -36,7 +33,6 @@ import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
-import org.http4s.Uri.Authority
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification

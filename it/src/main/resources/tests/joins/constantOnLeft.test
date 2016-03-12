@@ -1,0 +1,14 @@
+{
+  "name": "join where the left hand side is constant",
+  "backends": { "mongodb_read_only": "pending" },
+
+  "data": "largeZips.data",
+
+  "query": "select a.city, b.state from largeZips as a, largeZips as b where a._id = b._id
+            and \"CA\" = b.state",
+
+  "predicate": "containsAtLeast",
+  "expected": [
+    { "city": "REDONDO BEACH", "state": "CA" }
+  ]
+}

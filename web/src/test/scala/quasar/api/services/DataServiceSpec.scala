@@ -25,7 +25,6 @@ import quasar.api.MessageFormatGen._
 import quasar.fs.{Path => _, _}
 import quasar.fp.{evalNT, free, liftMT}
 import quasar.fp.numeric._
-import quasar.fp.numeric.SafeIntForVectorArbitrary._
 import quasar.fp.prism._
 
 import argonaut.Json
@@ -187,12 +186,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" ! prop {
-            (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: SafeIntForVector @@ RPositive, format: MessageFormat) =>
+            (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: Int @@ RPositive, format: MessageFormat) =>
               val request = Request(
-                uri = Uri(path = filesystem.path).+?("offset", offset.toString).+?("limit", limit.value.toString),
+                uri = Uri(path = filesystem.path).+?("offset", offset.toString).+?("limit", limit.toString),
                 headers = Headers(Accept(format.mediaType)))
               val response = service(filesystem.state)(request).run
-              isExpectedResponse(filesystem.contents.drop(offset).take(limit.value), response, format)
+              isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
           }
           "return 400 if provided with" >> {
             "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>

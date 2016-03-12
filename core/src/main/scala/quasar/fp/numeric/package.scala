@@ -26,46 +26,13 @@ import scalaz.syntax.show._
 
 package object numeric {
 
+  implicit class SafeBigInt(val a: BigInt) extends scala.AnyVal {
+    def safeToInt: Option[Int] =
+      if (a <= Int.MaxValue) Some(a.toInt) else None
+  }
+
   type Natural = Long Refined NonNegative
   type Positive = Long Refined RPositive
-
-  // Side-step https://issues.scala-lang.org/browse/SI-9581 by avoiding values of limit
-  // that are close to Int.MaxValue
-  // TODO: Remove after upgrade to Scala 2.11.8
-  final class SafeIntForVector private [numeric](val value: Int) extends scala.AnyVal
-
-  object SafeIntForVector {
-    val minValue = Int.MinValue
-    val maxValue = 10000000
-    def apply(a: Int): Option[SafeIntForVector] =
-      apply(a.toLong)
-    def apply(a: Long): Option[SafeIntForVector] =
-      apply(BigInt(a))
-    def apply(a: BigInt): Option[SafeIntForVector] =
-      if (a <= maxValue) Some(new SafeIntForVector(a.toInt))
-      else None
-    def unsafe(a: Int): SafeIntForVector =
-      apply(a).getOrElse(throw new java.lang.IllegalArgumentException(s"$a is not below maximum value of: $maxValue"))
-  }
-
-  trait SafeIntIsIntegral extends scala.math.Integral[SafeIntForVector] {
-    def plus(x: SafeIntForVector, y: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(x.value + y.value)
-    def minus(x: SafeIntForVector, y: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(x.value - y.value)
-    def times(x: SafeIntForVector, y: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(x.value * y.value)
-    def quot(x: SafeIntForVector, y: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(x.value / y.value)
-    def rem(x: SafeIntForVector, y: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(x.value % y.value)
-    def negate(x: SafeIntForVector): SafeIntForVector = SafeIntForVector.unsafe(-x.value)
-    def fromInt(x: Int): SafeIntForVector = SafeIntForVector.unsafe(x)
-    def toInt(x: SafeIntForVector): Int = x.value
-    def toLong(x: SafeIntForVector): Long = x.value.toLong
-    def toFloat(x: SafeIntForVector): scala.Float = x.value.toFloat
-    def toDouble(x: SafeIntForVector): Double = x.value.toDouble
-    def compare(x: SafeIntForVector, y: SafeIntForVector) =
-      if (x.value < y.value) -1
-      else if (x.value == y.value) 0
-      else 1
-  }
-  implicit object SafeIntIsIntegral extends SafeIntIsIntegral
 
   def Positive(a: Long): Option[Positive] = refineV[RPositive](a).right.toOption
   def Natural(a: Long): Option[Natural] = refineV[NonNegative](a).right.toOption

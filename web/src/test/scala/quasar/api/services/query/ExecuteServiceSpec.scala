@@ -19,7 +19,6 @@ package quasar.api.services.query
 import quasar.Predef._
 import quasar._, fp._
 import quasar.fp.numeric._
-import quasar.fp.numeric.SafeIntForVectorArbitrary._
 import quasar.api.services.Fixture._
 import quasar.fs.{Path => QPath, _}
 import quasar.fs.InMemory._
@@ -135,7 +134,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         varName: AlphaCharacters,
         var_ : Int,
         offset: Int Refined NonNegative,
-        limit: SafeIntForVector Refined RPositive) =>
+        limit: Int Refined RPositive) =>
           import quasar.std.StdLib.set._
 
           val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
@@ -144,24 +143,24 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
               Fix(Drop(
                 lp,
                 LogicalPlan.Constant(Data.Int(offset.get)))),
-              LogicalPlan.Constant(Data.Int(limit.get.value))))
+              LogicalPlan.Constant(Data.Int(limit.get))))
           val limitedContents =
             filesystem.contents
               .drop(offset.get)
-              .take(limit.get.value)
+              .take(limit.get)
 
           get(executeService)(
             path = filesystem.parent,
             query = Some(Query(
               query,
               offset = Some(offset),
-              limit = Some(Positive(limit.get.value.toLong).get),
+              limit = Some(Positive(limit.get.toLong).get),
               varNameAndValue = Some((varName.value, var_.toString)))),
             state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
             status = Status.Ok,
             response = (a: String) => a must_==
               jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
-                .drop(offset.get).take(limit.get.value).mkString(""))
+                .drop(offset.get).take(limit.get).mkString(""))
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FileOf[AlphaCharacters]) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)

@@ -219,9 +219,9 @@ object InMemory {
         optLp.para[FileSystemError \/ Vector[Data]] {
           case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem)).toRightDisjunction(unsupported(optLp))
           case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
-            src.flatMap(s => if (skip <= Int.MaxValue) s.drop(skip.toInt).right else unsupported(optLp).left)
+            src.flatMap(s => skip.safeToInt.map(s.drop).toRightDisjunction(unsupported(optLp)))
           case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
-            src.flatMap(s => SafeIntForVector(limit).map(i => s.take(i.value)).toRightDisjunction(unsupported(optLp)))
+            src.flatMap(s => limit.safeToInt.map(s.take).toRightDisjunction(unsupported(optLp)))
           case InvokeF(Squash,(_,src) :: Nil) => src
           case ConstantF(data) => Vector(data).right
           case other =>

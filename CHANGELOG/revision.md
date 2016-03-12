@@ -1,0 +1,1 @@
+Remove `SafeIntForVector` now it is no longer needed thx to a bug fix in `scala` `2.11.8`

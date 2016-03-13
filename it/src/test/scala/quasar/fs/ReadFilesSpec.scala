@@ -20,14 +20,13 @@ import quasar.Predef._
 import quasar.Data
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fp.numeric.NumericArbitrary._
 
 import java.lang.RuntimeException
 import scala.annotation.tailrec
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{Positive => RPositive,_}
-import eu.timepit.refined.scalacheck.numeric.chooseRefinedNum
+import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import monocle.std.{disjunction => D}

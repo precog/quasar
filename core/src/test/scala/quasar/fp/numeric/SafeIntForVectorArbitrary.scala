@@ -16,7 +16,7 @@
 
 package quasar.fp.numeric
 
-import eu.timepit.refined.scalacheck.numeric.Bounded
+import eu.timepit.refined.scalacheck.util.Bounded
 import org.scalacheck.Gen
 import org.scalacheck.Gen.Choose
 
@@ -27,5 +27,5 @@ object SafeIntForVectorArbitrary {
   }
 
   implicit val SafeIntForVectorBounded: Bounded[SafeIntForVector] =
-    Bounded(SafeIntForVector.unsafe(SafeIntForVector.minValue), SafeIntForVector.unsafe(SafeIntForVector.maxValue))
+    Bounded.instance(SafeIntForVector.unsafe(SafeIntForVector.minValue), SafeIntForVector.unsafe(SafeIntForVector.maxValue))
 }

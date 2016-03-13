@@ -29,7 +29,6 @@ import quasar.fs.{Path => _, _}
 import quasar.fp.{evalNT, free, liftMT}
 import quasar.fp.numeric._
 import quasar.fp.numeric.SafeIntForVectorArbitrary._
-import quasar.fp.numeric.NumericArbitrary._
 import quasar.fp.prism._
 
 import argonaut.Json
@@ -56,7 +55,7 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
-import eu.timepit.refined.scalacheck.numeric.greaterEqualArbitraryNat
+import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {

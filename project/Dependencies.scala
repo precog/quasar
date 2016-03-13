@@ -12,7 +12,7 @@ object Dependencies {
   private val http4sVersion  = "0.12.3"
   private val mongoVersion   = "3.2.1"
   private val nettyVersion   = "4.0.26.Final"
-  private val refinedVersion = "0.3.6"
+  private val refinedVersion = "0.3.7"
 
   val core = Seq(
     // NB: This version is forced because there seems to be some difference

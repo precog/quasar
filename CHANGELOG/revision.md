@@ -1,0 +1,2 @@
+- Fix /metadata for certain nonexistent files to produce `404 File Not Found` (instead of `400 BadRequest` with a confusing message).
+- Fix /metadata to succeed when views exist at those same paths, and others.

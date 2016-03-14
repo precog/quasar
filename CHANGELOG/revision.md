@@ -1,0 +1,1 @@
+Upgrade to refined 0.3.7, allowing to remove custom generators for refined numerics

@@ -1,0 +1,1 @@
+- [SD-1263] Handle specific failing case of "plan multiple reducing projections (all, distinct, orderBy)"

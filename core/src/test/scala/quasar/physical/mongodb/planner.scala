@@ -69,10 +69,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     MongoDbPlanner.compileToLP.apply(qr)
       .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
 
-  def plan(query: String): Either[CompilationError, Crystallized] =
-    SQLParser.parseInContext(Query(query), Path("/db/")).fold(
+  def plan(query: String): Either[CompilationError, Crystallized] = {
+    val (log, wf) = SQLParser.parseInContext(Query(query), Path("/db/")).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run._2).toEither
+      expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run)
+
+    wf.toEither
+  }
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] = {
     val (log, wf) = (for {
@@ -385,6 +388,29 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
            IgnoreId)))
     }
 
+    "plan filter by date field (SD-1508)" in {
+      plan("select * from foo where date_part(\"year\", ts) = 2016") must
+       beWorkflow(chain(
+         $read(Collection("db", "foo")),
+         $project(
+           reshape(
+             "__tmp2" ->
+               $cond(
+                 $and(
+                   $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("ts")),
+                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                 $eq($year($field("ts")), $literal(Bson.Int64(2016))),
+                 $literal(Bson.Undefined)),
+             "__tmp3" -> $$ROOT),
+           IgnoreId),
+         $match(Selector.Doc(
+           BsonField.Name("__tmp2") -> Selector.Eq(Bson.Bool(true)))),
+         $project(
+           reshape(
+             "value" -> $field("__tmp3")),
+           ExcludeId)))
+    }
+
     "plan filter array element" in {
       plan("select loc from zips where loc[0] < -73") must
       beWorkflow(chain(
@@ -584,60 +610,64 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan simple js filter" in {
+      import javascript._
+
       plan("select * from zips where length(city) < 4") must
       beWorkflow(chain(
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "__tmp4" ->
-            Call(ident("NumberLong"),
-              List(Select(Select(ident("x"), "city"), "length"))),
+          If(
+            isString(Select(ident("x"), "city")),
+            BinOp(Lt,
+              Call(ident("NumberLong"),
+                List(Select(Select(ident("x"), "city"), "length"))),
+                Literal(Js.Num(4, false))),
+            ident(Js.Undefined.ident)),
           "__tmp5" -> ident("x"))))),
           ListMap()),
-        $match(Selector.And(
+        $match(
           Selector.Doc(
-            BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-              Selector.Type(BsonType.Text)),
-          Selector.Doc(
-            BsonField.Name("__tmp4") -> Selector.Lt(Bson.Int64(4))))),
+            BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
         $project(
           reshape("value" -> $field("__tmp5")),
           ExcludeId)))
     }
 
     "plan filter with js and non-js" in {
+      import javascript._
+
       plan("select * from zips where length(city) < 4 and pop < 20000") must
       beWorkflow(chain(
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "__tmp8" ->
-            Call(ident("NumberLong"),
-              List(Select(Select(ident("x"), "city"), "length"))),
-          "__tmp9" -> ident("x"),
-          "__tmp10" -> Select(ident("x"), "pop"))))),
+            If(
+              BinOp(And,
+                binop(Or,
+                  BinOp(Or,
+                    isAnyNumber(Select(ident("x"), "pop")),
+                    isString(Select(ident("x"), "pop"))),
+                  isDate(Select(ident("x"), "pop")),
+                  isTimestamp(Select(ident("x"), "pop")),
+                  isBoolean(Select(ident("x"), "pop"))),
+                Call(ident("isString"), List(Select(ident("x"), "city")))),
+              BinOp(And,
+                BinOp(Lt,
+                  Call(ident("NumberLong"),
+                    List(Select(Select(ident("x"), "city"), "length"))),
+                    Literal(Js.Num(4, false))),
+                BinOp(Lt,
+                  Select(ident("x"), "pop"),
+                  Literal(Js.Num(20000, false)))),
+            ident(Js.Undefined.ident)),
+          "__tmp9" -> ident("x"))))),
           ListMap()),
-        $match(Selector.And(
-          Selector.Or(
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Int32)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Int64)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Dec)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Text)),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Bool)))),
-          Selector.And(
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-              Selector.Type(BsonType.Text)),
-            Selector.And(
-              Selector.Doc(BsonField.Name("__tmp8") -> Selector.Lt(Bson.Int64(4))),
-              Selector.Doc(BsonField.Name("__tmp10") -> Selector.Lt(Bson.Int64(20000))))))),
+        $match(
+          Selector.Doc(
+            BsonField.Name("__tmp8") -> Selector.Eq(Bson.Bool(true)))),
         $project(
           reshape("value" -> $field("__tmp9")),
           ExcludeId)))
@@ -1045,30 +1075,24 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "zips")),
         $project(
           reshape(
-            "__tmp4" -> $neq($field("city"), $field("state")),
-            "__tmp5" -> $$ROOT,
-            "__tmp6" -> $field("pop")),
+            "__tmp4" ->
+              $cond(
+                $or(
+                  $and(
+                    $lt($literal(Bson.Null), $field("pop")),
+                    $lt($field("pop"), $literal(Bson.Doc(ListMap())))),
+                  $and(
+                    $lte($literal(Bson.Bool(false)), $field("pop")),
+                    $lt($field("pop"), $literal(Bson.Regex("", ""))))),
+                $and(
+                  $neq($field("city"), $field("state")),
+                  $lt($field("pop"), $literal(Bson.Int64(10000)))),
+                $literal(Bson.Undefined)),
+            "__tmp5" -> $$ROOT),
           IgnoreId),
-        $match(Selector.And(
-          Selector.Or(
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Int32)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Int64)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Dec)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-              Selector.Type(BsonType.Text)),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
-                Selector.Type(BsonType.Bool)))),
-          Selector.And(
-            Selector.Doc(
-              BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true))),
-            Selector.Doc(
-              BsonField.Name("__tmp6") -> Selector.Lt(Bson.Int64(10000)))))),
+        $match(
+          Selector.Doc(
+            BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
         $project(
           reshape("value" -> $field("__tmp5")),
           ExcludeId)))
@@ -2632,43 +2656,34 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $project(
             reshape(
               "__tmp6" ->
-                $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
+                $cond(
+                  $or(
+                    $and(
+                      $lt($literal(Bson.Null), $field("date")),
+                      $lt($field("date"), $literal(Bson.Text("")))),
+                    $and(
+                      $lte($literal(Bson.Date(Instant.parse("1970-01-01T00:00:00Z"))), $field("date")),
+                      $lt($field("date"), $literal(Bson.Regex("", ""))))),
+                  $cond(
+                    $or(
+                      $and(
+                        $lt($literal(Bson.Null), $field("date")),
+                        $lt($field("date"), $literal(Bson.Doc(ListMap())))),
+                      $and(
+                        $lte($literal(Bson.Bool(false)), $field("date")),
+                        $lt($field("date"), $literal(Bson.Regex("", ""))))),
+                    $and(
+                      $lt($field("date"), $literal(Bson.Date(Instant.parse("2014-11-17T22:00:00Z")))),
+                      $gt(
+                        $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
+                        $literal(Bson.Date(Instant.parse("2014-11-17T00:00:00Z"))))),
+                    $literal(Bson.Undefined)),
+                  $literal(Bson.Undefined)),
               "__tmp7" -> $$ROOT),
-              IgnoreId),
+            IgnoreId),
           $match(
-            Selector.And(
-              // TODO: eliminate duplication
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                  Selector.Type(BsonType.Int32)),
-                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                  Selector.Type(BsonType.Int64)),
-                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                  Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                  Selector.Type(BsonType.Date))),
-              Selector.And(
-                Selector.Or(
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Int32)),
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Int64)),
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Dec)),
-                  Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                    Selector.Type(BsonType.Text)),
-                  Selector.Or(
-                    Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                      Selector.Type(BsonType.Date)),
-                    Selector.Doc(BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                      Selector.Type(BsonType.Bool)))),
-                Selector.And(
-                  Selector.Doc(
-                    BsonField.Name("__tmp7") \ BsonField.Name("date") ->
-                      Selector.Lt(Bson.Date(Instant.parse("2014-11-17T22:00:00Z")))),
-                  Selector.Doc(
-                    BsonField.Name("__tmp6") ->
-                      Selector.Gt(Bson.Date(Instant.parse("2014-11-17T00:00:00Z")))))))),
+            Selector.Doc(
+              BsonField.Name("__tmp6") -> Selector.Eq(Bson.Bool(true)))),
           $project(
             reshape("value" -> $field("__tmp7")),
             ExcludeId)))
@@ -3268,35 +3283,40 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $project(
               reshape(
                 "city"    -> $field("__tmp11", "city"),
-                "__tmp13" -> $field("__tmp12", "right"),
-                "__tmp14" -> $field("__tmp12", "right", "pop"),
-                "__tmp15" -> $field("__tmp12", "left"),
-                "__tmp16" -> $field("__tmp12", "left", "pop"),
-                "__tmp17" ->
-                  $lt(
-                    $field("__tmp12", "left", "pop"),
-                    $field("__tmp12", "right", "pop"))),
+                "__tmp13" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("__tmp12", "right")),
+                      $lt($field("__tmp12", "right"), $literal(Bson.Arr(List())))),
+                    $cond(
+                      $or(
+                        $and(
+                          $lt($literal(Bson.Null), $field("__tmp12", "right", "pop")),
+                          $lt($field("__tmp12", "right", "pop"), $literal(Bson.Doc(ListMap())))),
+                        $and(
+                          $lte($literal(Bson.Bool(false)), $field("__tmp12", "right", "pop")),
+                          $lt($field("__tmp12", "right", "pop"), $literal(Bson.Regex("", ""))))),
+                      $cond(
+                        $and(
+                          $lte($literal(Bson.Doc(ListMap())), $field("__tmp12", "left")),
+                          $lt($field("__tmp12", "left"), $literal(Bson.Arr(List())))),
+                        $cond(
+                          $or(
+                            $and(
+                              $lt($literal(Bson.Null), $field("__tmp12", "left", "pop")),
+                              $lt($field("__tmp12", "left", "pop"), $literal(Bson.Doc(ListMap())))),
+                            $and(
+                              $lte($literal(Bson.Bool(false)), $field("__tmp12", "left", "pop")),
+                              $lt($field("__tmp12", "left", "pop"), $literal(Bson.Regex("", ""))))),
+                          $lt($field("__tmp12", "left", "pop"), $field("__tmp12", "right", "pop")),
+                          $literal(Bson.Undefined)),
+                        $literal(Bson.Undefined)),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined))),
               IgnoreId),
-            $match(Selector.And(
-              Selector.Doc(BsonField.Name("__tmp13") -> Selector.Type(BsonType.Doc)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int32)),
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int64)),
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Text)),
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Bool))),
+            $match(
               Selector.Doc(
-                BsonField.Name("__tmp15") -> Selector.Type(BsonType.Doc)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Int32)),
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Int64)),
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Text)),
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Bool))),
-              Selector.Doc(
-                BsonField.Name("__tmp17") -> Selector.Eq(Bson.Bool(true))))),
+                BsonField.Name("__tmp13") -> Selector.Eq(Bson.Bool(true)))),
             $project(
               reshape("city" -> $field("city")),
               ExcludeId)),

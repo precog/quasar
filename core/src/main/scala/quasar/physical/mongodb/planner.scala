@@ -25,12 +25,13 @@ import quasar.namegen._
 import quasar.std.StdLib._
 import Type._
 import Workflow._
+import javascript._
 
 import matryoshka._, Fix._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
-object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
+object MongoDbPlanner extends Planner[Crystallized] {
   import LogicalPlan._
   import Planner._
   import WorkflowBuilder._
@@ -45,16 +46,12 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
   import string._
   import structural._
 
-  type InputFinder[A] = Cofree[LogicalPlan, A] => A
-  def here[A]: InputFinder[A] = _.head
-  def there[A](index: Int, next: InputFinder[A]): InputFinder[A] =
-    a => next((Recursive[Cofree[?[_], A]].children(a).apply)(index))
-  type Partial[In, Out, A] =
-    (PartialFunction[List[In], Out], List[InputFinder[A]])
+  type Partial[In, Out] =
+    (PartialFunction[List[In], Out], List[InputFinder])
 
   type OutputM[A] = PlannerError \/ A
 
-  type PartialJs[A] = Partial[JsFn, JsFn, A]
+  type PartialJs = Partial[JsFn, JsFn]
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -85,8 +82,8 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           Some(_))
 
 
-  def jsExprƒ[B]: Algebra[LogicalPlan, OutputM[PartialJs[B]]] = {
-    type Output = OutputM[PartialJs[B]]
+  def jsExprƒ[B]: Algebra[LogicalPlan, OutputM[PartialJs]] = {
+    type Output = OutputM[PartialJs]
 
     import jscore.{
       Add => _, In => _,
@@ -94,8 +91,8 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       And => _, Or => _, Not => _,
       _}
 
-    val HasJs: Output => OutputM[PartialJs[B]] =
-      _ <+> \/-(({ case List(field) => field }, List(here)))
+    val HasJs: Output => OutputM[PartialJs] =
+      _ <+> \/-(({ case List(field) => field }, List(Here)))
 
     def invoke(func: Func, args: List[Output]): Output = {
       val HasStr: Output => OutputM[String] = _.flatMap {
@@ -108,7 +105,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       def Arity1(f: JsCore => JsCore): Output = args match {
         case a1 :: Nil =>
           HasJs(a1).map {
-            case (f1, p1) => ({ case list => JsFn(JsFn.defaultName, f(f1(list)(Ident(JsFn.defaultName)))) }, p1.map(there(0, _)))
+            case (f1, p1) => ({ case list => JsFn(JsFn.defaultName, f(f1(list)(Ident(JsFn.defaultName)))) }, p1.map(There(0, _)))
           }
         case _         => -\/(FuncArity(func, args.length))
       }
@@ -118,7 +115,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           case a1 :: a2 :: Nil => (HasJs(a1) |@| HasJs(a2)) {
             case ((f1, p1), (f2, p2)) =>
               ({ case list => JsFn(JsFn.defaultName, f(f1(list.take(p1.size))(Ident(JsFn.defaultName)), f2(list.drop(p1.size))(Ident(JsFn.defaultName)))) },
-                p1.map(there(0, _)) ++ p2.map(there(1, _)))
+                p1.map(There(0, _)) ++ p2.map(There(1, _)))
           }
           case _               => -\/(FuncArity(func, args.length))
         }
@@ -133,7 +130,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
               f2(list.drop(p1.size).take(p2.size))(Ident(JsFn.defaultName)),
               f3(list.drop(p1.size + p2.size))(Ident(JsFn.defaultName))))
             },
-              p1.map(there(0, _)) ++ p2.map(there(1, _)) ++ p3.map(there(2, _)))
+              p1.map(There(0, _)) ++ p2.map(There(1, _)) ++ p3.map(There(2, _)))
         }
         case _                     => -\/(FuncArity(func, args.length))
       }
@@ -204,7 +201,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
         case Extract =>
           args match {
             case a1 :: a2 :: Nil => (HasStr(a1) |@| HasJs(a2)) {
-              case (field, source) => ((field match {
+              case (field, (sel, inputs)) => ((field match {
                 case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
                 case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
                 case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
@@ -256,9 +253,9 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
                 case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
 
                 case _ => -\/(FuncApply(func, "valid time period", field))
-              }): PlannerError \/ (JsCore => JsCore)).map(x => source.bimap[PartialFunction[List[JsFn], JsFn], List[InputFinder[B]]](
-                f1 => { case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(f1(list)(Ident(JsFn.defaultName)))) },
-                _.map(there(1, _))))
+              }): PlannerError \/ (JsCore => JsCore)).map(x =>
+                ({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(sel(list)(Ident(JsFn.defaultName)))) },
+                  inputs.map(There(1, _))): PartialJs)
             }.join
             case _               => -\/(FuncArity(func, args.length))
           }
@@ -280,41 +277,28 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
     _ match {
       case ConstantF(x)     => \/-(({ case Nil => JsFn.const(x.toJs) }, Nil))
       case InvokeF(f, a)    => invoke(f, a)
-      case FreeF(_)         => \/-(({ case List(x) => x }, List(here)))
+      case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LogicalPlan.LetF(_, _, body) => body
       case x @ TypecheckF(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
-            case Type.Null =>
-              ((expr: JsCore) => BinOp(jscore.Eq, Literal(Js.Null), expr))
-            case Type.Dec =>
-              ((expr: JsCore) => Call(ident("isNumber"), List(expr)))
+            case Type.Null             => isNull
+            case Type.Dec              => isDec
             case Type.Int
                | Type.Int ⨿ Type.Dec
-               | Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
-              isAnyNumber(_)
-            case Type.Str =>
-              ((expr: JsCore) => Call(ident("isString"), List(expr)))
-            case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _) =>
-              ((expr: JsCore) => Call(ident("isObject"), List(expr)))
-            case Type.Obj(_, _) =>
-              ((expr: JsCore) =>
-                BinOp(jscore.And,
-                  Call(ident("isObject"), List(expr)),
-                  UnOp(jscore.Not,
-                    Call(Select(ident("Array"), "isArray"), List(expr)))))
-            case Type.FlexArr(_, _, _) =>
-              ((expr: JsCore) => Call(Select(ident("Array"), "isArray"), List(expr)))
-            case Type.Binary =>
-              ((expr: JsCore) => BinOp(Instance, expr, ident("Binary")))
-            case Type.Id =>
-              ((expr: JsCore) => BinOp(Instance, expr, ident("ObjectId")))
-            case Type.Bool =>
-              ((expr: JsCore) => BinOp(jscore.Eq, UnOp(TypeOf, expr), jscore.Literal(Js.Str("boolean"))))
-            case Type.Date =>
-              ((expr: JsCore) => BinOp(Instance, expr, ident("Date")))
+               | Type.Int ⨿ Type.Dec ⨿ Type.Interval
+                                       => isAnyNumber
+            case Type.Str              => isString
+            case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _)
+                                       => isObjectOrArray
+            case Type.Obj(_, _)        => isObject
+            case Type.FlexArr(_, _, _) => isArray
+            case Type.Binary           => isBinary
+            case Type.Id               => isObjectId
+            case Type.Bool             => isBoolean
+            case Type.Date             => isDate
           }
-        jsCheck(typ).fold[OutputM[PartialJs[B]]](
+        jsCheck(typ).fold[OutputM[PartialJs]](
           -\/(UnsupportedPlan(x, None)))(
           f =>
           (HasJs(expr) |@| HasJs(cont) |@| HasJs(fallback)) {
@@ -324,13 +308,13 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
                   f2(list.drop(p1.size).take(p2.size))(Ident(JsFn.defaultName)),
                   f3(list.drop(p1.size + p2.size))(Ident(JsFn.defaultName))))
               },
-                p1.map(there(0, _)) ++ p2.map(there(1, _)) ++ p3.map(there(2, _)))
+                p1.map(There(0, _)) ++ p2.map(There(1, _)) ++ p3.map(There(2, _)))
           })
       case x => -\/(UnsupportedPlan(x, None))
     }
   }
 
-  type PartialSelector[A] = Partial[BsonField, Selector, A]
+  type PartialSelector = Partial[BsonField, Selector]
 
   /**
    * The selector phase tries to turn expressions into MongoDB selectors -- i.e.
@@ -349,8 +333,8 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
    * for conversion using \$where.
    */
   def selectorƒ[B]:
-      GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, OutputM[PartialSelector[B]]] = { node =>
-    type Output = OutputM[PartialSelector[B]]
+      GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, OutputM[PartialSelector]] = { node =>
+    type Output = OutputM[PartialSelector]
 
     object IsBson {
       def unapply(v: (Fix[LogicalPlan], Output)): Option[Bson] =
@@ -410,9 +394,9 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
         */
       def relop(f: Bson => Selector.Condition, r: Bson => Selector.Condition): Output = args match {
         case _           :: IsBson(v2)  :: Nil =>
-          \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(v2)))) }, List(there(0, here))))
+          \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(v2)))) }, List(There(0, Here))))
         case IsBson(v1)  :: _           :: Nil =>
-          \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(there(1, here))))
+          \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(There(1, Here))))
 
         case _ => -\/(UnsupportedPlan(node, None))
       }
@@ -420,7 +404,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
         \/-((
           { case x :: Nil => Selector.Doc(x -> f(Bson.Date(g(date).value))) },
-          List(there(index, here))))
+          List(There(index, Here))))
 
       def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.Date, g1: Data.Date => Data.Timestamp, g2: Data.Date => Data.Timestamp, index: Int): Output =
         \/-((
@@ -429,12 +413,13 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
               Selector.Doc(x -> f1(Bson.Date(g1(date).value))),
               Selector.Doc(x -> f2(Bson.Date(g2(date).value))))
           },
-          List(there(index, here))))
+          List(There(index, Here))))
 
-      def stringOp(f: String => Selector.Condition, arg: (Fix[LogicalPlan], Output)): Output = arg match {
-                                                                                                                     case IsText(str2) => \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(str2)))) }, List(there(0, here))))
-                                                                                                                     case _ => -\/(UnsupportedPlan(node, None))
-                                                                                                                     }
+      def stringOp(f: String => Selector.Condition, arg: (Fix[LogicalPlan], Output)): Output =
+        arg match {
+          case IsText(str2) =>  \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(str2)))) }, List(There(0, Here))))
+          case _            => -\/ (UnsupportedPlan(node, None))
+        }
 
       def invoke2Nel(f: (Selector, Selector) => Selector): Output = {
         val x :: y :: Nil = args.map(_._2)
@@ -443,7 +428,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           ({ case list =>
             f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
           },
-            p1.map(there(0, _)) ++ p2.map(there(1, _)))
+            p1.map(There(0, _)) ++ p2.map(There(1, _)))
         }
       }
 
@@ -478,7 +463,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
 
         case (IsNull, _ :: Nil) => \/-((
           { case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Null)) },
-          List(there(0, here))))
+          List(There(0, Here))))
         case (IsNull, _) => -\/(UnsupportedPlan(node, None))
 
         case (In | Within, _)  =>
@@ -494,13 +479,13 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
             Selector.Doc(f -> Selector.Gte(lower)),
             Selector.Doc(f -> Selector.Lte(upper)))
           },
-            List(there(0, here))))
+            List(There(0, Here))))
         case (Between, _) => -\/(UnsupportedPlan(node, None))
 
         case (And, _)      => invoke2Nel(Selector.And.apply _)
         case (Or, _)       => invoke2Nel(Selector.Or.apply _)
         case (Not, (_, v) :: Nil) =>
-          v.map(_.bimap(_ andThen (_.negate), _.map(there(0, _))))
+          v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
         case (Constantly, const :: _ :: Nil) => const._2
 
@@ -508,12 +493,12 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       }
     }
 
-    val default: PartialSelector[B] = (
+    val default: PartialSelector = (
       { case List(field) =>
         Selector.Doc(ListMap(
           field -> Selector.Expr(Selector.Eq(Bson.Bool(true)))))
       },
-      List(here))
+      List(Here))
 
     node match {
       case ConstantF(_)   => \/-(default)
@@ -545,14 +530,14 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
             case Type.Date =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
           }
-        selCheck(typ).fold[OutputM[PartialSelector[B]]](
+        selCheck(typ).fold[OutputM[PartialSelector]](
           -\/(UnsupportedPlan(node, None)))(
           f =>
-          \/-(cont._2.fold[PartialSelector[B]](
-            κ(({ case List(field) => f(field) }, List(there(0, here)))),
+          \/-(cont._2.fold[PartialSelector](
+            κ(({ case List(field) => f(field) }, List(There(0, Here)))),
             { case (f2, p2) =>
               ({ case head :: tail => Selector.And(f(head), f2(tail)) },
-                there[B](0, here) :: p2.map(there(1, _)))
+                There(0, Here) :: p2.map(There(1, _)))
             })))
       case _ => -\/(UnsupportedPlan(node, None))
     }
@@ -561,17 +546,15 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
   val workflowƒ:
       LogicalPlan[
         Cofree[LogicalPlan, (
-          (OutputM[PartialSelector[OutputM[WorkflowBuilder]]],
-           OutputM[PartialJs[OutputM[WorkflowBuilder]]]),
+          (OutputM[PartialSelector],
+           OutputM[PartialJs]),
           OutputM[WorkflowBuilder])]] =>
       State[NameGen, OutputM[WorkflowBuilder]] = {
     import WorkflowBuilder._
     import quasar.physical.mongodb.accumulator._
     import quasar.physical.mongodb.expression._
 
-    type PSelector = PartialSelector[OutputM[WorkflowBuilder]]
-    type PJs = PartialJs[OutputM[WorkflowBuilder]]
-    type Input  = (OutputM[PSelector], OutputM[PJs])
+    type Input  = (OutputM[PartialSelector], OutputM[PartialJs])
     type Output = M[WorkflowBuilder]
     type Ann    = Cofree[LogicalPlan, (Input, OutputM[WorkflowBuilder])]
 
@@ -606,9 +589,9 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       }
     }
 
-    val HasSelector: Ann => OutputM[PSelector] = _.head._1._1
+    val HasSelector: Ann => OutputM[PartialSelector] = _.head._1._1
 
-    val HasJs: Ann => OutputM[PJs] = _.head._1._2
+    val HasJs: Ann => OutputM[PartialJs] = _.head._1._2
 
     val HasWorkflow: Ann => OutputM[WorkflowBuilder] = _.head._2
 
@@ -673,6 +656,30 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
         k.traverse(HasJs).flatMap(k =>
           findArgs(k, comp).map(applyPartials(k, _))).toOption
 
+      /** Check for any values used in a selector which reach into the
+        * "consequent" branches of Typecheck or Cond nodes, and which
+        * involve expressions that are not safe to evaluate before
+        * evaluating the typecheck/condition. Using such values in
+        * selectors causes runtime errors when the expression ends up
+        * in a $project or $simpleMap prior to $match.
+        */
+      def breaksEvalOrder(ann: Cofree[LogicalPlan, OutputM[WorkflowBuilder]], f: InputFinder): Boolean = {
+        def isSimpleRef =
+          f(ann).fold(
+            κ(true),
+            _.unFix match {
+              case ExprBuilderF(_, \/-($var(_))) => true
+              case _ => false
+            })
+
+        (ann.tail, f) match {
+          case (TypecheckF(_, _, _, _), There(1, _)) => !isSimpleRef
+          case (InvokeF(Cond, _), There(x, _))
+              if x == 1 || x == 2                    => !isSimpleRef
+          case _                                     => false
+        }
+      }
+
       func match {
         case MakeArray => lift(Arity1(HasWorkflow).map(makeArray))
         case MakeObject =>
@@ -688,8 +695,14 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
             case a1 :: a2 :: Nil =>
               lift(HasWorkflow(a1).flatMap(wf => {
                 val on = a2.map(_._2)
-                HasSelector(a2).flatMap(s =>
-                  s._2.map(_(on)).sequence.map(filter(wf, _, s._1))) <+>
+                HasSelector(a2).flatMap { case (sel, inputs) =>
+                  if (!inputs.exists(breaksEvalOrder(on, _)))
+                    inputs.map(_(on)).sequence.map(filter(wf, _, sel))
+                  else
+                    HasWorkflow(a2).map(wf2 => filter(wf, List(wf2), {
+                      case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
+                    }))
+                } <+>
                   HasJs(a2).flatMap(js =>
                     // TODO: have this pass the JS args as the list of inputs … but right now, those inputs get converted to BsonFields, not ExprOps.
                     js._2.map(_(on)).sequence.map(args => filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
@@ -891,11 +904,11 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
       case _ => None
     }
 
-    def findArgs(partials: List[PJs], comp: Ann):
+    def findArgs(partials: List[PartialJs], comp: Ann):
         OutputM[List[List[WorkflowBuilder]]] =
       partials.map(_._2.map(_(comp.map(_._2))).sequenceU).sequenceU
 
-    def applyPartials(partials: List[PJs], args: List[List[WorkflowBuilder]]):
+    def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder]]):
         List[JsFn] =
       (partials zip args).map(l => l._1._1(l._2.map(κ(JsFn.identity))))
 

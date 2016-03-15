@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-package quasar
-package physical
-package mongodb
+// TODO: move to .planner package
+package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.jscore._
-import quasar.javascript._
 
-trait JsConversions {
-  /** Convert a `Bson.Date` to a JavaScript `Date`. */
-  def jsDate(value: Bson.Date): JsCore =
-    New(Name("Date"), List(Literal(Js.Str(value.value.toString))))
+import quasar.{LogicalPlan}
 
-  /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
-  def jsObjectId(value: Bson.ObjectId): JsCore =
-    New(Name("ObjectId"), List(Literal(Js.Str(value.str))))
+import matryoshka.{Recursive}
+import scalaz.{Cofree}
+
+sealed abstract class InputFinder {
+  def apply[A](t: Cofree[LogicalPlan, A]): A
 }
 
-object JsConversions extends JsConversions
+case object Here extends InputFinder {
+  def apply[A](a: Cofree[LogicalPlan, A]): A =
+    a.head
+}
+
+final case class There(index: Int, next: InputFinder) extends InputFinder {
+  def apply[A](a: Cofree[LogicalPlan, A]): A =
+    next((Recursive[Cofree[?[_], A]].children(a).apply)(index))
+}

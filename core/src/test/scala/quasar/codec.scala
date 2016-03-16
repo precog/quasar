@@ -150,7 +150,7 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
       "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
       "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("\"abc\"") }
-      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("\"NA\"") }
+      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("null") }
     }
 
     "round-trip" ! prop { (data: Data) =>

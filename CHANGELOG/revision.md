@@ -1,0 +1,1 @@
+- [SD-1509] Render NA values as JSON null in readable Data codec

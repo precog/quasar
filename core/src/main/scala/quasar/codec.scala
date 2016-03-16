@@ -161,7 +161,7 @@ object DataCodec {
 
         case Id(value)        => \/-(jString(value))
 
-        case `NA`             => \/-(jString("NA"))
+        case `NA`             => \/-(jNull)
       }
     }
 

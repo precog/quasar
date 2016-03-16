@@ -1,0 +1,1 @@
+- [SD-1518] Error when fn applied to wrong number of args

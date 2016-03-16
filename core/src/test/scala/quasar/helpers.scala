@@ -39,8 +39,14 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
     } yield cld
   }
 
+  // Compile -> Optimize -> Typecheck
+  val fullCompile: String => String \/ Fix[LogicalPlan] =
+    q => compile(q).map(Optimizer.optimize).flatMap(lp =>
+      LogicalPlan.ensureCorrectTypes(lp)
+        .disjunction.leftMap(_.list.mkString(";")))
+
   // NB: this plan is simplified and normalized, but not optimized. That allows
-  // the expected result to be controlled more precisley. Assuming you know
+  // the expected result to be controlled more precisely. Assuming you know
   // what plan the compiler produces for a reference query, you can demand that
   // `optimize` produces the same plan given a query in some more deviant form.
   def compileExp(query: String): Fix[LogicalPlan] =
@@ -48,9 +54,17 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
       e => throw new RuntimeException("could not compile query for expected value: " + query + "; " + e),
       lp => (LogicalPlan.normalizeLets _ >>> LogicalPlan.normalizeTempNames _)(Optimizer.simplify(lp)))
 
+  // Compile the given query, including optimization and typechecking
+  def fullCompileExp(query: String): Fix[LogicalPlan] =
+    fullCompile(query).valueOr(e =>
+      throw new RuntimeException(s"could not full-compile query for expected value '$query': $e"))
+
   def testLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) = {
     compile(query).map(Optimizer.optimize).toEither must beRight(equalToPlan(expected))
   }
+
+  def testTypedLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) =
+    fullCompile(query).toEither must beRight(equalToPlan(expected))
 
   def read(name: String): Fix[LogicalPlan] = LogicalPlan.Read(fs.Path(name))
 

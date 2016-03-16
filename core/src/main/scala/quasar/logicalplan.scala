@@ -278,7 +278,13 @@ object LogicalPlan {
       case ConstantF(d)      => success(ConstantF[Typed[LogicalPlan]](d))
       case InvokeF(f, args)  => for {
         types <- f.untype(typ)
-        args0 <- types.zip(args).traverseU((inferTypes(_, _)).tupled)
+        args0 <- types.align(args).traverseU(_.onlyBoth match {
+                   case Some((t, arg)) =>
+                     inferTypes(t, arg).disjunction
+                   case None =>
+                     SemanticError.WrongArgumentCount(f, types.length, args.length)
+                       .wrapNel.left
+                 }).validation
       } yield InvokeF[Typed[LogicalPlan]](f, args0)
       case FreeF(n)          => success(FreeF[Typed[LogicalPlan]](n))
       case LetF(n, form, in) =>

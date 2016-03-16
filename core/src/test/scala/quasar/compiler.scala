@@ -1273,6 +1273,16 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     }
   }
 
+  "error when too few arguments passed to a function" in {
+    fullCompile("""select substring("foo") from zips""")
+      .toEither must beLeft(contain("3,1"))
+  }
+
+  "error when too many arguments passed to a function" in {
+    fullCompile("select count(*, 1, 2, 4) from zips")
+      .toEither must beLeft(contain("1,4"))
+  }
+
   "reduceGroupKeys" should {
     import Compiler.reduceGroupKeys
 

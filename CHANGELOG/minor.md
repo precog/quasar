@@ -1,0 +1,1 @@
+- [SD-1505] generalize `Neq` to work for `Top`, which allows `!= null` to work like `is not null`

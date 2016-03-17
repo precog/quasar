@@ -231,17 +231,11 @@ The server provides a simple JSON API.
 
 Executes a SQL query, contained in the required `q` parameter, on the backend responsible for the request path.
 
-Optional `offset` and `limit` parameters can be specified to page through the results, and are interpreted the same way as in `GET /data`.
+Optional `offset` and `limit` parameters can be specified to page through the results, and are interpreted the same way as for `GET /data` requests.
 
 SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
-The result is returned in the response body. An `Accept` header may be specified to select the format of the response body:
-- no `Accept` header: “readable” results, one per line (note: this response cannot be parsed as a single JSON object)
-- `Accept: application/json`: “readable” results wrapped in a single JSON array
-- `Accept: application/ldjson;mode=precise`: “precise” JSON, one result per line
-- `Accept: text/csv`: comma-separated
-
-The formatting of CSV output can be controlled with an extended media type as in `Accept: text/csv; columnDelimiter="|"&rowDelimiter=";"&quoteChar="'"&escapeChar="\"`.
+The result is returned in the response body. The `Accept` header may be used in order to specify the desired [format](#data-formats) in which the client wishes to receive results.
 
 For compressed output use `Accept-Encoding: gzip`.
 
@@ -372,7 +366,7 @@ Retrieves metadata about the files, directories, and mounts which are children o
 
 ### GET /data/fs/[path]?offset=[offset]&limit=[limit]
 
-Retrieves data from the specified path, formatted in JSON or CSV format. The `offset` and `limit` parameters are optional, and may be used to page through results.
+Retrieves data from the specified path in the [format](#data-formats) specified in the `Accept` header. The optional `offset` and `limit` parameters can be used in order to page through results.
 
 ```json
 {"id":0,"guid":"03929dcb-80f6-44f3-a64c-09fc1d810c61","isActive":true,"balance":"$3,244.51","picture":"http://placehold.it/32x32","age":38,"eyeColor":"green","latitude":87.709281,"longitude":-20.549375}
@@ -384,9 +378,7 @@ Retrieves data from the specified path, formatted in JSON or CSV format. The `of
 {"id":6,"guid":"a2863ec1-9652-46d3-aa12-aa92308de055","isActive":false,"balance":"$1,621.67","picture":"http://placehold.it/32x32","age":34,"eyeColor":"blue","latitude":-83.908456,"longitude":67.190633}
 ```
 
-The output format can be selected using an `Accept` header as described above.
-
-Given a directory path (ending with a slash), produces a `zip` archive containing the contents of the named directory, database, etc. Each file in the archive is formatted as specified in the request query and/or `Accept` header.
+If the supplied path represents a directory (ends with a slash), this request produces a `zip` archive containing the contents of the named directory, database, etc. Each file in the archive is formatted as specified in the request query and/or `Accept` header.
 
 ### PUT /data/fs/[path]
 
@@ -464,9 +456,15 @@ Note: that's the URL-encoded form of `{"Accept": "text/csv"}`.
 
 ## Data Formats
 
-Quasar produces and accepts data in two JSON-based formats or CSV. Each JSON-based format can
+Quasar produces and accepts data in two JSON-based formats or CSV (`text/csv`). Each JSON-based format can
 represent all the types of data that Quasar supports. The two formats are appropriate for
 different purposes.
+
+Json can either be line delimited (`application/ldjson`/`application/x-ldjson`) or a single json value (`application/json`).
+
+In the case of an HTTP request, it is possible to add the `disposition` extension to any media-type specified in an `Accept` header in order to receive a response with that value in the `Content-Disposition` header field.
+
+Choosing between the two json formats is done using the "mode" content-type extension and by supplying either the "precise" or "readable" values. If no `mode` is supplied, `quasar` will default to the `readable` mode. If neither json nor csv is supplied, quasar will default to returning the results in `json` format. In the case of an upload request, the client MUST supply a media-type and requests without any media-type will result in an HTTP 415 error response.
 
 ### Precise JSON
 
@@ -515,6 +513,8 @@ foo.bar,foo.baz
 ```
 
 Data is formatted the same way as the "Readable" JSON format, except that all values including `null`, `true`, `false`, and numbers are indistinguishable from their string representations.
+
+It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv.
 
 When data is uploaded in CSV format, the headers are interpreted as field names in the same way. As with the Readable JSON format, any string that can be interpreted as another kind of value will be, so for example there's no way to specify the string `"null"`.
 

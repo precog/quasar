@@ -139,11 +139,12 @@ object FileSystemTest {
 
       val memPlus: ViewFileSystem ~> Task =
         interpretViewFileSystem(
+          KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync),
           viewState,
           MonotonicSeq.fromTaskRef(seqRef),
           mem.testInterp)
 
-      val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem](Views(Map.empty))
+      val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem]
 
       FileSystemUT(BackendName("No-view"), fs, fs, mem.testDir, mem.close)
     }

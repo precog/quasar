@@ -42,7 +42,8 @@ object RestApi {
         S3: ManageFileF :<: S,
         S4: MountingF :<: S,
         S5: QueryFileF :<: S,
-        S6: FileSystemFailureF :<: S
+        S6: FileSystemFailureF :<: S,
+        S7: MountConfigsF :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"  -> query.compile.service[S],

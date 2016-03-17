@@ -37,7 +37,8 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
 )(implicit S0: F :<: S,
            S1: MonotonicSeqF :<: S,
            S2: ViewStateF :<: S,
-           S3: MountedResultHF :<: S) {
+           S3: MountedResultHF :<: S,
+           S5: MountConfigsF :<: S) {
 
   import MountRequest._, FileSystemDef.DefinitionResult
 
@@ -49,7 +50,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFsF :<: T,
-                T2: MountedViewsF :<: T,
+                T2: MountConfigsF :<: T,
                 T3: EvalFSRefF :<: T)
       : Free[T, MountingError \/ Unit] = {
 
@@ -72,8 +73,8 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFsF :<: T,
-                T2: MountedViewsF :<: T,
-                T3: EvalFSRefF :<: T)
+                T2: EvalFSRefF :<: T,
+                T3: MountConfigsF :<: T)
       : Free[T, Unit] = {
 
     val handleUnmount: Free[T, Unit] =
@@ -91,15 +92,13 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
   ////
 
   private type ViewEff0[A] = Coproduct[MonotonicSeqF, FileSystem, A]
-  private type ViewEff[A]  = Coproduct[ViewStateF, ViewEff0, A]
+  private type ViewEff1[A] = Coproduct[ViewStateF, ViewEff0, A]
+  private type ViewEff[A]  = Coproduct[MountConfigsF, ViewEff1, A]
 
   private val fsMounter = FileSystemMounter[F](fsDef)
 
   private def evalFS[T[_]: Functor](implicit T: EvalFSRefF :<: T) =
     AtomicRef.Ops[FileSystem ~> EvalFS, T]
-
-  private def views[T[_]: Functor](implicit T: MountedViewsF :<: T) =
-    AtomicRef.Ops[Views, T]
 
   private def mounts[T[_]: Functor](implicit T: fsMounter.MountedFsF :<: T) =
     AtomicRef.Ops[Mounts[DefinitionResult[F]], T]
@@ -108,7 +107,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
     * filesystems, storing the result in an `AtomicRef`.
     *
     * This involves, roughly
-    *   1. Get the current mounted views and filesystem intepreters from their
+    *   1. Get the current mounted views and filesystem interpreters from their
     *      respective refs.
     *
     *   2. Build a hierarchical filesystem interpreter using the filesystem
@@ -123,19 +122,18 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
   private def updateComposite[T[_]: Functor]
               (implicit T0: F :<: T,
                         T1: fsMounter.MountedFsF :<: T,
-                        T2: MountedViewsF :<: T,
-                        T3: EvalFSRefF :<: T)
+                        T2: EvalFSRefF :<: T)
               : Free[T, Unit] =
     for {
-      vws    <- views[T].get
       mnts   <- mounts[T].get
       evals  =  mnts.map(_.run)
       mnted  =  hierarchical.fileSystem[F, S](evals)
       injSeq =  liftFT[S] compose injectNT[MonotonicSeqF, S]
       injVST =  liftFT[S] compose injectNT[ViewStateF, S]
-      iView  =  free.interpret3[ViewStateF, MonotonicSeqF, FileSystem, EvalFS](
-                  injVST, injSeq, mnted)
-      viewd  =  view.fileSystem[ViewEff](vws)
+      injMC  =  liftFT[S] compose injectNT[MountConfigsF, S]
+      iView  =  free.interpret4[MountConfigsF, ViewStateF, MonotonicSeqF, FileSystem, EvalFS](
+                  injMC, injVST, injSeq, mnted)
+      viewd  =  view.fileSystem[ViewEff]
       f      =  free.foldMapNT[ViewEff, EvalFS](iView) compose viewd
       _      <- evalFS[T].set(f)
     } yield ()
@@ -147,7 +145,8 @@ object EvaluatorMounter {
   )(implicit S0: F :<: S,
              S1: MonotonicSeqF :<: S,
              S2: ViewStateF :<: S,
-             S3: MountedResultHF :<: S
+             S3: MountedResultHF :<: S,
+             S5: MountConfigsF :<: S
   ): EvaluatorMounter[F, S] =
     new EvaluatorMounter[F, S](fsDef)
 }

@@ -18,8 +18,8 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
-import quasar.effect.Failure
-import quasar.fp.{free, liftMT}
+import quasar.effect.{KeyValueStore, Failure}
+import quasar.fp.{free, liftMT, TaskRef}
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -34,15 +34,18 @@ class RestApiSpecs extends Specification {
   import InMemory._
 
   type Eff0[A] = Coproduct[FileSystemFailureF, MountingFileSystem, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff1[A] = Coproduct[MountConfigsF, Eff0, A]
+  type Eff[A]  = Coproduct[Task, Eff1, A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).unsafePerformSync
-    val eff = free.interpret3[Task, FileSystemFailureF, MountingFileSystem, Task](
+    val eff = free.interpret4[Task, MountConfigsF, FileSystemFailureF, MountingFileSystem, Task](
       NaturalTransformation.refl,
+      Coyoneda.liftTF[MountConfigs, Task](
+        KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync)),
       Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[FileSystemError]),
       fs)
     val service = RestApi.finalizeServices[Eff](

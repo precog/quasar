@@ -34,6 +34,10 @@ import scalaz.syntax.id._
 sealed trait KeyValueStore[K, V, A]
 
 object KeyValueStore {
+  // NB: Switch to cursor style terms for Keys once backing stores exist where all keys won't fit into memory.
+  final case class Keys[K, V]()
+    extends KeyValueStore[K, V, Vector[K]]
+
   final case class Get[K, V](k: K)
     extends KeyValueStore[K, V, Option[V]]
 
@@ -86,6 +90,14 @@ object KeyValueStore {
     def get(k: K): OptionT[F, V] =
       OptionT(lift(Get[K, V](k)))
 
+    /** Returns current keys */
+    val keys: F[Vector[K]] =
+      lift(Keys[K, V]())
+
+    /** Moves/renames key */
+    def move(src: K, dst: K): F[Unit] =
+      get(src).flatMapF(delete(src) *> put(dst, _)).run.void
+
     /** Atomically updates the value associated with the given key with the
       * result of applying the given function to the current value, if defined.
       */
@@ -129,6 +141,9 @@ object KeyValueStore {
       def apply(): KeyValueStore[K, V, ?] ~> Free[RefF, ?] =
         new (KeyValueStore[K, V, ?] ~> Free[RefF, ?]) {
           def apply[A](m: KeyValueStore[K, V, A]) = m match {
+            case Keys() =>
+              R.get.map(_.keys.toVector)
+
             case Get(path) =>
               R.get.map(_.get(path))
 
@@ -172,6 +187,9 @@ object KeyValueStore {
 
             case Delete(key) =>
               modify(_ - key)
+
+            case Keys() =>
+              F.gets(s => l.get(s).keys.toVector)
 
             case Get(key) =>
               lookup(key)

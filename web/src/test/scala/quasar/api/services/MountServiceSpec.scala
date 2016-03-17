@@ -21,7 +21,6 @@ import quasar.{Variables}
 import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
-import quasar.sql, sql.Expr
 import quasar.effect.{KeyValueStore}
 import quasar.fp._, PathyCodecJson._
 import quasar.fs._
@@ -41,17 +40,14 @@ import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
+  import quasar.fs.mount.ViewMounterSpec._
   import posixCodec.printPath
   import PathError._
 
   val StubFs = FileSystemType("stub")
 
-  def viewConfig(q: String, vars: (String, String)*): (Expr, Variables) =
-    (sql.parse(quasar.sql.Query(q)).toOption.get,
-      Variables(Map(vars.map { case (n, v) =>
-        quasar.VarName(n) -> quasar.VarValue(v) }: _*)))
-
-  type Eff[A] = Coproduct[Task, MountingF, A]
+  type Eff0[A] = Coproduct[MountingF, MountConfigsF, A]
+  type Eff[A]  = Coproduct[Task, Eff0, A]
 
   val M = Mounting.Ops[Eff]
 
@@ -81,8 +77,8 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
       val tf: MountingF ~> Task = Coyoneda.liftTF(hoistFree(mt) compose mounter)
 
-      val eff: Eff ~> Task =
-        free.interpret2[Task, MountingF, Task](NaturalTransformation.refl, tf)
+      def eff: Eff ~> Task = free.interpret3[Task, MountingF, MountConfigsF, Task](
+        NaturalTransformation.refl, tf, Coyoneda.liftTF(store))
 
       val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
 

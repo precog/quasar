@@ -157,7 +157,7 @@ For example, given the above MongoDB mount, an additional view could be defined 
     ...,
     "/simpleZips": {
       "view": {
-        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%22%2Flocal%2Ftest%2Fzips%22%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
+        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
       }
     }
   }
@@ -422,16 +422,12 @@ Fails if the path identifies a view.
 
 ### DELETE /data/fs/[path]
 
-Removes all data at the specified path. Single files are deleted atomically.
-
-Fails if the path identifies a view (views may be added and deleted through the `/mount` API).
+Removes all data and views at the specified path. Single files are deleted atomically.
 
 ### MOVE /data/fs/[path]
 
 Moves data from one path to another within the same backend. The new path must
 be provided in the `Destination` request header. Single files are moved atomically.
-
-Fails if either the request of destination path identifies a view (views may be added and deleted through the `/mount` API).
 
 ### GET /mount/fs/[path]
 

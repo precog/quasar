@@ -278,6 +278,17 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
         r map (_ must_== ((None, Some(fsCfgA))))
       }
 
+      "moves the mount at src to dst (file)" >>* {
+        val d1 = rootDir </> file("d1")
+        val d2 = rootDir </> file("d2")
+
+        val r =
+          (mnt.mount(d1, viewCfgA) *> remount(d1, d2))
+            .run *> (lookup(d1).run.tuple(lookup(d2).run))
+
+        r map (_ must_== ((None, Some(viewCfgA))))
+      }
+
       "succeeds when src == dst" >>* {
         val d = rootDir </> dir("srcdst")
 

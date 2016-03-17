@@ -94,46 +94,53 @@ object Server {
     ): _*)
   }
 
-  def startWebServer(
+  def service(
     initialPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    openClient: Boolean,
     eval: CoreEff ~> ResponseOr
-  ): Task[Unit] = {
+  ): (Int => Task[Unit]) => HttpService = {
     import RestApi._
 
-    val produceSvc = (reload: Int => Task[Unit]) =>
+    (reload: Int => Task[Unit]) =>
       finalizeServices(eval)(
         coreServices[CoreEff],
         additionalServices
       ) orElse nonApiService(initialPort, reload, staticContent, redirect)
-
-    Http4sUtils.startAndWait(initialPort, produceSvc, openClient)
   }
+
+  def durableService(
+    qConfig: QuasarConfig,
+    webConfig: WebConfig)(
+    implicit
+    ev1: ConfigOps[WebConfig]
+  ): MainTask[(Int => Task[Unit]) => HttpService] =
+    for {
+      cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
+      mntCfgsT     =  MntCfgsIO.write(cfgRef, qConfig.configPath)
+      coreApi      <- CoreEff.interpreter[WebConfig](mntCfgsT).liftM[MainErrT]
+      ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
+      _            <- (mountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
+      durableApi   =  toResponseOr(MntCfgsIO.durableFile[WebConfig](mntCfgsT)) compose coreApi
+    } yield service(
+      webConfig.server.port,
+      qConfig.staticContent,
+      qConfig.redirect,
+      durableApi)
 
   def main(args: Array[String]): Unit = {
     implicit val configOps: ConfigOps[WebConfig] = WebConfig
 
-    val main0: MainTask[Unit] = for {
-      qConfig      <- QuasarConfig.fromArgs(args)
-      config       <- loadConfigFile(WebConfig, qConfig.configPath).liftM[MainErrT]
-                    // TODO: Find better way to do this
-      updConfig    =  config.copy(server = config.server.copy(qConfig.port.getOrElse(config.server.port)))
-      coreApi      <- CoreEff.interpreter.liftM[MainErrT]
-      ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
-      _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
-      cfgRef       <- TaskRef(config).liftM[MainErrT]
-      durableApi   =  toResponseOr(MntCfgsIO.durableFile(cfgRef, qConfig.configPath)) compose coreApi
-      _            <- startWebServer(
-                        updConfig.server.port,
-                        qConfig.staticContent,
-                        qConfig.redirect,
-                        qConfig.openClient,
-                        durableApi
-                      ).liftM[MainErrT]
+    val main0 = for {
+      qCfg    <- QuasarConfig.fromArgs(args)
+      wCfg    <- loadConfigFile(WebConfig, qCfg.configPath).liftM[MainErrT]
+                 // TODO: Find better way to do this
+      updWCfg =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
+      srvc    <- durableService(qCfg, updWCfg)
+      _       <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
     } yield ()
 
     logErrors(main0).unsafePerformSync
   }
+
 }

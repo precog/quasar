@@ -52,9 +52,6 @@ package object mount {
 
   type ViewStateF[A] = Coyoneda[ViewState, A]
 
-  type MountedViews[A]  = AtomicRef[Views, A]
-  type MountedViewsF[A] = Coyoneda[MountedViews, A]
-
   object ViewState {
     def Ops[S[_]: Functor](
       implicit S: ViewStateF :<: S
@@ -69,14 +66,16 @@ package object mount {
   }
 
   type ViewFileSystem0[A] = Coproduct[MonotonicSeqF, FileSystem, A]
-  /** Adds ViewStateF and MonotonicSeqF to FileSystem. */
-  type ViewFileSystem[A]  = Coproduct[ViewStateF, ViewFileSystem0, A]
+  type ViewFileSystem1[A] = Coproduct[ViewStateF, ViewFileSystem0, A]
+  /** Adds MountConfigsF, ViewStateF, and MonotonicSeqF to FileSystem. */
+  type ViewFileSystem[A]  = Coproduct[MountConfigsF, ViewFileSystem1, A]
 
   def interpretViewFileSystem[M[_]: Functor](
+    mc: MountConfigs ~> M,
     v: ViewState ~> M,
     s: MonotonicSeq ~> M,
     fs: FileSystem ~> M
   ): ViewFileSystem ~> M =
-    free.interpret3[ViewStateF, MonotonicSeqF, FileSystem, M](
-      Coyoneda.liftTF(v), Coyoneda.liftTF(s), fs)
+    free.interpret4[MountConfigsF, ViewStateF, MonotonicSeqF, FileSystem, M](
+      Coyoneda.liftTF(mc), Coyoneda.liftTF(v), Coyoneda.liftTF(s), fs)
 }

@@ -18,8 +18,9 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._, ToApiError.ops._
+import quasar.effect.KeyValueStore
 import quasar.fp._, PathyCodecJson._
-import quasar.fs.{AbsPath, APath, sandboxAbs}
+import quasar.fs.{AbsPath, APath, sandboxAbs, AFile}
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._
@@ -32,7 +33,7 @@ import scalaz.concurrent.Task
 object mount {
   import posixCodec.printPath
 
-  def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S): QHttpService[S] =
+  def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S, S1: MountConfigsF :<: S): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
         def err = ApiError.fromMsg(
@@ -43,10 +44,17 @@ object mount {
 
       case req @ MOVE -> AsPath(src) =>
         respond(requiredHeader(Destination, req).map(_.value).fold(
-          err => EitherT.leftU[String](err.point[Free[S, ?]]),
-          dst => refineType(src).fold(
-            srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
-            srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))).run)
+            err => EitherT.leftU[String](err.point[Free[S, ?]]),
+            dst => EitherT[Free[S, ?], ApiError, String] {
+              OptionT[Free[S, ?], (AFile, AFile)](
+                (refineType(src).toOption |@| UriPathCodec.parseAbsFile(dst).map(sandboxAbs)).tupled.point[Free[S, ?]])
+                .flatMap { case sd @ (s, _) => ViewMounter.lookup[S](s).map(κ(sd)) }
+                .map((ViewMounter.move[S] _).tupled(_) *>
+                     s"moved ${printPath(src)} to $dst".right[ApiError].point[Free[S, ?]])
+                .getOrElse(refineType(src).fold(
+                  srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
+                  srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file")).run).join
+            }).run)
 
       case req @ POST -> AsDirPath(parent) => respond((for {
         hdr <- EitherT.fromDisjunction[M.F](requiredHeader(XFileName, req))
@@ -79,15 +87,26 @@ object mount {
     parse: String => Option[Path[Abs, T, Unsandboxed]],
     typeStr: String
   )(implicit
-    M: Mounting.Ops[S]
-  ): EitherT[Free[S, ?], ApiError, String] =
-    parse(dstStr).map(sandboxAbs).cata(dst =>
-      M.remount[T](src, dst)
-        .as(s"moved ${printPath(src)} to ${printPath(dst)}")
-        .leftMap(_.toApiError),
+    M: Mounting.Ops[S],
+    S0: MountConfigsF :<: S
+  ): EitherT[Free[S, ?], ApiError, String] = {
+    val mntCfgs = KeyValueStore.Ops[APath, MountConfig, S]
+
+    parse(dstStr).map(sandboxAbs).cata(dst => {
+      val msg = s"moved ${printPath(src)} to ${printPath(dst)}"
+
+      val op = M.remount[T](src, dst).as(msg).leftMap(_.toApiError).run
+
+      EitherT[Free[S, ?], ApiError, String](mntCfgs.get(src).run.flatMap(_.cata(
+        MountConfig.fileSystemConfig.getOption(_).cata(
+          κ(mntCfgs.move(src, dst).as(msg.right[ApiError])),
+          op),
+        op)))
+      },
       EitherT.leftU[String](ApiError.apiError(
         BadRequest withReason s"Expected an absolute $typeStr.",
         "path" := transcode(UriPathCodec, posixCodec)(dstStr)).point[Free[S, ?]]))
+  }
 
   private def mount[S[_]: Functor](
     path: APath,

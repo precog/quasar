@@ -23,20 +23,21 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.std.StdLib._, set._
+import quasar.sql.Expr
 
 import matryoshka._
-import pathy.{Path => PPath}, PPath._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 object view {
   /** Translate reads on view paths to the equivalent queries. */
   def readFile[S[_]: Functor]
-      (views: Views)
       (implicit
         S0: ReadFileF :<: S,
         S1: QueryFileF :<: S,
         S2: MonotonicSeqF :<: S,
-        S3: ViewStateF :<: S
+        S3: ViewStateF :<: S,
+        S4: MountConfigsF :<: S
       ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
@@ -48,19 +49,28 @@ object view {
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]): Free[S, A] = rf match {
         case Open(path, off, lim) =>
-          views.lookup(path).cata(
-            { lp =>
-              for {
-                qh <- EitherT(queryUnsafe.eval(limit(lp, off, lim)).run.value)
-                h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
-                _  <- viewState.put(h, \/-(qh)).liftM[FileSystemErrT]
-              } yield h
-            },
+          val fOpen: Free[S, FileSystemError \/ ReadHandle] = {
             for {
               rh <- readUnsafe.open(path, off, lim)
               h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
               _  <- viewState.put(h, -\/(rh)).liftM[FileSystemErrT]
-            } yield h).run
+            } yield h
+          }.run
+
+          def vOpen(e: Expr, v: Variables): Free[S, FileSystemError \/ ReadHandle] = {
+            queryPlan(e, v).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
+              e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
+                // TODO: more sensible error?
+                Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),
+              lp =>
+                for {
+                  qh <- EitherT(queryUnsafe.eval(limit(lp, off, lim)).run.value)
+                  h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
+                  _  <- viewState.put(h, \/-(qh)).liftM[FileSystemErrT]
+                } yield h)
+          }.run
+
+          ViewMounter.lookup[S](path).run.flatMap(_.cata((vOpen _).tupled, fOpen))
 
         case Read(handle) =>
           (for {
@@ -87,9 +97,9 @@ object view {
 
   /** Intercept and fail any write to a view path; all others are passed untouched. */
   def writeFile[S[_]: Functor]
-      (views: Views)
       (implicit
-        S0: WriteFileF :<: S
+        S0: WriteFileF :<: S,
+        S1: MountConfigsF :<: S
       ): WriteFile ~> Free[S, ?] = {
     import WriteFile._
 
@@ -98,10 +108,9 @@ object view {
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wf: WriteFile[A]): Free[S, A] = wf match {
         case Open(p) =>
-          if (views.contains(p))
-            emit[S,A](-\/(pathErr(invalidPath(p, "cannot write to view"))))
-          else
-            writeUnsafe.open(p).run
+          ViewMounter.lookup[S](p).run.flatMap(_.cata(
+            κ(emit[S, A](-\/(pathErr(invalidPath(p, "cannot write to view"))))),
+            writeUnsafe.open(p).run))
 
         case Write(h, chunk) =>
           writeUnsafe.write(h, chunk)
@@ -113,31 +122,78 @@ object view {
   }
 
 
-  /** Intercept and fail any write to a view path; all others are passed untouched. */
+  /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]: Functor]
-      (views: Views)
       (implicit
-        S0: ManageFileF :<: S
+        S0: ManageFileF :<: S,
+        S1: QueryFileF :<: S,
+        S2: MountConfigsF :<: S
       ): ManageFile ~> Free[S, ?] = {
     import ManageFile._
+    import MoveSemantics._
 
     val manage = ManageFile.Ops[S]
+    val query = QueryFile.Ops[S]
+
+    def dirToDirMove(src: ADir, dst: ADir, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] = {
+      implicit val m = EitherT.eitherTMonad[Free[S, ?], FileSystemError]
+
+      def move(pathSegments: Set[PathSegment]): Free[S, FileSystemError \/ Unit] =
+        pathSegments
+          .toList
+          .traverse_[EitherT[Free[S, ?], FileSystemError, ?]] { s =>
+            EitherT[Free[S, ?], FileSystemError, Unit](s.fold(
+              d => dirToDirMove(src </> dir1(d), dst </> dir1(d), semantics),
+              f => fileToFileMove(src </> file1(f), dst </> file1(f), semantics)))
+          }.run
+
+      ViewMounter.ls[S](src).flatMap { ps =>
+        if (ps.isEmpty)
+          manage.moveDir(src, dst, semantics).run
+        else
+          manage.moveDir(src, dst, semantics).run *> move(ps)
+      }
+    }
+
+    def fileToFileMove(src: AFile, dst: AFile, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] = {
+      val move = manage.moveFile(src, dst, semantics).run
+
+      (
+        ViewMounter.lookup[S](src).run.map(_.isDefined) |@|
+        ViewMounter.lookup[S](dst).run.map(_.isDefined) |@|
+        query.fileExists(dst)
+      ) .tupled
+        .flatMap { case (srcViewExists, dstViewExists, dstFileExists) => semantics match {
+          case FailIfExists if dstViewExists || dstFileExists =>
+            emit[S, FileSystemError \/ Unit](-\/(pathErr(pathExists(dst))))
+          case FailIfMissing if !(dstViewExists || dstFileExists) =>
+            emit[S, FileSystemError \/ Unit](-\/(pathErr(pathNotFound(dst))))
+          case _ if srcViewExists && dstFileExists =>
+            manage.delete(dst).run *> ViewMounter.move[S](src, dst).map(_.right[FileSystemError])
+          case _ if srcViewExists && !dstFileExists =>
+            ViewMounter.move[S](src, dst).map(_.right[FileSystemError])
+          case _ =>
+            move
+        }}
+    }
 
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]) = mf match {
         case Move(scenario, semantics) =>
-          MoveScenario.fileToFile.getOption(scenario).flatMap { case (src, dst) =>
-            (for {
-              _ <- if (views.contains(src)) -\/(pathErr(invalidPath(src, "cannot move view"))) else \/-(())
-              _ <- if (views.contains(dst)) -\/(pathErr(invalidPath(dst, "cannot move file to view location"))) else \/-(())
-            } yield ()).swap.toOption
-          }.fold(manage.move(scenario, semantics).run)(err => emit[S,A](-\/(err)))
+          scenario.fold(
+            (src, dst) =>  dirToDirMove(src, dst, semantics),
+            (src, dst) => fileToFileMove(src, dst, semantics))
 
         case Delete(path) =>
-          if (maybeFile(path).map(views.contains(_)).getOrElse(false))
-            emit[S,A](-\/(pathErr(invalidPath(path, "cannot delete view"))))
-          else
-            manage.delete(path).run
+          val delete = manage.delete(path).run
+          ViewMounter.viewPaths[S].flatMap { viewPaths =>
+            refineType(path).fold(
+              d => viewPaths
+                .foldMap(f => f.relativeTo(d).map(κ(f)).toList)
+                .foldMap(ViewMounter.unmount[S])
+                *> delete,
+              f => viewPaths.contains(f) ? ViewMounter.unmount[S](f).map(_.right[FileSystemError]) | delete)
+          }
 
         case TempFile(nearTo) =>
           manage.tempFile(nearTo).run
@@ -149,22 +205,30 @@ object view {
   /** Intercept and rewrite queries involving views, and overlay views when
     * enumerating files and directories. */
   def queryFile[S[_]: Functor]
-      (views: Views)
       (implicit
-        S0: QueryFileF :<: S
+        S0: QueryFileF :<: S,
+        S1: MountConfigsF :<: S
       ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
     val query = QueryFile.Ops[S]
     val queryUnsafe = QueryFile.Unsafe[S]
 
+    def rewrite[A](lp: Fix[LogicalPlan], op: Fix[LogicalPlan] => query.transforms.ExecM[A]) =
+      ViewMounter.rewrite[S](lp).run.flatMap(_.fold[Free[S, (PhaseResults, FileSystemError \/ A)]](
+        e => (
+            Vector.empty[PhaseResult],
+            planningFailed(lp, Planner.InternalError(e.shows)).left[A]
+          ).point[Free[S, ?]],
+        p => op(p).run.run))
+
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) =>
-          query.execute(views.rewrite(lp), out).run.run
+          rewrite(lp, query.execute(_, out))
 
         case EvaluatePlan(lp) =>
-          queryUnsafe.eval(views.rewrite(lp)).run.run
+          rewrite(lp, queryUnsafe.eval)
 
         case More(handle) =>
           queryUnsafe.more(handle).run
@@ -173,24 +237,21 @@ object view {
           queryUnsafe.close(handle)
 
         case Explain(lp) =>
-          query.explain(views.rewrite(lp)).run.run
+          rewrite(lp, query.explain)
 
         case ListContents(dir) =>
-          query.ls(dir).run.map(_ match {
+          (ViewMounter.ls[S](dir) |@| query.ls(dir).run) { (vls, qls) => qls match {
             case  \/-(ps) =>
-              (ps ++ views.ls(dir)).right
+              (ps ++ vls).right
             case -\/(err @ PathErr(PathNotFound(_))) =>
-              val vs = views.ls(dir)
-              if (vs.nonEmpty) vs.right
+              if (vls.nonEmpty) vls.right
               else err.left
             case -\/(v) => v.left
-          })
+          }}
 
         case FileExists(file) =>
-          if (views.contains(file))
-            true.point[Free[S, ?]]
-          else
-            query.fileExists(file)
+          ViewMounter.lookup[S](file).run.flatMap(mc =>
+            if(mc.isDefined) true.point[Free[S, ?]] else query.fileExists(file))
       }
     }
   }
@@ -200,20 +261,20 @@ object view {
     * rewritten as queries against actual files.
     */
   def fileSystem[S[_]: Functor]
-      (views: Views)
       (implicit
         S0: ReadFileF :<: S,
         S1: WriteFileF :<: S,
         S2: ManageFileF :<: S,
         S3: QueryFileF :<: S,
         S4: MonotonicSeqF :<: S,
-        S5: ViewStateF :<: S
+        S5: ViewStateF :<: S,
+        S6: MountConfigsF :<: S
       ): FileSystem ~> Free[S, ?] = {
     interpretFileSystem[Free[S, ?]](
-      queryFile(views),
-      readFile(views),
-      writeFile(views),
-      manageFile(views))
+      queryFile,
+      readFile,
+      writeFile,
+      manageFile)
   }
 
 

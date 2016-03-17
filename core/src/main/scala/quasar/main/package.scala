@@ -70,11 +70,12 @@ package object main {
 
   /** The intermediate effect FileSystem operations are interpreted into.
     *
-    * PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF
+    * MountConfigsF \/ PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF
     */
   type FsEff0[A] = Coproduct[ViewStateF, MountedResultHF, A]
   type FsEff1[A] = Coproduct[MonotonicSeqF, FsEff0, A]
-  type FsEff[A]  = Coproduct[PhysFsEffM, FsEff1, A]
+  type FsEff2[A] = Coproduct[PhysFsEffM, FsEff1, A]
+  type FsEff[A]  = Coproduct[MountConfigsF, FsEff2, A]
   type FsEffM[A] = Free[FsEff, A]
 
   object FsEff {
@@ -82,12 +83,14 @@ package object main {
     def toFsErrsIOM(
       seqRef: TaskRef[Long],
       viewHandlesRef: TaskRef[ViewHandles],
-      mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+      mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]],
+      mntCfgsT: MountConfigs ~> Task
     ): FsEff ~> FsErrsIOM = {
       def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
         injectFT[Task, FsErrsIO].compose[E](f)
 
-      free.interpret4[PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, FsErrsIOM](
+      free.interpret5[MountConfigsF, PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, FsErrsIOM](
+        injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT)),
         hoistFree(PhysFsEff.toFsErrsIOM),
         injTask[MonotonicSeqF](Coyoneda.liftTF(MonotonicSeq.fromTaskRef(seqRef))),
         injTask[ViewStateF](Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef))),
@@ -140,27 +143,27 @@ package object main {
   /** Effect required by the composite (view + hierarchical + physical)
     * filesystem.
     *
-    * EvalFSRefF \/ PhysFsEffM \/ MountedFsF \/ MountedViewsF
+    * EvalFSRefF \/ PhysFsEffM \/ MountedFsF \/ MountConfigsF
     */
-  type CompFsEff0[A] = Coproduct[MountedFsF, MountedViewsF, A]
+  type CompFsEff0[A] = Coproduct[MountedFsF, MountConfigsF, A]
   type CompFsEff1[A] = Coproduct[PhysFsEffM, CompFsEff0, A]
-  type CompFsEff[A]  = Coproduct[EvalFSRefF, CompFsEff1, A]
+  type CompFsEff[A] = Coproduct[EvalFSRefF, CompFsEff1, A]
   type CompFsEffM[A] = Free[CompFsEff, A]
 
   object CompFsEff {
     def toFsErrsIOM(
       evalRef: TaskRef[FileSystem ~> FsEffM],
       mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]],
-      viewsRef: TaskRef[Views]
+      mntCfgsT: MountConfigs ~> Task
     ): CompFsEff ~> FsErrsIOM = {
       def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
         injectFT[Task, FsErrsIO].compose[E](f)
 
-      free.interpret4[EvalFSRefF, PhysFsEffM, MountedFsF, MountedViewsF, FsErrsIOM](
+      free.interpret4[EvalFSRefF, PhysFsEffM, MountedFsF, MountConfigsF, FsErrsIOM](
         injTask[EvalFSRefF](Coyoneda.liftTF[EvalFSRef, Task](AtomicRef.fromTaskRef(evalRef))),
         hoistFree(PhysFsEff.toFsErrsIOM),
         injTask[MountedFsF](Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(mntsRef))),
-        injTask[MountedViewsF](Coyoneda.liftTF[MountedViews, Task](AtomicRef.fromTaskRef(viewsRef))))
+        injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT)))
     }
   }
 
@@ -208,13 +211,16 @@ package object main {
       evalNT[Task, Map[APath, MountConfig]](Map()) compose interpret
     }
 
+    def write[C: EncodeJson]
+      (ref: TaskRef[C], loc: Option[FsFile])
+      (implicit configOps: ConfigOps[C])
+      : MountConfigs ~> Task =
+      writeConfig(configOps)(ref, loc)
+
     /** Interprets `MountConfigsF`, persisting changes to a config file. */
-    def durableFile[C: EncodeJson](
-      ref: TaskRef[C],
-      loc: Option[FsFile]
-    )(implicit configOps: ConfigOps[C]): MntCfgsIO ~> Task =
+    def durableFile[C: EncodeJson](write: MountConfigs ~> Task): MntCfgsIO ~> Task =
       free.interpret2[MountConfigsF, Task, Task](
-        Coyoneda.liftTF[MountConfigs, Task](writeConfig(configOps)(ref, loc)),
+        Coyoneda.liftTF[MountConfigs, Task](write),
         NaturalTransformation.refl)
   }
 
@@ -250,11 +256,14 @@ package object main {
     */
   type CoreEff0[A] = Coproduct[MountingF, FileSystem, A]
   type CoreEff1[A] = Coproduct[FileSystemFailureF, CoreEff0, A]
-  type CoreEff[A]  = Coproduct[Task, CoreEff1, A]
+  type CoreEff2[A] = Coproduct[MountConfigsF, CoreEff1, A]
+  type CoreEff[A]  = Coproduct[Task, CoreEff2, A]
   type CoreEffM[A] = Free[CoreEff, A]
 
   object CoreEff {
-    val interpreter: Task[CoreEff ~> CfgsErrsIOM] =
+    def interpreter[C: EncodeJson: ConfigOps]
+      (mntCfgsT: MountConfigs ~> Task)
+      : Task[CoreEff ~> CfgsErrsIOM] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
         seqRef     <- TaskRef(startSeq)
@@ -262,10 +271,9 @@ package object main {
         mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
         evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
         mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-        viewsRef   <- TaskRef(Views.empty)
       } yield {
-        val f: FsEff ~> FsErrsIOM = FsEff.toFsErrsIOM(seqRef, viewHRef, mntedRHRef)
-        val g: CompFsEff ~> FsErrsIOM = CompFsEff.toFsErrsIOM(evalFsRef, mntsRef, viewsRef)
+        val f: FsEff ~> FsErrsIOM = FsEff.toFsErrsIOM(seqRef, viewHRef, mntedRHRef, mntCfgsT)
+        val g: CompFsEff ~> FsErrsIOM = CompFsEff.toFsErrsIOM(evalFsRef, mntsRef, mntCfgsT)
 
         val liftTask: Task ~> CfgsErrsIOM =
           injectFT[Task, CfgsErrsIO]
@@ -284,8 +292,9 @@ package object main {
         val mounting: MountingF ~> CfgsErrsIOM =
           Coyoneda.liftTF[Mounting, CfgsErrsIOM](free.foldMapNT(mnt) compose mounter)
 
-        free.interpret4[Task, FileSystemFailureF, MountingF, FileSystem, CfgsErrsIOM](
+        free.interpret5[Task, MountConfigsF, FileSystemFailureF, MountingF, FileSystem, CfgsErrsIOM](
           liftTask,
+          injectFT[MountConfigsF, CfgsErrsIO],
           injectFT[FileSystemFailureF, CfgsErrsIO],
           mounting,
           translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))

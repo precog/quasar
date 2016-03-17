@@ -133,12 +133,13 @@ object Main {
       _            <- if (config.mountings.toMap.isEmpty) MainTask.raiseError("No mounts present")
                       else ().point[MainTask]
 
-      coreApi      <- CoreEff.interpreter.liftM[MainErrT]
+      cfgRef       <- TaskRef(config).liftM[MainErrT]
+      mntCfgsT     =  MntCfgsIO.write(cfgRef, cfgPath)
+      coreApi      <- CoreEff.interpreter[CoreConfig](mntCfgsT).liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
 
-      cfgRef       <- TaskRef(config).liftM[MainErrT]
-      durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durableFile(cfgRef, cfgPath)) compose coreApi
+      durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durableFile[CoreConfig](mntCfgsT)) compose coreApi
 
       r            <- EitherT.right(repl(mt compose (durableApi compose injectNT[MountingFileSystem, CoreEff])))
       _            <- EitherT.right(driver(r))

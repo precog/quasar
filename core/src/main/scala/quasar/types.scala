@@ -22,6 +22,7 @@ import SemanticError.{TypeError, MissingField, MissingIndex}
 
 import scala.Any
 
+import argonaut._, Argonaut._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 sealed trait Type { self =>
@@ -170,6 +171,8 @@ sealed trait Type { self =>
 }
 
 trait TypeInstances {
+  import Type._
+
   val TypeOrMonoid = new Monoid[Type] {
     def zero = Type.Bottom
 
@@ -202,6 +205,55 @@ trait TypeInstances {
 
   implicit val TypeRenderTree: RenderTree[Type] =
     RenderTree.fromToString[Type]("Type")
+
+  implicit val typeEncodeJson: EncodeJson[Type] =
+    EncodeJson {
+      case Top =>
+        jString("Top")
+      case Bottom =>
+        jString("Bottom")
+      case Const(d) =>
+        Json("Const" -> DataCodec.Precise.encode(d).getOrElse(jNull))
+      case Null =>
+        jString("Null")
+      case Str =>
+        jString("Str")
+      case Int =>
+        jString("Int")
+      case Dec =>
+        jString("Dec")
+      case Bool =>
+        jString("Bool")
+      case Binary =>
+        jString("Binary")
+      case Timestamp =>
+        jString("Timestamp")
+      case Date =>
+        jString("Date")
+      case Time =>
+        jString("Time")
+      case Interval =>
+        jString("Interval")
+      case Id =>
+        jString("Id")
+      case Arr(types) =>
+        Json("Array" := types)
+      case FlexArr(min, max, mbrs) =>
+        val flexarr =
+          ("minSize" :=  min) ->:
+          ("maxSize" :?= max) ->?:
+          ("members" :=  mbrs) ->:
+          jEmptyObject
+        Json("FlexArr" -> flexarr)
+      case Obj(assocs, unkns) =>
+        val obj =
+          ("associations" :=  assocs) ->:
+          ("unknownKeys"  :?= unkns)  ->?:
+          jEmptyObject
+        Json("Obj" -> obj)
+      case cp @ Coproduct(l, r) =>
+        Json("Coproduct" := cp.flatten)
+    }
 }
 
 final case object Type extends TypeInstances {

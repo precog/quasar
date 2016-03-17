@@ -17,12 +17,12 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.api._
-import quasar.fp._
+import quasar.api._, ToApiError.ops._
+import quasar.fp._, PathyCodecJson._
 import quasar.fs.{AbsPath, APath, sandboxAbs}
 import quasar.fs.mount._
 
-import argonaut._
+import argonaut._, Argonaut._
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import pathy.Path, Path._
@@ -30,30 +30,34 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object mount {
-  import ToQResponse.ops._
   import posixCodec._
 
   def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
-        def err = s"There is no mount point at ${printPath(path)}"
-        respond(M.lookup(path).toRight(QResponse.error[S](NotFound, err)).run)
+        def err = ApiError.fromMsg(
+          NotFound withReason "Mount point not found.",
+          s"There is no mount point at ${printPath(path)}",
+          "path" := path)
+        respond(M.lookup(path).toRight(err).run)
 
       case req @ MOVE -> AsPath(src) =>
-        requiredHeader(Destination, req).map(_.value).fold(
-          (_: QResponse[S]).point[Free[S, ?]],
+        respond(requiredHeader(Destination, req).map(_.value).fold(
+          err => EitherT.leftU[String](err.point[Free[S, ?]]),
           dst => refineType(src).fold(
-            srcDir  => move(srcDir,  dst, parseAbsDir,  "directory"),
-            srcFile => move(srcFile, dst, parseAbsFile, "file")))
+            srcDir  => move[S, Dir](srcDir,  dst, parseAbsDir,  "directory"),
+            srcFile => move[S, File](srcFile, dst, parseAbsFile, "file"))).run)
 
       case req @ POST -> AsDirPath(parent) => respond((for {
-        hdr <- EitherT.fromDisjunction[M.F](requiredHeader[S](XFileName, req))
+        hdr <- EitherT.fromDisjunction[M.F](requiredHeader(XFileName, req))
         fn  =  hdr.value
         dst <- EitherT.fromDisjunction[M.F](
                 (parseRelDir(fn) orElse parseRelFile(fn))
                   .flatMap(sandbox(currentDir, _))
                   .map(parent </> _)
-                  .toRightDisjunction(QResponse.error[S](BadRequest, s"Not a relative path: $fn")))
+                  .toRightDisjunction(ApiError.apiError(
+                    BadRequest withReason "Filename must be a relative path.",
+                    "fileName" := fn)))
         _   <- mount[S](dst, req, replaceIfExists = false)
       } yield s"added ${printPath(dst)}").run)
 
@@ -69,17 +73,21 @@ object mount {
 
   ////
 
-  private def move[S[_]: Functor, F[_], T](
+  private def move[S[_]: Functor, T](
     src: AbsPath[T],
     dstStr: String,
     parse: String => Option[Path[Abs, T, Unsandboxed]],
     typeStr: String
   )(implicit
     M: Mounting.Ops[S]
-  ): Free[S, QResponse[F]] =
+  ): EitherT[Free[S, ?], ApiError, String] =
     parse(dstStr).map(sandboxAbs).cata(dst =>
-      respond(M.remount[T](src, dst).as(s"moved ${printPath(src)} to $dstStr").run),
-      QResponse.error(BadRequest, s"Not an absolute $typeStr path: $dstStr").point[M.F])
+      M.remount[T](src, dst)
+        .as(s"moved ${printPath(src)} to $dstStr")
+        .leftMap(_.toApiError),
+      EitherT.leftU[String](ApiError.apiError(
+        BadRequest withReason s"Expected an absolute $typeStr.",
+        "path" := dstStr).point[Free[S, ?]]))
 
   private def mount[S[_]: Functor](
     path: APath,
@@ -88,20 +96,24 @@ object mount {
   )(implicit
     M: Mounting.Ops[S],
     S0: Task :<: S
-  ): EitherT[Free[S, ?], QResponse[S], Boolean] = {
+  ): EitherT[Free[S, ?], ApiError, Boolean] = {
     type FreeS[A] = Free[S, A]
 
     for {
-      body  <- EitherT.right(injectFT[Task, S].apply(EntityDecoder.decodeString(req)): FreeS[String])
+      body  <- EitherT.right(injectFT[Task, S].apply(
+                 EntityDecoder.decodeString(req)): FreeS[String])
       bConf <- EitherT.fromDisjunction[FreeS](Parse.decodeWith(
                   body,
-                  (_: MountConfig).right[QResponse[S]],
-                  parseErrorMsg => QResponse.error[S](BadRequest, s"input error: $parseErrorMsg").left,
-                  (msg, _) => QResponse.error[S](BadRequest, msg).left))
+                  (_: MountConfig).right[ApiError],
+                  parseErrorMsg => ApiError.fromMsg_(
+                    BadRequest withReason "Malformed input.",
+                    parseErrorMsg).left,
+                  (msg, _) => ApiError.fromMsg_(
+                    BadRequest, msg).left))
       exists <- EitherT.right(M.lookup(path).isDefined)
       mnt    =  if (replaceIfExists && exists) M.replace(path, bConf) else M.mount(path, bConf)
-      r      <- mnt.leftMap(_.toResponse[S])
-      _      <- EitherT.fromDisjunction[FreeS](r.leftMap(_.toResponse[S]))
+      r      <- mnt.leftMap(_.toApiError)
+      _      <- EitherT.fromDisjunction[FreeS](r.leftMap(_.toApiError))
     } yield exists
   }
 }

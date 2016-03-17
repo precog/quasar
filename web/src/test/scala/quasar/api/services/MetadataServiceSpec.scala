@@ -18,6 +18,8 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
+import quasar.api.matchers._
+import quasar.api.ApiErrorEntityDecoder._
 import quasar.{Variables, VariablesArbitrary}
 import quasar.effect.KeyValueStore
 import quasar.fp.{liftMT, free}
@@ -70,20 +72,19 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
   import VariablesArbitrary._, ExprArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
   import MetadataFixture._
+  import PathError._
 
   "Metadata Service" should {
     "respond with NotFound" >> {
       // TODO: escaped paths do not survive being embedded in error messages
       "if directory does not exist" ! prop { dir: ADir => (dir != rootDir) ==> {
         val response = service(InMemState.empty, Map())(Request(uri = pathUri(dir))).run
-        response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(dir)} doesn't exist")
+        response.as[ApiError].run must beApiErrorLike(pathNotFound(dir))
       }}
 
       "file does not exist" ! prop { file: AFile =>
         val response = service(InMemState.empty, Map())(Request(uri = pathUri(file))).run
-        response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(file)} doesn't exist")
+        response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -92,8 +93,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           // .get here is because we know thanks to the property guard, that the parent directory has a name
           val fileWithSameName = parentDir(parent).get </> file(dirName(parent).get.value)
           val response = service(s.state, Map())(Request(uri = pathUri(fileWithSameName))).run
-          response.status must_== Status.NotFound
-          response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(fileWithSameName)} doesn't exist")
+          response.as[ApiError].run must beApiErrorLike(pathNotFound(fileWithSameName))
         }
       }
     }

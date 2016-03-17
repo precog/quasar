@@ -42,9 +42,6 @@ object SemanticError {
   final case class FunctionNotFound(name: String) extends SemanticError {
     def message = "The function '" + name + "' could not be found in the standard library"
   }
-  final case class FunctionNotBound(node: Expr) extends SemanticError {
-    def message = "A function was not bound to the node " + node
-  }
   final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
     def message = "Expected type " + expected + " but found " + actual + hint.map(": " + _).getOrElse("")
   }

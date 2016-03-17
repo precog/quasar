@@ -442,6 +442,29 @@ Takes a port number in the body, and attempts to restart the server on that port
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
 
 
+## Error Responses
+
+Error responses from the REST api have the following form
+
+```
+{
+  "error": {
+    "status": <succinct message>,
+    "detail": {
+      "field1": <JSON>,
+      "field2": <JSON>,
+      ...
+      "fieldN": <JSON>
+    }
+  }
+}
+```
+
+The `status` field will always be present and will contain a succinct description of the error in english, the same content will be used as the status message of the HTTP response itself. The `detail` field is optional and, if present, will contain a JSON object with additional information about the error.
+
+Examples of `detail` fields would be a backend-specific error message, detailed type information for type errors in queries, the actual invalid arguments presented to a function, etc. These fields are error-specific, however, if the error is going to include a more detailed error message, it will found under the `message` field in the `detail` object.
+
+
 ## Request Headers
 
 Request headers may be supplied via a query parameter in case the client is unable to send arbitrary headers (e.g. browsers, in certain circumstances). The parameter name is `request-headers` and the value should be a JSON-formatted string containing an object whose fields are named for the corresponding header and whose values are strings or arrays of strings. If any header appears both in the `request-headers` query parameter and also as an ordinary header, the query parameter takes precedence.

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Errors.{ETask, convertError}
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
-import quasar.fp._
+import quasar.fp._, PathyCodecJson._
 import quasar.fs._
 
 import java.io.File
@@ -188,18 +188,19 @@ package object api {
     }
   }
 
-  def dirPathOrBadRequest[S[_]](encodedPath: String): QResponse[S] \/ ADir = {
-    pathOrBadRequest[S](encodedPath).flatMap { path =>
-      val msg = s"Expected directory path, found: ${posixCodec.printPath(path)}"
-      refineType(path).swap.leftMap(_ => QResponse.error[S](BadRequest, msg))
+  def decodedDir(encodedPath: String): ApiError \/ ADir =
+    decodedPath(encodedPath) flatMap { path =>
+      refineType(path).swap.leftAs(ApiError.fromMsg(
+        BadRequest withReason "Directory path expected.",
+        s"Expected '${posixCodec.printPath(path)}' to be a directory.",
+        "path" := path))
     }
-  }
 
-  def pathOrBadRequest[S[_]](encodedPath: String): QResponse[S] \/ APath = {
-    val msg = s"Invalid path: ${UrlCodingUtils.urlDecode(encodedPath)}"
-    AsPath.unapply(HPath(encodedPath)).toRightDisjunction(QResponse.error(BadRequest, msg))
-  }
-
+  def decodedPath(encodedPath: String): ApiError \/ APath =
+    AsPath.unapply(HPath(encodedPath)) \/> ApiError.fromMsg(
+      BadRequest withReason "Malformed path.",
+      s"Failed to parse '${UrlCodingUtils.urlDecode(encodedPath)}' as an absolute path.",
+      "encodedPath" := encodedPath)
 
   def staticFileService(basePath: String): HttpService = {
     def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {

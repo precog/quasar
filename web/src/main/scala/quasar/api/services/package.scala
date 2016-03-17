@@ -21,6 +21,7 @@ import quasar.Data
 import quasar.fs._
 import quasar.fp.numeric._
 
+import argonaut._, Argonaut._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
@@ -44,20 +45,20 @@ package object services {
     )(QResponse.streaming(format.encode[FileSystemErrT[Free[S,?],?]](data)))
   }
 
-  def limitOrInvalid[S[_]](
+  def limitOrInvalid(
     limitParam: Option[ValidationNel[ParseFailure, Positive]]
-  ): QResponse[S] \/ Option[Positive] =
+  ): ApiError \/ Option[Positive] =
     valueOrInvalid("limit", limitParam)
 
-  def offsetOrInvalid[S[_]](
+  def offsetOrInvalid(
     offsetParam: Option[ValidationNel[ParseFailure, Natural]]
-  ): QResponse[S] \/ Option[Natural] =
+  ): ApiError \/ Option[Natural] =
     valueOrInvalid("offset", offsetParam)
 
-  def valueOrInvalid[S[_], F[_]: Traverse, A](
+  def valueOrInvalid[F[_]: Traverse, A](
     paramName: String,
     paramResult: F[ValidationNel[ParseFailure, A]]
-  ): QResponse[S] \/ F[A] =
+  ): ApiError \/ F[A] =
     orBadRequest(paramResult, nel =>
       s"invalid ${paramName}: ${nel.head.sanitized} (${nel.head.details})")
 
@@ -65,18 +66,23 @@ package object services {
     * error message produced by the given function when it failed, otherwise
     * return the parsed value.
     */
-  def orBadRequest[S[_], F[_]: Traverse, A](
+  def orBadRequest[F[_]: Traverse, A](
     param: F[ValidationNel[ParseFailure, A]],
     msg: NonEmptyList[ParseFailure] => String
-  ): QResponse[S] \/ F[A] =
+  ): ApiError \/ F[A] =
     param.traverseU(_.disjunction.leftMap(nel =>
-      QResponse.error[S](BadRequest, msg(nel))))
+      ApiError.fromMsg_(BadRequest withReason "Invalid query parameter.", msg(nel))))
 
-  def requiredHeader[F[_]](key: HeaderKey.Extractable, request: Request): QResponse[F] \/ key.HeaderT =
-    request.headers.get(key) \/> QResponse.error(BadRequest, s"The '${key.name}' header must be specified")
+  def requiredHeader(key: HeaderKey.Extractable, request: Request): ApiError \/ key.HeaderT =
+    request.headers.get(key) \/> ApiError.apiError(
+      BadRequest withReason s"'${key.name}' header missing.",
+      "headerName" := key.name.toString)
 
   def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQResponse[A, F]): Free[S, QResponse[F]] =
     a.map(ev.toResponse)
+
+  def respond_[S[_], A, F[_]](a: A)(implicit ev: ToQResponse[A, F]): Free[S, QResponse[F]] =
+    respond(Free.pure(a))
 
   // https://github.com/puffnfresh/wartremover/issues/149
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))

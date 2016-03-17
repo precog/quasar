@@ -20,7 +20,10 @@ import quasar.Predef._
 import quasar._, fp._
 import quasar.fp.numeric._
 import quasar.api.services.Fixture._
+import quasar.api.matchers._
 import quasar.api.PathUtils
+import quasar.api.ApiError
+import quasar.api.ApiErrorEntityDecoder._
 import quasar.fs._
 import quasar.fs.PathArbitrary._
 import quasar.fs.InMemory._
@@ -30,10 +33,12 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.Fix
+import org.scalacheck.Arbitrary
 import org.http4s._
 import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
+import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
@@ -44,10 +49,13 @@ import scalaz.stream.Process
 
 class ExecuteServiceSpec extends Specification with FileSystemFixture with ScalaCheck with PathUtils {
   import queryFixture._
+  import posixCodec.printPath
 
   type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
 
-  import posixCodec.printPath
+  // Remove if eventually included in upstream scala-pathy
+  implicit val arbitraryFileName: Arbitrary[FileName] =
+    Arbitrary(Arbitrary.arbitrary[AFile].map(fileName(_)))
 
   def executeServiceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).run
@@ -183,33 +191,36 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         )
       }.pendingUntilFixed("SD-773")
       "be 400 with missing query" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[AJson](executeService)(
+        post[ApiError](executeService)(
           path = filesystem.parent,
           query = None,
           destination = Some(printPath(destination)),
           state = filesystem.state,
           status = Status.BadRequest,
-          response = Json(_) must_== json"""{"error" : "The body of the POST must contain a query"}"""
+          response = _ must equal(ApiError.fromStatus(
+            Status.BadRequest withReason "No SQL^2 query found in message body."))
         )
       }
       "be 400 with missing Destination header" ! prop { filesystem: SingleFileMemState =>
-        post[AJson](executeService)(
+        post[ApiError](executeService)(
           path = filesystem.parent,
           query = Some(Query(selectAll(file(filesystem.filename.value)))),
           destination = None,
           state = filesystem.state,
           status = Status.BadRequest,
-          response = Json(_) must_== json"""{"error" : "The 'Destination' header must be specified"}"""
+          response = _ must beHeaderMissingError("Destination")
         )
       }
       "be 400 for query error" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[AJson](executeService)(
+        post[ApiError](executeService)(
           path = filesystem.parent,
           query = Some(Query("select date where")),
           destination = Some(printPath(destination)),
           state = filesystem.state,
           status = Status.BadRequest,
-          response = Json(_) must_== json"""{"error" : "end of input; ErrorToken(end of input)"}""")
+          response = _ must beApiErrorWithMessage(
+            Status.BadRequest withReason "Malformed SQL^2 query.")
+        )
       }
     }
   }

@@ -19,13 +19,14 @@ package quasar.api.services
 import quasar.Predef._
 import quasar._, api._
 import quasar.fp.numeric._
-import quasar.fs._
-import quasar.sql.Query
+import quasar.sql.{Expr, Query}
 
+import argonaut._, Argonaut._
 import org.http4s._, dsl._
 import scalaz._, Scalaz._
 
 package object query {
+  import ToApiError.ops._
 
   implicit val QueryDecoder = new QueryParamDecoder[Query] {
     def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Query] =
@@ -36,31 +37,42 @@ package object query {
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
 
-  def queryOrBadRequest[S[_]](params: Map[String, scala.collection.Seq[String]]): QResponse[S] \/ Query =
-    params.get("q").cata(
-      values =>
-        if (values.size > 1) QResponse.error(BadRequest, "The request must contain only one query parameter").left
-        else values.headOption.map(Query(_)).toRightDisjunction(QResponse.error(BadRequest, "The request must contain the query parameter")),
-      QResponse.error(BadRequest, "Request must contain a query").left
-    )
+  def queryParam(params: Map[String, scala.collection.Seq[String]]): ApiError \/ Query =
+    params.get("q") flatMap (_.toList.toNel) match {
+      case Some(xs) if xs.tail.isEmpty =>
+        Query(xs.head).right
 
-  def parseQueryRequest[S[_]](req: Request,
-                        offset: Option[ValidationNel[ParseFailure, Natural]],
-                        limit: Option[ValidationNel[ParseFailure, Positive]])
-    : QResponse[S] \/ (ADir, Query, Option[Natural], Option[Positive]) =
-    (dirPathOrBadRequest[S](req.uri.path)  |@|
-     queryOrBadRequest[S](req.multiParams) |@|
-     offsetOrInvalid[S](offset)         |@|
-     limitOrInvalid[S](limit)) { (dir, query, offset, limit) => (dir, query, offset, limit)}
+      case Some(xs) =>
+        val ct = xs.size
+        ApiError.fromMsg(
+          BadRequest withReason "Multiple SQL^2 queries submitted.",
+          s"The request may only contain a single SQL^2 query, found $ct.",
+          "queryCount" := ct
+        ).left
 
-  def queryParameterMustContainQuery[S[_]] =
-    Free.pure[S, QResponse[S]](QResponse.error(BadRequest, "The request must contain a query"))
+      case None =>
+        ApiError.fromStatus(
+          BadRequest withReason "No SQL^2 query found in URL."
+        ).left
+    }
 
-  def postContentMustContainQuery[S[_]] =
-    Free.pure[S, QResponse[S]](QResponse.error(BadRequest, "The body of the POST must contain a query"))
+  def parsedQueryRequest(
+    req: Request,
+    offset: Option[ValidationNel[ParseFailure, Natural]],
+    limit: Option[ValidationNel[ParseFailure, Positive]]
+  ): ApiError \/ (Expr, Option[Natural], Option[Positive]) =
+    for {
+      dir <- decodedDir(req.uri.path)
+      qry <- queryParam(req.multiParams)
+      xpr <- sql.parseInContext(qry, dir) leftMap (_.toApiError)
+      off <- offsetOrInvalid(offset)
+      lim <- limitOrInvalid(limit)
+    } yield (xpr, off, lim)
 
-  private val VarPrefix = "var."
-  def vars(req: Request) = Variables(req.params.collect {
+  val bodyMustContainQuery: ApiError =
+    ApiError.fromStatus(BadRequest withReason "No SQL^2 query found in message body.")
+
+  def requestVars(req: Request) = Variables(req.params.collect {
     case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
 
   def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
@@ -68,4 +80,5 @@ package object query {
     limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.get), sql.Limit))
   }
 
+  private val VarPrefix = "var."
 }

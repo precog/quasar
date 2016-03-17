@@ -17,15 +17,14 @@
 package quasar.api.services
 
 import quasar.Data
-import quasar.api._, ToQResponse.ops._
-import quasar.fp._, numeric._
+import quasar.api._, ToQResponse.ops._, ToApiError.ops._
+import quasar.fp._, numeric._, PathyCodecJson._
 import quasar.fs._
 import quasar.Predef._
 
 import java.nio.charset.StandardCharsets
 
 import argonaut.Argonaut._
-import argonaut.Json
 import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
@@ -49,10 +48,10 @@ object data {
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
-      (offsetOrInvalid[S](offsetParam) |@| limitOrInvalid[S](limitParam)) { (offset, limit) =>
+      respond_((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
         download[S](requestedFormat, path, offset.getOrElse(0L), limit)
-      }.merge.point[R.F]
+      })
 
     case req @ POST -> AsFilePath(path) =>
       upload(req, W.appendThese(path, _))
@@ -61,14 +60,13 @@ object data {
       upload(req, W.saveThese(path, _))
 
     case req @ Method.MOVE -> AsPath(path) =>
-      (for {
+      respond((for {
         dst <- EitherT.fromDisjunction[M.F](
-                 requiredHeader[S](Destination, req) map (_.value))
+                 requiredHeader(Destination, req) map (_.value))
         scn <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
-                 .leftMap(QResponse.error[S](BadRequest, _))
         _   <- M.move(scn, MoveSemantics.FailIfExists)
-                 .leftMap(_.toResponse[S])
-      } yield QResponse.empty[S].withStatus(Created)).merge
+                 .leftMap(_.toApiError)
+      } yield Created).run)
 
     case DELETE -> AsPath(path) =>
       respond(M.delete(path).run)
@@ -95,19 +93,27 @@ object data {
       },
       filePath => formattedDataResponse(format, R.scan(filePath, offset, limit)))
 
-  private def moveScenario(src: APath, dstStr: String): String \/ MoveScenario =
+  private def moveScenario(src: APath, dstStr: String): ApiError \/ MoveScenario =
     refineType(src).fold(
       srcDir =>
         parseAbsDir(dstStr)
           .map(sandboxAbs)
           .map(MoveScenario.dirToDir(srcDir, _))
-          .toRightDisjunction("Cannot move directory into a file"),
+          .toRightDisjunction(ApiError.fromMsg(
+            BadRequest withReason "Illegal move.",
+            "Cannot move directory into a file",
+            "srcPath" := srcDir,
+            "dstPath" := dstStr)),
       srcFile =>
         parseAbsFile(dstStr)
           .map(sandboxAbs)
           // TODO: Why not move into directory if dst is a dir?
           .map(MoveScenario.fileToFile(srcFile, _))
-          .toRightDisjunction("Cannot move a file into a directory, must specify destination precisely"))
+          .toRightDisjunction(ApiError.fromMsg(
+            BadRequest withReason "Illegal move.",
+            "Cannot move a file into a directory, must specify destination precisely",
+            "srcPath" := srcFile,
+            "dstPath" := dstStr)))
 
   // TODO: Streaming
   private def upload[S[_]: Functor](
@@ -118,25 +124,23 @@ object data {
     type FreeFS[A] = FileSystemErrT[FreeS, A]
     type QRespT[F[_], A] = EitherT[F, QResponse[S], A]
 
-    def dataError[A: Show](status: Status, errs: IndexedSeq[A]): QResponse[S] =
-      QResponse.json(status, Json(
-        "error"   := "some uploaded value(s) could not be processed",
-        "details" := Json.array(errs.map(e => jString(e.shows)): _*)))
-
     def errorsResponse(
       decodeErrors: IndexedSeq[DecodeError],
       persistErrors: FreeFS[Vector[FileSystemError]]
     ): Free[S, QResponse[S]] =
-      if (decodeErrors.nonEmpty)
-        dataError(BadRequest, decodeErrors).point[FreeS]
-      else
-        persistErrors.fold(_.toResponse[S], errs =>
-          if (errs.isEmpty) QResponse.ok[S]
-          else dataError(InternalServerError, errs))
+      decodeErrors.toList.toNel
+        .map(errs => respond_[S, ApiError, S](ApiError.apiError(
+          BadRequest withReason "Malformed upload data.",
+          "errors" := errs.map(_.shows))))
+        .getOrElse(persistErrors.fold(_.toResponse[S], errs =>
+          errs.toList.toNel.fold(QResponse.ok[S])(errs1 =>
+            errs1.toApiError.copy(status = InternalServerError.withReason(
+              "Error persisting uploaded data."
+            )).toResponse[S])))
 
     def write(xs: IndexedSeq[(DecodeError \/ Data)]): Free[S, QResponse[S]] =
       if (xs.isEmpty) {
-        QResponse.error(BadRequest, "Request has no body").point[FreeS]
+        respond_(ApiError.fromStatus(BadRequest withReason "Request has no body."))
       } else {
         val (errors, data) = xs.toVector.separate
         errorsResponse(errors, by(data))

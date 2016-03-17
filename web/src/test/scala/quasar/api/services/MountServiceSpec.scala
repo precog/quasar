@@ -19,9 +19,11 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.{Variables}
 import quasar.api._
-import quasar.sql, sql.{Expr}
+import quasar.api.matchers._
+import quasar.api.ApiErrorEntityDecoder._
+import quasar.sql, sql.Expr
 import quasar.effect.{KeyValueStore}
-import quasar.fp._
+import quasar.fp._, PathyCodecJson._
 import quasar.fs._
 import quasar.fs.PathArbitrary._
 import quasar.fs.mount._
@@ -31,6 +33,7 @@ import org.http4s._
 import org.http4s.argonaut._
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
+import org.specs2.scalaz.ScalazMatchers._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy.Path, Path._
@@ -38,6 +41,7 @@ import pathy.scalacheck.PathyArbitrary._
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
   import posixCodec.printPath
+  import PathError._
 
   val StubFs = FileSystemType("stub")
 
@@ -87,8 +91,19 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
   def orFail[A](v: MountingError \/ A): Task[A] =
     Task.fromDisjunction(v.leftMap(e => new RuntimeException(e.shows)))
+
   def orFailF[A](v: MountingError \/ A): M.F[A] =
     free.lift(orFail(v)).into[Eff]
+
+  def beMountNotFoundError(path: APath) =
+    beApiErrorWithMessage(
+      Status.NotFound withReason "Mount point not found.",
+      "path" := path)
+
+  def beInvalidConfigError(rsn: String) =
+    equal(ApiError.apiError(
+      Status.BadRequest withReason "Invalid mount configuration.",
+      "reasons" := List(rsn)))
 
   "Mount Service" should {
     "GET" should {
@@ -146,8 +161,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           for {
             resp <- service(Request(uri = pathUri(d)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(d)}")
-            resp.status must_== Status.NotFound
+            resp.as[ApiError].run must beMountNotFoundError(d)
           }
         }
       }
@@ -161,8 +175,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
             resp <- service(Request(uri = pathUri(fp)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(fp)}")
-            resp.status must_== Status.NotFound
+            resp.as[ApiError].run must beMountNotFoundError(fp)
           }
         }
       }
@@ -209,8 +222,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               uri = pathUri(src),
               headers = Headers(destination(dst))))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(src)} doesn't exist")
-            resp.status must_== Status.NotFound
+            resp.as[ApiError].run must beApiErrorLike(pathNotFound(src))
           }
         }
       }
@@ -225,8 +237,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 method = MOVE,
                 uri = pathUri(src)))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"The 'Destination' header must be specified")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must beHeaderMissingError("Destination")
             }
           }
         }
@@ -243,8 +254,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 uri = pathUri(src),
                 headers = Headers(destination(dst))))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst)}")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must equal(ApiError.apiError(
+                Status.BadRequest withReason "Expected an absolute directory.",
+                "path" := dst))
             }
           }
         }
@@ -261,8 +273,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 uri = pathUri(src),
                 headers = Headers(destination(dst))))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst)}")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must equal(ApiError.apiError(
+                Status.BadRequest withReason "Expected an absolute directory.",
+                "path" := dst))
             }
           }
         }
@@ -424,8 +437,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             for {
               resp <- service(reqBuilder(parent, fsFile, """{ "stub": { "connectionUri": "foo" } }"""))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent </> fsFile)}; directory path required")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must beApiErrorWithMessage(
+                Status.BadRequest withReason "Incorrect path type.",
+                "path" := (parent </> fsFile))
             }
           }
         }
@@ -438,8 +452,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             for {
               resp <- service(reqBuilder(parent, viewDir, cfgStr))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent </> viewDir)}; file path required")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must beApiErrorWithMessage(
+                Status.BadRequest withReason "Incorrect path type.",
+                "path" := (parent </> viewDir))
             }
           }
         }
@@ -453,8 +468,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, cfgStr))
               } yield {
-                resp.as[Json].run must_== Json("error" := s"unbound variable (simulated)")
-                resp.status must_== Status.BadRequest
+                resp.as[ApiError].run must beInvalidConfigError("unbound variable (simulated)")
               }
             }
           }
@@ -466,8 +480,8 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, "{"))
               } yield {
-                resp.as[Json].run must_== Json("error" := "input error: JSON terminates unexpectedly.")
-                resp.status must_== Status.BadRequest
+                resp.as[ApiError].run must beApiErrorWithMessage(
+                  Status.BadRequest withReason "Malformed input.")
               }
             }
           }
@@ -479,8 +493,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, d, """{ "stub": { "connectionUri": "invalid" } }"""))
               } yield {
-                resp.as[Json].run must_== Json("error" := "invalid connectionUri (simulated)")
-                resp.status must_== Status.BadRequest
+                resp.as[ApiError].run must beInvalidConfigError("invalid connectionUri (simulated)")
               }
             }
           }
@@ -492,8 +505,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, """{ "view": { "connectionUri": "foo://bar" } }"""))
               } yield {
-                resp.as[Json].run must_== Json("error" := "unrecognized scheme: foo")
-                resp.status must_== Status.BadRequest
+                resp.as[ApiError].run must beApiErrorWithMessage(Status.BadRequest)
               }
             }
           }
@@ -510,9 +522,10 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
       "be 409 with existing filesystem path" ! prop { (parent: ADir, fsDir: RDir) =>
         runTest { service =>
           val previousCfg = (StubFs, ConnectionUri("bar"))
+          val mntPath = parent </> fsDir
 
           for {
-            _    <- M.mountFileSystem(parent </> fsDir, previousCfg._1, previousCfg._2).run.flatMap(orFailF)
+            _    <- M.mountFileSystem(mntPath, previousCfg._1, previousCfg._2).run.flatMap(orFailF)
 
             resp <- service(Request(
                       method = POST,
@@ -520,11 +533,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                       headers = Headers(xFileName(fsDir)))
                     .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
 
-            after <- M.lookup(parent </> fsDir).run
+            after <- M.lookup(mntPath).run
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(parent </> fsDir)} already exists")
-            resp.status must_== Status.Conflict
-
+            resp.as[ApiError].run must beApiErrorLike(pathExists(mntPath))
             after must beSome(MountConfig.fileSystemConfig(previousCfg))
           }
         }
@@ -539,8 +550,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                         uri = pathUri(parent))
                       .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
             } yield {
-              resp.as[Json].run must_== Json("error" := "The 'X-File-Name' header must be specified")
-              resp.status must_== Status.BadRequest
+              resp.as[ApiError].run must beHeaderMissingError("X-File-Name")
             }
           }
         }
@@ -628,8 +638,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           for {
             resp <- service(Request(method = DELETE, uri = pathUri(p)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(p)} doesn't exist")
-            resp.status must_== Status.NotFound
+            resp.as[ApiError].run must beApiErrorLike(pathNotFound(p))
           }
         }
       }

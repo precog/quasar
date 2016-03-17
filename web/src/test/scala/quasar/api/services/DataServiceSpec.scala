@@ -20,13 +20,16 @@ import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
 import quasar.api._
+import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.MessageFormat.JsonContentType
 import quasar.api.MessageFormatGen._
+import quasar.api.matchers._
 import quasar.fs._
 import quasar.fs.PathArbitrary._
 import quasar.fp.{evalNT, free, liftMT}
 import quasar.fp.numeric._
 import quasar.fp.prism._
+import quasar.fp.PathyCodecJson._
 
 import argonaut.Json
 import argonaut.Argonaut._
@@ -34,7 +37,9 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
 import org.specs2.execute.AsResult
+import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
+import org.specs2.scalaz.ScalazMatchers._
 import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -53,6 +58,7 @@ import shapeless.tag.@@
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
+  import PathError.{pathExists, pathNotFound}
 
   type Eff0[A] = Coproduct[FileSystemFailureF, FileSystem, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
@@ -103,7 +109,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         "if file does not exist" ! prop { file: AFile =>
           val response = service(InMemState.empty)(Request(uri = pathUri(file))).run
           response.status must_== Status.NotFound
-          response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(file)} doesn't exist")
+          response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
         }
       }
       "respond with file data" >> {
@@ -191,16 +197,16 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 val request = Request(
                   uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).run
-                response.status must_== Status.BadRequest
-                response.as[Json].run must_== Json("error" := s"invalid limit: $limit (must be >= 1)")
+                response.as[ApiError].run must beApiErrorWithMessage(
+                  Status.BadRequest withReason "Invalid query parameter.")
               }
             }
             "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
               val response = service(InMemState.empty)(request).run
-              response.status must_== Status.BadRequest
-              response.as[Json].run must_== Json("error" := s"invalid offset: $offset (must be >= 0)")
+              response.as[ApiError].run must beApiErrorWithMessage(
+                Status.BadRequest withReason "Invalid query parameter.")
             }
             "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
               val limits = limit1 :: limit2 :: otherLimits
@@ -224,8 +230,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
               val request = Request(uri = pathUri(path).+?("limit", "a"))
               val response = service(InMemState.empty)(request).run
-              response.status must_== Status.BadRequest
-              response.as[Json].run must_== Json("error" := s"""invalid limit: Query decoding Long failed (For input string: "a")""")
+              response.as[ApiError].run must beApiErrorWithMessage(
+                Status.BadRequest withReason "Invalid query parameter.")
             }
             "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
               (limit < 1) ==> {
@@ -278,78 +284,67 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
       }
       testBoth { method =>
-        "be 415 if media-type is" >> {
-          val supportedMediaTypesMsg = "Please specify a media type in the following ranges: "
-
-          def beExpected(response: Response, errorMsgPrefix: String) = {
-            val expectedSupportedMediaTypes = List(
-              "application/ldjson",
-              "text/csv",
-              "application/json",
-              "application/x-ldjson")
-            val jsonResponse = response.as[Json].run
-            jsonResponse -| "error" must beLike { case Some(errorMsgJson) =>
-              errorMsgJson.string must beLike { case Some(errorMsg) =>
-                (errorMsg.startsWith(errorMsgPrefix) must_== true) and
-                  (expectedSupportedMediaTypes.forall(errorMsg.contains(_)) must_== true)
-              }
-            }
-            jsonResponse -| "supported media types" must beLike { case Some(json) =>
-              json.array must beLike { case Some(elems) =>
-                elems must containTheSameElementsAs(expectedSupportedMediaTypes.map(jString))
-              }
-            }
-            response.status must_== Status.UnsupportedMediaType
-          }
+        "fail when media-type is" >> {
           "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
               method = method).withBody("zip code: 34561 and zip code: 78932").run
             val response = service(emptyMem)(request).run
-            val errorMsg = s"Request has an unsupported media type. $supportedMediaTypesMsg"
-            beExpected(response, errorMsg)
+            response.as[ApiError].run must beApiErrorLike[DecodeFailure](
+              MediaTypeMismatch(MediaType.`text/plain`, MessageFormat.supportedMediaTypes))
           }
           "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
               method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run.replaceAllHeaders(Headers.empty)
             val response = service(emptyMem)(request).run
-            val errorMsg = s"Request has no media type. $supportedMediaTypesMsg"
-            beExpected(response, errorMsg)
+            response.as[ApiError].run must beApiErrorLike[DecodeFailure](
+              MediaTypeMissing(MessageFormat.supportedMediaTypes))
           }
         }
         "be 400 with" >> {
-          def be400[A: EntityDecoder](body: String, expectedBody: A, mediaType: MediaType = jsonReadableLine.mediaType) = {
+          def be400[A: EntityDecoder](
+            reqBody: String,
+            expectBody: A => MatchResult[scala.Any],
+            mediaType: MediaType = jsonReadableLine.mediaType
+          ) = {
             prop { file: AFile =>
               val request = Request(
                 uri = pathUri(file),             // We do it this way becuase withBody sets the content-type
-                method = method).withBody(body).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
+                method = method
+              ).withBody(reqBody).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
               val (service, ref) = serviceRef(emptyMem)
               val response = service(request).run
-              response.as[A].run must_== expectedBody
-              response.status must_== Status.BadRequest
+              expectBody(response.as[A].run)
               ref.run must_== emptyMem
             }
           }
           "invalid body" >> {
-            "no body" ! be400(body = "", expectedBody = Json("error" := "Request has no body"))
+            "no body" ! be400(
+              reqBody = "",
+              expectBody = (_: ApiError) must equal(ApiError.fromStatus(
+                Status.BadRequest withReason "Request has no body."))
+            )
             "invalid JSON" ! be400(
-              body = "{",
-              expectedBody = Json("error" := "some uploaded value(s) could not be processed",
-                                  "details" := Json.array(jString("parse error: JSON terminates unexpectedly. in the following line: {")))
+              reqBody = "{",
+              expectBody = (_: ApiError) must equal(ApiError.apiError(
+                Status.BadRequest withReason "Malformed upload data.",
+                "errors" := List("parse error: JSON terminates unexpectedly. in the following line: {")))
             )
             "invalid CSV" >> {
               "empty (no headers)" ! be400(
-                body = "",
-                expectedBody = Json("error" := "Request has no body"),
+                reqBody = "",
+                expectBody = (_: ApiError) must equal(ApiError.fromStatus(
+                  Status.BadRequest withReason "Request has no body.")),
                 mediaType = csv
               )
               "if broken (after the tenth data line)" ! {
                 val brokenBody = "\"a\",\"b\"\n1,2\n3,4\n5,6\n7,8\n9,10\n11,12\n13,14\n15,16\n17,18\n19,20\n\",\n"
                 be400(
-                  body = brokenBody,
-                  expectedBody = Json("error" := "some uploaded value(s) could not be processed",
-                    "details" := Json.array(jString("parse error: Malformed Input!: Some(\",\n)"))),
+                  reqBody = brokenBody,
+                  expectBody = (_: ApiError) must equal(ApiError.apiError(
+                    Status.BadRequest withReason "Malformed upload data.",
+                    "errors" := List("parse error: Malformed Input!: Some(\",\n)"))),
                   mediaType = csv)
               }
             }
@@ -357,7 +352,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
           "if path is invalid (parent directory does not exist)" ! prop { (file: AFile, json: Json) =>
             Path.depth(file) != 1 ==> {
-              be400(body = json.spaces4, Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
+              be400(reqBody = json.spaces4, (_: Json) must_== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
             }
           }.pendingUntilFixed("What do we want here, create it or not?")
           "produce two errors with partially invalid JSON" ! prop { path: Path[Abs,File,Sandboxed] =>
@@ -366,12 +361,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                                  |{"b": 2}
                                  |}
                                  |{"c": 3}""".stripMargin
-            val expectedResponse = Json("error" := "some uploaded value(s) could not be processed",
-              "details" := Json.array(
-                jString("parse error: JSON terminates unexpectedly. in the following line: \"unmatched"),
-                jString("parse error: Unexpected content found: } in the following line: }")
-              ))
-            be400(twoErrorJson, expectedResponse)
+            be400(
+              reqBody = twoErrorJson,
+              expectBody = (_: ApiError) must equal(ApiError.apiError(
+                Status.BadRequest withReason "Malformed upload data.",
+                "errors" := List(
+                  "parse error: JSON terminates unexpectedly. in the following line: \"unmatched",
+                  "parse error: Unexpected content found: } in the following line: }"))))
           }
         }
         "accept valid data" >> {
@@ -480,8 +476,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(path), method = Method.MOVE)
         val response = service(emptyMem)(request).run
-        response.status must_== Status.BadRequest
-        response.as[Json].run must_== Json("error" := "The 'Destination' header must be specified")
+        response.as[ApiError].run must beHeaderMissingError("Destination")
       }
       "be 404 for missing source file" ! prop { (file: AFile, destFile: AFile) =>
         testMove(
@@ -489,7 +484,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = destFile,
           state = emptyMem,
           status = Status.NotFound,
-          body = (json: Json) => json must_== Json("error" := s"${posixCodec.printPath(file)} doesn't exist"),
+          body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
           newState = Unchanged)
       }
       "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AFile) =>
@@ -498,7 +493,10 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = file,
           state = fs.state,
           status = Status.BadRequest,
-          body = (json: Json) => json must_== Json("error" := "Cannot move directory into a file"),
+          body = (_: ApiError) must beApiErrorWithMessage(
+            Status.BadRequest withReason "Illegal move.",
+            "srcPath" := fs.dir,
+            "dstPath" := file),
           newState = Unchanged)
       }
       "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: ADir) =>
@@ -507,7 +505,10 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = dir,
           state = fs.state,
           status = Status.BadRequest,
-          body = (json: Json) => json must_== Json("error" := "Cannot move a file into a directory, must specify destination precisely"),
+          body = (_: ApiError) must beApiErrorWithMessage(
+            Status.BadRequest withReason "Illegal move.",
+            "srcPath" := fs.file,
+            "dstPath" := dir),
           newState = Unchanged)
       }
       "be 201 with file" ! prop {(fs: SingleFileMemState, file: AFile) =>
@@ -536,7 +537,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = fs.file,
           state = fs.state,
           status = Status.Conflict,
-          body = (json: Json) => json must_== Json("error" := s"${posixCodec.printPath(fs.file)} already exists"),
+          body = (_: ApiError) must beApiErrorLike(pathExists(fs.file)),
           newState = Unchanged)
       }
       "be 409 with dir to same location" ! prop {(fs: NonEmptyDir) =>
@@ -545,10 +546,10 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = fs.dir,
           state = fs.state,
           status = Status.Conflict,
-          body = (json: Json) => json must beOneOf(
-            fs.filesInDir.list.map { case (p, _) =>
-              Json("error" := s"${posixCodec.printPath(fs.dir </> p)} already exists")
-            }: _*),
+          body = { err: ApiError =>
+            (err.status.reason must_== "Path exists.") and
+            (err.detail("path") must beSome)
+          },
           newState = Unchanged)
       }
     }
@@ -570,12 +571,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
         val response = service(emptyMem)(request).run
-        response.status must_== Status.NotFound
+        response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
       }
       "be 404 with missing dir" ! prop { dir: AbsDir[Sandboxed] =>
         val request = Request(uri = pathUri(dir), method = Method.DELETE)
         val response = service(emptyMem)(request).run
-        response.status must_== Status.NotFound
+        response.as[ApiError].run must beApiErrorLike(pathNotFound(dir))
       }
     }
   }

@@ -19,12 +19,16 @@ package quasar.api.services.query
 import quasar.Predef._
 import quasar._, fs._
 import quasar.api.PathUtils
+import quasar.api.matchers._
+import quasar.api.ApiError
+import quasar.api.ApiErrorEntityDecoder._
+import quasar.fp.PathyCodecJson._
 import quasar.fs.InMemory._
 
 import argonaut._, Argonaut._
 import org.http4s._
-import org.http4s.argonaut._
 import org.specs2.ScalaCheck
+import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -60,7 +64,8 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             query = None,
             state = filesystem.state,
             status = Status.BadRequest,
-            response = (_: Json) must_== Json("error" := "Request must contain a query")
+            response = (_: ApiError) must equal(ApiError.fromStatus(
+              Status.BadRequest withReason "No SQL^2 query found in URL."))
           )
         }
 
@@ -70,7 +75,8 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             query = Some(Query("select date where")),
             state = filesystem.state,
             status = Status.BadRequest,
-            response = (_: Json) must_== Json("error" := "end of input; ErrorToken(end of input)")
+            response = (_: ApiError) must beApiErrorWithMessage(
+              Status.BadRequest withReason "Malformed SQL^2 query.")
           )
         }
 
@@ -88,7 +94,9 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
             val resp = service(filesystem.state)(req).run
             resp.status must_== Status.BadRequest
-            resp.as[Json].run must_== Json("error" := s"Expected directory path, found: ${posixCodec.printPath(parentAsFile)}")
+            resp.as[ApiError].run must beApiErrorWithMessage(
+              Status.BadRequest withReason "Directory path expected.",
+              "path" := parentAsFile)
           }
         }
       }

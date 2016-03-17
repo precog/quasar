@@ -117,9 +117,6 @@ object QResponse {
       qr => qr.headers.get(key))(
       h  => _.modifyHeaders(_.put(h)))
 
-  def error[S[_]](status: Status, s: String): QResponse[S] =
-    json(status, Json("error" := s))
-
   def json[A: EncodeJson, S[_]](status: Status, a: A): QResponse[S] =
     string[S](status, a.asJson.pretty(minspace)).modifyHeaders(_.put(
       `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))

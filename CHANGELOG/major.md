@@ -1,0 +1,4 @@
+- [SD-824] Standardize and enrich REST API errors
+  - Refactor HierarchicalFileSystemError to be more meaningful.
+  - Convert all errors into a common ApiError for serialization to HTTP responses.
+  - Include any additional detail possible for a given error in the response.

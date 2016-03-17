@@ -17,12 +17,11 @@
 package quasar.api.services.query
 
 import quasar.Predef._
+import quasar.RenderTree.ops._
 import quasar._, api._, fs._
 import quasar.api.services._
 import quasar.api.ToQResponse.ops._
-import quasar.fp._
 import quasar.fp.numeric._
-import quasar.sql.{ParsingError}
 
 import argonaut._, Argonaut._
 import matryoshka.Fix
@@ -38,24 +37,33 @@ object compile {
         case PhaseResult.Detail(name, value) => QResponse.string(Ok, name + "\n" + value)
       }
 
+    def noOutputError(lp: Fix[LogicalPlan]): ApiError =
+      ApiError.apiError(
+        InternalServerError withReason "No explain output for plan.",
+        "logicalPlan" := lp.render)
+
     def explainQuery(
-      expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Free[S, QResponse[S]] = respond(
-        queryPlan(addOffsetLimit(expr, offset, limit), vars).run.value
-          .traverse[Free[S, ?], SemanticErrors, QResponse[S]](lp =>
-            Q.explain(lp).run.run.map {
-              case (phases, \/-(_)) =>
-                phaseResultsResponse(phases)
-                  .getOrElse(QResponse.error(InternalServerError,
-                    s"No explain output for plan: \n\n" + RenderTree[Fix[LogicalPlan]].render(lp).shows))
-              case (_, -\/(fsErr)) => fsErr.toResponse[S]
-            }))
+      expr: sql.Expr,
+      offset: Option[Natural],
+      limit: Option[Positive],
+      vars: Variables
+    ): Free[S, QResponse[S]] =
+      respond(queryPlan(addOffsetLimit(expr, offset, limit), vars)
+        .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](lp =>
+          Q.explain(lp).run.run.map {
+            case (phases, \/-(_)) =>
+              phaseResultsResponse(phases)
+                .toRightDisjunction(noOutputError(lp))
+                .toResponse[S]
+            case (_, -\/(fsErr)) =>
+              fsErr.toResponse[S]
+          }))
 
     QHttpService {
-      case req @ GET -> _ :? Offset(offset) +& Limit(limit) => respond(
-        parseQueryRequest[S](req, offset, limit).traverse[Free[S,?], QResponse[S], ParsingError \/ QResponse[S]] {
-          case (path, query, offset, limit) =>
-            sql.parseInContext(query, path).traverse[Free[S, ?], ParsingError, QResponse[S]](
-              expr => explainQuery(expr, offset, limit, vars(req)))
+      case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
+        respond(parsedQueryRequest(req, offset, limit) traverseU {
+          case (expr, offset, limit) =>
+            explainQuery(expr, offset, limit, requestVars(req))
         })
     }
   }

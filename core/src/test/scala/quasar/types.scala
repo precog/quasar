@@ -20,13 +20,16 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.specs2._
 
+import scala.Right
+
+import argonaut._, Argonaut._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
+import org.specs2.scalaz.ScalazMatchers._
 
 class TypesSpec extends Specification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
   import Type._
-
-  import TypeArbitrary._
+  import TypeArbitrary._, DataArbitrary._
 
   val LatLong = Obj(Map("lat" -> Dec, "long" -> Dec), Some(Top))
   val Azim = Obj(Map("az" -> Dec), Some(Top))
@@ -709,5 +712,56 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     }
 
     // TODO: tests for coproducts
+  }
+
+  "EncodeJson" should {
+    def typJson(typ: Type): Json = typ.asJson
+
+    "encode simple types as their name" in {
+      (typJson(Top)       must equal(jString("Top")))       and
+      (typJson(Bottom)    must equal(jString("Bottom")))    and
+      (typJson(Null)      must equal(jString("Null")))      and
+      (typJson(Str)       must equal(jString("Str")))       and
+      (typJson(Int)       must equal(jString("Int")))       and
+      (typJson(Dec)       must equal(jString("Dec")))       and
+      (typJson(Bool)      must equal(jString("Bool")))      and
+      (typJson(Binary)    must equal(jString("Binary")))    and
+      (typJson(Timestamp) must equal(jString("Timestamp"))) and
+      (typJson(Date)      must equal(jString("Date")))      and
+      (typJson(Time)      must equal(jString("Time")))      and
+      (typJson(Interval)  must equal(jString("Interval")))  and
+      (typJson(Id)        must equal(jString("Id")))
+    }
+
+    "encode constant types as their data encoding" ! prop { data: Data =>
+      val exp = DataCodec.Precise.encode(data) map (jd => Json((("Const", jd))))
+      Right(typJson(Const(data))) must_== exp.toEither
+    }
+
+    "encode arrays as an array of types" ! prop { types: List[Type] =>
+      typJson(Arr(types)) must equal(Json("Array" := types))
+    }
+
+    "encode flex arrays as components" ! prop { (min: Int, max: Option[Int], mbr: Type) =>
+      typJson(FlexArr(min, max, mbr)) must equal(
+        Json("FlexArr" := (
+          ("minSize" := min)  ->:
+          ("maxSize" :?= max) ->?:
+          ("members" := mbr)  ->:
+          jEmptyObject)))
+    }
+
+    "encode objects" ! prop { (assocs: Map[String, Type], unks: Option[Type]) =>
+      typJson(Obj(assocs, unks)) must equal(
+        Json("Obj" := (
+          ("associations" := assocs) ->:
+          ("unknownKeys"  :?= unks)  ->?:
+          jEmptyObject)))
+    }
+
+    "encode coproducts as an array of types" ! prop { (t1: Type, t2: Type, ts: List[Type]) =>
+      val coprod = ts.foldLeft(Coproduct(t1, t2))(Coproduct(_, _))
+      typJson(coprod) must equal(Json("Coproduct" := coprod.flatten))
+    }
   }
 }

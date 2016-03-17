@@ -292,26 +292,24 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
       testBoth { method =>
         "be 415 if media-type is" >> {
-          val supportedMediaTypesMsg =
-            "Please specify a media type in the following ranges: " +
-              "text/csv, " +
-            "application/json; mode=\"precise\", " +
-            "application/json; mode=\"readable\", " +
-            "application/ldjson; mode=\"precise\", " +
-            "application/ldjson; mode=\"readable\""
+          val supportedMediaTypesMsg = "Please specify a media type in the following ranges: "
 
-          def beExpected(response: Response, errorMsg: String) = {
+          def beExpected(response: Response, errorMsgPrefix: String) = {
             val expectedSupportedMediaTypes = List(
-              jString("application/ldjson; mode=\"readable\""),
-              jString("text/csv"),
-              jString("application/json; mode=\"precise\""),
-              jString("application/ldjson; mode=\"precise\""),
-              jString("application/json; mode=\"readable\""))
+              "application/ldjson",
+              "text/csv",
+              "application/json",
+              "application/x-ldjson")
             val jsonResponse = response.as[Json].run
-            jsonResponse -| "error" must_== Some(jString(errorMsg))
+            jsonResponse -| "error" must beLike { case Some(errorMsgJson) =>
+              errorMsgJson.string must beLike { case Some(errorMsg) =>
+                (errorMsg.startsWith(errorMsgPrefix) must_== true) and
+                  (expectedSupportedMediaTypes.forall(errorMsg.contains(_)) must_== true)
+              }
+            }
             jsonResponse -| "supported media types" must beLike { case Some(json) =>
               json.array must beLike { case Some(elems) =>
-                elems must containTheSameElementsAs(expectedSupportedMediaTypes)
+                elems must containTheSameElementsAs(expectedSupportedMediaTypes.map(jString))
               }
             }
             response.status must_== Status.UnsupportedMediaType
@@ -419,7 +417,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "when formatted with one json object per line" >> {
               "Precise" ! {
                 accept(List(line1, preciseLine2).map(PreciseJson(_)), expectedData)
-              }.pendingUntilFixed("SD-1066")
+              }
               "Readable" ! {
                 accept(List(line1, readableLine2).map(ReadableJson(_)), expectedData)
               }
@@ -427,7 +425,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "when formatted as a single json array" >> {
               "Precise" ! {
                 accept(PreciseJson(Json.array(line1, preciseLine2)), expectedData)
-              }.pendingUntilFixed("SD-1066")
+              }
               "Readable" ! {
                 accept(ReadableJson(Json.array(line1, readableLine2)), expectedData)
               }
@@ -437,7 +435,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               def replicate[A](a: A) = Applicative[Id].replicateM[A](arbitraryValue, a)
               "Precise" ! {
                 accept(PreciseJson(Json.array(replicate(Json.array(line1, preciseLine2)): _*)), replicate(Data.Arr(expectedData)))
-              }.pendingUntilFixed("SD-1066")
+              }
               "Readable" ! {
                 accept(ReadableJson(Json.array(replicate(Json.array(line1, readableLine2)): _*)), replicate(Data.Arr(expectedData)))
               }

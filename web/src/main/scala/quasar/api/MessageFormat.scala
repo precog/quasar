@@ -180,95 +180,65 @@ object MessageFormat {
     }
   }
 
-  // TODO: Delete once http4s PR #531 has been merged and released
-  // Same as http4s OrDec but remembers all supported content types when notifying
-  // user of incorrect or missing content type
-  private class OrDec[T](a: EntityDecoder[T], b: EntityDecoder[T]) extends EntityDecoder[T] {
-
-    // This is not a real media type but will still be matched by `*/*`
-    private val UndefinedMediaType = new MediaType("UNKNOWN","UNKNOWN")
-
-    override def decode(msg: Message, strict: Boolean): DecodeResult[T] = {
-      msg.headers.get(`Content-Type`) match {
-        case Some(contentType) =>
-          if (a.matchesMediaType(contentType.mediaType)) a.decode(msg, strict)
-          else b.decode(msg, strict).leftMap{
-            case MediaTypeMismatch(actual, expected) =>
-              MediaTypeMismatch(actual, expected ++ a.consumes)
-            case other => other
-          }
-
-        case None =>
-          if (a.matchesMediaType(UndefinedMediaType)) a.decode(msg, strict)
-          else b.decode(msg, strict).leftMap{
-            case MediaTypeMissing(expected) =>
-              MediaTypeMissing(expected ++ a.consumes)
-            case other => other
-          }
-      }
-    }
-
-    override val consumes: Set[MediaRange] = a.consumes ++ b.consumes
-  }
-
-  // TODO: Delete once http4s PR #531 has been merged and released
-  private implicit class AugementedEntityDecoder[T](a: EntityDecoder[T]) {
-    /** Same as orElse but provides a better decoding failure message when no media type matches
-      * supported content types */
-    def orElse_BetterErrorMessage(b: EntityDecoder[T]): EntityDecoder[T] = new OrDec(a,b)
-  }
+  val supportedMediaTypes: Set[MediaRange] = Set(
+    JsonFormat.LineDelimited.mediaType,
+    new MediaType("application", "x-ldjson"),
+    JsonFormat.SingleArray.mediaType,
+    Csv.mediaType)
 
   val decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = {
-    val json = {
-      import JsonPrecision._
-      import JsonFormat._
-      JsonContentType(Readable,LineDelimited).decoder orElse_BetterErrorMessage
-      JsonContentType(Precise,LineDelimited).decoder orElse_BetterErrorMessage
-      JsonContentType(Readable,SingleArray).decoder orElse_BetterErrorMessage
-      JsonContentType(Precise,SingleArray).decoder
+    type Result = Process[Task, DecodeError \/ Data]
+    new EntityDecoder[Result] {
+      override def decode(msg: Message, strict: Boolean): DecodeResult[Result] = {
+        msg.headers.get(`Content-Type`).map { contentType =>
+          fromMediaType(contentType.mediaType).map { format =>
+            EitherT[Task, DecodeFailure, Result](format.decode(msg.bodyAsText).map(_.leftMap(err => ParseFailure(err.msg, ""))))
+          }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMismatch(contentType.mediaType, consumes).point[Task]))
+        }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMissing(consumes).point[Task]))
+      }
+
+      override val consumes: Set[MediaRange] = supportedMediaTypes
     }
-    Csv.decoder orElse_BetterErrorMessage json
   }
 
-  def fromAccept(accept: Option[Accept]): MessageFormat = {
-    val mediaTypes = NonEmptyList(
-      JsonFormat.LineDelimited.mediaType,
-      new MediaType("application", "x-ldjson"),
-      JsonFormat.SingleArray.mediaType,
-      Csv.mediaType)
-
-    (for {
-      acc       <- accept
-      // TODO: MediaRange needs an Order instance – combining QValue ordering
-      //       with specificity (EG, application/json sorts before
-      //       application/* if they have the same q-value).
-      chosenMediaType <- acc.values.sortBy(_.qValue).list.find(a => mediaTypes.list.exists(a.satisfies(_)))
-    } yield {
-      val disposition = chosenMediaType.extensions.get("disposition").flatMap { str =>
-        HttpHeaderParser.CONTENT_DISPOSITION(str).toOption
+  def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
+    val disposition = mediaType.extensions.get("disposition").flatMap { str =>
+      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption
+    }
+    if (mediaType satisfies Csv.mediaType) {
+      def toChar(str: String): Option[Char] = str.toList match {
+        case c :: Nil => Some(c)
+        case _ => None
       }
-      if (chosenMediaType satisfies Csv.mediaType) {
-        def toChar(str: String): Option[Char] = str.toList match {
-          case c :: Nil => Some(c)
-          case _ => None
-        }
-        Csv(chosenMediaType.extensions.get("columnDelimiter").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse(','),
-          chosenMediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n"),
-          chosenMediaType.extensions.get("quoteChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-          chosenMediaType.extensions.get("escapeChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-          disposition)
-      }
-      else {
-        val format = if ((chosenMediaType satisfies JsonFormat.SingleArray.mediaType) &&
-                          chosenMediaType.extensions.get("boundary") != Some("NL")) JsonFormat.SingleArray
-                     else JsonFormat.LineDelimited
+      Some(Csv(mediaType.extensions.get("columnDelimiter").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse(','),
+        mediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n"),
+        mediaType.extensions.get("quoteChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
+        mediaType.extensions.get("escapeChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
+        disposition))
+    }
+    else {
+      val format =
+        if (mediaType satisfies JsonFormat.SingleArray.mediaType)
+          if (mediaType.extensions.get("boundary") != Some("NL")) Some(JsonFormat.SingleArray)
+          else Some(JsonFormat.LineDelimited)
+        else if ((mediaType satisfies JsonFormat.LineDelimited.mediaType) ||
+                 (mediaType satisfies new MediaType("application", "x-ldjson"))) Some(JsonFormat.LineDelimited)
+        else None
+      format.map { f =>
         val precision =
-          if (chosenMediaType.extensions.get("mode") == Some(JsonPrecision.Precise.name))
+          if (mediaType.extensions.get("mode") == Some(JsonPrecision.Precise.name))
             JsonPrecision.Precise
           else
             JsonPrecision.Readable
-         JsonContentType(precision, format, disposition)
+        JsonContentType(precision, f, disposition)
       }
-    }).getOrElse(MessageFormat.Default)
+    }
   }
+
+  def fromAccept(accept: Option[Accept]): MessageFormat =
+    // TODO: MediaRange needs an Order instance – combining QValue ordering
+    //       with specificity (EG, application/json sorts before
+    //       application/* if they have the same q-value).
+    accept.flatMap(_.values.sortBy(_.qValue).list.map(fromMediaType).flatten(Option.option2Iterable).headOption)
+      .getOrElse(MessageFormat.Default)
 }

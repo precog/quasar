@@ -1,0 +1,1 @@
+- [SD-1523] allow expressions that fold to literals as `LIKE` patterns

@@ -1,0 +1,1 @@
+- [SD-1517] fix handling of join conditions containing flattening

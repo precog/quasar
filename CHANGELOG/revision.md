@@ -1,0 +1,1 @@
+- [SD-1508] fix bug where runtime typechecks were not happening in the right place

@@ -1,0 +1,4 @@
+- [SD-1516] allow non-literals in SQL set literals
+- SQL `IN` no longer (accidentally) works on arrays
+- select now has MRA set semantics, rather than SQL row semantics
+- eliminate `Set` from the type system

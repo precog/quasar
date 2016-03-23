@@ -1,0 +1,1 @@
+Fix bug where `quasar` was unable to upload json data in the "precise" mode

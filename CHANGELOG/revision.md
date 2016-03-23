@@ -1,0 +1,3 @@
+- preserve order of fields when writing data to MongoDB
+- make the regression test matchers more robust and improve messages
+- don't "unwind" the constant in a case like `select "abc", sum(pop) from zips`

@@ -1,0 +1,3 @@
+- Fix two memory leaks:
+   - one was about 30 KiB each time a query was parsed
+   - the other was 2.3 MiB per hour, regardless of activity

@@ -19,7 +19,7 @@ package quasar.regression
 import quasar._
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
 import quasar.physical.mongodb.fs.MongoDBFsType
 import quasar.sql, sql.{Expr, Query}
@@ -57,7 +57,6 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   val TestsRoot = new File("it/src/main/resources/tests")
   val DataDir: ADir = rootDir </> dir("regression")
-  val DataPath: QPath = QPath(posixCodec.printPath(DataDir))
 
   def dataFile(fileName: String): AFile =
     DataDir </> file1(FileName(fileName).dropExtension)
@@ -157,7 +156,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
       toCompExec compose injectTask
 
     val parseTask: Task[Expr] =
-      sql.parseInContext(Query(qry), DataPath)
+      sql.parseInContext(Query(qry), DataDir)
         .fold(e => Task.fail(new RuntimeException(e.message)), _.point[Task])
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars)))

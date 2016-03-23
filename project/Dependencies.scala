@@ -13,6 +13,7 @@ object Dependencies {
   private val mongoVersion   = "3.2.1"
   private val nettyVersion   = "4.0.26.Final"
   private val refinedVersion = "0.3.7"
+  private val raptureVersion = "2.0.0-M5"
 
   val core = Seq(
     // NB: This version is forced because there seems to be some difference
@@ -53,8 +54,10 @@ object Dependencies {
       // TODO: remove once jawn-streamz is in agreement with http4s on
       //       scalaz-stream version
       exclude("org.scalaz.stream", "scalaz-stream_2.11"),
-    "org.http4s"           %% "http4s-blaze-server" % http4sVersion % "compile, test",
-    "org.http4s"           %% "http4s-blaze-client" % http4sVersion % "test",
-    "org.scodec"           %% "scodec-scalaz"       % "1.1.0",
-    "ch.qos.logback"       % "logback-classic"      % "1.1.3")
+    "org.http4s"           %% "http4s-blaze-server"   % http4sVersion  % "compile, test",
+    "org.http4s"           %% "http4s-blaze-client"   % http4sVersion  % "test",
+    "org.scodec"           %% "scodec-scalaz"         % "1.1.0",
+    "ch.qos.logback"       %  "logback-classic"       % "1.1.3",
+    "com.propensive"       %% "rapture-json"          % raptureVersion % "test",
+    "com.propensive"       %% "rapture-json-argonaut" % raptureVersion % "test")
 }

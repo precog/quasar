@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 
@@ -79,7 +79,7 @@ private final class QueryFileInterpreter[C](
   import QueryFile._
   import Planner.{PlannerError => PPlannerError}
   import Workflow._
-  import FileSystemError._, PathError2._, fsops._
+  import FileSystemError._, fsops._
   import Recursive.ops._
   import queryfile._
 
@@ -94,8 +94,8 @@ private final class QueryFileInterpreter[C](
       EitherT[QR, WorkflowExecutionError, (PhaseResults, FileSystemError \/ AFile)](
         (for {
           _      <- checkPathsExist(lp)
-          dst    <- EitherT(Collection.fromPathy(out)
-                              .leftMap(pathError(_))
+          dst    <- EitherT(Collection.fromPath(out)
+                              .leftMap(pathErr(_))
                               .point[MongoLogWF])
           wf     <- convertPlanR(lp)(MongoDbPlanner plan lp)
           prefix <- liftMQ(genPrefix)
@@ -145,22 +145,22 @@ private final class QueryFileInterpreter[C](
       (dirName(dir) match {
         case Some(_) =>
           collectionsInDir(dir)
-            .map(_ foldMap (collectionPathName(dir) andThen (_.toSet)))
+            .map(_ foldMap (collectionPathSegment(dir) andThen (_.toSet)))
             .run
 
         case None if depth(dir) == 0 =>
           MongoDbIO.collections
-            .map(collectionPathName(dir))
+            .map(collectionPathSegment(dir))
             .pipe(process1.stripNone)
             .runLog
             .map(_.toSet.right[FileSystemError])
 
         case None =>
-          nonExistentParent[Set[PathName]](dir).run
+          nonExistentParent[Set[PathSegment]](dir).run
       }).liftM[QRT].liftM[WorkflowExecErrT]
 
     case FileExists(file) =>
-      Collection.fromPathy(file).fold(
+      Collection.fromPath(file).fold(
         κ(false.point[MQ]),
         coll => MongoDbIO.collectionExists(coll).liftM[QRT].liftM[WorkflowExecErrT])
   }
@@ -258,15 +258,16 @@ private final class QueryFileInterpreter[C](
   }
 
   private def checkPathsExist(lp: Fix[LogicalPlan]): MongoLogWFR[Unit] = {
-    def checkPathExists(p: QPath): MongoFsM[Unit] = for {
+    // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+    def checkPathExists(p: AFile): MongoFsM[Unit] = for {
       coll <- EitherT.fromDisjunction[MongoDbIO](Collection.fromPath(p))
-                .leftMap(e => pathError(invalidPath(p.asAPath, e.message)))
+                .leftMap(pathErr(_))
       _    <- EitherT(MongoDbIO.collectionExists(coll)
-                .map(_ either (()) or pathError(pathNotFound(p.asAPath))))
+                .map(_ either (()) or pathErr(PathError.pathNotFound(p))))
     } yield ()
 
     EitherT[MongoLogWF, FileSystemError, Unit](
-      (LogicalPlan.paths(lp).traverse_(checkPathExists).run
+      (LogicalPlan.paths(lp).traverse_(path => checkPathExists(mkAbsolute(rootDir, path))).run
         .liftM[QRT]
         .liftM[WorkflowExecErrT]: MQ[FileSystemError \/ Unit])
         .liftM[PhaseResultT])

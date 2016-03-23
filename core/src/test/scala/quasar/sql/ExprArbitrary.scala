@@ -17,6 +17,8 @@
 package quasar.sql
 
 import quasar.Predef._
+import quasar.fs._
+import quasar.fs.PathArbitrary._
 import quasar.std.StdLib._
 
 import org.scalacheck.{Arbitrary, Gen}
@@ -50,9 +52,7 @@ trait ExprArbitrary {
 
   private def relationGen(depth: Int): Gen[SqlRelation[Expr]] = {
     val simple = for {
-        p <- Gen.oneOf(Nil, "" :: Nil, "." :: Nil)
-        s <- Gen.choose(1, 3)
-        n <- Gen.listOfN(s, Gen.alphaChar.map(_.toString)).map(ns => (p ++ ns).mkString("/"))
+        n <- Arbitrary.arbitrary[FPath]
         a <- Gen.option(Gen.alphaChar.map(_.toString))
       } yield TableRelationAST[Expr](n, a)
     if (depth <= 0) simple

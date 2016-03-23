@@ -18,14 +18,15 @@ package quasar
 
 import quasar.Predef._
 import org.specs2.mutable._
+import pathy.Path._
 
 class ProvenanceSpec extends Specification {
   import SemanticAnalysis._
   import Provenance._
   import sql._
 
-  val Rel1 = Relation(TableRelationAST("foo", None))
-  val Rel2 = Relation(TableRelationAST("bar", None))
+  val Rel1 = Relation(TableRelationAST(file("foo"), None))
+  val Rel2 = Relation(TableRelationAST(file("bar"), None))
 
   "flatten" should {
     "flatten singleton in" in {

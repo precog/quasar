@@ -16,8 +16,11 @@
 
 package quasar.fs
 
-import org.scalacheck.{Gen, Arbitrary}
+import quasar.Predef._
+
+import org.scalacheck.{Arbitrary, Gen, Shrink}
 import pathy.scalacheck.PathyArbitrary._
+import pathy.Path._
 
 trait PathArbitrary {
 
@@ -26,6 +29,52 @@ trait PathArbitrary {
 
   implicit val arbitraryRPath: Arbitrary[RPath] =
     Arbitrary(Gen.oneOf(Arbitrary.arbitrary[RFile], Arbitrary.arbitrary[RDir]))
+
+  implicit val arbitraryFPath: Arbitrary[FPath] =
+    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[AFile], Arbitrary.arbitrary[RFile]))
+
+  implicit val shrinkAFile: Shrink[AFile] = Shrink { aFile =>
+    if (depth(aFile) <= 1) Stream.empty
+    else (1 until depth(aFile)).map(removeDirAt(aFile, _)).toStream
+  }
+
+  private def removeDirAt(file: AFile, index: Int): AFile = {
+    val (dir, rFile) = split(file, index)
+    parentDir(dir).getOrElse(dir) </> rFile
+  }
+
+  private def split(file: AFile, index: Int): (ADir, RFile) = {
+    // .get should always succed because it is impossible not to sandbox an absolute path
+    // to the root directory
+    if (index <= 0) (rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get)
+    else {
+      val (dir, filename) = peel(file)
+      peel(dir).map { case (parent, dirname) =>
+        val (dir, file) = split(parent </> file1(filename), index - 1)
+        (dir </> dir1(dirname), file)
+      }.getOrElse((rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get))
+    }
+  }
+
+  private def peel(file: AFile): (ADir, FileName) =
+    (fileParent(file), fileName(file))
+
+  private def peel(dir: ADir): Option[(ADir, DirName)] =
+    parentDir(dir).zip(dirName(dir)).headOption
+
+  // TODO[pathy]: Remove when upgrading to latest version
+  implicit val arbitraryFileName: Arbitrary[FileName] = Arbitrary(genSegment.map(FileName(_)))
+
+  // TODO[pathy]: Remove when upgrading to latest version
+  implicit val arbitraryDirName: Arbitrary[DirName] = Arbitrary(genSegment.map(DirName(_)))
+
+  private val genSegment: Gen[String] =
+    Gen.nonEmptyListOf(Gen.frequency(
+      100 -> Gen.alphaNumChar,
+      10 -> Gen.const('.'),
+      10 -> Gen.const('/'),
+      5 -> Arbitrary.arbitrary[Char]
+    )) map (_.mkString)
 
 }
 

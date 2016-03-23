@@ -113,14 +113,14 @@ class MongoDbFileSystemSpec
           val path = rootDir </> file("foo")
 
           runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
-            -\/(FileSystemError.pathError(PathError2.invalidPath(path, "path names a database, but no collection")))
+            -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
         }
 
         "fail to append data to DB path" in {
           val path = rootDir </> file("foo")
 
           runLogT(run, write.append(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
-            -\/(FileSystemError.pathError(PathError2.invalidPath(path, "path names a database, but no collection")))
+            -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
         }
 
         step(invalidData.flatMap(p => runT(run)(manage.delete(p))).runVoid)
@@ -228,8 +228,8 @@ class MongoDbFileSystemSpec
           def check(file: AFile) = {
             val errP: Prism[FileSystemError \/ AFile, APath] =
               D.left                    composePrism
-              FileSystemError.pathError composePrism
-              PathError2.pathNotFound
+              FileSystemError.pathErr composePrism
+              PathError.pathNotFound
 
             val out = renameFile(file, κ(FileName("out")))
 
@@ -311,7 +311,7 @@ class MongoDbFileSystemSpec
               manage.moveDir(src, dst, ovr).liftM[Process] |@|
               query.ls(dst).liftM[Process]
             ) { (_, _, create, _, moved) =>
-              val pn: Set[PathName] = Set(FileName("movdb1").right, FileName("movdb2").right)
+              val pn: Set[PathSegment] = Set(FileName("movdb1").right, FileName("movdb2").right)
               (create must contain(allOf(pn))) and (moved must contain(allOf(pn)))
             }
           }
@@ -335,7 +335,7 @@ class MongoDbFileSystemSpec
             runT(run)(for {
               tfile  <- manage.tempFile(pdir)
               dbName <- EitherT.fromDisjunction[manage.F](
-                          Collection.dbNameFromPath(tfile).leftMap(pathError(_)))
+                          Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
             } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
           }
         }

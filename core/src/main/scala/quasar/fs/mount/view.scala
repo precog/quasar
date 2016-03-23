@@ -21,7 +21,7 @@ import quasar._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fs._, FileSystemError._, PathError2._
+import quasar.fs._, FileSystemError._, PathError._
 import quasar.std.StdLib._, set._
 
 import matryoshka._
@@ -99,7 +99,7 @@ object view {
       def apply[A](wf: WriteFile[A]): Free[S, A] = wf match {
         case Open(p) =>
           if (views.contains(p))
-            emit[S,A](-\/(pathError(invalidPath(p, "cannot write to view"))))
+            emit[S,A](-\/(pathErr(invalidPath(p, "cannot write to view"))))
           else
             writeUnsafe.open(p).run
 
@@ -128,14 +128,14 @@ object view {
         case Move(scenario, semantics) =>
           MoveScenario.fileToFile.getOption(scenario).flatMap { case (src, dst) =>
             (for {
-              _ <- if (views.contains(src)) -\/(pathError(invalidPath(src, "cannot move view"))) else \/-(())
-              _ <- if (views.contains(dst)) -\/(pathError(invalidPath(dst, "cannot move file to view location"))) else \/-(())
+              _ <- if (views.contains(src)) -\/(pathErr(invalidPath(src, "cannot move view"))) else \/-(())
+              _ <- if (views.contains(dst)) -\/(pathErr(invalidPath(dst, "cannot move file to view location"))) else \/-(())
             } yield ()).swap.toOption
           }.fold(manage.move(scenario, semantics).run)(err => emit[S,A](-\/(err)))
 
         case Delete(path) =>
           if (maybeFile(path).map(views.contains(_)).getOrElse(false))
-            emit[S,A](-\/(pathError(invalidPath(path, "cannot delete view"))))
+            emit[S,A](-\/(pathErr(invalidPath(path, "cannot delete view"))))
           else
             manage.delete(path).run
 
@@ -179,7 +179,7 @@ object view {
           query.ls(dir).run.map(_ match {
             case  \/-(ps) =>
               (ps ++ views.ls(dir)).right
-            case -\/(err @ PathError(PathNotFound(_))) =>
+            case -\/(err @ PathErr(PathNotFound(_))) =>
               val vs = views.ls(dir)
               if (vs.nonEmpty) vs.right
               else err.left

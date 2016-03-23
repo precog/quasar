@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.RenderTree, RenderTree.ops._
 import quasar.fp._
 import quasar._
-import quasar.fs.Path
 import quasar.javascript._
 import quasar.sql.{ParsingError, Query}
 import quasar.std._
@@ -37,6 +36,7 @@ import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.ScalaCheck
 import org.threeten.bp.Instant
 import scalaz._, Scalaz._
+import pathy.Path._
 
 class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers with DisjunctionMatchers with PendingWithAccurateCoverage {
   import StdLib.{set => s, _}
@@ -70,7 +70,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
 
   def plan(query: String): Either[CompilationError, Crystallized] = {
-    val (log, wf) = sql.parseInContext(Query(query), Path("/db/")).fold(
+    val (log, wf) = sql.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
       e => scala.sys.error("parsing error: " + e.message),
       expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run)
 
@@ -90,7 +90,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- sql.parseInContext(Query(query), Path("/db/"))
+      expr <- sql.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db"))
     } yield queryPlanner(QueryRequest(expr, Variables(Map()))).run._1
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
@@ -3490,7 +3490,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       filter   <- filterGen
       groupBy  <- groupByGen
       orderBy  <- orderByGen
-    } yield Query(pprint(sql.Select(distinct, projs, Some(TableRelationAST("zips", None)), filter, groupBy, orderBy)))
+    } yield Query(pprint(sql.Select(distinct, projs, Some(TableRelationAST(file("zips"), None)), filter, groupBy, orderBy)))
 
   def genInnerInt = Gen.oneOf(
     sql.Ident("pop"),

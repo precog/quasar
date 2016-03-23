@@ -36,7 +36,7 @@ import scalaz.concurrent.Task
   */
 object InMemory {
   import ReadFile._, WriteFile._, ManageFile._, QueryFile._
-  import FileSystemError._, PathError2._
+  import FileSystemError._, PathError._
 
   type FileMap = Map[AFile, Vector[Data]]
   type RM = Map[ReadHandle, Reading]
@@ -217,7 +217,10 @@ object InMemory {
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
         optLp.para[FileSystemError \/ Vector[Data]] {
-          case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem)).toRightDisjunction(unsupported(optLp))
+          case ReadF(path) =>
+            // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+            val aPath = mkAbsolute(rootDir, path)
+            fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
           case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
             src.flatMap(s => skip.safeToInt.map(s.drop).toRightDisjunction(unsupported(optLp)))
           case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
@@ -305,10 +308,10 @@ object InMemory {
   //----
 
   private def fsPathNotFound[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
-    pathError(pathNotFound(f)).left.point[InMemoryFs]
+    pathErr(pathNotFound(f)).left.point[InMemoryFs]
 
   private def fsPathExists[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
-    pathError(pathExists(f)).left.point[InMemoryFs]
+    pathErr(pathExists(f)).left.point[InMemoryFs]
 
   private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
@@ -316,7 +319,7 @@ object InMemory {
       sufxs =  m.keys.toStream.map(_ relativeTo src).unite
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
-      r1    =  r0 flatMap (_.nonEmpty either (()) or pathError(pathNotFound(src)))
+      r1    =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(src)))
     } yield r1
 
   private def moveFile(src: AFile, dst: AFile, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
@@ -342,11 +345,11 @@ object InMemory {
       m  <- contentsL.st
       ss =  m.keys.toStream.map(_ relativeTo d).unite
       r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
-      r1 =  r0 flatMap (_.nonEmpty either (()) or pathError(pathNotFound(d)))
+      r1 =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(d)))
     } yield r1
 
   private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
-    (fileL(f) <:= None) map (_.void \/> pathError(pathNotFound(f)))
+    (fileL(f) <:= None) map (_.void \/> pathErr(pathNotFound(f)))
 
   //----
 
@@ -356,9 +359,9 @@ object InMemory {
   private def resultL(h: ResultHandle): InMemState @> Option[Vector[Data]] =
     Lens.mapVLens(h) <=< resultMapL
 
-  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[PathName]] =
+  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[PathSegment]] =
     contentsL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
         .map(_ foldMap (f => firstSegmentName(f).toSet))
-        .toRightDisjunction(pathError(pathNotFound(d))))
+        .toRightDisjunction(pathErr(pathNotFound(d))))
 }

@@ -19,7 +19,6 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.fs.Path
 import quasar.sql._
 import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
@@ -140,7 +139,7 @@ trait Compiler[F[_]] {
   private def compile0(node: CoExpr)(implicit M: Monad[F]):
       CompilerM[Fix[LogicalPlan]] = {
     def findFunction(name: String) =
-      library.functions.find(f => f.name.toLowerCase == name.toLowerCase).fold[CompilerM[Func]](
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[Func]](
         fail(FunctionNotFound(name)))(
         emit(_))
 
@@ -206,7 +205,7 @@ trait Compiler[F[_]] {
       val relations =
         if (namedRel.size <= 1) namedRel
         else {
-          val filtered = namedRel.filter(x => Path(x._1).filename ≟ pprint(node.convertTo[Fix]))
+          val filtered = namedRel.filter(x => x._1 ≟ pprint(node.convertTo[Fix]))
           if (filtered.isEmpty) namedRel else filtered
         }
       relations.toList match {
@@ -239,7 +238,11 @@ trait Compiler[F[_]] {
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LogicalPlan]] =
       r match {
-        case TableRelationAST(name, _) => emit(LogicalPlan.Read(Path(name)))
+        case TableRelationAST(file, _) =>
+          // All paths should have been made absolute at this point by calling the `relativeTo` method
+          // on `SqlExpr`, but that is not reflected in the types so we add rootDir to any relative files
+          // we might come accross which seems like a pretty safe operation
+          emit(LogicalPlan.Read(file))
         case ExprRelationAST(expr, _) => compile0(expr)
         case JoinRelation(left, right, tpe, clause) =>
           for {
@@ -280,7 +283,7 @@ trait Compiler[F[_]] {
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
         val names: List[Option[String]] =
-          namedProjections(node.convertTo[Fix], relationName(node).toOption.map(Path(_).filename)).map {
+          namedProjections(node.convertTo[Fix], relationName(node).toOption).map {
             case (_,    Splice(_)) => None
             case (name, _)         => Some(name)
           }
@@ -391,7 +394,7 @@ trait Compiler[F[_]] {
               rName   <- relationName(node).fold(fail, emit)
               table   <- CompilerState.subtableReq(rName)
             } yield
-              if (Path(rName).filename ≟ name) table
+              if ((rName:String) ≟ name) table
               else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
 
       case InvokeFunctionF(name, args) =>

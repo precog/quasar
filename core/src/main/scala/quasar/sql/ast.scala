@@ -18,9 +18,13 @@ package quasar.sql
 
 import quasar.Predef._
 
+import quasar.fs._
+
 import scala.Any
 
 import matryoshka._
+import scalaz._, Scalaz._
+import pathy.Path._
 
 trait IsDistinct
 final case object SelectDistinct extends IsDistinct
@@ -153,18 +157,26 @@ sealed trait SqlRelation[A] {
 
     collect(this).groupBy(_._1).mapValues(_.map(_._2))
   }
+
+  def mapPathsM[F[_]: Monad](f: FPath => F[FPath]): F[SqlRelation[A]] = this match {
+    case TableRelationAST(path, alias) => f(path).map(TableRelationAST(_, alias))
+    case rel @ JoinRelation(left, right, _, _) =>
+      (left.mapPathsM(f) |@| right.mapPathsM(f))((l,r) => rel.copy(left = l, right = r))
+    case ExprRelationAST(_,_) => this.point[F]
+  }
 }
 
 sealed trait NamedRelation[A] extends SqlRelation[A] {
   def aliasName: String
 }
 
-final case class TableRelationAST[A](name: String, alias: Option[String])
+final case class TableRelationAST[A](tablePath: FPath, alias: Option[String])
     extends NamedRelation[A] {
-  def aliasName = alias.getOrElse(name)
+  def aliasName = alias.getOrElse(fileName(tablePath).value)
 }
 final case class ExprRelationAST[A](expr: A, aliasName: String)
     extends NamedRelation[A]
+
 final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
     extends SqlRelation[A]
 

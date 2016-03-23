@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.{implicitly, String}
 import quasar.fp.{free, liftMT}
-import quasar.fs.{FileSystem, FileSystemType, PathError2, ADir}
+import quasar.fs.{FileSystem, FileSystemType, PathError, ADir}
 import quasar.effect._
 
 import monocle.function.Field1
@@ -89,7 +89,7 @@ class FileSystemMounterSpec extends mutable.Specification {
 
   val invalidPath =
     MountingError.pathError composePrism
-    PathError2.invalidPath  composeLens
+    PathError.invalidPath  composeLens
     Field1.first
 
   val fsMounter = FileSystemMounter(fsDef)

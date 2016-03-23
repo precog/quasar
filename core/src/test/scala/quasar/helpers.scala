@@ -17,13 +17,15 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs._
-import quasar.sql.{Query}
+import quasar.fs.sandboxCurrent
+import quasar.fp._
+import quasar.sql.Query
 import quasar.std._
 
 import matryoshka._
 import org.specs2.mutable._
 import scalaz._, Scalaz._
+import pathy.Path._
 
 trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
   import StdLib._
@@ -33,7 +35,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
 
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {
-      select <- sql.parseInContext(Query(query), Path("./")).leftMap(_.toString)
+      select <- sql.parse(Query(query)).leftMap(_.toString)
       attr   <- AllPhases(select).leftMap(_.toString)
       cld    <- Compiler.compile(attr).leftMap(_.toString)
     } yield cld
@@ -66,7 +68,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
-  def read(name: String): Fix[LogicalPlan] = LogicalPlan.Read(fs.Path(name))
+  def read(file: String): Fix[LogicalPlan] = LogicalPlan.Read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get))
 
   type FLP = Fix[LogicalPlan]
   implicit def toFix[F[_]](unFixed: F[Fix[F]]): Fix[F] = Fix(unFixed)

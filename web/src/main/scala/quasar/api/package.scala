@@ -145,14 +145,31 @@ package object api {
     }
   }
 
-  val UriPathCodec = PathCodec('/',
-    UrlCodingUtils.urlEncode(_, toSkip = HPath.pathUnreserved),
-    UrlCodingUtils.urlDecode(_))
+  val UriPathCodec = {
+
+    val $dot$ = "$dot$"
+    val $dotdot$ = "$dotdot$"
+
+    val escapeRel = (s: String) =>
+      if (s == "..") $dotdot$ else if (s == ".") $dot$ else s
+
+    val unescapeRel = (s: String) =>
+      if (s == $dotdot$) ".." else if (s == $dot$) "." else s
+
+    val encode = (s: String) =>
+      UrlCodingUtils.urlEncode(s, toSkip = HPath.pathUnreserved)
+
+    val decode = (s: String) =>
+      UrlCodingUtils.urlDecode(s)
+
+    PathCodec('/', encode compose escapeRel, decode compose unescapeRel)
+  }
 
   // NB: oddly, every path is prefixed with '/', except "".
   private def pathString(p: HPath) =
     if (p.toString === "") "/" else p.toString
 
+  // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
       UriPathCodec.parseAbsDir(pathString(p)) map sandboxAbs
@@ -170,6 +187,19 @@ package object api {
       AsDirPath.unapply(p) orElse AsFilePath.unapply(p)
     }
   }
+
+  def dirPathOrBadRequest[S[_]](encodedPath: String): QResponse[S] \/ ADir = {
+    pathOrBadRequest[S](encodedPath).flatMap { path =>
+      val msg = s"Expected directory path, found: ${posixCodec.printPath(path)}"
+      refineType(path).swap.leftMap(_ => QResponse.error[S](BadRequest, msg))
+    }
+  }
+
+  def pathOrBadRequest[S[_]](encodedPath: String): QResponse[S] \/ APath = {
+    val msg = s"Invalid path: ${UrlCodingUtils.urlDecode(encodedPath)}"
+    AsPath.unapply(HPath(encodedPath)).toRightDisjunction(QResponse.error(BadRequest, msg))
+  }
+
 
   def staticFileService(basePath: String): HttpService = {
     def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {

@@ -24,6 +24,7 @@ import quasar.specs2._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
+import pathy.Path._
 
 class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatchers {
   import SqlQueries._, ExprArbitrary._
@@ -144,7 +145,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Ident("as"), "as".some)),
-            TableRelationAST("from", "from".some).some,
+            TableRelationAST(file("from"), "from".some).some,
             Ident("where").some,
             GroupBy(List(Ident("group")), None).some,
             OrderBy(List((ASC, Ident("order")))).some))
@@ -156,7 +157,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Ident("false"), None)),
-            TableRelationAST("zips", None).some,
+            TableRelationAST(file("zips"), None).some,
             None, None, None))
     }
 
@@ -175,7 +176,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Ident("case"), None)),
-            TableRelationAST("when", None).some,
+            TableRelationAST(file("when"), None).some,
             Binop(Ident("then"), Ident("end"), And).some,
             None, None))
     }
@@ -197,7 +198,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Splice(None), None)),
-            Some(TableRelationAST("users",None)),
+            Some(TableRelationAST(file("users"),None)),
             Some(Binop(Ident("add_date"),IntLiteral(1425460451000L), Gt)),
             None,None))
     }
@@ -226,7 +227,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Splice(None), None)),
-            Some(TableRelationAST("zips",None)),
+            Some(TableRelationAST(file("zips"),None)),
             None, None, None)))
     }
 
@@ -240,7 +241,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           Select(
             SelectAll,
             List(Proj(Splice(None), None)),
-            Some(TableRelationAST("zips",None)),
+            Some(TableRelationAST(file("zips"),None)),
             None, None, None)))
     }
 
@@ -282,10 +283,10 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
           List(Proj(Splice(None), None)),
           Some(
             CrossRelation(
-              TableRelationAST("a", None),
+              TableRelationAST(file("a"), None),
               CrossRelation(
-                TableRelationAST("b", None),
-                TableRelationAST("c", None)))),
+                TableRelationAST(file("b"), None),
+                TableRelationAST(file("c"), None)))),
           None, None, None))
     }
 
@@ -299,13 +300,13 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
                   Ident("pop"))),
                 Concat),
               None)),
-          Some(TableRelationAST("zips", None)),
+          Some(TableRelationAST(file("zips"), None)),
           None, None, None))
     }
 
     val expectedSelect = Select(SelectAll,
       List(Proj(Ident("loc"), None)),
-      Some(TableRelationAST("places", None)),
+      Some(TableRelationAST(file("places"), None)),
       None,
       None,
       None

@@ -17,14 +17,14 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs._
 
 import org.specs2.mutable._
+import pathy.Path._
 
 class MRASpecs extends Specification {
   import MRA._
 
-  val FooPath = Path("foo.json")
+  val FooPath = file("foo.json")
 
   val DimIdFooPath = DimId.Source(FooPath)
 
@@ -44,15 +44,15 @@ class MRASpecs extends Specification {
     }
 
     "report size 1 for set" in {
-      Dims.set(Path("foo")).size must_== 1
+      Dims.set(file("foo")).size must_== 1
     }
 
     "report size 3 for set that has been grouped and expanded" in {
-      Dims.set(Path("foo")).contract.expand.size must_== 3
+      Dims.set(file("foo")).contract.expand.size must_== 3
     }
 
     "report size 2 for set that has been grouped and flattened" in {
-      Dims.set(Path("foo")).contract.flatten.size must_== 2
+      Dims.set(file("foo")).contract.flatten.size must_== 2
     }
   }
 
@@ -66,7 +66,7 @@ class MRASpecs extends Specification {
     }
 
     "report false for set" in {
-      Dims.set(Path("foo.json")).value must beFalse
+      Dims.set(file("foo.json")).value must beFalse
     }
   }
 
@@ -86,7 +86,7 @@ class MRASpecs extends Specification {
     }
 
     "not change size of set" in {
-      Dims.set(Path("foo.json")).flatten.size must_== 1
+      Dims.set(file("foo.json")).flatten.size must_== 1
     }
   }
 

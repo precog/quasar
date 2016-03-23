@@ -33,7 +33,7 @@ object FileSystemError {
   import ReadFile.ReadHandle
   import WriteFile.WriteHandle
 
-  final case class PathError private (e: PathError2)
+  final case class PathErr private (e: PathError)
     extends FileSystemError
   final case class PlannerError private (lp: Fix[LogicalPlan], err: PlannerErr)
     extends FileSystemError
@@ -48,9 +48,9 @@ object FileSystemError {
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
-  val pathError = pPrism[FileSystemError, PathError2] {
-    case PathError(err) => err
-  } (PathError)
+  val pathErr = pPrism[FileSystemError, PathError] {
+    case PathErr(err) => err
+  } (PathErr)
 
   val plannerError = pPrism[FileSystemError, (Fix[LogicalPlan], PlannerErr)] {
     case PlannerError(lp, e) => (lp, e)
@@ -78,7 +78,7 @@ object FileSystemError {
 
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {
-      case PathError(e) =>
+      case PathErr(e) =>
         e.shows
       case PlannerError(_, e) =>
         e.shows

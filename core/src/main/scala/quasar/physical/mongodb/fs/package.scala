@@ -22,7 +22,7 @@ import quasar.{NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fs.{Path => _, _}
+import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs.bsoncursor._
 

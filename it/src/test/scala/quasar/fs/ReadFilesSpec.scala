@@ -37,7 +37,7 @@ import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
-  import ReadFilesSpec._, FileSystemError._, PathError2._
+  import ReadFilesSpec._, FileSystemError._, PathError._
   import ReadFile._
 
   val read   = ReadFile.Ops[FileSystem]
@@ -73,7 +73,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
       "open returns PathNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
         read.unsafe.open(dne, 0L, None).run map { r =>
-          r.toEither must beLeft(pathError(pathNotFound(dne)))
+          r.toEither must beLeft(pathErr(pathNotFound(dne)))
         }
       }
 

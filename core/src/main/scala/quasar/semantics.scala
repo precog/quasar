@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.sql._
+import quasar.fs.prettyPrint
 
 import scala.AnyRef
 
@@ -173,8 +174,8 @@ trait SemanticAnalysis {
       case sel @ SelectF(_, _, relations, _, _, _) =>
         def findRelations(r: SqlRelation[Expr]): ValidSem[Map[String, SqlRelation[Expr]]] =
           r match {
-            case TableRelationAST(name, aliasOpt) =>
-              success(Map(aliasOpt.getOrElse(name) -> r))
+            case TableRelationAST(file, aliasOpt) =>
+              success(Map(aliasOpt.getOrElse(prettyPrint(file)) -> r))
             case ExprRelationAST(_, alias) => success(Map(alias -> r))
             case JoinRelation(l, r, _, _) => for {
               rels <- findRelations(l) tuple findRelations(r)

@@ -25,6 +25,8 @@ import argonaut._, Argonaut._
 import org.specs2.mutable
 import org.specs2.scalaz._
 
+import pathy.Path._
+
 class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
   import MountConfig._
 
@@ -32,7 +34,7 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
     val read = sql.Select(
       sql.SelectAll,
       List(sql.Proj(sql.Splice(None), None)),
-      Some(sql.TableRelationAST("zips", None)),
+      Some(sql.TableRelationAST(file("zips"), None)),
       None, None, None)
 
     def viewJson(uri: String) =

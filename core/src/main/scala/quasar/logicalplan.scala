@@ -19,11 +19,12 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.fs.Path
+import quasar.fs.{FPath, refineTypeAbs}
 import quasar.namegen._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
+import pathy.Path.posixCodec
 
 sealed trait LogicalPlan[A]
 object LogicalPlan {
@@ -97,7 +98,7 @@ object LogicalPlan {
                 case (x, n) => NonTerminal("Invoke" :: nodeType, Some(ObjectProject.name), x :: n :: Nil)
               }
 
-            case ReadF(name)              => Terminal("Read" :: nodeType, Some(name.pathname))
+            case ReadF(file)              => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
             case ConstantF(data)          => Terminal("Constant" :: nodeType, Some(data.toString))
             case InvokeF(func, args)      => NonTerminal("Invoke" :: nodeType, Some(func.name), args.map(ra.render))
             case FreeF(name)              => Terminal("Free" :: nodeType, Some(name.toString))
@@ -112,7 +113,7 @@ object LogicalPlan {
     new EqualF[LogicalPlan] {
       def equal[A: Equal](v1: LogicalPlan[A], v2: LogicalPlan[A]): Boolean =
         (v1, v2) match {
-          case (ReadF(n1), ReadF(n2)) => n1 ≟ n2
+          case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (ConstantF(d1), ConstantF(d2)) => d1 == d2
           case (InvokeF(f1, v1), InvokeF(f2, v2)) => f1 == f2 && v1 ≟ v2
           case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
@@ -124,11 +125,11 @@ object LogicalPlan {
         }
     }
 
-  final case class ReadF[A](path: Path) extends LogicalPlan[A] {
-    override def toString = s"""Read(Path("${path.simplePathname}"))"""
+  final case class ReadF[A](path: FPath) extends LogicalPlan[A] {
+    override def toString = s"""Read("${path.shows}")"""
   }
   object Read {
-    def apply(path: Path): Fix[LogicalPlan] =
+    def apply(path: FPath): Fix[LogicalPlan] =
       Fix[LogicalPlan](new ReadF(path))
   }
 
@@ -453,8 +454,8 @@ object LogicalPlan {
   def lpParaZygoHisto[A, B] = lpParaZygoHistoM[Id, A, B] _
 
   /** The set of paths referenced in the given plan. */
-  def paths(lp: Fix[LogicalPlan]): Set[Path] =
-    lp.foldMap(_.cata[Set[Path]] {
+  def paths(lp: Fix[LogicalPlan]): Set[FPath] =
+    lp.foldMap(_.cata[Set[FPath]] {
       case ReadF(p) => Set(p)
       case other    => other.fold
     })

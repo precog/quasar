@@ -23,7 +23,6 @@ import quasar.config.{CoreConfig, FsPath, FsFile}
 import quasar.console._
 import quasar.effect._
 import quasar.fp._
-import quasar.fs._
 import quasar.fs.mount._
 import quasar.main._
 

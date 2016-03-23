@@ -22,8 +22,8 @@ import quasar.api._
 import quasar.api.services._
 import quasar.api.ToQResponse.ops._
 import quasar.fp._
-import quasar.fs.{Path => QPath, _}
-import quasar.sql.{Query}
+import quasar.fs._
+import quasar.sql.Query
 
 import argonaut._, Argonaut._
 import org.http4s.headers.Accept
@@ -47,9 +47,9 @@ object execute {
     val Q = QueryFile.Ops[S]
 
     QHttpService {
-      case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
-        (offsetOrInvalid[S](offset) |@| limitOrInvalid[S](limit)) { (offset, limit) =>
-          sql.parseInContext(query, QPath.fromAPath(path)).map(
+      case req @ GET -> _ :? Offset(offset) +& Limit(limit) => respond(
+        parseQueryRequest[S](req, offset, limit).map { case (path, query, offset, limit) =>
+          sql.parseInContext(query, path).map(
             expr => queryPlan(addOffsetLimit(expr, offset, limit), vars(req)).run.value.map(
               logicalPlan => {
                 val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
@@ -61,14 +61,13 @@ object execute {
           )
         }.point[Free[S, ?]]
       )
-      case GET -> _ => queryParameterMustContainQuery[S]
       case req @ POST -> AsDirPath(path) =>
         Free.liftF(S1.inj(EntityDecoder.decodeString(req))).flatMap { query =>
           if (query == "") postContentMustContainQuery[S]
           else {
             respond(requiredHeader[S](Destination, req)
               .traverse[Free[S, ?], QResponse[S], QResponse[S]] { destination =>
-                val parseRes = sql.parseInContext(Query(query), QPath.fromAPath(path))
+                val parseRes = sql.parseInContext(Query(query), path)
                   .leftMap(_.toResponse[S])
                 val destinationFile = posixCodec.parsePath(
                   relFile => \/-(\/-(relFile)),

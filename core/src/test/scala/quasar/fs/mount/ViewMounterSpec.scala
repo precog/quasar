@@ -19,7 +19,6 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{LogicalPlan, Variables}
 import quasar.effect.AtomicRef
-import quasar.fs.{Path => QPath}
 import quasar.sql
 
 import matryoshka.Fix
@@ -57,7 +56,7 @@ class ViewMounterSpec extends mutable.Specification {
       val selStar = Fix(sql.SelectF(
         sql.SelectAll,
         Nil,
-        Some(sql.TableRelationAST[sql.Expr]("/foo/bar", None)),
+        Some(sql.TableRelationAST[sql.Expr](rootDir[Sandboxed] </> dir("foo") </> file("bar"), None)),
         None, None, None))
 
       val f = rootDir </> dir("mnt") </> file("selectStar")
@@ -69,7 +68,7 @@ class ViewMounterSpec extends mutable.Specification {
 
   "unmounting views" >> {
     "removes plan from mounted views" >> {
-      val rd = LogicalPlan.Read(QPath("/foo/bar"))
+      val rd = LogicalPlan.Read(rootDir[Sandboxed] </> dir("foo") </> file("bar"))
       val f  = rootDir </> dir("mnt") </> file("foo")
 
       eval(Views(Map(f -> rd)))(ViewMounter.unmount[MountedViewsF](f))

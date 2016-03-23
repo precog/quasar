@@ -65,7 +65,7 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
     import FileSystemError._
 
     response {
-      case PathError(e)                => e.toResponse
+      case PathErr(e)                => e.toResponse
       case PlannerError(_, e)          => e.toResponse
       case UnknownReadHandle(handle)   => QResponse.error(InternalServerError, s"Unknown read handle: $handle")
       case UnknownWriteHandle(handle)  => QResponse.error(InternalServerError, s"Unknown write handle: $handle")
@@ -85,7 +85,7 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
   }
 
   implicit def mountingErrorResponse[S[_]]: ToQResponse[MountingError, S] = {
-    import MountingError._, PathError2.InvalidPath
+    import MountingError._, PathError.InvalidPath
 
     response {
       case PError(InvalidPath(p, rsn)) =>
@@ -105,8 +105,8 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
         s"wrong path type for mount: ${posixCodec.printPath(err.path)}; $expectedType path required")
     }
 
-  implicit def pathErrorResponse[S[_]]: ToQResponse[PathError2, S] = {
-    import PathError2._
+  implicit def pathErrorResponse[S[_]]: ToQResponse[PathError, S] = {
+    import PathError._
 
     response {
       case PathExists(path)          => QResponse.error(Conflict, s"${posixCodec.printPath(path)} already exists")

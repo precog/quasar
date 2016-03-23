@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.{Unit, String}
 import quasar.effect.AtomicRef
-import quasar.fs.{ADir, FileSystemType, PathError2}
+import quasar.fs.{ADir, FileSystemType, PathError}
 import quasar.fp.free
 import quasar.fp.prism._
 
@@ -27,7 +27,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.either._
 
 final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
-  import MountingError._, PathError2._, MountConfig._, FileSystemDef._
+  import MountingError._, PathError._, MountConfig._, FileSystemDef._
 
   type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[F]], A]
   type MountedFsF[A] = Coyoneda[MountedFs, A]

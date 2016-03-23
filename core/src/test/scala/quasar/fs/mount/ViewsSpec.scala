@@ -35,41 +35,41 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
     "trivial read with relative path" in {
       val vs = Views(Map(
         (rootDir </> dir("foo") </> file("justZips")) ->
-          Read(Path("zips"))))
+          Read(file("zips"))))
 
       vs.lookup(rootDir </> dir("foo") </> file("justZips")) must beSome(beTree(
-        Read(Path("/foo/zips"))))
+        Read(rootDir[Sandboxed] </> dir("foo") </> file("zips"))))
     }
   }
 
   "rewrite" should {
     "no match" in {
       val vs = Views(Map())
-      vs.rewrite(Read(Path("/zips"))) must beTree(
-        Read(Path("/zips")))
+      vs.rewrite(Read(rootDir </> file("zips"))) must beTree(
+        Read(rootDir </> file("zips")))
     }
 
     "trivial read" in {
       val vs = Views(Map(
         (rootDir </> dir("view") </> file("justZips")) ->
-          Read(Path("/zips"))))
+          Read(rootDir </> file("zips"))))
 
-      vs.rewrite(Read(Path("/view/justZips"))) must beTree(
-        Read(Path("/zips")))
+      vs.rewrite(Read(rootDir </> dir("view") </> file("justZips"))) must beTree(
+        Read(rootDir </> file("zips")))
     }
 
     "trivial read with relative path" in {
       val vs = Views(Map(
         (rootDir </> dir("foo") </> file("justZips")) ->
-          Read(Path("zips"))))
+          Read(file("zips"))))
 
-      vs.rewrite(Read(Path("/foo/justZips"))) must beTree(
-        Read(Path("/foo/zips")))
+      vs.rewrite(Read(rootDir </> dir("foo") </> file("justZips"))) must beTree(
+        Read(rootDir </> dir("foo") </> file("zips")))
     }
 
     "non-trivial" in {
       val inner =
-        Let('tmp0, Read(Path("/zips")),
+        Let('tmp0, Read(rootDir </> file("zips")),
           Fix(MakeObjectN(
             Constant(Data.Str("city")) ->
               Fix(ObjectProject(LPFree('tmp0), Constant(Data.Str("city")))),
@@ -78,7 +78,7 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
       val outer =
         Fix(Take(
           Fix(Drop(
-            Read(Path("/view/simpleZips")),
+            Read(rootDir </> dir("view") </> file("simpleZips")),
             Constant(Data.Int(5)))),
           Constant(Data.Int(10))))
       val vs = Views(Map(
@@ -87,7 +87,7 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
       vs.rewrite(outer) must beTree(
         Fix(Take(
           Fix(Drop(
-            Let('tmp0, Read(Path("/zips")),
+            Let('tmp0, Read(rootDir </> file("zips")),
               Fix(MakeObjectN(
                 Constant(Data.Str("city")) ->
                   Fix(ObjectProject(LPFree('tmp0), Constant(Data.Str("city")))),
@@ -100,12 +100,12 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
     "multi-level" in {
       val vs = Views(Map(
         (rootDir </> dir("view") </> file("view1")) ->
-          Read(Path("/zips")),
+          Read(rootDir </> file("zips")),
         (rootDir </> dir("view") </> file("view2")) ->
-          Read(Path("view1"))))
+          Read(file("view1"))))
 
-      vs.rewrite(Read(Path("/view/view2"))) must beTree(
-        Read(Path("/zips")))
+      vs.rewrite(Read(rootDir </> dir("view") </> file("view2"))) must beTree(
+        Read(rootDir </> file("zips")))
     }
 
 
@@ -117,16 +117,16 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val vs = Views(Map(
         (rootDir </> dir("view") </> file("view1")) ->
-          Read(Path("/zips"))))
+          Read(rootDir </> file("zips"))))
 
       val q = Fix(InnerJoin(
-        Read(Path("/view/view1")),
-        Read(Path("/view/view1")),
+        Read(rootDir </> dir("view") </> file("view1")),
+        Read(rootDir </> dir("view") </> file("view1")),
         Constant(Data.Bool(true))))
 
       val exp = Fix(InnerJoin(
-        Read(Path("/zips")),
-        Read(Path("/zips")),
+        Read(rootDir </> file("zips")),
+        Read(rootDir </> file("zips")),
         Constant(Data.Bool(true))))
 
       vs.rewrite(q) must beTree(exp)
@@ -137,11 +137,11 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
       // to act like a filter or decorator for an existing collection.
 
       val p = rootDir </> dir("foo") </> file("bar")
-      val q = Fix(Take(Read(Path.fromAPath(p)), Constant(Data.Int(10))))
+      val q = Fix(Take(Read(p), Constant(Data.Int(10))))
       val vs = Views(Map(p -> q))
 
       vs.lookup(p) must beSome(q)
-      vs.rewrite(Read(Path("/foo/bar"))) must beTree(q)
+      vs.rewrite(Read(rootDir </> dir("foo") </> file("bar"))) must beTree(q)
     }
 
     "circular reference" in {
@@ -154,14 +154,14 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val vs = Views(Map(
         (rootDir </> dir("view") </> file("view1")) ->
-          Fix(Drop(Read(Path("view2")), Constant(Data.Int(5)))),
+          Fix(Drop(Read(file("view2")), Constant(Data.Int(5)))),
         (rootDir </> dir("view") </> file("view2")) ->
-          Fix(Take(Read(Path("view1")), Constant(Data.Int(10))))))
+          Fix(Take(Read(file("view1")), Constant(Data.Int(10))))))
 
-      vs.rewrite(Read(Path("/view/view2"))) must beTree(
+      vs.rewrite(Read(rootDir </> dir("view") </> file("view2"))) must beTree(
         Fix(Take(
           Fix(Drop(
-            Read(Path("/view/view2")),
+            Read(rootDir </> dir("view") </> file("view2")),
             Constant(Data.Int(5)))),
           Constant(Data.Int(10)))))
     }
@@ -174,14 +174,14 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
     }
 
     "list view under its parent dir" ! prop { (path: AFile) =>
-      val views = Views(Map(path -> Read(Path("/foo"))))
+      val views = Views(Map(path -> Read(rootDir </> file("foo"))))
       views.ls(fileParent(path)) must_== Set(fileName(path).right)
     }
 
     "list view parent under grand-parent dir" ! prop { (dir: ADir) =>
       (dir ≠ rootDir) ==> {
         val parent = parentDir(dir).get
-        val views = Views(Map((dir </> file("view1")) -> Read(Path("/foo"))))
+        val views = Views(Map((dir </> file("view1")) -> Read(rootDir </> file("foo"))))
         views.ls(parent) must_== Set(dirName(dir).get.left)
       }
     }

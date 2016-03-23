@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.Path._
+import quasar.fs.PathError
 import quasar.sql._
 
 import matryoshka._
@@ -89,7 +89,7 @@ object Planner {
   }
   final case class UnsupportedFunction(func: Func, message: String) extends PlannerError
   final case class PlanPathError(error: PathError) extends PlannerError {
-    def message = error.message
+    def message = error.shows
   }
   object UnsupportedFunction extends ((Func, String) => PlannerError) {
     def apply(func: Func): PlannerError =
@@ -133,7 +133,7 @@ object Planner {
   object CompilationError {
     final case class CompilePathError(error: PathError)
         extends CompilationError {
-      def message = error.message
+      def message = error.shows
     }
     final case class CSemanticError(error: SemanticError)
         extends CompilationError {

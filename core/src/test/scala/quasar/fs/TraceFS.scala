@@ -36,14 +36,14 @@ object TraceFS {
 
   type Trace[A] = Writer[Vector[RenderedTree], A]
 
-  def qfTrace(paths: Map[ADir, Set[PathName]]) = new (QueryFile ~> Trace) {
+  def qfTrace(paths: Map[ADir, Set[PathSegment]]) = new (QueryFile ~> Trace) {
     import QueryFile._
 
     def ls(dir: ADir) =
       paths.get(dir).cata(
         _.right,
-        if (dir === rootDir) Set[PathName]().right
-        else FileSystemError.pathError(PathError2.pathNotFound(dir)).left)
+        if (dir === rootDir) Set[PathSegment]().right
+        else FileSystemError.pathErr(PathError.pathNotFound(dir)).left)
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
       WriterT.writer((Vector(qf.render),
@@ -98,10 +98,10 @@ object TraceFS {
         }))
   }
 
-  def traceFs(paths: Map[ADir, Set[PathName]]): FileSystem ~> Trace =
+  def traceFs(paths: Map[ADir, Set[PathSegment]]): FileSystem ~> Trace =
     interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace)
 
-  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathName]]): (Vector[RenderedTree], A) = {
+  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathSegment]]): (Vector[RenderedTree], A) = {
     new free.Interpreter(traceFs(paths)).interpret(t).run
   }
 }

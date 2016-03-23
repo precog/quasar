@@ -20,36 +20,32 @@ import quasar.Predef._
 import quasar._, fp._
 import quasar.fp.numeric._
 import quasar.api.services.Fixture._
-import quasar.fs.{Path => QPath, _}
+import quasar.api.PathUtils
+import quasar.fs._
+import quasar.fs.PathArbitrary._
 import quasar.fs.InMemory._
-import quasar.std.IdentityLib
 
-import argonaut._, Argonaut._
+import argonaut.{Json => AJson}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.Fix
 import org.http4s._
-import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
+import rapture.json._, jsonBackends.argonaut._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
 
-class ExecuteServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
+class ExecuteServiceSpec extends Specification with FileSystemFixture with ScalaCheck with PathUtils {
   import queryFixture._
 
   type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
-
-  // Remove if eventually included in upstream scala-pathy
-  implicit val arbitraryFileName: Arbitrary[FileName] =
-    Arbitrary(Arbitrary.arbitrary[AFile].map(fileName(_)))
 
   import posixCodec.printPath
 
@@ -63,14 +59,15 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
     (svc, ref)
   }
 
-  def post[A:EntityDecoder](service: InMemState => HttpService)(path: ADir,
+  def post[A:EntityDecoder](service: InMemState => HttpService)(
+            path: ADir,
             query: Option[Query],
             destination: Option[String],
             state: InMemState,
             status: Status,
             response: A => MatchResult[scala.Any],
             stateCheck: Option[InMemState => MatchResult[scala.Any]] = None) = {
-    val baseURI = Uri(path = printPath(path))
+    val baseURI = pathUri(path)
     val baseReq = Request(uri = baseURI, method = Method.POST)
     val req = query.map { query =>
       val uri = baseURI.+??("offset", query.offset.map(_.shows)).+??("limit", query.limit.map(_.shows))
@@ -82,18 +79,14 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
     ).getOrElse(req)
     val (service, ref) = executeServiceRef(state)
     val actualResponse = service(req1).run
-    response(actualResponse.as[A].run)
-    actualResponse.status must_== status
     val stateCheck0 = stateCheck.getOrElse((_: InMemState) ==== state)
-    stateCheck0(ref.run)
+    response(actualResponse.as[A].run) and (actualResponse.status must_== status) and stateCheck0(ref.run)
   }
 
-  def selectAllLP(file: AFile) = LogicalPlan.Invoke(IdentityLib.Squash,List(LogicalPlan.Read(QPath.fromAPath(file))))
-
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.parse(sql.Query(q)).toOption.map { ast =>
-        quasar.queryPlan(ast,vars).run.value.toOption.get
-      }.getOrElse(scala.sys.error("could not compile: " + q))
+      sql.parse(sql.Query(q)).fold(
+        error => scala.sys.error(s"could not compile query: $q due to error: $error"),
+        ast => quasar.queryPlan(ast,vars).run.value.toOption.get)
 
   "Execute" should {
     "execute a simple query" >> {
@@ -107,24 +100,24 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run.mkString("")
         )
       }
-      "POST" ! prop { (filesystem: SingleFileMemState, destination: FileOf[AlphaCharacters]) => {
-        val destinationPath = printPath(destination.fold(_.path, _.path))
-        val expectedDestinationPath = destination.fold(_.path, filesystem.parent </> _.path)
-        post[Json](executeService)(
+      "POST" ! prop { (filesystem: SingleFileMemState, destination: FPath) => {
+        val destinationPath = printPath(destination)
+        val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
+        post[AJson](executeService)(
           path = filesystem.parent,
-          query = Some(Query(selectAll(file(filesystem.filename.value)))),
+          query = Some(Query(selectAll(file1(filesystem.filename)))),
           destination = Some(destinationPath),
           state = filesystem.state,
           status = Status.Ok,
-          response = json => json.field("out").flatMap(_.string).map(_ must_== printPath(expectedDestinationPath))
-            .getOrElse(ko("Missing out field on json response")),
-          stateCheck = Some(
-            s => s.contents.contains(expectedDestinationPath) ==== true))
+          response = json => Json(json) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
+            outValue.as[String] must_== printPath(expectedDestinationPath)
+          },
+          stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }}
     }
     "execute a query with offset and limit and a variable" >> {
       def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String,Fix[LogicalPlan]) = {
-        val query = selectAllWithVar(file(fileName(aFile).value), varName.value)
+        val query = selectAllWithVar(file1(fileName(aFile)), varName.value)
         val inlineQuery = selectAllWithVar(aFile, varName.value)
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
@@ -162,20 +155,20 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
               jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
                 .drop(offset.get).take(limit.get).mkString(""))
       }
-      "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FileOf[AlphaCharacters]) =>
+      "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
-        val destinationPath = printPath(destination.fold(_.path, _.path))
-        val expectedDestinationPath = destination.fold(_.path, filesystem.parent </> _.path)
-        post[Json](executeService)(
+        val destinationPath = printPath(destination)
+        val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
+        post[AJson](executeService)(
           path = filesystem.parent,
           query = Some(Query(query, offset = Some(offset), limit = Some(limit), varNameAndValue = Some((varName.value, var_.toString)))),
           destination = Some(destinationPath),
           state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
           status = Status.Ok,
-          response = json => json.field("out").flatMap(_.string).map(_ must_== printPath(expectedDestinationPath))
-            .getOrElse(ko("Missing expected out field on json response")),
-          stateCheck = Some(
-            s => s.contents.contains(expectedDestinationPath) ==== true))
+          response = json => Json(json) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
+            outValue.as[String] must_== printPath(expectedDestinationPath)
+          },
+          stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }
     }
     "POST (error conditions)" >> {
@@ -190,33 +183,33 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         )
       }.pendingUntilFixed("SD-773")
       "be 400 with missing query" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[Json](executeService)(
+        post[AJson](executeService)(
           path = filesystem.parent,
           query = None,
           destination = Some(printPath(destination)),
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must_== Json("error" := "The body of the POST must contain a query")
+          response = Json(_) must_== json"""{"error" : "The body of the POST must contain a query"}"""
         )
       }
       "be 400 with missing Destination header" ! prop { filesystem: SingleFileMemState =>
-        post[Json](executeService)(
+        post[AJson](executeService)(
           path = filesystem.parent,
           query = Some(Query(selectAll(file(filesystem.filename.value)))),
           destination = None,
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must_== Json("error" := "The 'Destination' header must be specified")
+          response = Json(_) must_== json"""{"error" : "The 'Destination' header must be specified"}"""
         )
       }
       "be 400 for query error" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[Json](executeService)(
+        post[AJson](executeService)(
           path = filesystem.parent,
           query = Some(Query("select date where")),
           destination = Some(printPath(destination)),
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must_== Json("error" := "end of input; ErrorToken(end of input)"))
+          response = Json(_) must_== json"""{"error" : "end of input; ErrorToken(end of input)"}""")
       }
     }
   }

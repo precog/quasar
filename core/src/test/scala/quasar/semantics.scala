@@ -21,6 +21,7 @@ import quasar.specs2._
 
 import matryoshka._, Recursive.ops._
 import org.specs2.mutable._
+import pathy.Path._
 
 class SemanticsSpec extends Specification with PendingWithAccurateCoverage with TreeMatchers {
 
@@ -35,14 +36,14 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "add single field for order by" in {
       val q = Select(SelectAll,
                      Proj(Ident("name"), None) :: Nil,
-                     Some(TableRelationAST("person", None)),
+                     Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
                      Some(OrderBy((ASC, Ident("height")) :: Nil)))
       transform(q) must beTree(
                Select(SelectAll,
                       Proj(Ident("name"), None) :: Proj(Ident("height"), Some("__sd__0")) :: Nil,
-                      Some(TableRelationAST("person", None)),
+                      Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
                       Some(OrderBy((ASC, Ident("__sd__0")) :: Nil)))
@@ -52,7 +53,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "not add a field that appears in the projections" in {
       val q = Select(SelectAll,
                      Proj(Ident("name"), None) :: Nil,
-                     Some(TableRelationAST("person", None)),
+                     Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
                      Some(OrderBy((ASC, Ident("name")) :: Nil)))
@@ -62,7 +63,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "not add a field that appears as an alias in the projections" in {
       val q = Select(SelectAll,
                      Proj(Ident("foo"), Some("name")) :: Nil,
-                     Some(TableRelationAST("person", None)),
+                     Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
                      Some(OrderBy((ASC, Ident("name")) :: Nil)))
@@ -72,7 +73,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "not add a field with wildcard present" in {
       val q = Select(SelectAll,
                      Proj(Splice(None), None) :: Nil,
-                     Some(TableRelationAST("person", None)),
+                     Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
                      Some(OrderBy((ASC, Ident("height")) :: Nil)))
@@ -82,7 +83,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "add single field for order by" in {
       val q = Select(SelectAll,
                      Proj(Ident("name"), None) :: Nil,
-                     Some(TableRelationAST("person", None)),
+                     Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
                      Some(OrderBy((ASC, Ident("height")) ::
@@ -93,7 +94,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
                       Proj(Ident("name"), None) ::
                         Proj(Ident("height"), Some("__sd__0")) ::
                         Nil,
-                      Some(TableRelationAST("person", None)),
+                      Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
                       Some(OrderBy((ASC, Ident("__sd__0")) ::
@@ -104,13 +105,13 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
     "transform sub-select" in {
       val q = Select(SelectAll,
                      Proj(Splice(None), None) :: Nil,
-                     Some(TableRelationAST("foo", None)),
+                     Some(TableRelationAST(file("foo"), None)),
                      Some(
                        Binop(
                          Ident("a"),
                          Select(SelectAll,
                                 Proj(Ident("a"), None) :: Nil,
-                                Some(TableRelationAST("bar", None)),
+                                Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
                                 Some(OrderBy((ASC, Ident("b")) :: Nil))),
@@ -120,7 +121,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
       transform(q) must beTree(
               Select(SelectAll,
                      Proj(Splice(None), None) :: Nil,
-                     Some(TableRelationAST("foo", None)),
+                     Some(TableRelationAST(file("foo"), None)),
                      Some(
                        Binop(
                          Ident("a"),
@@ -128,7 +129,7 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
                                 Proj(Ident("a"), None) ::
                                   Proj(Ident("b"), Some("__sd__0")) ::
                                   Nil,
-                                Some(TableRelationAST("bar", None)),
+                                Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
                                 Some(OrderBy((ASC, Ident("__sd__0")) :: Nil))),

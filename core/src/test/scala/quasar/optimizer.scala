@@ -17,11 +17,11 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs._
 import quasar.std._
 
 import matryoshka._, Fix._, FunctorT.ops._
 import org.specs2.mutable._
+import pathy.Path._
 
 class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers {
   import StdLib._
@@ -125,23 +125,23 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
   "preferProjections" should {
     "ignore a delete with unknown shape" in {
       Optimizer.preferProjections(
-        DeleteField(Read(Path.fileRel("zips")),
+        DeleteField(Read(file("zips")),
           Constant(Data.Str("pop")))) must
         beTree[Fix[LogicalPlan]](
-          DeleteField(Read(Path.fileRel("zips")),
+          DeleteField(Read(file("zips")),
             Constant(Data.Str("pop"))))
     }
 
     "convert a delete after a projection" in {
       Optimizer.preferProjections(
-        Let('meh, Read(Path.fileRel("zips")),
+        Let('meh, Read(file("zips")),
           DeleteField[FLP](
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
               "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
             Constant(Data.Str("pop"))))) must
       beTree(
-        Let('meh, Read(Path.fileRel("zips")),
+        Let('meh, Read(file("zips")),
           makeObj(
             "city" ->
               ObjectProject(
@@ -155,7 +155,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
 
     "convert a delete when the shape is hidden by a Free" in {
       Optimizer.preferProjections(
-        Let('meh, Read(Path.fileRel("zips")),
+        Let('meh, Read(file("zips")),
           Let('meh2,
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
@@ -165,7 +165,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
               "cleaned" ->
                 DeleteField(Free('meh2), Constant(Data.Str("pop"))))))) must
       beTree(
-        Let('meh, Read(Path.fileRel("zips")),
+        Let('meh, Read(file("zips")),
           Let('meh2,
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),

@@ -29,7 +29,7 @@ import scalaz.syntax.monad._
 import scalaz.stream._
 
 class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import DataArbitrary._, FileSystemError._, PathError2._
+  import DataArbitrary._, FileSystemError._, PathError._
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
 
@@ -109,7 +109,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
         val p = write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)
 
-        MemTask.runLogEmpty(p).run.toEither must beLeft(pathError(pathExists(f)))
+        MemTask.runLogEmpty(p).run.toEither must beLeft(pathErr(pathExists(f)))
       }
 
       s"$n should consume all input into a new file" ! prop {
@@ -126,7 +126,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
         (f: AFile, xs: Vector[Data]) =>
 
         MemTask.runLogEmpty(wt(f, xs.toProcess))
-          .run.toEither must beLeft(pathError(pathNotFound(f)))
+          .run.toEither must beLeft(pathErr(pathNotFound(f)))
       }
 
       s"$n should leave the existing file untouched on failure" ! prop {

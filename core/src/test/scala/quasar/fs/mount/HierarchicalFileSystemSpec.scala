@@ -33,7 +33,7 @@ import scalaz.syntax.either._
 import scalaz.std.list._
 
 class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFixture {
-  import InMemory.InMemState, FileSystemError._, PathError2._
+  import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.{HFSErrT, HierarchicalFileSystemError, HFSFailure, HFSFailureF, MountedResultH, MountedResultHF}
   import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._
 
@@ -113,7 +113,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
   def failDueToInvalidPath[A](p: APath) =
     beLike[HierarchicalFileSystemError \/ (FileSystemError \/ A)] {
-      case \/-(-\/(PathError(InvalidPath(p0, _)))) => p0 must_== p
+      case \/-(-\/(PathErr(InvalidPath(p0, _)))) => p0 must_== p
     }
 
   def failDueToMultipleMnts[A] =
@@ -149,7 +149,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       val mnted = mntB </> local
 
       val lp = Invoke(Take, List(
-        Invoke(Squash, List(Read(Path(posixCodec.printPath(mnted))))),
+        Invoke(Squash, List(Read(mnted))),
         Constant(Data.Int(5))))
 
       val fss = bMem.set(
@@ -169,7 +169,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
           val out = mntC </> file("outf")
 
           val lp = Invoke(Take, List(
-            Invoke(Squash, List(Read(Path(posixCodec.printPath(rd))))),
+            Invoke(Squash, List(Read(rd))),
             Constant(Data.Int(5))))
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)

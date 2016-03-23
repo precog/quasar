@@ -29,11 +29,6 @@ import scalaz.concurrent._
 
 object TestConfig {
 
-  /** The path prefix under which test data may be found as well as where tests
-    * can write test data/output.
-    */
-  val DefaultTestPathPrefix = Path("/quasar-test/")
-
   /** The directory under which test data may be found as well as where tests
     * can write test data/output.
     */
@@ -135,19 +130,6 @@ object TestConfig {
       c2.map(c2 => (c1.getOrElse(c2), c2))
     })
   }
-
-  /** Returns the absolute path within a backend to the directory containing test
-    * data.
-    *
-    * One may specify this externally by setting the [[TestPathPrefixEnvName]].
-    * The returned [[Task]] will fail if an invalid path is provided from the
-    * environment and return the [[DefaultTestPathPrefix]] if nothing is provided.
-    */
-  def testDataPathPrefix: Task[Path] =
-    readEnv(TestPathPrefixEnvName).map(Path(_)).flatMapF { path =>
-      if (path.absolute) Task.now(path)
-      else fail("Test path prefix must be an absolute dir, got: " + path.shows)
-    } getOrElse DefaultTestPathPrefix
 
   /** Returns the absolute path within a filesystem to the directory where tests
     * may write data.

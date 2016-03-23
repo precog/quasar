@@ -29,7 +29,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle
-  import FileSystemError._, PathError2._
+  import FileSystemError._, PathError._
 
   type HFSFailure[A]      = Failure[HierarchicalFileSystemError, A]
   type HFSFailureF[A]     = Coyoneda[HFSFailure, A]
@@ -85,7 +85,7 @@ object hierarchical {
         case Open(loc, off, lim) =>
           lookupMounted(mountedRfs, loc) map { case (mnt, g) =>
             evalRead(g, Open(loc, off, lim))
-          } getOrElse pathError(pathNotFound(loc)).left.point[M]
+          } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
         case Read(h) =>
           lookupMounted(mountedRfs, h.file) map { case (mnt, g) =>
@@ -130,7 +130,7 @@ object hierarchical {
         case Open(loc) =>
           lookupMounted(mountedWfs, loc) map { case (mnt, g) =>
             evalWrite(g, Open(loc))
-          } getOrElse pathError(pathNotFound(loc)).left.point[M]
+          } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
         case Write(h, chunk) =>
           lookupMounted(mountedWfs, h.file) map { case (mnt, g) =>
@@ -171,13 +171,13 @@ object hierarchical {
     val lookup = lookupMounted(mountedMfs, _: APath)
 
     def noMountError(path: APath) =
-      pathError(invalidPath(path, "does not refer to a mounted filesystem"))
+      pathErr(invalidPath(path, "does not refer to a mounted filesystem"))
 
     val f = new (ManageFile ~> M) {
       def apply[A](mf: ManageFile[A]) = mf match {
         case Move(scn, sem) =>
           val src = lookup(scn.src).toRightDisjunction(
-            pathError(pathNotFound(scn.src)))
+            pathErr(pathNotFound(scn.src)))
 
           val dst = lookup(scn.dst).toRightDisjunction(
             noMountError(scn.dst))
@@ -187,7 +187,7 @@ object hierarchical {
               EitherT(evalManage(g, Move(scn, sem)))
 
             case _ =>
-              pathError(invalidPath(
+              pathErr(invalidPath(
                 scn.dst,
                 s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
               )).raiseError[ME, Unit]
@@ -214,7 +214,7 @@ object hierarchical {
 
       def deleteFile(f: AFile) =
         EitherT.fromDisjunction[M](
-          lookup(f) toRightDisjunction pathError(pathNotFound(f))
+          lookup(f) toRightDisjunction pathErr(pathNotFound(f))
         ).flatMapF { case (_, g) =>
           evalManage(g, Delete(f))
         }.run
@@ -285,7 +285,7 @@ object hierarchical {
             .orElse(
               lsMounts(mountedQfs.toMap.keySet, d)
                 .map(_.right[FileSystemError].point[M]))
-            .getOrElse(pathError(pathNotFound(d)).left.point[M])
+            .getOrElse(pathErr(pathNotFound(d)).left.point[M])
 
         case FileExists(f) =>
           lookupMounted(mountedQfs, f)
@@ -303,7 +303,7 @@ object hierarchical {
             toExec(failure.fail[(ADir, A)](hfsErr))
 
           case -\/(\/-(pErr)) =>
-            EitherT.leftU[(ADir, A)](pathError(pErr).point[G])
+            EitherT.leftU[(ADir, A)](pathErr(pErr).point[G])
 
           case \/-((mnt, g)) =>
             EitherT(WriterT(evalQuery(g, qf)): G[FileSystemError \/ A])
@@ -346,24 +346,24 @@ object hierarchical {
     mounts: Mounts[A],
     lp: Fix[LogicalPlan],
     out: Option[AFile]
-  ): (HierarchicalFileSystemError \/ PathError2) \/ (ADir, A) = {
+  ): (HierarchicalFileSystemError \/ PathError) \/ (ADir, A) = {
     import LogicalPlan._
     import HierarchicalFileSystemError._
 
     type MntA = (ADir, A)
     type F[A] = State[Option[MntA], A]
-    type M[A] = EitherT[F, PathError2, A]
+    type M[A] = EitherT[F, PathError, A]
 
     val F = MonadState[State, Option[MntA]]
 
-    def lookupMnt(p: APath): PathError2 \/ MntA =
+    def lookupMnt(p: APath): PathError \/ MntA =
       lookupMounted(mounts, p) toRightDisjunction pathNotFound(p)
 
     def compareToExisting(mnt: ADir): M[Unit] = {
-      def errMsg(exMnt: ADir): PathError2 =
+      def errMsg(exMnt: ADir): PathError =
         invalidPath(mnt, s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'")
 
-      EitherT[F, PathError2, Unit](F.gets(exMnt =>
+      EitherT[F, PathError, Unit](F.gets(exMnt =>
         exMnt map (_._1) filter (_ != mnt) map errMsg toLeftDisjunction (())
       ))
     }
@@ -377,7 +377,8 @@ object hierarchical {
 
     out.cata(d => lookupMnt(d) bimap (_.right, some), none.right) flatMap (initMnt =>
       lp.cataM[M, Unit] {
-        case ReadF(p) => mountFor(p.asAPath)
+        // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+        case ReadF(p) => mountFor(mkAbsolute(rootDir, p))
         case _        => ().point[M]
       }.run.run(initMnt) match {
         // NB: If mnt is empty, then there were no `ReadF`, so we should
@@ -391,7 +392,7 @@ object hierarchical {
       })
   }
 
-  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[PathName]] = {
+  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[PathSegment]] = {
     def firstDir(rdir: RDir): Option[DirName] =
       firstSegmentName(rdir).flatMap(_.swap.toOption)
 

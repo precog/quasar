@@ -30,7 +30,7 @@ object fsops {
   type MongoFsM[A]  = FileSystemErrT[MongoDbIO, A]
   type MongoE[A, B] = EitherT[MongoDbIO, A, B]
 
-  import FileSystemError._, PathError2._
+  import FileSystemError._, PathError._
 
   /** The collections having a prefix equivalent to the given directory path. */
   def collectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
@@ -43,7 +43,7 @@ object fsops {
       cs     <- MongoDbIO.collectionsIn(dbName)
                   .filter(_.collectionName startsWith cName)
                   .runLog.map(_.toVector).liftM[FileSystemErrT]
-      _      <- if (cs.isEmpty) pathError(pathNotFound(dir)).raiseError[MongoE, Unit]
+      _      <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoE, Unit]
                 else ().point[MongoFsM]
     } yield cs
 
@@ -53,19 +53,19 @@ object fsops {
   def userCollectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
     collectionsInDir(dir) map (_.filterNot(_.collectionName startsWith "system."))
 
-  /** A filesystem `PathName` representing the first segment of a collection name
+  /** A filesystem `PathSegment` representing the first segment of a collection name
     * relative to the given parent directory.
     */
-  def collectionPathName(parent: ADir): Collection => Option[PathName] =
+  def collectionPathSegment(parent: ADir): Collection => Option[PathSegment] =
     _.asFile relativeTo parent flatMap firstSegmentName
 
   /** The collection represented by the given path. */
   def collFromPathM(path: APath): MongoFsM[Collection] =
-    EitherT(Collection.fromPathy(path).leftMap(pathError(_)).point[MongoDbIO])
+    EitherT(Collection.fromPath(path).leftMap(pathErr(_)).point[MongoDbIO])
 
   /** The database referred to by the given path. */
   def dbNameFromPathM(path: APath): MongoFsM[String] =
-    EitherT(Collection.dbNameFromPath(path).leftMap(pathError(_)).point[MongoDbIO])
+    EitherT(Collection.dbNameFromPath(path).leftMap(pathErr(_)).point[MongoDbIO])
 
   /** An error indicating that the directory refers to an ancestor of `/`.
     *
@@ -74,6 +74,6 @@ object fsops {
     *       scala-pathy has been updated.
     */
   def nonExistentParent[A](dir: ADir): MongoFsM[A] =
-    pathError(invalidPath(dir, "directory refers to nonexistent parent"))
+    pathErr(invalidPath(dir, "directory refers to nonexistent parent"))
       .raiseError[MongoE, A]
 }

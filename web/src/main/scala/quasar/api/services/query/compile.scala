@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, api._, fs._
 import quasar.api.services._
 import quasar.api.ToQResponse.ops._
-import quasar.fs.{Path => QPath}
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.sql.{ParsingError}
@@ -52,14 +51,12 @@ object compile {
             }))
 
     QHttpService {
-      case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
-        offsetOrInvalid[S](offset).tuple(limitOrInvalid[S](limit))
-          .traverse[Free[S, ?], QResponse[S], ParsingError \/ QResponse[S]] { case (offset, limit) =>
-            sql.parseInContext(query, QPath.fromAPath(path))
-              .traverse[Free[S, ?], ParsingError, QResponse[S]](expr =>
-                explainQuery(expr, offset, limit, vars(req)))
+      case req @ GET -> _ :? Offset(offset) +& Limit(limit) => respond(
+        parseQueryRequest[S](req, offset, limit).traverse[Free[S,?], QResponse[S], ParsingError \/ QResponse[S]] {
+          case (path, query, offset, limit) =>
+            sql.parseInContext(query, path).traverse[Free[S, ?], ParsingError, QResponse[S]](
+              expr => explainQuery(expr, offset, limit, vars(req)))
         })
-      case GET -> _ => queryParameterMustContainQuery
     }
   }
 

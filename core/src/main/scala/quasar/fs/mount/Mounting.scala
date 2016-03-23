@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Variables
 import quasar.effect.LiftedOps
 import quasar.fp._
-import quasar.fs.{Path => _, _}
+import quasar.fs._
 import quasar.sql._
 
 import monocle.Prism
@@ -124,10 +124,10 @@ object Mounting {
       bifold(v)(_.fold(_.left, _.left.right), _.right.right)
 
     private val notFound: Prism[MountingError, APath] =
-      MountingError.pathError composePrism PathError2.pathNotFound
+      MountingError.pathError composePrism PathError.pathNotFound
 
     private val invalidPath: Prism[MountingError, (APath, String)] =
-      MountingError.pathError composePrism PathError2.invalidPath
+      MountingError.pathError composePrism PathError.invalidPath
 
     private def modify[T](
       src: Path[Abs,T,Sandboxed],

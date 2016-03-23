@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 
 class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
-  import FileSystemTest._, FileSystemError._, PathError2._
+  import FileSystemTest._, FileSystemError._, PathError._
 
   val query  = QueryFile.Ops[FileSystem]
   val write  = WriteFile.Ops[FileSystem]
@@ -44,7 +44,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
         val f2 = d1 </> dir("d2") </> file("f1")
-        val expectedNodes = List[PathName](DirName("d2").left, FileName("f1").right)
+        val expectedNodes = List[PathSegment](DirName("d2").left, FileName("f1").right)
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
                     write.save(f2, anotherDoc.toProcess).drain
@@ -65,7 +65,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")
-        runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathError(pathNotFound(d)))
+        runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))
       }
 
       "listing results should not contain deleted files" >> {
@@ -80,7 +80,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val p = query.ls(d).liftM[Process]
                    .flatMap(ns => Process.emitAll(ns.toVector))
 
-        val preDelete = List[PathName](FileName("f1").right, FileName("f2").right)
+        val preDelete = List[PathSegment](FileName("f1").right, FileName("f2").right)
 
         (runLogT(fs.testInterpM, p)
           .runEither must beRight(containTheSameElementsAs(preDelete)))

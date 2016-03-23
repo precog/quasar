@@ -19,6 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar._, api._
 import quasar.fp.numeric._
+import quasar.fs._
 import quasar.sql.Query
 
 import org.http4s._, dsl._
@@ -34,6 +35,23 @@ package object query {
   // https://github.com/puffnfresh/wartremover/issues/149
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
+
+  def queryOrBadRequest[S[_]](params: Map[String, scala.collection.Seq[String]]): QResponse[S] \/ Query =
+    params.get("q").cata(
+      values =>
+        if (values.size > 1) QResponse.error(BadRequest, "The request must contain only one query parameter").left
+        else values.headOption.map(Query(_)).toRightDisjunction(QResponse.error(BadRequest, "The request must contain the query parameter")),
+      QResponse.error(BadRequest, "Request must contain a query").left
+    )
+
+  def parseQueryRequest[S[_]](req: Request,
+                        offset: Option[ValidationNel[ParseFailure, Natural]],
+                        limit: Option[ValidationNel[ParseFailure, Positive]])
+    : QResponse[S] \/ (ADir, Query, Option[Natural], Option[Positive]) =
+    (dirPathOrBadRequest[S](req.uri.path)  |@|
+     queryOrBadRequest[S](req.multiParams) |@|
+     offsetOrInvalid[S](offset)         |@|
+     limitOrInvalid[S](limit)) { (dir, query, offset, limit) => (dir, query, offset, limit)}
 
   def queryParameterMustContainQuery[S[_]] =
     Free.pure[S, QResponse[S]](QResponse.error(BadRequest, "The request must contain a query"))

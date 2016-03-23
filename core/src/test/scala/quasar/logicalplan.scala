@@ -18,7 +18,6 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs._
 
 import matryoshka.Fix
 import org.scalacheck._
@@ -26,6 +25,7 @@ import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 import shapeless.contrib.scalaz.instances._
+import pathy.Path._
 
 class LogicalPlanSpecs extends Spec {
   import LogicalPlan._
@@ -49,7 +49,7 @@ class LogicalPlanSpecs extends Spec {
     (form, body) <- Arbitrary.arbitrary[(A, A)]
   } yield LetF(Symbol("tmp" + n), form, body)
 
-  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(ReadF(Path.Root))
+  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(ReadF(rootDir </> file("foo")))
 
   import DataArbitrary._
 
@@ -70,13 +70,13 @@ class LogicalPlanSpecs extends Spec {
   "normalizeTempNames" should {
     "rename simple nested lets" in {
       LogicalPlan.normalizeTempNames(
-        Let('foo, Read(Path.fileRel("foo")),
-          Let('bar, Read(Path.fileRel("bar")),
+        Let('foo, Read(file("foo")),
+          Let('bar, Read(file("bar")),
             Fix(MakeObjectN(
               Constant(Data.Str("x")) -> Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))),
               Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y"))))))))) must_==
-        Let('__tmp0, Read(Path.fileRel("foo")),
-          Let('__tmp1, Read(Path.fileRel("bar")),
+        Let('__tmp0, Read(file("foo")),
+          Let('__tmp1, Read(file("bar")),
             Fix(MakeObjectN(
               Constant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), Constant(Data.Str("x")))),
               Constant(Data.Str("y")) -> Fix(ObjectProject(Free('__tmp1), Constant(Data.Str("y"))))))))
@@ -84,11 +84,11 @@ class LogicalPlanSpecs extends Spec {
 
     "rename shadowed name" in {
       LogicalPlan.normalizeTempNames(
-        Let('x, Read(Path.fileRel("foo")),
+        Let('x, Read(file("foo")),
           Let('x, Fix(MakeObjectN(
               Constant(Data.Str("x")) -> Fix(ObjectProject(Free('x), Constant(Data.Str("x")))))),
             Free('x)))) must_==
-        Let('__tmp0, Read(Path.fileRel("foo")),
+        Let('__tmp0, Read(file("foo")),
           Let('__tmp1, Fix(MakeObjectN(
               Constant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), Constant(Data.Str("x")))))),
             Free('__tmp1)))
@@ -100,12 +100,12 @@ class LogicalPlanSpecs extends Spec {
       LogicalPlan.normalizeLets(
         Let('bar,
           Let('foo,
-            Read(Path.fileRel("foo")),
+            Read(file("foo")),
             Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x"))))))))),
           Fix(MakeObjectN(
             Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y")))))))) must_==
         Let('foo,
-          Read(Path.fileRel("foo")),
+          Read(file("foo")),
           Let('bar,
             Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))))))),
             Fix(MakeObjectN(
@@ -117,13 +117,13 @@ class LogicalPlanSpecs extends Spec {
         Let('baz,
           Let('bar,
             Let('foo,
-              Read(Path.fileRel("foo")),
+              Read(file("foo")),
               Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Int(0))))))),
             Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("y")))), Constant(Data.Int(1))))))),
           Fix(MakeObjectN(
             Constant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("z")))))))) must_==
         Let('foo,
-          Read(Path.fileRel("foo")),
+          Read(file("foo")),
           Let('bar,
             Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Int(0)))))),
             Let('baz,

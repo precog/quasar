@@ -21,6 +21,7 @@ import quasar.fp._
 import quasar.fs._
 
 import scalaz._, Scalaz._
+import pathy.Path.posixCodec
 
 object MRA {
   // foo[*].bar + foo[*].baz
@@ -74,7 +75,7 @@ object MRA {
   object Dims {
     def Value = id(DimId.Value)
 
-    def set(p: Path, ps: Path*) = new Dims(Nil, ps.map(DimId.Source.apply).foldLeft[DimId](DimId.Source(p))(_ & _), Nil)
+    def set(p: FPath, ps: FPath*) = new Dims(Nil, ps.map(DimId.Source.apply).foldLeft[DimId](DimId.Source(p))(_ & _), Nil)
 
     def combineAll(list: List[Dims]): Dims = list match {
       case Nil => Value
@@ -178,7 +179,7 @@ object MRA {
 
     def id: String = this match {
       case Value => "<value>"
-      case Source(path) => path.pathname
+      case Source(path) => posixCodec.printPath(path)
       case ArrProj(on, index) => on.id + ("[" + index + "]")
       case ObjProj(on, name)  => on.id + ("{" + name  + "}")
       case Flatten(on) => on.id + "(*)"
@@ -202,7 +203,7 @@ object MRA {
       def append(v1: DimId, v2: => DimId): DimId = if (v1 == Value) v2 else if (v2 == Value) v1 else v1 & v2
     }
     final case object Value extends DimId
-    final case class Source(path: Path) extends DimId
+    final case class Source(path: FPath) extends DimId
     final case class ArrProj(on: DimId, index: Long) extends DimId
     final case class ObjProj(on: DimId, name: String) extends DimId
     final case class Flatten(on: DimId) extends DimId

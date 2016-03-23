@@ -33,7 +33,7 @@ import scalaz.syntax.std.option._
   * creating any, files.
   */
 object Empty {
-  import FileSystemError._, PathError2._
+  import FileSystemError._, PathError._
 
   def readFile[F[_]: Applicative]: ReadFile ~> F =
     new (ReadFile ~> F) {
@@ -97,7 +97,7 @@ object Empty {
 
         case QueryFile.ListContents(d) =>
           if (d === rootDir)
-            \/.right[FileSystemError, Set[PathName]](Set()).point[F]
+            \/.right[FileSystemError, Set[PathSegment]](Set()).point[F]
           else
             fsPathNotFound(d)
 
@@ -114,11 +114,12 @@ object Empty {
   private def lpResult[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
     LogicalPlan.paths(lp)
       .headOption
-      .cata(p => fsPathNotFound[F, A](p.asAPath), unsupportedPlan[F, A](lp))
+      // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)), unsupportedPlan[F, A](lp))
       .strengthL(Vector())
 
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
-    pathError(pathNotFound(p)).left.point[F]
+    pathErr(pathNotFound(p)).left.point[F]
 
   private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
     plannerError(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]

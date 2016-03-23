@@ -20,10 +20,11 @@ import quasar.Predef._
 import quasar._, api._, fp._, fs._
 import quasar.fp.numeric._
 import quasar.fs.InMemory._
+import quasar.sql._
 
 import org.http4s._
 import org.specs2.matcher._, MustMatchers._
-import pathy.Path._, posixCodec._
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -67,8 +68,23 @@ object queryFixture {
   def executeService(state: InMemState): HttpService =
     execute.service[Eff].toHttpService(effRespOr(runFs(state).run))
 
-  def selectAll(from: File) = "select * from `" + printPath(from) + "`"
-  def selectAllWithVar(from: File, varName: String) = selectAll(from) + " where pop < :" + varName
+  def selectAll(from: File) = {
+    val ast = Select(
+      SelectAll,
+      List(Proj(Splice(None), None)),
+      Some(TableRelationAST(from, None)),
+      None, None, None)
+    pprint(ast)
+  }
+  def selectAllWithVar(from: File, varName: String) = {
+    val ast = Select(
+      SelectAll,
+      List(Proj(Splice(None), None)),
+      Some(TableRelationAST(from, None)),
+      Some(Binop(Ident("pop"),Vari(varName), Gt)),
+      None, None)
+    pprint(ast)
+  }
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
     free.interpret3[Task, FileSystemFailureF, FileSystem, ResponseOr](

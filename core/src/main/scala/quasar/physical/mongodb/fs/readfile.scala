@@ -29,7 +29,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
-  import ReadFile._, FileSystemError._, PathError2._, MongoDbIO._
+  import ReadFile._, FileSystemError._, PathError._, MongoDbIO._
 
   type ReadState           = (Long, Map[ReadHandle, BsonCursor])
   type ReadStateT[F[_], A] = ReaderT[F, TaskRef[ReadState], A]
@@ -112,10 +112,10 @@ object readfile {
         h    <- recordCursor(f, cur)
       } yield h
 
-    Collection.fromPathy(f).fold(
-      err  => pathError(err).left.point[MongoRead],
+    Collection.fromPath(f).fold(
+      err  => pathErr(err).left.point[MongoRead],
       coll => collectionExists(coll).liftM[ReadStateT].ifM(
                 openCursor0(coll) map (_.right[FileSystemError]),
-                pathError(pathNotFound(f)).left.point[MongoRead]))
+                pathErr(pathNotFound(f)).left.point[MongoRead]))
   }
 }

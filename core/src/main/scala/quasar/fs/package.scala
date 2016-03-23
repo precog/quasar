@@ -18,9 +18,10 @@ package quasar
 
 import quasar.Predef._
 import quasar.effect.Failure
+import quasar.fp._
 import quasar.fp.free._
 
-import pathy.{Path => PPath}, PPath._
+import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs {
@@ -44,9 +45,14 @@ package object fs {
   type APath = AbsPath[_]
   type RPath = RelPath[_]
 
-  type PathName = DirName \/ FileName
+  type FilePath[B] = pathy.Path[B,File,Sandboxed]
+  type DirPath[B]  = pathy.Path[B,Dir, Sandboxed]
+  type FPath = FilePath[_]
+  type DPath = DirPath[_]
 
-  type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
+  type PathSegment = DirName \/ FileName
+
+  type PathErr2T[F[_], A] = EitherT[F, PathError, A]
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemFailureF[A] = Coyoneda[FileSystemFailure, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
@@ -77,18 +83,42 @@ package object fs {
     }
 
   /** Returns the first named segment of the given relative path. */
-  def firstSegmentName(f: RPath): Option[PathName] =
+  def firstSegmentName(f: RPath): Option[PathSegment] =
     flatten(none, none, none,
       n => DirName(n).left.some,
       n => FileName(n).right.some,
       f).toIList.unite.headOption
 
+  def prettyPrint(path: Path[_,_,Sandboxed]): String =
+    refineType(path).fold(
+      dir => posixCodec.printPath(dir),
+      file => refineTypeAbs(file).fold(
+        abs => posixCodec.printPath(abs),
+        // Remove the `./` from the beginning of the string representation of a relative path
+        rel => posixCodec.printPath(rel).drop(2)))
+
   /** Sandboxes an absolute path, needed due to parsing functions producing
     * unsandboxed paths.
     *
-    * TODO: We know this can't fail, remove once Pathy is refactored to be more precise
+    * TODO[pathy]: We know this can't fail, remove once Pathy is refactored to be more precise
     */
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
-  def sandboxAbs[T, S](apath: PPath[Abs,T,S]): PPath[Abs,T,Sandboxed] =
+  def sandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
     rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
+
+  // TODO[pathy]: Offer clean API in pathy to do this
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
+  def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Path[A,T,Sandboxed] =
+    refineTypeAbs(path).fold(
+      abs => (rootDir[Sandboxed] </> abs.relativeTo(rootDir).get).asInstanceOf[Path[A,T,Sandboxed]],
+      rel => (currentDir[Sandboxed] </> rel.relativeTo(currentDir).get).asInstanceOf[Path[A,T,Sandboxed]])
+
+  // TODO[pathy]: Offer clean API in pathy to do this
+  def refineTypeAbs[T,S](path: Path[_,T,S]): Path[Abs,T,S] \/ Path[Rel,T,S] = {
+    if (path.isAbsolute) path.asInstanceOf[Path[Abs,T,S]].left
+    else path.asInstanceOf[Path[Rel,T,S]].right
+  }
+
+  def mkAbsolute[T,S](baseDir: AbsDir[S], path: Path[_,T,S]): Path[Abs,T,S] =
+    refineTypeAbs(path).fold(ι, baseDir </> _)
 }

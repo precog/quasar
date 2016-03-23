@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 sealed trait MountingError
 
 object MountingError {
-  final case class PError private (err: PathError2)
+  final case class PError private (err: PathError)
     extends MountingError
 
   final case class EError private (err: EnvironmentError)
@@ -36,8 +36,8 @@ object MountingError {
   final case class InvalidConfig private (config: MountConfig, reasons: NonEmptyList[String])
     extends MountingError
 
-  val pathError: Prism[MountingError, PathError2] =
-    Prism[MountingError, PathError2] {
+  val pathError: Prism[MountingError, PathError] =
+    Prism[MountingError, PathError] {
       case PError(err) => Some(err)
       case _ => None
     } (PError)

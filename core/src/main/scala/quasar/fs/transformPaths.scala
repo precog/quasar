@@ -27,6 +27,8 @@ import monocle.std.tuple2._
 import scalaz.{Optional => _, _}
 import scalaz.std.tuple._
 import scalaz.syntax.functor._
+import scalaz.NaturalTransformation.natToFunction
+import pathy.Path._
 
 object transformPaths {
   import ReadFile.ReadHandle, WriteFile.WriteHandle
@@ -149,13 +151,16 @@ object transformPaths {
     import QueryFile._
 
     val g = new (QueryFile ~> QueryFileF) {
+
+      val translateFile = natToFunction[AbsPath,AbsPath,File](inPath)
+
       def apply[A](qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) =>
-          Coyoneda.lift(ExecutePlan(lp.translate(transformLPPaths(inPath)), inPath(out)))
+          Coyoneda.lift(ExecutePlan(lp.translate(transformLPPaths(translateFile)), inPath(out)))
             .map(_.map(_.bimap(transformErrorPath(outPath), outPath(_))))
 
         case EvaluatePlan(lp) =>
-          Coyoneda.lift(EvaluatePlan(lp.translate(transformLPPaths(inPath))))
+          Coyoneda.lift(EvaluatePlan(lp.translate(transformLPPaths(translateFile))))
             .map(_.map(_ leftMap transformErrorPath(outPath)))
 
         case More(h) =>
@@ -166,7 +171,7 @@ object transformPaths {
           Coyoneda.lift(Close(h))
 
         case Explain(lp) =>
-          Coyoneda.lift(Explain(lp.translate(transformLPPaths(inPath))))
+          Coyoneda.lift(Explain(lp.translate(transformLPPaths(translateFile))))
             .map(_.map(_ leftMap transformErrorPath(outPath)))
 
         case ListContents(d) =>
@@ -219,7 +224,7 @@ object transformPaths {
     FileSystemError.unknownWriteHandle composeLens writeHFile
 
   private val fsPathError: Optional[FileSystemError, APath] =
-    FileSystemError.pathError composeLens PathError2.errorPath
+    FileSystemError.pathErr composeLens PathError.errorPath
 
   private val fsPlannerError: Optional[FileSystemError, Fix[LogicalPlan]] =
     FileSystemError.plannerError composeLens _1
@@ -230,12 +235,13 @@ object transformPaths {
     fsPathError.modify(f(_)) compose
     fsUnkRdError.modify(f(_)) compose
     fsUnkWrError.modify(f(_)) compose
-    fsPlannerError.modify(_ translate transformLPPaths(f))
+    fsPlannerError.modify(_ translate transformLPPaths(natToFunction[AbsPath,AbsPath,File](f)))
 
-  private def transformLPPaths(f: AbsPath ~> AbsPath): LogicalPlan ~> LogicalPlan =
+  private def transformLPPaths(f: AFile => AFile): LogicalPlan ~> LogicalPlan =
     new (LogicalPlan ~> LogicalPlan) {
       def apply[A](lp: LogicalPlan[A]) = lp match {
-        case ReadF(p) => ReadF(Path.fromAPath(f(p.asAPath)))
+        // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+        case ReadF(p) => ReadF(f(mkAbsolute(rootDir, p)))
         case _        => lp
       }
     }

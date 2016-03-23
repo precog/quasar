@@ -23,6 +23,7 @@ import quasar.sql, sql.{Expr}
 import quasar.effect.{KeyValueStore}
 import quasar.fp._
 import quasar.fs._
+import quasar.fs.PathArbitrary._
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._
@@ -33,7 +34,6 @@ import org.specs2.mutable.Specification
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy.Path, Path._
-import pathy.scalacheck._
 import pathy.scalacheck.PathyArbitrary._
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
@@ -141,30 +141,27 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         }
       }
 
-      // FIXME: use APath (see PathGen)
-      // TODO: escaped paths do not survive being embedded in error messges
-      "be 404 with missing mount (dir)" ! prop { d: AbsDirOf[AlphaCharacters] =>
+      "be 404 with missing mount (dir)" ! prop { d: APath =>
         runTest { service =>
           for {
-            resp <- service(Request(uri = pathUri(d.path)))
+            resp <- service(Request(uri = pathUri(d)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(d.path)}")
+            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(d)}")
             resp.status must_== Status.NotFound
           }
         }
       }
 
-      // TODO: escaped paths do not survive being embedded in error messges
-      "be 404 with path type mismatch" ! prop { fp: AbsFileOf[AlphaCharacters] =>
+      "be 404 with path type mismatch" ! prop { fp: AFile =>
         runTest { service =>
-          val dp = fileParent(fp.path) </> dir(fileName(fp.path).value)
+          val dp = fileParent(fp) </> dir(fileName(fp).value)
 
           for {
             _    <- M.mountFileSystem(dp, StubFs, ConnectionUri("foo")).run.flatMap(orFailF)
 
-            resp <- service(Request(uri = pathUri(fp.path)))
+            resp <- service(Request(uri = pathUri(fp)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(fp.path)}")
+            resp.as[Json].run must_== Json("error" := s"There is no mount point at ${printPath(fp)}")
             resp.status must_== Status.NotFound
           }
         }
@@ -204,16 +201,15 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         }
       }
 
-      // TODO: escaped paths do not survive being embedded in error messges
-      "be 404 with missing source" ! prop { (src: AbsDirOf[AlphaCharacters], dst: ADir) =>
+      "be 404 with missing source" ! prop { (src: ADir, dst: ADir) =>
         runTest { service =>
           for {
             resp <- service(Request(
               method = MOVE,
-              uri = pathUri(src.path),
+              uri = pathUri(src),
               headers = Headers(destination(dst))))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(src.path)} doesn't exist")
+            resp.as[Json].run must_== Json("error" := s"${printPath(src)} doesn't exist")
             resp.status must_== Status.NotFound
           }
         }
@@ -236,8 +232,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         }
       }
 
-      // TODO: escaped paths do not survive being embedded in error messages
-      "be 400 with relative path destination" ! prop { (src: ADir, dst: RelDirOf[AlphaCharacters]) =>
+      "be 400 with relative path destination" ! prop { (src: ADir, dst: RDir) =>
         !hasDot(src) ==> {
           runTest { service =>
             for {
@@ -246,17 +241,16 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp <- service(Request(
                 method = MOVE,
                 uri = pathUri(src),
-                headers = Headers(destination(dst.path))))
+                headers = Headers(destination(dst))))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst.path)}")
+              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst)}")
               resp.status must_== Status.BadRequest
             }
           }
         }
       }
 
-      // TODO: escaped paths do not survive being embedded in error messages
-      "be 400 with non-directory path destination" ! prop { (src: ADir, dst: AbsFileOf[AlphaCharacters]) =>
+      "be 400 with non-directory path destination" ! prop { (src: ADir, dst: AFile) =>
         !hasDot(src) ==> {
           runTest { service =>
             for {
@@ -265,9 +259,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp <- service(Request(
                 method = MOVE,
                 uri = pathUri(src),
-                headers = Headers(destination(dst.path))))
+                headers = Headers(destination(dst))))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst.path)}")
+              resp.as[Json].run must_== Json("error" := s"Not an absolute directory path: ${printPath(dst)}")
               resp.status must_== Status.BadRequest
             }
           }
@@ -372,25 +366,24 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           }
         }
 
-        // TODO: escaped paths do not survive being embedded in error messages
-        "succeed with view 'above' existing fs path" ! prop { (d: AbsDirOf[AlphaCharacters], view: RFile, fsSuffix: RDir) =>
-          !hasDot(d.path </> view) ==> {
+        "succeed with view 'above' existing fs path" ! prop { (d: ADir, view: RFile, fsSuffix: RDir) =>
+          !hasDot(d </> view) ==> {
             runTest { service =>
               val fsCfg = ()
 
               val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
-              val fs = d.path </> posixCodec.parseRelDir(printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
+              val fs = d </> posixCodec.parseRelDir(printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
 
               for {
                 _     <- M.mountFileSystem(fs,StubFs, ConnectionUri("foo")).run.flatMap(orFailF)
 
-                resp  <- service(reqBuilder(d.path, view, cfgStr))
+                resp  <- service(reqBuilder(d, view, cfgStr))
 
-                after <- M.lookup(d.path </> view).run
+                after <- M.lookup(d </> view).run
               } yield {
-                resp.as[String].run must_== s"added ${printPath(d.path </> view)}"
+                resp.as[String].run must_== s"added ${printPath(d </> view)}"
                 resp.status must_== Status.Ok
 
                 after must beSome(MountConfig.viewConfig(cfg))
@@ -399,24 +392,23 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           }
         }
 
-        // TODO: escaped paths do not survive being embedded in error messages
-        "be 409 with fs above existing fs path" ! prop { (d: AbsDirOf[AlphaCharacters], fs: RelDirOf[AlphaCharacters], fsSuffix: RelDirOf[AlphaCharacters]) =>
-          (!identicalPath(fsSuffix.path, currentDir)) ==> {
+        "be 409 with fs above existing fs path" ! prop { (d: ADir, fs: RDir, fsSuffix: RDir) =>
+          (!identicalPath(fsSuffix, currentDir)) ==> {
             runTest { service =>
               val cfg = (StubFs, ConnectionUri("foo"))
 
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.fileSystemConfig(cfg))
 
-              val fs1 = d.path </> fs.path </> fsSuffix.path
+              val fs1 = d </> fs </> fsSuffix
 
               for {
                 _     <- M.mountFileSystem(fs1, cfg._1, cfg._2).run.flatMap(orFailF)
 
-                resp  <- service(reqBuilder(d.path, fs.path, cfgStr))
+                resp  <- service(reqBuilder(d, fs, cfgStr))
 
-                after <- M.lookup(d.path </> fs.path).run
+                after <- M.lookup(d </> fs).run
               } yield {
-                resp.as[Json].run must_== Json("error" := s"cannot mount at ${printPath(d.path </> fs.path)} because existing mount below: ${printPath(fs1)}")
+                resp.as[Json].run must_== Json("error" := s"cannot mount at ${printPath(d </> fs)} because existing mount below: ${printPath(fs1)}")
                 resp.status must_== Status.Conflict
 
                 after must beNone
@@ -425,30 +417,28 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           }
         }.pendingUntilFixed("test harness does not yet detect conflicts")
 
-        // TODO: escaped paths do not survive being embedded in error messages
-        "be 400 with fs config and file path in X-File-Name header" ! prop { (parent: AbsDirOf[AlphaCharacters], fsFile: RelFileOf[AlphaCharacters]) =>
+        "be 400 with fs config and file path in X-File-Name header" ! prop { (parent: ADir, fsFile: RFile) =>
           runTest { service =>
             val cfg = (StubFs, ConnectionUri("foo"))
 
             for {
-              resp <- service(reqBuilder(parent.path, fsFile.path, """{ "stub": { "connectionUri": "foo" } }"""))
+              resp <- service(reqBuilder(parent, fsFile, """{ "stub": { "connectionUri": "foo" } }"""))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent.path </> fsFile.path)}; directory path required")
+              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent </> fsFile)}; directory path required")
               resp.status must_== Status.BadRequest
             }
           }
         }
 
-        // TODO: escaped paths do not survive being embedded in error messages
-        "be 400 with view config and dir path in X-File-Name header" ! prop { (parent: AbsDirOf[AlphaCharacters], viewDir: RelDirOf[AlphaCharacters]) =>
+        "be 400 with view config and dir path in X-File-Name header" ! prop { (parent: ADir, viewDir: RDir) =>
           runTest { service =>
             val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
             val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
-              resp <- service(reqBuilder(parent.path, viewDir.path, cfgStr))
+              resp <- service(reqBuilder(parent, viewDir, cfgStr))
             } yield {
-              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent.path </> viewDir.path)}; file path required")
+              resp.as[Json].run must_== Json("error" := s"wrong path type for mount: ${printPath(parent </> viewDir)}; file path required")
               resp.status must_== Status.BadRequest
             }
           }
@@ -517,23 +507,22 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
     "POST" should {
       import org.http4s.Method.POST
 
-      // TODO: escaped paths do not survive being embedded in error messages
-      "be 409 with existing filesystem path" ! prop { (parent: AbsDirOf[AlphaCharacters], fsDir: RelDirOf[AlphaCharacters]) =>
+      "be 409 with existing filesystem path" ! prop { (parent: ADir, fsDir: RDir) =>
         runTest { service =>
           val previousCfg = (StubFs, ConnectionUri("bar"))
 
           for {
-            _    <- M.mountFileSystem(parent.path </> fsDir.path, previousCfg._1, previousCfg._2).run.flatMap(orFailF)
+            _    <- M.mountFileSystem(parent </> fsDir, previousCfg._1, previousCfg._2).run.flatMap(orFailF)
 
             resp <- service(Request(
                       method = POST,
-                      uri = pathUri(parent.path),
-                      headers = Headers(xFileName(fsDir.path)))
+                      uri = pathUri(parent),
+                      headers = Headers(xFileName(fsDir)))
                     .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
 
-            after <- M.lookup(parent.path </> fsDir.path).run
+            after <- M.lookup(parent </> fsDir).run
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(parent.path </> fsDir.path)} already exists")
+            resp.as[Json].run must_== Json("error" := s"${printPath(parent </> fsDir)} already exists")
             resp.status must_== Status.Conflict
 
             after must beSome(MountConfig.fileSystemConfig(previousCfg))
@@ -634,16 +623,12 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         }
       }
 
-      // FIXME: need Arbitrary[APath]
-      // TODO: escaped paths do not survive being embedded in error messages
-      "be 404 with missing path" ! prop { (p: AbsDirOf[AlphaCharacters]) =>
+      "be 404 with missing path" ! prop { p: APath =>
         runTest { service =>
           for {
-            resp <- service(Request(
-                      method = DELETE,
-                      uri = pathUri(p.path)))
+            resp <- service(Request(method = DELETE, uri = pathUri(p)))
           } yield {
-            resp.as[Json].run must_== Json("error" := s"${printPath(p.path)} doesn't exist")
+            resp.as[Json].run must_== Json("error" := s"${printPath(p)} doesn't exist")
             resp.status must_== Status.NotFound
           }
         }

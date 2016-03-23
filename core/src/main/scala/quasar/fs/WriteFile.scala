@@ -52,7 +52,7 @@ object WriteFile {
     extends WriteFile[Unit]
 
   final class Ops[S[_]](implicit S: Functor[S], val unsafe: Unsafe[S]) {
-    import FileSystemError._, PathError2._
+    import FileSystemError._, PathError._
     import ManageFile.MoveSemantics
 
     type F[A]    = unsafe.F[A]
@@ -203,10 +203,10 @@ object WriteFile {
     ////
 
     private def shouldNotExist(dst: AFile): M[FileSystemError] =
-      MonadError[G, FileSystemError].raiseError(pathError(pathExists(dst)))
+      MonadError[G, FileSystemError].raiseError(pathErr(pathExists(dst)))
 
     private def shouldExist(dst: AFile): M[FileSystemError] =
-      MonadError[G, FileSystemError].raiseError(pathError(pathNotFound(dst)))
+      MonadError[G, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
 
     private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])

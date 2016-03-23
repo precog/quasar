@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._
 import quasar.fp._
+import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
@@ -29,6 +30,7 @@ import javascript._
 
 import matryoshka._, Fix._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
+import pathy.Path.rootDir
 import scalaz._, Scalaz._
 
 object MongoDbPlanner extends Planner[Crystallized] {
@@ -915,7 +917,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
     // mapping from one to the other.
     _ match {
       case ReadF(path) =>
-        state(Collection.fromPath(path).bimap(PlanPathError, WorkflowBuilder.read))
+        // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+        state(Collection.fromPath(mkAbsolute(rootDir, path)).bimap(PlanPathError, WorkflowBuilder.read))
       case ConstantF(data) =>
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),

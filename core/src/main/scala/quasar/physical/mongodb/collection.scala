@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{RenderTree, Terminal}
 import quasar.fp._
-import quasar.fs._, Path._
+import quasar.fs._
 
 import scala.util.parsing.combinator._
 
@@ -28,13 +28,6 @@ import pathy.Path.{dir => pDir, file => pFile, _}
 
 final case class Collection(databaseName: String, collectionName: String) {
   import Collection._
-
-  def asPath: Path = {
-    val first = DatabaseNameUnparser(databaseName)
-    val rest = CollectionNameUnparser(collectionName)
-    val segs = NonEmptyList(first, rest: _*)
-    Path(DirNode.Current :: segs.list.dropRight(1).map(DirNode(_)), Some(FileNode(segs.last)))
-  }
 
   /** Convert this collection to a file. */
   def asFile: AFile = {
@@ -47,36 +40,9 @@ final case class Collection(databaseName: String, collectionName: String) {
 }
 
 object Collection {
-  import PathError._
 
-  // TODO: Remove once Path has been replaced by pathy.Path
-  def foldPath[A](path: Path)(clusterF: => A, dbF: String => A, collF: Collection => A):
-      PathError \/ A = {
-    val abs = path.asAbsolute
-    val segs = abs.dir.map(_.value) ++ abs.file.map(_.value).toList
-
-    (segs match {
-      case Nil => clusterF.right
-      case first :: rest => for {
-        db       <- DatabaseNameParser(first)
-        collSegs <- rest.traverseU(CollectionSegmentParser(_))
-        coll     =  collSegs.mkString(".")
-        _        <- if (utf8length(db) + 1 + utf8length(coll) > 120)
-                      s"database/collection name too long (> 120 bytes): $db.$coll".left
-                    else ().right
-      } yield if (collSegs.isEmpty) dbF(db) else collF(Collection(db, coll))
-    }) leftMap InvalidPathError
-  }
-
-  def fromPath(path: Path): PathError \/ Collection =
-    foldPath(path)(
-      -\/(PathTypeError(path, Some("has no segments"))),
-      κ(-\/(InvalidPathError("path names a database, but no collection: " + path))),
-      \/-(_)).join
-
-  // TODO: Rename to `fromPath` once old path code is deleted
-  def fromPathy(path: APath): PathError2 \/ Collection = {
-    import PathError2._
+  def fromPath(path: APath): PathError \/ Collection = {
+    import PathError._
 
     val collResult = for {
       tpl  <- dbNameAndRest(path)
@@ -94,8 +60,8 @@ object Collection {
   }
 
   /** Returns the database name determined by the given path. */
-  def dbNameFromPath(path: APath): PathError2 \/ String =
-    dbNameAndRest(path) bimap (PathError2.invalidPath(path, _), _._1)
+  def dbNameFromPath(path: APath): PathError \/ String =
+    dbNameAndRest(path) bimap (PathError.invalidPath(path, _), _._1)
 
   /** Returns the directory name derived from the given database name. */
   def dirNameFromDbName(dbName: String): DirName =

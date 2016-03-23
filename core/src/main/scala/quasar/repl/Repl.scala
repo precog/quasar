@@ -22,7 +22,7 @@ import quasar.{Data, DataCodec, PhaseResult, Variables}
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.fp._, free.freeCatchable
-import quasar.fs.{Path => QPath, _}
+import quasar.fs._
 import quasar.fs.mount._
 import quasar.sql
 
@@ -174,7 +174,7 @@ object Repl {
             for {
               state <- RS.get
               out   =  state.cwd </> file(name)
-              expr  <- DF.unattempt_(sql.parseInContext(q, QPath.fromAPath(state.cwd)).leftMap(_.message))
+              expr  <- DF.unattempt_(sql.parseInContext(q, state.cwd).leftMap(_.message))
               query =  Q.executeQuery(expr, Variables.fromMap(state.variables), out)
               _     <- runQuery(state, query)(p =>
                         P.println(
@@ -184,7 +184,7 @@ object Repl {
           },
           for {
             state <- RS.get
-            expr  <- DF.unattempt_(sql.parseInContext(q, QPath.fromAPath(state.cwd)).leftMap(_.message))
+            expr  <- DF.unattempt_(sql.parseInContext(q, state.cwd).leftMap(_.message))
             query =  Q.evaluateQuery(expr, Variables.fromMap(state.variables)).take(state.summaryCount+1).runLog
             _     <- runQuery(state, query)(
                       ds => summarize[S](state.summaryCount, state.format)(ds))

@@ -23,6 +23,7 @@ import quasar.effect.KeyValueStore
 import quasar.fp.{liftMT, free}
 import quasar.fp.prism._
 import quasar.fs._
+import quasar.fs.PathArbitrary._
 import quasar.fs.InMemory._
 import quasar.fs.mount._
 import quasar.sql._
@@ -34,7 +35,7 @@ import org.http4s.argonaut._
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import pathy.Path._
-import pathy.scalacheck._
+import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
@@ -64,29 +65,25 @@ object MetadataFixture {
       Coyoneda.liftTF(runMount(mnts)))))
 }
 
-class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
+class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
   import metadata.FsNode
   import VariablesArbitrary._, ExprArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
   import MetadataFixture._
 
-  import posixCodec.printPath
-
   "Metadata Service" should {
     "respond with NotFound" >> {
       // TODO: escaped paths do not survive being embedded in error messages
-      "if directory does not exist" ! prop { dir: AbsDirOf[AlphaCharacters] => (dir.path != rootDir) ==> {
-        val path:String = printPath(dir.path)
-        val response = service(InMemState.empty, Map())(Request(uri = Uri(path = path))).run
+      "if directory does not exist" ! prop { dir: ADir => (dir != rootDir) ==> {
+        val response = service(InMemState.empty, Map())(Request(uri = pathUri(dir))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"${printPath(dir.path)} doesn't exist")
+        response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(dir)} doesn't exist")
       }}
 
-      "file does not exist" ! prop { file: AbsFileOf[AlphaCharacters] =>
-        val path:String = posixCodec.printPath(file.path)
-        val response = service(InMemState.empty, Map())(Request(uri = Uri(path = path))).run
+      "file does not exist" ! prop { file: AFile =>
+        val response = service(InMemState.empty, Map())(Request(uri = pathUri(file))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"$path doesn't exist")
+        response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(file)} doesn't exist")
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -94,10 +91,9 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           val parent = fileParent(s.file)
           // .get here is because we know thanks to the property guard, that the parent directory has a name
           val fileWithSameName = parentDir(parent).get </> file(dirName(parent).get.value)
-          val path = printPath(fileWithSameName)
-          val response = service(s.state, Map())(Request(uri = Uri(path = path))).run
+          val response = service(s.state, Map())(Request(uri = pathUri(fileWithSameName))).run
           response.status must_== Status.NotFound
-          response.as[Json].run must_== Json("error" := s"$path doesn't exist")
+          response.as[Json].run must_== Json("error" := s"${posixCodec.printPath(fileWithSameName)} doesn't exist")
         }
       }
     }
@@ -111,15 +107,15 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
       "and list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
         val childNodes = s.ls.map(FsNode(_, None))
 
-        service(s.state, Map())(Request(uri = Uri(path = printPath(s.dir))))
+        service(s.state, Map())(Request(uri = pathUri(s.dir)))
           .as[Json].run must_== Json("children" := childNodes.sorted)
       }
 
       "and mounts when any children happen to be mount points" ! prop { (
-        fName: AlphaCharacters,
-        dName: AlphaCharacters,
-        mName: AlphaCharacters,
-        vName: AlphaCharacters,
+        fName: FileName,
+        dName: DirName,
+        mName: DirName,
+        vName: FileName,
         vcfg: (Expr, Variables),
         fsCfg: (FileSystemType, ConnectionUri)
       ) => (fName != vName && dName != mName) ==> {
@@ -133,7 +129,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           (parent </> file(vName.value), Vector()),
           (parent </> dir(mName.value) </> file("bar"), Vector()))
 
-        service(mem, mnts)(Request(uri = Uri(path = posixCodec.printPath(parent))))
+        service(mem, mnts)(Request(uri = pathUri(parent)))
           .as[Json].run must_== Json("children" := List(
             FsNode(fName.value, "file", None),
             FsNode(dName.value, "directory", None),
@@ -143,7 +139,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
       }}
 
       "and empty object for existing file" ! prop { s: SingleFileMemState =>
-        service(s.state, Map())(Request(uri = Uri(path = s.path)))
+        service(s.state, Map())(Request(uri = pathUri(s.file)))
           .as[Json].run must_== Json.obj()
       }
     }

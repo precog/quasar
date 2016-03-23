@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.effect._
-import quasar.fs.{Path => _, _}
+import quasar.fs._
 import quasar.fp._
 
 import pathy.Path._
@@ -104,8 +104,8 @@ object Mounter {
 
   ////
 
-  private val pathNotFound = MountingError.pathError composePrism PathError2.pathNotFound
-  private val pathExists = MountingError.pathError composePrism PathError2.pathExists
+  private val pathNotFound = MountingError.pathError composePrism PathError.pathNotFound
+  private val pathExists = MountingError.pathError composePrism PathError.pathExists
 
   private def mkMountRequest(path: APath, cfg: MountConfig): Option[MountRequest] =
     refineType(path).fold(

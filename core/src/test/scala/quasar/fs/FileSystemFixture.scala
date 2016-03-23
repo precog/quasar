@@ -20,15 +20,16 @@ package fs
 import quasar.Predef._
 import quasar.DataArbitrary._
 import quasar.fp._
+import quasar.fs.PathArbitrary._
 import quasar.fp.free.{Interpreter, SpecializedInterpreter}
 import quasar.fs.SandboxedPathy._
 
 import scala.collection.IndexedSeq
 
-import org.scalacheck.{Gen, Arbitrary}
+import org.scalacheck.{Gen, Arbitrary, Shrink}
+import org.scalacheck.Shrink.shrink
 import pathy.Path._
-import pathy.scalacheck._
-import pathy.scalacheck.PathOf._
+import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
@@ -43,6 +44,15 @@ object AlphaCharacters {
   implicit val show: Show[AlphaCharacters] = Show.shows(_.value)
 }
 
+/** Useful for debugging by producing easier to read paths but that still tend to trigger corner cases */
+case class AlphaAndSpecialCharacters(value: String)
+
+object AlphaAndSpecialCharacters {
+  implicit val arb: Arbitrary[AlphaAndSpecialCharacters] =
+    Arbitrary(Gen.nonEmptyListOf(Gen.oneOf(Gen.alphaChar, Gen.const('/'), Gen.const('.'))).map(chars => AlphaAndSpecialCharacters(chars.mkString)))
+  implicit val show: Show[AlphaAndSpecialCharacters] = Show.shows(_.value)
+}
+
 trait FileSystemFixture {
   import FileSystemFixture._, InMemory._
 
@@ -53,37 +63,37 @@ trait FileSystemFixture {
 
   val emptyMem = InMemState.empty
 
-  import posixCodec.printPath
-
-  case class SingleFileMemState(fileOfCharacters: AbsFileOf[AlphaCharacters], contents: Vector[Data]) {
-    def file = fileOfCharacters.path
-    def path = printPath(file)
+  case class SingleFileMemState(file: AFile, contents: Vector[Data]) {
     def state = InMemState fromFiles Map(file -> contents)
     def parent = fileParent(file)
     def filename = fileName(file)
   }
 
   case class NonEmptyDir(
-                          dirOfCharacters: AbsDirOf[AlphaCharacters],
-                          filesInDir: NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]
+                          dir: ADir,
+                          filesInDir: NonEmptyList[(RFile, Vector[Data])]
                         ) {
-    def dir = dirOfCharacters.path
     def state = {
-      val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}
+      val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}
       InMemState fromFiles fileMapping.toList.toMap
     }
-    def relFiles = filesInDir.unzip._1.map(_.path)
+    def relFiles = filesInDir.unzip._1
     def ls = relFiles.map(segAt(0,_)).list.flatten.distinct
-      .sortBy((pname: PathName) => printPath(pname.fold(dir1, file1)))
+      .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
   }
 
   implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(
-    (Arbitrary.arbitrary[AbsFileOf[AlphaCharacters]] |@|
+    (Arbitrary.arbitrary[AFile] |@|
       Arbitrary.arbitrary[Vector[Data]])(SingleFileMemState.apply))
 
+  implicit val shrinkSingleFileMemSate: Shrink[SingleFileMemState] = Shrink { fs =>
+    (shrink(fs.file).map(newFile => fs.copy(file = newFile))) append
+    (shrink(fs.contents).map(newContents => fs.copy(contents = newContents)))
+  }
+
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
-    (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
-      Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
+    (Arbitrary.arbitrary[ADir] |@|
+      Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]])(NonEmptyDir.apply))
 
   type F[A]            = Free[FileSystem, A]
   type InMemFix[A]     = ReadWriteT[InMemoryFs, A]

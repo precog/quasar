@@ -40,10 +40,10 @@ object metadata {
   final case class FsNode(name: String, typ: String, mount: Option[String])
 
   object FsNode {
-    def apply(pathName: PathName, mount: Option[String]): FsNode =
+    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
       FsNode(
-        pathName.fold(_.value, _.value),
-        pathName.fold(κ("directory"), κ("file")),
+        pathSegment.fold(_.value, _.value),
+        pathSegment.fold(κ("directory"), κ("file")),
         mount)
 
     implicit val fsNodeOrdering: Ordering[FsNode] =
@@ -70,7 +70,7 @@ object metadata {
       case FileSystemConfig(typ, _) => typ.value
     }
 
-    def mkNode(parent: ADir, name: PathName): Q.M[FsNode] =
+    def mkNode(parent: ADir, name: PathSegment): Q.M[FsNode] =
       M.lookup(parent </> name.fold(dir1, file1))
         .run.map(cfg => FsNode(name, cfg map mountType))
         .liftM[FileSystemErrT]
@@ -83,7 +83,7 @@ object metadata {
 
     def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
       Q.fileExists(f)
-        .map(_ either Json() or PathError2.pathNotFound(f)))
+        .map(_ either Json() or PathError.pathNotFound(f)))
 
     QHttpService {
       case GET -> AsPath(path) =>

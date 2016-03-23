@@ -39,22 +39,49 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
+  /** The result of the query is stored in an output file
+    * instead of being returned to the user immidiately.
+    * The `LogicalPlan` is expected to only contain absolute paths even though
+    * that is unfortunatly not expressed in the types currently.
+    */
   final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
     extends QueryFile[(PhaseResults, FileSystemError \/ AFile)]
 
+  /** The result of the query is immidiately
+    * streamed back to the client. This operation begins the streaming, in order
+    * to continue the streaming, the client must make use of the `More` operation and
+    * finally the `Close` operation in order to halt the streaming.
+    * The `LogicalPlan` is expected to only contain absolute paths even though
+    * that is unfortunatly not expressed in the types currently.
+    */
   final case class EvaluatePlan(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultHandle)]
 
+  /** Used to continue streaming after initiating a streaming
+    * result with the `EvaluatePlan` operation.
+    */
   final case class More(h: ResultHandle)
     extends QueryFile[FileSystemError \/ Vector[Data]]
 
+  /** Used to halt streaming of a result set initiated using
+    * the `EvaluatePlan` operation.
+    */
   final case class Close(h: ResultHandle)
     extends QueryFile[Unit]
 
+  /** Represents an "explain plan" operation. This operation should not actually have any side effect
+    * on the filesystem, it should simply return useful information to the user about how a given query
+    * would be evaluated on this filesystem implementation.
+    * The `LogicalPlan` is expected to only contain absolute paths even though
+    * that is unfortunatly not expressed in the types currently.
+    */
   final case class Explain(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ExecutionPlan)]
 
-  /** TODO: While this is a bit better in one dimension here in `QueryFile`,
+  /** This operation lists the names of all the immidiate children of the supplied directory
+    * in the filesystem.
+    */
+    /* TODO: While this is a bit better in one dimension here in `QueryFile`,
     *       `@mossprescott` points out it is still a bit of a stretch to include
     *       in this algebra. We need to revisit this and probably add algebras
     *       over multiple dimensions to better organize these (and other)
@@ -64,8 +91,9 @@ object QueryFile {
     *       https://github.com/quasar-analytics/quasar/pull/986#discussion-diff-45081757
     */
   final case class ListContents(dir: ADir)
-    extends QueryFile[FileSystemError \/ Set[PathName]]
+    extends QueryFile[FileSystemError \/ Set[PathSegment]]
 
+  /** This operation should return whether a file exists in the filesystem.*/
   final case class FileExists(file: AFile)
     extends QueryFile[Boolean]
 
@@ -150,11 +178,11 @@ object QueryFile {
     /** Returns the names of the immediate children of the given directory,
       * fails if the directory does not exist.
       */
-    def ls(dir: ADir): M[Set[PathName]] =
+    def ls(dir: ADir): M[Set[PathSegment]] =
       EitherT(lift(ListContents(dir)))
 
     /** The children of the root directory. */
-    def ls: M[Set[PathName]] =
+    def ls: M[Set[PathSegment]] =
       ls(rootDir)
 
     /** Returns all files in this directory and all of it's sub-directories
@@ -164,7 +192,7 @@ object QueryFile {
       type S[A] = StreamT[M, A]
 
       def lsR(desc: RDir): StreamT[M, RFile] =
-        StreamT.fromStream[M, PathName](ls(dir </> desc) map (_.toStream))
+        StreamT.fromStream[M, PathSegment](ls(dir </> desc) map (_.toStream))
           .flatMap(_.fold(
             d => lsR(desc </> dir1(d)),
             f => (desc </> file1(f)).point[S]))

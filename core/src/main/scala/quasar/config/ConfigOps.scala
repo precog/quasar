@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.config.FsPath._
 import quasar.Errors.ETask
 import quasar.fp._
-import quasar.fs.{Path => _, _}
+import quasar.fs._
 import quasar.fs.mount.MountingsConfig
 
 import java.nio.file.{Path => _, _}

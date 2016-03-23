@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.Variables
 import quasar.fp.prism._
-import quasar.fs.{APath, ADir, AFile, PathError2, FileSystemType}
+import quasar.fs.{APath, ADir, AFile, PathError, FileSystemType}
 import quasar.specs2.DisjunctionMatchers
 import quasar.sql
 
@@ -64,14 +64,14 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
   val fsCfgB   = fileSystemConfig(dbType, uriB)
 
   val invalidPath = MountingError.pathError composePrism
-                    PathError2.invalidPath  composeLens
+                    PathError.invalidPath  composeLens
                     Field1.first
 
   val notFound = MountingError.pathError composePrism
-                 PathError2.pathNotFound
+                 PathError.pathNotFound
 
   val pathExists = MountingError.pathError composePrism
-                   PathError2.pathExists
+                   PathError.pathExists
 
   def maybeInvalid[A](dj: MountingError \/ A): Option[APath] =
     D.left composeOptional invalidPath getOption dj

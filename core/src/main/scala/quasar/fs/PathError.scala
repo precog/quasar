@@ -24,30 +24,29 @@ import monocle.Lens
 import pathy.Path._
 import scalaz._
 
-// TODO: Rename to [[PathError]] once we've deprecated the other [[Path]] type.
-sealed trait PathError2
+sealed trait PathError
 
-object PathError2 {
+object PathError {
   final case class PathExists private (path: APath)
-      extends PathError2
+      extends PathError
   final case class PathNotFound private (path: APath)
-      extends PathError2
+      extends PathError
   final case class InvalidPath private (path: APath, reason: String)
-      extends PathError2
+      extends PathError
 
   val pathExists =
-    pPrism[PathError2, APath] { case PathExists(p) => p } (PathExists)
+    pPrism[PathError, APath] { case PathExists(p) => p } (PathExists)
 
   val pathNotFound =
-    pPrism[PathError2, APath] { case PathNotFound(p) => p } (PathNotFound)
+    pPrism[PathError, APath] { case PathNotFound(p) => p } (PathNotFound)
 
   val invalidPath =
-    pPrism[PathError2, (APath, String)] {
+    pPrism[PathError, (APath, String)] {
       case InvalidPath(p, r) => (p, r)
     } (InvalidPath.tupled)
 
-  val errorPath: Lens[PathError2, APath] =
-    Lens[PathError2, APath] {
+  val errorPath: Lens[PathError, APath] =
+    Lens[PathError, APath] {
       case PathExists(p)     => p
       case PathNotFound(p)   => p
       case InvalidPath(p, _) => p
@@ -57,7 +56,7 @@ object PathError2 {
       case InvalidPath(_, r) => invalidPath(p, r)
     }}
 
-  implicit val pathErrorShow: Show[PathError2] = {
+  implicit val pathErrorShow: Show[PathError] = {
     val typeStr: APath => String =
       p => refineType(p).fold(κ("Dir"), κ("File"))
 

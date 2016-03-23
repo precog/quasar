@@ -53,10 +53,4 @@ class AsPathSpec extends Specification with ScalaCheck with PathUtils {
       AsDirPath.unapply(httpPath) must beSome(rootDir </> dir("foo/bar") </> dir("baz"))
     }
   }
-
-  "UriPathCodec" should {
-    "encode /" in {
-      UriPathCodec.printPath(rootDir </> dir("foo/bar") </> dir("baz")) must_== "/foo%2Fbar/baz/"
-    }
-  }
 }

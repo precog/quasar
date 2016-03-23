@@ -60,7 +60,7 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             query = None,
             state = filesystem.state,
             status = Status.BadRequest,
-            response = (_: Json) must_== Json("error" := "The request must contain a query")
+            response = (_: Json) must_== Json("error" := "Request must contain a query")
           )
         }
 
@@ -85,11 +85,10 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
 
             val parentAsFile = asFile(filesystem.parent).get
 
-            val req = Request(
-                uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
+            val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
             val resp = service(filesystem.state)(req).run
             resp.status must_== Status.BadRequest
-            resp.as[Json].run must_== Json("error" := s"${posixCodec.printPath(parentAsFile)}: invalid workingDir (not a directory)")
+            resp.as[Json].run must_== Json("error" := s"Expected directory path, found: ${posixCodec.printPath(parentAsFile)}")
           }
         }
       }

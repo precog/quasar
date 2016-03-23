@@ -18,7 +18,7 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs._, Path._
+import quasar.fs._
 import quasar.std._
 
 import scala.util.parsing.combinator._
@@ -28,11 +28,12 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
+import pathy.Path.posixCodec
 
 sealed trait ParsingError { def message: String}
 final case class GenericParsingError(message: String) extends ParsingError
 final case class ParsingPathError(error: PathError) extends ParsingError {
-  def message = error.message
+  def message = error.shows
 }
 
 object ParsingError {
@@ -385,8 +386,10 @@ private[sql] class SQLParser extends StandardTokenParsers {
     } | keyword("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =
-    ident ~ opt(keyword("as") ~> ident) ^^ {
-      case ident ~ alias => TableRelationAST[Expr](ident, alias)
+    ident ~ opt(keyword("as") ~> ident) ^? Function.unlift {
+      case ident ~ alias =>
+        val filePath = posixCodec.parsePath(Some(_),Some(_),_ => None, _ => None)(ident)
+        filePath.map(p => TableRelationAST[Expr](sandboxCurrent(p), alias))
     } |
     op("(") ~> (
       (expr ~ op(")") ~ keyword("as") ~ ident ^^ {

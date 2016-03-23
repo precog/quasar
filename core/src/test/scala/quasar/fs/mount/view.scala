@@ -47,20 +47,20 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   val _seq = GenLens[VS](_.seq)
   val _handles = GenLens[VS](_.handles)
 
-  implicit val arbLogicalPlan: Arbitrary[Fix[LogicalPlan]] = Arbitrary(Gen.const(Read(Path("/zips"))))
+  implicit val arbLogicalPlan: Arbitrary[Fix[LogicalPlan]] = Arbitrary(Gen.const(Read(rootDir </> file("zips"))))
 
   type VSF[F[_], A] = StateT[F, VS, A]
   type TraceS[S, A] = StateT[Trace, S, A]
   type VST[A]       = TraceS[VS, A]
 
-  def traceViewFs(paths: Map[ADir, Set[PathName]]): ViewFileSystem ~> VST =
+  def traceViewFs(paths: Map[ADir, Set[PathSegment]]): ViewFileSystem ~> VST =
     interpretViewFileSystem[VST](
       KeyValueStore.toState[TraceS](_handles),
       MonotonicSeq.toState[TraceS](_seq),
       liftMT[Trace, VSF] compose
         interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
 
-  def viewInterp[A](views: Views, paths: Map[ADir, Set[PathName]], t: Free[FileSystem, A]): (Vector[RenderedTree], A) =
+  def viewInterp[A](views: Views, paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A]): (Vector[RenderedTree], A) =
     (t flatMapSuspension view.fileSystem[ViewFileSystem](views))
       .foldMap(traceViewFs(paths))
       .eval(VS(0, Map.empty)).run
@@ -72,7 +72,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "ReadFile.open" should {
     "translate simple read to query" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -95,7 +95,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "translate limited read to query" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -108,7 +108,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val expQ =
         Fix(Take(
           Fix(Drop(
-            Read(Path("/zips")),
+            Read(rootDir </> file("zips")),
             Constant(Data.Int(5)))),
           Constant(Data.Int(10))))
       val exp = (for {
@@ -124,7 +124,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "read from closed handle (error)" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -139,7 +139,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "double close (no-op)" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -156,7 +156,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "WriteFile.open" should {
     "fail with view path" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -164,7 +164,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.pathError(PathError2.invalidPath(p, "cannot write to view")))))
+          -\/(FileSystemError.pathErr(PathError.invalidPath(p, "cannot write to view")))))
     }
   }
 
@@ -174,7 +174,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     "fail with view source path" in {
       val viewPath = rootDir </> dir("view") </> file("simpleZips")
       val otherPath = rootDir </> dir("foo") </> file("bar")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(viewPath -> q))
 
@@ -182,13 +182,13 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.pathError(PathError2.invalidPath(viewPath, "cannot move view")))))
+          -\/(FileSystemError.pathErr(PathError.invalidPath(viewPath, "cannot move view")))))
     }
 
     "fail with view destination path" in {
       val viewPath = rootDir </> dir("view") </> file("simpleZips")
       val otherPath = rootDir </> dir("foo") </> file("bar")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(viewPath -> q))
 
@@ -196,14 +196,14 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.pathError(PathError2.invalidPath(viewPath, "cannot move file to view location")))))
+          -\/(FileSystemError.pathErr(PathError.invalidPath(viewPath, "cannot move file to view location")))))
     }
   }
 
   "ManageFile.delete" should {
     "fail with view path" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
@@ -211,20 +211,20 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.pathError(PathError2.invalidPath(p, "cannot delete view")))))
+          -\/(FileSystemError.pathErr(PathError.invalidPath(p, "cannot delete view")))))
     }
   }
 
   "QueryFile.exec" should {
     "handle simple query" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
-      val f = query.execute(Read(Path("/view/simpleZips")), rootDir </> file("tmp")).run.run
+      val f = query.execute(Read(rootDir </> dir("view") </> file("simpleZips")), rootDir </> file("tmp")).run.run
 
-      val exp = query.execute(Read(Path("/zips")), rootDir </> file("tmp")).run.run
+      val exp = query.execute(Read(rootDir </> file("zips")), rootDir </> file("tmp")).run.run
 
       viewInterp(views, Map(), f)._1 must beTree(traceInterp(exp, Map())._1)
     }
@@ -233,12 +233,12 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "QueryFile.eval" should {
     "handle simple query" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
       val f = (for {
-        h <- query.unsafe.eval(Read(Path("/view/simpleZips")))
+        h <- query.unsafe.eval(Read(rootDir </> dir("view") </> file("simpleZips")))
         _ <- query.transforms.fsErrToExec(
               query.unsafe.more(h))
         _ <- query.transforms.toExec(
@@ -246,7 +246,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       } yield ()).run.run
 
       val exp = (for {
-        h <- query.unsafe.eval(Read(Path("/zips")))
+        h <- query.unsafe.eval(Read(rootDir </> file("zips")))
         _ <- query.transforms.fsErrToExec(
               query.unsafe.more(h))
         _ <- query.transforms.toExec(
@@ -260,13 +260,13 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "QueryFile.explain" should {
     "handle simple query" in {
       val p = rootDir </> dir("view") </> file("simpleZips")
-      val q = Read(Path("/zips"))
+      val q = Read(rootDir </> file("zips"))
 
       val views = Views(Map(p -> q))
 
-      val f = query.explain(Read(Path("/view/simpleZips"))).run.run
+      val f = query.explain(Read(rootDir </> dir("view") </> file("simpleZips"))).run.run
 
-      val exp = query.explain(Read(Path("/zips"))).run.run
+      val exp = query.explain(Read(rootDir </> file("zips"))).run.run
 
       viewInterp(views, Map(), f)._1 must beTree(traceInterp(exp, Map())._1)
     }
@@ -274,12 +274,12 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
   "QueryFile.ls" should {
     def twoNodes(aDir: ADir) =
-      Map(aDir -> Set[PathName](FileName("afile").right, DirName("adir").left))
+      Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
 
     "preserve files and dirs in the presence of non-conflicting views" ! prop { (aDir: ADir) =>
       val views = Views(Map(
-        (aDir </> file("view1")) -> Read(Path("/zips")),
-        (aDir </> dir("views") </> file("view2")) -> Read(Path("/zips"))))
+        (aDir </> file("view1")) -> Read(rootDir </> file("zips")),
+        (aDir </> dir("views") </> file("view2")) -> Read(rootDir </> file("zips"))))
 
       val f = query.ls(aDir).run
 
@@ -294,8 +294,8 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "overlay files and dirs with conflicting paths" ! prop { (aDir: ADir) =>
       val views = Views(Map(
-        (aDir </> file("afile")) -> Read(Path("/zips")),
-        (aDir </> dir("adir") </> file("view1")) -> Read(Path("/zips"))))
+        (aDir </> file("afile")) -> Read(rootDir </> file("zips")),
+        (aDir </> dir("adir") </> file("view1")) -> Read(rootDir </> file("zips"))))
 
       val f = query.ls(aDir).run
 
@@ -324,7 +324,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
         viewInterp(views, Map(), f) must_==(
           (traceInterp(f, Map())._1,
-            -\/(FileSystemError.pathError(PathError2.pathNotFound(aDir)))))
+            -\/(FileSystemError.pathErr(PathError.pathNotFound(aDir)))))
       }
     }
 

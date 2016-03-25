@@ -180,11 +180,11 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
             None, None))
     }
     "parse quoted literal" in {
-      parser.parse("select * from foo where bar = \"abc\"").toOption should beSome
+      parser.parse("""select * from foo where bar = "abc" """).toOption should beSome
     }
 
     "parse quoted literal with escaped quote" in {
-      parser.parse("""select * from foo where bar = "that\"s it!"""").toOption should beSome
+      parser.parse(raw"""select * from foo where bar = "that\"s it!" """).toOption should beSome
     }
 
     "don’t parse multi-character char literal" in {
@@ -207,7 +207,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse quoted identifier with escaped quote" in {
-      parser.parse("""select * from `tmp/foo[\`bar\`]` """).toOption should beSome
+      parser.parse(raw"select * from `tmp/foo[\`bar\`]` ").toOption should beSome
     }
 
     "parse simple query with two variables" in {
@@ -367,17 +367,17 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "should parse escaped characters" in {
-      val q = "select '\\'', '\\\\', '\u1234'"
+      val q = raw"select '\'', '\\', '\u1234'"
       parser.parse(q) must beRightDisjunction(
         Select(SelectAll, List(
           Proj(StringLiteral("'"), None),
-          Proj(StringLiteral("\\"), None),
+          Proj(StringLiteral(raw"\"), None),
           Proj(StringLiteral("ሴ"), None)),
           None, None, None, None))
     }
     "should parse escaped characters in a string" in {
-      val q = """"\'\\\u1234""""
-      parser.parse(q) must beRightDisjunction(StringLiteral("'\\ሴ"))
+      val q = raw""""'\\\u1234""""
+      parser.parse(q) must beRightDisjunction(StringLiteral(raw"'\ሴ"))
     }
 
     "should not parse multiple expressions seperated incorrectly" in {
@@ -386,7 +386,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse array literal at top level" in {
-      parser.parse("[\"X\", \"Y\"]") must beRightDisjunction(
+      parser.parse("""["X", "Y"]""") must beRightDisjunction(
         ArrayLiteral(List(StringLiteral("X"), StringLiteral("Y"))))
     }
 

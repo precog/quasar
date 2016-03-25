@@ -413,6 +413,15 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       parser.parse(q).map(pprint) must beRightDisjunction(q)
     }
 
+    "should not parse query with a single backslash in an identifier" >> {
+      "in table relation" in {
+        parser.parse(raw"select * from `\bar`") should beLeftDisjunction
+      }.pendingUntilFixed("SD-1536")
+      "in identifier" in {
+        parser.parse(raw"`\bar`") should beLeftDisjunction
+      }.pendingUntilFixed("SD-1536")
+    }
+
     "round-trip to SQL and back" ! prop { (node: Expr) =>
       val parsed = parser.parse(pprint(node))
 

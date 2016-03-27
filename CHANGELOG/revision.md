@@ -1,0 +1,1 @@
+[SD-1133] Publish `core` as well as `web` to Github release pages

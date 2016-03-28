@@ -1,0 +1,1 @@
+Internal refactoring: Improve usages of string literals in `SQLParserSpec`

@@ -37,8 +37,6 @@ import scalaz.concurrent.Task
 package object fs {
   import FileSystemDef.{DefinitionError, DefErrT}
 
-  type WFTask[A] = WorkflowExecErrT[Task, A]
-
   val MongoDBFsType = FileSystemType("mongodb")
 
   final case class DefaultDb(run: String) extends scala.AnyVal
@@ -55,8 +53,7 @@ package object fs {
     defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
-    S1: MongoErrF :<: S,
-    S2: WorkflowExecErrF :<: S
+    S1: MongoErrF :<: S
   ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
@@ -77,8 +74,7 @@ package object fs {
 
   def mongoDbFileSystemDef[S[_]: Functor](implicit
     S0: Task :<: S,
-    S1: MongoErrF :<: S,
-    S2: WorkflowExecErrF :<: S
+    S1: MongoErrF :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
     case (MongoDBFsType, uri) =>
       type M[A] = Free[S, A]

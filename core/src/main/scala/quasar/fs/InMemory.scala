@@ -234,7 +234,7 @@ object InMemory {
     }
 
     private def unsupported(lp: Fix[LogicalPlan]) =
-      plannerError(lp, UnsupportedPlan(
+      planningFailed(lp, UnsupportedPlan(
         lp.unFix,
         some("In Memory interpreter does not currently support this plan")))
   }

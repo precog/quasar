@@ -58,19 +58,17 @@ object filesystems {
   ////
 
   private type MongoEff0[A] = Coproduct[MongoErrF, Task, A]
-  private type MongoEff1[A] = Coproduct[WorkflowExecErrF, MongoEff0, A]
-  private type MongoEff2[A] = Coproduct[EnvErrF, MongoEff1, A]
-  private type MongoEff[A]  = Coproduct[CfgErrF, MongoEff2, A]
+  private type MongoEff1[A] = Coproduct[EnvErrF, MongoEff0, A]
+  private type MongoEff[A]  = Coproduct[CfgErrF, MongoEff1, A]
   private type MongoEffM[A] = Free[MongoEff, A]
 
   private val envErr =
     Failure.Ops[EnvironmentError, MongoEff](implicitly, Inject[EnvErrF, MongoEff])
 
   private val mongoEffToTask: MongoEff ~> Task =
-    interpret5[CfgErrF, EnvErrF, WorkflowExecErrF, MongoErrF, Task, Task](
+    interpret4[CfgErrF, EnvErrF, MongoErrF, Task, Task](
       Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[ConfigError]),
       Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[EnvironmentError]),
-      Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toRuntimeError[WorkflowExecutionError]),
       Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
       NaturalTransformation.refl)
 

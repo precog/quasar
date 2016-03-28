@@ -22,9 +22,7 @@ import quasar.{EnvironmentError, Planner, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
-import quasar.fs.mount.hierarchical.HierarchicalFileSystemError
 import quasar.fp._, PathyCodecJson._
-import quasar.physical.mongodb.WorkflowExecutionError
 import quasar.sql._
 
 import argonaut._, Argonaut._
@@ -106,9 +104,16 @@ sealed abstract class ToApiErrorInstances {
   implicit def fileSystemErrorResponse: ToApiError[FileSystemError] = {
     import FileSystemError._
     error {
+      case ExecutionFailed(lp, reason, det, cause) =>
+        fromMsg(
+          InternalServerError withReason "Failed to execute SQL^2 query.",
+          reason,
+          det.toList : _*)            :+
+        ("logicalPlan" :=  lp.render) :?+
+        ("cause"       :?= cause.map(_.getMessage))
       case PathErr(e) =>
         e.toApiError
-      case PlannerError(lp, e) =>
+      case PlanningFailed(lp, e) =>
         e.toApiError :+ ("logicalPlan" := lp.render)
       case UnknownReadHandle(ReadHandle(path, id)) =>
         apiError(
@@ -129,18 +134,10 @@ sealed abstract class ToApiErrorInstances {
           InternalServerError withReason "Failed to write some values.",
           "failedCount" := numFailed)
       case WriteFailed(data, reason) =>
-        val res = fromMsg_(
+        fromMsg_(
           InternalServerError withReason "Failed to write data.",
-          s"Failed to write data: $reason.")
-        encodeData(data).fold(res)(json => ("data" := json) +: res)
-    }
-  }
-
-  implicit def hierarchicalFileSystemErrorToApiError: ToApiError[HierarchicalFileSystemError] = {
-    import HierarchicalFileSystemError._
-    error {
-      case NoMountsDefined =>
-        fromStatus(BadRequest withReason "No mounts defined.")
+          s"Failed to write data: $reason."
+        ) :?+ ("data" :?= encodeData(data))
     }
   }
 
@@ -210,10 +207,10 @@ sealed abstract class ToApiErrorInstances {
     import Planner._
     error(err => err match {
       case NonRepresentableData(data) =>
-        val res = fromMsg_(
+        fromMsg_(
           InternalServerError withReason "Unsupported constant.",
-          err.message)
-        encodeData(data).fold(res)(json => ("data" := json) +: res)
+          err.message
+        ) :?+ ("data" :?= encodeData(data))
       case UnsupportedFunction(fn, msg) =>
         fromMsg(
           InternalServerError withReason "Unsupported function.",
@@ -227,11 +224,11 @@ sealed abstract class ToApiErrorInstances {
           err.message,
           "joinCondition" := cond.render)
       case UnsupportedPlan(lp, hint) =>
-        val aerr = fromMsg(
+        fromMsg(
           InternalServerError withReason "Unsupported query plan.",
           err.message,
-          "term" := lp.toString)
-        hint.fold(aerr)(rsn => aerr :+ ("reason" := rsn))
+          "term" := lp.toString
+        ) :?+ ("reason" :?= hint)
       case FuncApply(fn, exp, act) =>
         fromMsg(
           BadRequest withReason "Illegal function argument.",
@@ -272,10 +269,10 @@ sealed abstract class ToApiErrorInstances {
       case GenericError(msg) =>
         fromMsg_(BadRequest withReason "Error in query.", msg)
       case DomainError(data, _) =>
-        val res = fromMsg_(
+        fromMsg_(
           BadRequest withReason "Illegal argument.",
-          err.message)
-        encodeData(data).fold(res)(json => res :+ ("data" := json))
+          err.message
+        ) :?+ ("data" :?= encodeData(data))
       case FunctionNotFound(name) =>
         fromMsg(
           BadRequest withReason "Unknown function.",
@@ -352,28 +349,6 @@ sealed abstract class ToApiErrorInstances {
           InternalServerError withReason "Compilation error.",
           other.message)
     })
-  }
-
-  implicit def workflowExecutionErrorToApiError: ToApiError[WorkflowExecutionError] = {
-    import WorkflowExecutionError._
-    error {
-      case InvalidTask(task, rsn) =>
-        fromMsg(
-          InternalServerError withReason "Invalid workflow task.",
-          s"Invalid workflow task: $rsn.",
-          "workflowTask" := task.render)
-
-      case InsertFailed(bson, rsn) =>
-        fromMsg(
-          BadRequest withReason "Unable to insert data.",
-          s"Unable to insert data: $rsn",
-          "data" := bson.toString)
-
-      case NoDatabase =>
-        fromMsg_(
-          InternalServerError withReason "No database.",
-          "Unable to determine a database in which to store temporary collections.")
-    }
   }
 
   implicit def nonEmptyListToApiError[A: ToApiError]: ToApiError[NonEmptyList[A]] =

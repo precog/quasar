@@ -227,7 +227,7 @@ object transformPaths {
     FileSystemError.pathErr composeLens PathError.errorPath
 
   private val fsPlannerError: Optional[FileSystemError, Fix[LogicalPlan]] =
-    FileSystemError.plannerError composeLens _1
+    FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
     f: AbsPath ~> AbsPath

@@ -261,17 +261,39 @@ This API method returns the name where the results are stored, as an absolute pa
 }
 ```
 
-If an error occurs while compiling or executing the query, a 500 response is
-produced, with this content:
+If the query fails to compile, a 400 response is produced with a JSON body similar to the following:
 
 ```json
 {
-  "error": "[very large error text]",
-  "phases": [
-    ...
-  ]
+  "status": "Bad Request",
+  "detail": {
+    "errors" [
+      <all errors produced during compilation, each an object with `status` and `detail` fields>
+    ],
+    "phases": [
+      <see the following sections>
+    ]
+  }
 }
 ```
+
+If an error occurs while executing the query on a backend, a 500 response is produced, with this content:
+
+```json
+{
+  "status": <general error description>,
+  "detail": {
+    "message": <specific error description>,
+    "phases": [
+      <see the following sections>
+    ],
+    "logicalPlan": <tree of objects describing the logical plan the query compiled to>,
+    "cause": <optional, backend-specific error>
+  }
+}
+```
+
+the `cause` field is optional and the `detail` object may also contain additional, backend-specific fields.
 
 The `phases` array contains a sequence of objects containing the result from
 each phase of the query compilation process. A phase may result in a tree of

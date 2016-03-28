@@ -23,7 +23,6 @@ import quasar.fp._
 import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._
-import monocle.Prism
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
@@ -31,30 +30,8 @@ object hierarchical {
   import QueryFile.ResultHandle
   import FileSystemError._, PathError._
 
-  type HFSFailure[A]      = Failure[HierarchicalFileSystemError, A]
-  type HFSFailureF[A]     = Coyoneda[HFSFailure, A]
-
   type MountedResultH[A]  = KeyValueStore[ResultHandle, (ADir, ResultHandle), A]
   type MountedResultHF[A] = Coyoneda[MountedResultH, A]
-
-  type HFSErrT[F[_], A] = EitherT[F, HierarchicalFileSystemError, A]
-
-  sealed trait HierarchicalFileSystemError
-
-  object HierarchicalFileSystemError {
-    case object NoMountsDefined extends HierarchicalFileSystemError
-
-    val noMountsDefined: Prism[HierarchicalFileSystemError, Unit] =
-      Prism[HierarchicalFileSystemError, Unit] {
-        case NoMountsDefined => Some(())
-        case _ => None
-      } (κ(NoMountsDefined))
-
-    implicit val hierarchicalFSErrorShow: Show[HierarchicalFileSystemError] =
-      Show.shows {
-        case NoMountsDefined => "No mounts defined."
-      }
-  }
 
   /** Returns a `ReadFileF` interpreter that selects one of the configured
     * child interpreters based on the path of the incoming request.
@@ -227,16 +204,14 @@ object hierarchical {
   def queryFile[F[_], S[_]](qfs: Mounts[QueryFileF ~> F])
                            (implicit S0: Functor[S],
                                      S1: F :<: S,
-                                     S2: HFSFailureF :<: S,
-                                     S3: MonotonicSeqF :<: S,
-                                     S4: MountedResultHF :<: S)
+                                     S2: MonotonicSeqF :<: S,
+                                     S3: MountedResultHF :<: S)
                            : QueryFileF ~> Free[S, ?] = {
     import QueryFile._
 
     type M[A] = Free[S, A]
 
-    val failure = Failure.Ops[HierarchicalFileSystemError, S]
-    val seq     = MonotonicSeq.Ops[S]
+    val seq = MonotonicSeq.Ops[S]
     val handles = KeyValueStore.Ops[ResultHandle, (ADir, ResultHandle), S]
     val transforms = Transforms[M]
     import transforms._
@@ -297,11 +272,8 @@ object hierarchical {
         qf: QueryFile[(PhaseResults, FileSystemError \/ A)]
       ): ExecM[(ADir, A)] =
         mountForPlan(mountedQfs, lp, out) match {
-          case -\/(-\/(hfsErr)) =>
-            toExec(failure.fail[(ADir, A)](hfsErr))
-
-          case -\/(\/-(pErr)) =>
-            EitherT.leftU[(ADir, A)](pathErr(pErr).point[G])
+          case -\/(err) =>
+            EitherT.leftU[(ADir, A)](err.point[G])
 
           case \/-((mnt, g)) =>
             EitherT(WriterT(evalQuery(g, qf)): G[FileSystemError \/ A])
@@ -318,8 +290,7 @@ object hierarchical {
     S0: Functor[S],
     S1: F :<: S,
     S2: MountedResultHF :<: S,
-    S3: MonotonicSeqF :<: S,
-    S4: HFSFailureF :<: S
+    S3: MonotonicSeqF :<: S
   ): FileSystem ~> Free[S, ?] = {
     type M[A] = Free[S, A]
     type FS[A] = FileSystem[A]
@@ -336,6 +307,9 @@ object hierarchical {
 
   ////
 
+  private def noMountsDefined(lp: Fix[LogicalPlan]): FileSystemError =
+    executionFailed_(lp, "No mounts defined.")
+
   // TODO{performance}: Move the prefix find op to `Mounts` so it can be optimized
   private def lookupMounted[A](mounts: Mounts[A], path: APath): Option[(ADir, A)] =
     mounts.toMap find { case (d, a) => path.relativeTo(d).isDefined }
@@ -344,25 +318,25 @@ object hierarchical {
     mounts: Mounts[A],
     lp: Fix[LogicalPlan],
     out: Option[AFile]
-  ): (HierarchicalFileSystemError \/ PathError) \/ (ADir, A) = {
+  ): FileSystemError \/ (ADir, A) = {
     import LogicalPlan._
-    import HierarchicalFileSystemError._
 
     type MntA = (ADir, A)
     type F[A] = State[Option[MntA], A]
-    type M[A] = EitherT[F, PathError, A]
+    type M[A] = FileSystemErrT[F, A]
 
     val F = MonadState[State, Option[MntA]]
 
-    def lookupMnt(p: APath): PathError \/ MntA =
-      lookupMounted(mounts, p) toRightDisjunction pathNotFound(p)
+    def lookupMnt(p: APath): FileSystemError \/ MntA =
+      lookupMounted(mounts, p) toRightDisjunction pathErr(pathNotFound(p))
 
     def compareToExisting(mnt: ADir): M[Unit] = {
-      def errMsg(exMnt: ADir): PathError =
-        invalidPath(mnt, s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'")
+      def errMsg(exMnt: ADir): FileSystemError =
+        pathErr(invalidPath(mnt,
+          s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'"))
 
-      EitherT[F, PathError, Unit](F.gets(exMnt =>
-        exMnt map (_._1) filter (_ != mnt) map errMsg toLeftDisjunction (())
+      EitherT[F, FileSystemError, Unit](F.gets(exMnt =>
+        (exMnt map (_._1) filter (_ != mnt) map errMsg) <\/ (())
       ))
     }
 
@@ -370,10 +344,10 @@ object hierarchical {
       mntA     <- EitherT.fromDisjunction[F](lookupMnt(p))
       (mnt, a) =  mntA
       _        <- compareToExisting(mnt)
-      _        <- F.put(some(mntA)).liftM[PathErr2T]
+      _        <- F.put(some(mntA)).liftM[FileSystemErrT]
     } yield ()
 
-    out.cata(d => lookupMnt(d) bimap (_.right, some), none.right) flatMap (initMnt =>
+    out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
       lp.cataM[M, Unit] {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         case ReadF(p) => mountFor(mkAbsolute(rootDir, p))
@@ -384,9 +358,7 @@ object hierarchical {
         // and we just pass it to an arbitrary mount, if there is at
         // least one present.
         case (mntA, r) =>
-          r.leftMap(_.right[HierarchicalFileSystemError]) *>
-            (mntA orElse mounts.toMap.toList.headOption)
-              .toRightDisjunction(noMountsDefined().left)
+          r *> (mntA.orElse(mounts.toMap.toList.headOption) \/> noMountsDefined(lp))
       })
   }
 

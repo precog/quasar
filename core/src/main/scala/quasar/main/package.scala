@@ -47,18 +47,16 @@ package object main {
 
   /** Effects that physical filesystems require.
     *
-    * MongoErrF \/ WorkflowExecErrF \/ Task
+    * MongoErrF \/ Task
     */
-  type PhysFsEff0[A] = Coproduct[WorkflowExecErrF, Task, A]
-  type PhysFsEff[A]  = Coproduct[MongoErrF, PhysFsEff0, A]
+  type PhysFsEff[A]  = Coproduct[MongoErrF, Task, A]
   type PhysFsEffM[A] = Free[PhysFsEff, A]
 
   object PhysFsEff {
     // Lift into FsErrsIOM
     val toFsErrsIOM: PhysFsEff ~> FsErrsIOM =
-      free.interpret3[MongoErrF, WorkflowExecErrF, Task, FsErrsIOM](
+      free.interpret2[MongoErrF, Task, FsErrsIOM](
         injectFT[MongoErrF, FsErrsIO],
-        injectFT[WorkflowExecErrF, FsErrsIO],
         injectFT[Task, FsErrsIO])
   }
 
@@ -72,12 +70,11 @@ package object main {
 
   /** The intermediate effect FileSystem operations are interpreted into.
     *
-    * PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF \/ HFSFailureF
+    * PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF
     */
-  type FsEff0[A] = Coproduct[MountedResultHF, HFSFailureF, A]
-  type FsEff1[A] = Coproduct[ViewStateF, FsEff0, A]
-  type FsEff2[A] = Coproduct[MonotonicSeqF, FsEff1, A]
-  type FsEff[A]  = Coproduct[PhysFsEffM, FsEff2, A]
+  type FsEff0[A] = Coproduct[ViewStateF, MountedResultHF, A]
+  type FsEff1[A] = Coproduct[MonotonicSeqF, FsEff0, A]
+  type FsEff[A]  = Coproduct[PhysFsEffM, FsEff1, A]
   type FsEffM[A] = Free[FsEff, A]
 
   object FsEff {
@@ -90,12 +87,11 @@ package object main {
       def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
         injectFT[Task, FsErrsIO].compose[E](f)
 
-      free.interpret5[PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, HFSFailureF, FsErrsIOM](
+      free.interpret4[PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, FsErrsIOM](
         hoistFree(PhysFsEff.toFsErrsIOM),
         injTask[MonotonicSeqF](Coyoneda.liftTF(MonotonicSeq.fromTaskRef(seqRef))),
         injTask[ViewStateF](Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef))),
-        injTask[MountedResultHF](Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef))),
-        injectFT[HFSFailureF, FsErrsIO])
+        injTask[MountedResultHF](Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef))))
     }
 
     /** A dynamic `FileSystem` evaluator formed by internally fetching an
@@ -120,11 +116,9 @@ package object main {
     * We interpret into this effect to defer error handling based on the
     * final context of interpretation (i.e. web service vs cmd line).
     *
-    * HFSFailureF \/ MongoErrF \/ WorkflowExecErrF \/ Task
+    * MongoErrF \/ Task
     */
-  type FsErrsIO0[A] = Coproduct[WorkflowExecErrF, Task, A]
-  type FsErrsIO1[A] = Coproduct[MongoErrF, FsErrsIO0, A]
-  type FsErrsIO[A]  = Coproduct[HFSFailureF, FsErrsIO1, A]
+  type FsErrsIO[A]  = Coproduct[MongoErrF, Task, A]
   type FsErrsIOM[A] = Free[FsErrsIO, A]
 
 
@@ -227,22 +221,18 @@ package object main {
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.
     *
-    * FileSystemFailureF \/ MongoErrF \/ WorkflowExecErrF \/ HFSFailureF \/ MntCfgsIO
+    * FileSystemFailureF \/ MongoErrF \/ MntCfgsIO
     */
-  type CfgsErrsIO0[A] = Coproduct[HFSFailureF, MntCfgsIO, A]
-  type CfgsErrsIO1[A] = Coproduct[WorkflowExecErrF, CfgsErrsIO0, A]
-  type CfgsErrsIO2[A] = Coproduct[MongoErrF, CfgsErrsIO1, A]
-  type CfgsErrsIO[A]  = Coproduct[FileSystemFailureF, CfgsErrsIO2, A]
+  type CfgsErrsIO0[A] = Coproduct[MongoErrF, MntCfgsIO, A]
+  type CfgsErrsIO[A]  = Coproduct[FileSystemFailureF, CfgsErrsIO0, A]
   type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
 
   object CfgsErrsIO {
     /** Interprets errors into strings. */
     def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
-      val f = free.interpret5[FileSystemFailureF, MongoErrF, WorkflowExecErrF, HFSFailureF, MntCfgsIO, Task](
+      val f = free.interpret3[FileSystemFailureF, MongoErrF, MntCfgsIO, Task](
         Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[FileSystemError]),
         Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
-        Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toRuntimeError[WorkflowExecutionError]),
-        Coyoneda.liftTF[HFSFailure, Task](Failure.toRuntimeError[HierarchicalFileSystemError]),
         evalCfgsIO)
 
       val g = new (CfgsErrsIO ~> MainTask) {
@@ -282,10 +272,8 @@ package object main {
 
         val translateFsErrs: FsErrsIOM ~> CfgsErrsIOM =
           free.foldMapNT[FsErrsIO, CfgsErrsIOM](
-            free.interpret4[HFSFailureF, MongoErrF, WorkflowExecErrF, Task, CfgsErrsIOM](
-              injectFT[HFSFailureF, CfgsErrsIO],
+            free.interpret2[MongoErrF, Task, CfgsErrsIOM](
               injectFT[MongoErrF, CfgsErrsIO],
-              injectFT[WorkflowExecErrF, CfgsErrsIO],
               liftTask))
 
         val mnt: CompleteFsEff ~> CfgsErrsIOM =

@@ -33,6 +33,12 @@ final case class ApiError(status: Status, detail: JsonObject) {
 
   def :+ (jassoc: JsonAssoc): ApiError =
     copy(detail = detail + (jassoc._1, jassoc._2))
+
+  def +?: (maybeAssoc: Option[JsonAssoc]): ApiError =
+    maybeAssoc.fold(this)(_ +: this)
+
+  def :?+ (maybeAssoc: Option[JsonAssoc]): ApiError =
+    maybeAssoc.fold(this)(this :+ _)
 }
 
 object ApiError {

@@ -18,9 +18,10 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, LogicalPlan}
-import quasar.Planner.{PlannerError => PlannerErr}
+import quasar.Planner.PlannerError
 import quasar.fp._
 
+import argonaut.JsonObject
 import matryoshka._
 import pathy.Path.posixCodec
 import scalaz._
@@ -33,10 +34,18 @@ object FileSystemError {
   import ReadFile.ReadHandle
   import WriteFile.WriteHandle
 
+  final case class ExecutionFailed private (
+    lp: Fix[LogicalPlan],
+    reason: String,
+    detail: JsonObject,
+    cause: Option[Throwable]
+  ) extends FileSystemError
   final case class PathErr private (e: PathError)
     extends FileSystemError
-  final case class PlannerError private (lp: Fix[LogicalPlan], err: PlannerErr)
-    extends FileSystemError
+  final case class PlanningFailed private (
+    lp: Fix[LogicalPlan],
+    err: PlannerError
+  ) extends FileSystemError
   final case class UnknownResultHandle private (h: ResultHandle)
     extends FileSystemError
   final case class UnknownReadHandle private (h: ReadHandle)
@@ -48,13 +57,20 @@ object FileSystemError {
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
+  val executionFailed = pPrism[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[Throwable])] {
+    case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
+  } (ExecutionFailed.tupled)
+
+  def executionFailed_(lp: Fix[LogicalPlan], reason: String): FileSystemError =
+    executionFailed(lp, reason, JsonObject.empty, None)
+
   val pathErr = pPrism[FileSystemError, PathError] {
     case PathErr(err) => err
   } (PathErr)
 
-  val plannerError = pPrism[FileSystemError, (Fix[LogicalPlan], PlannerErr)] {
-    case PlannerError(lp, e) => (lp, e)
-  } (PlannerError.tupled)
+  val planningFailed = pPrism[FileSystemError, (Fix[LogicalPlan], PlannerError)] {
+    case PlanningFailed(lp, e) => (lp, e)
+  } (PlanningFailed.tupled)
 
   val unknownResultHandle = pPrism[FileSystemError, ResultHandle] {
     case UnknownResultHandle(h) => h
@@ -78,9 +94,11 @@ object FileSystemError {
 
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {
+      case ExecutionFailed(_, rsn, _, c) =>
+        s"Plan execution failed: $rsn, cause=${c.map(_.getMessage)}"
       case PathErr(e) =>
         e.shows
-      case PlannerError(_, e) =>
+      case PlanningFailed(_, e) =>
         e.shows
       case UnknownResultHandle(h) =>
         s"Attempted to get results from an unknown or closed handle: ${h.run}"

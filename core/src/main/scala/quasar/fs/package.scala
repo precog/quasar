@@ -52,7 +52,6 @@ package object fs {
 
   type PathSegment = DirName \/ FileName
 
-  type PathErr2T[F[_], A] = EitherT[F, PathError, A]
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemFailureF[A] = Coyoneda[FileSystemFailure, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]

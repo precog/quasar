@@ -33,8 +33,6 @@ package object mongodb {
   type MongoErrF[A]       = Coyoneda[MongoErr, A]
   type MongoErrT[F[_], A] = EitherT[F, MongoException, A]
 
-  type WorkflowExecErr[A]        = Failure[WorkflowExecutionError, A]
-  type WorkflowExecErrF[A]       = Coyoneda[WorkflowExecErr, A]
   type WorkflowExecErrT[F[_], A] = EitherT[F, WorkflowExecutionError, A]
 
   type JavaScriptPrg           = Vector[Js.Stmt]

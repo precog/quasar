@@ -78,10 +78,13 @@ object execute {
 
               parseRes tuple absDestination
             } traverseU { case (expr, out) =>
-              Q.executeQuery(expr, requestVars(req), out).run.run.run map { case (phases, result) =>
-                result.map(_.map(rfile => Json(
-                  "out"    := posixCodec.printPath(rfile),
-                  "phases" := phases)))
+              Q.executeQuery(expr, requestVars(req), out).run.run.run map {
+                case (phases, result) =>
+                  result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
+                    .bimap(_ :+ ("phases" := phases), f => Json(
+                      "out"    := posixCodec.printPath(f),
+                      "phases" := phases
+                    ))
               }
             })
           }

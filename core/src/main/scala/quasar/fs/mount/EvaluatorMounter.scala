@@ -20,7 +20,7 @@ import quasar.Predef.Unit
 import quasar.effect._
 import quasar.fp.{liftFT, injectNT, free}
 import quasar.fs.FileSystem
-import hierarchical.{HFSFailureF, MountedResultHF}
+import hierarchical.MountedResultHF
 
 import scalaz._
 import scalaz.syntax.monad._
@@ -37,8 +37,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
 )(implicit S0: F :<: S,
            S1: MonotonicSeqF :<: S,
            S2: ViewStateF :<: S,
-           S3: MountedResultHF :<: S,
-           S4: HFSFailureF :<: S) {
+           S3: MountedResultHF :<: S) {
 
   import MountRequest._, FileSystemDef.DefinitionResult
 
@@ -148,8 +147,7 @@ object EvaluatorMounter {
   )(implicit S0: F :<: S,
              S1: MonotonicSeqF :<: S,
              S2: ViewStateF :<: S,
-             S3: MountedResultHF :<: S,
-             S4: HFSFailureF :<: S
+             S3: MountedResultHF :<: S
   ): EvaluatorMounter[F, S] =
     new EvaluatorMounter[F, S](fsDef)
 }

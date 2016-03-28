@@ -122,5 +122,5 @@ object Empty {
     pathErr(pathNotFound(p)).left.point[F]
 
   private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
-    plannerError(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]
+    planningFailed(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]
 }

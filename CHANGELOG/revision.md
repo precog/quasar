@@ -1,0 +1,1 @@
+- Improve documentation of REST API surround `GET` method of `/data` resource

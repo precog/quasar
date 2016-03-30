@@ -382,19 +382,17 @@ If the supplied path represents a directory (ends with a slash), this request pr
 
 ### PUT /data/fs/[path]
 
-Replaces data at the specified path, formatted as one JSON object per line in the same format as above.
-Either succeeds, replacing any previous contents atomically, or else fails leaving the previous contents
-unchanged.
+Replace data at the specified path. Uploaded data may be in any of the [supported formats](#data-formats) and the request must include the appropriate `Content-Type` header indicating the format used.
 
-If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
+A successful upload will replace any previous contents atomically, leaving them unchanged if an error occurs.
+
+If an error occurs when reading data from the request body, the response will contain a summary in the common `error` field and a separate array of error messages about specific values under `details`.
 
 Fails if the path identifies a view.
 
 ### POST /data/fs/[path]
 
-Appends data to the specified path, formatted as one JSON object per line in the same format as above.
-If an error occurs, some data may have been written, and the content of the response describes what
-was done.
+Append data to the specified path. Uploaded data may be in any of the [supported formats](#data-formats) and the request must include the appropriate `Content-Type` header indicating the format used. This operation is _not_ atomic and some data may have been written even if an error occurs. The body of an error response will describe what was done.
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 

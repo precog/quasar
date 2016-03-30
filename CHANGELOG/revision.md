@@ -1,0 +1,1 @@
+Add integration test for seeing empty directories in MongoDB (SD-712)

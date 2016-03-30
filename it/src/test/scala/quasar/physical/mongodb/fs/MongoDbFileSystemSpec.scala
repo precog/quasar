@@ -262,7 +262,7 @@ class MongoDbFileSystemSpec
       }
 
       "List dirs" >> {
-        "listing the root dir should succeed" >> {
+        "listing the root dir should succeed no matter what" >> {
           runT(run)(query.ls(rootDir)).runEither must beRight
         }
 
@@ -276,6 +276,19 @@ class MongoDbFileSystemSpec
 
           (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
             .runEither must beRight(contain(FileName("foobar").right[DirName]))
+        }
+
+        "listing the root dir should also list empty databases" >> {
+          val dbName = DirName("__topDir__")
+          val topLevelDb = rootDir </> dir1(dbName)
+          val tmpFile = topLevelDb </> file("foobar")
+
+          val p = write.save(tmpFile, oneDoc.toProcess).drain ++
+            manage.delete(tmpFile).liftM[Process].drain ++
+            query.ls(rootDir).liftM[Process].flatMap(ns => Process.emitAll(ns.toVector))
+
+          (runLogT(run, p) <* runT(run)(manage.delete(topLevelDb)))
+              .runEither must beRight(contain(dbName).left[FileName])
         }
       }
 

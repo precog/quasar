@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+#
+# Upload all the test datasets via the API, overwriting any existing data.
+# This requires the a Quasar API server to be running without authentication.
+# Note: unlike mongoimport (used in importTestData), this handles our Precise
+# JSON encoding, so _all_ of the datasets can be imported.
+#
+
+if (( $# < 3 )); then
+  echo 'usage: loadTestData <host> <port> <path>'
+  exit 1
+fi
+
+QUASAR_HOST="$1"
+QUASAR_PORT="$2"
+QUASAR_PATH="$3"
+
+# Makes the paths relative
+cd it/src/main/resources/tests
+
+for f in $(find . -name '*.data'); do
+
+  COLL=${f#./}
+  COLL=${COLL%.data}
+
+  URL="http://$QUASAR_HOST:$QUASAR_PORT/data/fs/$QUASAR_PATH/$COLL"
+
+  echo "Uploading $f to $URL..."
+
+  time curl -f -X PUT --data-binary @"$f" -H "Content-type: application/ldjson; mode=precise" $URL
+
+  echo
+done

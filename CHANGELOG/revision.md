@@ -1,0 +1,1 @@
+- add a shell script that uploads the test datasets via the API

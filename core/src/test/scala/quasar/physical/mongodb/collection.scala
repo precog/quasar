@@ -210,7 +210,10 @@ class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatch
   }
 
   "dbName <-> dirName are inverses" ! prop { db: SpecialStr =>
-    Collection.dbNameFromPath(rootDir </> dir(db.str))
-      .map(Collection.dirNameFromDbName(_)) must beRightDisjunction(DirName(db.str))
+    val name = Collection.dbNameFromPath(rootDir </> dir(db.str))
+    // NB: can fail if the path has enough multi-byte chars to exceed 64 bytes
+    name.isRight ==> {
+      name.map(Collection.dirNameFromDbName(_)) must beRightDisjunction(DirName(db.str))
+    }
   }.set(maxSize = 20)
 }

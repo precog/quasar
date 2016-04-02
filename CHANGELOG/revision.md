@@ -1,0 +1,1 @@
+- add `changelog` command that concatenates all changelog entries into a single searchable, browsable file

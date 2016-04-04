@@ -407,7 +407,7 @@ Fails if the path identifies a view (views may be added and deleted through the 
 ### MOVE /data/fs/[path]
 
 Moves data from one path to another within the same backend. The new path must
-be provided in the "Destination" request header. Single files are moved atomically.
+be provided in the `Destination` request header. Single files are moved atomically.
 
 Fails if either the request of destination path identifies a view (views may be added and deleted through the `/mount` API).
 
@@ -432,6 +432,10 @@ Creates a new mount point or replaces an existing mount point using the JSON con
 ### DELETE /mount/fs/[path]
 
 Deletes an existing mount point, if any exists at the given path. If no such mount exists, the request succeeds but the response has no content.
+
+### MOVE /mount/fs/[path]
+
+Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount.
 
 ### PUT /server/port
 

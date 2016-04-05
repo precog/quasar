@@ -109,12 +109,10 @@ object TestConfig {
     )
 
     TestConfig.testDataPrefix flatMap { prefix =>
-      if (TestConfig.backendNames.isEmpty)
-        Task.fail(noBackendsFound)
-      else
-        TestConfig.backendNames.toIList
-          .traverse(n => fileSystemNamed(n, prefix).run)
-          .map(_.unite)
+      TestConfig.backendNames.toIList
+        .traverse(n => fileSystemNamed(n, prefix).run)
+        .map(_.unite)
+        .flatMap(uts => if (uts.isEmpty) Task.fail(noBackendsFound) else Task.now(uts))
     }
   }
 

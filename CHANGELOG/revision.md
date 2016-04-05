@@ -1,0 +1,1 @@
+- fail regression tests if no backend configuration is present

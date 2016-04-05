@@ -67,6 +67,9 @@ object ReadFile {
       * the maximum amount of data read.
       */
     def scan(file: AFile, offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+      def closeHandle(h: ReadHandle): Process[M, Nothing] =
+        Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])
+
       def readUntilEmpty(h: ReadHandle): Process[M, Data] =
         Process.await(unsafe.read(h)) { data =>
           if (data.isEmpty)
@@ -75,9 +78,7 @@ object ReadFile {
             Process.emitAll(data) ++ readUntilEmpty(h)
         }
 
-      Process.bracket(unsafe.open(file, offset, limit))(h => Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])) { h =>
-        readUntilEmpty(h)
-      }
+      Process.bracket(unsafe.open(file, offset, limit))(closeHandle)(readUntilEmpty)
     }
 
     /** Returns a process that produces all the data contained in the
@@ -141,7 +142,7 @@ object ReadFile {
       new Unsafe[S]
   }
 
-  implicit def RenderReadFile[A] =
+  implicit def renderTree[A]: RenderTree[ReadFile[A]] =
     new RenderTree[ReadFile[A]] {
       def render(rf: ReadFile[A]) = rf match {
         case Open(file, off, lim) => NonTerminal(List("Open"), None,

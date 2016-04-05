@@ -65,12 +65,13 @@ object WriteFile {
       * exhausted.
       */
     def appendChannel(dst: AFile): Channel[M, Vector[Data], Vector[FileSystemError]] = {
+      def closeHandle(h: WriteHandle): Process[M, Nothing] =
+        Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])
+
       def writeChunk(h: WriteHandle): Vector[Data] => M[Vector[FileSystemError]] =
         xs => unsafe.write(h, xs).liftM[FileSystemErrT]
 
-      Process.bracket(unsafe.open(dst))(h => Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])) { h =>
-        channel.lift(writeChunk(h))
-      }
+      Process.bracket(unsafe.open(dst))(closeHandle)(h => channel.lift(writeChunk(h)))
     }
 
     /** Same as `append` but accepts chunked [[Data]]. */
@@ -215,12 +216,15 @@ object WriteFile {
       def cleanupTmp(tmp: AFile)(t: Throwable): Process[M, Nothing] =
         Process.eval_(MF.delete(tmp)).causedBy(Cause.Error(t))
 
-      MF.tempFile(dst).liftM[Process] flatMap (tmp =>
-        appendChunked(tmp, src).terminated.take(1)
+      MF.tempFile(dst).liftM[Process] flatMap { tmp =>
+        appendChunked(tmp, src)
+          .map(some).append(Process.emit(none))
+          .take(1)
           .flatMap(_.cata(
             werr => MF.delete(tmp).as(werr).liftM[Process],
             Process.eval_(MF.moveFile(tmp, dst, sem))))
-          .onFailure(cleanupTmp(tmp)))
+          .onFailure(cleanupTmp(tmp))
+      }
     }
 
     private def saveThese0(dst: AFile, data: Vector[Data], sem: MoveSemantics)
@@ -277,7 +281,7 @@ object WriteFile {
       new Unsafe[S]
   }
 
-  implicit def RenderWriteFile[A] =
+  implicit def renderTree[A]: RenderTree[WriteFile[A]] =
     new RenderTree[WriteFile[A]] {
       def render(wf: WriteFile[A]) = wf match {
         case Open(file)           => NonTerminal(List("Open"), None, List(file.render))

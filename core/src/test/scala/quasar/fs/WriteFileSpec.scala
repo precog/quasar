@@ -75,13 +75,19 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }
     }
 
-    "append should fail after writing some when source fails" ! prop {
-      (f: AFile, xs: Vector[Data]) =>
+    "append should fail, but persist all data emitted prior to failure, when source fails" ! prop {
+      (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-      // TODO: handle the error, and check the contents of the file
+      val src = xs.toProcess ++
+                Process.fail(new RuntimeException("SRCFAIL")) ++
+                ys.toProcess
 
-      val p = write.append(f, xs.toProcess ++ Process.fail(new RuntimeException("source failed")))
-      MemTask.runLogEmpty(p).attemptRun must beLeftDisjunction
+      val p = write.append(f, src).drain onFailure {
+        case err if err.getMessage == "SRCFAIL" => read.scanAll(f)
+        case err                                => Process.fail(err)
+      }
+
+      MemTask.runLogEmpty(p).run.toEither must beRight(xs)
     }
 
     withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
@@ -114,13 +120,21 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
     }
 
     "save should fail and write nothing when source fails" ! prop {
-      (f: AFile, xs: Vector[Data]) =>
+      (f: AFile, xs: Vector[Data], ys: Vector[Data], zs: Vector[Data]) =>
 
-      // TODO: handle the error, and check that the file is not written
+      val src = xs.toProcess ++
+                Process.fail(new RuntimeException("SRCFAIL")) ++
+                ys.toProcess
 
-      val p = write.save(f, xs.toProcess ++ Process.fail(new RuntimeException("source failed")))
-      MemTask.runLogEmpty(p).attemptRun must beLeftDisjunction
-    }.pendingUntilFixed("SD-1544")
+      val init = write.save(f, zs.toProcess).drain
+
+      val p = write.save(f, src).drain onFailure {
+        case err if err.getMessage == "SRCFAIL" => read.scanAll(f)
+        case err                                => Process.fail(err)
+      }
+
+      MemTask.runLogEmpty(init ++ p).run.toEither must beRight(zs)
+    }
 
     withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
       s"$n should fail if file exists" ! prop {

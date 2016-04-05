@@ -293,8 +293,7 @@ object QueryFile {
       new Transforms[F]
   }
 
-
-  implicit def RenderQueryFile[A]: RenderTree[QueryFile[A]] =
+  implicit def renderTree[A]: RenderTree[QueryFile[A]] =
     new RenderTree[QueryFile[A]] {
       def render(qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) => NonTerminal(List("ExecutePlan"), None, List(lp.render, out.render))

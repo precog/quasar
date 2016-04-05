@@ -1,0 +1,1 @@
+- [SD-1544] WriteFile#save should not succeed when the src process fails

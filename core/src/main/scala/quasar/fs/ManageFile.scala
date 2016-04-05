@@ -151,7 +151,7 @@ object ManageFile {
       new Ops[S]
   }
 
-  implicit def RenderManageFile[A] =
+  implicit def renderTree[A]: RenderTree[ManageFile[A]] =
     new RenderTree[ManageFile[A]] {
       def render(mf: ManageFile[A]) = mf match {
         case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.toString.some,

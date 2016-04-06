@@ -26,8 +26,7 @@ import quasar.fs.SandboxedPathy._
 
 import scala.collection.IndexedSeq
 
-import org.scalacheck.{Gen, Arbitrary, Shrink}
-import org.scalacheck.Shrink.shrink
+import org.scalacheck.{Arbitrary, Shrink}, Shrink.shrink
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -35,23 +34,6 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream._
 import scalaz.concurrent.Task
-
-case class AlphaCharacters(value: String)
-
-object AlphaCharacters {
-  implicit val arb: Arbitrary[AlphaCharacters] =
-    Arbitrary(Gen.nonEmptyListOf(Gen.alphaChar).map(chars => AlphaCharacters(chars.mkString)))
-  implicit val show: Show[AlphaCharacters] = Show.shows(_.value)
-}
-
-/** Useful for debugging by producing easier to read paths but that still tend to trigger corner cases */
-case class AlphaAndSpecialCharacters(value: String)
-
-object AlphaAndSpecialCharacters {
-  implicit val arb: Arbitrary[AlphaAndSpecialCharacters] =
-    Arbitrary(Gen.nonEmptyListOf(Gen.oneOf(Gen.alphaChar, Gen.const('/'), Gen.const('.'))).map(chars => AlphaAndSpecialCharacters(chars.mkString)))
-  implicit val show: Show[AlphaAndSpecialCharacters] = Show.shows(_.value)
-}
 
 trait FileSystemFixture {
   import FileSystemFixture._, InMemory._
@@ -78,7 +60,7 @@ trait FileSystemFixture {
       InMemState fromFiles fileMapping.toList.toMap
     }
     def relFiles = filesInDir.unzip._1
-    def ls = relFiles.map(segAt(0,_)).list.flatten.distinct
+    def ls = relFiles.list.flatMap(segAt(0,_).toList).distinct
       .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
   }
 
@@ -100,6 +82,7 @@ trait FileSystemFixture {
   type MemStateTask[A] = StateT[Task, InMemState,A]
   type MemStateFix[A]  = ReadWriteT[MemStateTask,A]
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object Mem extends Interpreter[FileSystem,InMemoryFs](
     interpretTerm = fileSystem
   ) {
@@ -116,6 +99,7 @@ trait FileSystemFixture {
   val hoistTask: InMemoryFs ~> MemStateTask =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object MemTask extends SpecializedInterpreter[FileSystem, MemStateTask](
     interpretTerm = hoistTask compose Mem.interpretTerm
   ) {
@@ -132,6 +116,7 @@ trait FileSystemFixture {
     amendWrites(writeFile),
     liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object MemFixTask extends SpecializedInterpreter[FileSystem, MemStateFix](
     interpretTerm = hoistFix compose readWrite
   ) {
@@ -156,7 +141,7 @@ object FileSystemFixture {
   type ReadWriteT[F[_], A] = StateT[F, ReadWrites, A]
 
   /** Transforms a [[ReadFile]] interpreter, intercepting responses to `Read`s
-    * until the provided state is empty, falling back to the base interperter
+    * until the provided state is empty, falling back to the base interpreter
     * thereafter. All other operations use the base interpreter.
     *
     * For some base interpreter, f,

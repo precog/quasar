@@ -1,4 +1,5 @@
 import github.GithubPlugin._
+import quasar.project._
 import quasar.project.build._
 
 import java.lang.Integer
@@ -129,23 +130,44 @@ lazy val oneJarSettings =
 
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
-  .aggregate(core, web, it)
+  .aggregate(core, tests, web, it)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
   .settings(oneJarSettings: _*)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
+lazy val scalacheck = project
+  .in(file("core-scalacheck"))
+  .dependsOn(core)
+  .settings(commonSettings: _*)
+  .settings(
+    libraryDependencies ++= Dependencies.scalacheck)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val testUtils = project
+  .in(file("core-test-utils"))
+  .dependsOn(core, scalacheck)
+  .settings(commonSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val tests = project
+  .in(file("core-tests"))
+  .dependsOn(core, scalacheck % "test", testUtils % "test")
+  .settings(commonSettings: _*)
+
 lazy val web = project
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(
+    core, scalacheck % "test", testUtils % "test")
   .settings(oneJarSettings: _*)
+  .settings(
+    mainClass in Compile := Some("quasar.server.Server"),
+    libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(
-    core % "test->test;compile->compile",
-    web  % "test->test;compile->compile")
+  .dependsOn(core, testUtils % "test")
   .settings(commonSettings: _*)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)

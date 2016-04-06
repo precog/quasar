@@ -19,34 +19,27 @@ object Dependencies {
     // NB: This version is forced because there seems to be some difference
     //     with `Free` or `Catchable` in 7.1.7 that affects our implementation
     //     of `CatchableFree`.
-    "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test" force(),
-    "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion  % "compile, test",
-    "org.scalaz.stream" %% "scalaz-stream"             % "0.8"          % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion % "compile, test",
-    "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion % "compile, test",
-    "com.github.scopt"  %% "scopt"                     % "3.3.0"        % "compile, test",
-    "org.threeten"      %  "threetenbp"                % "1.2"          % "compile, test",
-    "org.mongodb"       %  "mongodb-driver-async"      % mongoVersion   % "compile, test",
-    "io.netty"          %  "netty-buffer"              % nettyVersion   % "compile, test",
-    "io.netty"          %  "netty-transport"           % nettyVersion   % "compile, test",
-    "io.netty"          %  "netty-handler"             % nettyVersion   % "compile, test",
-    "io.argonaut"       %% "argonaut"                  % "6.1"          % "compile, test",
-    "org.jboss.aesh"    %  "aesh"                      % "0.55"         % "compile, test",
-    "org.typelevel"     %% "shapeless-scalaz"          % slcVersion     % "compile, test",
-    "com.slamdata"      %% "matryoshka-core"           % "0.8.0"        % "compile",
-    "com.slamdata"      %% "pathy-core"                % pathyVersion   % "compile",
-    "com.github.mpilquist" %% "simulacrum"             % "0.7.0"        % "compile, test",
-    "org.http4s"        %% "http4s-core"               % http4sVersion  % "compile",
-    "com.github.tototoshi" %% "scala-csv"              % "1.1.2"        % "compile",
-    "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion   % "test",
-    "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion  % "test",
-    "org.specs2"        %% "specs2-core"               % "2.4"          % "test",
-    "org.scalacheck"    %% "scalacheck"                % "1.11.6"       % "test" force(),
-    "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"        % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test",
-    "eu.timepit"        %% "refined"                   % refinedVersion % "compile, test",
-    "eu.timepit"        %% "refined-scalacheck"        % refinedVersion % "test")
+    "org.scalaz"        %% "scalaz-core"               % scalazVersion force(),
+    "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion,
+    "org.scalaz.stream" %% "scalaz-stream"             % "0.8",
+    "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion,
+    "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion,
+    "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion,
+    "com.github.scopt"  %% "scopt"                     % "3.3.0",
+    "org.threeten"      %  "threetenbp"                % "1.2",
+    "org.mongodb"       %  "mongodb-driver-async"      % mongoVersion,
+    "io.netty"          %  "netty-buffer"              % nettyVersion,
+    "io.netty"          %  "netty-transport"           % nettyVersion,
+    "io.netty"          %  "netty-handler"             % nettyVersion,
+    "io.argonaut"       %% "argonaut"                  % "6.1",
+    "org.jboss.aesh"    %  "aesh"                      % "0.55",
+    "org.typelevel"     %% "shapeless-scalaz"          % slcVersion,
+    "com.slamdata"      %% "matryoshka-core"           % "0.8.0",
+    "com.slamdata"      %% "pathy-core"                % pathyVersion,
+    "com.github.mpilquist" %% "simulacrum"             % "0.7.0",
+    "org.http4s"        %% "http4s-core"               % http4sVersion,
+    "com.github.tototoshi" %% "scala-csv"              % "1.1.2",
+    "eu.timepit"        %% "refined"                   % refinedVersion)
 
   val web = Seq(
     "org.http4s"           %% "http4s-dsl"          % http4sVersion % "compile, test",
@@ -60,4 +53,13 @@ object Dependencies {
     "ch.qos.logback"       %  "logback-classic"       % "1.1.3",
     "com.propensive"       %% "rapture-json"          % raptureVersion % "test",
     "com.propensive"       %% "rapture-json-argonaut" % raptureVersion % "test")
+
+  val scalacheck = Seq(
+    "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion,
+    "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion,
+    "org.specs2"        %% "specs2-core"               % "2.4",
+    "org.scalacheck"    %% "scalacheck"                % "1.11.6" force(),
+    "org.typelevel"     %% "scalaz-specs2"             % "0.3.0",
+    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion,
+    "eu.timepit"        %% "refined-scalacheck"        % refinedVersion)
 }

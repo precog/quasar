@@ -26,6 +26,7 @@ import org.specs2.scalaz._
 import pathy._, Path._
 import scalaz._, concurrent.Task, Scalaz._
 
+@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 abstract class ConfigSpec[Config: CodecJson] extends Specification with DisjunctionMatchers {
   import FsPath._, ConfigError._
 

@@ -491,6 +491,41 @@ The `status` field will always be present and will contain a succinct descriptio
 Examples of `detail` fields would be a backend-specific error message, detailed type information for type errors in queries, the actual invalid arguments presented to a function, etc. These fields are error-specific, however, if the error is going to include a more detailed error message, it will found under the `message` field in the `detail` object.
 
 
+## Paths
+
+Paths identify files and directories in Quasar's virtual file system. File and directory paths are distinct, so `/foo` and `/foo/` represent a file and a directory, respectively.
+
+Depending on the backend, some restrictions may apply:
+- it may be possible for a file and directory with the same name to exist side by side.
+- it may _not_ be possible for an empty directory to exist. That is, deleting the only descendant file from a directory may cause the directory to disappear as well.
+- there may be limits on the overall length of paths, and/or the length of particular path segments. Any request that exceeds these limits will result in an error.
+
+_Any_ character can appear in a path, but when paths are embedded in character strings and byte-streams they are encoded in the following ways:
+
+When a path appears in a request URI, or in a header such as `Destination` or `X-FileName`, it must be URL-encoded. Note: `/` characters that appear _within_ path segments are encoded.
+
+When a path appears in a JSON string value, `/` characters that appear _within_ path segments are encoded as `$sep$`.
+
+In both cases, the special names `.` and `..` are encoded as `$dot$` and $dotdot$`, but only if they appear as an _entire_ segment.
+
+When only a single path segment is shown, as in the response body of a `/metadata` request, no special encoding is done (beyond the normal JSON encoding of `"` and non-ASCII characters).
+
+For example, a file called `Plan 1/2 笑` in a directory `mydata` would appear in the following ways:
+- in a URL: `http://<host>:<port>/data/fs/mydata/Plan%201%2F2%20%E7%AC%91`
+- in a header: `Destination: /mydata/Plan%201%2F2%20%E7%AC%91`
+- in the response body of `/metadata/fs/mydata/`: `{ "type": "file", "name": "Plan 1/2 \u7b11" }`
+- in an error:
+```json
+{
+  "error": {
+    "status": "Path not found.",
+    "detail": {
+      "path": "/local/quasar-test/mydata/Plan 1$sep$2 \u7b11"
+    }
+  }
+}
+```
+
 ## Request Headers
 
 Request headers may be supplied via a query parameter in case the client is unable to send arbitrary headers (e.g. browsers, in certain circumstances). The parameter name is `request-headers` and the value should be a JSON-formatted string containing an object whose fields are named for the corresponding header and whose values are strings or arrays of strings. If any header appears both in the `request-headers` query parameter and also as an ordinary header, the query parameter takes precedence.

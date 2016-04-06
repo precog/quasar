@@ -1,0 +1,2 @@
+- [SD-1324] accept/require "path" URL-encoding for `Destination` and `X-FileName` headers.
+- corrected a misleading error message that can be triggered by ill-formed paths in these headers.

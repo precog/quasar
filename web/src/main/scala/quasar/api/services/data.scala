@@ -30,7 +30,7 @@ import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.{`Content-Type`, Accept}
-import pathy.Path._, posixCodec._
+import pathy.Path._
 import scalaz.{Zip => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -62,11 +62,12 @@ object data {
 
     case req @ Method.MOVE -> AsPath(path) =>
       respond((for {
-        dst <- EitherT.fromDisjunction[M.F](
-                 requiredHeader(Destination, req) map (_.value))
-        scn <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
-        _   <- M.move(scn, MoveSemantics.FailIfExists)
-                 .leftMap(_.toApiError)
+        dstStr <- EitherT.fromDisjunction[M.F](
+                    requiredHeader(Destination, req) map (_.value))
+        dst    <- EitherT.fromDisjunction[M.F](parseDestination(dstStr))
+        scn    <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
+        _      <- M.move(scn, MoveSemantics.FailIfExists)
+                    .leftMap(_.toApiError)
       } yield Created).run)
 
     case DELETE -> AsPath(path) =>
@@ -94,27 +95,38 @@ object data {
       },
       filePath => formattedDataResponse(format, R.scan(filePath, offset, limit)))
 
-  private def moveScenario(src: APath, dstStr: String): ApiError \/ MoveScenario =
+  private def parseDestination(dstString: String): ApiError \/ APath = {
+    def absPathRequired(rf: pathy.Path[Rel, _, _]) = ApiError.fromMsg(
+      BadRequest withReason "Illegal move.",
+      "Absolute path required for Destination.",
+      "dstPath" := posixCodec.unsafePrintPath(rf)).left
+    UriPathCodec.parsePath(
+      absPathRequired,
+      sandboxAbs(_).right,
+      absPathRequired,
+      sandboxAbs(_).right
+    )(dstString)
+  }
+
+  private def moveScenario(src: APath, dst: APath): ApiError \/ MoveScenario =
     refineType(src).fold(
       srcDir =>
-        parseAbsDir(dstStr)
-          .map(sandboxAbs)
-          .map(MoveScenario.dirToDir(srcDir, _))
-          .toRightDisjunction(ApiError.fromMsg(
+        refineType(dst).swap.bimap(
+          df => ApiError.fromMsg(
             BadRequest withReason "Illegal move.",
             "Cannot move directory into a file",
             "srcPath" := srcDir,
-            "dstPath" := dstStr)),
+            "dstPath" := df),
+          MoveScenario.dirToDir(srcDir, _)),
       srcFile =>
-        parseAbsFile(dstStr)
-          .map(sandboxAbs)
-          // TODO: Why not move into directory if dst is a dir?
-          .map(MoveScenario.fileToFile(srcFile, _))
-          .toRightDisjunction(ApiError.fromMsg(
+        refineType(dst).bimap(
+          dd => ApiError.fromMsg(
             BadRequest withReason "Illegal move.",
             "Cannot move a file into a directory, must specify destination precisely",
             "srcPath" := srcFile,
-            "dstPath" := dstStr)))
+            "dstPath" := dd),
+          // TODO: Why not move into directory if dst is a dir?
+          MoveScenario.fileToFile(srcFile, _)))
 
   // TODO: Streaming
   private def upload[S[_]: Functor](

@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object mount {
-  import posixCodec._
+  import posixCodec.printPath
 
   def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S): QHttpService[S] =
     QHttpService {
@@ -45,14 +45,14 @@ object mount {
         respond(requiredHeader(Destination, req).map(_.value).fold(
           err => EitherT.leftU[String](err.point[Free[S, ?]]),
           dst => refineType(src).fold(
-            srcDir  => move[S, Dir](srcDir,  dst, parseAbsDir,  "directory"),
-            srcFile => move[S, File](srcFile, dst, parseAbsFile, "file"))).run)
+            srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
+            srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))).run)
 
       case req @ POST -> AsDirPath(parent) => respond((for {
         hdr <- EitherT.fromDisjunction[M.F](requiredHeader(XFileName, req))
         fn  =  hdr.value
         dst <- EitherT.fromDisjunction[M.F](
-                (parseRelDir(fn) orElse parseRelFile(fn))
+                (UriPathCodec.parseRelDir(fn) orElse UriPathCodec.parseRelFile(fn))
                   .flatMap(sandbox(currentDir, _))
                   .map(parent </> _)
                   .toRightDisjunction(ApiError.apiError(
@@ -83,11 +83,11 @@ object mount {
   ): EitherT[Free[S, ?], ApiError, String] =
     parse(dstStr).map(sandboxAbs).cata(dst =>
       M.remount[T](src, dst)
-        .as(s"moved ${printPath(src)} to $dstStr")
+        .as(s"moved ${printPath(src)} to ${printPath(dst)}")
         .leftMap(_.toApiError),
       EitherT.leftU[String](ApiError.apiError(
         BadRequest withReason s"Expected an absolute $typeStr.",
-        "path" := dstStr).point[Free[S, ?]]))
+        "path" := transcode(UriPathCodec, posixCodec)(dstStr)).point[Free[S, ?]]))
 
   private def mount[S[_]: Functor](
     path: APath,

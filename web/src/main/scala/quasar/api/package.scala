@@ -206,6 +206,9 @@ package object api {
       s"Failed to parse '${UrlCodingUtils.urlDecode(encodedPath)}' as an absolute path.",
       "encodedPath" := encodedPath)
 
+  def transcode(from: PathCodec, to: PathCodec): String => String =
+    from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
+
   def staticFileService(basePath: String): HttpService = {
     def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
       if (file.isDirectory) StaticFile.fromFile(new File(file, "index.html"), Some(req))

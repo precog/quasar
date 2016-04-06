@@ -48,9 +48,9 @@ object execute {
     def destinationFile(fileStr: String): ApiError \/ (Path[Abs,File,Unsandboxed] \/ Path[Rel,File,Unsandboxed]) = {
       val err = -\/(ApiError.apiError(
         BadRequest withReason "Destination must be a file.",
-        "destination" := fileStr))
+        "destination" := transcode(UriPathCodec, posixCodec)(fileStr)))
 
-      posixCodec.parsePath(relFile => \/-(\/-(relFile)), absFile => \/-(-\/(absFile)), κ(err), κ(err))(fileStr)
+      UriPathCodec.parsePath(relFile => \/-(\/-(relFile)), absFile => \/-(-\/(absFile)), κ(err), κ(err))(fileStr)
     }
 
     QHttpService {

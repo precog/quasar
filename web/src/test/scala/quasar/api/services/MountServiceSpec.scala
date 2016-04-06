@@ -185,7 +185,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
     "MOVE" should {
       import org.http4s.Method.MOVE
 
-      def destination(p: pathy.Path[_, _, Sandboxed]) = Header(Destination.name.value, printPath(p))
+      def destination(p: pathy.Path[_, _, Sandboxed]) = Header(Destination.name.value, UriPathCodec.printPath(p))
 
       "succeed with filesystem mount" ! prop { (srcHead: String, srcTail: RDir, dstHead: String, dstTail: RDir) =>
         // NB: distinct first segments means no possible conflict, but doesn't
@@ -283,7 +283,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
       }
     }
 
-    def xFileName(p: pathy.Path[_, _, Sandboxed]) = Header(XFileName.name.value, printPath(p))
+    def xFileName(p: pathy.Path[_, _, Sandboxed]) = Header(XFileName.name.value, UriPathCodec.printPath(p))
 
     "Common" >> {
       import org.http4s.Method.POST
@@ -388,7 +388,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
-              val fs = d </> posixCodec.parseRelDir(printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
+              val fs = d </> posixCodec.parseRelDir(posixCodec.printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
 
               for {
                 _     <- M.mountFileSystem(fs,StubFs, ConnectionUri("foo")).run.flatMap(orFailF)

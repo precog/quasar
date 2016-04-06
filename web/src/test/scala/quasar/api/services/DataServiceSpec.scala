@@ -461,7 +461,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         // TODO: Consider if it's possible to invent syntax Move(...)
         val request = Request(
           uri = pathUri(from),
-          headers = Headers(Header("Destination", posixCodec.printPath(to))),
+          headers = Headers(Header("Destination", UriPathCodec.printPath(to))),
           method = Method.MOVE)
         val (service, ref) = serviceRef(state)
         val response = service(request).unsafePerformSync

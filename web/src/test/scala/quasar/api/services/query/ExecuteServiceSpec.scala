@@ -19,6 +19,7 @@ package quasar.api.services.query
 import quasar.Predef._
 import quasar._, fp._
 import quasar.fp.numeric._
+import quasar.api._
 import quasar.api.services.Fixture._
 import quasar.api.matchers._
 import quasar.api.PathUtils
@@ -100,7 +101,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
     eval: FileSystem ~> InMemoryFs)(
     path: ADir,
     query: Option[Query],
-    destination: Option[String],
+    destination: Option[FPath],
     state: InMemState,
     status: Status,
     response: A => MatchResult[_],
@@ -115,7 +116,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
       baseReq.copy(uri = uri1).withBody(query.q).unsafePerformSync
     }.getOrElse(baseReq)
     val req1 = destination.map(destination =>
-      req.copy(headers = Headers(Header("Destination", destination)))
+      req.copy(headers = Headers(Header("Destination", UriPathCodec.printPath(destination))))
     ).getOrElse(req)
     val (service, ref) = executeServiceRef(state, eval)
     val actualResponse = service(req1).unsafePerformSync
@@ -141,12 +142,11 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         )
       }
       "POST" ! prop { (filesystem: SingleFileMemState, destination: FPath) => {
-        val destinationPath = printPath(destination)
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
         post[AJson](fileSystem)(
           path = filesystem.parent,
           query = Some(Query(selectAll(file1(filesystem.filename)))),
-          destination = Some(destinationPath),
+          destination = Some(destination),
           state = filesystem.state,
           status = Status.Ok,
           response = json => Json.parse(json.nospaces) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
@@ -197,12 +197,11 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
-        val destinationPath = printPath(destination)
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
         post[AJson](fileSystem)(
           path = filesystem.parent,
           query = Some(Query(query, offset = Some(offset), limit = Some(limit), varNameAndValue = Some((varName.value, var_.toString)))),
-          destination = Some(destinationPath),
+          destination = Some(destination),
           state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
           status = Status.Ok,
           response = json => Json.parse(json.nospaces) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
@@ -216,7 +215,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         post[String](fileSystem)(
           path = dir,
           query = Some(Query(selectAll(file(filename.value)))),
-          destination = Some(printPath(destination)),
+          destination = Some(destination),
           state = InMemState.empty,
           status = Status.NotFound,
           response = _ must_== "???"
@@ -226,7 +225,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         post[ApiError](fileSystem)(
           path = filesystem.parent,
           query = None,
-          destination = Some(printPath(destination)),
+          destination = Some(destination),
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must equal(ApiError.fromStatus(
@@ -247,7 +246,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         post[ApiError](fileSystem)(
           path = filesystem.parent,
           query = Some(Query("select date where")),
-          destination = Some(printPath(destination)),
+          destination = Some(destination),
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must beApiErrorWithMessage(
@@ -269,7 +268,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         post[ApiError](fileSystem)(
           path = fs.parent,
           query = Some(Query(q)),
-          destination = Some(printPath(dst)),
+          destination = Some(dst),
           state = fs.state,
           status = Status.BadRequest,
           response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases))
@@ -290,7 +289,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,
           query = Some(Query(q)),
-          destination = Some(printPath(rootDir </> file("outA"))),
+          destination = Some(rootDir </> file("outA")),
           state = InMemState.empty,
           status = Status.InternalServerError,
           response = _ must equal(err.toApiError :+ ("phases" := phases))

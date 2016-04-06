@@ -1,0 +1,3 @@
+- make regression tests more robust by closing backend connections after they're used
+- allow relative paths in queries (e.g. `` select * from `../zips` ``)
+- increase MongoDB connection timeout to 10 seconds

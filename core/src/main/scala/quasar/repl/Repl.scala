@@ -153,12 +153,16 @@ object Repl {
         } yield ()
 
       case Cd(d) =>
-        RS.modify(state => state.copy(cwd = state.targetDir(d.some))).void
+        for {
+          dir <- RS.get.map(_.targetDir(d.some))
+          _   <- DF.unattemptT(Q.ls(dir).leftMap(_.shows))
+          _   <- RS.modify(state => state.copy(cwd = dir))
+        } yield ()
 
-      case Ls(d)         =>
+      case Ls(d) =>
         for {
           path  <- RS.get.map(_.targetDir(d))
-          files <- DF.unattempt(Q.ls(path).leftMap(_.shows).run)
+          files <- DF.unattemptT(Q.ls(path).leftMap(_.shows))
           names <- files.toList
                     .traverse[Free[S, ?], String](_.fold(
                       d => mountType[S](path </> dir1(d)).map(t =>
@@ -168,7 +172,7 @@ object Repl {
           _     <- names.sorted.foldMap(P.println)
         } yield ()
 
-      case Select(n, q)    =>
+      case Select(n, q) =>
         n.cata(
           name => {
             for {
@@ -190,13 +194,13 @@ object Repl {
                       ds => summarize[S](state.summaryCount, state.format)(ds))
           } yield ())
 
-      case Save(f, v)   =>
+      case Save(f, v) =>
         write(W.saveThese(_, _), f, v)
 
       case Append(f, v) =>
         write(W.appendThese(_, _), f, v)
 
-      case Delete(f)    =>
+      case Delete(f) =>
         for {
           state <- RS.get
           res   <- M.delete(state.targetFile(f)).run
@@ -205,7 +209,7 @@ object Repl {
                      _   => P.println("File deleted."))
         } yield ()
 
-      case Exit            =>
+      case Exit =>
         ().point[Free[S, ?]]
     }
   }

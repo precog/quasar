@@ -43,15 +43,15 @@ package object sql {
   def projectionNames[T[_[_]]:Recursive](projections: List[Proj[T[ExprF]]], relName: Option[String]):
       SemanticError \/ List[(String, T[ExprF])] = {
     def extractName(expr: T[ExprF]): Option[String] = expr.project match {
-      case IdentF(name) if Some(name) != relName      => Some(name)
+      case IdentF(name) if Some(name) != relName => Some(name)
       // TODO[matryoshka]: Change to Embed(StringLiteralF(name)
-      case BinopF(_, stringLiteral, FieldDeref) => stringLiteral.project match {
+      case BinopF(_, stringLiteral, FieldDeref)  => stringLiteral.project match {
         case string: ExprF.StringLiteralF[_] => Some(string.v)
-        case _ => None
+        case _                               => None
       }
-      case UnopF(expr, FlattenMapValues)              => extractName(expr)
-      case UnopF(expr, FlattenArrayValues)            => extractName(expr)
-      case _                                         => None
+      case UnopF(expr, FlattenMapValues)         => extractName(expr)
+      case UnopF(expr, FlattenArrayValues)       => extractName(expr)
+      case _                                     => None
     }
 
     val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}

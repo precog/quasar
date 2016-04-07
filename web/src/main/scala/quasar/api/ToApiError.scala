@@ -314,11 +314,11 @@ sealed abstract class ToApiErrorInstances {
           BadRequest withReason "Missing field.",
           err.message,
           "fieldName" := name)
-      case DuplicateFieldName(name) =>
+      case DuplicateAlias(name) =>
         fromMsg(
-          BadRequest withReason "Duplicate field name.",
+          BadRequest withReason "Duplicate alias name.",
           err.message,
-          "fieldName" := name)
+          "name" := name)
       case MissingIndex(i) =>
         fromMsg(
           BadRequest withReason "No element at index.",

@@ -16,7 +16,7 @@
 
 package quasar.fp
 
-import quasar.Predef.String
+import quasar.Predef._
 import quasar.fs.{APath, sandboxAbs}
 
 import argonaut._, Argonaut._
@@ -32,4 +32,9 @@ object PathyCodecJson {
       posixCodec.parseAbsFile(s).orElse(posixCodec.parseAbsDir(s))
         .map(sandboxAbs)
         .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
+
+  implicit val relFileDecodeJson: DecodeJson[RelFile[Unsandboxed]] =
+    DecodeJson.of[String] flatMap (s => DecodeJson[RelFile[Unsandboxed]](hc =>
+      posixCodec.parseRelFile(s)
+        .fold(DecodeResult.fail[RelFile[Unsandboxed]](s"not a relative file path: $s", hc.history))(DecodeResult.ok)))
 }

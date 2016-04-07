@@ -18,7 +18,7 @@ package quasar
 package regression
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp._, PathyCodecJson._
 
 import argonaut._, Argonaut._
 import pathy.Path, Path._

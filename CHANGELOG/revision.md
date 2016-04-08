@@ -1,0 +1,1 @@
+- Modularize the build a bit, so that subprojects don't have to depend on core's tests. This also makes the core Arbitraries available to other projects.

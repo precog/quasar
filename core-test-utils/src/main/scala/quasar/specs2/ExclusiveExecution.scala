@@ -17,6 +17,8 @@
 package quasar
 package specs2
 
+import quasar.fp._
+
 import org.specs2.mutable.Specification
 import org.specs2.specification.{SpecificationStructure, Fragments}
 
@@ -28,7 +30,7 @@ import org.specs2.specification.{SpecificationStructure, Fragments}
 trait ExclusiveExecution extends SpecificationStructure { self: Specification =>
   import ExclusiveExecution._
 
-  sequential
+  ignore(sequential)
 
   override def map(fs: => Fragments) =
     section(ExclusiveExecutionTag) ^ super.map(fs) ^ section(ExclusiveExecutionTag)

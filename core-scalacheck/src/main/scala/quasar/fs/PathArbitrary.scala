@@ -21,6 +21,7 @@ import quasar.Predef._
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import pathy.scalacheck.PathyArbitrary._
 import pathy.Path._
+import scalaz._, Scalaz._
 
 trait PathArbitrary {
 
@@ -43,6 +44,7 @@ trait PathArbitrary {
     parentDir(dir).getOrElse(dir) </> rFile
   }
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
   private def split(file: AFile, index: Int): (ADir, RFile) = {
     // .get should always succed because it is impossible not to sandbox an absolute path
     // to the root directory
@@ -60,7 +62,7 @@ trait PathArbitrary {
     (fileParent(file), fileName(file))
 
   private def peel(dir: ADir): Option[(ADir, DirName)] =
-    parentDir(dir).zip(dirName(dir)).headOption
+    (parentDir(dir) |@| dirName(dir)).tupled
 
   // TODO[pathy]: Remove when upgrading to latest version
   implicit val arbitraryFileName: Arbitrary[FileName] = Arbitrary(genSegment.map(FileName(_)))

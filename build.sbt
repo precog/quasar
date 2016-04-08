@@ -140,7 +140,7 @@ lazy val core = project
 lazy val scalacheck = project
   .in(file("core-scalacheck"))
   .dependsOn(core)
-  .settings(commonSettings: _*)
+  .settings(oneJarSettings: _*)  // HACK
   .settings(
     libraryDependencies ++= Dependencies.scalacheck)
   .enablePlugins(AutomateHeaderPlugin)
@@ -148,13 +148,13 @@ lazy val scalacheck = project
 lazy val testUtils = project
   .in(file("core-test-utils"))
   .dependsOn(core, scalacheck)
-  .settings(commonSettings: _*)
+  .settings(oneJarSettings: _*)  // HACK
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val tests = project
   .in(file("core-tests"))
   .dependsOn(core, scalacheck % "test", testUtils % "test")
-  .settings(commonSettings: _*)
+  .settings(oneJarSettings: _*)  // HACK
 
 lazy val web = project
   .dependsOn(

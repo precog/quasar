@@ -1,0 +1,1 @@
+- [SD-1239] Prevent changing to a non-existent directory in the repl

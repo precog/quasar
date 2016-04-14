@@ -1,0 +1,1 @@
+- optimize join conditions without an explicit `where`

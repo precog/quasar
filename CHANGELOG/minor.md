@@ -1,0 +1,3 @@
+- add functions to parse strings into various types. The names match the target type: `boolean`, `integer`, `decimal`, and `null`
+- extend existing string-parsers to not require literal strings (`date`, `time`, `timestamp`, and `interval`)
+- add `to_string` function to convert various values to strings

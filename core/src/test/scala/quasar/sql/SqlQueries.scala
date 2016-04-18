@@ -38,7 +38,7 @@ group by
   l_linestatus
 order by
   l_returnflag,
-  l_linestatus;"""
+  l_linestatus"""
 
   val q2 = """
 select
@@ -84,7 +84,7 @@ order by
   n_name,
   s_name,
   p_partkey
-limit 100;
+limit 100
 """
 
   val q3 = """
@@ -110,7 +110,7 @@ group by
 order by
   revenue desc,
   o_orderdate
-limit 10;
+limit 10
 """
 
   val q4 = """
@@ -134,7 +134,7 @@ where
 group by
   o_orderpriority
 order by
-  o_orderpriority;
+  o_orderpriority
 """
 
   val q5 = """
@@ -161,7 +161,7 @@ where
 group by
   n_name
 order by
-  revenue desc;
+  revenue desc
 """
 
   val q6 = """
@@ -173,7 +173,7 @@ where
   l_shipdate >= date("1999-01-01")
   and l_shipdate < date("1999-01-01") + interval("1 day")
   and l_discount between 2 - 0.01 and 2 + 0.01
-  and l_quantity < 3;
+  and l_quantity < 3
 """
 
   val q7 = """
@@ -215,7 +215,7 @@ group by
 order by
   supp_nation,
   cust_nation,
-  l_year;
+  l_year
 """
 
   val q8 = """
@@ -255,7 +255,7 @@ from
 group by
   o_year
 order by
-  o_year;
+  o_year
 """
 
   val q9 = """
@@ -290,7 +290,7 @@ group by
   o_year
 order by
   nation,
-  o_year desc;
+  o_year desc
 """
 
   val q10 = """
@@ -354,7 +354,7 @@ group by
         and n_name = "name"
     )
 order by
-  value desc;
+  value desc
 """
 
   val q12 = """
@@ -385,7 +385,7 @@ where
 group by
   l_shipmode
 order by
-  l_shipmode;
+  l_shipmode
 """
 
   val q13 = """
@@ -408,7 +408,7 @@ group by
   c_count
 order by
   custdist desc,
-  c_count desc;
+  c_count desc
 """
 
   val q14 = """
@@ -424,7 +424,7 @@ from
 where
   l_partkey = p_partkey
   and l_shipdate >= date("1999-01-01")
-  and l_shipdate < date("1999-01-01") + interval("1 month");
+  and l_shipdate < date("1999-01-01") + interval("1 month")
 """
 
   val q16 = """
@@ -457,7 +457,7 @@ order by
   supplier_cnt desc,
   p_brand,
   p_type,
-  p_size;
+  p_size
 """
 
   val q17 = """
@@ -477,7 +477,7 @@ where
       lineitem
     where
       l_partkey = p_partkey
-  );
+  )
 """
 
   val q18 = """
@@ -513,7 +513,7 @@ group by
 order by
   o_totalprice desc,
   o_orderdate
-limit 100;
+limit 100
 """
 
   val q19 = """
@@ -551,7 +551,7 @@ where
     and p_size between 1 and 15
     and l_shipmode in ("AIR", "AIR REG")
     and l_shipinstruct = "DELIVER IN PERSON"
-  );
+  )
 """
 
   val q20 = """
@@ -591,7 +591,7 @@ where
   and s_nationkey = n_nationkey
   and n_name = "foo"
 order by
-  s_name;
+  s_name
 """
 
   val q21 = """
@@ -634,7 +634,7 @@ group by
 order by
   numwait desc,
   s_name
-limit 100;
+limit 100
 """
 
   val q22 = """
@@ -674,6 +674,6 @@ from
 group by
   cntrycode
 order by
-  cntrycode;
+  cntrycode
 """
 }

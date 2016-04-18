@@ -23,6 +23,8 @@ import quasar.fs._
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import scalaz._, Scalaz._
 
+import pathy.Path.posixCodec
+
 package object sql {
   type Expr = Fix[ExprF]
 
@@ -31,11 +33,11 @@ package object sql {
 
   private val parser = new SQLParser()
 
-  val parse: Query => (ParsingError \/ Expr) = parser.parse(_).map(_.transAna(repeatedly(normalizeƒ)))
+  val parse: Query => (ParsingError \/ Expr) =
+    parser.parse(_).map(_.transAna(repeatedly(normalizeƒ[Fix])).makeTables(Nil))
 
   def parseInContext(sql: Query, basePath: ADir): ParsingError \/ Expr =
     parse(sql).map(_.mkPathsAbsolute(basePath))
-
 
   def CrossRelation(left: SqlRelation[Expr], right: SqlRelation[Expr]) =
     JoinRelation(left, right, InnerJoin, BoolLiteral(true))
@@ -79,19 +81,36 @@ package object sql {
   implicit class ExprOps(q: Expr) {
     def mkPathsAbsolute(basePath: ADir): Expr =
       q.cata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
-  }
 
-  def rewriteRelationsM[F[_]: Monad](q: Expr)(f: SqlRelation[Expr] => OptionT[F, SqlRelation[Expr]]): F[Expr] = {
-    def rewrite(r: SqlRelation[Expr]): OptionT[F, SqlRelation[Expr]] =
-      f(r).orElse(r match {
-        case JoinRelation(left, right, tpe, clause) =>
-          (rewrite(left) |@| rewrite(right))((l,r) => sql.JoinRelation(l, r, tpe, clause))
-        case _ => OptionT.none
-      })
-    q.transAnaTM {
-      case Fix(sel @ ExprF.SelectF(_, _, Some(rel), _, _, _)) =>
-        rewrite(rel).fold(r => Fix(sel.copy(relations = Some(r))), Fix(sel))
-      case x => x.point[F]
+    def makeTables(bindings: List[String]): Expr = q.project match {
+      case sel @ SelectF(_, _, _, _, _, _) => {
+        // perform all the appropriate recursions
+        // TODO remove asInstanceOf by providing a `SelectF` at compile time
+        val sel2 = sel.map(_.makeTables(bindings)).asInstanceOf[ExprF.SelectF[Expr]]
+
+        def mkRel[A](rel: SqlRelation[A]): SqlRelation[A] = rel match {
+          case ir @ IdentRelationAST(name, alias) if !bindings.contains(name) => {
+            val filePath = posixCodec.parsePath(Some(_),Some(_),_ => None, _ => None)(name)
+            filePath.map(p => TableRelationAST[A](p, alias)).getOrElse(ir)
+          }
+
+          case JoinRelation(left, right, tpe, clause) =>
+            JoinRelation(mkRel(left), mkRel(right), tpe, clause)
+
+          case other => other
+        }
+
+        // TODO use lenses
+        sel2.copy(relations = sel2.relations.map(mkRel(_))).embed
+      }
+
+      case LetF(name, form, body) => {
+        val form2 = form.makeTables(bindings)
+        val body2 = body.makeTables(name :: bindings)
+        Let(name, form2, body2)
+      }
+
+      case other => other.map(_.makeTables(bindings)).embed
     }
   }
 
@@ -107,6 +126,8 @@ package object sql {
   }
 
   private def pprintRelationƒ(r: SqlRelation[(Expr, String)]): String = (r match {
+    case IdentRelationAST(name, alias) =>
+      _qq("`", name) :: alias.map("as " + _).toList
     case TableRelationAST(path, alias) =>
       _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
     case ExprRelationAST(expr, aliasName) =>
@@ -215,6 +236,8 @@ package object sql {
 
   private def traverseRelation[G[_], A, B](r: SqlRelation[A], f: A => G[B])(
       implicit G: Applicative[G]): G[SqlRelation[B]] = r match {
+    case IdentRelationAST(name, alias) =>
+      G.point(IdentRelationAST(name, alias))
     case TableRelationAST(name, alias) =>
       G.point(TableRelationAST(name, alias))
     case ExprRelationAST(expr, aliasName) =>
@@ -259,6 +282,8 @@ package object sql {
         case SwitchF(cases, default) =>
           (cases.traverse(traverseCase) ⊛ default.traverse(f))(
             SwitchF(_, _))
+        case LetF(name, form, body) =>
+          (f(form) ⊛ f(body))(LetF(name, _, _))
         case IntLiteralF(v) => IntLiteralF(v).point[G]
         case FloatLiteralF(v) => FloatLiteralF(v).point[G]
         case StringLiteralF(v) => StringLiteralF(v).point[G]
@@ -274,6 +299,9 @@ package object sql {
     new (RenderTree ~> λ[α => RenderTree[SqlRelation[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[SqlRelation[α]] {
         def render(r: SqlRelation[α]): RenderedTree = r match {
+          case IdentRelationAST(name, alias) =>
+            val aliasString = alias.cata(" as " + _, "")
+            Terminal("IdentRelation" :: astType, Some(name + aliasString))
           case ExprRelationAST(select, alias) =>
             NonTerminal("ExprRelation" :: astType, Some("Expr as " + alias), ra.render(select) :: Nil)
           case TableRelationAST(name, alias) =>
@@ -335,6 +363,9 @@ package object sql {
           case IdentF(name) => Terminal("Ident" :: astType, Some(name))
 
           case VariF(name) => Terminal("Variable" :: astType, Some(":" + name))
+
+          case LetF(name, form, body) =>
+            NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
 
           case IntLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
           case FloatLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))

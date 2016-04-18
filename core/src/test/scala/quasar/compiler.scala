@@ -135,6 +135,136 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
             "name" -> ObjectProject(read("city"), Constant(Data.Str("name"))))))
     }
 
+    "compile basic let" in {
+      testLogicalPlanCompile(
+        "foo := 5; foo",
+        Constant(Data.Int(5)))
+    }
+
+    "compile basic let, ignoring the form" in {
+      testLogicalPlanCompile(
+        "bar := 5; 7",
+        Constant(Data.Int(7)))
+    }
+
+    "compile nested lets" in {
+      testLogicalPlanCompile(
+        """foo := 5; bar := 7; bar + foo""",
+        Add[FLP](Constant(Data.Int(7)), Constant(Data.Int(5))))
+    }
+
+    "compile let with select in body from let binding ident" in {
+      val query = """foo := (1,2,3); select * from foo"""
+      val expectation =
+        Squash[FLP](
+          ShiftArray[FLP](
+            ArrayConcat[FLP](
+              ArrayConcat[FLP](
+                MakeArrayN[Fix](Constant(Data.Int(1))),
+                MakeArrayN[Fix](Constant(Data.Int(2)))),
+              MakeArrayN[Fix](Constant(Data.Int(3))))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile let with select in body selecting let binding ident" in {
+      val query = """foo := 12; select foo from bar"""
+      val expectation =
+        Squash(
+          makeObj(
+            "0" ->
+              Constant(Data.Int(12))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "fail to compile let inside select with ambigious reference" in {
+      compile("""select foo from (bar := 12; baz) as quag""") must
+        beLeftDisjunction  // AmbiguousReference(baz)
+    }
+
+    "compile let inside select with table reference" in {
+      val query = """select foo from (bar := 12; select * from baz) as quag"""
+      val expectation =
+        Squash(
+          makeObj(
+            "foo" ->
+              ObjectProject[FLP](Squash(read("baz")), Constant(Data.Str("foo")))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile let inside select with ident reference" in {
+      val query = """select foo from (bar := 12; select * from bar) as quag"""
+      val expectation =
+        Squash(
+          makeObj(
+            "foo" ->
+              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("foo")))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile selection with same ident as nested let" in {
+      val query = """select bar from (bar := 12; select * from bar) as quag"""
+      val expectation =
+        Squash(
+          makeObj(
+            "bar" ->
+              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("bar")))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile selection with same ident as nested let and alias" in {
+      val query = """select bar from (bar := 12; select * from bar) as bar"""
+      val expectation =
+        Squash(
+          makeObj(
+            "0" ->
+              Squash(Constant(Data.Int(12)))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile let with select in form and body" in {
+      val query = """foo := select * from bar; select * from foo"""
+      val expectation = Squash[FLP](Squash[FLP](read("bar")))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile let with inner context that shares a table reference" in {
+      val query = """select (foo := select * from bar; select * from foo) from foo"""
+      val expectation =
+        Squash[FLP](
+          makeObj(
+            "0" ->
+              Squash[FLP](Squash[FLP](read("bar")))))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "compile let with an inner context of as that shares a binding name" in {
+      val query = """foo := 4; select * from bar as foo"""
+      val expectation = Squash(read("bar"))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
+    "fail to compile let with an inner context of let that shares a binding name in expression context" in {
+      val query = """foo := 4; select * from (foo := bar; foo) as quag"""
+
+      compile(query) must beLeftDisjunction // ambiguous reference for `bar` - `4` or `foo`
+    }
+
+    "compile let with an inner context of as that shares a binding name in table context" in {
+      val query = """foo := 4; select * from (foo := select * from bar; foo) as quag"""
+      val expectation = Squash[FLP](Squash[FLP](read("bar")))
+
+      testLogicalPlanCompile(query, expectation)
+    }
+
     "compile simple 1-table projection when root identifier is also a projection" in {
       // 'foo' must be interpreted as a projection because only this interpretation is possible
       testLogicalPlanCompile(

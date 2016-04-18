@@ -47,6 +47,11 @@ object Select {
     SelectF.unapply(obj.unFix)
 }
 
+object Let {
+  def apply(name: String, form: Expr, body: Expr): Expr = Fix[ExprF](LetF(name, form, body))
+  def unapply(obj: Expr): Option[(String, Expr, Expr)] = LetF.unapply(obj.unFix)
+}
+
 object Vari {
   def apply(symbol: String): Expr = Fix[ExprF](VariF(symbol))
   def unapply(obj: Expr): Option[String] = VariF.unapply(obj.unFix)

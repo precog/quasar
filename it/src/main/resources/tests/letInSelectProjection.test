@@ -1,0 +1,13 @@
+{
+    "name": "handle let as project of select",
+
+    "data": "zips.data",
+
+    "query": "select (zips := select * from cars; select * from zips) from zips",
+
+    "predicate": "containsExactly",
+
+    "expected": [{ "0": { "_id": "1", "name": "RangeRover-Evoque" } },
+                 { "0": { "_id": "2", "name": "Honda-civic" } },
+                 { "0": { "_id": "3", "name": "BMW-X5" } }]
+}

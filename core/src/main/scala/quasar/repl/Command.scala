@@ -29,7 +29,7 @@ object Command {
   private val ExitPattern         = "(?i)(?:exit)|(?:quit)".r
   private val HelpPattern         = "(?i)(?:help)|(?:commands)|\\?".r
   private val CdPattern           = "(?i)cd(?: +(.+))?".r
-  private val NamedExprPattern    = "(?i)([^ :]+) *:= *(.+)".r
+  private val NamedExprPattern    = "(?i)([^ :]+) *<- *(.+)".r
   private val LsPattern           = "(?i)ls(?: +(.+))?".r
   private val SavePattern         = "(?i)save +([\\S]+) (.+)".r
   private val AppendPattern       = "(?i)append +([\\S]+) (.+)".r

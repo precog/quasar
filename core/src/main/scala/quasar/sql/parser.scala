@@ -28,7 +28,6 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
-import pathy.Path.posixCodec
 
 sealed trait ParsingError { def message: String}
 final case class GenericParsingError(message: String) extends ParsingError
@@ -121,7 +120,7 @@ private[sql] class SQLParser extends StandardTokenParsers {
     "*", "+", "-", "%", "^", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
     "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ":", ";", "...",
     "{", "}", "{*}", "{:*}", "{*:}", "{_}", "{:_}", "{_:}",
-    "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]"))
+    "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]", ":="))
 
   override def keyword(name: String): Parser[String] =
     elem("keyword '" + name + "'", v => v.isInstanceOf[lexical.Identifier] && v.chars.toLowerCase == name) ^^ (κ(name))
@@ -132,6 +131,12 @@ private[sql] class SQLParser extends StandardTokenParsers {
   def op(op : String): Parser[String] =
     if (lexical.delimiters.contains(op)) elem("operator '" + op + "'", v => v.chars == op && v.isInstanceOf[lexical.Keyword]) ^^ (_.chars)
     else failure("You are trying to parse \""+op+"\" as an operator, but it is not contained in the operators list")
+
+  def let: Parser[Expr] =
+    ident ~ op(":=") ~ expr ~ op(";") ~ expr ^^ {
+      case i ~ _ ~ e ~ _ ~ b =>
+       Let(i, e, b)
+    } | query_expr
 
   def select: Parser[Expr] =
     keyword("select") ~> opt(keyword("distinct")) ~ projections ~
@@ -171,8 +176,6 @@ private[sql] class SQLParser extends StandardTokenParsers {
 
   def variable: Parser[Expr] =
     elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => Vari(token.chars))
-
-  def command: Parser[Expr] = expr <~ opt(op(";"))
 
   def or_expr: Parser[Expr] = and_expr * (keyword("or") ^^^ Or)
 
@@ -387,10 +390,9 @@ private[sql] class SQLParser extends StandardTokenParsers {
     } | keyword("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =
-    ident ~ opt(keyword("as") ~> ident) ^? Function.unlift {
+    ident ~ opt(keyword("as") ~> ident) ^^ {
       case ident ~ alias =>
-        val filePath = posixCodec.parsePath(Some(_),Some(_),_ => None, _ => None)(ident)
-        filePath.map(p => TableRelationAST[Expr](p, alias))
+        IdentRelationAST[Expr](ident, alias)
     } |
     op("(") ~> (
       (expr ~ op(")") ~ keyword("as") ~ ident ^^ {
@@ -411,7 +413,9 @@ private[sql] class SQLParser extends StandardTokenParsers {
       case i ~ Some("desc") => (DESC, i)
     }, op(",")) ^^ (OrderBy(_))
 
-  def expr: Parser[Expr] =
+  def expr: Parser[Expr] = let
+
+  def query_expr: Parser[Expr] =
     (query | or_expr) * (
       keyword("limit")                        ^^^ Limit        |
         keyword("offset")                     ^^^ Offset       |
@@ -424,7 +428,7 @@ private[sql] class SQLParser extends StandardTokenParsers {
   private def stripQuotes(s:String) = s.substring(1, s.length-1)
 
   def parseExpr(exprSql: String): ParsingError \/ Expr =
-    phrase(command)(new lexical.Scanner(exprSql)) match {
+    phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
       case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first))

@@ -172,11 +172,19 @@ trait SemanticAnalysis {
     case _ => Nil
   }
 
+  case class BindingScope(scope: Map[String, SqlRelation[Expr]])
+
+  implicit val ShowBindingScope: Show[BindingScope] = new Show[BindingScope] {
+    override def show(v: BindingScope) = v.scope.toString
+  }
+
   case class TableScope(scope: Map[String, SqlRelation[Expr]])
 
   implicit val ShowTableScope: Show[TableScope] = new Show[TableScope] {
     override def show(v: TableScope) = v.scope.toString
   }
+
+  case class Scope(tableScope: TableScope, bindingScope: BindingScope)
 
   import Validation.FlatMap._
 
@@ -187,11 +195,13 @@ trait SemanticAnalysis {
     * then because this leads to an ambiguity, an error is produced containing
     * details on the duplicate name.
     */
-  val scopeTablesƒ: CoalgebraM[ValidSem, ExprF, (TableScope, Expr)] =
-    p => p._2.unFix match {
+  val scopeTablesƒ: CoalgebraM[ValidSem, ExprF, (Scope, Expr)] = {
+    case (Scope(ts, bs), expr) => expr.unFix match {
       case sel @ SelectF(_, _, relations, _, _, _) =>
         def findRelations(r: SqlRelation[Expr]): ValidSem[Map[String, SqlRelation[Expr]]] =
           r match {
+            case IdentRelationAST(name, aliasOpt) =>
+              success(Map(aliasOpt.getOrElse(name) -> r))
             case TableRelationAST(file, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(prettyPrint(file)) -> r))
             case ExprRelationAST(_, alias) => success(Map(alias -> r))
@@ -207,9 +217,18 @@ trait SemanticAnalysis {
         relations.fold[ValidSem[Map[String, SqlRelation[Expr]]]](
           success(Map[String, SqlRelation[Expr]]()))(
           findRelations)
-          .map(m => sel.map((TableScope(m), _)))
-      case x => success(x.map((p._1, _)))
+          .map(m => sel.map((Scope(TableScope(m), bs), _)))
+
+      case LetF(name, form, body) => {
+        val bs2: BindingScope =
+          BindingScope(bs.scope ++ Map(name -> ExprRelationAST(form, name)))
+
+        success(LetF(name, (Scope(ts, bs), form), (Scope(ts, bs2), body)))
+      }
+
+      case x => success(x.map((Scope(ts, bs), _)))
     }
+  }
 
   sealed trait Provenance {
     import Provenance._
@@ -333,23 +352,27 @@ trait SemanticAnalysis {
 
   /** This phase infers the provenance of every expression, issuing errors
     * if identifiers are used with unknown provenance. The phase requires
-    * TableScope annotations on the tree.
+    * TableScope and BindingScope annotations on the tree.
     */
-  val inferProvenanceƒ: ElgotAlgebraM[(TableScope, ?), ValidSem, ExprF, Provenance] = {
-    case (tableScope, expr) => expr match {
+  val inferProvenanceƒ: ElgotAlgebraM[(Scope, ?), ValidSem, ExprF, Provenance] = {
+    case (Scope(ts, bs), expr) => expr match {
       case SelectF(_, projections, _, _, _, _) =>
         success(Provenance.allOf(projections.map(_.expr)))
 
-      case SetLiteralF(_)  => success(Provenance.Value)
-      case ArrayLiteralF(_) => success(Provenance.Value)
-      case MapLiteralF(_) => success(Provenance.Value)
-      case SpliceF(expr)       => success(expr.getOrElse(Provenance.Empty))
-      case VariF(_)        => success(Provenance.Value)
-      case BinopF(left, right, _) => success(left & right)
-      case UnopF(expr, _) => success(expr)
-      case IdentF(name) =>
-        tableScope.scope.get(name).fold(
-          Provenance.anyOf[Map[String, ?]](tableScope.scope ∘ (Provenance.Relation(_))) match {
+      case SetLiteralF(_)           => success(Provenance.Value)
+      case ArrayLiteralF(_)         => success(Provenance.Value)
+      case MapLiteralF(_)           => success(Provenance.Value)
+      case SpliceF(expr)            => success(expr.getOrElse(Provenance.Empty))
+      case VariF(_)                 => success(Provenance.Value)
+      case BinopF(left, right, _)   => success(left & right)
+      case UnopF(expr, _)           => success(expr)
+      case IdentF(name)             =>
+        val scope = bs.scope.get(name) match {
+          case None => ts.scope.get(name)
+          case s => s
+        }
+        scope.fold(
+          Provenance.anyOf[Map[String, ?]]((ts.scope ++ bs.scope) ∘ (Provenance.Relation(_))) match {
             case Provenance.Empty => fail(NoTableDefined(Ident(name)))
             case x                => success(x)
           })(
@@ -359,6 +382,7 @@ trait SemanticAnalysis {
         success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
       case SwitchF(cases, _)        =>
         success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
+      case LetF(_, form, body)      => success(form & body)
       case IntLiteralF(_)           => success(Provenance.Value)
       case FloatLiteralF(_)         => success(Provenance.Value)
       case StringLiteralF(_)        => success(Provenance.Value)
@@ -370,23 +394,23 @@ trait SemanticAnalysis {
   type Annotations = (List[Option[Synthetic]], Provenance)
 
   val synthElgotMƒ:
-      ElgotAlgebraM[(TableScope, ?), ValidSem, ExprF, List[Option[Synthetic]]] =
-    identifySyntheticsƒ.generalizeElgot[(TableScope, ?)] >>> (_.point[ValidSem])
+      ElgotAlgebraM[(Scope, ?), ValidSem, ExprF, List[Option[Synthetic]]] =
+    identifySyntheticsƒ.generalizeElgot[(Scope, ?)] >>> (_.point[ValidSem])
 
   def addAnnotations:
       ElgotAlgebraM[
-        ((TableScope, Expr), ?),
+        ((Scope, Expr), ?),
         NonEmptyList[SemanticError] \/ ?,
         ExprF,
         Cofree[ExprF, Annotations]] =
-    e => attributeElgotM[(TableScope, ?), ValidSem].apply[ExprF, Annotations](
-      ElgotAlgebraMZip[(TableScope, ?), ValidSem, ExprF].zip(
+    e => attributeElgotM[(Scope, ?), ValidSem].apply[ExprF, Annotations](
+      ElgotAlgebraMZip[(Scope, ?), ValidSem, ExprF].zip(
         synthElgotMƒ,
         inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
 
   // NB: projectSortKeys >>> (identifySynthetics &&& (scopeTables >>> inferProvenance))
   def AllPhases(expr: Expr) =
-    (TableScope(Map()), expr.cata(projectSortKeysƒ))
+    (Scope(TableScope(Map()), BindingScope(Map())), expr.cata(projectSortKeysƒ))
       .coelgotM[NonEmptyList[SemanticError] \/ ?](
       addAnnotations, scopeTablesƒ(_).disjunction)
 }

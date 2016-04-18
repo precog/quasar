@@ -31,116 +31,127 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
   implicit def stringToQuery(s: String): Query = Query(s)
 
-  val parser = new SQLParser
+  def parse(query: Query): ParsingError \/ Expr =
+    (new SQLParser).parse(query).map(_.makeTables(Nil))
 
   "SQLParser" should {
     "parse query1" in {
-      val r = parser.parse(q1).toOption
+      val r = parse(q1).toOption
       r should beSome
     }
 
     "parse query2" in {
-      val r = parser.parse(q2).toOption
+      val r = parse(q2).toOption
       r should beSome
     }
 
     "parse query3" in {
-      val r = parser.parse(q3).toOption
+      val r = parse(q3).toOption
       r should beSome
     }
 
     "parse query4" in {
-      val r = parser.parse(q4).toOption
+      val r = parse(q4).toOption
       r should beSome
     }
 
     "parse query5" in {
-      val r = parser.parse(q5).toOption
+      val r = parse(q5).toOption
       r should beSome
     }
 
     "parse query6" in {
-      val r = parser.parse(q6).toOption
+      val r = parse(q6).toOption
       r should beSome
     }
 
     "parse query7" in {
-      val r = parser.parse(q7).toOption
+      val r = parse(q7).toOption
       r should beSome
     }
 
     "parse query8" in {
-      val r = parser.parse(q8).toOption
+      val r = parse(q8).toOption
       r should beSome
     }
 
     "parse query9" in {
-      val r = parser.parse(q9).toOption
+      val r = parse(q9).toOption
       r should beSome
     }
 
     "parse query10" in {
-      val r = parser.parse(q10).toOption
+      val r = parse(q10).toOption
       r should beSome
     }
 
     "parse query11" in {
-      val r = parser.parse(q11).toOption
+      val r = parse(q11).toOption
       r should beSome
     }
 
     "parse query12" in {
-      val r = parser.parse(q12).toOption
+      val r = parse(q12).toOption
       r should beSome
     }
 
     "parse query13" in {
-      val r = parser.parse(q13).toOption
+      val r = parse(q13).toOption
       r should beSome
     }
 
     "parse query14" in {
-      val r = parser.parse(q14).toOption
+      val r = parse(q14).toOption
       r should beSome
     }
 
     "parse query16" in {
-      val r = parser.parse(q16).toOption
+      val r = parse(q16).toOption
       r should beSome
     }
 
     "parse query17" in {
-      val r = parser.parse(q17).toOption
+      val r = parse(q17).toOption
       r should beSome
     }
 
     "parse query18" in {
-      val r = parser.parse(q18).toOption
+      val r = parse(q18).toOption
       r should beSome
     }
 
     "parse query19" in {
-      val r = parser.parse(q19).toOption
+      val r = parse(q19).toOption
       r should beSome
     }
 
     "parse query20" in {
-      val r = parser.parse(q20).toOption
+      val r = parse(q20).toOption
       r should beSome
     }
 
     "parse query21" in {
-      val r = parser.parse(q21).toOption
+      val r = parse(q21).toOption
       r should beSome
     }
 
     "parse query22" in {
-      val r = parser.parse(q22).toOption
+      val r = parse(q22).toOption
       r should beSome
     }
 
+    "parse basic select" in {
+      parse("select foo from bar") must
+        beRightDisjunction(
+          Select(
+            SelectAll,
+            List(Proj(Ident("foo"), None)),
+            Some(TableRelationAST(file("bar"), None)),
+            None, None, None))
+    }
+
     "parse keywords as identifiers" in {
-      parser.parse("select as as as from from as from where where group by group order by order") should
+      parse("select as as as from from as from where where group by group order by order") should
         beRightDisjOrDiff(
           Select(
             SelectAll,
@@ -152,7 +163,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse ambiguous keyword as identifier" in {
-      parser.parse("""select `false` from zips""") should
+      parse("""select `false` from zips""") should
         beRightDisjOrDiff(
           Select(
             SelectAll,
@@ -162,7 +173,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse ambiguous expression as expression" in {
-      parser.parse("""select case from when where then and end""") should
+      parse("""select case from when where then and end""") should
         beRightDisjOrDiff(
           Select(
             SelectAll,
@@ -171,7 +182,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse partially-disambiguated expression" in {
-      parser.parse("""select `case` from when where then and end""") should
+      parse("""select `case` from when where then and end""") should
         beRightDisjOrDiff(
           Select(
             SelectAll,
@@ -181,19 +192,19 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
             None, None))
     }
     "parse quoted literal" in {
-      parser.parse("""select * from foo where bar = "abc" """).toOption should beSome
+      parse("""select * from foo where bar = "abc" """).toOption should beSome
     }
 
     "parse quoted literal with escaped quote" in {
-      parser.parse(raw"""select * from foo where bar = "that\"s it!" """).toOption should beSome
+      parse(raw"""select * from foo where bar = "that\"s it!" """).toOption should beSome
     }
 
     "don’t parse multi-character char literal" in {
-      parser.parse("""select * from foo where bar = 'it!'""").toOption should beNone
+      parse("""select * from foo where bar = 'it!'""").toOption should beNone
     }
 
     "parse literal that’s too big for an Int" in {
-      parser.parse("select * from users where add_date > 1425460451000") should
+      parse("select * from users where add_date > 1425460451000") should
         beRightDisjOrDiff(
           Select(
             SelectAll,
@@ -204,23 +215,23 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse quoted identifier" in {
-      parser.parse("""select * from `tmp/foo` """).toOption should beSome
+      parse("""select * from `tmp/foo` """).toOption should beSome
     }
 
     "parse quoted identifier with escaped quote" in {
-      parser.parse(raw"select * from `tmp/foo[\`bar\`]` ").toOption should beSome
+      parse(raw"select * from `tmp/foo[\`bar\`]` ").toOption should beSome
     }
 
     "parse simple query with two variables" in {
-      parser.parse("""SELECT * FROM zips WHERE zips.dt > :start_time AND zips.dt <= :end_time """).toOption should beSome
+      parse("""SELECT * FROM zips WHERE zips.dt > :start_time AND zips.dt <= :end_time """).toOption should beSome
     }
 
     "parse true and false literals" in {
-      parser.parse("""SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
+      parse("""SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
     }
 
     "parse “full-value” insert expression" in {
-      parser.parse("insert into zips values 1, 2, 3") should
+      parse("insert into zips values 1, 2, 3") should
       beRightDisjOrDiff(
         Union(
           SetLiteral(List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
@@ -232,7 +243,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse “keyed” insert expression" in {
-      parser.parse("insert into zips ('a', 'b') values (1, 2), (3, 4)") should
+      parse("insert into zips ('a', 'b') values (1, 2), (3, 4)") should
       beRightDisjOrDiff(
         Union(
           SetLiteral(List(
@@ -246,7 +257,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse numeric literals" in {
-      parser.parse("select 1, 2.0, 3000000, 2.998e8, -1.602E-19, 1e+6") should beRightDisjunction
+      parse("select 1, 2.0, 3000000, 2.998e8, -1.602E-19, 1e+6") should beRightDisjunction
     }
 
     "parse date, time, timestamp, and id literals" in {
@@ -256,7 +267,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
                   and ts < timestamp("2014-11-16T03:00:00Z") + interval("PT1H")
                   and _id != oid("abc123")"""
 
-      parser.parse(q) must beRightDisjunction
+      parse(q) must beRightDisjunction
     }
 
     "parse IS and IS NOT" in {
@@ -266,36 +277,36 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
                   and c IS TRUE
                   and d IS NOT FALSE"""
 
-      parser.parse(q) must beRightDisjunction
+      parse(q) must beRightDisjunction
     }
 
     "parse is (not) as (!)=" in {
       val q1 = "select * from zips where pop is 1000 and city is not \"BOULDER\""
       val q2 = "select * from zips where pop = 1000 and city != \"BOULDER\""
-      parser.parse(q1) must_== parser.parse(q2)
+      parse(q1) must_== parse(q2)
     }
 
     "parse `in` and `like` with optional `is`" in {
       val q1 = "select * from zips where pop is in (1000, 2000) and city is like \"BOU%\""
       val q2 = "select * from zips where pop in (1000, 2000) and city like \"BOU%\""
-      parser.parse(q1) must_== parser.parse(q2)
+      parse(q1) must_== parse(q2)
     }
 
     "parse `not in` and `not like` with optional `is`" in {
       val q1 = "select * from zips where pop is not in (1000, 2000) and city is not like \"BOU%\""
       val q2 = "select * from zips where pop not in (1000, 2000) and city not like \"BOU%\""
-      parser.parse(q1) must_== parser.parse(q2)
+      parse(q1) must_== parse(q2)
     }
 
     "parse nested joins left to right" in {
       val q1 = "select * from a cross join b cross join c"
       val q2 = "select * from (a cross join b) cross join c"
-      parser.parse(q1) must_== parser.parse(q2)
+      parse(q1) must_== parse(q2)
     }
 
     "parse nested joins with parens" in {
       val q = "select * from a cross join (b cross join c)"
-      parser.parse(q) must beRightDisjunction(
+      parse(q) must beRightDisjunction(
         Select(
           SelectAll,
           List(Proj(Splice(None), None)),
@@ -309,7 +320,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse array constructor and concat op" in {
-      parser.parse("select loc || [ pop ] from zips") must beRightDisjunction(
+      parse("select loc || [ pop ] from zips") must beRightDisjunction(
         Select(SelectAll,
           List(
             Proj(
@@ -333,7 +344,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse offset" in {
       val q = s"$selectString offset 6"
-      parser.parse(q) must beRightDisjunction(
+      parse(q) must beRightDisjunction(
         Offset(expectedSelect, IntLiteral(6))
       )
     }
@@ -341,32 +352,32 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse limit" in {
       "normal" in {
         val q = s"$selectString limit 6"
-        parser.parse(q) must beRightDisjunction(
+        parse(q) must beRightDisjunction(
           Limit(expectedSelect, IntLiteral(6))
         )
       }
       "multiple limits" in {
         val q = s"$selectString limit 6 limit 3"
-        parser.parse(q) must beRightDisjunction(
+        parse(q) must beRightDisjunction(
           Limit(Limit(expectedSelect, IntLiteral(6)), IntLiteral(3))
         )
       }
       "should not allow single limit" in {
         val q = "limit 6"
-        parser.parse(q) must beLeftDisjunction
+        parse(q) must beLeftDisjunction
       }
     }
 
     "parse limit and offset" in {
       "limit before" in {
         val q = s"$selectString limit 6 offset 3"
-        parser.parse(q) must beRightDisjunction(
+        parse(q) must beRightDisjunction(
           Offset(Limit(expectedSelect, IntLiteral(6)), IntLiteral(3))
         )
       }
       "limit after" in {
         val q = s"$selectString offset 6 limit 3"
-        parser.parse(q) must beRightDisjunction(
+        parse(q) must beRightDisjunction(
           Limit(Offset(expectedSelect, IntLiteral(6)), IntLiteral(3))
         )
       }
@@ -375,19 +386,112 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "should refuse a semicolon not at the end" in {
       import shapeless.contrib.scalaz._
       val q = "select foo from (select 5 as foo;) where foo = 7"
-      parser.parse(q) must beLeftDisjunction(
+      parse(q) must beLeftDisjunction(
         GenericParsingError("operator ')' expected; `;'")
       )
     }
 
+    "parse basic let" in {
+      parse("""foo := 5; foo""") must
+        beRightDisjunction(
+          Let("foo", IntLiteral(5), Ident("foo")))
+    }
+
+    "parse nested lets" in {
+      parse("""foo := 5; bar := "hello"; bar + foo""") must
+        beRightDisjunction(
+          Let(
+            "foo",
+            IntLiteral(5),
+            Let(
+              "bar",
+              StringLiteral("hello"),
+              Binop(Ident("bar"), Ident("foo"), Plus))))
+    }
+
+    "parse let inside select" in {
+      parse("""select foo from (bar := 12; baz) as quag""") must
+        beRightDisjunction(
+          Select(
+            SelectAll,
+            List(Proj(Ident("foo"), None)),
+            Some(ExprRelationAST(
+              Let(
+                "bar",
+                IntLiteral(12),
+                Ident("baz")),
+              "quag")),
+            None,
+            None,
+            None))
+    }
+
+    "parse select inside body of let" in {
+      parse("""foo := (1,2,3); select * from foo""") must
+        beRightDisjunction(
+          Let(
+            "foo",
+            SetLiteral(
+              List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
+            Select(
+              SelectAll,
+              List(Proj(Splice(None), None)),
+              Some(IdentRelationAST("foo", None)),
+              None,
+              None,
+              None)))
+    }
+
+    "parse select inside body of let" in {
+      parse("""foo := (1,2,3); select foo from bar""") must
+        beRightDisjunction(
+          Let(
+            "foo",
+            SetLiteral(
+              List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
+            Select(
+              SelectAll,
+              // TODO this should be IdentRelationAST not Ident
+              List(Proj(Ident("foo"), None)),
+              Some(TableRelationAST(file("bar"), None)),
+              None,
+              None,
+              None)))
+    }
+
+    "parse select inside body of let inside select" in {
+      val innerLet =
+        Let(
+          "foo",
+          SetLiteral(
+            List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
+          Select(
+            SelectAll,
+            List(Proj(Splice(None), None)),
+            Some(IdentRelationAST("foo", None)),
+            None,
+            None,
+            None))
+
+      parse("""select (foo := (1,2,3); select * from foo) from baz""") must
+        beRightDisjunction(
+          Select(
+            SelectAll,
+            List(Proj(innerLet, None)),
+            Some(TableRelationAST(file("baz"), None)),
+            None,
+            None,
+            None))
+    }
+
     "should parse a single-quoted character" in {
       val q = "'c'"
-      parser.parse(q) must beRightDisjunction(StringLiteral("c"))
+      parse(q) must beRightDisjunction(StringLiteral("c"))
     }
 
     "should parse escaped characters" in {
       val q = raw"select '\'', '\\', '\u1234'"
-      parser.parse(q) must beRightDisjunction(
+      parse(q) must beRightDisjunction(
         Select(SelectAll, List(
           Proj(StringLiteral("'"), None),
           Proj(StringLiteral(raw"\"), None),
@@ -396,31 +500,31 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
     "should parse escaped characters in a string" in {
       val q = raw""""'\\\u1234""""
-      parser.parse(q) must beRightDisjunction(StringLiteral(raw"'\ሴ"))
+      parse(q) must beRightDisjunction(StringLiteral(raw"'\ሴ"))
     }
 
     "should not parse multiple expressions seperated incorrectly" in {
       val q = "select foo from bar limit 6 select biz from baz"
-      parser.parse(q) must beLeftDisjunction
+      parse(q) must beLeftDisjunction
     }
 
     "parse array literal at top level" in {
-      parser.parse("""["X", "Y"]""") must beRightDisjunction(
+      parse("""["X", "Y"]""") must beRightDisjunction(
         ArrayLiteral(List(StringLiteral("X"), StringLiteral("Y"))))
     }
 
     "parse empty set literal" in {
-      parser.parse("()") must beRightDisjunction(
+      parse("()") must beRightDisjunction(
         SetLiteral(Nil))
     }
 
     "parse parenthesized simple expression (which is syntactically identical to a 1-element set literal)" in {
-      parser.parse("(a)") must beRightDisjunction(
+      parse("(a)") must beRightDisjunction(
         Ident("a"))
     }
 
     "parse 2-element set literal" in {
-      parser.parse("(a, b)") must beRightDisjunction(
+      parse("(a, b)") must beRightDisjunction(
         SetLiteral(List(Ident("a"), Ident("b"))))
     }
 
@@ -429,20 +533,20 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       // left-recursive expression with many unneeded parenes, which
       // happens to be exactly what pprint produces.
       val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
-      parser.parse(q).map(pprint) must beRightDisjunction(q)
+      parse(q).map(pprint) must beRightDisjunction(q)
     }
 
     "should not parse query with a single backslash in an identifier" >> {
       "in table relation" in {
-        parser.parse(raw"select * from `\bar`") should beLeftDisjunction
+        parse(raw"select * from `\bar`") should beLeftDisjunction
       }.pendingUntilFixed("SD-1536")
       "in identifier" in {
-        parser.parse(raw"`\bar`") should beLeftDisjunction
+        parse(raw"`\bar`") should beLeftDisjunction
       }.pendingUntilFixed("SD-1536")
     }
 
     "round-trip to SQL and back" ! prop { (node: Expr) =>
-      val parsed = parser.parse(pprint(node))
+      val parsed = parse(pprint(node))
 
       parsed.fold(
         _ => println(node.shows + "\n" + pprint(node)),

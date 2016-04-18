@@ -56,6 +56,7 @@ object ExprF {
       extends ExprF[A]
   final case class SwitchF[A](cases: List[Case[A]], default: Option[A])
       extends ExprF[A]
+  final case class LetF[A](name: String, form: A, body: A) extends ExprF[A]
   final case class IntLiteralF[A](v: Long) extends ExprF[A]
   final case class FloatLiteralF[A](v: Double) extends ExprF[A]
   final case class StringLiteralF[A](v: String) extends ExprF[A]
@@ -147,15 +148,15 @@ sealed trait SqlRelation[A] {
   def namedRelations: Map[String, List[NamedRelation[A]]] = {
     def collect(n: SqlRelation[A]): List[(String, NamedRelation[A])] =
       n match {
-        case t @ TableRelationAST(_, _) => (t.aliasName -> t) :: Nil
-        case t @ ExprRelationAST(_, _) => (t.aliasName -> t) :: Nil
         case JoinRelation(left, right, _, _) => collect(left) ++ collect(right)
+        case t: NamedRelation[A] => (t.aliasName -> t) :: Nil
     }
 
     collect(this).groupBy(_._1).mapValues(_.map(_._2))
   }
 
   def mapPathsM[F[_]: Monad](f: FUPath => F[FUPath]): F[SqlRelation[A]] = this match {
+    case IdentRelationAST(_, _) => this.point[F]
     case TableRelationAST(path, alias) => f(path).map(TableRelationAST(_, alias))
     case rel @ JoinRelation(left, right, _, _) =>
       (left.mapPathsM(f) |@| right.mapPathsM(f))((l,r) => rel.copy(left = l, right = r))
@@ -165,6 +166,17 @@ sealed trait SqlRelation[A] {
 
 sealed trait NamedRelation[A] extends SqlRelation[A] {
   def aliasName: String
+}
+
+/**
+ * IdentRelationAST allows us to reference a let binding in relation (i.e. table)
+ * context. ExprF.IdentF allows us to reference a let binding in expression context.
+ * Ideally we can unify these two contexts, providing a single way to reference a
+ * let binding.
+ */
+final case class IdentRelationAST[A](name: String, alias: Option[String])
+    extends NamedRelation[A] {
+  def aliasName = alias.getOrElse(name)
 }
 
 final case class TableRelationAST[A](tablePath: FUPath, alias: Option[String])
@@ -218,8 +230,15 @@ object SelectF {
         groupBy,
         orderBy) =>
         Some((isDistinct, projections, relations, filter, groupBy, orderBy))
-      case _                         => None
+      case _ => None
     }
+}
+object LetF {
+  def apply[A](name: String, form: A, body: A): ExprF[A] = ExprF.LetF(name, form, body)
+  def unapply[A](obj: ExprF[A]): Option[(String, A, A)] = obj match {
+    case ExprF.LetF(name, form, body) => Some((name, form, body))
+    case _                            => None
+  }
 }
 object VariF {
   def apply[A](symbol: String): ExprF[A] = ExprF.VariF(symbol)

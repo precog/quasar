@@ -1,0 +1,17 @@
+{
+    "name": "handle nested let binding and selects",
+
+    "data": "zips.data",
+
+    "query": "min_pop := 10000;
+              max_pop := 20000;
+                select zips.city, zips.pop from zips where zips.pop > min_pop and zips.pop < max_pop",
+
+    "predicate": "containsAtLeast",
+
+    "expected": [{ "city": "AGAWAM",          "pop": 15338 },
+                 { "city": "BELCHERTOWN",     "pop": 10579 },
+                 { "city": "MOUNT TOM",       "pop": 16864 },
+                 { "city": "EAST LONGMEADOW", "pop": 13367 },
+                 { "city": "FEEDING HILLS",   "pop": 11985 }]
+}

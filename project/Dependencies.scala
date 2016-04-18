@@ -51,6 +51,9 @@ object Dependencies {
     "org.http4s"           %% "http4s-argonaut"       % http4sVersion % "compile, test",
     "org.http4s"           %% "http4s-blaze-server"   % http4sVersion  % "compile, test",
     "org.http4s"           %% "http4s-blaze-client"   % http4sVersion  % "test",
+    // This dependency is calling for scalaz 7.1.x which gets evicted but can't upgrade right now
+    // All tests work even though there is a chance of hitting a binary incompatibility at some
+    // point if we don't upgrade when it becomes possible.
     "org.scodec"           %% "scodec-scalaz"         % "1.1.0",
     "ch.qos.logback"       %  "logback-classic"       % "1.1.3",
     "com.propensive"       %% "rapture-json"          % raptureVersion % "test",

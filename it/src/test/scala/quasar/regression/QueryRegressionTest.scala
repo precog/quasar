@@ -218,7 +218,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
     testDir: RDir,
     knownBackends: Set[BackendName]
   ): Task[Map[RFile, RegressionTest]] =
-    descendantsMatching(testDir, """.*\.test"""r)
+    descendantsMatching(testDir, """^([^.].*)\.test"""r) // don't match file names with a leading .
       .map(f =>
         (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL
           (f relativeTo testDir).get)

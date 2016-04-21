@@ -1,0 +1,1 @@
+- Don't attempt to run regression test files that start with a dot.

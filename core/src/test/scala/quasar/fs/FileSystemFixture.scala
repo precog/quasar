@@ -82,18 +82,30 @@ trait FileSystemFixture {
       .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
   }
 
+  /** Resize a generator, applying a scale factor so that the resulting
+    * values still respond to the incoming size value (which is
+    * controlled by `maxSize` parameter), but typically scaled down
+    * so that the default size results more modestly-sized values.
+    */
+  def scaleSize[A](gen: Gen[A], pow: Double): Gen[A] = {
+    def app(size: Int) = (scala.math.pow(size.toDouble, pow)).toInt
+    Gen.sized(size => Gen.resize(app(size), gen))
+  }
+
+  // NB: scale down because `Vector[Data]` is `O(n^2)`
   implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(
     (Arbitrary.arbitrary[AFile] |@|
-      Arbitrary.arbitrary[Vector[Data]])(SingleFileMemState.apply))
+      scaleSize(Arbitrary.arbitrary[Vector[Data]], 1/2.0))(SingleFileMemState.apply))
 
   implicit val shrinkSingleFileMemSate: Shrink[SingleFileMemState] = Shrink { fs =>
     (shrink(fs.file).map(newFile => fs.copy(file = newFile))) append
     (shrink(fs.contents).map(newContents => fs.copy(contents = newContents)))
   }
 
+  // NB: scale down even more because `NonEmptyList[(..., Vector[Data])]` is `O(n^3)`
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
     (Arbitrary.arbitrary[ADir] |@|
-      Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]])(NonEmptyDir.apply))
+      scaleSize(Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]], 1/3.0))(NonEmptyDir.apply))
 
   type F[A]            = Free[FileSystem, A]
   type InMemFix[A]     = ReadWriteT[InMemoryFs, A]

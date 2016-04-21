@@ -35,7 +35,6 @@ import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
-import org.scalacheck.Arbitrary
 import org.specs2.specification.core.Fragments
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
@@ -127,7 +126,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           }
           "in any supported format if specified" >> {
             "in the content-type header" >> {
-              def testProp(format: MessageFormat) = prop { filesystem: SingleFileMemState => test(format, filesystem) }
+              def testProp(format: MessageFormat) = prop { filesystem: SingleFileMemState =>
+                test(format, filesystem)
+              }
               def test(format: MessageFormat, filesystem: SingleFileMemState) = {
                 val request = Request(
                   uri = pathUri(filesystem.file),
@@ -149,7 +150,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                   testProp(jsonPreciseArray)
                 }
               }
-              "csv" ! prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) => test(format, filesystem) }
+              "csv" ! prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) =>
+                test(format, filesystem)
+              }
               "or a more complicated proposition" ! prop { filesystem: SingleFileMemState =>
                 val request = Request(
                   uri = pathUri(filesystem.file),
@@ -247,13 +250,16 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         "support very large data set" >> {
           val sampleFile = rootDir[Sandboxed] </> dir("foo") </> file("bar")
           def fileSystemWithSampleFile(data: Vector[Data]) = InMemState fromFiles Map(sampleFile -> data)
-          val data = (0 until 100*1000).map(n => Data.Obj(ListMap("n" -> Data.Int(n)))).toVector
+          // NB: defer constructing this large object until the actual test that uses it, so it becomes garbage sooner.
+          def bigData = (0 until 100*1000).map(n => Data.Obj(ListMap("n" -> Data.Int(n)))).toVector
           "plain text" >> {
+            val data = bigData
             val request = Request(uri = pathUri(sampleFile))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             isExpectedResponse(data, response, MessageFormat.Default)
           }
           "gziped" >> {
+            val data = bigData
             val request = Request(
               uri = pathUri(sampleFile),
               headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
@@ -262,8 +268,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           }
         }
       }
-      "using disposition to download as zipped directory" ! prop { filesystem: NonEmptyDir =>
-        val disposition = `Content-Disposition`("attachement", Map("filename" -> "foo.zip"))
+      "download as zipped directory" ! prop { filesystem: NonEmptyDir =>
+        val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
         val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
         val request = Request(
           uri = pathUri(filesystem.dir),
@@ -272,7 +278,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         response.status must_== Status.Ok
         response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
         response.headers.get(`Content-Disposition`) must_== Some(disposition)
-      }.set(minTestsOk = 1).setGen(Arbitrary.arbitrary[NonEmptyDir].retryUntil(κ(true))) // This test is relatively slow TODO[scalacheck]: Remove retryUnit once upgrade to 0.13.0 as it should no longer be necessary
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {
@@ -305,64 +311,74 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "be 400 with" >> {
           def be400[A: EntityDecoder](
+            file: AFile,
             reqBody: String,
             expectBody: A => MatchResult[scala.Any],
             mediaType: MediaType = jsonReadableLine.mediaType
           ) = {
-            prop { file: AFile =>
-              val request = Request(
-                uri = pathUri(file),             // We do it this way becuase withBody sets the content-type
-                method = method
-              ).withBody(reqBody).unsafePerformSync.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
-              val (service, ref) = serviceRef(emptyMem)
-              val response = service(request).unsafePerformSync
-              expectBody(response.as[A].unsafePerformSync)
-              ref.unsafePerformSync must_== emptyMem
-            }
+            val request = Request(
+              uri = pathUri(file),             // We do it this way because withBody sets the content-type
+              method = method
+            ).withBody(reqBody).unsafePerformSync.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
+            val (service, ref) = serviceRef(emptyMem)
+            val response = service(request).unsafePerformSync
+            expectBody(response.as[A].unsafePerformSync)
+            ref.unsafePerformSync must_== emptyMem
           }
           "invalid body" >> {
-            "no body" ! be400(
-              reqBody = "",
-              expectBody = (_: ApiError) must equal(ApiError.fromStatus(
-                Status.BadRequest withReason "Request has no body."))
-            )
-            "invalid JSON" ! be400(
-              reqBody = "{",
-              expectBody = (_: ApiError) must equal(ApiError.apiError(
-                Status.BadRequest withReason "Malformed upload data.",
-                "errors" := List("parse error: JSON terminates unexpectedly. in the following line: {")))
-            )
-            "invalid CSV" >> {
-              "empty (no headers)" ! be400(
+            "no body" ! prop { file: AFile =>
+              be400(
+                file,
                 reqBody = "",
                 expectBody = (_: ApiError) must equal(ApiError.fromStatus(
-                  Status.BadRequest withReason "Request has no body.")),
-                mediaType = csv
+                  Status.BadRequest withReason "Request has no body."))
               )
-              "if broken (after the tenth data line)" ! {
-                val brokenBody = "\"a\",\"b\"\n1,2\n3,4\n5,6\n7,8\n9,10\n11,12\n13,14\n15,16\n17,18\n19,20\n\",\n"
+            }.set(minTestsOk = 5) // NB: seems like the parser is slow
+            "invalid JSON" ! prop { file: AFile =>
+              be400(
+                file,
+                reqBody = "{",
+                expectBody = (_: ApiError) must equal(ApiError.apiError(
+                  Status.BadRequest withReason "Malformed upload data.",
+                  "errors" := List("parse error: JSON terminates unexpectedly. in the following line: {")))
+              )
+            }.set(minTestsOk = 5)  // NB: seems like the parser is slow
+            "invalid CSV" >> {
+              "empty (no headers)" ! prop { file: AFile =>
                 be400(
-                  reqBody = brokenBody,
-                  expectBody = (_: ApiError) must equal(ApiError.apiError(
-                    Status.BadRequest withReason "Malformed upload data.",
-                    "errors" := List("parse error: Malformed Input!: Some(\",\n)"))),
-                  mediaType = csv)
-              }
+                  file,
+                  reqBody = "",
+                  expectBody = (_: ApiError) must equal(ApiError.fromStatus(
+                    Status.BadRequest withReason "Request has no body.")),
+                  mediaType = csv
+                )
+              }.set(minTestsOk = 5)  // NB: seems like the parser is slow
+              "if broken (after the tenth data line)" ! prop { file: AFile =>
+                val brokenBody = "\"a\",\"b\"\n1,2\n3,4\n5,6\n7,8\n9,10\n11,12\n13,14\n15,16\n17,18\n19,20\n\",\n"
+                  be400(
+                    file,
+                    reqBody = brokenBody,
+                    expectBody = (_: ApiError) must equal(ApiError.apiError(
+                      Status.BadRequest withReason "Malformed upload data.",
+                      "errors" := List("parse error: Malformed Input!: Some(\",\n)"))),
+                    mediaType = csv)
+              }.set(minTestsOk = 5)  // NB: seems like the parser is slow
             }
           }
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
           "if path is invalid (parent directory does not exist)" ! prop { (file: AFile, json: Json) =>
             Path.depth(file) != 1 ==> {
-              be400(reqBody = json.spaces4, (_: Json) must_== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
+              be400(file, reqBody = json.spaces4, (_: Json) must_== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
             }
           }.pendingUntilFixed("What do we want here, create it or not?")
-          "produce two errors with partially invalid JSON" ! prop { path: Path[Abs,File,Sandboxed] =>
+          "produce two errors with partially invalid JSON" ! prop { file: AFile =>
             val twoErrorJson = """{"a": 1}
                                  |"unmatched
                                  |{"b": 2}
                                  |}
                                  |{"c": 3}""".stripMargin
             be400(
+              file,
               reqBody = twoErrorJson,
               expectBody = (_: ApiError) must equal(ApiError.apiError(
                 Status.BadRequest withReason "Malformed upload data.",
@@ -498,7 +514,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "srcPath" := fs.dir,
             "dstPath" := file),
           newState = Unchanged)
-      }
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: ADir) =>
         testMove(
           from = fs.file,
@@ -530,7 +546,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             status = Status.Created,
             body = (str: String) => str must_== "",
             newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
-      }
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 409 with file to same location" ! prop {(fs: SingleFileMemState) =>
         testMove(
           from = fs.file,
@@ -551,7 +567,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             (err.detail("path") must beSome)
           },
           newState = Unchanged)
-      }
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
     }
     "DELETE" >> {
       "be 204 with existing file" ! prop { filesystem: SingleFileMemState =>
@@ -567,7 +583,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         val response = service(request).unsafePerformSync
         response.status must_== Status.NoContent
         ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
-      }
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
         val response = service(emptyMem)(request).unsafePerformSync

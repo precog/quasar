@@ -24,9 +24,7 @@ import quasar.sql, sql.{Expr}
 
 import argonaut._, Argonaut._
 import monocle.Prism
-import scalaz._
-import scalaz.syntax.std.option._
-import scalaz.syntax.std.boolean._
+import scalaz._, Scalaz._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
 sealed trait MountConfig
@@ -69,28 +67,32 @@ object MountConfig {
     }
 */
 
+  val toConfigPair: MountConfig => (String, ConnectionUri) = {
+    case ViewConfig(query, vars) =>
+      "view" -> ConnectionUri(viewCfgAsUri(query, vars))
+    case FileSystemConfig(typ, uri) =>
+      typ.value -> uri
+  }
+
+  val fromConfigPair: (String, ConnectionUri) => String \/ MountConfig = {
+    case ("view", uri) =>
+      viewCfgFromUri(uri.value).map(viewConfig(_))
+    case (typ, uri) =>
+      fileSystemConfig(FileSystemType(typ), uri).right
+  }
+
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
-    CodecJson({
-      case ViewConfig(query, vars) =>
-        Json("view" := Json("connectionUri" := viewCfgAsUri(query, vars)))
-
-      case FileSystemConfig(typ, uri) =>
-        Json(typ.value := Json("connectionUri" := uri))
-    }, c => c.fields match {
-      case Some("view" :: Nil) =>
-        val uriCur = (c --\ "view" --\ "connectionUri")
-        uriCur.as[String].flatMap(uri => DecodeResult(
-          viewCfgFromUri(uri).bimap(
-            e => (e.toString, uriCur.history),
-            viewConfig(_)).toEither
-        ))
-
-      case Some(t :: Nil) =>
-        (c --\ t --\ "connectionUri").as[ConnectionUri]
-          .map(fileSystemConfig(FileSystemType(t), _))
-
+    CodecJson({ cfg =>
+      val (key, uri) = toConfigPair(cfg)
+      Json(key := Json("connectionUri" := uri.value))
+    },
+    json => json.fields match {
+      case Some(key :: Nil) =>
+        val uriCur = json --\ key --\ "connectionUri"
+        uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
+          fromConfigPair(key, uri).leftMap((_, uriCur.history)).toEither))
       case _ =>
-        DecodeResult.fail(s"invalid config: ${c.focus}", c.history)
+        DecodeResult.fail(s"invalid config: ${json.focus}", json.history)
     })
 
   ////

@@ -1,0 +1,1 @@
+- [SD-1339] Support view move and delete operations in Data API

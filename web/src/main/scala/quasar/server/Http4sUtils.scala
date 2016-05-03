@@ -25,7 +25,7 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.{Server => Http4sServer}
 import scalaz.concurrent.Task
 import scalaz._, Scalaz._
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scalaz.stream.Process
 import scalaz.stream.async
 import shapeless._
@@ -45,13 +45,11 @@ object Http4sUtils {
   // as it seems unecessary to constantly poll for user input in such a scenario.
   def waitForInput: Task[Unit] = {
     import java.lang.System
-    for {
-      _    <- Task.delay(java.lang.Thread.sleep(250))
-        .handle { case _: java.lang.InterruptedException => () }
-      test <- Task.delay(Option(System.console).isEmpty || System.in.available() <= 0)
-        .handle { case _ => true }
-      done <- if (test) waitForInput else Task.now(())
-    } yield done
+
+    val inputPresent = Task.delay(Option(System.console).nonEmpty && System.in.available() > 0)
+                           .handle { case _ => false }
+
+    Process.eval(inputPresent.after(250.milliseconds)).repeat.takeWhile(!_).run
   }
 
   def openBrowser(port: Int): Task[Unit] = {

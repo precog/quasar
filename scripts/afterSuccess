@@ -7,7 +7,7 @@ source "$(dirname $0)/constants"
 
 # Only run for the first travis job
 if [[ "${TRAVIS_JOB_NUMBER##*.}" == "1" ]]; then
-  "$SCRIPT_DIR/publishJarIfMaster"
+  "$SCRIPT_DIR/publishJarOnUpstream"
   # Upload coverage information to codecov.io (BETA)
   pip install --user codecov && codecov
 fi

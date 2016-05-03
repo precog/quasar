@@ -17,8 +17,7 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.Variables
-import quasar.api._, ApiErrorEntityDecoder._
+import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.effect.KeyValueStore
@@ -59,9 +58,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
       val mounter: Mounting ~> Free[MEff, ?] = Mounter[Task, MEff](
         {
-          case MountRequest.MountView(_, expr, Variables(vars)) if (vars.isEmpty) =>
-            Task.now(MountingError.invalidConfig(MountConfig.viewConfig(expr, Variables(vars)),
-              "unbound variable (simulated)".wrapNel).left)
           case MountRequest.MountFileSystem(_, typ, uri @ ConnectionUri("invalid")) =>
             Task.now(MountingError.invalidConfig(MountConfig.fileSystemConfig(typ, uri),
               "invalid connectionUri (simulated)".wrapNel).left)
@@ -464,7 +460,8 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, cfgStr))
               } yield {
-                resp.as[ApiError].unsafePerformSync must beInvalidConfigError("unbound variable (simulated)")
+                resp.as[ApiError].unsafePerformSync must
+                  beInvalidConfigError("There is no binding for the variable :cutoff")
               }
             }
           }

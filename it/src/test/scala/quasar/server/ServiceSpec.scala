@@ -65,6 +65,47 @@ class ServiceSpec extends mutable.Specification {
 
   "/mount/fs" should {
 
+    "POST view" in {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val r = withServer(port, WebConfig.default) { baseUri: Uri =>
+        client.fetch(
+          Request(
+              uri = baseUri / "mount" / "fs",
+              method = Method.POST,
+              headers = Headers(Header("X-File-Name", "a")))
+            .withBody("""{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
+          )(Task.now) *>
+        client.fetch(
+          Request(
+            uri = baseUri / "mount" / "fs" / "a",
+            method = Method.GET)
+          )(Task.now)
+      }
+
+      r.map(_.status) must beRightDisjunction(Ok)
+    }
+
+    "PUT view" in {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val r = withServer(port, WebConfig.default) { baseUri: Uri =>
+        client.fetch(
+          Request(
+              uri = baseUri / "mount" / "fs" / "a",
+              method = Method.PUT)
+            .withBody("""{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
+          )(Task.now) *>
+        client.fetch(
+          Request(
+            uri = baseUri / "mount" / "fs" / "a",
+            method = Method.GET)
+          )(Task.now)
+      }
+
+      r.map(_.status) must beRightDisjunction(Ok)
+    }
+
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 

@@ -57,6 +57,7 @@ object Predef extends LowPriorityImplicits {
 
   type Iterable[+A] = C.Iterable[A]
   type IndexedSeq[+A] = C.IndexedSeq[A]
+  type IS[+A] = C.IndexedSeq[A]
 
   type ListMap[A, +B] = I.ListMap[A, B]
   val  ListMap        = I.ListMap

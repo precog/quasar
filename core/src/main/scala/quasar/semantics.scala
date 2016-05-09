@@ -27,6 +27,7 @@ import matryoshka.{ToIdOps => toIdOps, _}, Recursive.ops._, FunctorT.ops._
 import monocle._
 import pathy.Path, Path._
 import scalaz._, Scalaz._, Validation.{success, failure}
+import shapeless.{Prism => _, _}
 import shapeless.contrib.scalaz._
 
 sealed trait SemanticError {
@@ -69,9 +70,6 @@ object SemanticError {
   final case class MissingIndex(index: Int) extends SemanticError {
     def message = "No element exists at array index '" + index
   }
-  final case class WrongArgumentCount(func: Func, expected: Int, actual: Int) extends SemanticError {
-    def message = "Wrong number of arguments for function '" + func.name + "': expected " + expected + " but found " + actual
-  }
   final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
     def message =
       "Expected " +
@@ -88,7 +86,7 @@ object SemanticError {
   final case class CompiledSubtableMissing(name: String) extends SemanticError {
     def message = "Expected to find a compiled subtable with name \"" + name + "\""
   }
-  final case class DateFormatError(func: Func, str: String, hint: Option[String]) extends SemanticError {
+  final case class DateFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String]) extends SemanticError {
     def message = "Date/time string could not be parsed as " + func.name + ": " + str + hint.map(" (" + _ + ")").getOrElse("")
   }
   final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
@@ -101,12 +99,6 @@ object SemanticError {
       case GenericError(msg) => Some(msg)
       case _ => None
     } (GenericError(_))
-
-  val wrongArgumentCount: Prism[SemanticError, (Func, Int, Int)] =
-    Prism[SemanticError, (Func, Int, Int)] {
-      case WrongArgumentCount(func, expected, actual) => Some((func, expected, actual))
-      case _ => None
-    } ((WrongArgumentCount(_,_,_)).tupled)
 }
 
 trait SemanticAnalysis {

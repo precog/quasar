@@ -27,6 +27,7 @@ import quasar.SemanticAnalysis._, quasar.SemanticError._
 import matryoshka.{ToIdOps => toAllOps, _}, Recursive.ops._, FunctorT.ops._
 import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
+import shapeless.{Data => _, :: => _, _}
 
 trait Compiler[F[_]] {
   import identity._
@@ -53,7 +54,7 @@ trait Compiler[F[_]] {
     def ++(that: TableContext): TableContext =
       TableContext(
         None,
-        () => Fix(ObjectConcat(this.full(), that.full())),
+        () => Fix(ObjectConcat(Sized[IS](this.full(), that.full()))),
         this.subtables ++ that.subtables)
   }
 
@@ -179,29 +180,40 @@ trait Compiler[F[_]] {
   // TODO: parameterize this
   val library = std.StdLib
 
-  type CoAnn[F[_]] = Cofree[F, Annotations]
+  type CoAnn[F[_]] = Cofree[F, SemanticAnalysis.Annotations]
   type CoExpr = CoAnn[Sql]
 
   // CORE COMPILER
   private def compile0(node: CoExpr)(implicit M: Monad[F]):
       CompilerM[Fix[LogicalPlan]] = {
-    def findFunction(name: String) =
-      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[Func]](
+
+    def findUnaryFunction(name: String): CompilerM[GenericFunc[nat._1]] =
+      library.unaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
+        fail(FunctionNotFound(name)))(
+        emit(_))
+
+    def findBinaryFunction(name: String): CompilerM[GenericFunc[nat._2]] =
+      library.binaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
+        fail(FunctionNotFound(name)))(
+        emit(_))
+
+    def findTernaryFunction(name: String): CompilerM[GenericFunc[nat._3]] =
+      library.ternaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
         fail(FunctionNotFound(name)))(
         emit(_))
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LogicalPlan])(f: Case[CoExpr] => CompilerM[(Fix[LogicalPlan], Fix[LogicalPlan])]) =
       cases.traverseU(f).map(_.foldRight(default) {
-        case ((cond, expr), default) => Fix(relations.Cond(cond, expr, default))
+        case ((cond, expr), default) => Fix(relations.Cond(Sized[IS](cond, expr, default)))
       })
 
     def flattenJoins(term: Fix[LogicalPlan], relations: SqlRelation[CoExpr]):
         Fix[LogicalPlan] = relations match {
       case _: NamedRelation[_]             => term
       case JoinRelation(left, right, _, _) =>
-        Fix(ObjectConcat(
+        Fix(ObjectConcat(Sized[IS](
           flattenJoins(Left.projectFrom(term), left),
-          flattenJoins(Right.projectFrom(term), right)))
+          flattenJoins(Right.projectFrom(term), right))))
     }
 
     def buildJoinDirectionMap(relations: SqlRelation[CoExpr]):
@@ -268,19 +280,19 @@ trait Compiler[F[_]] {
       }
     }
 
-    def compileFunction(func: Func, args: List[CoExpr]):
+    def compileFunction[N <: Nat](func: GenericFunc[N], args: Func.Input[CoExpr, N]):
         CompilerM[Fix[LogicalPlan]] =
-      args.traverseU(compile0).map(args => Fix(func.apply(args: _*)))
+      args.traverseU(compile0).map(args => Fix(func.apply(args)))
 
     def buildRecord(names: List[Option[String]], values: List[Fix[LogicalPlan]]):
         Fix[LogicalPlan] = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(MakeObject(LogicalPlan.Constant(Data.Str(name)), value))
+          Fix(MakeObject(Sized[IS](LogicalPlan.Constant(Data.Str(name)), value)))
         case (None, value) => value
       }
 
-      fields.reduceOption((a,b) => Fix(ObjectConcat(a, b)))
+      fields.reduceOption((a,b) => Fix(ObjectConcat(Sized[IS](a, b))))
         .getOrElse(LogicalPlan.Constant(Data.Obj(ListMap())))
     }
 
@@ -315,7 +327,7 @@ trait Compiler[F[_]] {
                     case RightJoin => RightOuterJoin
                     case FullJoin  => FullOuterJoin
                   },
-                  List(leftFree, rightFree, c))))
+                  Sized[IS](leftFree, rightFree, c))))
           } yield LogicalPlan.Let(leftName, left0,
             LogicalPlan.Let(rightName, right0, join))
       }
@@ -362,21 +374,21 @@ trait Compiler[F[_]] {
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
                     (CompilerState.rootTableReq ⊛ compile0(filter)) ((set, filt) =>
-                      Fix(Filter(set, filt))))
+                      Fix(Filter(Sized[IS](set, filt)))))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
                       (CompilerState.rootTableReq ⊛
                         groupBy.keys.traverseU(compile0)) ((src, keys) =>
-                        Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
+                        Fix(GroupBy(Sized[IS](src, Fix(MakeArrayN(keys: _*)))))))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
                         (CompilerState.rootTableReq ⊛ compile0(having)) ((set, filt) =>
-                          Fix(Filter(set, filt))))
+                          Fix(Filter(Sized[IS](set, filt)))))
 
                       stepBuilder(having) {
-                        val squashed = select.map(set => Fix(Squash(set)))
+                        val squashed = select.map(set => Fix(Squash(Sized[IS](set))))
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
@@ -385,16 +397,16 @@ trait Compiler[F[_]] {
                               flat = names.foldMap(_.toList)
                               keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
                               orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
-                            } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
+                            } yield Fix(OrderBy(Sized[IS](t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
                               case SelectDistinct =>
                                 CompilerState.rootTableReq.map(t =>
                                   if (syntheticNames.nonEmpty)
-                                    Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(DeleteField(acc, LogicalPlan.Constant(Data.Str(field)))))))
-                                  else Fix(Distinct(t))).some
+                                    Fix(DistinctBy(Sized[IS](t, syntheticNames.foldLeft(t)((acc, field) =>
+                                      Fix(DeleteField(Sized[IS](acc, LogicalPlan.Constant(Data.Str(field)))))))))
+                                  else Fix(Distinct(Sized[IS](t)))).some
                               case _ => None
                             }
 
@@ -402,8 +414,8 @@ trait Compiler[F[_]] {
                               val pruned =
                                 CompilerState.rootTableReq.map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
-                                    Fix(DeleteField(acc,
-                                      LogicalPlan.Constant(Data.Str(field))))))
+                                    Fix(DeleteField(Sized[IS](acc,
+                                      LogicalPlan.Constant(Data.Str(field)))))))
 
                               pruned
                             }
@@ -423,7 +435,7 @@ trait Compiler[F[_]] {
 
       case SetLiteral(values0) =>
         values0.traverse(compile0).map(vs =>
-          ShiftArray(MakeArrayN(vs: _*).embed).embed)
+          ShiftArray(Sized[IS](MakeArrayN(vs: _*).embed)).embed)
 
       case ArrayLiteral(exprs) =>
         exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
@@ -438,26 +450,34 @@ trait Compiler[F[_]] {
           compile0)
 
       case Binop(left, right, op) =>
-        findFunction(op.name).flatMap(compileFunction(_, left :: right :: Nil))
+        findBinaryFunction(op.name).flatMap(compileFunction[nat._2](_, Sized[IS](left, right)))
 
       case Unop(expr, op) =>
-        findFunction(op.name).flatMap(compileFunction(_, expr :: Nil))
+        findUnaryFunction(op.name).flatMap(compileFunction[nat._1](_, Sized[IS](expr)))
 
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
-              Fix(ObjectProject(obj, LogicalPlan.Constant(Data.Str(name)))))
+              Fix(ObjectProject(Sized[IS](obj, LogicalPlan.Constant(Data.Str(name))))))
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq(rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
+              else Fix(ObjectProject(Sized[IS](table, LogicalPlan.Constant(Data.Str(name))))))
 
-      case InvokeFunction(name, args) =>
-        findFunction(name).flatMap(compileFunction(_, args))
+      case InvokeFunction(name, List(a1)) =>
+        findUnaryFunction(name).flatMap(compileFunction[nat._1](_, Sized[IS](a1)))
+
+      case InvokeFunction(name, List(a1, a2)) =>
+        findBinaryFunction(name).flatMap(compileFunction[nat._2](_, Sized[IS](a1, a2)))
+
+      case InvokeFunction(name, List(a1, a2, a3)) =>
+        findTernaryFunction(name).flatMap(compileFunction[nat._3](_, Sized[IS](a1, a2, a3)))
+
+      case InvokeFunction(name, _) => fail(FunctionNotFound(name))
 
       case Match(expr, cases, default0) =>
         for {
@@ -466,7 +486,7 @@ trait Compiler[F[_]] {
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
               (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
-                (Fix(relations.Eq(expr, cse)), expr2))
+                (Fix(relations.Eq(Sized[IS](expr, cse))), expr2))
           }
         } yield cases
 
@@ -486,7 +506,8 @@ trait Compiler[F[_]] {
     }
   }
 
-  def compile(tree: Cofree[Sql, Annotations])(implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
+  def compile(tree: Cofree[Sql, SemanticAnalysis.Annotations])(
+      implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
     compile0(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.map(_.map(Compiler.reduceGroupKeys))
   }
 }
@@ -499,12 +520,12 @@ object JoinDir {
 
   final case object Left extends JoinDir {
     def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("left"))))
+      Fix(ObjectProject(Sized[IS](t, LogicalPlan.Constant(Data.Str("left")))))
   }
 
   final case object Right extends JoinDir {
     def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("right"))))
+      Fix(ObjectProject(Sized[IS](t, LogicalPlan.Constant(Data.Str("right")))))
   }
 }
 
@@ -515,7 +536,7 @@ object Compiler {
 
   def trampoline = apply[scalaz.Free.Trampoline]
 
-  def compile(tree: Cofree[Sql, Annotations]):
+  def compile(tree: Cofree[Sql, SemanticAnalysis.Annotations]):
       SemanticError \/ Fix[LogicalPlan] =
     trampoline.compile(tree).run
 
@@ -530,9 +551,9 @@ object Compiler {
     {
       def groupedKeys(t: LogicalPlan[Fix[LogicalPlan]], newSrc: Fix[LogicalPlan]): Option[List[Fix[LogicalPlan]]] = {
         t match {
-          case InvokeF(set.GroupBy, List(src, structural.MakeArrayN(keys))) =>
+          case InvokeFUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeF(func, src :: _) if func.effect ≟ Sifting =>
+          case InvokeFUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
             groupedKeys(src.unFix, newSrc)
           case _ => None
         }
@@ -552,11 +573,11 @@ object Compiler {
       def strip(v: Cofree[LogicalPlan, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeF(func, arg :: Nil) if func.effect ≟ Reduction =>
-          InvokeF(func, List(strip(arg)))
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+          InvokeF[Cofree[LogicalPlan, Boolean], nat._1](func, Sized[IS](strip(arg)))
 
         case _ =>
-          if (t.head) InvokeF(agg.Arbitrary, List(strip(t)))
+          if (t.head) InvokeF(agg.Arbitrary, Sized[IS](strip(t)))
           else t.tail
       }
     }

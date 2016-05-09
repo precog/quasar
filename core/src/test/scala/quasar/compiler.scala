@@ -23,6 +23,7 @@ import quasar.specs2.PendingWithAccurateCoverage
 import matryoshka.Fix
 import org.specs2.mutable._
 import org.specs2.scalaz._
+import shapeless.{Data => _, _}
 
 class CompilerSpec extends Specification with CompilerHelpers with PendingWithAccurateCoverage with DisjunctionMatchers {
   import StdLib._
@@ -71,10 +72,10 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
         Squash(
           makeObj(
             "0" ->
-              Substring[FLP](
-                ObjectProject(read("foo"), Constant(Data.Str("bar"))),
+              Substring[FLP](Sized(
+                ObjectProject(Sized(read("foo"), Constant(Data.Str("bar")))),
                 Constant(Data.Int(2)),
-                Constant(Data.Int(3))))))
+                Constant(Data.Int(3)))))))
     }
 
     "compile select length" in {
@@ -82,7 +83,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
         "select length(bar) from foo",
         Squash(
           makeObj(
-            "0" -> Length[FLP](ObjectProject(read("foo"), Constant(Data.Str("bar")))))))
+            "0" -> Length[FLP](ObjectProject(Sized(read("foo"), Constant(Data.Str("bar"))))))))
     }
 
     "compile simple select *" in {
@@ -103,9 +104,9 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
               ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
               makeObj(
                 "address" ->
-                  ObjectProject[FLP](
+                  ObjectProject[FLP](Sized(
                     ObjectProject(Free('__tmp0), Constant(Data.Str("right"))),
-                    Constant(Data.Str("address"))))))))
+                    Constant(Data.Str("address")))))))))
     }
 
     "compile deeply-nested qualified select *" in {
@@ -114,17 +115,17 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
         Let('__tmp0,
           InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
           Squash[FLP](
-            ObjectConcat[FLP](
-              ObjectProject[FLP](
-                ObjectProject[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
-                  Constant(Data.Str("bar"))),
-                Constant(Data.Str("baz"))),
+            ObjectConcat[FLP](Sized(
+              ObjectProject[FLP](Sized(
+                ObjectProject[FLP](Sized(
+                  ObjectProject(Sized(Free('__tmp0), Constant(Data.Str("left")))),
+                  Constant(Data.Str("bar")))),
+                Constant(Data.Str("baz")))),
               makeObj(
                 "address" ->
-                  ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("right"))),
-                    Constant(Data.Str("address"))))))))
+                  ObjectProject[FLP](Sized(
+                    ObjectProject(Sized(Free('__tmp0), Constant(Data.Str("right")))),
+                    Constant(Data.Str("address"))))))))))
     }
 
     "compile simple select with unnamed projection which is just an identifier" in {
@@ -132,7 +133,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
         "select name from city",
         Squash(
           makeObj(
-            "name" -> ObjectProject(read("city"), Constant(Data.Str("name"))))))
+            "name" -> ObjectProject(Sized(read("city"), Constant(Data.Str("name")))))))
     }
 
     "compile basic let" in {
@@ -150,19 +151,19 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile nested lets" in {
       testLogicalPlanCompile(
         """foo := 5; bar := 7; bar + foo""",
-        Add[FLP](Constant(Data.Int(7)), Constant(Data.Int(5))))
+        Add[FLP](Sized(Constant(Data.Int(7)), Constant(Data.Int(5)))))
     }
 
     "compile let with select in body from let binding ident" in {
       val query = """foo := (1,2,3); select * from foo"""
       val expectation =
-        Squash[FLP](
-          ShiftArray[FLP](
-            ArrayConcat[FLP](
-              ArrayConcat[FLP](
-                MakeArrayN[Fix](Constant(Data.Int(1))),
-                MakeArrayN[Fix](Constant(Data.Int(2)))),
-              MakeArrayN[Fix](Constant(Data.Int(3))))))
+        Squash[FLP](Sized(
+          ShiftArray[FLP](Sized(
+            ArrayConcat[FLP](Sized(
+              ArrayConcat[FLP](Sized(
+                MakeArrayN[Fix](Sized(Constant(Data.Int(1)))),
+                MakeArrayN[Fix](Sized(Constant(Data.Int(2)))))),
+              MakeArrayN[Fix](Sized(Constant(Data.Int(3))))))))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -186,10 +187,10 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile let inside select with table reference" in {
       val query = """select foo from (bar := 12; select * from baz) as quag"""
       val expectation =
-        Squash(
+        Squash(Sized(
           makeObj(
             "foo" ->
-              ObjectProject[FLP](Squash(read("baz")), Constant(Data.Str("foo")))))
+              ObjectProject[FLP](Sized(Squash(Sized(read("baz"))), Constant(Data.Str("foo")))))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -197,10 +198,10 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile let inside select with ident reference" in {
       val query = """select foo from (bar := 12; select * from bar) as quag"""
       val expectation =
-        Squash(
+        Squash(Sized(
           makeObj(
             "foo" ->
-              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("foo")))))
+              ObjectProject[FLP](Sized(Squash(Sized(Constant(Data.Int(12)))), Constant(Data.Str("foo")))))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -208,10 +209,10 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile selection with same ident as nested let" in {
       val query = """select bar from (bar := 12; select * from bar) as quag"""
       val expectation =
-        Squash(
+        Squash(Sized(
           makeObj(
             "bar" ->
-              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("bar")))))
+              ObjectProject[FLP](Sized(Squash(Sized(Constant(Data.Int(12)))), Constant(Data.Str("bar")))))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -219,10 +220,10 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile selection with same ident as nested let and alias" in {
       val query = """select bar from (bar := 12; select * from bar) as bar"""
       val expectation =
-        Squash(
+        Squash(Sized(
           makeObj(
             "0" ->
-              Squash(Constant(Data.Int(12)))))
+              Squash(Sized(Constant(Data.Int(12)))))))
 
       testLogicalPlanCompile(query, expectation)
     }

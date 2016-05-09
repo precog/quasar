@@ -51,8 +51,8 @@ final case class Func(
   effect: DimensionalEffect,
   name: String,
   help: String,
-  codomain: Type,
-  domain: List[Type],
+  codomain: Func.Codomain,
+  domain: Func.Domain,
   simplify: Func.Simplifier,
   apply: Func.Typer,
   untype0: Func.Untyper) {
@@ -70,7 +70,7 @@ final case class Func(
 
   def untype(tpe: Type) = untype0(this, tpe)
 
-  final def apply(arg1: Type, rest: Type*): ValidationNel[SemanticError, Type] =
+  final def apply(arg1: Type, rest: Type*): Func.VCodomain =
     apply(arg1 :: rest.toList)
 
   final def arity: Int = domain.length
@@ -94,6 +94,13 @@ object Func extends FuncInstances {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]):
         Option[LogicalPlan[T[LogicalPlan]]]
   }
-  type Typer      = List[Type] => ValidationNel[SemanticError, Type]
-  type Untyper    = (Func, Type) => ValidationNel[SemanticError, List[Type]]
+
+  type Domain = List[Type]
+  type Codomain = Type
+
+  type VDomain = ValidationNel[SemanticError, Domain]
+  type VCodomain = ValidationNel[SemanticError, Codomain]
+
+  type Typer = Domain => VCodomain
+  type Untyper = (Func, Codomain) => VDomain
 }

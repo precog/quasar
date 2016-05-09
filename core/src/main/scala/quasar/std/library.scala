@@ -24,54 +24,50 @@ import matryoshka._
 import scalaz._, Validation.{success, failure}
 
 trait Library {
-  protected val noSimplification: Func.Simplifier = new Func.Simplifier {
+  import Func._
+
+  protected val noSimplification: Simplifier = new Simplifier {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
       None
   }
 
-  protected def constTyper(codomain: Type): Func.Typer = { args =>
+  protected def constTyper(codomain: Codomain): Typer = { _ =>
     Validation.success(codomain)
   }
 
-  private def partialTyperOV(f: List[Type] => Option[ValidationNel[SemanticError, Type]]):
-      Func.Typer = {
-    args =>
-    f(args).getOrElse(Validation.failure(NonEmptyList(SemanticError.GenericError("Unknown arguments: " + args))))
+  private def partialTyperOV(f: Domain => Option[VCodomain]): Typer = { args =>
+    f(args).getOrElse {
+      val msg: String = "Unknown arguments: " + args
+      Validation.failure(NonEmptyList(SemanticError.GenericError(msg)))
+    }
   }
 
-  protected def partialTyperV(f: PartialFunction[List[Type], ValidationNel[SemanticError, Type]]):
-      Func.Typer =
+  protected def partialTyperV(f: PartialFunction[Domain, VCodomain]): Typer =
     partialTyperOV(f.lift)
 
-  protected def partialTyper(f: PartialFunction[List[Type], Type]): Func.Typer =
+  protected def partialTyper(f: PartialFunction[Domain, Codomain]): Typer =
     partialTyperOV(f.lift(_).map(success))
 
-  protected def basicUntyper: Func.Untyper =
+  protected def basicUntyper: Untyper =
     (func, _) => success(func.domain)
 
-  protected def untyper(f: Type => ValidationNel[SemanticError, List[Type]]):
-      Func.Untyper =
+  protected def untyper(f: Codomain => VDomain): Untyper =
     (func, rez) => Type.typecheck(rez, func.codomain).fold(
       κ(f(rez)),
       κ(success(func.domain)))
 
-  private def partialUntyperOV(f: Type => Option[ValidationNel[SemanticError, List[Type]]]):
-      Func.Untyper =
+  private def partialUntyperOV(f: Codomain => Option[VDomain]): Untyper =
     (func, rez) => Type.typecheck(rez, func.codomain).fold(
       e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))),
       κ(success(func.domain)))
 
-  protected def partialUntyperV(
-    f: PartialFunction[Type, ValidationNel[SemanticError, List[Type]]]):
-      Func.Untyper =
+  protected def partialUntyperV(f: PartialFunction[Codomain, VDomain]): Untyper =
     partialUntyperOV(f.lift)
 
-  protected def partialUntyper(
-    f: PartialFunction[Type, List[Type]]):
-      Func.Untyper =
+  protected def partialUntyper(f: PartialFunction[Codomain, Domain]): Untyper =
     partialUntyperOV(f.lift(_).map(success))
 
-  protected def reflexiveTyper: Func.Typer = {
+  protected def reflexiveTyper: Typer = {
     case Type.Const(data) :: Nil => success(data.dataType)
     case x :: Nil => success(x)
     case _ =>
@@ -84,16 +80,16 @@ trait Library {
       def apply(a: A) = p(f(a))
     }
 
-    val half: PartialFunction[List[Type], Type] = {
+    val half: PartialFunction[Domain, Codomain] = {
       case t1 :: t2 :: Nil       if t1 contains t2       => t1
       case Type.Dec :: t2 :: Nil if Type.Int contains t2 => Type.Dec
       case Type.Int :: t2 :: Nil if Type.Dec contains t2 => Type.Dec
     }
-    partialTyper(half orElse mapFirst[List[Type], Type](_.reverse, half))
+    partialTyper(half orElse mapFirst[Domain, Codomain](_.reverse, half))
   }
 
-  protected implicit class TyperW(self: Func.Typer) {
-    def ||| (that: Func.Typer): Func.Typer = { args =>
+  protected implicit class TyperW(self: Typer) {
+    def ||| (that: Typer): Typer = { args =>
       self(args) ||| that(args)
     }
   }

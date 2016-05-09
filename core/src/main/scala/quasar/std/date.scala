@@ -17,11 +17,12 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, Mapping, Type, SemanticError}, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, Validation.success
+import shapeless.{Data => _, _}
 
 trait DateLib extends Library {
   def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
@@ -57,80 +58,99 @@ trait DateLib extends Library {
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
-  val Extract = Func(Mapping, 
+  val Extract = BinaryFunc(
+    Mapping,
     "date_part",
     "Pulls out a part of the date. The first argument is one of the strings defined for Postgres’ `date_type function. This is a partial function – using an unsupported string has undefined results.",
-    Type.Numeric, Type.Str :: Type.Temporal :: Nil,
+    Type.Numeric,
+    Func.Input2(Type.Str, Type.Temporal),
     noSimplification,
-    constTyper(Type.Numeric),
+    constTyper[nat._2](Type.Numeric),
     basicUntyper)
 
-  val Date = Func(Mapping, 
+  val Date = UnaryFunc(
+    Mapping,
     "date",
     "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Date, Type.Str :: Nil,
+    Type.Date,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str)) :: Nil => parseDate(str).map(Type.Const(_)).validation.toValidationNel
-      case Type.Str                  :: Nil => success(Type.Date)
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseDate(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.Date)
     },
     basicUntyper)
 
-  val Time = Func(Mapping, 
+  val Time = UnaryFunc(
+    Mapping,
     "time",
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Time, Type.Str :: Nil,
+    Type.Time,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str)) :: Nil => parseTime(str).map(Type.Const(_)).validation.toValidationNel
-      case Type.Str                  :: Nil => success(Type.Time)
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.Time)
     },
     basicUntyper)
 
-  val Timestamp = Func(Mapping, 
+  val Timestamp = UnaryFunc(
+    Mapping,
     "timestamp",
     "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Timestamp, Type.Str :: Nil,
+    Type.Timestamp,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str)) :: Nil => parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
-      case Type.Str                  :: Nil => success(Type.Timestamp)
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str) => success(Type.Timestamp)
     },
     basicUntyper)
 
-  val Interval = Func(Mapping, 
+  val Interval = UnaryFunc(
+    Mapping,
     "interval",
     "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Interval, Type.Str :: Nil,
+    Type.Interval,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str)) :: Nil => parseInterval(str).map(Type.Const(_)).validation.toValidationNel
-      case Type.Str                  :: Nil => success(Type.Interval)
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseInterval(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str) => success(Type.Interval)
     },
     basicUntyper)
 
-  val TimeOfDay = Func(Mapping, 
+  val TimeOfDay = UnaryFunc(
+    Mapping,
     "time_of_day",
     "Extracts the time of day from a (UTC) timestamp value.",
-    Type.Time, Type.Timestamp :: Nil,
+    Type.Time,
+    Func.Input1(Type.Timestamp),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Timestamp(value)) :: Nil => Type.Const(Data.Time(value.atZone(ZoneOffset.UTC).toLocalTime))
-      case Type.Timestamp :: Nil => Type.Time
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Timestamp(value))) => Type.Const(Data.Time(value.atZone(ZoneOffset.UTC).toLocalTime))
+      case Sized(Type.Timestamp) => Type.Time
     },
     basicUntyper)
 
-  val ToTimestamp = Func(Mapping, 
+  val ToTimestamp = UnaryFunc(
+    Mapping,
     "to_timestamp",
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
-    Type.Timestamp, Type.Int :: Nil,
+    Type.Timestamp,
+    Func.Input1(Type.Int),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Int(millis)) :: Nil => Type.Const(Data.Timestamp(Instant.ofEpochMilli(millis.toLong)))
-      case Type.Int :: Nil => Type.Timestamp
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Int(millis))) => Type.Const(Data.Timestamp(Instant.ofEpochMilli(millis.toLong)))
+      case Sized(Type.Int) => Type.Timestamp
     },
     basicUntyper)
 
-  def functions = Extract :: Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil
+  def unaryFunctions: List[GenericFunc[nat._1]] =
+    Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil
+
+  def binaryFunctions: List[GenericFunc[nat._2]] = Extract :: Nil
+  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
+
 object DateLib extends DateLib

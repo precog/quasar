@@ -487,7 +487,7 @@ object WorkflowBuilder {
             fields.traverse(f => (DocField(name) \\ f.toDocVar).deref).fold(
               scala.sys.error("prefixed ${name}, but still no field"))(
               op.lift(_).fold(
-                fail[CollectionBuilderF](UnsupportedFunction(set.Filter, "failed to build operation")))(
+                fail[CollectionBuilderF](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
                 op =>
                 (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \/-($$ROOT))))) {
                   case (
@@ -512,7 +512,7 @@ object WorkflowBuilder {
               CollectionBuilderF(_, _, srcStruct),
               CollectionBuilderF(graph, base0, bothStruct)) =>
               op.lift(fields.map(f => base0.toDocVar.deref.map(_ \ f).getOrElse(f))).fold[M[CollectionBuilderF]](
-                fail[CollectionBuilderF](UnsupportedFunction(set.Filter, "failed to build operation")))(
+                fail[CollectionBuilderF](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
                 { op =>
                   val g = chain(graph, op)
                   if (srcStruct ≟ bothStruct)
@@ -1163,8 +1163,8 @@ object WorkflowBuilder {
         case (GroupBuilderF(_, _, _), DocBuilderF(Fix(ArraySpliceBuilderF(_, _)), _)) => delegate
 
         case _ => fail(UnsupportedFunction(
-          structural.ObjectConcat,
-          "unrecognized shapes:\n" + wb1.show + "\n" + wb2.show))
+          structural.ObjectConcat.name,
+          Some("unrecognized shapes:\n" + wb1.show + "\n" + wb2.show)))
       }
     }
 
@@ -1281,8 +1281,8 @@ object WorkflowBuilder {
 
         case _ =>
           fail(UnsupportedFunction(
-            structural.ArrayConcat,
-            "values are not both arrays"))
+            structural.ArrayConcat.name,
+            Some("values are not both arrays")))
       }
     }
 
@@ -1312,19 +1312,19 @@ object WorkflowBuilder {
         projectField(src, name).map(ShapePreservingBuilder(_, inputs, op))
       case ValueBuilderF(Bson.Doc(fields)) =>
         fields.get(name).fold[PlannerError \/ WorkflowBuilder](
-          -\/(UnsupportedFunction(structural.ObjectProject, "value does not contain a field ‘" + name + "’.")))(
+          -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value does not contain a field ‘" + name + "’."))))(
           x => \/-(ValueBuilder(x)))
       case ValueBuilderF(_) =>
-        -\/(UnsupportedFunction(structural.ObjectProject, "value is not a document."))
+        -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value is not a document.")))
       case GroupBuilderF(wb0, key, Expr(\/-($var(dv)))) =>
         projectField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($var(dv)))))
       case GroupBuilderF(wb0, key, Doc(doc)) =>
         doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder](
-          -\/(UnsupportedFunction(structural.ObjectProject, "group does not contain a field ‘" + name + "’.")))(
+          -\/(UnsupportedFunction(structural.ObjectProject.name, Some("group does not contain a field ‘" + name + "’."))))(
           x => \/-(GroupBuilder(wb0, key, Expr(x))))
       case DocBuilderF(wb, doc) =>
         doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder](
-          -\/(UnsupportedFunction(structural.ObjectProject, "document does not contain a field ‘" + name + "’.")))(
+          -\/(UnsupportedFunction(structural.ObjectProject.name, Some("document does not contain a field ‘" + name + "’."))))(
           expr => \/-(ExprBuilder(wb, expr)))
       case ExprBuilderF(wb0,  -\/(js1)) =>
         \/-(ExprBuilder(wb0,
@@ -1341,23 +1341,23 @@ object WorkflowBuilder {
           \/-(ValueBuilder(elems(index)))
         else
           -\/(UnsupportedFunction(
-            structural.ArrayProject,
-            "value does not contain index ‘" + index + "’."))
+            structural.ArrayProject.name,
+            Some("value does not contain index ‘" + index + "’.")))
       case ArrayBuilderF(wb0, elems) =>
         if (index < elems.length) // UGH!
           \/-(ExprBuilder(wb0, elems(index)))
         else
           -\/(UnsupportedFunction(
-            structural.ArrayProject,
-            "array does not contain index ‘" + index + "’."))
+            structural.ArrayProject.name,
+            Some("array does not contain index ‘" + index + "’.")))
       case ValueBuilderF(_) =>
         -\/(UnsupportedFunction(
-          structural.ArrayProject,
-          "value is not an array."))
+          structural.ArrayProject.name,
+          Some("value is not an array.")))
       case DocBuilderF(_, _) =>
         -\/(UnsupportedFunction(
-          structural.ArrayProject,
-          "value is not an array."))
+          structural.ArrayProject.name,
+          Some("value is not an array.")))
       case _ =>
         jsExpr1(wb, JsFn(jsBase,
           jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.num(index.toLong))))).right
@@ -1372,8 +1372,8 @@ object WorkflowBuilder {
         \/-(ValueBuilder(Bson.Doc(fields - name)))
       case ValueBuilderF(_) =>
         -\/(UnsupportedFunction(
-          structural.DeleteField,
-          "value is not a document."))
+          structural.DeleteField.name,
+          Some("value is not a document.")))
       case GroupBuilderF(wb0, key, Expr(\/-($var(DocVar.ROOT(None))))) =>
         deleteField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($$ROOT))))
       case GroupBuilderF(wb0, key, Doc(doc)) =>
@@ -1430,7 +1430,7 @@ object WorkflowBuilder {
   }
 
   def join(left0: WorkflowBuilder, right0: WorkflowBuilder,
-    tpe: Func,
+    tpe: GenericFunc[_],
     leftKey0: List[WorkflowBuilder], leftJs0: Option[List[JsFn]],
     rightKey0: List[WorkflowBuilder], rightJs0: Option[List[JsFn]]):
       M[WorkflowBuilder] = {
@@ -1503,7 +1503,8 @@ object WorkflowBuilder {
     def buildProjection(l: Expression, r: Expression): WorkflowOp =
       $project(Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r))))(_)
 
-    def buildJoin(src: Workflow, tpe: Func): Workflow =
+    // TODO exhaustive pattern match
+    def buildJoin(src: Workflow, tpe: GenericFunc[_]): Workflow =
       tpe match {
         case set.FullOuterJoin =>
           chain(src,

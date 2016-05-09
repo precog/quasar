@@ -1,0 +1,1 @@
+- Used a sized list for domain and parameters in LogicalPlan.

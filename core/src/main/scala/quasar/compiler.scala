@@ -22,11 +22,13 @@ import quasar.fp.binder._
 import quasar.fs._
 import quasar.sql._
 import quasar.std.StdLib._
+import quasar.{SemanticAnalysis => SA}
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
+import shapeless.{Data => _, :: => _, _}
 
 trait Compiler[F[_]] {
   import identity._
@@ -179,16 +181,39 @@ trait Compiler[F[_]] {
   // TODO: parameterize this
   val library = std.StdLib
 
-  type CoAnn[F[_]] = Cofree[F, Annotations]
+  type CoAnn[F[_]] = Cofree[F, SA.Annotations]
   type CoExpr = CoAnn[Sql]
 
   // CORE COMPILER
   private def compile0(node: CoExpr)(implicit M: Monad[F]):
       CompilerM[Fix[LogicalPlan]] = {
-    def findFunction(name: String) =
-      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[Func]](
-        fail(FunctionNotFound(name)))(
-        emit(_))
+
+    def findUnaryFunction(name: String): CompilerM[GenericFunc[nat._1]] =
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
+        fail(FunctionNotFound(name))) {
+          case func @ UnaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 1))
+        }
+
+    def findBinaryFunction(name: String): CompilerM[GenericFunc[nat._2]] =
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
+        fail(FunctionNotFound(name))) {
+          case func @ BinaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 2))
+        }
+
+    def findTernaryFunction(name: String): CompilerM[GenericFunc[nat._3]] =
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
+        fail(FunctionNotFound(name))) {
+          case func @ TernaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 3))
+        }
+
+    def findNaryFunction(name: String, length: Int): CompilerM[Fix[LogicalPlan]] =
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LogicalPlan]]](
+        fail(FunctionNotFound(name))) {
+          case func => fail(WrongArgumentCount(name, func.arity, length))
+        }
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LogicalPlan])(f: Case[CoExpr] => CompilerM[(Fix[LogicalPlan], Fix[LogicalPlan])]) =
       cases.traverse(f).map(_.foldRight(default) {
@@ -268,9 +293,9 @@ trait Compiler[F[_]] {
       }
     }
 
-    def compileFunction(func: Func, args: List[CoExpr]):
+    def compileFunction[N <: Nat](func: GenericFunc[N], args: Func.Input[CoExpr, N]):
         CompilerM[Fix[LogicalPlan]] =
-      args.traverse(compile0).map(args => Fix(func.apply(args: _*)))
+      args.traverse(compile0).map(args => Fix(func.applyGeneric(args)))
 
     def buildRecord(names: List[Option[String]], values: List[Fix[LogicalPlan]]):
         Fix[LogicalPlan] = {
@@ -315,7 +340,7 @@ trait Compiler[F[_]] {
                     case RightJoin => RightOuterJoin
                     case FullJoin  => FullOuterJoin
                   },
-                  List(leftFree, rightFree, c))))
+                  Func.Input3(leftFree, rightFree, c))))
           } yield LogicalPlan.Let(leftName, left0,
             LogicalPlan.Let(rightName, right0, join))
       }
@@ -438,10 +463,10 @@ trait Compiler[F[_]] {
           compile0)
 
       case Binop(left, right, op) =>
-        findFunction(op.name).flatMap(compileFunction(_, left :: right :: Nil))
+        findBinaryFunction(op.name).flatMap(compileFunction[nat._2](_, Func.Input2(left, right)))
 
       case Unop(expr, op) =>
-        findFunction(op.name).flatMap(compileFunction(_, expr :: Nil))
+        findUnaryFunction(op.name).flatMap(compileFunction[nat._1](_, Func.Input1(expr)))
 
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
@@ -456,8 +481,17 @@ trait Compiler[F[_]] {
               if ((rName: String) ≟ name) table
               else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
 
+      case InvokeFunction(name, List(a1)) =>
+        findUnaryFunction(name).flatMap(compileFunction[nat._1](_, Func.Input1(a1)))
+
+      case InvokeFunction(name, List(a1, a2)) =>
+        findBinaryFunction(name).flatMap(compileFunction[nat._2](_, Func.Input2(a1, a2)))
+
+      case InvokeFunction(name, List(a1, a2, a3)) =>
+        findTernaryFunction(name).flatMap(compileFunction[nat._3](_, Func.Input3(a1, a2, a3)))
+
       case InvokeFunction(name, args) =>
-        findFunction(name).flatMap(compileFunction(_, args))
+        findNaryFunction(name, args.length)
 
       case Match(expr, cases, default0) =>
         for {
@@ -486,7 +520,8 @@ trait Compiler[F[_]] {
     }
   }
 
-  def compile(tree: Cofree[Sql, Annotations])(implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
+  def compile(tree: Cofree[Sql, SA.Annotations])(
+      implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
     compile0(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.map(_.map(Compiler.reduceGroupKeys))
   }
 }
@@ -515,7 +550,7 @@ object Compiler {
 
   def trampoline = apply[scalaz.Free.Trampoline]
 
-  def compile(tree: Cofree[Sql, Annotations]):
+  def compile(tree: Cofree[Sql, SA.Annotations]):
       SemanticError \/ Fix[LogicalPlan] =
     trampoline.compile(tree).run
 
@@ -530,9 +565,9 @@ object Compiler {
     {
       def groupedKeys(t: LogicalPlan[Fix[LogicalPlan]], newSrc: Fix[LogicalPlan]): Option[List[Fix[LogicalPlan]]] = {
         t match {
-          case InvokeF(set.GroupBy, List(src, structural.MakeArrayN(keys))) =>
+          case InvokeFUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeF(func, src :: _) if func.effect ≟ Sifting =>
+          case InvokeFUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
             groupedKeys(src.unFix, newSrc)
           case _ => None
         }
@@ -552,11 +587,11 @@ object Compiler {
       def strip(v: Cofree[LogicalPlan, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeF(func, arg :: Nil) if func.effect ≟ Reduction =>
-          InvokeF(func, List(strip(arg)))
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+          InvokeF[Cofree[LogicalPlan, Boolean], nat._1](func, Func.Input1(strip(arg)))
 
         case _ =>
-          if (t.head) InvokeF(agg.Arbitrary, List(strip(t)))
+          if (t.head) InvokeF(agg.Arbitrary, Func.Input1(strip(t)))
           else t.tail
       }
     }

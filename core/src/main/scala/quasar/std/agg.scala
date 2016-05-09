@@ -27,106 +27,135 @@ import scalaz.syntax.bifunctor._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.list._
 import scalaz.syntax.std.option._
+import shapeless.{Data => _, :: => _, _}
 
 trait AggLib extends Library {
-  private val reflexiveUntyper: Func.Untyper =
-    untyper(t => success(List(t)))
+  private val reflexiveUntyper: Func.Untyper[nat._1] =
+    untyper[nat._1](t => success(Func.Input1(t)))
 
-  val Count = Func(Reduction, "COUNT", "Counts the values in a set",
-    Type.Int, Type.Top :: Nil,
+  val Count = UnaryFunc(
+    Reduction,
+    "COUNT",
+    "Counts the values in a set",
+    Type.Int,
+    Func.Input1(Type.Top),
     noSimplification,
-    partialTyper {
-      case List(Type.Const(Data.Set(xs))) => Type.Const(Data.Int(xs.length))
-      case List(_)                        => Type.Int
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Set(xs))) => Type.Const(Data.Int(xs.length))
+      case Sized(_)                        => Type.Int
     },
     basicUntyper)
 
-  val Sum = Func(Reduction, "SUM", "Sums the values in a set",
-    Type.Numeric ⨿ Type.Interval, Type.Numeric ⨿ Type.Interval :: Nil,
+  val Sum = UnaryFunc(
+    Reduction,
+    "SUM",
+    "Sums the values in a set",
+    Type.Numeric ⨿ Type.Interval,
+    Func.Input1(Type.Numeric ⨿ Type.Interval),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(Data.Set(Nil))) =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Set(Nil))) =>
         success(Type.Const(Data.Int(0)))
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Int =>
+      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Int =>
         intSet(xs)
           .map(ys => Type.Const(Data.Int(ys.sum)))
           .validationNel
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Dec =>
+      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Dec =>
         decSet(xs)
           .map(ys => Type.Const(Data.Dec(ys.sum)))
           .validationNel
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Interval =>
+      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Interval =>
         ivlSet(xs)
           .map(ys => Type.Const(Data.Interval(ys.foldLeft(Duration.ZERO)(_ plus _))))
           .validationNel
 
-      case List(t) =>
+      case Sized(t) =>
         success(t)
     },
     reflexiveUntyper)
 
-  val Min = Func(Reduction, "MIN", "Finds the minimum in a set of values",
-    Type.Comparable, Type.Comparable :: Nil,
+  val Min = UnaryFunc(
+    Reduction,
+    "MIN",
+    "Finds the minimum in a set of values",
+    Type.Comparable,
+    Func.Input1(Type.Comparable),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(Data.Set(xs))) =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Set(xs))) =>
         reduceComparableSet(Data.Comparable.min)(xs)
           .map(c => Type.Const(c.value))
 
-      case List(t) =>
+      case Sized(t) =>
         success(t)
     },
     reflexiveUntyper)
 
-  val Max = Func(Reduction, "MAX", "Finds the maximum in a set of values",
-    Type.Comparable, Type.Comparable :: Nil,
+  val Max = UnaryFunc(
+    Reduction,
+    "MAX", 
+    "Finds the maximum in a set of values",
+    Type.Comparable,
+    Func.Input1(Type.Comparable),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(Data.Set(xs))) =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Set(xs))) =>
         reduceComparableSet(Data.Comparable.max)(xs)
           .map(c => Type.Const(c.value))
 
-      case List(t) =>
+      case Sized(t) =>
         success(t)
     },
     reflexiveUntyper)
 
-  val Avg = Func(Reduction, "AVG", "Finds the average in a set of numeric values",
-    Type.Numeric ⨿ Type.Interval, Type.Numeric ⨿ Type.Interval :: Nil,
+  val Avg = UnaryFunc(
+    Reduction,
+    "AVG",
+    "Finds the average in a set of numeric values",
+    Type.Numeric ⨿ Type.Interval,
+    Func.Input1(Type.Numeric ⨿ Type.Interval),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(Data.Set(Nil))) =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Set(Nil))) =>
         expectedNonEmptySet
 
-      case List(Type.Const(Data.Set(xs))) =>
+      case Sized(Type.Const(Data.Set(xs))) =>
         numSet(xs)
           .map(ns => Type.Const(Data.Dec(ns.sum / ns.length)))
           .validationNel
 
-      case List(t) =>
+      case Sized(t) =>
         success(t)
     },
     reflexiveUntyper)
 
-  val Arbitrary = Func(Reduction, "ARBITRARY", "Returns an arbitrary value from a set",
-    Type.Top, Type.Top :: Nil,
+  val Arbitrary = UnaryFunc(
+    Reduction,
+    "ARBITRARY",
+    "Returns an arbitrary value from a set",
+    Type.Top,
+    Func.Input1(Type.Top),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(Data.Set(Nil))) =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Set(Nil))) =>
         expectedNonEmptySet
 
-      case List(Type.Const(Data.Set(x :: xs))) =>
+      case Sized(Type.Const(Data.Set(x :: xs))) =>
         success(Type.Const(x))
 
-      case List(t) =>
+      case Sized(t) =>
         success(t)
     },
     reflexiveUntyper)
 
-  def functions = Count :: Sum :: Min :: Max :: Avg :: Arbitrary :: Nil
+  def unaryFunctions: List[GenericFunc[nat._1]] =
+    Count :: Sum :: Min :: Max :: Avg :: Arbitrary :: Nil
+
+  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
+  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 
   ////
 

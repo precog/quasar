@@ -17,28 +17,34 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, Type, Mapping, SemanticError}, SemanticError._
+import quasar.{Data, Type, Func, BinaryFunc, GenericFunc, Mapping, SemanticError}, SemanticError._
 
 import scalaz._, NonEmptyList.nels, Validation.{success, failure}
+import shapeless._
 
 trait ArrayLib extends Library {
-  val ArrayLength = Func(Mapping,
+  val ArrayLength = BinaryFunc(
+    Mapping,
     "array_length",
     "Gets the length of a given dimension of an array.",
-    Type.Int, Type.AnyArray :: Type.Int :: Nil,
+    Type.Int,
+    Func.Input2(Type.AnyArray, Type.Int),
     noSimplification,
-    partialTyperV {
-      case _ :: Type.Const(Data.Int(dim)) :: Nil if (dim < 1) =>
+    partialTyperV[nat._2] {
+      case Sized(_, Type.Const(Data.Int(dim))) if (dim < 1) =>
         failure(nels(GenericError("array dimension out of range")))
-      case Type.Const(Data.Arr(arr)) :: Type.Const(Data.Int(i)) :: Nil
+      case Sized(Type.Const(Data.Arr(arr)), Type.Const(Data.Int(i)))
           if (i == 1) =>
         // TODO: we should support dims other than 1, but it's work
         success(Type.Const(Data.Int(arr.length)))
-      case Type.AnyArray :: Type.Const(Data.Int(_)) :: Nil =>
+      case Sized(Type.AnyArray, Type.Const(Data.Int(_))) =>
         success(Type.Int)
     },
     basicUntyper)
 
-  def functions = ArrayLength :: Nil
+  def unaryFunctions: List[GenericFunc[nat._1]] = Nil
+  def binaryFunctions: List[GenericFunc[nat._2]] = ArrayLength :: Nil
+  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
+
 object ArrayLib extends ArrayLib

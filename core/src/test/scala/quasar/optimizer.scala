@@ -22,12 +22,17 @@ import quasar.std._
 import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import pathy.Path._
+import scalaz._, Scalaz._
 
-class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers {
-  import StdLib._
-  import structural._
-  import set._
+import org.scalacheck._
+import org.specs2.ScalaCheck
+import org.specs2.mutable._
+import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz.scalacheck.ScalazProperties._
 
+class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers with ScalaCheck {
+  import StdLib.structural._
+  import StdLib.set._
   import LogicalPlan._
 
   "simplify" should {
@@ -76,7 +81,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
-          Invoke(ObjectProject, List(
+          Invoke(ObjectProject, Func.Input2(
             read("foo"),
             makeObj(
               "bar" -> ObjectProject(read("bar"), Constant(Data.Str("bar")))))))
@@ -91,7 +96,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
               "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
-          Invoke(ObjectProject, List(
+          Invoke(ObjectProject, Func.Input2(
             read("foo"),
             Let('tmp0, read("bar"),
               makeObj(
@@ -108,7 +113,8 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
             OrderBy[FLP](
               Free('tmp1),
               MakeArray[FLP](
-                ObjectProject(Free('tmp1), Constant(Data.Str("name"))))),
+                ObjectProject(Free('tmp1), Constant(Data.Str("name")))),
+              Constant(Data.Str("foobar"))),
             Free('tmp2))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
@@ -118,7 +124,9 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
                 ObjectProject(read("person"), Constant(Data.Str("name")))),
             OrderBy[FLP](
               Free('tmp1),
-              MakeArray[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("name")))))))
+              MakeArray[FLP](
+                ObjectProject(Free('tmp1), Constant(Data.Str("name")))),
+              Constant(Data.Str("foobar")))))
     }
   }
 
@@ -176,6 +184,27 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
                 makeObj(
                   "city" ->
                     ObjectProject(Free('meh2), Constant(Data.Str("city"))))))))
+    }
+  }
+
+  "Component" should {
+    implicit def componentArbitrary[A: Arbitrary]: Arbitrary[Optimizer.Component[A]] =
+      Arbitrary(Arbitrary.arbitrary[A]) ∘ (Optimizer.NeitherCond(_))
+
+    implicit def ArbComponentInt: Arbitrary[Optimizer.Component[Int]] =
+      componentArbitrary[Int]
+
+    implicit def ArbComponentInt2Int: Arbitrary[Optimizer.Component[Int => Int]] =
+      componentArbitrary[Int => Int]
+
+    // FIXME this test isn't really testing much at this point because
+    // we cannot test the equality of two functions
+    implicit def EqualComponent: Equal[Optimizer.Component[Int]] = new Equal[Optimizer.Component[Int]] {
+      def equal(a1: Optimizer.Component[Int], a2: Optimizer.Component[Int]): Boolean = true
+    }
+
+    "obey applicative laws" in {
+      applicative.laws[Optimizer.Component]
     }
   }
 }

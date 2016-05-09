@@ -32,6 +32,7 @@ import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
 import pathy.Path.rootDir
 import scalaz._, Scalaz._
+import shapeless.{Data => _, :: => _, _}
 
 object MongoDbPlanner extends Planner[Crystallized] {
   import LogicalPlan._
@@ -92,36 +93,32 @@ object MongoDbPlanner extends Planner[Crystallized] {
     val HasJs: Output => OutputM[PartialJs] =
       _ <+> \/-(({ case List(field) => field }, List(Here)))
 
-    def invoke(func: Func, args: List[Output]): Output = {
+    def invoke[N <: Nat](func: GenericFunc[N], args: Func.Input[Output, N]): Output = {
       val HasStr: Output => OutputM[String] = _.flatMap {
         _._1(Nil)(ident("_")) match {
           case Literal(Js.Str(str)) => str.right
-          case x => FuncApply(func, "JS string", x.toString).left
+          case x => FuncApply(func.name, "JS string", x.toString).left
         }
       }
 
       def Arity1(f: JsCore => JsCore): Output = args match {
-        case a1 :: Nil =>
+        case Sized(a1) =>
           HasJs(a1).map {
             case (f1, p1) => ({ case list => JsFn(JsFn.defaultName, f(f1(list)(Ident(JsFn.defaultName)))) }, p1.map(There(0, _)))
           }
-        case _         => -\/(FuncArity(func, args.length))
       }
 
       def Arity2(f: (JsCore, JsCore) => JsCore): Output =
         args match {
-          case a1 :: a2 :: Nil => (HasJs(a1) |@| HasJs(a2)) {
+          case Sized(a1, a2) => (HasJs(a1) |@| HasJs(a2)) {
             case ((f1, p1), (f2, p2)) =>
               ({ case list => JsFn(JsFn.defaultName, f(f1(list.take(p1.size))(Ident(JsFn.defaultName)), f2(list.drop(p1.size))(Ident(JsFn.defaultName)))) },
                 p1.map(There(0, _)) ++ p2.map(There(1, _)))
           }
-          case _               => -\/(FuncArity(func, args.length))
         }
 
-      def Arity3(
-        f: (JsCore, JsCore, JsCore) => JsCore):
-          Output = args match {
-        case a1 :: a2 :: a3 :: Nil => (HasJs(a1) |@| HasJs(a2) |@| HasJs(a3)) {
+      def Arity3(f: (JsCore, JsCore, JsCore) => JsCore): Output = args match {
+        case Sized(a1, a2, a3) => (HasJs(a1) |@| HasJs(a2) |@| HasJs(a3)) {
           case ((f1, p1), (f2, p2), (f3, p3)) =>
             ({ case list => JsFn(JsFn.defaultName, f(
               f1(list.take(p1.size))(Ident(JsFn.defaultName)),
@@ -130,7 +127,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
             },
               p1.map(There(0, _)) ++ p2.map(There(1, _)) ++ p3.map(There(2, _)))
         }
-        case _                     => -\/(FuncArity(func, args.length))
       }
 
       def makeSimpleCall(func: String, args: List[JsCore]): JsCore =
@@ -217,7 +213,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
               Call(ident("String"), List(value)))))
         case Extract =>
           args match {
-            case a1 :: a2 :: Nil => (HasStr(a1) |@| HasJs(a2)) {
+            case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
               case (field, (sel, inputs)) => ((field match {
                 case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
                 case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
@@ -269,12 +265,11 @@ object MongoDbPlanner extends Planner[Crystallized] {
                 // case "week"         => \/- (???)
                 case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
 
-                case _ => -\/(FuncApply(func, "valid time period", field))
+                case _ => -\/(FuncApply(func.name, "valid time period", field))
               }): PlannerError \/ (JsCore => JsCore)).map(x =>
                 ({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(sel(list)(Ident(JsFn.defaultName)))) },
                   inputs.map(There(1, _))): PartialJs)
             }.join
-            case _               => -\/(FuncArity(func, args.length))
           }
 
         case TimeOfDay    => {
@@ -316,7 +311,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           )
         case ObjectProject => Arity2(Access(_, _))
         case ArrayProject  => Arity2(Access(_, _))
-        case _ => -\/(UnsupportedFunction(func))
+        case _ => -\/(UnsupportedFunction(func.name, None))
       }
     }
 
@@ -386,9 +381,9 @@ object MongoDbPlanner extends Planner[Crystallized] {
       def unapply(v: (Fix[LogicalPlan], Output)): Option[Bson] =
         v._1.unFix match {
           case ConstantF(b) => BsonCodec.fromData(b).toOption
-          case InvokeF(Negate, Fix(ConstantF(Data.Int(i))) :: Nil) => Some(Bson.Int64(-i.toLong))
-          case InvokeF(Negate, Fix(ConstantF(Data.Dec(x))) :: Nil) => Some(Bson.Dec(-x.toDouble))
-          case InvokeF(ToId, Fix(ConstantF(Data.Str(str))) :: Nil) => Bson.ObjectId(str).toOption
+          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
           case _ => None
         }
     }
@@ -417,7 +412,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
         }
     }
 
-    def relFunc(f: Func): Option[Bson => Selector.Condition] = f match {
+    def relFunc(f: GenericFunc[_]): Option[Bson => Selector.Condition] = f match {
       case Eq  => Some(Selector.Eq)
       case Neq => Some(Selector.Neq)
       case Lt  => Some(Selector.Lt)
@@ -427,7 +422,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
       case _   => None
     }
 
-    def invoke(func: Func, args: List[(Fix[LogicalPlan], Output)]): Output = {
+    def invoke[N <: Nat](func: GenericFunc[N], args: Func.Input[(Fix[LogicalPlan], Output), N]): Output = {
       /**
         * All the relational operators require a field as one parameter, and
         * BSON literal value as the other parameter. So we have to try to
@@ -439,9 +434,9 @@ object MongoDbPlanner extends Planner[Crystallized] {
         * Javascript using the "$where" operator.
         */
       def relop(f: Bson => Selector.Condition, r: Bson => Selector.Condition): Output = args match {
-        case _           :: IsBson(v2)  :: Nil =>
+        case Sized(_, IsBson(v2)) =>
           \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(v2)))) }, List(There(0, Here))))
-        case IsBson(v1)  :: _           :: Nil =>
+        case Sized(IsBson(v1), _) =>
           \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(There(1, Here))))
 
         case _ => -\/(UnsupportedPlan(node, None))
@@ -468,7 +463,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
         }
 
       def invoke2Nel(f: (Selector, Selector) => Selector): Output = {
-        val x :: y :: Nil = args.map(_._2)
+        val Sized(x, y) = args.map(_._2)
 
         (x |@| y) { case ((f1, p1), (f2, p2)) =>
           ({ case list =>
@@ -478,27 +473,27 @@ object MongoDbPlanner extends Planner[Crystallized] {
         }
       }
 
-      def reversibleRelop(f: Func): Output =
+      def reversibleRelop(f: GenericFunc[nat._2]): Output =
         (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError("couldn’t decipher operation")))
 
       (func, args) match {
-        case (Gt, _ :: IsDate(d2) :: Nil)  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
-        case (Lt, IsDate(d1) :: _ :: Nil)  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
+        case (Gt, Sized(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
+        case (Lt, Sized(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
 
-        case (Lt, _ :: IsDate(d2) :: Nil)  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
-        case (Gt, IsDate(d1) :: _ :: Nil)  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
+        case (Lt, Sized(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
+        case (Gt, Sized(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
 
-        case (Gte, _ :: IsDate(d2) :: Nil) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
-        case (Lte, IsDate(d1) :: _ :: Nil) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
+        case (Gte, Sized(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
+        case (Lte, Sized(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
 
-        case (Lte, _ :: IsDate(d2) :: Nil) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
-        case (Gte, IsDate(d1) :: _ :: Nil) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
+        case (Lte, Sized(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
+        case (Gte, Sized(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
 
-        case (Eq, _ :: IsDate(d2) :: Nil) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
-        case (Eq, IsDate(d1) :: _ :: Nil) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
+        case (Eq, Sized(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
+        case (Eq, Sized(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
 
-        case (Neq, _ :: IsDate(d2) :: Nil) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
-        case (Neq, IsDate(d1) :: _ :: Nil) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
+        case (Neq, Sized(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
+        case (Neq, Sized(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
 
         case (Eq, _)  => reversibleRelop(Eq)
         case (Neq, _) => reversibleRelop(Neq)
@@ -512,10 +507,10 @@ object MongoDbPlanner extends Planner[Crystallized] {
             Selector.In.apply _,
             x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
 
-        case (Search, List(_, patt, IsBool(b))) =>
+        case (Search, Sized(_, patt, IsBool(b))) =>
           stringOp(Selector.Regex(_, b, true, false, false), patt)
 
-        case (Between, _ :: IsBson(lower) :: IsBson(upper) :: Nil) =>
+        case (Between, Sized(_, IsBson(lower), IsBson(upper))) =>
           \/-(({ case List(f) => Selector.And(
             Selector.Doc(f -> Selector.Gte(lower)),
             Selector.Doc(f -> Selector.Lte(upper)))
@@ -523,14 +518,14 @@ object MongoDbPlanner extends Planner[Crystallized] {
             List(There(0, Here))))
         case (Between, _) => -\/(UnsupportedPlan(node, None))
 
-        case (And, _)      => invoke2Nel(Selector.And.apply _)
-        case (Or, _)       => invoke2Nel(Selector.Or.apply _)
-        case (Not, (_, v) :: Nil) =>
+        case (And, _) => invoke2Nel(Selector.And.apply _)
+        case (Or, _) => invoke2Nel(Selector.Or.apply _)
+        case (Not, Sized((_, v))) =>
           v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case (Constantly, const :: _ :: Nil) => const._2
+        case (Constantly, Sized(const, _)) => const._2
 
-        case _ => -\/(UnsupportedFunction(func))
+        case _ => -\/(UnsupportedFunction(func.name, None))
       }
     }
 
@@ -636,39 +631,36 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
     val HasWorkflow: Ann => OutputM[WorkflowBuilder] = _.head._2
 
-    def invoke(func: Func, args: List[Ann]): Output = {
+    def invoke[N <: Nat](func: GenericFunc[N], args: Func.Input[Ann, N]): Output = {
 
       val HasLiteral: Ann => OutputM[Bson] = ann => HasWorkflow(ann).flatMap { p =>
         asLiteral(p) match {
           case Some(value) => \/-(value)
-          case _           => -\/(FuncApply(func, "literal", p.toString))
+          case _           => -\/(FuncApply(func.name, "literal", p.toString))
         }
       }
 
       val HasInt64: Ann => OutputM[Long] = HasLiteral(_).flatMap {
         case Bson.Int64(v) => \/-(v)
-        case x => -\/(FuncApply(func, "64-bit integer", x.toString))
+        case x => -\/(FuncApply(func.name, "64-bit integer", x.toString))
       }
 
       val HasText: Ann => OutputM[String] = HasLiteral(_).flatMap {
         case Bson.Text(v) => \/-(v)
-        case x => -\/(FuncApply(func, "text", x.toString))
+        case x => -\/(FuncApply(func.name, "text", x.toString))
       }
 
       def Arity1[A](f: Ann => OutputM[A]): OutputM[A] = args match {
-        case a1 :: Nil => f(a1)
-        case _ => -\/(FuncArity(func, args.length))
+        case Sized(a1) => f(a1)
       }
 
       def Arity2[A, B](f1: Ann => OutputM[A], f2: Ann => OutputM[B]): OutputM[(A, B)] = args match {
-        case a1 :: a2 :: Nil => (f1(a1) |@| f2(a2))((_, _))
-        case _ => -\/(FuncArity(func, args.length))
+        case Sized(a1, a2) => (f1(a1) |@| f2(a2))((_, _))
       }
 
       def Arity3[A, B, C](f1: Ann => OutputM[A], f2: Ann => OutputM[B], f3: Ann => OutputM[C]):
           OutputM[(A, B, C)] = args match {
-        case a1 :: a2 :: a3 :: Nil => (f1(a1) |@| f2(a2) |@| f3(a3))((_, _, _))
-        case _ => -\/(FuncArity(func, args.length))
+        case Sized(a1, a2, a3) => (f1(a1) |@| f2(a2) |@| f3(a3))((_, _, _))
       }
 
       def expr1(f: Expression => Expression): Output =
@@ -715,7 +707,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
         (ann.tail, f) match {
           case (TypecheckF(_, _, _, _), There(1, _)) => !isSimpleRef
-          case (InvokeF(Cond, _), There(x, _))
+          case (InvokeFUnapply(Cond, _), There(x, _))
               if x == 1 || x == 2                    => !isSimpleRef
           case _                                     => false
         }
@@ -733,7 +725,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           lift(Arity2(HasWorkflow, HasWorkflow)).flatMap((arrayConcat(_, _)).tupled)
         case Filter =>
           args match {
-            case a1 :: a2 :: Nil =>
+            case Sized(a1, a2) =>
               lift(HasWorkflow(a1).flatMap(wf => {
                 val on = a2.map(_._2)
                 HasSelector(a2).flatMap { case (sel, inputs) =>
@@ -748,7 +740,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
                     // TODO: have this pass the JS args as the list of inputs … but right now, those inputs get converted to BsonFields, not ExprOps.
                     js._2.traverse(_(on)).map(args => filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
               }))
-            case _ => fail(FuncArity(func, args.length))
           }
         case Drop =>
           lift(Arity2(HasWorkflow, HasInt64).map((skip(_, _)).tupled))
@@ -756,7 +747,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           lift(Arity2(HasWorkflow, HasInt64).map((limit(_, _)).tupled))
         case InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin =>
           args match {
-            case List(left, right, comp) =>
+            case Sized(left, right, comp) =>
               splitConditions(comp).fold[M[WorkflowBuilder]](
                 fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder])]].convertTo[LogicalPlan, Fix](comp))))(
                 c => {
@@ -767,7 +758,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
                     rightKeys.traverse(HasWorkflow))((l, r, lk, rk) =>
                     join(l, r, func, lk, makeKeys(leftKeys, comp), rk, makeKeys(rightKeys, comp)))).join
                 })
-            case _ => fail(FuncArity(func, args.length))
           }
         case GroupBy =>
           lift(Arity2(HasWorkflow, HasKeys).map((groupBy(_, _)).tupled))
@@ -815,7 +805,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case ArrayLength =>
           lift(Arity2(HasWorkflow, HasInt64)).flatMap {
             case (p, 1)   => mapExpr(p)($size(_))
-            case (_, dim) => fail(FuncApply(func, "lower array dimension", dim.toString))
+            case (_, dim) => fail(FuncApply(func.name, "lower array dimension", dim.toString))
           }
 
         case Extract   =>
@@ -854,7 +844,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
                 // TODO: timezone, timezone_hour, timezone_minute
                 case "week"         => mapExpr(p)($week(_))
                 case "year"         => mapExpr(p)($year(_))
-                case _              => fail(FuncApply(func, "valid time period", field))
+                case _              => fail(FuncApply(func.name, "valid time period", field))
               }
           }
 
@@ -904,14 +894,14 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case DistinctBy   =>
           lift(Arity2(HasWorkflow, HasKeys)).flatMap((distinctBy(_, _)).tupled)
 
-        case _ => fail(UnsupportedFunction(func))
+        case _ => fail(UnsupportedFunction(func.name, None))
       }
     }
 
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
-      case InvokeF(relations.And, terms) =>
-        terms.traverse(splitConditions).map(_.concatenate)
-      case InvokeF(relations.Eq, List(left, right)) => Some(List((left, right)))
+      case InvokeFUnapply(relations.And, terms) =>
+        terms.unsized.traverse(splitConditions).map(_.concatenate)
+      case InvokeFUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
       case ConstantF(Data.Bool(true)) => Some(List())
       case _ => None
     }
@@ -1023,48 +1013,58 @@ object MongoDbPlanner extends Planner[Crystallized] {
       selectorƒ,
       toAlgebraOps(jsExprƒ).generalize[(Fix[LogicalPlan], ?)])
 
-  // FIXME: This removes all type checks from join conditions. Shouldn’t do
-  //        this, but currently need it in order to align the joins.
-  val elideJoinCheckƒ:
-      Fix[LogicalPlan] => LogicalPlan[Fix[LogicalPlan] \/ Fix[LogicalPlan]] =
-    _.unFix match {
-      case InvokeF(j @ (set.InnerJoin | set.LeftOuterJoin | set.RightOuterJoin | set.FullOuterJoin), List(l, r, cond)) =>
-        InvokeF(j, List(\/-(l), \/-(r), -\/(cond.cata(Optimizer.elideTypeCheckƒ))))
-      case x => x.map(\/-(_))
+  private type LPorLP = Fix[LogicalPlan] \/ Fix[LogicalPlan]
+
+  private def elideJoin(in: Func.Input[Fix[LogicalPlan], nat._3]): Func.Input[LPorLP, nat._3] =
+    in match {
+      case Sized(l, r, cond) =>
+        Func.Input3(\/-(l), \/-(r), -\/(cond.cata(Optimizer.elideTypeCheckƒ)))
     }
 
-  def alignJoinsƒ:
-      LogicalPlan[Fix[LogicalPlan]] => OutputM[Fix[LogicalPlan]] = {
+  // FIXME: This removes all type checks from join conditions. Shouldn’t do
+  //        this, but currently need it in order to align the joins.
+  val elideJoinCheckƒ: Fix[LogicalPlan] => LogicalPlan[LPorLP] = _.unFix match {
+    case InvokeFUnapply(JoinFunc(jf), Sized(a1, a2, a3)) =>
+      InvokeF(jf, elideJoin(Func.Input3(a1, a2, a3)))
+    case x => x.map(\/-(_))
+  }
+
+  def alignJoinsƒ: LogicalPlan[Fix[LogicalPlan]] => OutputM[Fix[LogicalPlan]] = {
+
     def containsTableRefs(condA: Fix[LogicalPlan], tableA: Fix[LogicalPlan], condB: Fix[LogicalPlan], tableB: Fix[LogicalPlan]) =
       condA.contains(tableA) && condB.contains(tableB) &&
         condA.all(_ ≠ tableB) && condB.all(_ ≠ tableA)
+
     def alignCondition(lt: Fix[LogicalPlan], rt: Fix[LogicalPlan]):
         Fix[LogicalPlan] => OutputM[Fix[LogicalPlan]] =
       _.unFix match {
         case TypecheckF(expr, typ, cont, fb) =>
           alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _, fb))
-        case InvokeF(And, terms) =>
-          terms.traverse(alignCondition(lt, rt)).map(Invoke(And, _))
-        case InvokeF(Or, terms) =>
-          terms.traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
-        case InvokeF(Not, terms) =>
-          terms.traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
-        case x @ InvokeF(func, List(left, right)) if func.effect ≟ Mapping =>
+        case InvokeFUnapply(And, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(And, _))
+        case InvokeFUnapply(Or, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
+        case InvokeFUnapply(Not, Sized(t1)) =>
+          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
+        case x @ InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
-            \/-(Invoke(func, List(left, right)))
+            \/-(Invoke(func, Func.Input2(left, right)))
           else if (containsTableRefs(left, rt, right, lt))
             flip(func).fold[PlannerError \/ Fix[LogicalPlan]](
               -\/(UnsupportedJoinCondition(Fix(x))))(
-              f => \/-(Invoke(f, List(right, left))))
+              f => \/-(Invoke[nat._2](f, Func.Input2(right, left))))
           else -\/(UnsupportedJoinCondition(Fix(x)))
+
         case LetF(name, form, in) =>
-            alignCondition(lt, rt)(in).map(Let(name, form, _))
+          alignCondition(lt, rt)(in).map(Let(name, form, _))
+
         case x => \/-(Fix(x))
       }
 
     {
-      case InvokeF(f @ (InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin), List(l, r, cond)) =>
-        alignCondition(l, r)(cond).map(c => Invoke(f, List(l, r, c)))
+      case x @ InvokeFUnapply(JoinFunc(f), Sized(l, r, cond)) =>
+        alignCondition(l, r)(cond).map(c => Invoke[nat._3](f, Func.Input3(l, r, c)))
+
       case x => \/-(Fix(x))
     }
   }

@@ -24,6 +24,7 @@ import quasar.namegen._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
+import shapeless.{:: => _, Id => _, _}
 import pathy.Path.posixCodec
 
 sealed trait LogicalPlan[A]
@@ -63,7 +64,7 @@ object LogicalPlan {
         fa match {
           case ReadF(_)              => B.zero
           case ConstantF(_)          => B.zero
-          case InvokeF(func, values) => values.foldMap(f)
+          case InvokeF(_, values)    => values.foldMap(f)
           case FreeF(_)              => B.zero
           case LetF(_, form, in)     => f(form) ⊹ f(in)
           case TypecheckF(expr, _, cont, fallback) =>
@@ -74,7 +75,7 @@ object LogicalPlan {
         fa match {
           case ReadF(_)              => z
           case ConstantF(_)          => z
-          case InvokeF(func, values) => Foldable[List].foldRight(values, z)(f)
+          case InvokeF(_, values)    => values.foldRight(z)(f)
           case FreeF(_)              => z
           case LetF(ident, form, in) => f(form, f(in, z))
           case TypecheckF(expr, _, cont, fallback) =>
@@ -91,18 +92,18 @@ object LogicalPlan {
           def render(v: LogicalPlan[α]) = v match {
             // NB: a couple of special cases for readability
             case ConstantF(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
-            case InvokeF(structural.ObjectProject, expr :: name :: Nil) =>
+            case InvokeFUnapply(structural.ObjectProject, Sized(expr, name)) =>
               (ra.render(expr), ra.render(name)) match {
                 case (RenderedTree(_, Some(x), Nil), RenderedTree(_, Some(n), Nil)) =>
                   Terminal("ObjectProject" :: nodeType, Some(x + "[" + n + "]"))
                 case (x, n) => NonTerminal("Invoke" :: nodeType, Some(ObjectProject.name), x :: n :: Nil)
               }
 
-            case ReadF(file)              => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
-            case ConstantF(data)          => Terminal("Constant" :: nodeType, Some(data.toString))
-            case InvokeF(func, args)      => NonTerminal("Invoke" :: nodeType, Some(func.name), args.map(ra.render))
-            case FreeF(name)              => Terminal("Free" :: nodeType, Some(name.toString))
-            case LetF(ident, form, body)  => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
+            case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
+            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.toString))
+            case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.name), args.unsized.map(ra.render))
+            case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
+            case LetF(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
             case TypecheckF(expr, typ, cont, fallback) =>
               NonTerminal("Typecheck" :: nodeType, Some(typ.shows),
                 List(ra.render(expr), ra.render(cont), ra.render(fallback)))
@@ -115,7 +116,7 @@ object LogicalPlan {
         (v1, v2) match {
           case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (ConstantF(d1), ConstantF(d2)) => d1 == d2
-          case (InvokeF(f1, v1), InvokeF(f2, v2)) => f1 == f2 && v1 ≟ v2
+          case (InvokeFUnapply(f1, v1), InvokeFUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
           case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
           case (LetF(ident1, form1, in1), LetF(ident2, form2, in2)) =>
             ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
@@ -139,15 +140,25 @@ object LogicalPlan {
       Fix[LogicalPlan](ConstantF(data))
   }
 
-  final case class InvokeF[A](func: Func, values: List[A]) extends LogicalPlan[A] {
+  final case class InvokeF[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N]) extends LogicalPlan[A] {
     override def toString = {
       val funcName = if (func.name(0).isLetter) func.name.split('_').map(_.toLowerCase.capitalize).mkString
                       else "\"" + func.name + "\""
       funcName + "(" + values.mkString(", ") + ")"
     }
+    override def equals(that: scala.Any): Boolean = that match {
+      case that @ InvokeF(_, _) =>
+        (this.func == that.func) && (this.values.unsized == that.values.unsized)
+      case _ => false
+    }
+  }
+  // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
+  // https://issues.scala-lang.org/browse/SI-5900
+  object InvokeFUnapply {
+    def unapply[A, N <: Nat](in: InvokeF[A, N]): Option[(GenericFunc[N], Func.Input[A, N])] = Some((in.func, in.values))
   }
   object Invoke {
-    def apply(func: Func, values: List[Fix[LogicalPlan]]): Fix[LogicalPlan] =
+    def apply[N <: Nat](func: GenericFunc[N], values: Func.Input[Fix[LogicalPlan], N]): Fix[LogicalPlan] =
       Fix[LogicalPlan](InvokeF(func, values))
   }
 
@@ -227,13 +238,6 @@ object LogicalPlan {
   def normalizeTempNames(t: Fix[LogicalPlan]) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
-  /** Finds the first element matching a predicate, if any, and returns it
-    * along with the preceding and following elements. */
-  private def splitAtFirstMatch[A](as: List[A])(p: A => Boolean): Option[(List[A], A, List[A])] = {
-    val x = as.prefixLength(!p(_))
-    (x < as.length).option((as.take(x), as(x), as.drop(x+1)))
-  }
-
   /** Per the following:
     * 1. Successive Lets are re-associated to the right:
     *    (let a = (let b = x1 in x2) in x3) becomes
@@ -248,11 +252,24 @@ object LogicalPlan {
   val normalizeLetsƒ: LogicalPlan[Fix[LogicalPlan]] => Option[LogicalPlan[Fix[LogicalPlan]]] = {
       case LetF(b, Fix(LetF(a, x1, x2)), x3) => LetF(a, x1, Let(b, x2, x3)).some
 
-      case InvokeF(func, xs) =>
-        splitAtFirstMatch(xs) { case Fix(LetF(_, _, _)) => true; case _ => false }.map {
-          case (prefix, Fix(LetF(a, x1, x2)), suffix) =>
-            LetF(a, x1, Invoke(func, prefix ++ (x2 :: suffix)))
-        }
+      // TODO generalize the following three `GenericFunc` cases
+      case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) => a1 match {
+        case Fix(LetF(a, x1, x2)) => LetF(a, x1, Invoke[nat._1](func, Func.Input1(x2))).some
+        case _ => None
+      }
+
+      case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) => (a1, a2) match {
+        case (Fix(LetF(a, x1, x2)), a2) => LetF(a, x1, Invoke[nat._2](func, Func.Input2(x2, a2))).some
+        case (a1, Fix(LetF(a, x1, x2))) => LetF(a, x1, Invoke[nat._2](func, Func.Input2(a1, x2))).some
+        case _ => None
+      }
+
+      case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
+        case (Fix(LetF(a, x1, x2)), a2, a3) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
+        case (a1, Fix(LetF(a, x1, x2)), a3) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(a1, x2, a3))).some
+        case (a1, a2, Fix(LetF(a, x1, x2))) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(a1, a2, x2))).some
+        case _ => None
+      }
 
       case TypecheckF(Fix(LetF(a, x1, x2)), typ, cont, fallback) =>
         LetF(a, x1, Fix(TypecheckF(x2, typ, cont, fallback))).some
@@ -266,9 +283,10 @@ object LogicalPlan {
 
   def normalizeLets(t: Fix[LogicalPlan]) = t.transAna(repeatedly(normalizeLetsƒ))
 
-  type Typed[F[_]] = Cofree[F, Type]
   final case class NamedConstraint(name: Symbol, inferred: Type, term: Fix[LogicalPlan])
   final case class ConstrainedPlan(inferred: Type, constraints: List[NamedConstraint], plan: Fix[LogicalPlan])
+
+  type Typed[F[_]] = Cofree[F, Type]
   type SemValidation[A] = ValidationNel[SemanticError, A]
   type SemDisj[A] = NonEmptyList[SemanticError] \/ A
 
@@ -284,13 +302,10 @@ object LogicalPlan {
 
       case InvokeF(func, args) => for {
         types <- func.untpe(typ)
-        args0 <- types.align(args).traverse(_.onlyBoth match {
-          case Some((t, arg)) => inferTypes(t, arg).disjunction
-          case None =>
-            (SemanticError.wrongArgumentCount(func, types.length, args.length))
-              .wrapNel.left
-        }).validation
-      } yield InvokeF[Typed[LogicalPlan]](func, args0)
+        args0 <- types.zip(args).traverse {
+          case (t, arg) => inferTypes(t, arg)
+        }
+      } yield InvokeF(func, args0)
 
       case FreeF(n) => success(FreeF[Typed[LogicalPlan]](n))
 
@@ -358,52 +373,53 @@ object LogicalPlan {
       ((Type, LogicalPlan[ConstrainedPlan])) => NameT[SemDisj, ConstrainedPlan] = {
     case (inf, term) =>
       def applyConstraints(
-        poss: Type, constraints: ConstrainedPlan)
-        (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
+          poss: Type, constraints: ConstrainedPlan)
+          (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
         unifyOrCheck(inf, poss, f(appConst(constraints, Constant(Data.NA))))
 
       term match {
         case ReadF(c)         => unifyOrCheck(inf, Type.Top, Read(c))
         case ConstantF(d)     => unifyOrCheck(inf, Type.Const(d), Constant(d))
-        case InvokeF(MakeObject, List(name, value)) =>
-          lift(MakeObject.tpe(List(name.inferred, value.inferred)).disjunction).flatMap(
+        case InvokeFUnapply(MakeObject, Sized(name, value)) =>
+          lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeObject(name.plan, x))))
-        case InvokeF(MakeArray, List(value)) =>
-          lift(MakeArray.tpe(List(value.inferred)).disjunction).flatMap(
+        case InvokeFUnapply(MakeArray, Sized(value)) =>
+          lift(MakeArray.tpe(Func.Input1(value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeArray(x))))
         // TODO: Move this case to the Mongo planner once type information is
         //       available there.
-        case InvokeF(ConcatOp, args) =>
-          val (types, constraints, terms) = args.foldMap(a =>
-            (List(a.inferred), a.constraints, List(a.plan)))
+        case InvokeFUnapply(ConcatOp, Sized(left, right)) =>
+          val (types, constraints0, terms) = Func.Input2(left, right).map {
+            case ConstrainedPlan(in, con, pl) => (in, (con, pl))
+          }.unzip3[Type, List[NamedConstraint], Fix[LogicalPlan]]
+
+          val constraints = constraints0.unsized.flatten
+
           lift(ConcatOp.tpe(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
             case t if Type.Str.contains(t) => unifyOrCheck(inf, poss, Invoke(string.Concat, terms))
             case t if t.arrayLike => unifyOrCheck(inf, poss, Invoke(ArrayConcat, terms))
             case _                => lift(-\/(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types"))))
           }).map(cp =>
             cp.copy(constraints = cp.constraints ++ constraints))
-        case InvokeF(relations.Or, args) =>
-          lift(relations.Or.tpe(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
-        case InvokeF(structural.FlattenArray, args) =>
+        case InvokeFUnapply(relations.Or, Sized(left, right)) =>
+          lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, Func.Input2(left, right).map(appConst(_, Constant(Data.NA))))))
+        case InvokeFUnapply(structural.FlattenArray, Sized(arg)) =>
           for {
-            types <- lift(structural.FlattenArray.tpe(args.map(_.inferred)).disjunction)
-            consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.traverse(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))))
-            plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenArray, consts))
+            types <- lift(structural.FlattenArray.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
+            consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))))
+            plan  <- unifyOrCheck(inf, types, Invoke[nat._1](structural.FlattenArray, consts))
           } yield plan
-        case InvokeF(structural.FlattenMap, args) => for {
-          types <- lift(structural.FlattenMap.tpe(args.map(_.inferred)).disjunction)
-          consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.traverse(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))))
-          plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenMap, consts))
+        case InvokeFUnapply(structural.FlattenMap, Sized(arg)) => for {
+          types <- lift(structural.FlattenMap.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
+          consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))))
+          plan  <- unifyOrCheck(inf, types, Invoke[nat._1](structural.FlattenMap, consts))
         } yield plan
-        case InvokeF(f, args) => f.effect match {
-          case Mapping =>
-            val (types, constraints, terms) = args.foldMap(a =>
-              (List(a.inferred), a.constraints, List(a.plan)))
-            lift(f.tpe(types).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, terms))).map(cp =>
-              cp.copy(constraints = cp.constraints ++ constraints))
-          case _ =>
-            lift(f.tpe(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
-        }
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) =>
+          handleGenericInvoke(inf, InvokeF(func, Func.Input1(a1)))
+        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) =>
+          handleGenericInvoke(inf, InvokeF(func, Func.Input2(a1, a2)))
+        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
+          handleGenericInvoke(inf, InvokeF(func, Func.Input3(a1, a2, a3)))
         case TypecheckF(expr, typ, cont, fallback) =>
           unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))
         case LetF(name, value, in) =>
@@ -411,6 +427,28 @@ object LogicalPlan {
         // TODO: Get the possible type from the LetF
         case FreeF(v) => emit(ConstrainedPlan(inf, Nil, Free(v)))
       }
+  }
+
+  private def handleGenericInvoke[N <: Nat](inf: Type, invoke: InvokeF[ConstrainedPlan, N]): NameT[SemDisj, ConstrainedPlan] = {
+    val func: GenericFunc[N] = invoke.func
+    val args: Func.Input[ConstrainedPlan, N] = invoke.values
+
+    func.effect match {
+      case Mapping =>
+        val (types, constraints0, terms) = args.map {
+          case ConstrainedPlan(in, con, pl) => (in, (con, pl))
+        }.unzip3[Type, List[NamedConstraint], Fix[LogicalPlan]]
+
+        val constraints = constraints0.unsized.flatten
+
+        lift(func.tpe(types).disjunction).flatMap(
+          unifyOrCheck(inf, _, Invoke(func, terms))).map(cp =>
+            cp.copy(constraints = cp.constraints ++ constraints))
+
+      case _ =>
+        lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
+          unifyOrCheck(inf, _, Invoke(func, args.map(appConst(_, Constant(Data.NA))))))
+    }
   }
 
   type SemNames[A] = NameT[SemDisj, A]

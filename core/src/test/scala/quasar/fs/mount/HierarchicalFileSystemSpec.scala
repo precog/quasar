@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.{Data, Func, LogicalPlan}
 import quasar.effect._
 import quasar.fp.{hoistFree, free, zoomNT}
 import quasar.fs._
@@ -31,6 +31,7 @@ import pathy.Path._
 import scalaz.{Lens => _, Failure => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
+import shapeless.{Data => _, Coproduct => _, _}
 
 class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
@@ -140,8 +141,8 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       val local = dir("d1") </> file("f1")
       val mnted = mntB </> local
 
-      val lp = Invoke(Take, List(
-        Invoke(Squash, List(Read(mnted))),
+      val lp = Invoke(Take, Func.Input2(
+        Invoke(Squash, Func.Input1(Read(mnted))),
         Constant(Data.Int(5))))
 
       val fss = bMem.set(
@@ -166,8 +167,8 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
           val rd = mntB </> file("f1")
           val out = mntC </> file("outf")
 
-          val lp = Invoke(Take, List(
-            Invoke(Squash, List(Read(rd))),
+          val lp = Invoke(Take, Func.Input2(
+            Invoke(Squash, Func.Input1(Read(rd))),
             Constant(Data.Int(5))))
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)

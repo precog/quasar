@@ -3745,7 +3745,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "leave well enough alone" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          List(Free('left), Free('right),
+          Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
                 ObjectProject(Free('left), Constant(Data.Str("foo"))),
@@ -3767,7 +3767,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "swap a reversed condition" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          List(Free('left), Free('right),
+          Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
                 ObjectProject(Free('right), Constant(Data.Str("bar"))),
@@ -3789,7 +3789,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "swap multiple reversed conditions" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          List(Free('left), Free('right),
+          Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
                 ObjectProject(Free('right), Constant(Data.Str("bar"))),
@@ -3811,7 +3811,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "fail with “mixed” conditions" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          List(Free('left), Free('right),
+          Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
                 math.Add[FLP](

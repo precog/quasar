@@ -42,7 +42,7 @@ class LogicalPlanSpecs extends Spec {
   def addGen[A: Arbitrary]: Gen[LogicalPlan[A]] = for {
     l <- Arbitrary.arbitrary[A]
     r <- Arbitrary.arbitrary[A]
-  } yield InvokeF(std.MathLib.Add, List(l, r))
+  } yield InvokeF(std.MathLib.Add, Func.Input2(l, r))
 
   def letGen[A: Arbitrary]: Gen[LogicalPlan[A]] = for {
     n            <- Gen.choose(0, 1000)
@@ -101,13 +101,13 @@ class LogicalPlanSpecs extends Spec {
         Let('bar,
           Let('foo,
             Read(file("foo")),
-            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x"))))))))),
+            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Str("z"))))))), 
           Fix(MakeObjectN(
             Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y")))))))) must_==
         Let('foo,
           Read(file("foo")),
           Let('bar,
-            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))))))),
+            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Str("z")))))), 
             Fix(MakeObjectN(
               Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y"))))))))
     }

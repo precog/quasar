@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-import quasar.Predef.{Long, String, Vector}
+import quasar.Predef.{List, Long, String, Vector}
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.sql._
 
 import matryoshka._
 import scalaz._
+import scalaz.Leibniz._
+import scalaz.std.vector._
+import scalaz.std.list._
 import scalaz.syntax.monad._
+import scalaz.syntax.traverse._
 import scalaz.syntax.either._
 import scalaz.syntax.writer._
 import scalaz.syntax.nel._
-import scalaz.std.vector._
 
 package object quasar {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -37,8 +40,8 @@ package object quasar {
 
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
 
-  type EnvErr[A]         = Failure[EnvironmentError, A]
-  type EnvErrF[A]        = Coyoneda[EnvErr, A]
+  type EnvErr[A] = Failure[EnvironmentError, A]
+  type EnvErrF[A] = Coyoneda[EnvErr, A]
   type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
 
   type SeqNameGeneratorT[F[_], A] = StateT[F, Long, A]
@@ -64,5 +67,34 @@ package object quasar {
       optimized   <- phase("Optimized", \/-(Optimizer.optimize(logical)))
       typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
     } yield typechecked
+  }
+
+  // TODO generalize this and contribute to shapeless-contrib
+  implicit class FuncUtils[A, N <: shapeless.Nat](val self: Func.Input[A, N]) extends scala.AnyVal {
+    import shapeless._
+
+    def reverse: Func.Input[A, N] =
+      Sized.wrap[List[A], N](self.unsized.reverse)
+
+    def foldMap[B](f: A => B)(implicit F: Monoid[B]): B =
+      self.unsized.foldMap(f)
+
+    def foldRight[B](z: => B)(f: (A, => B) => B): B =
+      Foldable[List].foldRight(self.unsized, z)(f)
+
+    def traverse[G[_], B](f: A => G[B])(implicit G: Applicative[G]): G[Func.Input[B, N]] =
+      G.map(self.unsized.traverse(f))(bs => Sized.wrap[List[B], N](bs))
+
+    // Input[Option[B], N] -> Option[Input[B, N]]
+    def sequence[G[_], B](implicit ev: A === G[B], G: Applicative[G]): G[Func.Input[B, N]] =
+      G.map(self.unsized.sequence(ev, G))(bs => Sized.wrap[List[B], N](bs))
+
+    def zip[B](input: Func.Input[B, N]): Func.Input[(A, B), N] =
+      Sized.wrap[List[(A, B)], N](self.unsized.zip(input))
+
+    def unzip3[X, Y, Z](implicit ev: A === (X, (Y, Z))): (Func.Input[X, N], Func.Input[Y, N], Func.Input[Z, N]) =
+      Unzip[List].unzip3[X, Y, Z](ev.subst(self.unsized)) match {
+        case (x, y, z) => (Sized.wrap[List[X], N](x), Sized.wrap[List[Y], N](y), Sized.wrap[List[Z], N](z))
+      }
   }
 }

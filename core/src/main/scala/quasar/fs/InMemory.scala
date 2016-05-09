@@ -27,6 +27,7 @@ import matryoshka.{Fix, Recursive}, Recursive.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import shapeless._
 
 /** In-Memory FileSystem interpreters, useful for testing/stubbing
   * when a "real" interpreter isn't needed or desired.
@@ -221,11 +222,11 @@ object InMemory {
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
-          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
+          case InvokeFUnapply(Drop, Sized((_,src), (Fix(ConstantF(Data.Int(skip))),_))) =>
             src.flatMap(s => skip.safeToInt.map(s.drop).toRightDisjunction(unsupported(optLp)))
-          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
+          case InvokeFUnapply(Take, Sized((_,src), (Fix(ConstantF(Data.Int(limit))),_))) =>
             src.flatMap(s => limit.safeToInt.map(s.take).toRightDisjunction(unsupported(optLp)))
-          case InvokeF(Squash,(_,src) :: Nil) => src
+          case InvokeFUnapply(Squash, Sized((_,src))) => src
           case ConstantF(data) => Vector(data).right
           case other =>
             queryResponsesL.get(mem).mapKeys(Optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))

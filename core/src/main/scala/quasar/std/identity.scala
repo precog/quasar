@@ -20,28 +20,38 @@ import quasar.Predef._
 import quasar._
 
 import scalaz._
+import shapeless.{Data => _, _}
 
 trait IdentityLib extends Library {
   import Type._
   import Validation.success
 
-  val Squash = Func(Squashing, "SQUASH", "Squashes all dimensional information",
-    Top, Top :: Nil,
+  val Squash = UnaryFunc(
+    Squashing,
+    "SQUASH",
+    "Squashes all dimensional information",
+    Top,
+    Func.Input1(Top),
     noSimplification,
-    partialTyper { case x :: Nil => x },
-    untyper(t => success(t :: Nil)))
+    partialTyper[nat._1] { case Sized(x) => x },
+    untyper[nat._1](t => success(Func.Input1(t))))
 
-  val ToId = Func(Mapping, 
+  val ToId = UnaryFunc(
+    Mapping,
     "oid",
     "Converts a string to a (backend-specific) object identifier.",
-    Type.Id, Type.Str :: Nil,
+    Type.Id,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Str(str)) :: Nil => Type.Const(Data.Id(str))
-      case Type.Str :: Nil                  => Type.Id
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => Type.Const(Data.Id(str))
+      case Sized(Type.Str)                  => Type.Id
     },
     basicUntyper)
 
-  val functions = Squash :: ToId :: Nil
+  def unaryFunctions: List[GenericFunc[nat._1]] = Squash :: ToId :: Nil
+  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
+  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
+
 object IdentityLib extends IdentityLib

@@ -16,6 +16,7 @@
 
 package quasar.std
 
+import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
 import quasar.specs2.PendingWithAccurateCoverage
@@ -39,7 +40,7 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
   "RelationsLib" should {
 
     "type eq with matching arguments" ! prop { (t : Type) =>
-      val expr = Eq.tpe(List(t, t))
+      val expr = Eq.tpe(Func.Input2(t, t))
       t match {
         case Const(_) => expr should beSuccessful(Const(Bool(true)))
         case _ => expr should beSuccessful(Type.Bool)
@@ -47,59 +48,59 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
     }
 
     "fold integer eq" in {
-      val expr = Eq.tpe(List(Const(Int(1)), Const(Int(1))))
+      val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Int(1))))
       expr should beSuccessful(Const(Bool(true)))
     }
 
     "fold eq with mixed numeric type" in {
-      val expr = Eq.tpe(List(Const(Int(1)), Const(Dec(1.0))))
+      val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Dec(1.0))))
       expr should beSuccessful(Const(Bool(true)))
     }
 
     "fold eq with mixed type" in {
-      val expr = Eq.tpe(List(Const(Int(1)), Const(Str("a"))))
+      val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Str("a"))))
       expr should beSuccessful(Const(Bool(false)))
     }
 
     "type Eq with Top" ! prop { (t : Type) =>
-      Eq.tpe(List(Type.Top, t)) should beSuccessful(Type.Bool)
-      Eq.tpe(List(t, Type.Top)) should beSuccessful(Type.Bool)
+      Eq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
+      Eq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
     }
 
     "type Neq with Top" ! prop { (t : Type) =>
-      Neq.tpe(List(Type.Top, t)) should beSuccessful(Type.Bool)
-      Neq.tpe(List(t, Type.Top)) should beSuccessful(Type.Bool)
+      Neq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
+      Neq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
     }
 
     "fold neq with mixed type" in {
-      val expr = Neq.tpe(List(Const(Int(1)), Const(Str("a"))))
+      val expr = Neq.tpe(Func.Input2(Const(Int(1)), Const(Str("a"))))
       expr should beSuccessful(Const(Bool(true)))
     }
 
     // TODO: similar for the rest of the simple relations
 
     "fold cond with true" ! prop { (t1 : Type, t2 : Type) =>
-      val expr = Cond.tpe(List(Const(Bool(true)), t1, t2))
+      val expr = Cond.tpe(Func.Input3(Const(Bool(true)), t1, t2))
       expr must beSuccessful(t1)
     }
 
     "fold cond with false" ! prop { (t1 : Type, t2 : Type) =>
-      val expr = Cond.tpe(List(Const(Bool(false)), t1, t2))
+      val expr = Cond.tpe(Func.Input3(Const(Bool(false)), t1, t2))
       expr must beSuccessful(t2)
     }
 
     "find lub for cond with int" in {
-      val expr = Cond.tpe(List(Type.Bool, Type.Int, Type.Int))
+      val expr = Cond.tpe(Func.Input3(Type.Bool, Type.Int, Type.Int))
       expr must beSuccessful(Type.Int)
     }
 
     "find lub for cond with arbitrary args" ! prop { (t1 : Type, t2 : Type) =>
-      val expr = Cond.tpe(List(Type.Bool, t1, t2))
+      val expr = Cond.tpe(Func.Input3(Type.Bool, t1, t2))
       expr must beSuccessful(Type.lub(t1, t2))
     }
 
     "fold coalesce with right null type" ! prop { (t1 : Type) =>
-      val expr = Coalesce.tpe(List(t1, Type.Null))
+      val expr = Coalesce.tpe(Func.Input2(t1, Type.Null))
       expr must beSuccessful(t1 match {
         case Const(Null) => Type.Null
         case _           => t1
@@ -107,12 +108,12 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
     }
 
     "fold coalesce with left null type" ! prop { (t2 : Type) =>
-      val expr = Coalesce.tpe(List(Type.Null, t2))
+      val expr = Coalesce.tpe(Func.Input2(Type.Null, t2))
       expr must beSuccessful(t2)
     }
 
     "fold coalesce with right null value" ! prop { (t1 : Type) =>
-      val expr = Coalesce.tpe(List(t1, Const(Null)))
+      val expr = Coalesce.tpe(Func.Input2(t1, Const(Null)))
       expr must beSuccessful(t1 match {
         case Type.Null => Const(Null)
         case _         => t1
@@ -120,22 +121,22 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
     }
 
     "fold coalesce with left null value" ! prop { (t2 : Type) =>
-      val expr = Coalesce.tpe(List(Const(Null), t2))
+      val expr = Coalesce.tpe(Func.Input2(Const(Null), t2))
       expr must beSuccessful(t2)
     }
 
     "fold coalesce with left value" ! prop { (t2 : Type) =>
-      val expr = Coalesce.tpe(List(Const(Int(3)), t2))
+      val expr = Coalesce.tpe(Func.Input2(Const(Int(3)), t2))
       expr must beSuccessful(Const(Int(3)))
     }
 
     "find lub for coalesce with int" in {
-      val expr = Coalesce.tpe(List(Type.Int, Type.Int))
+      val expr = Coalesce.tpe(Func.Input2(Type.Int, Type.Int))
       expr must beSuccessful(Type.Int)
     }
 
-    "find lub for coalesce with arbitrary args" ! prop { (t1 : Type, t2 : Type) =>
-      val expr = Cond.tpe(List(t1, t2))
+    "find lub for coalesce with arbitrary args" ! prop { (t1: Type, t2: Type) =>
+      val expr = Coalesce.tpe(Func.Input2(t1, t2))
       if (t1 == Type.Null || t1 == Const(Null))
         expr must beSuccessful(t2)
       else
@@ -148,26 +149,24 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
       Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
         case (func, left, right) =>
           flip(func).map(
-            _.tpe(List(Type.Const(Int(right)), Type.Const(Int(left))))) must
-            beSome(func.tpe(List(Type.Const(Int(left)), Type.Const(Int(right)))))
+            _.tpe(Func.Input2(Type.Const(Int(right)), Type.Const(Int(left))))) must
+            beSome(func.tpe(Func.Input2(Type.Const(Int(left)), Type.Const(Int(right)))))
     }
 
     "flip boolean ops" !
       Prop.forAll(Gen.oneOf(And, Or), arbitrary[Boolean], arbitrary[Boolean]) {
         case (func, left, right) =>
           flip(func).map(
-            _.tpe(List(Type.Const(Bool(right)), Type.Const(Bool(left))))) must
-            beSome(func.tpe(List(Type.Const(Bool(left)), Type.Const(Bool(right)))))
+            _.tpe(Func.Input2(Type.Const(Bool(right)), Type.Const(Bool(left))))) must
+            beSome(func.tpe(Func.Input2(Type.Const(Bool(left)), Type.Const(Bool(right)))))
     }
 
     "negate comparison ops" !
       Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
         case (func, left, right) =>
           RelationsLib.negate(func).map(
-            _.tpe(List(Type.Const(Int(left)), Type.Const(Int(right))))) must
-          beSome(func.tpe(List(Type.Const(Int(left)), Type.Const(Int(right)))).flatMap(x => Not.tpe(List(x))))
+            _.tpe(Func.Input2(Type.Const(Int(left)), Type.Const(Int(right))))) must
+          beSome(func.tpe(Func.Input2(Type.Const(Int(left)), Type.Const(Int(right)))).flatMap(x => Not.tpe(Func.Input1(x))))
     }
-
-    // TODO:
   }
 }

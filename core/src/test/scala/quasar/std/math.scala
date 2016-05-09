@@ -16,6 +16,7 @@
 
 package quasar.std
 
+import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
 import quasar.specs2.PendingWithAccurateCoverage
@@ -28,6 +29,7 @@ import org.specs2.ScalaCheck
 import org.threeten.bp.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
+import shapeless._
 
 class MathSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import MathLib._
@@ -40,37 +42,37 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
 
   "MathLib" should {
     "type simple add with ints" in {
-      val expr = Add.tpe(List(Type.Int, Type.Int))
+      val expr = Add.tpe(Func.Input2(Type.Int, Type.Int))
       expr should beSuccessful(Type.Int)
     }
 
     "type simple add with decs" in {
-      val expr = Add.tpe(List(Type.Dec, Type.Dec))
+      val expr = Add.tpe(Func.Input2(Type.Dec, Type.Dec))
       expr should beSuccessful(Type.Dec)
     }
 
     "type simple add with promotion" in {
-      val expr = Add.tpe(List(Type.Int, Type.Dec))
+      val expr = Add.tpe(Func.Input2(Type.Int, Type.Dec))
       expr should beSuccessful(Type.Dec)
     }
 
     "type simple add with zero" in {
-      val expr = Add.tpe(List(Type.Numeric, TZero()))
+      val expr = Add.tpe(Func.Input2(Type.Numeric, TZero()))
       expr should beSuccessful(Type.Numeric)
     }
 
     "fold simple add with int constants" in {
-      val expr = Add.tpe(List(TOne(), Const(Int(2))))
+      val expr = Add.tpe(Func.Input2(TOne(), Const(Int(2))))
       expr should beSuccessful(Const(Int(3)))
     }
 
     "fold simple add with decimal constants" in {
-      val expr = Add.tpe(List(Const(Dec(1.0)), Const(Dec(2.0))))
+      val expr = Add.tpe(Func.Input2(Const(Dec(1.0)), Const(Dec(2.0))))
       expr should beSuccessful(Const(Dec(3)))
     }
 
     "fold simple add with promotion" in {
-      val expr = Add.tpe(List(TOne(), Const(Dec(2.0))))
+      val expr = Add.tpe(Func.Input2(TOne(), Const(Dec(2.0))))
       expr should beSuccessful(Const(Dec(3)))
     }
 
@@ -85,90 +87,90 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
     }
 
     "eliminate multiply by dec zero (on the right)" ! prop { (c : Const) =>
-      val expr = Multiply.tpe(List(c, Const(Dec(0.0))))
+      val expr = Multiply.tpe(Func.Input2(c, Const(Dec(0.0))))
       expr should beSuccessful(TZero())
     }
 
     "eliminate multiply by zero (on the left)" ! prop { (c : Const) =>
-      val expr = Multiply.tpe(List(TZero(), c))
+      val expr = Multiply.tpe(Func.Input2(TZero(), c))
       expr should beSuccessful(TZero())
     }
 
     "fold simple division" in {
-      val expr = Divide.tpe(List(Const(Int(6)), Const(Int(3))))
+      val expr = Divide.tpe(Func.Input2(Const(Int(6)), Const(Int(3))))
       expr should beSuccessful(Const(Int(2)))
     }
 
     "fold truncating division" in {
-      val expr = Divide.tpe(List(Const(Int(5)), Const(Int(2))))
+      val expr = Divide.tpe(Func.Input2(Const(Int(5)), Const(Int(2))))
       expr should beSuccessful(Const(Int(2)))
     }
 
     "fold simple division (dec)" in {
-      val expr = Divide.tpe(List(Const(Int(6)), Const(Dec(3.0))))
+      val expr = Divide.tpe(Func.Input2(Const(Int(6)), Const(Dec(3.0))))
       expr should beSuccessful(Const(Dec(2.0)))
     }
 
     "fold division (dec)" in {
-      val expr = Divide.tpe(List(Const(Int(5)), Const(Dec(2))))
+      val expr = Divide.tpe(Func.Input2(Const(Int(5)), Const(Dec(2))))
       expr should beSuccessful(Const(Dec(2.5)))
     }
 
     "divide by zero" in {
-      val expr = Divide.tpe(List(TOne(), TZero()))
+      val expr = Divide.tpe(Func.Input2(TOne(), TZero()))
       expr must beFailing
     }
 
     "divide by zero (dec)" in {
-      val expr = Divide.tpe(List(Const(Dec(1.0)), Const(Dec(0.0))))
+      val expr = Divide.tpe(Func.Input2(Const(Dec(1.0)), Const(Dec(0.0))))
       expr must beFailing
     }
 
     "fold simple modulo" in {
-      val expr = Modulo.tpe(List(Const(Int(6)), Const(Int(3))))
+      val expr = Modulo.tpe(Func.Input2(Const(Int(6)), Const(Int(3))))
       expr should beSuccessful(TZero())
     }
 
     "fold non-zero modulo" in {
-      val expr = Modulo.tpe(List(Const(Int(5)), Const(Int(2))))
+      val expr = Modulo.tpe(Func.Input2(Const(Int(5)), Const(Int(2))))
       expr should beSuccessful(TOne())
     }
 
     "fold simple modulo (dec)" in {
-      val expr = Modulo.tpe(List(Const(Int(6)), Const(Dec(3.0))))
+      val expr = Modulo.tpe(Func.Input2(Const(Int(6)), Const(Dec(3.0))))
       expr should beSuccessful(Const(Dec(0.0)))
     }
 
     "fold non-zero modulo (dec)" in {
-      val expr = Modulo.tpe(List(Const(Int(5)), Const(Dec(2.2))))
+      val expr = Modulo.tpe(Func.Input2(Const(Int(5)), Const(Dec(2.2))))
       expr should beSuccessful(Const(Dec(0.6)))
     }
 
     "modulo by zero" in {
-      val expr = Modulo.tpe(List(TOne(), TZero()))
+      val expr = Modulo.tpe(Func.Input2(TOne(), TZero()))
       expr must beFailing
     }
 
     "modulo by zero (dec)" in {
-      val expr = Modulo.tpe(List(Const(Dec(1.0)), Const(Dec(0.0))))
+      val expr = Modulo.tpe(Func.Input2(Const(Dec(1.0)), Const(Dec(0.0))))
       expr must beFailing
     }
 
     "typecheck number raised to 0th power" ! prop { (t: Type) =>
-      Power.tpe(List(t, TZero())) should beSuccessful(TOne())
+      Power.tpe(Func.Input2(t, TZero())) should beSuccessful(TOne())
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck 0 raised to any (non-zero) power" ! prop { (t: Type) =>
       (t != TZero()) ==>
-        (Power.tpe(List(TZero(), t)) should beSuccessful(TZero()))
+        (Power.tpe(Func.Input2(TZero(), t)) should beSuccessful(TZero()))
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck any number raised to 1st power" ! prop { (t: Type) =>
-      Power.tpe(List(t, TOne())) should beSuccessful(t)
+      Power.tpe(Func.Input2(t, TOne())) should beSuccessful(t)
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck constant raised to int constant" in {
-      Power.tpe(List(Const(Dec(7.2)), Const(Int(2)))) should beSuccessful(Const(Dec(51.84)))
+      Power.tpe(Func.Input2(Const(Dec(7.2)), Const(Int(2)))) should beSuccessful(Const(Dec(51.84)))
     }
 
     "simplify expression raised to 1st power" in {
@@ -178,46 +180,46 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
 
     "fold a complex expression (10-4)/3 + (5*8)" in {
       val expr = for {
-        x1 <- Subtract.tpe(List(
+        x1 <- Subtract.tpe(Func.Input2(
                 Const(Int(10)),
                 Const(Int(4))));
-        x2 <- Divide.tpe(List(x1,
+        x2 <- Divide.tpe(Func.Input2(x1,
                 Const(Int(3))));
-        x3 <- Multiply.tpe(List(
+        x3 <- Multiply.tpe(Func.Input2(
                 Const(Int(5)),
                 Const(Int(8))))
-        x4 <- Add.tpe(List(x2, x3))
+        x4 <- Add.tpe(Func.Input2(x2, x3))
       } yield x4
       expr should beSuccessful(Const(Int(42)))
     }
 
     "fail with mismatched constants" in {
-      val expr = Add.tpe(List(TOne(), Const(Str("abc"))))
+      val expr = Add.tpe(Func.Input2(TOne(), Const(Str("abc"))))
       expr should beFailing
     }
 
     "fail with object and int constant" in {
-      val expr = Add.tpe(List(Obj(Map("x" -> Type.Int), None), TOne()))
+      val expr = Add.tpe(Func.Input2(Obj(Map("x" -> Type.Int), None), TOne()))
       expr should beFailing
     }
 
     "add timestamp and interval" in {
-      val expr = Add.tpe(List(
+      val expr = Add.tpe(Func.Input2(
         Type.Const(Timestamp(Instant.parse("2015-01-21T00:00:00Z"))),
         Type.Const(Interval(Duration.ofHours(9)))))
       expr should beSuccessful(Type.Const(Timestamp(Instant.parse("2015-01-21T09:00:00Z"))))
     }
 
-    def permute(f: List[Type] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
-      f(t1 :: t2 :: Nil) should beSuccessful(exp1)
-      f(t1 :: t2.value.dataType :: Nil) should beSuccessful(exp2)
-      f(t1.value.dataType :: t2 :: Nil) should beSuccessful(exp2)
-      f(t1.value.dataType :: t2.value.dataType :: Nil) should beSuccessful(exp2)
+    def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
+      f(Func.Input2(t1, t2)) should beSuccessful(exp1)
+      f(Func.Input2(t1, t2.value.dataType)) should beSuccessful(exp2)
+      f(Func.Input2(t1.value.dataType, t2)) should beSuccessful(exp2)
+      f(Func.Input2(t1.value.dataType, t2.value.dataType)) should beSuccessful(exp2)
 
-      f(t2 :: t1 :: Nil) should beSuccessful(exp1)
-      f(t2.value.dataType :: t1 :: Nil) should beSuccessful(exp2)
-      f(t2 :: t1.value.dataType :: Nil) should beSuccessful(exp2)
-      f(t2.value.dataType :: t1.value.dataType :: Nil) should beSuccessful(exp2)
+      f(Func.Input2(t2, t1)) should beSuccessful(exp1)
+      f(Func.Input2(t2.value.dataType, t1)) should beSuccessful(exp2)
+      f(Func.Input2(t2, t1.value.dataType)) should beSuccessful(exp2)
+      f(Func.Input2(t2.value.dataType, t1.value.dataType)) should beSuccessful(exp2)
     }
 
     "add with const and non-const Ints" in {

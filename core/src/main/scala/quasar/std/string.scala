@@ -17,31 +17,36 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 import quasar.fp._
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failureNel}
+import shapeless.{Data => _, :: => _, _}
 
 trait StringLib extends Library {
-  private def stringApply(f: (String, String) => String): Func.Typer =
-    partialTyper {
-      case Type.Const(Data.Str(a)) :: Type.Const(Data.Str(b)) :: Nil => Type.Const(Data.Str(f(a, b)))
+  private def stringApply(f: (String, String) => String): Func.Typer[nat._2] =
+    partialTyper[nat._2] {
+      case Sized(Type.Const(Data.Str(a)), Type.Const(Data.Str(b))) => Type.Const(Data.Str(f(a, b)))
 
-      case Type.Str :: Type.Const(Data.Str(_)) :: Nil => Type.Str
-      case Type.Const(Data.Str(_)) :: Type.Str :: Nil => Type.Str
-      case Type.Str :: Type.Str :: Nil                => Type.Str
+      case Sized(Type.Str, Type.Const(Data.Str(_))) => Type.Str
+      case Sized(Type.Const(Data.Str(_)), Type.Str) => Type.Str
+      case Sized(Type.Str, Type.Str)                => Type.Str
     }
 
   // TODO: variable arity
-  val Concat = Func(Mapping, "concat", "Concatenates two (or more) string values",
-    Type.Str, Type.Str :: Type.Str :: Nil,
+  val Concat = BinaryFunc(
+    Mapping,
+    "concat",
+    "Concatenates two (or more) string values",
+    Type.Str,
+    Func.Input2(Type.Str, Type.Str),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, List(Embed(ConstantF(Data.Str(""))), Embed(second))) =>
+          case InvokeFUnapply(_, Sized(Embed(ConstantF(Data.Str(""))), Embed(second))) =>
             second.some
-          case InvokeF(_, List(Embed(first), Embed(ConstantF(Data.Str(""))))) =>
+          case InvokeFUnapply(_, Sized(Embed(first), Embed(ConstantF(Data.Str(""))))) =>
             first.some
           case _ => None
         }
@@ -78,14 +83,16 @@ trait StringLib extends Library {
     "^" + escape(pattern.toList).mkString + "$"
   }
 
-  val Like = Func(Mapping, 
+  val Like = TernaryFunc(
+    Mapping,
     "(like)",
     "Determines if a string value matches a pattern.",
-    Type.Bool, Type.Str :: Type.Str :: Type.Str :: Nil,
+    Type.Bool,
+    Func.Input3(Type.Str, Type.Str, Type.Str),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, List(Embed(str), Embed(ConstantF(Data.Str(pat))), Embed(ConstantF(Data.Str(esc))))) =>
+          case InvokeFUnapply(_, Sized(Embed(str), Embed(ConstantF(Data.Str(pat))), Embed(ConstantF(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
@@ -101,120 +108,132 @@ trait StringLib extends Library {
   def matchAnywhere(str: String, pattern: String, insen: Boolean) =
     java.util.regex.Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
 
-  val Search = Func(Mapping, 
+  val Search = TernaryFunc(
+    Mapping,
     "search",
     "Determines if a string value matches a regular expresssion. If the third argument is true, then it is a case-insensitive match.",
-    Type.Bool, Type.Str :: Type.Str :: Type.Bool :: Nil,
+    Type.Bool,
+    Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str)) :: Type.Const(Data.Str(pattern)) :: Type.Const(Data.Bool(insen)) :: Nil =>
+    partialTyperV[nat._3] {
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen))) =>
         success(Type.Const(Data.Bool(matchAnywhere(str, pattern, insen))))
-      case strT :: patternT :: insenT :: Nil =>
+      case Sized(strT, patternT, insenT) =>
         (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
          Type.typecheck(Type.Str, patternT).leftMap(nel => nel.map(ι[SemanticError])) |@|
          Type.typecheck(Type.Bool, insenT).leftMap(nel => nel.map(ι[SemanticError])))((_, _, _) => Type.Bool)
     },
     basicUntyper)
 
-  val Length = Func(Mapping, 
+  val Length = UnaryFunc(
+    Mapping,
     "length",
     "Counts the number of characters in a string.",
-    Type.Int, Type.Str :: Nil,
+    Type.Int,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Str(str)) :: Nil => Type.Const(Data.Int(str.length))
-      case Type.Str :: Nil                  => Type.Int
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => Type.Const(Data.Int(str.length))
+      case Sized(Type.Str)                  => Type.Int
     },
     basicUntyper)
 
-  val Lower = Func(Mapping, 
+  val Lower = UnaryFunc(
+    Mapping,
     "lower",
     "Converts the string to lower case.",
-    Type.Str, Type.Str :: Nil,
+    Type.Str,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Str(str)) :: Nil =>
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) =>
         Type.Const(Data.Str(str.toLowerCase))
-      case Type.Str :: Nil => Type.Str
+      case Sized(Type.Str) => Type.Str
     },
     basicUntyper)
 
-  val Upper = Func(Mapping, 
+  val Upper = UnaryFunc(
+    Mapping,
     "upper",
     "Converts the string to upper case.",
-    Type.Str, Type.Str :: Nil,
+    Type.Str,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Str(str)) :: Nil =>
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) =>
         Type.Const (Data.Str(str.toUpperCase))
-      case Type.Str :: Nil => Type.Str
+      case Sized(Type.Str) => Type.Str
     },
     basicUntyper)
 
-  val Substring: Func = Func(Mapping, 
+  val Substring: TernaryFunc = TernaryFunc(
+    Mapping,
     "substring",
     "Extracts a portion of the string",
-    Type.Str, Type.Str :: Type.Int :: Type.Int :: Nil,
+    Type.Str,
+    Func.Input3(Type.Str, Type.Int, Type.Int),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(f, List(
+          case InvokeFUnapply(f @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(
             Embed(ConstantF(Data.Str(str))),
             Embed(ConstantF(Data.Int(from))),
             for0))
               if 0 < from =>
-            InvokeF(f, List(
+            InvokeF(f, Func.Input3(
               ConstantF[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
               ConstantF[T[LogicalPlan]](Data.Int(0)).embed,
               for0)).some
           case _ => None
         }
     },
-    partialTyperV {
-      case List(
+    partialTyperV[nat._3] {
+      case Sized(
         Type.Const(Data.Str(str)),
         Type.Const(Data.Int(from)),
         Type.Const(Data.Int(for0))) => {
         success(Type.Const(Data.Str(str.substring(from.intValue, from.intValue + for0.intValue))))
       }
-      case List(Type.Const(Data.Str(str)), Type.Const(Data.Int(from)), _)
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Int(from)), _)
           if str.length <= from =>
         success(Type.Const(Data.Str("")))
-      case List(Type.Const(Data.Str(_)), Type.Const(Data.Int(_)), Type.Int) =>
+      case Sized(Type.Const(Data.Str(_)), Type.Const(Data.Int(_)), Type.Int) =>
         success(Type.Str)
-      case List(Type.Const(Data.Str(_)), Type.Int, Type.Const(Data.Int(_))) =>
+      case Sized(Type.Const(Data.Str(_)), Type.Int, Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case List(Type.Const(Data.Str(_)), Type.Int,                Type.Int) =>
+      case Sized(Type.Const(Data.Str(_)), Type.Int,                Type.Int) =>
         success(Type.Str)
-      case List(Type.Str, Type.Const(Data.Int(_)), Type.Const(Data.Int(_))) =>
+      case Sized(Type.Str, Type.Const(Data.Int(_)), Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case List(Type.Str, Type.Const(Data.Int(_)), Type.Int)                =>
+      case Sized(Type.Str, Type.Const(Data.Int(_)), Type.Int)                =>
         success(Type.Str)
-      case List(Type.Str, Type.Int,                Type.Const(Data.Int(_))) =>
+      case Sized(Type.Str, Type.Int,                Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case List(Type.Str, Type.Int,                Type.Int)                =>
+      case Sized(Type.Str, Type.Int,                Type.Int)                =>
         success(Type.Str)
-      case List(Type.Str, _,                       _)                       =>
+      case Sized(Type.Str, _,                       _)                       =>
         failureNel(GenericError("expected integer arguments for SUBSTRING"))
-      case List(t, _, _) => failureNel(TypeError(Type.Str, t, None))
+      case Sized(t, _, _) => failureNel(TypeError(Type.Str, t, None))
     },
     basicUntyper)
 
-  val Boolean = Func(Mapping, 
+  val Boolean = UnaryFunc(
+    Mapping,
     "boolean",
     "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Bool, Type.Str :: Nil,
+    Type.Bool,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str("true"))  :: Nil =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str("true")))  =>
         success(Type.Const(Data.Bool(true)))
-      case Type.Const(Data.Str("false")) :: Nil =>
+      case Sized(Type.Const(Data.Str("false"))) =>
         success(Type.Const(Data.Bool(false)))
-      case Type.Const(Data.Str(str))     :: Nil =>
+      case Sized(Type.Const(Data.Str(str)))     =>
         failureNel(InvalidStringCoercion(str, List("true", "false").right))
-      case Type.Str                      :: Nil => success(Type.Bool)
+      case Sized(Type.Str)                      => success(Type.Bool)
     },
-    untyper(x => ToString.tpe(List(x)).map(List(_))))
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
   val intRegex = "[+-]?\\d+"
   val floatRegex = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
@@ -222,54 +241,63 @@ trait StringLib extends Library {
   val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
   val timestampRegex = dateRegex + "T" + timeRegex
 
-  val Integer = Func(Mapping, 
+  val Integer = UnaryFunc(
+    Mapping,
     "integer",
     "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Int, Type.Str :: Nil,
+    Type.Int,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str))   :: Nil =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) =>
         str.parseInt.fold(
           κ(failureNel(InvalidStringCoercion(str, "a string containing an integer".left))),
           i => success(Type.Const(Data.Int(i))))
-      case Type.Str                    :: Nil => success(Type.Int)
-    },
-    untyper(x => ToString.tpe(List(x)).map(List(_))))
 
-  val Decimal = Func(Mapping, 
+      case Sized(Type.Str) => success(Type.Int)
+    },
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
+
+  val Decimal = UnaryFunc(
+    Mapping,
     "decimal",
     "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Dec, Type.Str :: Nil,
+    Type.Dec,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str(str))   :: Nil =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) =>
         str.parseDouble.fold(
           κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
           i => success(Type.Const(Data.Dec(i))))
-      case Type.Str                    :: Nil => success(Type.Int)
+      case Sized(Type.Str) => success(Type.Int)
     },
-    untyper(x => ToString.tpe(List(x)).map(List(_))))
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
-  val Null = Func(Mapping, 
+  val Null = UnaryFunc(
+    Mapping,
     "null",
     "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Null, Type.Str :: Nil,
+    Type.Null,
+    Func.Input1(Type.Str),
     noSimplification,
-    partialTyperV {
-      case Type.Const(Data.Str("null"))  :: Nil => success(Type.Const(Data.Null))
-      case Type.Const(Data.Str(str))     :: Nil =>
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str("null"))) => success(Type.Const(Data.Null))
+      case Sized(Type.Const(Data.Str(str))) =>
         failureNel(InvalidStringCoercion(str, List("null").right))
-      case Type.Str                      :: Nil => success(Type.Null)
+      case Sized(Type.Str) => success(Type.Null)
     },
-    untyper(x => ToString.tpe(List(x)).map(List(_))))
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
-  val ToString: Func = Func(Mapping, 
+  val ToString: UnaryFunc = UnaryFunc(
+    Mapping,
     "to_string",
     "Converts any primitive type to a string.",
-    Type.Str, Type.Syntaxed :: Nil,
+    Type.Str,
+    Func.Input1(Type.Syntaxed),
     noSimplification,
-    partialTyperV {
-      case List(Type.Const(data)) => (data match {
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(data)) => (data match {
         case Data.Str(str)     => success(str)
         case Data.Null         => success("null")
         case Data.Bool(b)      => success(b.shows)
@@ -287,21 +315,31 @@ trait StringLib extends Library {
               other.dataType,
               "can not convert aggregate types to String".some):SemanticError)
       }).map(s => Type.Const(Data.Str(s)))
-      case List(_) => success(Type.Str)
+      case Sized(_) => success(Type.Str)
     },
-    partialUntyperV {
+    partialUntyperV[nat._1] {
       case x @ Type.Const(_) =>
-        (Null.tpe(List(x)) <+>
-          Boolean.tpe(List(x)) <+>
-          Integer.tpe(List(x)) <+>
-          Decimal.tpe(List(x)) <+>
-          DateLib.Date.tpe(List(x)) <+>
-          DateLib.Time.tpe(List(x)) <+>
-          DateLib.Timestamp.tpe(List(x)) <+>
-          DateLib.Interval.tpe(List(x)))
-          .map(List(_))
+        (Null.tpe(Func.Input1(x)) <+>
+          Boolean.tpe(Func.Input1(x)) <+>
+          Integer.tpe(Func.Input1(x)) <+>
+          Decimal.tpe(Func.Input1(x)) <+>
+          DateLib.Date.tpe(Func.Input1(x)) <+>
+          DateLib.Time.tpe(Func.Input1(x)) <+>
+          DateLib.Timestamp.tpe(Func.Input1(x)) <+>
+          DateLib.Interval.tpe(Func.Input1(x)))
+          .map(Func.Input1(_))
     })
 
-  def functions = Concat :: Like :: Search :: Length :: Lower :: Upper :: Substring :: Boolean :: Integer :: Decimal :: Null :: ToString :: Nil
+  def unaryFunctions: List[GenericFunc[nat._1]] =
+    Length :: Lower :: Upper ::
+    Boolean :: Integer :: Decimal ::
+    Null :: ToString :: Nil
+
+  def binaryFunctions: List[GenericFunc[nat._2]] =
+    Concat :: Nil
+
+  def ternaryFunctions: List[GenericFunc[nat._3]] =
+    Like :: Search :: Substring :: Nil
 }
+
 object StringLib extends StringLib

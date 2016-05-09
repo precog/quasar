@@ -214,7 +214,7 @@ trait StringLib extends Library {
         failureNel(InvalidStringCoercion(str, List("true", "false").right))
       case Type.Str                      :: Nil => success(Type.Bool)
     },
-    untyper(x => ToString(List(x)).map(List(_))))
+    untyper(x => ToString.tpe(List(x)).map(List(_))))
 
   val intRegex = "[+-]?\\d+"
   val floatRegex = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
@@ -234,7 +234,7 @@ trait StringLib extends Library {
           i => success(Type.Const(Data.Int(i))))
       case Type.Str                    :: Nil => success(Type.Int)
     },
-    untyper(x => ToString(List(x)).map(List(_))))
+    untyper(x => ToString.tpe(List(x)).map(List(_))))
 
   val Decimal = Func(Mapping, 
     "decimal",
@@ -248,7 +248,7 @@ trait StringLib extends Library {
           i => success(Type.Const(Data.Dec(i))))
       case Type.Str                    :: Nil => success(Type.Int)
     },
-    untyper(x => ToString(List(x)).map(List(_))))
+    untyper(x => ToString.tpe(List(x)).map(List(_))))
 
   val Null = Func(Mapping, 
     "null",
@@ -261,7 +261,7 @@ trait StringLib extends Library {
         failureNel(InvalidStringCoercion(str, List("null").right))
       case Type.Str                      :: Nil => success(Type.Null)
     },
-    untyper(x => ToString(List(x)).map(List(_))))
+    untyper(x => ToString.tpe(List(x)).map(List(_))))
 
   val ToString: Func = Func(Mapping, 
     "to_string",
@@ -291,10 +291,14 @@ trait StringLib extends Library {
     },
     partialUntyperV {
       case x @ Type.Const(_) =>
-        (Null(List(x)) <+> Boolean(List(x)) <+>
-          Integer(List(x)) <+> Decimal(List(x)) <+>
-          DateLib.Date(List(x)) <+> DateLib.Time(List(x)) <+>
-          DateLib.Timestamp(List(x)) <+> DateLib.Interval(List(x)))
+        (Null.tpe(List(x)) <+>
+          Boolean.tpe(List(x)) <+>
+          Integer.tpe(List(x)) <+>
+          Decimal.tpe(List(x)) <+>
+          DateLib.Date.tpe(List(x)) <+>
+          DateLib.Time.tpe(List(x)) <+>
+          DateLib.Timestamp.tpe(List(x)) <+>
+          DateLib.Interval.tpe(List(x)))
           .map(List(_))
     })
 

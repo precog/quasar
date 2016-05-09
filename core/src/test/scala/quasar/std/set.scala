@@ -33,42 +33,42 @@ class SetSpec extends Specification with ScalaCheck with TypeArbitrary with Vali
 
   "SetLib" should {
     "type taking no results" in {
-      val expr = Take(Type.Int, Type.Const(Data.Int(0)))
+      val expr = Take.tpe(List(Type.Int, Type.Const(Data.Int(0))))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type filtering by false" in {
-      val expr = Filter(Type.Int, Type.Const(Data.Bool(false)))
+      val expr = Filter.tpe(List(Type.Int, Type.Const(Data.Bool(false))))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type inner join on false" in {
-      val expr = InnerJoin(Type.Int, Type.Int, Type.Const(Data.Bool(false)))
+      val expr = InnerJoin.tpe(List(Type.Int, Type.Int, Type.Const(Data.Bool(false))))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type inner join with empty left" in {
-      val expr = InnerJoin(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool)
+      val expr = InnerJoin.tpe(List(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type inner join with empty right" in {
-      val expr = InnerJoin(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool)
+      val expr = InnerJoin.tpe(List(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type left outer join with empty left" in {
-      val expr = LeftOuterJoin(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool)
+      val expr = LeftOuterJoin.tpe(List(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type right outer join with empty right" in {
-      val expr = RightOuterJoin(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool)
+      val expr = RightOuterJoin.tpe(List(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "maintain first type for constantly" ! prop { (t1 : Type, t2 : Type) =>
-      val expr = Constantly(t1, t2)
+      val expr = Constantly.tpe(List(t1, t2))
       (t1, t2) match {
         case (Const(r), Const(Data.Set(l))) =>
            expr must beSuccessful(Const(Data.Set(l.map(κ(r)))))

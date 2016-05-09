@@ -79,8 +79,8 @@ trait StructuralLib extends Library {
           if (map1.isEmpty)      map2
           else if (map2.isEmpty) map1
           else                   map1 ++ map2)))
-      case List(Const(o1 @ Data.Obj(_)), o2) => ObjectConcat(o1.dataType, o2)
-      case List(o1, Const(o2 @ Data.Obj(_))) => ObjectConcat(o1, o2.dataType)
+      case List(Const(o1 @ Data.Obj(_)), o2) => ObjectConcat.tpe(List(o1.dataType, o2))
+      case List(o1, Const(o2 @ Data.Obj(_))) => ObjectConcat.tpe(List(o1, o2.dataType))
       case List(Obj(map1, uk1), Obj(map2, None)) =>
         success(Obj(map1 ++ map2, uk1))
       case List(Obj(map1, uk1), Obj(map2, Some(uk2))) =>
@@ -105,8 +105,8 @@ trait StructuralLib extends Library {
       case List(Const(Data.Arr(els1)), a2) if els1.isEmpty => success(a2)
       case List(a1, Const(Data.Arr(els2))) if els2.isEmpty => success(a1)
       case List(Arr(els1), Arr(els2)) => success(Arr(els1 ++ els2))
-      case List(Const(a1 @ Data.Arr(_)), a2) => ArrayConcat(a1.dataType, a2)
-      case List(a1, Const(a2 @ Data.Arr(_))) => ArrayConcat(a1, a2.dataType)
+      case List(Const(a1 @ Data.Arr(_)), a2) => ArrayConcat.tpe(List(a1.dataType, a2))
+      case List(a1, Const(a2 @ Data.Arr(_))) => ArrayConcat.tpe(List(a1, a2.dataType))
       case List(a1, FlexArr(min2, max2, elem2)) =>
         (a1.arrayMinLength |@| a1.arrayType)((min1, typ1) =>
           success(FlexArr(
@@ -139,14 +139,14 @@ trait StructuralLib extends Library {
     AnyArray ⨿ Str, AnyArray ⨿ Str :: AnyArray ⨿ Str :: Nil,
     noSimplification,
     partialTyperV {
-      case t1 :: t2 :: Nil if t1.arrayLike && t2.contains(AnyArray ⨿ Str)    => ArrayConcat(t1, FlexArr(0, None, Top))
-      case t1 :: t2 :: Nil if t1.contains(AnyArray ⨿ Str) && t2.arrayLike    => ArrayConcat(FlexArr(0, None, Top), t2)
-      case t1 :: t2 :: Nil if t1.arrayLike && t2.arrayLike       => ArrayConcat(t1, t2)
+      case t1 :: t2 :: Nil if t1.arrayLike && t2.contains(AnyArray ⨿ Str) => ArrayConcat.tpe(List(t1, FlexArr(0, None, Top)))
+      case t1 :: t2 :: Nil if t1.contains(AnyArray ⨿ Str) && t2.arrayLike => ArrayConcat.tpe(List(FlexArr(0, None, Top), t2))
+      case t1 :: t2 :: Nil if t1.arrayLike && t2.arrayLike                => ArrayConcat.tpe(List(t1, t2))
 
-      case Const(Data.Str(str1)) :: Const(Data.Str(str2)) :: Nil     => success(Const(Data.Str(str1 ++ str2)))
+      case Const(Data.Str(str1)) :: Const(Data.Str(str2)) :: Nil              => success(Const(Data.Str(str1 ++ str2)))
       case t1 :: t2 :: Nil if Str.contains(t1) && t2.contains(AnyArray ⨿ Str) => success(Type.Str)
       case t1 :: t2 :: Nil if t1.contains(AnyArray ⨿ Str) && Str.contains(t2) => success(Type.Str)
-      case t1 :: t2 :: Nil if Str.contains(t1) && Str.contains(t2) => StringLib.Concat(t1, t2)
+      case t1 :: t2 :: Nil if Str.contains(t1) && Str.contains(t2)            => StringLib.Concat.tpe(List(t1, t2))
 
       case t1 :: t2 :: Nil if t1 == t2 => success(t1)
 
@@ -155,8 +155,8 @@ trait StructuralLib extends Library {
     },
     partialUntyperV {
       case x if x.contains(AnyArray ⨿ Str) => success(AnyArray ⨿ Str :: AnyArray ⨿ Str :: Nil)
-      case x if x.arrayLike                 => ArrayConcat.untype(x)
-      case x if x.contains(Type.Str)        => StringLib.Concat.untype(x)
+      case x if x.arrayLike                => ArrayConcat.untpe(x)
+      case x if x.contains(Type.Str)       => StringLib.Concat.untpe(x)
     })
 
   val ObjectProject = Func(Mapping, 
@@ -193,7 +193,7 @@ trait StructuralLib extends Library {
       case List(v1, _) => Obj(Map(), v1.objectType)
     },
     partialUntyperV {
-      case Const(o @ Data.Obj(map)) => DeleteField.untype(o.dataType)
+      case Const(o @ Data.Obj(map)) => DeleteField.untpe(o.dataType)
       case Obj(map, _)              => success(List(Obj(map, Some(Top)), Str))
     })
 
@@ -252,8 +252,8 @@ trait StructuralLib extends Library {
     Top, AnyObject :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, List(Embed(UnshiftMap(List(Embed(set)))))) => set.some
-        case _                                                     => None
+        case InvokeF(_, List(Embed(InvokeF(UnshiftMap, (List(Embed(set))))))) => set.some
+        case _                                                                => None
       }
     },
     partialTyperV {
@@ -270,8 +270,8 @@ trait StructuralLib extends Library {
     Top, AnyArray :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, List(Embed(UnshiftArray(List(Embed(set)))))) => set.some
-        case _                                                       => None
+        case InvokeF(_, List(Embed(InvokeF(UnshiftArray, List(Embed(set)))))) => set.some
+        case _                                                                => None
       }
     },
     partialTyperV {
@@ -305,8 +305,8 @@ trait StructuralLib extends Library {
     AnyObject, Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, List(Embed(ShiftMap(List(Embed(map)))))) => map.some
-        case _                                                   => None
+        case InvokeF(_, List(Embed(InvokeF(ShiftMap, List(Embed(map)))))) => map.some
+        case _                                                            => None
       }
     },
     partialTyper { case List(tpe) => Obj(Map(), Some(tpe)) },
@@ -322,12 +322,12 @@ trait StructuralLib extends Library {
     AnyArray, Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, List(Embed(ShiftArray(List(Embed(array)))))) => array.some
-        case InvokeF(_, List(Embed(ShiftArrayIndices(List(Embed(ConstantF(Data.Arr(array)))))))) =>
+        case InvokeF(_, List(Embed(InvokeF(ShiftArray, List(Embed(array)))))) => array.some
+        case InvokeF(_, List(Embed(InvokeF(ShiftArrayIndices, List(Embed(ConstantF(Data.Arr(array)))))))) =>
           ConstantF(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
-        case InvokeF(_, List(Embed(ShiftMap(List(Embed(ConstantF(Data.Obj(map)))))))) =>
+        case InvokeF(_, List(Embed(InvokeF( ShiftMap, List(Embed(ConstantF(Data.Obj(map)))))))) =>
           ConstantF(Data.Arr(map.values.toList)).some
-        case InvokeF(_, List(Embed(ShiftMapKeys(List(Embed(ConstantF(Data.Obj(map)))))))) =>
+        case InvokeF(_, List(Embed(InvokeF( ShiftMapKeys, List(Embed(ConstantF(Data.Obj(map)))))))) =>
           ConstantF(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
         case _ => None
       }
@@ -368,9 +368,9 @@ trait StructuralLib extends Library {
     def unapply[T[_[_]]: Recursive](t: LogicalPlan[T[LogicalPlan]]):
         Option[List[(T[LogicalPlan], T[LogicalPlan])]] =
       t match {
-        case MakeObject(List(name, expr)) => Some(List((name, expr)))
-        case ObjectConcat(List(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
-        case _                            => None
+        case InvokeF(MakeObject, List(name, expr)) => Some(List((name, expr)))
+        case InvokeF(ObjectConcat, List(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
+        case _                                     => None
       }
   }
 
@@ -384,9 +384,9 @@ trait StructuralLib extends Library {
 
     def unapply[T[_[_]]: Recursive](t: T[LogicalPlan]): Option[List[T[LogicalPlan]]] =
       t.project match {
-        case MakeArray(x :: Nil)        => Some(x :: Nil)
-        case ArrayConcat(a :: b :: Nil) => (unapply(a) ⊛ unapply(b))(_ ::: _)
-        case _                          => None
+        case InvokeF(MakeArray, x :: Nil)        => Some(x :: Nil)
+        case InvokeF(ArrayConcat, a :: b :: Nil) => (unapply(a) ⊛ unapply(b))(_ ::: _)
+        case _                                   => None
       }
 
     object Attr {

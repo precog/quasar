@@ -283,7 +283,7 @@ object LogicalPlan {
         success(ConstantF[Typed[LogicalPlan]](d))
 
       case InvokeF(func, args) => for {
-        types <- func.untype(typ)
+        types <- func.untpe(typ)
         args0 <- types.align(args).traverseU(_.onlyBoth match {
           case Some((t, arg)) => inferTypes(t, arg).disjunction
           case None =>
@@ -366,32 +366,32 @@ object LogicalPlan {
         case ReadF(c)         => unifyOrCheck(inf, Type.Top, Read(c))
         case ConstantF(d)     => unifyOrCheck(inf, Type.Const(d), Constant(d))
         case InvokeF(MakeObject, List(name, value)) =>
-          lift(MakeObject.apply(List(name.inferred, value.inferred)).disjunction).flatMap(
+          lift(MakeObject.tpe(List(name.inferred, value.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeObject(name.plan, x))))
         case InvokeF(MakeArray, List(value)) =>
-          lift(MakeArray.apply(List(value.inferred)).disjunction).flatMap(
+          lift(MakeArray.tpe(List(value.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeArray(x))))
         // TODO: Move this case to the Mongo planner once type information is
         //       available there.
         case InvokeF(ConcatOp, args) =>
           val (types, constraints, terms) = args.foldMap(a =>
             (List(a.inferred), a.constraints, List(a.plan)))
-          lift(ConcatOp.apply(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
+          lift(ConcatOp.tpe(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
             case t if Type.Str.contains(t) => unifyOrCheck(inf, poss, Invoke(string.Concat, terms))
             case t if t.arrayLike => unifyOrCheck(inf, poss, Invoke(ArrayConcat, terms))
             case _                => lift(-\/(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types"))))
           }).map(cp =>
             cp.copy(constraints = cp.constraints ++ constraints))
         case InvokeF(relations.Or, args) =>
-          lift(relations.Or.apply(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
+          lift(relations.Or.tpe(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, args.map(appConst(_, Constant(Data.NA))))))
         case InvokeF(structural.FlattenArray, args) =>
           for {
-            types <- lift(structural.FlattenArray.apply(args.map(_.inferred)).disjunction)
+            types <- lift(structural.FlattenArray.tpe(args.map(_.inferred)).disjunction)
             consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))).sequenceU)
             plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenArray, consts))
           } yield plan
         case InvokeF(structural.FlattenMap, args) => for {
-          types <- lift(structural.FlattenMap.apply(args.map(_.inferred)).disjunction)
+          types <- lift(structural.FlattenMap.tpe(args.map(_.inferred)).disjunction)
           consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))).sequenceU)
           plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenMap, consts))
         } yield plan
@@ -399,10 +399,10 @@ object LogicalPlan {
           case Mapping =>
             val (types, constraints, terms) = args.foldMap(a =>
               (List(a.inferred), a.constraints, List(a.plan)))
-            lift(f.apply(types).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, terms))).map(cp =>
+            lift(f.tpe(types).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, terms))).map(cp =>
               cp.copy(constraints = cp.constraints ++ constraints))
           case _ =>
-            lift(f.apply(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
+            lift(f.tpe(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
         }
         case TypecheckF(expr, typ, cont, fallback) =>
           unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))

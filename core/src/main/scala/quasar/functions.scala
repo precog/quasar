@@ -54,29 +54,23 @@ final case class Func(
   codomain: Func.Codomain,
   domain: Func.Domain,
   simplify: Func.Simplifier,
-  apply: Func.Typer,
-  untype0: Func.Untyper) {
+  typer0: Func.Typer,
+  untyper0: Func.Untyper) {
 
   def apply[A](args: A*): LogicalPlan[A] =
     LogicalPlan.InvokeF(this, args.toList)
 
-  // TODO: Make this `unapplySeq`
-  def unapply[A](node: LogicalPlan[A]): Option[List[A]] = {
-    node match {
-      case LogicalPlan.InvokeF(f, a) if f == this => Some(a)
-      case _                                      => None
-    }
-  }
+  final def untpe(tpe: Func.Codomain): Func.VDomain =
+    untyper0(this, tpe)
 
-  def untype(tpe: Type) = untype0(this, tpe)
-
-  final def apply(arg1: Type, rest: Type*): Func.VCodomain =
-    apply(arg1 :: rest.toList)
+  final def tpe(args: Func.Domain): Func.VCodomain =
+    typer0(args.toList)
 
   final def arity: Int = domain.length
 
   override def toString: String = name
 }
+
 trait FuncInstances {
   implicit val FuncRenderTree: RenderTree[Func] = new RenderTree[Func] {
     def render(v: Func) = Terminal("Func" :: Nil, Some(v.name))

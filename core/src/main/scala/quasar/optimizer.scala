@@ -182,8 +182,8 @@ object Optimizer {
     def preserveFree(x: (Fix[LogicalPlan], Fix[LogicalPlan])) = preserveFree0(x)(ι)
 
     def flattenAnd: Fix[LogicalPlan] => List[Fix[LogicalPlan]] = {
-      case Fix(relations.And(ts)) => ts.flatMap(flattenAnd)
-      case t                      => List(t)
+      case Fix(InvokeF(relations.And, ts)) => ts.flatMap(flattenAnd)
+      case t                                     => List(t)
     }
 
     sealed trait Component[A] {
@@ -228,9 +228,9 @@ object Optimizer {
         case t if t.map(_._1) ≟ left.unFix  => LeftCond(ι)
         case t if t.map(_._1) ≟ right.unFix => RightCond(ι)
 
-        case relations.Eq((_, LeftCond(lc)) :: (_, RightCond(rc)) :: Nil) =>
+        case InvokeF(relations.Eq, (_, LeftCond(lc)) :: (_, RightCond(rc)) :: Nil) =>
           EquiCond((l, r) => Fix(relations.Eq(lc(l), rc(r))))
-        case relations.Eq((_, RightCond(rc)) :: (_, LeftCond(lc)) :: Nil) =>
+        case InvokeF(relations.Eq, (_, RightCond(rc)) :: (_, LeftCond(lc)) :: Nil) =>
           EquiCond((l, r) => Fix(relations.Eq(rc(r), lc(l))))
 
         case InvokeF(func, ts) =>
@@ -288,11 +288,11 @@ object Optimizer {
 
 
     node match {
-      case Filter((src, Fix(InnerJoin(joinL :: joinR :: joinCond :: Nil))) :: (cond, _) :: Nil) =>
+      case InvokeF(Filter, (src, Fix(InvokeF(InnerJoin, joinL :: joinR :: joinCond :: Nil))) :: (cond, _) :: Nil) =>
         val comps = flattenAnd(joinCond).map(toComp(joinL, joinR)) ++
                     flattenAnd(cond).map(toComp(JoinDir.Left.projectFrom(src), JoinDir.Right.projectFrom(src)))
         newJoin(joinL, joinR, comps)
-      case InnerJoin((srcL, _) :: (srcR, _) :: (_, joinCond) :: Nil) =>
+      case InvokeF(InnerJoin, (srcL, _) :: (srcR, _) :: (_, joinCond) :: Nil) =>
         newJoin(srcL, srcR, flattenAnd(joinCond).map(toComp(srcL, srcR)))
       case _ => State.state(Fix(node.map(preserveFree)))
     }

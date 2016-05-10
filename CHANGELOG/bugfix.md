@@ -1,0 +1,2 @@
+- modernize the SQL AST to use prisms and eliminate fixpoint wrappers
+- add a `∘` type operator for composing functors

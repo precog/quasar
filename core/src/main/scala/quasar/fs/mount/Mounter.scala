@@ -69,6 +69,11 @@ object Mounter {
 
     new (Mounting ~> FreeS) {
       def apply[A](ma: Mounting[A]) = ma match {
+        case LookupType(path) =>
+          mountConfigs.get(path).map {
+            case ViewConfig(_, _) => ViewType.left
+            case FileSystemConfig(tpe, _) => tpe.right
+          }.run
         case Lookup(path) =>
           mountConfigs.get(path).run
 

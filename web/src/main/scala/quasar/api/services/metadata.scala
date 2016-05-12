@@ -35,7 +35,6 @@ import scalaz.syntax.std.boolean._
 import scalaz.std.list._
 
 object metadata {
-  import MountConfig._
 
   final case class FsNode(name: String, typ: String, mount: Option[String])
 
@@ -65,14 +64,10 @@ object metadata {
   }
 
   def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
-    val mountType: MountConfig => String = {
-      case ViewConfig(_, _)         => "view"
-      case FileSystemConfig(typ, _) => typ.value
-    }
 
     def mkNode(parent: ADir, name: PathSegment): Q.M[FsNode] =
-      M.lookup(parent </> name.fold(dir1, file1))
-        .run.map(cfg => FsNode(name, cfg map mountType))
+      M.lookupType(parent </> name.fold(dir1, file1)).run
+        .map(mntType => FsNode(name, mntType.map(_.fold(κ("view"), _.value))))
         .liftM[FileSystemErrT]
 
     def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(

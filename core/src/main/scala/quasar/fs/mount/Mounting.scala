@@ -32,6 +32,12 @@ import scalaz._, Scalaz._
 sealed trait Mounting[A]
 
 object Mounting {
+
+  final case object ViewType
+
+  final case class LookupType(path: APath)
+    extends Mounting[Option[ViewType.type \/ FileSystemType]]
+
   final case class Lookup(path: APath)
     extends Mounting[Option[MountConfig]]
 
@@ -64,6 +70,9 @@ object Mounting {
     import MountConfig._
 
     type M[A] = EitherT[F, MountingError, A]
+
+    def lookupType(path: APath): OptionT[F, ViewType.type \/ FileSystemType] =
+      OptionT(lift(LookupType(path)))
 
     /** Returns the mount configuration for the given mount path or nothing
       * if the path does not refer to a mount.

@@ -89,7 +89,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to a map type from some value type" in {
-      FlattenMap.untpe(Str) must beSuccessful(Sized[IS](Obj(Map(), Str.some)))
+      FlattenMap.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Str.some)))
     }
   }
 
@@ -103,7 +103,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to a map type from some key type" in {
-      FlattenMapKeys.untpe(Str) must beSuccessful(Sized[IS](Obj(Map(), Top.some)))
+      FlattenMapKeys.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Top.some)))
     }
   }
 
@@ -117,7 +117,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to an array type from some value type" in {
-      FlattenArray.untpe(Str) must beSuccessful(Sized[IS](FlexArr(0, None, Str)))
+      FlattenArray.untpe(Str).map(_.unsized) must beSuccessful(List(FlexArr(0, None, Str)))
     }
   }
 
@@ -131,12 +131,12 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to an array type from int" in {
-      FlattenArrayIndices.untpe(Int) must
-        beSuccessful(Sized[IS](FlexArr(0, None, Top)))
+      FlattenArrayIndices.untpe(Int).map(_.unsized) must
+        beSuccessful(List(FlexArr(0, None, Top)))
     }
 
     "only untype from ints" ! prop { (nonInt: Type) =>
-      FlattenArrayIndices.untpe(nonInt) must beFailing
+      FlattenArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
     }.setArbitrary(arbStrType)
   }
 
@@ -150,7 +150,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to a map type from some value type" in {
-      ShiftMap.untpe(Str) must beSuccessful(Sized[IS](Obj(Map(), Str.some)))
+      ShiftMap.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Str.some)))
     }
   }
 
@@ -164,7 +164,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to a map type from some key type" in {
-      ShiftMapKeys.untpe(Str) must beSuccessful(Sized[IS](Obj(Map(), Top.some)))
+      ShiftMapKeys.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Top.some)))
     }
   }
 
@@ -178,7 +178,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to an array type from some value type" in {
-      ShiftArray.untpe(Str) must beSuccessful(Sized[IS](FlexArr(0, None, Str)))
+      ShiftArray.untpe(Str).map(_.unsized) must beSuccessful(List(FlexArr(0, None, Str)))
     }
   }
 
@@ -192,12 +192,12 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype to an array type from int" in {
-      ShiftArrayIndices.untpe(Int) must
-        beSuccessful(Sized[IS](FlexArr(0, None, Top)))
+      ShiftArrayIndices.untpe(Int).map(_.unsized) must
+        beSuccessful(List(FlexArr(0, None, Top)))
     }
 
     "only untype from ints" ! prop { (nonInt: Type) =>
-      ShiftArrayIndices.untpe(nonInt) must beFailing
+      ShiftArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
     }.setArbitrary(arbStrType)
   }
 
@@ -207,7 +207,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype from a map type to the type of its values" in {
-      UnshiftMap.untpe(Obj(Map(), Str.some)) must beSuccessful(Sized[IS](Str))
+      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(List(Str))
     }
   }
 
@@ -217,7 +217,7 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     }
 
     "untype from an array type to the type of its values" in {
-      UnshiftArray.untpe(FlexArr(0, None, Str)) must beSuccessful(Sized[IS](Str))
+      UnshiftArray.untpe(FlexArr(0, None, Str)).map(_.unsized) must beSuccessful(List(Str))
     }
   }
 

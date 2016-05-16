@@ -146,6 +146,11 @@ object LogicalPlan {
                       else "\"" + func.name + "\""
       funcName + "(" + values.mkString(", ") + ")"
     }
+    override def equals(that: scala.Any): Boolean = that match {
+      case that @ InvokeF(_, _) =>
+        (this.func == that.func) && (this.values.unsized == that.values.unsized)
+      case _ => false
+    }
   }
   // we create a custom `unapply` to bypass a scalac pattern matching bug
   // https://issues.scala-lang.org/browse/SI-5900

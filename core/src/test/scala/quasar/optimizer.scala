@@ -22,6 +22,7 @@ import quasar.std._
 import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import pathy.Path._
+import shapeless.{Data => _, _}
 
 class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers {
   import StdLib._
@@ -41,14 +42,14 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
     "not inline binding that's used twice" in {
       Let('tmp0, read("foo"),
         makeObj(
-          "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-          "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))
+          "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar"))),
+          "baz" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("baz")))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Let('tmp0, read("foo"),
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-              "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz"))))))
+              "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar"))),
+              "baz" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("baz"))))))
     }
 
     "completely inline stupid lets" in {
@@ -61,95 +62,98 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
       Let('tmp0, read("foo"),
         Let('tmp0, read("bar"),
           makeObj(
-            "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))))))
+            "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar"))))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           makeObj(
-            "bar" -> ObjectProject(read("bar"), Constant(Data.Str("bar")))))
+            "bar" -> ObjectProject.apply0(read("bar"), Constant(Data.Str("bar")))))
     }
 
     "inline a binding used once, then shadowed once" in {
       Let('tmp0, read("foo"),
-        ObjectProject(Free('tmp0),
+        ObjectProject.apply0(Free('tmp0),
           Let('tmp0, read("bar"),
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))))))
+              "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar")))))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
-          Invoke(ObjectProject, List(
+          Invoke(ObjectProject, Sized[IS](
             read("foo"),
             makeObj(
-              "bar" -> ObjectProject(read("bar"), Constant(Data.Str("bar")))))))
+              "bar" -> ObjectProject.apply0(read("bar"), Constant(Data.Str("bar")))))))
     }
 
     "inline a binding used once, then shadowed twice" in {
       Let('tmp0, read("foo"),
-        ObjectProject(Free('tmp0),
+        ObjectProject.apply0(Free('tmp0),
           Let('tmp0, read("bar"),
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-              "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))))
+              "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar"))),
+              "baz" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("baz")))))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
-          Invoke(ObjectProject, List(
+          Invoke(ObjectProject, Sized[IS](
             read("foo"),
             Let('tmp0, read("bar"),
               makeObj(
-                "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-                "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz"))))))))
+                "bar" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("bar"))),
+                "baz" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("baz"))))))))
     }
 
     "partially inline a more interesting case" in {
       Let('tmp0, read("person"),
         Let('tmp1,
           makeObj(
-            "name" -> ObjectProject(Free('tmp0), Constant(Data.Str("name")))),
+            "name" -> ObjectProject.apply0(Free('tmp0), Constant(Data.Str("name")))),
           Let('tmp2,
-            OrderBy[FLP](
+            OrderBy.apply0[FLP](
               Free('tmp1),
-              MakeArray[FLP](
-                ObjectProject(Free('tmp1), Constant(Data.Str("name"))))),
+              MakeArray.apply0[FLP](
+                ObjectProject.apply0(Free('tmp1), Constant(Data.Str("name")))),
+                Constant(Data.Str("foobar"))),
             Free('tmp2))))
         .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Let('tmp1,
             makeObj(
               "name" ->
-                ObjectProject(read("person"), Constant(Data.Str("name")))),
-            OrderBy[FLP](
+                ObjectProject.apply0(read("person"), Constant(Data.Str("name")))),
+            OrderBy.apply0[FLP](
               Free('tmp1),
-              MakeArray[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("name")))))))
+              MakeArray.apply0[FLP](
+                ObjectProject.apply0(Free('tmp1), Constant(Data.Str("name")))),
+                Constant(Data.Str("foobar")))))
     }
   }
 
   "preferProjections" should {
     "ignore a delete with unknown shape" in {
       Optimizer.preferProjections(
-        DeleteField(Read(file("zips")),
+        DeleteField.apply0(Read(file("zips")),
           Constant(Data.Str("pop")))) must
         beTree[Fix[LogicalPlan]](
-          DeleteField(Read(file("zips")),
+          DeleteField.apply0(Read(file("zips")),
             Constant(Data.Str("pop"))))
     }
 
     "convert a delete after a projection" in {
       Optimizer.preferProjections(
         Let('meh, Read(file("zips")),
-          DeleteField[FLP](
+          DeleteField.apply0[FLP](
             makeObj(
-              "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
-              "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
+              "city" -> ObjectProject.apply0(Free('meh), Constant(Data.Str("city"))),
+              "pop"  -> ObjectProject.apply0(Free('meh), Constant(Data.Str("pop")))),
             Constant(Data.Str("pop"))))) must
       beTree(
         Let('meh, Read(file("zips")),
           makeObj(
             "city" ->
-              ObjectProject(
+              ObjectProject.apply0(
                 makeObj(
                   "city" ->
-                    ObjectProject(Free('meh), Constant(Data.Str("city"))),
+                    ObjectProject.apply0(Free('meh), Constant(Data.Str("city"))),
                   "pop" ->
-                    ObjectProject(Free('meh), Constant(Data.Str("pop")))),
+                    ObjectProject.apply0(Free('meh), Constant(Data.Str("pop")))),
                 Constant(Data.Str("city"))))))
     }
 
@@ -158,24 +162,24 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
         Let('meh, Read(file("zips")),
           Let('meh2,
             makeObj(
-              "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
-              "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
+              "city" -> ObjectProject.apply0(Free('meh), Constant(Data.Str("city"))),
+              "pop"  -> ObjectProject.apply0(Free('meh), Constant(Data.Str("pop")))),
             makeObj(
               "orig" -> Free('meh2),
               "cleaned" ->
-                DeleteField(Free('meh2), Constant(Data.Str("pop"))))))) must
+                DeleteField.apply0(Free('meh2), Constant(Data.Str("pop"))))))) must
       beTree(
         Let('meh, Read(file("zips")),
           Let('meh2,
             makeObj(
-              "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
-              "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
+              "city" -> ObjectProject.apply0(Free('meh), Constant(Data.Str("city"))),
+              "pop"  -> ObjectProject.apply0(Free('meh), Constant(Data.Str("pop")))),
             makeObj(
               "orig" -> Free('meh2),
               "cleaned" ->
                 makeObj(
                   "city" ->
-                    ObjectProject(Free('meh2), Constant(Data.Str("city"))))))))
+                    ObjectProject.apply0(Free('meh2), Constant(Data.Str("city"))))))))
     }
   }
 }

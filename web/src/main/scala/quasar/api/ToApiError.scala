@@ -315,6 +315,13 @@ sealed abstract class ToApiErrorInstances {
           BadRequest withReason "No element at index.",
           err.message,
           "index" := i)
+      case WrongArgumentCount(fn, exp, act) =>
+        fromMsg(
+          BadRequest withReason "Wrong number of arguments to function.",
+          err.message,
+          "functionName" := fn,
+          "expectedArgs" := exp,
+          "actualArgs"   := act)
       case AmbiguousReference(expr, _) =>
         fromMsg(
           BadRequest withReason "Ambiguous table reference.",

@@ -70,6 +70,9 @@ object SemanticError {
   final case class MissingIndex(index: Int) extends SemanticError {
     def message = "No element exists at array index '" + index
   }
+  final case class WrongArgumentCount(func: String, expected: Int, actual: Int) extends SemanticError {
+    def message = "Wrong number of arguments for function '" + func + "': expected " + expected + " but found " + actual
+  }
   final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
     def message =
       "Expected " +
@@ -99,6 +102,12 @@ object SemanticError {
       case GenericError(msg) => Some(msg)
       case _ => None
     } (GenericError(_))
+
+  val wrongArgumentCount: Prism[SemanticError, (String, Int, Int)] =
+    Prism[SemanticError, (String, Int, Int)] {
+      case WrongArgumentCount(func, expected, actual) => Some((func, expected, actual))
+      case _ => None
+    } ((WrongArgumentCount(_,_,_)).tupled)
 }
 
 trait SemanticAnalysis {

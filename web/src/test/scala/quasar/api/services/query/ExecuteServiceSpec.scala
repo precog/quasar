@@ -173,8 +173,8 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
 
           val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
           val limitedLp =
-            Fix(Take(
-              Fix(Drop(
+            Fix(Take.apply0(
+              Fix(Drop.apply0(
                 lp,
                 LogicalPlan.Constant(Data.Int(offset.get)))),
               LogicalPlan.Constant(Data.Int(limit.get))))

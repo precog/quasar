@@ -188,19 +188,31 @@ trait Compiler[F[_]] {
       CompilerM[Fix[LogicalPlan]] = {
 
     def findUnaryFunction(name: String): CompilerM[GenericFunc[nat._1]] =
-      library.unaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
-        fail(FunctionNotFound(name)))(
-        emit(_))
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
+        fail(FunctionNotFound(name))) {
+          case func @ UnaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 1))
+        }
 
     def findBinaryFunction(name: String): CompilerM[GenericFunc[nat._2]] =
-      library.binaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
-        fail(FunctionNotFound(name)))(
-        emit(_))
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
+        fail(FunctionNotFound(name))) {
+          case func @ BinaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 2))
+        }
 
     def findTernaryFunction(name: String): CompilerM[GenericFunc[nat._3]] =
-      library.ternaryFunctions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
-        fail(FunctionNotFound(name)))(
-        emit(_))
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
+        fail(FunctionNotFound(name))) {
+          case func @ TernaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func => fail(WrongArgumentCount(name, func.arity, 3))
+        }
+
+    def findNaryFunction(name: String, length: Int): SemanticError =
+      library.functions.find(f => f.name.toLowerCase === name.toLowerCase).fold[SemanticError](
+        FunctionNotFound(name)) {
+          case func => WrongArgumentCount(name, func.arity, length)
+        }
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LogicalPlan])(f: Case[CoExpr] => CompilerM[(Fix[LogicalPlan], Fix[LogicalPlan])]) =
       cases.traverseU(f).map(_.foldRight(default) {
@@ -477,7 +489,8 @@ trait Compiler[F[_]] {
       case InvokeFunction(name, List(a1, a2, a3)) =>
         findTernaryFunction(name).flatMap(compileFunction[nat._3](_, Sized[IS](a1, a2, a3)))
 
-      case InvokeFunction(name, _) => fail(FunctionNotFound(name))
+      case InvokeFunction(name, args) =>
+        fail(findNaryFunction(name, args.length))
 
       case Match(expr, cases, default0) =>
         for {

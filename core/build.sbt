@@ -1,19 +1,10 @@
 import quasar.project._
 
-import scala.Some
 import scala.collection.Seq
 
 import scoverage._
 
-mainClass in Compile := Some("quasar.repl.Main")
-
 libraryDependencies ++= Dependencies.core
-
-fork in run := true
-
-connectInput in run := true
-
-outputStrategy := Some(StdoutOutput)
 
 ScoverageKeys.coverageExcludedPackages := "quasar.repl;.*RenderTree"
 

@@ -270,8 +270,14 @@ object Optimizer {
         case InvokeFUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
           EquiCond((l, r) => Fix(relations.Eq(Sized[IS](rc(r), lc(l)))))
 
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(t1)) =>
+          Sized[IS](t1).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
+
         case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(t1, t2)) =>
           Sized[IS](t1, t2).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
+
+        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
+          Sized[IS](t1, t2, t3).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
 
         case t => NeitherCond(Fix(t.map(_._1)))
       }

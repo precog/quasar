@@ -232,6 +232,7 @@ object Optimizer {
       }
     }
 
+    // TODO add scalaz propery test
     implicit val ComponentApplicative = new Applicative[Component] {
       def point[A](a: => A): Component[A] = NeitherCond(a)
 

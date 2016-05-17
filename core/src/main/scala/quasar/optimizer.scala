@@ -221,17 +221,6 @@ object Optimizer {
       def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = run0
     }
 
-    // TODO delete
-    implicit val ComponentFunctor = new Functor[Component] {
-      def map[A, B](fa: Component[A])(f: A => B) = fa match {
-        case EquiCond(run)    => EquiCond((l, r) => f(run(l, r)))
-        case LeftCond(run)    => LeftCond((l) => f(run(l)))
-        case RightCond(run)   => RightCond((r) => f(run(r)))
-        case OtherCond(run)   => OtherCond((l, r) => f(run(l, r)))
-        case NeitherCond(run) => NeitherCond(f(run))
-      }
-    }
-
     // TODO add scalaz propery test
     implicit val ComponentApplicative = new Applicative[Component] {
       def point[A](a: => A): Component[A] = NeitherCond(a)

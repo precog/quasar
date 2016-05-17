@@ -28,6 +28,7 @@ import quasar.sql.Sql
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
+import shapeless.{Data => _, _}
 
 object view {
   /** Translate reads on view paths to the equivalent queries. */
@@ -90,8 +91,8 @@ object view {
   }
 
   def limit(lp: Fix[LogicalPlan], off: Natural, lim: Option[Positive]): Fix[LogicalPlan] = {
-    val skipped = if (off.get != 0L) Fix(Drop(lp, LogicalPlan.Constant(Data.Int(off.get)))) else lp
-    val limited = lim.fold(skipped)(l => Fix(Take(skipped, LogicalPlan.Constant(Data.Int(l.get)))))
+    val skipped = if (off.get != 0L) Fix(Drop(Sized[IS](lp, LogicalPlan.Constant(Data.Int(off.get))))) else lp
+    val limited = lim.fold(skipped)(l => Fix(Take(Sized[IS](skipped, LogicalPlan.Constant(Data.Int(l.get))))))
     limited
   }
 

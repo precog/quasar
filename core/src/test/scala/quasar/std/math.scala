@@ -28,6 +28,7 @@ import org.specs2.ScalaCheck
 import org.threeten.bp.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
+import shapeless._
 
 class MathSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import MathLib._
@@ -40,192 +41,192 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
 
   "MathLib" should {
     "type simple add with ints" in {
-      val expr = Add(Type.Int, Type.Int)
+      val expr = Add.tpe(Sized[IS](Type.Int, Type.Int))
       expr should beSuccessful(Type.Int)
     }
 
     "type simple add with decs" in {
-      val expr = Add(Type.Dec, Type.Dec)
+      val expr = Add.tpe(Sized[IS](Type.Dec, Type.Dec))
       expr should beSuccessful(Type.Dec)
     }
 
     "type simple add with promotion" in {
-      val expr = Add(Type.Int, Type.Dec)
+      val expr = Add.tpe(Sized[IS](Type.Int, Type.Dec))
       expr should beSuccessful(Type.Dec)
     }
 
     "type simple add with zero" in {
-      val expr = Add(Type.Numeric, TZero())
+      val expr = Add.tpe(Sized[IS](Type.Numeric, TZero()))
       expr should beSuccessful(Type.Numeric)
     }
 
     "fold simple add with int constants" in {
-      val expr = Add(TOne(), Const(Int(2)))
+      val expr = Add.tpe(Sized[IS](TOne(), Const(Int(2))))
       expr should beSuccessful(Const(Int(3)))
     }
 
     "fold simple add with decimal constants" in {
-      val expr = Add(Const(Dec(1.0)), Const(Dec(2.0)))
+      val expr = Add.tpe(Sized[IS](Const(Dec(1.0)), Const(Dec(2.0))))
       expr should beSuccessful(Const(Dec(3)))
     }
 
     "fold simple add with promotion" in {
-      val expr = Add(TOne(), Const(Dec(2.0)))
+      val expr = Add.tpe(Sized[IS](TOne(), Const(Dec(2.0))))
       expr should beSuccessful(Const(Dec(3)))
     }
 
     "simplify add with zero" in {
-      Add.simplify(Add(LogicalPlan.Constant(Int(0)), Free('x))) should
+      Add.simplify(Add.apply0(LogicalPlan.Constant(Int(0)), Free('x))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
     "simplify add with Dec zero" in {
-      Add.simplify(Add(Free('x), LogicalPlan.Constant(Dec(0.0)))) should
+      Add.simplify(Add.apply0(Free('x), LogicalPlan.Constant(Dec(0.0)))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
     "eliminate multiply by dec zero (on the right)" ! prop { (c : Const) =>
-      val expr = Multiply(c, Const(Dec(0.0)))
+      val expr = Multiply.tpe(Sized[IS](c, Const(Dec(0.0))))
       expr should beSuccessful(TZero())
     }
 
     "eliminate multiply by zero (on the left)" ! prop { (c : Const) =>
-      val expr = Multiply(TZero(), c)
+      val expr = Multiply.tpe(Sized[IS](TZero(), c))
       expr should beSuccessful(TZero())
     }
 
     "fold simple division" in {
-      val expr = Divide(Const(Int(6)), Const(Int(3)))
+      val expr = Divide.tpe(Sized[IS](Const(Int(6)), Const(Int(3))))
       expr should beSuccessful(Const(Int(2)))
     }
 
     "fold truncating division" in {
-      val expr = Divide(Const(Int(5)), Const(Int(2)))
+      val expr = Divide.tpe(Sized[IS](Const(Int(5)), Const(Int(2))))
       expr should beSuccessful(Const(Int(2)))
     }
 
     "fold simple division (dec)" in {
-      val expr = Divide(Const(Int(6)), Const(Dec(3.0)))
+      val expr = Divide.tpe(Sized[IS](Const(Int(6)), Const(Dec(3.0))))
       expr should beSuccessful(Const(Dec(2.0)))
     }
 
     "fold division (dec)" in {
-      val expr = Divide(Const(Int(5)), Const(Dec(2)))
+      val expr = Divide.tpe(Sized[IS](Const(Int(5)), Const(Dec(2))))
       expr should beSuccessful(Const(Dec(2.5)))
     }
 
     "divide by zero" in {
-      val expr = Divide(TOne(), TZero())
+      val expr = Divide.tpe(Sized[IS](TOne(), TZero()))
       expr must beFailing
     }
 
     "divide by zero (dec)" in {
-      val expr = Divide(Const(Dec(1.0)), Const(Dec(0.0)))
+      val expr = Divide.tpe(Sized[IS](Const(Dec(1.0)), Const(Dec(0.0))))
       expr must beFailing
     }
 
     "fold simple modulo" in {
-      val expr = Modulo(Const(Int(6)), Const(Int(3)))
+      val expr = Modulo.tpe(Sized[IS](Const(Int(6)), Const(Int(3))))
       expr should beSuccessful(TZero())
     }
 
     "fold non-zero modulo" in {
-      val expr = Modulo(Const(Int(5)), Const(Int(2)))
+      val expr = Modulo.tpe(Sized[IS](Const(Int(5)), Const(Int(2))))
       expr should beSuccessful(TOne())
     }
 
     "fold simple modulo (dec)" in {
-      val expr = Modulo(Const(Int(6)), Const(Dec(3.0)))
+      val expr = Modulo.tpe(Sized[IS](Const(Int(6)), Const(Dec(3.0))))
       expr should beSuccessful(Const(Dec(0.0)))
     }
 
     "fold non-zero modulo (dec)" in {
-      val expr = Modulo(Const(Int(5)), Const(Dec(2.2)))
+      val expr = Modulo.tpe(Sized[IS](Const(Int(5)), Const(Dec(2.2))))
       expr should beSuccessful(Const(Dec(0.6)))
     }
 
     "modulo by zero" in {
-      val expr = Modulo(TOne(), TZero())
+      val expr = Modulo.tpe(Sized[IS](TOne(), TZero()))
       expr must beFailing
     }
 
     "modulo by zero (dec)" in {
-      val expr = Modulo(Const(Dec(1.0)), Const(Dec(0.0)))
+      val expr = Modulo.tpe(Sized[IS](Const(Dec(1.0)), Const(Dec(0.0))))
       expr must beFailing
     }
 
     "typecheck number raised to 0th power" ! prop { (t: Type) =>
-      Power(t, TZero()) should beSuccessful(TOne())
+      Power.tpe(Sized[IS](t, TZero())) should beSuccessful(TOne())
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck 0 raised to any (non-zero) power" ! prop { (t: Type) =>
       (t != TZero()) ==>
-        (Power(TZero(), t) should beSuccessful(TZero()))
+        (Power.tpe(Sized[IS](TZero(), t)) should beSuccessful(TZero()))
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck any number raised to 1st power" ! prop { (t: Type) =>
-      Power(t, TOne()) should beSuccessful(t)
+      Power.tpe(Sized[IS](t, TOne())) should beSuccessful(t)
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck constant raised to int constant" in {
-      Power(Const(Dec(7.2)), Const(Int(2))) should beSuccessful(Const(Dec(51.84)))
+      Power.tpe(Sized[IS](Const(Dec(7.2)), Const(Int(2)))) should beSuccessful(Const(Dec(51.84)))
     }
 
     "simplify expression raised to 1st power" in {
-      Power.simplify(Power(Free('x), Constant(Int(1)))) should
+      Power.simplify(Power.apply0(Free('x), Constant(Int(1)))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
     "fold a complex expression (10-4)/3 + (5*8)" in {
       val expr = for {
-        x1 <- Subtract(
+        x1 <- Subtract.tpe(Sized[IS](
                 Const(Int(10)),
-                Const(Int(4)));
-        x2 <- Divide(x1,
-                Const(Int(3)));
-        x3 <- Multiply(
+                Const(Int(4))));
+        x2 <- Divide.tpe(Sized[IS](x1,
+                Const(Int(3))));
+        x3 <- Multiply.tpe(Sized[IS](
                 Const(Int(5)),
-                Const(Int(8)))
-        x4 <- Add(x2, x3)
+                Const(Int(8))))
+        x4 <- Add.tpe(Sized[IS](x2, x3))
       } yield x4
       expr should beSuccessful(Const(Int(42)))
     }
 
     "fail with mismatched constants" in {
-      val expr = Add(TOne(), Const(Str("abc")))
+      val expr = Add.tpe(Sized[IS](TOne(), Const(Str("abc"))))
       expr should beFailing
     }
 
     "fail with object and int constant" in {
-      val expr = Add(Obj(Map("x" -> Type.Int), None), TOne())
+      val expr = Add.tpe(Sized[IS](Obj(Map("x" -> Type.Int), None), TOne()))
       expr should beFailing
     }
 
     "add timestamp and interval" in {
-      val expr = Add(
+      val expr = Add.tpe(Sized[IS](
         Type.Const(Timestamp(Instant.parse("2015-01-21T00:00:00Z"))),
-        Type.Const(Interval(Duration.ofHours(9))))
+        Type.Const(Interval(Duration.ofHours(9)))))
       expr should beSuccessful(Type.Const(Timestamp(Instant.parse("2015-01-21T09:00:00Z"))))
     }
 
-    def permute(f: List[Type] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
-      f(t1 :: t2 :: Nil) should beSuccessful(exp1)
-      f(t1 :: t2.value.dataType :: Nil) should beSuccessful(exp2)
-      f(t1.value.dataType :: t2 :: Nil) should beSuccessful(exp2)
-      f(t1.value.dataType :: t2.value.dataType :: Nil) should beSuccessful(exp2)
+    def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
+      f(Sized[IS](t1, t2)) should beSuccessful(exp1)
+      f(Sized[IS](t1, t2.value.dataType)) should beSuccessful(exp2)
+      f(Sized[IS](t1.value.dataType, t2)) should beSuccessful(exp2)
+      f(Sized[IS](t1.value.dataType, t2.value.dataType)) should beSuccessful(exp2)
 
-      f(t2 :: t1 :: Nil) should beSuccessful(exp1)
-      f(t2.value.dataType :: t1 :: Nil) should beSuccessful(exp2)
-      f(t2 :: t1.value.dataType :: Nil) should beSuccessful(exp2)
-      f(t2.value.dataType :: t1.value.dataType :: Nil) should beSuccessful(exp2)
+      f(Sized[IS](t2, t1)) should beSuccessful(exp1)
+      f(Sized[IS](t2.value.dataType, t1)) should beSuccessful(exp2)
+      f(Sized[IS](t2, t1.value.dataType)) should beSuccessful(exp2)
+      f(Sized[IS](t2.value.dataType, t1.value.dataType)) should beSuccessful(exp2)
     }
 
     "add with const and non-const Ints" in {
-      permute(Add(_), TOne(), Const(Int(2)))(Const(Int(3)), Type.Int)
+      permute(Add.tpe(_), TOne(), Const(Int(2)))(Const(Int(3)), Type.Int)
     }
 
     "add with const and non-const Int and Dec" in {
-      permute(Add(_), TOne(), Const(Dec(2.0)))(Const(Dec(3.0)), Type.Dec)
+      permute(Add.tpe(_), TOne(), Const(Dec(2.0)))(Const(Dec(3.0)), Type.Dec)
     }
 
     // TODO: tests for unapply() in general

@@ -212,11 +212,11 @@ sealed abstract class ToApiErrorInstances {
           InternalServerError withReason "Unsupported constant.",
           err.message
         ) :?+ ("data" :?= encodeData(data))
-      case UnsupportedFunction(fn, msg) =>
+      case UnsupportedFunction(fn, _) =>
         fromMsg(
           InternalServerError withReason "Unsupported function.",
           err.message,
-          "functionName" := fn.name)
+          "functionName" := fn)
       case PlanPathError(e) =>
         e.toApiError
       case UnsupportedJoinCondition(cond) =>
@@ -234,16 +234,9 @@ sealed abstract class ToApiErrorInstances {
         fromMsg(
           BadRequest withReason "Illegal function argument.",
           err.message,
-          "functionName" := fn.name,
+          "functionName" := fn,
           "expectedArg"  := exp,
           "actualArg"    := act)
-      case FuncArity(fn, ct) =>
-        fromMsg(
-          BadRequest withReason "Wrong number of arguments to function.",
-          err.message,
-          "functionName" := fn.name,
-          "expectedArgs" := fn.arity,
-          "actualArgs"   := ct)
       case ObjectIdFormatError(oid) =>
         fromMsg(
           BadRequest withReason "Invalid ObjectId.",
@@ -326,7 +319,7 @@ sealed abstract class ToApiErrorInstances {
         fromMsg(
           BadRequest withReason "Wrong number of arguments to function.",
           err.message,
-          "functionName" := fn.name,
+          "functionName" := fn,
           "expectedArgs" := exp,
           "actualArgs"   := act)
       case AmbiguousReference(expr, _) =>

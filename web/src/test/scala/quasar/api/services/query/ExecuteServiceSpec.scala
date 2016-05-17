@@ -173,8 +173,8 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
 
           val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
           val limitedLp =
-            Fix(Take(
-              Fix(Drop(
+            Fix(Take.apply0(
+              Fix(Drop.apply0(
                 lp,
                 LogicalPlan.Constant(Data.Int(offset.get)))),
               LogicalPlan.Constant(Data.Int(limit.get))))
@@ -258,7 +258,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         val q = "select sum(1, 2, 3, 4)"
 
         val err: SemanticError =
-          SemanticError.WrongArgumentCount(quasar.std.AggLib.Sum, 1, 4)
+          SemanticError.WrongArgumentCount("sum", 1, 4)
 
         val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))

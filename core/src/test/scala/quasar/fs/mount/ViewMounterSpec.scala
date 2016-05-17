@@ -120,7 +120,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(p)).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Squash(Read(rootDir </> file("zips"))))
+          Fix(Squash.apply0(Read(rootDir </> file("zips"))))
         )}
     }
 
@@ -131,7 +131,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(p)).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Squash(Read(rootDir </> dir("foo") </> file("zips"))))
+          Fix(Squash.apply0(Read(rootDir </> dir("foo") </> file("zips"))))
         )}
     }
 
@@ -141,8 +141,8 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val p = rootDir </> dir("view") </> file("simpleZips")
 
       val outer =
-        Fix(Take(
-          Fix(Drop(
+        Fix(Take.apply0(
+          Fix(Drop.apply0(
             Read(p),
             Constant(Data.Int(5)))),
           Constant(Data.Int(10))))
@@ -154,8 +154,8 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](outer).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Take(
-            Fix(Drop(
+          Fix(Take.apply0(
+            Fix(Drop.apply0(
               innerLP,
               Constant(Data.Int(5)))),
             Constant(Data.Int(10)))))
@@ -171,7 +171,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(rootDir </> dir("view") </> file("view2"))).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Squash(Fix(Squash(Read(rootDir </> file("zips")))))))
+          Fix(Squash.apply0(Fix(Squash.apply0(Read(rootDir </> file("zips")))))))
         }
     }
 
@@ -188,14 +188,14 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val vs = Map[APath, MountConfig](
         vp -> MountConfig.viewConfig(viewConfig("select * from `/zips`")))
 
-      val q = Fix(InnerJoin(
+      val q = Fix(InnerJoin.apply0(
         Read(vp),
         Read(vp),
         Constant(Data.Bool(true))))
 
-      val exp = Fix(InnerJoin(
-        Fix(Squash(Read(zp))),
-        Fix(Squash(Read(zp))),
+      val exp = Fix(InnerJoin.apply0(
+        Fix(Squash.apply0(Read(zp))),
+        Fix(Squash.apply0(Read(zp))),
         Constant(Data.Bool(true))))
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](q).run)
@@ -239,9 +239,9 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(v2p)).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-           Fix(Take(
-             Fix(Squash(Fix(Drop(
-               Fix(Squash(Read(v2p))),
+           Fix(Take.apply0(
+             Fix(Squash.apply0(Fix(Drop.apply0(
+               Fix(Squash.apply0(Read(v2p))),
                Constant(Data.Int(5)))))),
              Constant(Data.Int(10))))
         )}

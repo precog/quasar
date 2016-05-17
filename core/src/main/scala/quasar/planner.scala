@@ -86,13 +86,11 @@ object Planner {
   final case class NonRepresentableData(data: Data) extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data
   }
-  final case class UnsupportedFunction(func: Func, message: String) extends PlannerError
+  final case class UnsupportedFunction(name: String, hint: Option[String]) extends PlannerError {
+    def message = "The function '" + name + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
+  }
   final case class PlanPathError(error: PathError) extends PlannerError {
     def message = error.shows
-  }
-  object UnsupportedFunction extends ((Func, String) => PlannerError) {
-    def apply(func: Func): PlannerError =
-      new UnsupportedFunction(func, "The function '" + func.name + "' is recognized but not supported by this back-end")
   }
   final case class UnsupportedJoinCondition(cond: Fix[LogicalPlan]) extends PlannerError {
     def message = "Joining with " + cond + " is not currently supported"
@@ -100,11 +98,8 @@ object Planner {
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
     def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan
   }
-  final case class FuncApply(func: Func, expected: String, actual: String) extends PlannerError {
-    def message = "A parameter passed to function " + func.name + " is invalid: Expected " + expected + " but found: " + actual
-  }
-  final case class FuncArity(func: Func, actual: Int) extends PlannerError {
-    def message = "The wrong number of parameters were passed to " + func.name + "; expected " + func.arity + " but found " + actual
+  final case class FuncApply(name: String, expected: String, actual: String) extends PlannerError {
+    def message = "A parameter passed to function " + name + " is invalid: Expected " + expected + " but found: " + actual
   }
   final case class ObjectIdFormatError(str: String) extends PlannerError {
     def message = "Invalid ObjectId string: " + str

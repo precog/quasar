@@ -45,6 +45,7 @@ package object namegen {
 
   def emit[F[_]: Monad, A](v: A): NameT[F, A] =
     lift(v.point[F])
+
   def emitName[F[_]: Monad, A](v: State[NameGen, A]): NameT[F, A] =
     StateT[F, NameGen, A](s => v.run(s).point[F])
 }

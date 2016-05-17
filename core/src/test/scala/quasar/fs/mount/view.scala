@@ -169,9 +169,9 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       } yield ()).run
 
       val expQ =
-        Fix(Take(
-          Fix(Drop(
-            Fix(Squash(Read(rootDir </> file("zips")))),
+        Fix(Take.apply0(
+          Fix(Drop.apply0(
+            Fix(Squash.apply0(Read(rootDir </> file("zips")))),
             Constant(Data.Int(5)))),
           Constant(Data.Int(10))))
       val exp = (for {
@@ -338,7 +338,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.execute(Read(rootDir </> dir("view") </> file("simpleZips")), rootDir </> file("tmp")).run.run
 
-      val exp = query.execute(Fix(Squash(Read(rootDir </> file("zips")))), rootDir </> file("tmp")).run.run
+      val exp = query.execute(Fix(Squash.apply0(Read(rootDir </> file("zips")))), rootDir </> file("tmp")).run.run
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
@@ -360,7 +360,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       } yield ()).run.run
 
       val exp = (for {
-        h <- query.unsafe.eval(Fix(Squash(Read(rootDir </> file("zips")))))
+        h <- query.unsafe.eval(Fix(Squash.apply0(Read(rootDir </> file("zips")))))
         _ <- query.transforms.fsErrToExec(
               query.unsafe.more(h))
         _ <- query.transforms.toExec(
@@ -380,7 +380,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.explain(Read(rootDir </> dir("view") </> file("simpleZips"))).run.run
 
-      val exp = query.explain(Fix(Squash(Read(rootDir </> file("zips"))))).run.run
+      val exp = query.explain(Fix(Squash.apply0(Read(rootDir </> file("zips"))))).run.run
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }

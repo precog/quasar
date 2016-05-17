@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.std
+package quasar
+package std
 
 import quasar.Predef._
 import quasar.fp._
@@ -22,81 +23,85 @@ import quasar.{Func, LogicalPlan, Type, SemanticError}
 
 import matryoshka._
 import scalaz._, Validation.{success, failure}
+import shapeless.{:: => _, _}
 
 trait Library {
-  protected val noSimplification: Func.Simplifier = new Func.Simplifier {
+  import Func._
+
+  protected val noSimplification: Simplifier = new Simplifier {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
       None
   }
 
-  protected def constTyper(codomain: Type): Func.Typer = { args =>
+  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] = { _ =>
     Validation.success(codomain)
   }
 
-  private def partialTyperOV(f: List[Type] => Option[ValidationNel[SemanticError, Type]]):
-      Func.Typer = {
-    args =>
-    f(args).getOrElse(Validation.failure(NonEmptyList(SemanticError.GenericError("Unknown arguments: " + args))))
+  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
+    f(args).getOrElse {
+      val msg: String = "Unknown arguments: " + args
+      Validation.failure(NonEmptyList(SemanticError.GenericError(msg)))
+    }
   }
 
-  protected def partialTyperV(f: PartialFunction[List[Type], ValidationNel[SemanticError, Type]]):
-      Func.Typer =
-    partialTyperOV(f.lift)
+  protected def partialTyperV[N <: Nat](f: PartialFunction[Domain[N], VCodomain]): Typer[N] =
+    partialTyperOV[N](f.lift)
 
-  protected def partialTyper(f: PartialFunction[List[Type], Type]): Func.Typer =
-    partialTyperOV(f.lift(_).map(success))
+  protected def partialTyper[N <: Nat](f: PartialFunction[Domain[N], Codomain]): Typer[N] =
+    partialTyperOV[N](g => f.lift(g).map(success))
 
-  protected def basicUntyper: Func.Untyper =
+  protected def basicUntyper[N <: Nat]: Untyper[N] =
     (func, _) => success(func.domain)
 
-  protected def untyper(f: Type => ValidationNel[SemanticError, List[Type]]):
-      Func.Untyper =
+  protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] =
     (func, rez) => Type.typecheck(rez, func.codomain).fold(
       κ(f(rez)),
       κ(success(func.domain)))
 
-  private def partialUntyperOV(f: Type => Option[ValidationNel[SemanticError, List[Type]]]):
-      Func.Untyper =
+  private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] =
     (func, rez) => Type.typecheck(rez, func.codomain).fold(
       e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))),
       κ(success(func.domain)))
 
-  protected def partialUntyperV(
-    f: PartialFunction[Type, ValidationNel[SemanticError, List[Type]]]):
-      Func.Untyper =
+  protected def partialUntyperV[N <: Nat](f: PartialFunction[Codomain, VDomain[N]]): Untyper[N] =
     partialUntyperOV(f.lift)
 
-  protected def partialUntyper(
-    f: PartialFunction[Type, List[Type]]):
-      Func.Untyper =
+  protected def partialUntyper[N <: Nat](f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
     partialUntyperOV(f.lift(_).map(success))
 
-  protected def reflexiveTyper: Func.Typer = {
-    case Type.Const(data) :: Nil => success(data.dataType)
-    case x :: Nil => success(x)
+  protected def reflexiveTyper[N <: Nat]: Typer[N] = {
+    case Sized(Type.Const(data)) => success(data.dataType)
+    case Sized(x) => success(x)
     case _ =>
       failure(NonEmptyList(SemanticError.GenericError("Wrong number of arguments for reflexive typer")))
   }
 
-  protected val numericWidening = {
+  protected def numericWidening = {
     def mapFirst[A, B](f: A => A, p: PartialFunction[A, B]) = new PartialFunction[A, B] {
       def isDefinedAt(a: A) = p.isDefinedAt(f(a))
       def apply(a: A) = p(f(a))
     }
 
-    val half: PartialFunction[List[Type], Type] = {
-      case t1 :: t2 :: Nil       if t1 contains t2       => t1
-      case Type.Dec :: t2 :: Nil if Type.Int contains t2 => Type.Dec
-      case Type.Int :: t2 :: Nil if Type.Dec contains t2 => Type.Dec
+    val half: PartialFunction[Domain[nat._2], Codomain] = {
+      case Sized(t1, t2)       if t1 contains t2       => t1
+      case Sized(Type.Dec, t2) if Type.Int contains t2 => Type.Dec
+      case Sized(Type.Int, t2) if Type.Dec contains t2 => Type.Dec
     }
-    partialTyper(half orElse mapFirst[List[Type], Type](_.reverse, half))
+
+    partialTyper[nat._2](half orElse mapFirst[Domain[nat._2], Codomain](_.reverse, half))
   }
 
-  protected implicit class TyperW(self: Func.Typer) {
-    def ||| (that: Func.Typer): Func.Typer = { args =>
+  protected implicit class TyperW[N <: Nat](self: Typer[N]) {
+    def ||| (that: Typer[N]): Typer[N] = { args =>
       self(args) ||| that(args)
     }
   }
 
-  def functions: List[Func]
+  // TODO exhaustiveness checking for each arity
+  def unaryFunctions: List[GenericFunc[nat._1]]
+  def binaryFunctions: List[GenericFunc[nat._2]]
+  def ternaryFunctions: List[GenericFunc[nat._3]]
+
+  def functions: List[GenericFunc[_]] =
+    unaryFunctions ++ binaryFunctions ++ ternaryFunctions
 }

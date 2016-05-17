@@ -139,8 +139,8 @@ class WorkflowBuilderSpec
       } yield state2).evalZero
 
       op must beLeftDisjunction(UnsupportedFunction(
-        quasar.std.StdLib.structural.ArrayProject,
-        "array does not contain index ‘2’."))
+        quasar.std.StdLib.structural.ArrayProject.name,
+        Some("array does not contain index ‘2’.")))
     }
 
     "project field from value" in {

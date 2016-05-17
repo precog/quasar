@@ -20,6 +20,7 @@ import quasar.Predef._
 
 import matryoshka._
 import scalaz._
+import shapeless._
 
 sealed trait DimensionalEffect
 /** Describes a function that reduces a set of values to a single value. */
@@ -47,39 +48,69 @@ object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
 }
 
-final case class Func(
-  effect: DimensionalEffect,
-  name: String,
-  help: String,
-  codomain: Type,
-  domain: List[Type],
-  simplify: Func.Simplifier,
-  apply: Func.Typer,
-  untype0: Func.Untyper) {
+final case class UnaryFunc(
+    val effect: DimensionalEffect,
+    val name: String,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._1],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._1],
+    val untyper0: Func.Untyper[nat._1]) extends GenericFunc[nat._1] {
+  def apply0[A](a1: A): LogicalPlan[A] = apply(Sized[IS](a1))
+}
 
-  def apply[A](args: A*): LogicalPlan[A] =
-    LogicalPlan.InvokeF(this, args.toList)
+final case class BinaryFunc(
+    val effect: DimensionalEffect,
+    val name: String,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._2],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._2],
+    val untyper0: Func.Untyper[nat._2]) extends GenericFunc[nat._2] {
+  def apply0[A](a1: A, a2: A): LogicalPlan[A] = apply(Sized[IS](a1, a2))
+}
 
-  // TODO: Make this `unapplySeq`
-  def unapply[A](node: LogicalPlan[A]): Option[List[A]] = {
-    node match {
-      case LogicalPlan.InvokeF(f, a) if f == this => Some(a)
-      case _                                      => None
-    }
-  }
+final case class TernaryFunc(
+    val effect: DimensionalEffect,
+    val name: String,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._3],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._3],
+    val untyper0: Func.Untyper[nat._3]) extends GenericFunc[nat._3] {
+  def apply0[A](a1: A, a2: A, a3: A): LogicalPlan[A] = apply(Sized[IS](a1, a2, a3))
+}
 
-  def untype(tpe: Type) = untype0(this, tpe)
+abstract class GenericFunc[N <: Nat] {
+  def effect: DimensionalEffect
+  def name: String
+  def help: String
+  def codomain: Func.Codomain
+  def domain: Func.Domain[N]
+  def simplify: Func.Simplifier
+  def typer0: Func.Typer[N]
+  def untyper0: Func.Untyper[N]
 
-  final def apply(arg1: Type, rest: Type*): ValidationNel[SemanticError, Type] =
-    apply(arg1 :: rest.toList)
+  def apply[A](args: Func.Input[A, N]): LogicalPlan[A] =
+    LogicalPlan.InvokeF[A, N](this, args)
+
+  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
+    untyper0(this, tpe)
+
+  final def tpe(args: Func.Domain[N]): Func.VCodomain =
+    typer0(args)
 
   final def arity: Int = domain.length
 
   override def toString: String = name
 }
+
 trait FuncInstances {
-  implicit val FuncRenderTree: RenderTree[Func] = new RenderTree[Func] {
-    def render(v: Func) = Terminal("Func" :: Nil, Some(v.name))
+  implicit val FuncRenderTree: RenderTree[GenericFunc[_]] = new RenderTree[GenericFunc[_]] {
+    def render(func: GenericFunc[_]) = Terminal("Func" :: Nil, Some(func.name))
   }
 }
 
@@ -94,6 +125,15 @@ object Func extends FuncInstances {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]):
         Option[LogicalPlan[T[LogicalPlan]]]
   }
-  type Typer      = List[Type] => ValidationNel[SemanticError, Type]
-  type Untyper    = (Func, Type) => ValidationNel[SemanticError, List[Type]]
+
+  type Input[A, N <: Nat] = Sized[IndexedSeq[A], N]
+
+  type Domain[N <: Nat] = Input[Type, N]
+  type Codomain = Type
+
+  type VDomain[N <: Nat] = ValidationNel[SemanticError, Domain[N]]
+  type VCodomain = ValidationNel[SemanticError, Codomain]
+
+  type Typer[N <: Nat] = Domain[N] => VCodomain
+  type Untyper[N <: Nat] = (GenericFunc[N], Codomain) => VDomain[N]
 }

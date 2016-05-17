@@ -187,38 +187,65 @@ object Optimizer {
       case t                               => List(t)
     }
 
+    //sealed trait Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]): A
+    //}
+    //// A condition that refers to left and right sources using equality, so may
+    //// be rewritten into the join condition:
+    //final case class EquiCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
+    //    case Sized(l, r) => run0(l,r)
+    //  }
+    //}
+    //// A condition which refers only to the left source:
+    //final case class LeftCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
+    //    case Sized(l, _) => run0(l)
+    //  }
+    //}
+    //// A condition which refers only to the right source:
+    //final case class RightCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
+    //    case Sized(_, r) => run0(r)
+    //  }
+    //}
+    //// A condition which refers to both sources but doesn't have the right shape
+    //// to become the join condition:
+    //final case class OtherCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
+    //    case Sized(l, r) => run0(l,r)
+    //  }
+    //}
+    //// An expression that doesn't refer to any source.
+    //final case class NeitherCond[A](run0: A) extends Component[A] {
+    //  def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = run0
+    //}
+    //
+    
     sealed trait Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]): A
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]): A
     }
     // A condition that refers to left and right sources using equality, so may
     // be rewritten into the join condition:
     final case class EquiCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
-        case Sized(l, r) => run0(l,r)
-      }
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l,r)
     }
     // A condition which refers only to the left source:
     final case class LeftCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
-        case Sized(l, _) => run0(l)
-      }
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l)
     }
     // A condition which refers only to the right source:
     final case class RightCond[A](run0: Fix[LogicalPlan] => A) extends Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
-        case Sized(_, r) => run0(r)
-      }
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(r)
     }
     // A condition which refers to both sources but doesn't have the right shape
     // to become the join condition:
     final case class OtherCond[A](run0: (Fix[LogicalPlan], Fix[LogicalPlan]) => A) extends Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = in match {
-        case Sized(l, r) => run0(l,r)
-      }
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0(l,r)
     }
     // An expression that doesn't refer to any source.
     final case class NeitherCond[A](run0: A) extends Component[A] {
-      def run(in: Func.Input[Fix[LogicalPlan], nat._2]) = run0
+      def run(l: Fix[LogicalPlan], r: Fix[LogicalPlan]) = run0
     }
 
     // TODO add scalaz propery test
@@ -245,7 +272,7 @@ object Optimizer {
                // LP => A       // LP => A => B
           case (RightCond(a),   RightCond(g))   => RightCond(lp => g(lp)(a(lp)))
 
-          case (ca, cg)                         => OtherCond((l, r) => cg.run(Sized[IS](l, r))(ca.run(Sized[IS](l, r))))
+          case (ca, cg)                         => OtherCond((l, r) => cg.run(l, r)(ca.run(l, r)))
       }
     }
 
@@ -299,7 +326,7 @@ object Optimizer {
                 Let(rFName, Fix(Filter(Sized[IS](Free(rName), assembleCond(rights.map(_.run0(Free(rName))))))),
                   Let(jName,
                     Fix(InnerJoin(Sized[IS](Free(lFName), Free(rFName),
-                      assembleCond(equis.map(_.run(Sized[IS](Free(lFName), Free(rFName)))))))),
+                      assembleCond(equis.map(_.run(Free(lFName), Free(rFName))))))),
                     Fix(Filter(Sized[IS](Free(jName), assembleCond(
                       others.map(_.run0(JoinDir.Left.projectFrom(Free(jName)), JoinDir.Right.projectFrom(Free(jName)))) ++
                       neithers.map(_.run0)))))))))))

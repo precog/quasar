@@ -22,6 +22,7 @@ import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
+import scalaz.syntax.std.option._
 
 /** Provides the ability to indicate a computation has failed.
   *
@@ -46,6 +47,9 @@ object Failure {
       attempt(fa).flatMap(_.fold(
         e => f(Some(e)) *> fail(e),
         a => f(None)    as a))
+
+    def onFail[A](fa: F[A], f: E => F[Unit]): F[A] =
+      onFinish(fa, _.cata(f,().pure[F]))
 
     def recover[A](fa: F[A], f: E => F[A]): F[A] =
       attempt(fa).flatMap(_.fold(f, _.point[F]))

@@ -1,0 +1,1 @@
+Add `onFail` to `quasar.effect.Failure`

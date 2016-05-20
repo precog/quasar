@@ -3,7 +3,7 @@ import quasar.project._
 import quasar.project.build._
 
 import java.lang.Integer
-import scala.{Predef, Some, sys, Unit}, Predef.{assert, augmentString}
+import scala.{List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
@@ -26,6 +26,7 @@ lazy val checkHeaders =
   taskKey[Unit]("Fail the build if createHeaders is not up-to-date")
 
 lazy val commonSettings = Seq(
+  organization := "org.quasar-analytics",
   headers := Map(
     ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
     ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
@@ -80,6 +81,46 @@ lazy val commonSettings = Seq(
       sys.error("headers not all present")
   })
 
+lazy val publishSettings = Seq(
+  organizationName := "SlamData Inc.",
+  organizationHomepage := Some(url("http://quasar-analytics.org")),
+  homepage := Some(url("https://github.com/quasar-analytics/quasar")),
+  licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value)
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+  },
+  publishMavenStyle := true,
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ => false },
+  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
+  releaseCrossBuild := true,
+  autoAPIMappings := true,
+  scmInfo := Some(
+    ScmInfo(
+      url("https://github.com/quasar-analytics/quasar"),
+      "scm:git@github.com:quasar-analytics/quasar.git"
+    )
+  ),
+  developers := List(
+    Developer(
+      id = "slamdata",
+      name = "SlamData Inc.",
+      email = "contact@slamdata.com",
+      url = new URL("http://slamdata.com")
+    )
+  )
+)
+
+lazy val noPublishSettings = Seq(
+  publishTo := None,
+  publishLocal := {},
+  publishArtifact := false
+)
+
 // Using a Seq of desired warts instead of Warts.allBut due to an incremental compilation issue.
 // https://github.com/puffnfresh/wartremover/issues/202
 // omissions:
@@ -114,14 +155,13 @@ lazy val oneJarSettings =
   com.github.retronym.SbtOneJar.oneJarSettings ++
     commonSettings ++
     githubSettings ++
-    releaseSettings ++
     Seq(
       GithubKeys.assets := { Seq(oneJar.value) },
       GithubKeys.repoSlug := "quasar-analytics/quasar",
 
-      ReleaseKeys.versionFile := file("version.sbt"),
-      ReleaseKeys.useGlobalVersion := true,
-      ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+      releaseVersionFile := file("version.sbt"),
+      releaseUseGlobalVersion := true,
+      releaseProcess := Seq[ReleaseStep](
         checkSnapshotDependencies,
         inquireVersions,
         runTest,
@@ -145,13 +185,17 @@ lazy val oneJarSettings =
 
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
+  .settings(noPublishSettings)
   .aggregate(core, main, mongodb, repl, web, it)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
+  .settings(name := "quasar-core-internal")
   .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
   .settings(
     libraryDependencies ++= Dependencies.core,
+    publishArtifact in (Test, packageBin) := true,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled),
@@ -159,6 +203,7 @@ lazy val core = project
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val main = project
+  .settings(name := "quasar-main-internal")
   .dependsOn(mongodb % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
@@ -166,6 +211,7 @@ lazy val main = project
 // filesystems (backends)
 
 lazy val mongodb = project
+  .settings(name := "quasar-mongodb-internal")
   .dependsOn(core % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
@@ -177,8 +223,10 @@ lazy val mongodb = project
 // interfaces
 
 lazy val repl = project
+  .settings(name := "quasar-repl")
   .dependsOn(main % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .settings(noPublishSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -186,10 +234,13 @@ lazy val repl = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val web = project
+  .settings(name := "quasar-web")
   .dependsOn(main % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
+    publishArtifact in (Test, packageBin) := true,
     libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -204,4 +255,5 @@ lazy val it = project
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(noPublishSettings)
   .enablePlugins(AutomateHeaderPlugin)

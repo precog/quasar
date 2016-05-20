@@ -88,7 +88,7 @@ To build a JAR containing a lightweight HTTP server that allows you to programma
 ./sbt 'project web' oneJar
 ```
 
-The path of the JAR will be `./web/target/scala-2.11/web_2.11-[version]-SNAPSHOT-one-jar.jar`, where `[version]` is the Quasar version number.
+The path of the JAR will be `./web/target/scala-2.11/quasar-web_2.11-[version]-SNAPSHOT-one-jar.jar`, where `[version]` is the Quasar version number.
 
 To run the JAR, execute the following command:
 

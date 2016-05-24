@@ -1,0 +1,1 @@
+- restore coverage and full testing to the build

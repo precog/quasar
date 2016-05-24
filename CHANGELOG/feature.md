@@ -1,0 +1,2 @@
+- added “if undefined’ (`??`) and “range” (`..`) operators to SQL²
+- restored short-circuiting of constant plans

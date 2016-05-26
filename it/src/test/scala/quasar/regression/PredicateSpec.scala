@@ -282,10 +282,9 @@ class PredicateSpec extends Specification with ScalaCheck {
     }
 
     "reject with any leading" ! prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
-      (a.nonEmpty && b != a.take(b.length) && b.nonEmpty) ==> {
-        val expected = b
-        val result = a ++ b ++ c
-
+      val expected = b
+      val result = a ++ b ++ c
+      (a.nonEmpty && b.nonEmpty && result.take(b.length) != b) ==> {
         run(pred, expected, result) must beLike { case Failure(msg, _, _, _) => msg must contain("does not match") }
       }
     }

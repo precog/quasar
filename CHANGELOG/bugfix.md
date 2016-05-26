@@ -1,0 +1,2 @@
+- remove a couple of unused, redundant utility functions
+- convert to ops on String parseBigInt/BigDecimal to be consistent with scalaz

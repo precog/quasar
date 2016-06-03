@@ -65,9 +65,9 @@ object filesystems {
 
   private val mongoEffToTask: MongoEff ~> Task =
     interpret4[CfgErrF, EnvErrF, MongoErrF, Task, Task](
-      Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[ConfigError]),
-      Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[EnvironmentError]),
-      Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
+      Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[Task,ConfigError]),
+      Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[Task,EnvironmentError]),
+      Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException]),
       NaturalTransformation.refl)
 
   private val mongoEffMToTask: MongoEffM ~> Task =

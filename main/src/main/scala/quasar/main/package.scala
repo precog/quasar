@@ -212,8 +212,8 @@ package object main {
     /** Interprets errors into strings. */
     def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
       val f = free.interpret3[FileSystemFailureF, MongoErrF, MntCfgsIO, Task](
-        Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[FileSystemError]),
-        Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
+        Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]),
+        Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException]),
         evalCfgsIO)
 
       val g = new (CfgsErrsIO ~> MainTask) {

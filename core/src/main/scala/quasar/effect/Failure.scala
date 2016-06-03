@@ -19,7 +19,6 @@ package quasar.effect
 import quasar.Predef._
 
 import scalaz.{Failure => _, _}
-import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
@@ -110,14 +109,15 @@ object Failure {
       }
     }
 
-  def toRuntimeError[E: Show]: Failure[E, ?] ~> Task =
-    toTaskFailure[RuntimeException]
-      .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
-
-  def toTaskFailure[E <: Throwable]: Failure[E, ?] ~> Task =
-    new (Failure[E, ?] ~> Task) {
-      def apply[A](fa: Failure[E, A]) = fa match {
-        case Fail(e) => Task.fail(e)
+  def toCatchable[F[_],E <: Throwable](implicit C: Catchable[F]): Failure[E,?] ~> F =
+    new (Failure[E,?] ~> F) {
+      def apply[A](fa: Failure[E,A]) = fa match {
+        case Fail(e) => C.fail(e)
       }
     }
+
+  def toRuntimeError[F[_]:Catchable,E: Show]: Failure[E, ?] ~> F =
+    toCatchable[F,RuntimeException]
+      .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
+
 }

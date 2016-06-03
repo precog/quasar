@@ -47,7 +47,7 @@ class RestApiSpecs extends Specification {
       NaturalTransformation.refl,
       Coyoneda.liftTF[MountConfigs, Task](
         KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync)),
-      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[FileSystemError]),
+      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]),
       fs)
     val service = RestApi.finalizeServices[Eff](
       liftMT[Task, ResponseT].compose[Eff](eff))(

@@ -30,8 +30,6 @@ import pathy.Path._
 class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
   import CoreConfigArbitrary._
 
-  def configOps: ConfigOps[CoreConfig] = CoreConfig
-
   def sampleConfig(uri: ConnectionUri): CoreConfig = {
     CoreConfig(MountingsConfig(Map(
       rootDir -> MountConfig.fileSystemConfig(MongoDBFsType, uri)

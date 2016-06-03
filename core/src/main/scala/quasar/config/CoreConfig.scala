@@ -23,11 +23,10 @@ import monocle.macros.Lenses
 
 @Lenses final case class CoreConfig(mountings: MountingsConfig)
 
-object CoreConfig extends ConfigOps[CoreConfig] {
-
-  val mountingsLens = CoreConfig.mountings
-
-  val default = CoreConfig(MountingsConfig.empty)
+object CoreConfig {
+  implicit val configOps = new ConfigOps[CoreConfig] {
+    val default = CoreConfig(MountingsConfig.empty)
+  }
 
   implicit val codec = casecodec1(CoreConfig.apply, CoreConfig.unapply)("mountings")
 }

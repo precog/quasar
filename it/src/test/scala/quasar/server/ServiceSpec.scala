@@ -37,12 +37,12 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class ServiceSpec extends mutable.Specification {
-  implicit val configOps: ConfigOps[WebConfig] = WebConfig
+  val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient
 
   def withServer[A]
-    (port: Int = 8888, webConfig: WebConfig = WebConfig.default)
+    (port: Int = 8888, webConfig: WebConfig = configOps.default)
     (f: Uri => Task[A])
     : String \/ A = {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
@@ -68,7 +68,7 @@ class ServiceSpec extends mutable.Specification {
     "POST view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-      val r = withServer(port, WebConfig.default) { baseUri: Uri =>
+      val r = withServer(port, configOps.default) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs",
@@ -89,7 +89,7 @@ class ServiceSpec extends mutable.Specification {
     "PUT view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-      val r = withServer(port, WebConfig.default) { baseUri: Uri =>
+      val r = withServer(port, configOps.default) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs" / "a",
@@ -115,7 +115,7 @@ class ServiceSpec extends mutable.Specification {
 
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(srcPath -> viewConfig)))(
-        WebConfig.default)
+        configOps.default)
 
       val r = withServer(port, webConfig) { baseUri: Uri =>
         client.fetch(
@@ -164,7 +164,7 @@ class ServiceSpec extends mutable.Specification {
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(
           srcPath -> viewConfig) ++ fileSystemConfigs))(
-        WebConfig.default)
+        configOps.default)
 
       val r = withServer(port, webConfig) { baseUri: Uri =>
         client.fetch(
@@ -194,7 +194,7 @@ class ServiceSpec extends mutable.Specification {
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(
           (srcPath </> file("view")) -> viewConfig) ++ fileSystemConfigs))(
-        WebConfig.default)
+        configOps.default)
 
       val r = withServer(port, webConfig) { baseUri: Uri =>
         client.fetch(

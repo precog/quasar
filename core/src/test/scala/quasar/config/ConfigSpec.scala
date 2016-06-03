@@ -26,12 +26,12 @@ import org.specs2.scalaz._
 import pathy._, Path._
 import scalaz._, concurrent.Task, Scalaz._
 
-abstract class ConfigSpec[Config: CodecJson] extends Specification with DisjunctionMatchers {
+abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends Specification with DisjunctionMatchers {
   import FsPath._, ConfigError._
 
   sequential
 
-  def configOps: ConfigOps[Config]
+  def configOps = ConfigOps[Config]
   def sampleConfig(uri: ConnectionUri): Config
 
   val host = "mongodb://foo:bar@mongo.example.com:12345"

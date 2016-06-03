@@ -25,8 +25,6 @@ import pathy.Path._
 
 class WebConfigSpec extends ConfigSpec[WebConfig] {
 
-  def configOps: ConfigOps[WebConfig] = WebConfig
-
   def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
     server = ServerConfig(92),
     mountings = MountingsConfig(Map(

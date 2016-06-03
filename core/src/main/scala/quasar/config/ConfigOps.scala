@@ -21,25 +21,23 @@ import quasar.config.FsPath._
 import quasar.Errors.ETask
 import quasar.fp._
 import quasar.fs._
-import quasar.fs.mount.MountingsConfig
 
 import java.nio.file.{Path => _, _}
 import java.nio.charset._
 import scala.util.Properties._
 
 import argonaut._
-import monocle.Lens
 import monocle.syntax.fields._
 import monocle.std.tuple2._
 import pathy._, Path._
 import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import simulacrum.typeclass
 
-trait ConfigOps[C] {
+@typeclass trait ConfigOps[C] {
   import ConfigOps._, ConfigError._
 
-  val default: C
-  def mountingsLens: Lens[C, MountingsConfig]
+  def default: C
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] = {
     def attemptReadFile(f: String): CfgTask[String] = {
@@ -109,24 +107,11 @@ trait ConfigOps[C] {
   def asString(config: C)(implicit E: EncodeJson[C]): String =
     E.encode(config).pretty(quasar.fp.multiline)
 
-  ////
-
-  private def merr = MonadError[ETask[ConfigError,?], ConfigError]
-  private val malformedRsn = malformedConfig composeLens _2
-
-  /** The default path to the configuration file for the current operating system. */
-  private def defaultPath: Task[FsFile] =
-    OS.currentOS >>= defaultPathForOS(dir("quasar") </> file("quasar-config.json"))
-
-  /**
-   * The default path in a previous version of the software, used to ease the
-   * transition to the new location.
-   */
-  private def legacyDefaultPath: Task[FsFile] =
-    OS.currentOS >>= defaultPathForOS(dir("SlamData") </> file("slamengine-config.json"))
 }
 
 object ConfigOps {
+  import ConfigError._
+
   /** NB: Paths read from environment/props are assumed to be absolute. */
   def defaultPathForOS(file: RFile)(os: OS): Task[FsFile] = {
     def localAppData: OptionT[Task, FsPath.Aux[Abs, Dir, Sandboxed]] =
@@ -150,4 +135,21 @@ object ConfigOps {
 
     baseDir map (_ </> dirPath </> file)
   }
+
+  ////
+
+  private def merr = MonadError[ETask[ConfigError,?], ConfigError]
+  private val malformedRsn = malformedConfig composeLens _2
+
+  /** The default path to the configuration file for the current operating system. */
+  private def defaultPath: Task[FsFile] =
+    OS.currentOS >>= defaultPathForOS(dir("quasar") </> file("quasar-config.json"))
+
+  /**
+   * The default path in a previous version of the software, used to ease the
+   * transition to the new location.
+   */
+  private def legacyDefaultPath: Task[FsFile] =
+    OS.currentOS >>= defaultPathForOS(dir("SlamData") </> file("slamengine-config.json"))
+
 }

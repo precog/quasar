@@ -18,10 +18,10 @@ package quasar
 
 import quasar.Predef._
 
-import quasar.config.{writeConfig, ConfigOps, FsFile}
+import quasar.config.ConfigOps
 import quasar.effect._
 import quasar.fp._
-import quasar.fp.free.{:+:}
+import quasar.fp.free.:+:
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
@@ -195,14 +195,8 @@ package object main {
       evalNT[Task, Map[APath, MountConfig]](Map()) compose interpret
     }
 
-    def write[C: EncodeJson]
-      (ref: TaskRef[C], loc: Option[FsFile])
-      (implicit configOps: ConfigOps[C])
-      : MountConfigs ~> Task =
-      writeConfig(configOps)(ref, loc)
-
-    /** Interprets `MountConfigsF`, persisting changes to a config file. */
-    def durableFile[C: EncodeJson](write: MountConfigs ~> Task): MntCfgsIO ~> Task =
+    /** Interprets `MountConfigsF`, persisting changes via the write interpreter. */
+    def durable[C: EncodeJson](write: MountConfigs ~> Task): MntCfgsIO ~> Task =
       free.interpret2[MountConfigsF, Task, Task](
         Coyoneda.liftTF[MountConfigs, Task](write),
         NaturalTransformation.refl)

@@ -18,7 +18,7 @@ package quasar.repl
 
 import quasar.Predef._
 
-import quasar.config.{CoreConfig, FsPath, FsFile}
+import quasar.config._
 import quasar.console._
 import quasar.effect._
 import quasar.fp._
@@ -113,7 +113,7 @@ object Main {
     }
 
   def main(args: Array[String]): Unit = {
-    implicit val cfgOps = CoreConfig
+    val cfgOps = ConfigOps[CoreConfig]
 
     val main0: MainTask[Unit] = for {
       opts         <- CliOptions.parser.parse(args, CliOptions.default)
@@ -123,7 +123,7 @@ object Main {
                           .toRight(s"Invalid path to config file: $cfg")
                           .map(some))
 
-      config       <- cfgPath.cata(CoreConfig.fromFile, CoreConfig.fromDefaultPaths).leftMap(_.shows)
+      config       <- cfgPath.cata(cfgOps.fromFile, cfgOps.fromDefaultPaths).leftMap(_.shows)
 
       // NB: for now, there's no way to add mounts through the REPL, so no point
       // in starting if you can't do anything and can't correct the situation.
@@ -131,12 +131,12 @@ object Main {
                       else ().point[MainTask]
 
       cfgRef       <- TaskRef(config).liftM[MainErrT]
-      mntCfgsT     =  MntCfgsIO.write(cfgRef, cfgPath)
+      mntCfgsT     =  writeConfig(CoreConfig.mountings, cfgRef, cfgPath)
       coreApi      <- CoreEff.interpreter[CoreConfig](mntCfgsT).liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
 
-      durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durableFile[CoreConfig](mntCfgsT)) compose coreApi
+      durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durable[CoreConfig](mntCfgsT)) compose coreApi
 
       r            <- EitherT.right(repl(mt compose (durableApi compose injectNT[MountingFileSystem, CoreEff])))
       _            <- EitherT.right(driver(r))

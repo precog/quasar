@@ -30,8 +30,9 @@ import scalaz.concurrent.{Task}
 
 /** Interpreter providing access to configuration, based on some concrete Config type. */
 object writeConfig {
-  def apply[Cfg](configOps: ConfigOps[Cfg])(ref: TaskRef[Cfg], loc: Option[FsFile])
-      (implicit E: EncodeJson[Cfg]): MountConfigs ~> Task = {
+  def apply[Cfg: ConfigOps: EncodeJson](
+    mountingsLens: Lens[Cfg, MountingsConfig], ref: TaskRef[Cfg], loc: Option[FsFile])
+    : MountConfigs ~> Task = {
 
     type MRef[A] = AtomicRef[Map[APath, MountConfig], A]
     type MRefF[A] = Coyoneda[MRef, A]
@@ -47,7 +48,7 @@ object writeConfig {
     val configRef: ConfigRefF ~> Task = {
       val refToTask: ConfigRef ~> Task = AtomicRef.fromTaskRef(ref)
 
-      val write: Cfg => Task[Unit] = configOps.toFile(_, loc)
+      val write: Cfg => Task[Unit] = ConfigOps[Cfg].toFile(_, loc)
       def writing: ConfigRef ~> ConfigRefPlusTaskM = AtomicRef.onSet[Cfg](write)
 
       val refToTaskF: ConfigRefPlusTask ~> Task =
@@ -59,11 +60,8 @@ object writeConfig {
 
     // AtomicRef[Map[APath, MountConfig], ?] ~> Free[AtomicRef[Cfg, ?], ?]:
     val mapToConfig: MRefF ~> ConfigRefM =  {
-      val mountingsLens: Lens[Cfg, Map[APath, MountConfig]] =
-        configOps.mountingsLens composeIso MountingsConfig.mapIso
-
       Coyoneda.liftTF[MRef, ConfigRefM]{
-        val aux = AtomicRef.zoom(mountingsLens)
+        val aux = AtomicRef.zoom(mountingsLens composeIso MountingsConfig.mapIso)
         aux.into[aux.RefAF]
       }
     }

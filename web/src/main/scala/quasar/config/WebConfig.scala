@@ -23,11 +23,11 @@ import monocle._, macros.Lenses
 
 @Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig)
 
-object WebConfig extends ConfigOps[WebConfig] {
+object WebConfig {
+  implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
+    val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig.empty)
+  }
 
   implicit val codecJson: CodecJson[WebConfig] =
     casecodec2(WebConfig.apply, WebConfig.unapply)("server", "mountings")
-  val mountingsLens = WebConfig.mountings
-
-  val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig.empty)
 }

@@ -61,20 +61,20 @@ object Server {
     * default paths. If an error occurs, it is logged to STDERR and the
     * default configuration is returned.
     */
-  def loadConfigFile[C: DecodeJson](configOps: ConfigOps[C], configFile: Option[FsFile]): Task[C] = {
+  def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(implicit cfgOps: ConfigOps[C]): Task[C] = {
     import ConfigError._
-    configFile.fold(configOps.fromDefaultPaths)(configOps.fromFile).run flatMap {
+    configFile.fold(cfgOps.fromDefaultPaths)(cfgOps.fromFile).run flatMap {
       case \/-(c) => c.point[Task]
 
       case -\/(FileNotFound(f)) => for {
         codec <- FsPath.systemCodec
         fstr  =  FsPath.printFsPath(codec, f)
         _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
-      } yield configOps.default
+      } yield cfgOps.default
 
       case -\/(MalformedConfig(_, rsn)) =>
         stderr(s"Error in configuration file, using default configuration: $rsn")
-          .as(configOps.default)
+          .as(cfgOps.default)
     }
   }
 
@@ -118,11 +118,11 @@ object Server {
   ): MainTask[(Int => Task[Unit]) => HttpService] =
     for {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
-      mntCfgsT     =  MntCfgsIO.write(cfgRef, qConfig.configPath)
+      mntCfgsT     =  writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath)
       coreApi      <- CoreEff.interpreter[WebConfig](mntCfgsT).liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- (mountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
-      durableApi   =  toResponseOr(MntCfgsIO.durableFile[WebConfig](mntCfgsT)) compose coreApi
+      durableApi   =  toResponseOr(MntCfgsIO.durable[WebConfig](mntCfgsT)) compose coreApi
     } yield service[T](
       webConfig.server.port,
       qConfig.staticContent,
@@ -130,11 +130,11 @@ object Server {
       durableApi)
 
   def main(args: Array[String]): Unit = {
-    implicit val configOps: ConfigOps[WebConfig] = WebConfig
+    implicit val configOps = ConfigOps[WebConfig]
 
     val main0 = for {
       qCfg    <- QuasarConfig.fromArgs(args)
-      wCfg    <- loadConfigFile(WebConfig, qCfg.configPath).liftM[MainErrT]
+      wCfg    <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
                  // TODO: Find better way to do this
       updWCfg =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
       srvc    <- durableService[Fix](qCfg, updWCfg)

@@ -98,6 +98,20 @@ package object free {
         fa.run.fold(f, interpret5(g, h, i, j, k)(_))
     }
 
+  def interpret7[F[_], G[_], H[_], I[_], J[_], K[_], L[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M, l: L ~> M):
+      (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ ~> M =
+    new ((F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ[A]) =
+        fa.run.fold(f, interpret6(g, h, i, j, k, l)(_))
+    }
+
+  def interpret8[F[_], G[_], H[_], I[_], J[_], K[_], L[_], N[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M, l: L ~> M, n: N ~> M):
+      (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ ~> M =
+    new ((F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ[A]) =
+        fa.run.fold(f, interpret7(g, h, i, j, k, l, n)(_))
+    }
+
   /** A `Catchable` instance for `Free[S, ?]` when `Task` can be injected into `S`. */
   implicit def freeCatchable[S[_]: Functor](implicit S: Task :<: S): Catchable[Free[S, ?]] =
     new Catchable[Free[S, ?]] {

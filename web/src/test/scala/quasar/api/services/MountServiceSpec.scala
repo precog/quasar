@@ -22,7 +22,7 @@ import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.effect.KeyValueStore
 import quasar.fp._, PathyCodecJson._
-import quasar.fp.free.{:+:}
+import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
 import quasar.fs.mount._
 
@@ -35,7 +35,7 @@ import org.specs2.mutable.Specification
 import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz._, Scalaz._
+import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
@@ -68,12 +68,12 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
       val store: MountConfigs ~> Task = KeyValueStore.fromTaskRef(ref)
 
-      val mt: MEff ~> Task = free.interpret2[Task, MountConfigsF, Task](NaturalTransformation.refl, Coyoneda.liftTF(store))
+      val mt: MEff ~> Task = NaturalTransformation.refl[Task] :+: Coyoneda.liftTF(store)
 
       val tf: MountingF ~> Task = Coyoneda.liftTF(hoistFree(mt) compose mounter)
 
-      def eff: Eff ~> Task = free.interpret3[Task, MountingF, MountConfigsF, Task](
-        NaturalTransformation.refl, tf, Coyoneda.liftTF(store))
+      def eff: Eff ~> Task =
+        NaturalTransformation.refl[Task] :+: tf :+: Coyoneda.liftTF(store)
 
       val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
 

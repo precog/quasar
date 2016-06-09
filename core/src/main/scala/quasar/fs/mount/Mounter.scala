@@ -19,10 +19,10 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.effect._
 import quasar.fs._
-import quasar.fp._
+import quasar.fp._, free._
 
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{:+: => _, _}, Scalaz._
 
 object Mounter {
   import Mounting._, MountConfig._
@@ -103,7 +103,7 @@ object Mounter {
       type M[A] = Free[S, A]
       val mnt = Mounter[Id, F](κ(().right), κ(()))
       def apply[A](m: Mounting[A]) =
-        mnt(m).foldMap[M](free.interpret2[Id, S, M](pointNT[M], liftFT[S]))
+        mnt(m).foldMap[M](pointNT[M] :+: liftFT[S])
     }
 
   ////

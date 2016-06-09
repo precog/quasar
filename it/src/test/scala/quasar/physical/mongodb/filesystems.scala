@@ -53,7 +53,7 @@ object filesystems {
     prefix: ADir
   ): Task[(FileSystemIO ~> Task, Task[Unit])] =
     testFileSystem(uri, prefix)
-      .map { case (run, close) => (interpret2(NaturalTransformation.refl[Task], run), close) }
+      .map { case (run, close) => (NaturalTransformation.refl[Task] :+: run, close) }
 
   ////
 
@@ -64,11 +64,10 @@ object filesystems {
   private val envErr = Failure.Ops[EnvironmentError, MongoEff]
 
   private val mongoEffToTask: MongoEff ~> Task =
-    interpret4[CfgErrF, EnvErrF, MongoErrF, Task, Task](
-      Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[Task,ConfigError]),
-      Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[Task,EnvironmentError]),
-      Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException]),
-      NaturalTransformation.refl)
+    Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[Task,ConfigError])      :+:
+    Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[Task,EnvironmentError]) :+:
+    Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException])    :+:
+    NaturalTransformation.refl
 
   private val mongoEffMToTask: MongoEffM ~> Task =
     foldMapNT(mongoEffToTask)

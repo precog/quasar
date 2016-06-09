@@ -19,12 +19,12 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{LogicalPlan, PhaseResults}
 import quasar.effect._
-import quasar.fp._
+import quasar.fp._, free._
 import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._
 import pathy.Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, :+: => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle
@@ -302,7 +302,7 @@ object hierarchical {
     val wf: WriteFileF ~> M  = writeFile[F, S](mounts map (_ compose injFS[WriteFileF]))
     val mf: ManageFileF ~> M = manageFile[F, S](mounts map (_ compose injFS[ManageFileF]))
 
-    free.interpret4(qf, rf, wf, mf)
+    qf :+: rf :+: wf :+: mf
   }
 
   ////

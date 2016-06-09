@@ -21,13 +21,13 @@ import quasar.{EnvironmentError, EnvErrT, EnvErr, EnvErrF, NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fp.free.{:+:}
+import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs.bsoncursor._
 
 import com.mongodb.async.client.MongoClient
-import scalaz._
+import scalaz.{:+: => _, _}
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
@@ -129,6 +129,6 @@ package object fs {
       liftMT[M, DefErrT] compose liftFT[S] compose injectNT[Task, S]
 
     util.createAsyncMongoClient[Eff](uri)
-      .foldMap[DefM](free.interpret3(liftTask, evalEnvErr, evalCfgErr))
+      .foldMap[DefM](liftTask :+: evalEnvErr :+: evalCfgErr)
   }
 }

@@ -17,12 +17,12 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp._, free._
 
 import org.http4s.dsl._
 import org.http4s.headers.Host
 import org.specs2.mutable
-import scalaz._
+import scalaz.{:+: => _, _}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.order._
@@ -54,7 +54,7 @@ class QResponseSpec extends mutable.Specification {
           a.k(a.s).point[ResponseOr]
     }
 
-    free.interpret2[Str, Task, ResponseOr](f, liftMT[Task, ResponseT])
+    f :+: liftMT[Task, ResponseT]
   }
 
   "toHttpResponse" should {

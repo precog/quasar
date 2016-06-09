@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.api._
 import quasar.effect.{KeyValueStore, Failure}
 import quasar.fp.{liftMT, TaskRef}
-import quasar.fp.free, free.{:+:}
+import quasar.fp.free, free._
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -28,7 +28,7 @@ import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
 import org.specs2.mutable.Specification
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, :+: => _, _}
 import scalaz.concurrent.Task
 
 class RestApiSpecs extends Specification {
@@ -42,12 +42,12 @@ class RestApiSpecs extends Specification {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).unsafePerformSync
-    val eff = free.interpret4[Task, MountConfigsF, FileSystemFailureF, MountingFileSystem, Task](
-      NaturalTransformation.refl,
+    val eff =
+      NaturalTransformation.refl[Task]                                                       :+:
       Coyoneda.liftTF[MountConfigs, Task](
-        KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync)),
-      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]),
-      fs)
+        KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync)) :+:
+      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]) :+:
+      fs
     val service = RestApi.finalizeServices[Eff](
       liftMT[Task, ResponseT].compose[Eff](eff))(
       RestApi.coreServices[Eff], Map())

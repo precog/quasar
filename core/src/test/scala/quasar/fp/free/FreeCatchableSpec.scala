@@ -34,9 +34,9 @@ final class FreeCatchableSpec extends mutable.Specification {
     new (EffM ~> Id) {
       def apply[A](effm: EffM[A]) =
         TaskRef(0).flatMap(ref =>
-          effm.foldMap(interpret2[Task, CounterF, Task](
-            NaturalTransformation.refl,
-            Coyoneda.liftTF(runCounter(ref))))
+          effm.foldMap(
+            NaturalTransformation.refl[Task] :+:
+            Coyoneda.liftTF(runCounter(ref)))
         ).unsafePerformSync
     }
 

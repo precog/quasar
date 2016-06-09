@@ -22,7 +22,7 @@ import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.effect.KeyValueStore
 import quasar.fp.liftMT
-import quasar.fp.free
+import quasar.fp.free, free._
 import quasar.fp.prism._
 import quasar.fs._, InMemory._, PathArbitrary._
 import quasar.fs.mount._
@@ -37,7 +37,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, :+: => _, _}
 import scalaz.concurrent.Task
 
 object MetadataFixture {
@@ -61,9 +61,8 @@ object MetadataFixture {
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService =
     metadata.service[MetadataEff].toHttpService(
-      liftMT[Task, ResponseT].compose[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
-      Coyoneda.liftTF(runQuery(mem)),
-      Coyoneda.liftTF(runMount(mnts)))))
+      liftMT[Task, ResponseT].compose[MetadataEff](
+        Coyoneda.liftTF(runQuery(mem)) :+: Coyoneda.liftTF(runMount(mnts))))
 }
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {

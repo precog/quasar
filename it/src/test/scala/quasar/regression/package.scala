@@ -19,10 +19,10 @@ package quasar
 import quasar.Predef.{Long, Map}
 import quasar.effect._
 import quasar.fp.{TaskRef}
-import quasar.fp.free, free.{:+:}
+import quasar.fp.free, free._
 import quasar.fs.{QueryFile, FileSystem, ADir}
 
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, :+: => _, _}
 import scalaz.concurrent._
 import scalaz.syntax.apply._
 
@@ -48,9 +48,6 @@ package object regression {
         MonotonicSeq.fromTaskRef(ref))
 
     (TaskRef(Map.empty[ResultHandle, (ADir, ResultHandle)]) |@| TaskRef(0L))(
-      (handles, ct) => free.interpret3(
-        monoSeqTask(ct),
-        handlesTask(handles),
-        NaturalTransformation.refl))
+      (handles, ct) => monoSeqTask(ct) :+: handlesTask(handles) :+: NaturalTransformation.refl)
   }
 }

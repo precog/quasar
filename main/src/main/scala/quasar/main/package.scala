@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.config.ConfigOps
 import quasar.effect._
 import quasar.fp._
-import quasar.fp.free.:+:
+import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
@@ -30,7 +30,7 @@ import quasar.physical.mongodb._
 import argonaut.EncodeJson
 import com.mongodb.MongoException
 import monocle.Lens
-import scalaz.{Failure => _, Lens => _, _}, Scalaz._
+import scalaz.{Failure => _, Lens => _, :+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 /** Concrete effect types and their interpreters that implement the quasar
@@ -54,9 +54,8 @@ package object main {
   object PhysFsEff {
     // Lift into FsErrsIOM
     val toFsErrsIOM: PhysFsEff ~> FsErrsIOM =
-      free.interpret2[MongoErrF, Task, FsErrsIOM](
-        injectFT[MongoErrF, FsErrsIO],
-        injectFT[Task, FsErrsIO])
+      injectFT[MongoErrF, FsErrsIO] :+:
+      injectFT[Task, FsErrsIO]
   }
 
   /** The physical filesystems currently supported.
@@ -84,12 +83,13 @@ package object main {
       def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
         injectFT[Task, FsErrsIO].compose[E](f)
 
-      free.interpret5[MountConfigsF, PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, FsErrsIOM](
-        injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT)),
-        hoistFree(PhysFsEff.toFsErrsIOM),
-        injTask[MonotonicSeqF](Coyoneda.liftTF(MonotonicSeq.fromTaskRef(seqRef))),
-        injTask[ViewStateF](Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef))),
-        injTask[MountedResultHF](Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef))))
+      injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT))          :+:
+      hoistFree(PhysFsEff.toFsErrsIOM)                                               :+:
+      injTask[MonotonicSeqF](Coyoneda.liftTF(MonotonicSeq.fromTaskRef(seqRef)))      :+:
+      injTask[ViewStateF](
+        Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef))) :+:
+      injTask[MountedResultHF](
+        Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef)))
     }
 
     /** A dynamic `FileSystem` evaluator formed by internally fetching an
@@ -149,11 +149,10 @@ package object main {
       def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
         injectFT[Task, FsErrsIO].compose[E](f)
 
-      free.interpret4[EvalFSRefF, PhysFsEffM, MountedFsF, MountConfigsF, FsErrsIOM](
-        injTask[EvalFSRefF](Coyoneda.liftTF[EvalFSRef, Task](AtomicRef.fromTaskRef(evalRef))),
-        hoistFree(PhysFsEff.toFsErrsIOM),
-        injTask[MountedFsF](Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(mntsRef))),
-        injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT)))
+      injTask[EvalFSRefF](Coyoneda.liftTF[EvalFSRef, Task](AtomicRef.fromTaskRef(evalRef))) :+:
+      hoistFree(PhysFsEff.toFsErrsIOM)                                                      :+:
+      injTask[MountedFsF](Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(mntsRef))) :+:
+      injTask[MountConfigsF](Coyoneda.liftTF[MountConfigs, Task](mntCfgsT))
     }
   }
 
@@ -188,18 +187,16 @@ package object main {
         KeyValueStore.toState[ST](Lens.id[Map[APath, MountConfig]])
 
       val interpret: MntCfgsIO ~> ST =
-        free.interpret2[MountConfigsF, Task, ST](
-          Coyoneda.liftTF(toState),
-          liftMT[Task, StateT[?[_], Map[APath, MountConfig], ?]])
+        Coyoneda.liftTF(toState) :+:
+        liftMT[Task, StateT[?[_], Map[APath, MountConfig], ?]]
 
       evalNT[Task, Map[APath, MountConfig]](Map()) compose interpret
     }
 
     /** Interprets `MountConfigsF`, persisting changes via the write interpreter. */
     def durable[C: EncodeJson](write: MountConfigs ~> Task): MntCfgsIO ~> Task =
-      free.interpret2[MountConfigsF, Task, Task](
-        Coyoneda.liftTF[MountConfigs, Task](write),
-        NaturalTransformation.refl)
+      Coyoneda.liftTF[MountConfigs, Task](write) :+:
+      NaturalTransformation.refl
   }
 
   /** Encompasses all the failure effects and mount config effect, all of
@@ -211,10 +208,10 @@ package object main {
   object CfgsErrsIO {
     /** Interprets errors into strings. */
     def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
-      val f = free.interpret3[FileSystemFailureF, MongoErrF, MntCfgsIO, Task](
-        Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]),
-        Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException]),
-        evalCfgsIO)
+      val f =
+        Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]) :+:
+        Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException])              :+:
+        evalCfgsIO
 
       val g = new (CfgsErrsIO ~> MainTask) {
         def apply[A](a: CfgsErrsIO[A]) =
@@ -251,24 +248,20 @@ package object main {
 
         val translateFsErrs: FsErrsIOM ~> CfgsErrsIOM =
           free.foldMapNT[FsErrsIO, CfgsErrsIOM](
-            free.interpret2[MongoErrF, Task, CfgsErrsIOM](
-              injectFT[MongoErrF, CfgsErrsIO],
-              liftTask))
+            injectFT[MongoErrF, CfgsErrsIO] :+: liftTask)
 
         val mnt: CompleteFsEff ~> CfgsErrsIOM =
-          free.interpret2[MountConfigsF, CompFsEffM, CfgsErrsIOM](
-            injectFT[MountConfigsF, CfgsErrsIO],
-            translateFsErrs.compose[CompFsEffM](free.foldMapNT(g)))
+          injectFT[MountConfigsF, CfgsErrsIO] :+:
+          translateFsErrs.compose[CompFsEffM](free.foldMapNT(g))
 
         val mounting: MountingF ~> CfgsErrsIOM =
           Coyoneda.liftTF[Mounting, CfgsErrsIOM](free.foldMapNT(mnt) compose mounter)
 
-        free.interpret5[Task, MountConfigsF, FileSystemFailureF, MountingF, FileSystem, CfgsErrsIOM](
-          liftTask,
-          injectFT[MountConfigsF, CfgsErrsIO],
-          injectFT[FileSystemFailureF, CfgsErrsIO],
-          mounting,
-          translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
+        liftTask                                 :+:
+        injectFT[MountConfigsF, CfgsErrsIO]      :+:
+        injectFT[FileSystemFailureF, CfgsErrsIO] :+:
+        mounting                                 :+:
+        (translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
       }
   }
 

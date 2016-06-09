@@ -19,7 +19,7 @@ package quasar.api.services.query
 import quasar.Predef._
 import quasar.api._
 import quasar.fp._
-import quasar.fp.free.{:+:}
+import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.sql._
@@ -28,7 +28,7 @@ import quasar.sql.fixpoint._
 import org.http4s._
 import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object queryFixture {
@@ -87,10 +87,9 @@ object queryFixture {
   }
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
-    free.interpret3[Task, FileSystemFailureF, FileSystem, ResponseOr](
-      liftMT[Task, ResponseT].compose(NaturalTransformation.refl),
-      Coyoneda.liftTF[FileSystemFailure, ResponseOr](
-        failureResponseOr[FileSystemError]),
-      liftMT[Task, ResponseT].compose(fs))
+    liftMT[Task, ResponseT].compose(NaturalTransformation.refl[Task]) :+:
+    Coyoneda.liftTF[FileSystemFailure, ResponseOr](
+      failureResponseOr[FileSystemError])                             :+:
+    liftMT[Task, ResponseT].compose(fs)
 
 }

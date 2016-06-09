@@ -19,11 +19,11 @@ package quasar.fs.mount
 import quasar.Predef.Unit
 import quasar.effect._
 import quasar.fp.{liftFT, injectNT}
-import quasar.fp.free, free.{:+:}
+import quasar.fp.free, free._
 import quasar.fs.FileSystem
 import hierarchical.MountedResultHF
 
-import scalaz._
+import scalaz.{:+: => _, _}
 import scalaz.syntax.monad._
 
 /** Handles mount requests, managing a composite `FileSystem` interpreter
@@ -131,8 +131,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
       injSeq =  liftFT[S] compose injectNT[MonotonicSeqF, S]
       injVST =  liftFT[S] compose injectNT[ViewStateF, S]
       injMC  =  liftFT[S] compose injectNT[MountConfigsF, S]
-      iView  =  free.interpret4[MountConfigsF, ViewStateF, MonotonicSeqF, FileSystem, EvalFS](
-                  injMC, injVST, injSeq, mnted)
+      iView  =  injMC :+: injVST :+: injSeq :+: mnted
       viewd  =  view.fileSystem[ViewEff]
       f      =  free.foldMapNT[ViewEff, EvalFS](iView) compose viewd
       _      <- evalFS[T].set(f)

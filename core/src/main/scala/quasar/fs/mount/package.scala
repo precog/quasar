@@ -19,12 +19,12 @@ package quasar.fs
 import quasar.Predef.Map
 import quasar.effect._
 import quasar.fp.{TaskRef}
-import quasar.fp.free, free.{:+:}
+import quasar.fp.free, free._
 
 import scala.collection.immutable.Vector
 
 import monocle.Lens
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, :+: => _, _}
 import scalaz.concurrent.Task
 
 package object mount {
@@ -40,7 +40,7 @@ package object mount {
     m: Mounting ~> M,
     fs: FileSystem ~> M
   ): MountingFileSystem ~> M =
-    free.interpret2[MountingF, FileSystem, M](Coyoneda.liftTF(m), fs)
+    Coyoneda.liftTF(m) :+: fs
 
   //-- Views --
 
@@ -79,6 +79,5 @@ package object mount {
     s: MonotonicSeq ~> M,
     fs: FileSystem ~> M
   ): ViewFileSystem ~> M =
-    free.interpret4[MountConfigsF, ViewStateF, MonotonicSeqF, FileSystem, M](
-      Coyoneda.liftTF(mc), Coyoneda.liftTF(v), Coyoneda.liftTF(s), fs)
+    Coyoneda.liftTF(mc) :+: Coyoneda.liftTF(v) :+: Coyoneda.liftTF(s) :+: fs
 }

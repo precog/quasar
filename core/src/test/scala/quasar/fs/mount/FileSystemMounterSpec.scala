@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.String
 import quasar.fp.{liftMT}
-import quasar.fp.free, free.{:+:}
+import quasar.fp.free, free._
 import quasar.fs.{FileSystem, FileSystemType, PathError, ADir}
 import quasar.effect._
 
@@ -26,7 +26,7 @@ import monocle.function.Field1
 import monocle.std.tuple2._
 import pathy.Path._
 import org.specs2.mutable
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, :+: => _, _}
 import scalaz.syntax.applicative._
 
 class FileSystemMounterSpec extends mutable.Specification {
@@ -63,10 +63,9 @@ class FileSystemMounterSpec extends mutable.Specification {
         Coyoneda.liftTF[MountedFs, ResMntsS](AtomicRef.toState[ResMntsS, ResMnts])
 
       val evalEff: Eff ~> M =
-        free.interpret3[AbortM, AbortF, MountedFsF, M](
-          free.foldMapNT(evalAbort),
-          evalAbort,
-          liftMT[ResMntsS, MT] compose evalMnts)
+        free.foldMapNT(evalAbort) :+:
+        evalAbort                 :+:
+        (liftMT[ResMntsS, MT] compose evalMnts)
 
       def apply[A](ma: EffM[A]) =
         ma.foldMap(evalEff).run(rms)

@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{Data, Func, LogicalPlan}
 import quasar.effect._
-import quasar.fp._
+import quasar.fp._, free._
 import quasar.fs._
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
@@ -29,7 +29,7 @@ import matryoshka.Fix
 import monocle.Lens
 import org.specs2.mutable
 import pathy.Path._
-import scalaz.{Lens => _, Failure => _, _}, Id.Id
+import scalaz.{Lens => _, Failure => _, :+: => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
@@ -79,7 +79,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
     val handlesNT: MountedResultHF ~> MountedFs =
       Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.toState[MountedFs](handles))
 
-    free.interpret3(seqNT, handlesNT, NaturalTransformation.refl)
+    seqNT :+: handlesNT :+: NaturalTransformation.refl
   }
 
   val interpretMnted: FileSystem ~> HEffM =

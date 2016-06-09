@@ -23,7 +23,7 @@ import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
 import quasar.fp._, PathyCodecJson._
-import quasar.fp.free.{:+:}
+import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._, PathArbitrary._
 
@@ -40,7 +40,7 @@ import org.specs2.scalaz.ScalazMatchers._
 import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, :+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
@@ -61,11 +61,10 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   type EffM[A] = Free[Eff, A]
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
-    free.interpret3[Task, FileSystemFailureF, FileSystem, ResponseOr](
-      liftMT[Task, ResponseT],
-      Coyoneda.liftTF[FileSystemFailure, ResponseOr](
-        failureResponseOr[FileSystemError]),
-      liftMT[Task, ResponseT] compose fs)
+    liftMT[Task, ResponseT]                         :+:
+    Coyoneda.liftTF[FileSystemFailure, ResponseOr](
+      failureResponseOr[FileSystemError])           :+:
+    (liftMT[Task, ResponseT] compose fs)
 
   def service(mem: InMemState): HttpService =
     HttpService.lift(req => runFs(mem) flatMap (fs =>

@@ -60,8 +60,7 @@ package object fs {
     w: WriteFile ~> M,
     m: ManageFile ~> M
   ): FileSystem ~> M =
-    interpret4[QueryFileF, ReadFileF, WriteFileF, ManageFileF, M](
-      Coyoneda.liftTF(q), Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(m))
+    Coyoneda.liftTF(q) :+: Coyoneda.liftTF(r) :+: Coyoneda.liftTF(w) :+: Coyoneda.liftTF(m)
 
   /** Rebases absolute paths onto the provided absolute directory, so
     * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.

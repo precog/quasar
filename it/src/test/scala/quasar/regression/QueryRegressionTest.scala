@@ -18,7 +18,7 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
-import quasar.fp._
+import quasar.fp._, free._
 import quasar.fs._
 import quasar.main.FilesystemQueries
 import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
@@ -34,7 +34,7 @@ import matryoshka.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
-import scalaz._, Scalaz._
+import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{merge => pmerge, _}
 
@@ -300,9 +300,8 @@ object QueryRegressionTest {
         hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS))
           .compose(chroot.fileSystem[FileSystem](mnt))
 
-      free.interpret2(
-        NaturalTransformation.refl[Task],
-        free.foldMapNT(hfs) compose g)
+      NaturalTransformation.refl[Task] :+:
+      (free.foldMapNT(hfs) compose g)
     }
 
   implicit val dataEncodeJson: EncodeJson[Data] =

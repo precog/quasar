@@ -18,11 +18,11 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.effect._
-import quasar.fp._
+import quasar.fp._, free._
 import quasar.fs.APath
 
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 class MounterSpec extends MountingSpec[MountingF] {
@@ -48,8 +48,7 @@ class MounterSpec extends MountingSpec[MountingF] {
     val interpMnts: MountConfigsF ~> Task =
       Coyoneda.liftTF[MountConfigs, Task](KeyValueStore.fromTaskRef(cfgRef))
 
-    val interpEff: MEff ~> Task =
-      free.interpret2(NaturalTransformation.refl, interpMnts)
+    val interpEff: MEff ~> Task = NaturalTransformation.refl[Task] :+: interpMnts
 
     val interp0: Mounting ~> Task =
       free.foldMapNT[MEff, Task](interpEff).compose(mm)

@@ -22,7 +22,7 @@ import quasar.config._
 import quasar.console._
 import quasar.effect._
 import quasar.fp._
-import quasar.fp.free.{:+:}
+import quasar.fp.free._
 import quasar.fs.mount._
 import quasar.main._
 
@@ -31,7 +31,7 @@ import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
 import org.jboss.aesh.edit.actions.Action
 import pathy.Path, Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, :+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object Main {
@@ -61,10 +61,10 @@ object Main {
         .create())
     console.setPrompt(new Prompt("💪 $ "))
 
-    val i: DriverEff ~> MainTask = free.interpret3[ReplFailF, ConsoleIOF, Task, MainTask](
-      Coyoneda.liftTF[ReplFail, MainTask](Failure.toError[MainTask, String]),
-      liftMT[Task, MainErrT].compose[ConsoleIOF](Coyoneda.liftTF(consoleIO(console))),
-      liftMT[Task, MainErrT])
+    val i: DriverEff ~> MainTask =
+      Coyoneda.liftTF[ReplFail, MainTask](Failure.toError[MainTask, String])          :+:
+      liftMT[Task, MainErrT].compose[ConsoleIOF](Coyoneda.liftTF(consoleIO(console))) :+:
+      liftMT[Task, MainErrT]
 
     console.setConsoleCallback(new AeshConsoleCallback() {
       override def execute(input: ConsoleOperation): Int = {
@@ -90,13 +90,14 @@ object Main {
 
   def repl(fs: MountingFileSystem ~> DriverEffM): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
-      def i: ReplEff ~> DriverEffM = free.interpret6[Repl.RunStateF, ConsoleIOF, ReplFailF, TimingF, Task, MountingFileSystem, DriverEffM](
-        injectFT[Task, DriverEff].compose[Repl.RunStateF](Coyoneda.liftTF[Repl.RunStateT, Task](AtomicRef.fromTaskRef(ref))),
-        injectFT[ConsoleIOF, DriverEff],
-        injectFT[ReplFailF, DriverEff],
-        injectFT[Task, DriverEff].compose[TimingF](Coyoneda.liftTF(Timing.toTask)),
-        injectFT[Task, DriverEff],
-        fs)
+      val i: ReplEff ~> DriverEffM =
+        injectFT[Task, DriverEff].compose[Repl.RunStateF](
+          Coyoneda.liftTF[Repl.RunStateT, Task](AtomicRef.fromTaskRef(ref)))       :+:
+        injectFT[ConsoleIOF, DriverEff]                                            :+:
+        injectFT[ReplFailF, DriverEff]                                             :+:
+        injectFT[Task, DriverEff].compose[TimingF](Coyoneda.liftTF(Timing.toTask)) :+:
+        injectFT[Task, DriverEff]                                                  :+:
+        fs
 
       (cmd => Repl.command[ReplEff](cmd).foldMap(i))
     }

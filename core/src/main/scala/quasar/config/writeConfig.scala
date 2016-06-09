@@ -19,13 +19,13 @@ package quasar.config
 import quasar.Predef._
 import quasar.effect._
 import quasar.fp.{TaskRef}
-import quasar.fp.free
+import quasar.fp.free, free._
 import quasar.fs.{APath}
 import quasar.fs.mount._
 
 import argonaut.{EncodeJson}
 import monocle.{Lens}
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, :+: => _, _}
 import scalaz.concurrent.{Task}
 
 /** Interpreter providing access to configuration, based on some concrete Config type. */
@@ -52,8 +52,7 @@ object writeConfig {
       def writing: ConfigRef ~> ConfigRefPlusTaskM = AtomicRef.onSet[Cfg](write)
 
       val refToTaskF: ConfigRefPlusTask ~> Task =
-        free.interpret2[ConfigRefF, Task, Task](
-          Coyoneda.liftTF(refToTask), NaturalTransformation.refl)
+        Coyoneda.liftTF(refToTask) :+: NaturalTransformation.refl
 
       free.foldMapNT(refToTaskF).compose[ConfigRefF](Coyoneda.liftTF(writing))
     }

@@ -24,7 +24,6 @@ import quasar.fp.free, free.{:+:}
 import quasar.fs._
 import quasar.fs.mount._
 
-import matryoshka.Fix
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
@@ -51,7 +50,7 @@ class RestApiSpecs extends Specification {
       fs)
     val service = RestApi.finalizeServices[Eff](
       liftMT[Task, ResponseT].compose[Eff](eff))(
-      RestApi.coreServices[Fix, Eff], Map())
+      RestApi.coreServices[Eff], Map())
 
     def testAdvertise(path: String,
                       additionalHeaders: List[Header],

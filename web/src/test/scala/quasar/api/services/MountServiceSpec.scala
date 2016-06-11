@@ -70,7 +70,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
       val mt: MEff ~> Task = NaturalTransformation.refl[Task] :+: store
 
-      val tf: Mounting ~> Task = hoistFree(mt) compose mounter
+      val tf: Mounting ~> Task = foldMapNT(mt) compose mounter
 
       def eff: Eff ~> Task =
         NaturalTransformation.refl[Task] :+: tf :+: store

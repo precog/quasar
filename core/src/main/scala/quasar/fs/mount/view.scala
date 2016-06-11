@@ -24,7 +24,7 @@ import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.sql.Sql
 
-import matryoshka._
+import matryoshka.{free => _, _}
 import pathy.Path._
 import scalaz._, Scalaz._
 

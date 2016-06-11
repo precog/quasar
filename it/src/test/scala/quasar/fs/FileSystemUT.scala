@@ -41,7 +41,6 @@ final case class FileSystemUT[S[_]](
   testDir:     ADir,
   close:       Task[Unit]
 ) {
-  import quasar.fp.hoistFree
 
   type F[A] = Free[S, A]
 
@@ -56,6 +55,6 @@ final case class FileSystemUT[S[_]](
       testDir,
       close)
 
-  val testInterpM: F ~> Task = hoistFree(testInterp)
-  val setupInterpM: F ~> Task = hoistFree(setupInterp)
+  val testInterpM: F ~> Task = foldMapNT(testInterp)
+  val setupInterpM: F ~> Task = foldMapNT(setupInterp)
 }

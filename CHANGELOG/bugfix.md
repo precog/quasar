@@ -1,0 +1,4 @@
+- Cleanup after updating to scalaz-7.2 Free implementation
+  - Remove all unecessary `Functor[_]` constraints from signatures
+  - Delete the dubious `Catchable[Free[S, ?]]` instance
+  - Remove all unecessary usage of Coyoneda

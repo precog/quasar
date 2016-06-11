@@ -33,7 +33,7 @@ class Interpreter[F[_], M[_]: Monad](val interpretTerm: F ~> M) {
   type Program[A] = Free[F,A]
 
   def interpret: Program ~> M =
-    hoistFree(interpretTerm)
+    foldMapNT(interpretTerm)
 
   def interpretT[T[_[_],_]: Hoist]: T[Program,?] ~> T[M,?] =
     Hoist[T].hoist[Program,M](interpret)

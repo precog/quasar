@@ -17,8 +17,7 @@
 package quasar.fs
 
 import quasar.LogicalPlan, LogicalPlan.ReadF
-import quasar.fp.liftFT
-import quasar.fp.free.{flatMapSNT, transformIn}
+import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
 import quasar.fp.prism._
 
 import matryoshka.{FunctorT, Fix}, FunctorT.ops._

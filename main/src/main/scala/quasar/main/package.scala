@@ -84,7 +84,7 @@ package object main {
         injectFT[Task, FsErrsIO] compose f
 
       injTask[MountConfigs](mntCfgsT)                               :+:
-      hoistFree(PhysFsEff.toFsErrsIOM)                              :+:
+      foldMapNT(PhysFsEff.toFsErrsIOM)                              :+:
       injTask[MonotonicSeq](MonotonicSeq.fromTaskRef(seqRef))       :+:
       injTask[ViewState](KeyValueStore.fromTaskRef(viewHandlesRef)) :+:
       injTask[MountedResultH](KeyValueStore.fromTaskRef(mntResRef))
@@ -147,7 +147,7 @@ package object main {
         injectFT[Task, FsErrsIO] compose f
 
       injTask[EvalFSRef](AtomicRef.fromTaskRef(evalRef)) :+:
-      hoistFree(PhysFsEff.toFsErrsIOM)                   :+:
+      foldMapNT(PhysFsEff.toFsErrsIOM)                   :+:
       injTask[MountedFs](AtomicRef.fromTaskRef(mntsRef)) :+:
       injTask[MountConfigs](mntCfgsT)
     }
@@ -210,7 +210,7 @@ package object main {
           EitherT(f(a).attempt).leftMap(_.getMessage)
       }
 
-      hoistFree(g)
+      foldMapNT(g)
     }
   }
 

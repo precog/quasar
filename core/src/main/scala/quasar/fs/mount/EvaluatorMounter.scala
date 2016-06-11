@@ -18,7 +18,6 @@ package quasar.fs.mount
 
 import quasar.Predef.Unit
 import quasar.effect._
-import quasar.fp.{liftFT, injectNT}
 import quasar.fp.free, free._
 import quasar.fs.FileSystem
 import hierarchical.MountedResultH

@@ -160,7 +160,7 @@ object data {
         errorsResponse(errors, by(data))
       }
 
-      injectFT[Task,S].apply(
+      free.injectFT[Task,S].apply(
         MessageFormat.decoder.decode(req,true)
           .leftMap(_.toResponse[S].point[FreeS])
           .flatMap(dataStream => EitherT.right(dataStream.runLog.map(write)))

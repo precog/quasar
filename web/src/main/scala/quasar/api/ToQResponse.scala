@@ -61,7 +61,7 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
     response(r => QResponse(
       status = r.status,
       headers = r.headers,
-      body = r.body.translate[Free[S, ?]](injectFT[Task, S])))
+      body = r.body.translate[Free[S, ?]](free.injectFT[Task, S])))
 
   implicit def qResponseToQResponse[S[_]]: ToQResponse[QResponse[S], S] =
     response(ι)

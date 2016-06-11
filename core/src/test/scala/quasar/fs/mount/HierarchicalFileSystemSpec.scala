@@ -89,12 +89,12 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
     )).toOption.get)
 
   val runMntd: F ~> MountedFs =
-    hoistFree(hoistFree(interpHEff).compose[FileSystem](interpretMnted))
+    foldMapNT(foldMapNT(interpHEff).compose[FileSystem](interpretMnted))
 
   val runEmpty: F ~> MountedFs = {
     val interpEmpty: FileSystem ~> HEffM =
       hierarchical.fileSystem[MountedFs, HEff](Mounts.empty)
-    hoistFree(hoistFree(interpHEff) compose interpEmpty)
+    foldMapNT(foldMapNT(interpHEff) compose interpEmpty)
   }
 
   // NB: Defining these here for a reuse, but also because using `beLike`

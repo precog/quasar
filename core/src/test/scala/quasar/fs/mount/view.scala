@@ -28,7 +28,7 @@ import quasar.sql.ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._
-import matryoshka._
+import matryoshka.{free => _, _}
 import monocle.macros.GenLens
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
@@ -118,7 +118,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       fvs compose InMemory.fileSystem)
 
     val r: (VS, A) =
-      hoistFree[ViewFileSystem, State[VS, ?]](viewfs).apply(fv).run(
+      free.foldMapNT[ViewFileSystem, State[VS, ?]](viewfs).apply(fv).run(
         VS.emptyWithViews(views).copy(fs = InMemState.fromFiles(files.map(_ -> Vector[Data]()).toMap)))
 
     (ViewInterpResult[A] _).tupled(r)

@@ -134,7 +134,7 @@ object mount {
     type FreeS[A] = Free[S, A]
 
     for {
-      body  <- EitherT.right(injectFT[Task, S].apply(
+      body  <- EitherT.right(free.injectFT[Task, S].apply(
                  EntityDecoder.decodeString(req)): FreeS[String])
       bConf <- EitherT.fromDisjunction[FreeS](Parse.decodeWith(
                   body,

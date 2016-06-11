@@ -82,7 +82,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
 
   def failingExecPlan[F[_]: Applicative](msg: String, f: FileSystem ~> F): FileSystem ~> F = {
     val qf: QueryFile ~> F =
-      f compose injectNT[QueryFile, FileSystem]
+      f compose free.injectNT[QueryFile, FileSystem]
 
     val failingQf: QueryFile ~> F = new (QueryFile ~> F) {
       import QueryFile._

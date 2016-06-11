@@ -128,7 +128,7 @@ object QResponse {
     QResponse(
       status,
       E.headers,
-      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT))
+      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
 
   def streaming[S[_], A]
       (p: Process[Free[S, ?], A])
@@ -138,7 +138,7 @@ object QResponse {
       Ok,
       E.headers,
       p.flatMap[Free[S, ?], ByteVector](a =>
-        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT)))
+        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT)))
 
   def streaming[S[_], A, E]
       (p: Process[EitherT[Free[S, ?], E, ?], A])

@@ -33,6 +33,6 @@ package object server {
       failureResponseOr[MongoException]            :+:
       (liftMT[Task, ResponseT] compose evalCfgsIO)
 
-    hoistFree(f)
+    foldMapNT(f)
   }
 }

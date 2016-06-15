@@ -18,8 +18,8 @@ package quasar
 
 import quasar.Predef._
 
-import org.scalacheck.{Gen, Arbitrary}
-import scalaz.{Apply, NonEmptyList, IList}
+import org.scalacheck.{Gen, Arbitrary, Shrink}
+import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 
 package object scalacheck {
@@ -31,4 +31,11 @@ package object scalacheck {
 
   def listSmallerThan[A: Arbitrary](n: Int): Arbitrary[List[A]] =
     Arbitrary(Gen.containerOfN[List,A](n, Arbitrary.arbitrary[A]))
+
+
+  implicit def shrinkIList[A](implicit s: Shrink[List[A]]): Shrink[IList[A]] =
+    Shrink(as => s.shrink(as.toList).map(IList.fromFoldable(_)))
+
+  implicit def shrinkISet[A: Order](implicit s: Shrink[Set[A]]): Shrink[ISet[A]] =
+    Shrink(as => s.shrink(as.toSet).map(ISet.fromFoldable(_)))
 }

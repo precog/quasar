@@ -1,0 +1,2 @@
+- implement Shrink for ISet and IList
+- move readEnv to quasar.console

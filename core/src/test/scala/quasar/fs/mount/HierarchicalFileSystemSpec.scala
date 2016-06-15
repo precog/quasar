@@ -29,10 +29,10 @@ import matryoshka.Fix
 import monocle.Lens
 import org.specs2.mutable
 import pathy.Path._
-import scalaz.{Lens => _, Failure => _, :+: => _, _}, Id.Id
+import scalaz.{Lens => _, Failure => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
-import shapeless.{Data => _, Coproduct => _, :+: => _, _}
+import shapeless.{Data => _, Coproduct => _, _}
 
 class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
@@ -46,7 +46,8 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
   type MountedFs[A] = State[MountedState, A]
   type MountedFsE[E, A] = EitherT[MountedFs, E, A]
 
-  type HEff[A]  = (MonotonicSeq :+: (MountedResultH :+: MountedFs)#λ)#λ[A]
+  type HEff0[A] = Coproduct[MountedResultH, MountedFs, A]
+  type HEff[A]  = Coproduct[MonotonicSeq, HEff0, A]
   type HEffM[A] = Free[HEff, A]
 
   type RHandles = Map[ResultHandle, (ADir, ResultHandle)]

@@ -24,7 +24,7 @@ import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._
 import pathy.Path._
-import scalaz.{Failure => _, :+: => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle

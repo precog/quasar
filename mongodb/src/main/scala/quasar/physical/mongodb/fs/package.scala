@@ -27,7 +27,7 @@ import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs.bsoncursor._
 
 import com.mongodb.async.client.MongoClient
-import scalaz.{:+: => _, _}
+import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
@@ -92,7 +92,8 @@ package object fs {
 
   ////
 
-  private type Eff[A] = (Task :+: (EnvErr :+: CfgErr)#λ)#λ[A]
+  private type Eff0[A] = Coproduct[EnvErr, CfgErr, A]
+  private type Eff[A]  = Coproduct[Task, Eff0, A]
 
   private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
     (for {

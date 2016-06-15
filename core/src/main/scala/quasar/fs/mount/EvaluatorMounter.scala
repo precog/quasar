@@ -22,7 +22,7 @@ import quasar.fp.free, free._
 import quasar.fs.FileSystem
 import hierarchical.MountedResultH
 
-import scalaz.{:+: => _, _}
+import scalaz._
 import scalaz.syntax.monad._
 
 /** Handles mount requests, managing a composite `FileSystem` interpreter
@@ -90,8 +90,9 @@ final class EvaluatorMounter[F[_], S[_]](
 
   ////
 
-  private type ViewEff[A] =
-    (MountConfigs :+: (ViewState :+: (MonotonicSeq :+: FileSystem)#λ)#λ)#λ[A]
+  private type ViewEff0[A] = Coproduct[MonotonicSeq, FileSystem, A]
+  private type ViewEff1[A] = Coproduct[ViewState, ViewEff0, A]
+  private type ViewEff[A]  = Coproduct[MountConfigs, ViewEff1, A]
 
   private val fsMounter = FileSystemMounter[F](fsDef)
 

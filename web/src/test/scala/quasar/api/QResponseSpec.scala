@@ -22,7 +22,7 @@ import quasar.fp._, free._
 import org.http4s.dsl._
 import org.http4s.headers.Host
 import org.specs2.mutable
-import scalaz.{:+: => _, _}
+import scalaz._
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.order._

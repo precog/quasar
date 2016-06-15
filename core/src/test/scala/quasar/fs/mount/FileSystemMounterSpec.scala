@@ -26,7 +26,7 @@ import monocle.function.Field1
 import monocle.std.tuple2._
 import pathy.Path._
 import org.specs2.mutable
-import scalaz.{Failure => _, :+: => _, _}
+import scalaz.{Failure => _, _}
 import scalaz.syntax.applicative._
 
 class FileSystemMounterSpec extends mutable.Specification {
@@ -41,7 +41,8 @@ class FileSystemMounterSpec extends mutable.Specification {
 
   type MountedFs[A]  = AtomicRef[ResMnts, A]
 
-  type Eff[A] = (AbortM :+: (Abort :+: MountedFs)#λ)#λ[A]
+  type Eff0[A] = Coproduct[Abort, MountedFs, A]
+  type Eff[A]  = Coproduct[AbortM, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
   type EffR[A] = (ResMnts, String \/ A)

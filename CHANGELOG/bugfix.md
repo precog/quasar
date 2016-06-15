@@ -1,0 +1,1 @@
+- Revert effect types back to hand nesting as the :+: syntax slows down implicit search considerably

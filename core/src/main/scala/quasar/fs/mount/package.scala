@@ -24,7 +24,7 @@ import quasar.fp.free, free._
 import scala.collection.immutable.Vector
 
 import monocle.Lens
-import scalaz.{Lens => _, :+: => _, _}
+import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
 package object mount {
@@ -32,7 +32,7 @@ package object mount {
 
   type MountConfigs[A] = KeyValueStore[APath, MountConfig, A]
 
-  type MountingFileSystem[A] = (Mounting :+: FileSystem)#λ[A]
+  type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
   def interpretMountingFileSystem[M[_]](
     m: Mounting ~> M,
@@ -66,8 +66,9 @@ package object mount {
       KeyValueStore.toState[State[S,?]](l)
   }
 
-  type ViewFileSystem[A] =
-    (MountConfigs :+: (ViewState :+: (MonotonicSeq :+: FileSystem)#λ)#λ)#λ[A]
+  type ViewFileSystem0[A] = Coproduct[MonotonicSeq, FileSystem, A]
+  type ViewFileSystem1[A] = Coproduct[ViewState, ViewFileSystem0, A]
+  type ViewFileSystem[A]  = Coproduct[MountConfigs, ViewFileSystem1, A]
 
   def interpretViewFileSystem[M[_]](
     mc: MountConfigs ~> M,

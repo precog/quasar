@@ -28,14 +28,15 @@ import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
 import org.specs2.mutable.Specification
-import scalaz.{Failure => _, :+: => _, _}
+import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 class RestApiSpecs extends Specification {
   import InMemory._
 
-  type Eff[A] =
-    (Task :+: (MountConfigs :+: (FileSystemFailure :+: MountingFileSystem)#λ)#λ)#λ[A]
+  type Eff0[A] = Coproduct[FileSystemFailure, MountingFileSystem, A]
+  type Eff1[A] = Coproduct[MountConfigs, Eff0, A]
+  type Eff[A]  = Coproduct[Task, Eff1, A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {

@@ -37,7 +37,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Lens => _, :+: => _, _}
+import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
 object MetadataFixture {

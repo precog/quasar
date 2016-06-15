@@ -25,7 +25,7 @@ import quasar.fs.mount._
 
 import argonaut.EncodeJson
 import monocle.Lens
-import scalaz.{Lens => _, :+: => _, _}
+import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
 /** Interpreter providing access to configuration, based on some concrete Config type. */
@@ -39,7 +39,7 @@ object writeConfig {
     type ConfigRef[A]  = AtomicRef[Cfg, A]
     type ConfigRefM[A] = Free[ConfigRef, A]
 
-    type ConfigRefPlusTask[A]  = (ConfigRef :+: Task)#λ[A]
+    type ConfigRefPlusTask[A]  = Coproduct[ConfigRef, Task, A]
     type ConfigRefPlusTaskM[A] = Free[ConfigRefPlusTask, A]
 
     // AtomicRef[Cfg, ?] ~> Task (with writing the config file):

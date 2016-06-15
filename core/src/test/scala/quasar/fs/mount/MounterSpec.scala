@@ -22,13 +22,13 @@ import quasar.fp._, free._
 import quasar.fs.APath
 
 import pathy.Path._
-import scalaz.{:+: => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class MounterSpec extends MountingSpec[Mounting] {
   import MountConfig._, MountingError._, MountRequest._
 
-  type MEff[A]  = (Task :+: MountConfigs)#λ[A]
+  type MEff[A] = Coproduct[Task, MountConfigs, A]
 
   val invalidUri = ConnectionUri(uriA.value + "INVALID")
   val invalidCfg = fileSystemConfig(dbType, invalidUri)

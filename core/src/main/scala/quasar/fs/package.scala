@@ -22,11 +22,12 @@ import quasar.fp._
 import quasar.fp.free._
 
 import pathy.Path, Path._
-import scalaz.{Failure => _, :+: => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs {
-  type FileSystem[A] =
-    (QueryFile :+: (ReadFile :+: (WriteFile :+: ManageFile)#λ)#λ)#λ[A]
+  type FileSystem0[A] = Coproduct[WriteFile, ManageFile, A]
+  type FileSystem1[A] = Coproduct[ReadFile, FileSystem0, A]
+  type FileSystem[A]  = Coproduct[QueryFile, FileSystem1, A]
 
   type AbsPath[T] = pathy.Path[Abs,T,Sandboxed]
   type RelPath[T] = pathy.Path[Rel,T,Sandboxed]

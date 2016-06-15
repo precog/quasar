@@ -40,7 +40,7 @@ import org.specs2.scalaz.ScalazMatchers._
 import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, :+: => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
@@ -57,7 +57,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.{pathExists, pathNotFound}
 
-  type Eff[A] = (Task :+: (FileSystemFailure :+: FileSystem)#λ)#λ[A]
+  type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]
+  type Eff[A]  = Coproduct[Task, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =

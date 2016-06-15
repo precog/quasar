@@ -34,7 +34,7 @@ import matryoshka.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
-import scalaz.{:+: => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{merge => pmerge, _}
 
@@ -300,8 +300,7 @@ object QueryRegressionTest {
         flatMapSNT(hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
           .compose(chroot.fileSystem[FileSystem](mnt))
 
-      NaturalTransformation.refl[Task] :+:
-      (free.foldMapNT(hfs) compose g)
+      NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)
     }
 
   implicit val dataEncodeJson: EncodeJson[Data] =

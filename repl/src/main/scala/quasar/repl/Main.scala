@@ -31,7 +31,7 @@ import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
 import org.jboss.aesh.edit.actions.Action
 import pathy.Path, Path._
-import scalaz.{Failure => _, :+: => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object Main {
@@ -44,7 +44,8 @@ object Main {
       }
     }
 
-  type DriverEff[A] = (ReplFail :+: (ConsoleIO :+: Task)#λ)#λ[A]
+  type DriverEff0[A] = Coproduct[ConsoleIO, Task, A]
+  type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
   private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = Task.delay {
@@ -85,8 +86,11 @@ object Main {
     ()
   }
 
-  type ReplEff[A] =
-    (Repl.RunStateT :+: (ConsoleIO :+: (ReplFail :+: (Timing :+: (Task :+: MountingFileSystem)#λ)#λ)#λ)#λ)#λ[A]
+  type ReplEff0[A] = Coproduct[Task, MountingFileSystem, A]
+  type ReplEff1[A] = Coproduct[Timing, ReplEff0, A]
+  type ReplEff2[A] = Coproduct[ReplFail, ReplEff1, A]
+  type ReplEff3[A] = Coproduct[ConsoleIO, ReplEff2, A]
+  type ReplEff[A]  = Coproduct[Repl.RunStateT, ReplEff3, A]
 
   def repl(fs: MountingFileSystem ~> DriverEffM): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>

@@ -28,7 +28,7 @@ import quasar.physical.mongodb.fs._
 import quasar.regression._
 
 import com.mongodb.MongoException
-import scalaz.{Failure => _, :+: => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object filesystems {
@@ -57,8 +57,9 @@ object filesystems {
 
   ////
 
-  private type MongoEff[A]  =
-    (CfgErr :+: (EnvErr :+: (MongoErr :+: Task)#λ)#λ)#λ[A]
+  private type MongoEff0[A] = Coproduct[MongoErr, Task, A]
+  private type MongoEff1[A] = Coproduct[EnvErr, MongoEff0, A]
+  private type MongoEff[A]  = Coproduct[CfgErr, MongoEff1, A]
   private type MongoEffM[A] = Free[MongoEff, A]
 
   private val envErr = Failure.Ops[EnvironmentError, MongoEff]

@@ -44,6 +44,9 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
   def mapS[T[_]](f: S ~> T): QResponse[T] =
     copy[T](body = body.translate[Free[T, ?]](free.mapSNT(f)))
 
+  def translate[T[_]](f: Free[S, ?] ~> Free[T, ?]): QResponse[T] =
+    copy[T](body = body.translate(f))
+
   def modifyHeaders(f: Headers => Headers): QResponse[S] =
     QResponse.headers.modify(f)(this)
 

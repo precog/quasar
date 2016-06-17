@@ -32,6 +32,9 @@ final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QRespons
   def mapS[T[_]](g: S ~> T): QHttpService[T] =
     QHttpService(f.andThen(_.map(_.mapS(g)).mapSuspension(g)))
 
+  def translate[T[_]](g: Free[S, ?] ~> Free[T, ?]): QHttpService[T] =
+    QHttpService(f.andThen(resp => g(resp).map(_.translate(g))))
+
   def orElse(other: QHttpService[S]): QHttpService[S] =
     QHttpService(f orElse other.f)
 

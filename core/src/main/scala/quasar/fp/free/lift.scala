@@ -24,9 +24,6 @@ object lift {
 
     def into[G[_]](implicit I: F :<: G): Free[G, A] =
       Free.liftF(I.inj(fa))
-
-    def intoC[G[_]](implicit I: CF :<: G): Free[G, A] =
-      lift[CF, A](Coyoneda.lift(fa)).into[G]
   }
 
   def apply[F[_], A](fa: F[A]): LifterAux[F, A] =

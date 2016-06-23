@@ -45,9 +45,12 @@ object Server {
     openClient: Boolean)
 
   object QuasarConfig {
-    def fromArgs(args: Array[String]): MainTask[QuasarConfig] = for {
-      opts    <- CliOptions.parser.parse(args, CliOptions.default)
-                  .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
+    def fromArgs(args: Array[String]): MainTask[QuasarConfig] =
+      CliOptions.parser.parse(args, CliOptions.default)
+        .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
+        .flatMap(fromCliOptions)
+
+    def fromCliOptions(opts: CliOptions): MainTask[QuasarConfig] = for {
       content <- StaticContent.fromCliOptions("/files", opts)
       redirect = content.map(_.loc)
       cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>

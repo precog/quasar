@@ -24,7 +24,7 @@ object Dependencies {
     "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion          % "compile, test",
     "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion          % "compile, test",
     "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion          % "compile, test",
-    "com.github.scopt"  %% "scopt"                     % "3.4.0"                 % "compile, test",
+    "com.github.scopt"  %% "scopt"                     % "3.5.0"                 % "compile, test",
     "org.threeten"      %  "threetenbp"                % "1.3.1"                 % "compile, test",
     "org.mongodb"       %  "mongodb-driver-async"      % mongoVersion            % "compile, test",
     "io.netty"          %  "netty-buffer"              % nettyVersion            % "compile, test",

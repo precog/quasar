@@ -114,6 +114,7 @@ package object main {
     * We interpret into this effect to defer error handling based on the
     * final context of interpretation (i.e. web service vs cmd line).
     */
+  // TODO: Add MountConfigs to this type
   type FsErrsIO[A] = Coproduct[MongoErr, Task, A]
   type FsErrsIOM[A] = Free[FsErrsIO, A]
 
@@ -173,6 +174,8 @@ package object main {
   type MntCfgsIO[A] = Coproduct[MountConfigs, Task, A]
   type MntCfgsIOM[A] = Free[MntCfgsIO, A]
 
+  // TODO: MntCgsIO doesn't look terribly useful any longer, maybe just a
+  //       forgetful interpreter for MountConfigs is needed?
   object MntCfgsIO {
     /** Interprets `MountConfigsF` in memory, without any persistence to a
       * backing store.
@@ -223,6 +226,8 @@ package object main {
   type CoreEff[A]  = Coproduct[Task, CoreEff2, A]
   type CoreEffM[A] = Free[CoreEff, A]
 
+  // TODO: Don't interpret MountConfigs anywhere.
+  // Accept an initial set of mounts?
   object CoreEff {
     def interpreter[C: EncodeJson: ConfigOps]
       (mntCfgsT: MountConfigs ~> Task)

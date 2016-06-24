@@ -1,0 +1,2 @@
+- Make cli options extensible
+- Update scopt to 3.5.0

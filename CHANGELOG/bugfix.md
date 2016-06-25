@@ -1,0 +1,2 @@
+- [SD-1757] Remove MountConfigs interpretation from CoreEff interpreter
+- Provide non-IO variants for a few effect types

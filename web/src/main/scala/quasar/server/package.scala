@@ -19,17 +19,25 @@ package quasar
 import quasar.api._
 import quasar.fp._, free._
 import quasar.fs.FileSystemError
+import quasar.fs.mount.MountConfigs
 import quasar.main._
 
 import com.mongodb.MongoException
-import scalaz.~>
+import org.http4s.Response
+import scalaz.{~>, EitherT, Monad}
 import scalaz.concurrent.Task
 
 package object server {
-  /** Interprets errors into `Response`s, for use in web services. */
-  def toResponseOr(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIO ~> ResponseOr = {
-    failureResponseOr[FileSystemError]           :+:
-    failureResponseOr[MongoException]            :+:
-    (liftMT[Task, ResponseT] compose evalCfgsIO)
+  def toResponseIOT[F[_]: Monad](
+    eval: MountConfigs ~> F
+  ): CfgsErrs ~> ResponseIOT[F, ?] = {
+    failureResponseIOT[F, FileSystemError]                       :+:
+    failureResponseIOT[F, MongoException]                        :+:
+    (liftMT[F, EitherT[?[_], Task[Response], ?]] compose eval)
   }
+
+  /** Interprets errors into `Response`s, for use in web services. */
+  def toResponseOr(eval: MountConfigs ~> Task): CfgsErrsIO ~> ResponseOr =
+    liftMT[Task, ResponseT]                         :+:
+    joinResponseOr.compose(toResponseIOT[Task](eval))
 }

@@ -19,6 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._
 import quasar.api.{Destination, HeaderParam}
+import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -65,12 +66,12 @@ object RestApi {
     * TODO: Is using `Prefix` necessary? Can we replace with
     *       `org.http4s.server.Router` instead?
     */
-  def finalizeServices[S[_]](
-    f: S ~> ResponseOr)(
+  def finalizeServicesF[S[_]](
+    f: Free[S, ?] ~> ResponseOr)(
     qsvcs: Map[String, QHttpService[S]],
     hsvcs: Map[String, HttpService]
   ): HttpService = {
-    val allSvcs = qsvcs.mapValues(_.toHttpService(f)) ++ hsvcs
+    val allSvcs = qsvcs.mapValues(_.toHttpServiceF(f)) ++ hsvcs
     // Sort by prefix length so that foldLeft results in routes procesed in
     // descending order (longest first), this ensures that something mounted
     // at `/a/b/c` is consulted before a mount at `/a/b`.
@@ -78,6 +79,13 @@ object RestApi {
       case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
     })
   }
+
+  def finalizeServices[S[_]](
+    f: S ~> ResponseOr)(
+    qsvcs: Map[String, QHttpService[S]],
+    hsvcs: Map[String, HttpService]
+  ): HttpService =
+    finalizeServicesF(foldMapNT(f))(qsvcs, hsvcs)
 
   def defaultMiddleware: HttpMiddleware =
     (cors(_)) <<< gzip <<< HeaderParam <<< passOptions

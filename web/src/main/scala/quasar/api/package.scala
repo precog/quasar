@@ -37,19 +37,19 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object api {
-  // TODO: Names
-  type ResponseT[F[_], A] = EitherT[F, Response, A]
-  type ResponseOr[A] = ResponseT[Task, A]
+  type ResponseT[F[_], A]   = EitherT[F, Response, A]
+  type ResponseIOT[F[_], A] = EitherT[F, Task[Response], A]
+  type ResponseOr[A]        = ResponseT[Task, A]
 
   /** Interpret a `Failure` effect into `ResponseOr` given evidence the
     * failure type can be converted to a `QResponse`.
     */
   def failureResponseOr[E](implicit E: ToQResponse[E, ResponseOr])
     : Failure[E, ?] ~> ResponseOr =
-    joinResponseOr compose failureResponseT[Task, E]
+    joinResponseOr compose failureResponseIOT[Task, E]
 
-  def failureResponseT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> EitherT[F, Task[Response], ?] = {
+  def failureResponseIOT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
+    : Failure[E, ?] ~> ResponseIOT[F, ?] = {
 
     def errToResp(e: E): Task[Response] =
       e.toResponse[ResponseOr].toHttpResponse(NaturalTransformation.refl)
@@ -58,9 +58,9 @@ package object api {
   }
 
   /** Sequences the `Response` on the left with the outer `Task`. */
-  val joinResponseOr: EitherT[Task, Task[Response], ?] ~> ResponseOr =
-    new (EitherT[Task, Task[Response], ?] ~> ResponseOr) {
-      def apply[A](et: EitherT[Task, Task[Response], A]) =
+  val joinResponseOr: ResponseIOT[Task, ?] ~> ResponseOr =
+    new (ResponseIOT[Task, ?] ~> ResponseOr) {
+      def apply[A](et: ResponseIOT[Task, A]) =
         EitherT(et.run.flatMap(_.fold(
           _.map(_.left[A]),
           _.right[Response].point[Task])))

@@ -18,7 +18,6 @@ package quasar
 
 import quasar.Predef._
 
-import quasar.config.ConfigOps
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
@@ -27,7 +26,6 @@ import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.physical.mongodb._
 
-import argonaut.EncodeJson
 import com.mongodb.MongoException
 import monocle.Lens
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
@@ -52,10 +50,10 @@ package object main {
   type PhysFsEffM[A] = Free[PhysFsEff, A]
 
   object PhysFsEff {
-    // Lift into FsErrsIOM
-    val toFsErrsIOM: PhysFsEff ~> FsErrsIOM =
-      injectFT[MongoErr, FsErrsIO] :+:
-      injectFT[Task, FsErrsIO]
+    // Lift into FsEvalIOM
+    val toFsEvalIOM: PhysFsEff ~> FsEvalIOM =
+      injectFT[MongoErr, FsEvalIO] :+:
+      injectFT[Task, FsEvalIO]
   }
 
   /** The physical filesystems currently supported.
@@ -76,17 +74,16 @@ package object main {
 
   object FsEff {
     /** Interpret all effects except failures. */
-    def toFsErrsIOM(
+    def toFsEvalIOM(
       seqRef: TaskRef[Long],
       viewHandlesRef: TaskRef[ViewHandles],
-      mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]],
-      mntCfgsT: MountConfigs ~> Task
-    ): FsEff ~> FsErrsIOM = {
-      def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
-        injectFT[Task, FsErrsIO] compose f
+      mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+    ): FsEff ~> FsEvalIOM = {
+      def injTask[E[_]](f: E ~> Task): E ~> FsEvalIOM =
+        injectFT[Task, FsEvalIO] compose f
 
-      injTask[MountConfigs](mntCfgsT)                               :+:
-      foldMapNT(PhysFsEff.toFsErrsIOM)                              :+:
+      injectFT[MountConfigs, FsEvalIO]                              :+:
+      foldMapNT(PhysFsEff.toFsEvalIOM)                              :+:
       injTask[MonotonicSeq](MonotonicSeq.fromTaskRef(seqRef))       :+:
       injTask[ViewState](KeyValueStore.fromTaskRef(viewHandlesRef)) :+:
       injTask[MountedResultH](KeyValueStore.fromTaskRef(mntResRef))
@@ -109,14 +106,15 @@ package object main {
     }
   }
 
-  /** The error effects invovled in FileSystem evaluation.
+  /** The effects involved in FileSystem evaluation.
     *
-    * We interpret into this effect to defer error handling based on the
-    * final context of interpretation (i.e. web service vs cmd line).
+    * We interpret into this effect to defer error handling and mount
+    * configuration based on the final context of interpretation
+    * (i.e. web service vs cmd line).
     */
-  // TODO: Add MountConfigs to this type
-  type FsErrsIO[A] = Coproduct[MongoErr, Task, A]
-  type FsErrsIOM[A] = Free[FsErrsIO, A]
+  type FsEval[A]    = Coproduct[MongoErr, MountConfigs, A]
+  type FsEvalIO[A]  = Coproduct[Task, FsEval, A]
+  type FsEvalIOM[A] = Free[FsEvalIO, A]
 
 
   //--- Composite FileSystem ---
@@ -142,18 +140,17 @@ package object main {
   type CompFsEffM[A] = Free[CompFsEff, A]
 
   object CompFsEff {
-    def toFsErrsIOM(
+    def toFsEvalIOM(
       evalRef: TaskRef[FileSystem ~> FsEffM],
-      mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]],
-      mntCfgsT: MountConfigs ~> Task
-    ): CompFsEff ~> FsErrsIOM = {
-      def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
-        injectFT[Task, FsErrsIO] compose f
+      mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
+    ): CompFsEff ~> FsEvalIOM = {
+      def injTask[E[_]](f: E ~> Task): E ~> FsEvalIOM =
+        injectFT[Task, FsEvalIO] compose f
 
       injTask[EvalFSRef](AtomicRef.fromTaskRef(evalRef)) :+:
-      foldMapNT(PhysFsEff.toFsErrsIOM)                   :+:
+      foldMapNT(PhysFsEff.toFsEvalIOM)                   :+:
       injTask[MountedFs](AtomicRef.fromTaskRef(mntsRef)) :+:
-      injTask[MountConfigs](mntCfgsT)
+      injectFT[MountConfigs, FsEvalIO]
     }
   }
 
@@ -168,49 +165,39 @@ package object main {
       mountHandler.mount[CompFsEff](_),
       mountHandler.unmount[CompFsEff](_))
 
-  /** Effect representing fully interpreting everything but `MountConfigs` to
-    * allow for multiple implementations.
-    */
-  type MntCfgsIO[A] = Coproduct[MountConfigs, Task, A]
-  type MntCfgsIOM[A] = Free[MntCfgsIO, A]
+  def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
+    type ST[A] = StateT[F, Map[APath, MountConfig], A]
 
-  // TODO: MntCgsIO doesn't look terribly useful any longer, maybe just a
-  //       forgetful interpreter for MountConfigs is needed?
-  object MntCfgsIO {
-    /** Interprets `MountConfigsF` in memory, without any persistence to a
-      * backing store.
-      */
-    val ephemeral: MntCfgsIO ~> Task = {
-      type ST[A] = StateT[Task, Map[APath, MountConfig], A]
+    val toState: MountConfigs ~> ST =
+      KeyValueStore.toState[ST](Lens.id[Map[APath, MountConfig]])
 
-      val toState: MountConfigs ~> ST =
-        KeyValueStore.toState[ST](Lens.id[Map[APath, MountConfig]])
-
-      val interpret: MntCfgsIO ~> ST =
-        toState :+: liftMT[Task, StateT[?[_], Map[APath, MountConfig], ?]]
-
-      evalNT[Task, Map[APath, MountConfig]](Map()) compose interpret
-    }
-
-    /** Interprets `MountConfigsF`, persisting changes via the write interpreter. */
-    def durable[C: EncodeJson](write: MountConfigs ~> Task): MntCfgsIO ~> Task =
-      write :+: NaturalTransformation.refl
+    evalNT[F, Map[APath, MountConfig]](Map()) compose toState
   }
 
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.
     */
-  type CfgsErrsIO0[A] = Coproduct[MongoErr, MntCfgsIO, A]
-  type CfgsErrsIO[A]  = Coproduct[FileSystemFailure, CfgsErrsIO0, A]
+  type CfgsErrs0[A]   = Coproduct[MongoErr, MountConfigs, A]
+  type CfgsErrs[A]    = Coproduct[FileSystemFailure, CfgsErrs0, A]
+
+  object CfgsErrs {
+    def toCatchable[F[_]: Catchable](
+      eval: MountConfigs ~> F
+    ): CfgsErrs ~> F =
+      Failure.toRuntimeError[F, FileSystemError] :+:
+      Failure.toCatchable[F, MongoException]     :+:
+      eval
+  }
+
+  type CfgsErrsIO[A]  = Coproduct[Task, CfgsErrs, A]
   type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
 
   object CfgsErrsIO {
     /** Interprets errors into strings. */
-    def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIO ~> MainTask = {
+    def toMainTask(eval: MountConfigs ~> Task): CfgsErrsIO ~> MainTask = {
       val f =
-        Failure.toRuntimeError[Task,FileSystemError] :+:
-        Failure.toCatchable[Task,MongoException]     :+:
-        evalCfgsIO
+        NaturalTransformation.refl[Task] :+:
+        CfgsErrs.toCatchable(eval)
 
       new (CfgsErrsIO ~> MainTask) {
         def apply[A](a: CfgsErrsIO[A]) =
@@ -226,12 +213,9 @@ package object main {
   type CoreEff[A]  = Coproduct[Task, CoreEff2, A]
   type CoreEffM[A] = Free[CoreEff, A]
 
-  // TODO: Don't interpret MountConfigs anywhere.
-  // Accept an initial set of mounts?
+  // TODO: Accept an initial set of mounts?
   object CoreEff {
-    def interpreter[C: EncodeJson: ConfigOps]
-      (mntCfgsT: MountConfigs ~> Task)
-      : Task[CoreEff ~> CfgsErrsIOM] =
+    val interpreter: Task[CoreEff ~> CfgsErrsIOM] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
         seqRef     <- TaskRef(startSeq)
@@ -240,15 +224,17 @@ package object main {
         evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
         mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
       } yield {
-        val f: FsEff ~> FsErrsIOM = FsEff.toFsErrsIOM(seqRef, viewHRef, mntedRHRef, mntCfgsT)
-        val g: CompFsEff ~> FsErrsIOM = CompFsEff.toFsErrsIOM(evalFsRef, mntsRef, mntCfgsT)
+        val f: FsEff ~> FsEvalIOM = FsEff.toFsEvalIOM(seqRef, viewHRef, mntedRHRef)
+        val g: CompFsEff ~> FsEvalIOM = CompFsEff.toFsEvalIOM(evalFsRef, mntsRef)
 
         val liftTask: Task ~> CfgsErrsIOM =
           injectFT[Task, CfgsErrsIO]
 
-        val translateFsErrs: FsErrsIOM ~> CfgsErrsIOM =
-          free.foldMapNT[FsErrsIO, CfgsErrsIOM](
-            injectFT[MongoErr, CfgsErrsIO] :+: liftTask)
+        val translateFsErrs: FsEvalIOM ~> CfgsErrsIOM =
+          free.foldMapNT[FsEvalIO, CfgsErrsIOM](
+            liftTask                           :+:
+            injectFT[MongoErr, CfgsErrsIO]     :+:
+            injectFT[MountConfigs, CfgsErrsIO])
 
         val mnt: CompleteFsEff ~> CfgsErrsIOM =
           injectFT[MountConfigs, CfgsErrsIO] :+:

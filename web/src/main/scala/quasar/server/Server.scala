@@ -122,10 +122,10 @@ object Server {
     for {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
       mntCfgsT     =  writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath)
-      coreApi      <- CoreEff.interpreter[WebConfig](mntCfgsT).liftM[MainErrT]
-      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral)) compose coreApi
+      coreApi      <- CoreEff.interpreter.liftM[MainErrT]
+      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(ephemeralMountConfigs[Task])) compose coreApi
       _            <- (mountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
-      durableApi   =  foldMapNT(toResponseOr(MntCfgsIO.durable[WebConfig](mntCfgsT))) compose coreApi
+      durableApi   =  foldMapNT(toResponseOr(mntCfgsT)) compose coreApi
     } yield service(
       webConfig.server.port,
       qConfig.staticContent,

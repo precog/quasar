@@ -1,0 +1,1 @@
+- Add publishSettings to foundation and ejson

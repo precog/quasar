@@ -180,6 +180,7 @@ lazy val root = project.in(file("."))
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -187,6 +188,7 @@ lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 

@@ -59,33 +59,32 @@ object RestApi {
       "/welcome" -> welcome.service
     )
 
-  /** Converts `QHttpService`s into `HttpService`s and mounts them along with
-    * any additional `HttpService`s provided, applying the default middleware
-    * to the result.
+  /** Mount services and apply default middleware to the result.
     *
     * TODO: Is using `Prefix` necessary? Can we replace with
     *       `org.http4s.server.Router` instead?
     */
-  def finalizeServicesF[S[_]](
-    f: Free[S, ?] ~> ResponseOr)(
-    qsvcs: Map[String, QHttpService[S]],
-    hsvcs: Map[String, HttpService]
-  ): HttpService = {
-    val allSvcs = qsvcs.mapValues(_.toHttpServiceF(f)) ++ hsvcs
-    // Sort by prefix length so that foldLeft results in routes procesed in
+  def finalizeServices(svcs: Map[String, HttpService]): HttpService = {
+    // Sort by prefix length so that foldLeft results in routes processed in
     // descending order (longest first), this ensures that something mounted
     // at `/a/b/c` is consulted before a mount at `/a/b`.
-    defaultMiddleware(allSvcs.toList.sortBy(_._1.length).foldLeft(HttpService.empty) {
-      case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
-    })
+    defaultMiddleware(
+      svcs.toList.sortBy(_._1.length).foldLeft(HttpService.empty) {
+        case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
+      })
   }
 
-  def finalizeServices[S[_]](
-    f: S ~> ResponseOr)(
-    qsvcs: Map[String, QHttpService[S]],
-    hsvcs: Map[String, HttpService]
-  ): HttpService =
-    finalizeServicesF(foldMapNT(f))(qsvcs, hsvcs)
+  def toHttpServices[S[_]](
+    f: S ~> ResponseOr,
+    svcs: Map[String, QHttpService[S]])
+    : Map[String, HttpService] =
+    toHttpServicesF(foldMapNT(f), svcs)
+
+  def toHttpServicesF[S[_]](
+    f: Free[S, ?] ~> ResponseOr,
+    svcs: Map[String, QHttpService[S]])
+    : Map[String, HttpService] =
+    svcs.mapValues(_.toHttpServiceF(f))
 
   def defaultMiddleware: HttpMiddleware =
     (cors(_)) <<< gzip <<< HeaderParam <<< passOptions

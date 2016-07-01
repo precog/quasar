@@ -48,9 +48,8 @@ class RestApiSpecs extends Specification {
       KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync) :+:
       Failure.toRuntimeError[Task,FileSystemError]                                        :+:
       fs
-    val service = RestApi.finalizeServices[Eff](
-      liftMT[Task, ResponseT].compose[Eff](eff))(
-      RestApi.coreServices[Eff], Map())
+    val service = RestApi.finalizeServices(
+      RestApi.toHttpServices(liftMT[Task, ResponseT] compose eff, RestApi.coreServices[Eff]))
 
     def testAdvertise(path: String,
                       additionalHeaders: List[Header],

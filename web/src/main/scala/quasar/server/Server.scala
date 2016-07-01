@@ -107,9 +107,8 @@ object Server {
     import RestApi._
 
     (reload: Int => Task[Unit]) =>
-      finalizeServices(eval)(
-        coreServices[CoreEff],
-        additionalServices
+      finalizeServices(
+        toHttpServices(eval, coreServices[CoreEff]) ++ additionalServices
       ) orElse nonApiService(initialPort, reload, staticContent, redirect)
   }
 

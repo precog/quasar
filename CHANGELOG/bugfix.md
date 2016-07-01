@@ -1,0 +1,2 @@
+- Remove QHttpService interpretation from finalizeServices
+- Add NamedDaemonThreadFactory

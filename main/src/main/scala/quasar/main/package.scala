@@ -28,6 +28,7 @@ import quasar.physical.mongodb._
 
 import com.mongodb.MongoException
 import monocle.Lens
+import pathy.Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
@@ -37,7 +38,6 @@ import scalaz.concurrent.Task
 package object main {
   import FileSystemDef.DefinitionResult
   import QueryFile.ResultHandle
-  import Mounting.PathTypeMismatch
 
   type MainErrT[F[_], A] = EitherT[F, String, A]
   type MainTask[A]       = MainErrT[Task, A]
@@ -251,18 +251,30 @@ package object main {
       }
   }
 
-  /** Mount all the mounts defined in the given configuration. */
-  def mountAll[S[_]]
-      (mc: MountingsConfig)
-      (implicit mnt: Mounting.Ops[S])
-      : Free[S, String \/ Unit] = {
+  /** Mount all the mounts defined in the given configuration, returning
+    * the paths that failed to mount along with the reasons why.
+    */
+  def attemptMountAll[S[_]](
+    config: MountingsConfig
+  )(implicit
+    mounting: Mounting.Ops[S]
+  ): Free[S, Map[APath, String]] = {
+    val attemptMount: ((APath, MountConfig)) => Free[S, Map[APath, String]] = {
+      case (path, cfg) =>
+        mounting.mount(path, cfg).run map {
+          case \/-(\/-(_)) => Map.empty
+          case \/-(-\/(e)) => Map(path -> e.shows)
+          case -\/(e)      => Map(path -> e.shows)
+        }
+    }
 
-    type MainF[A] = EitherT[mnt.F, String, A]
+    config.toMap.toList foldMapM attemptMount
+  }
 
-    def toMainF(v: mnt.M[PathTypeMismatch \/ Unit]): MainF[Unit] =
-      EitherT[mnt.F, String, Unit](
-        v.fold(_.shows.left, _.fold(_.shows.left, _.right)))
-
-    mc.toMap.toList.traverse_ { case (p, cfg) => toMainF(mnt.mount(p, cfg)) }.run
+  /** Prints a warning about the mount failure to the console. */
+  val logFailedMount: ((APath, String)) => Task[Unit] = {
+    case (path, err) => console.stderr(
+      s"Warning: Failed to mount '${posixCodec.printPath(path)}' because '$err'."
+    )
   }
 }

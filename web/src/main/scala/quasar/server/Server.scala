@@ -30,8 +30,10 @@ import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
 import scalaz._
+import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.string._
+import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 import scalaz.concurrent.Task
@@ -123,7 +125,9 @@ object Server {
       mntCfgsT     =  writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath)
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
       ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(ephemeralMountConfigs[Task])) compose coreApi
-      _            <- (mountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
+      failedMnts   <- attemptMountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi
+      // TODO: Still need to expose these in the HTTP API, see SD-1131
+      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
       durableApi   =  foldMapNT(toResponseOr(mntCfgsT)) compose coreApi
     } yield service(
       webConfig.server.port,

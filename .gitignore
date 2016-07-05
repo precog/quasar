@@ -9,3 +9,5 @@ tmp
 .settings
 *.sw*
 tags
+/.ensime
+.ensime_cache/

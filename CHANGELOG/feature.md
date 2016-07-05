@@ -1,0 +1,1 @@
+- Add script that runs tests on dockerized mongodb

@@ -48,7 +48,30 @@ Note: please note that we are not using here a system wide sbt, but our own copy
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
 This will lead to failures in the integration test project (`it`). The reason for the failures is the fact that there is no configured
-"backend" to connect to in order to run the integration tests. Currently Quasar only supports MongoDB so in order to run the integration
+"backend" to connect to in order to run the integration tests. There are two ways two run the whole suite:
+
+1. Use dockerized integration tests script
+2. Explicitly set-up infrastrucutre
+
+##### Use dockerized integration tests script
+
+Note: this script is using Docker which has to be installed on your system in order to use it
+
+Simply run the following script
+
+```bash
+./full-it-tests.sh 
+```
+
+This script will
+1. clean any existing docker container named some-mongo
+2. run new instance of mongodb
+3. run tests on that instance
+4. clear afterwards
+
+##### Explicitly set-up infrastrucutre
+
+Currently Quasar only supports MongoDB so in order to run the integration
 tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
 you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
 allow you to run the integration tests offline as well as make the tests run as fast as possible.

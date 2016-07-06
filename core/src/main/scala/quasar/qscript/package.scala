@@ -80,14 +80,15 @@ package object qscript {
     implicit val show: Show[JoinSide] = Show.showFromToString
   }
 
-  type FreeUnit[T[_[_]], F[_]] = Free[F, Unit]
+  type FreeUnit[F[_]] = Free[F, Unit]
 
-  type FreeMap[T[_[_]]] = FreeUnit[T, MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeUnit[T, QScriptInternal[T, ?]]
+  type FreeMap[T[_[_]]] = FreeUnit[MapFunc[T, ?]]
+  type FreeQS[T[_[_]]] = FreeUnit[QScriptInternal[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
-  def UnitF[T[_[_]]] = Free.point[MapFunc[T, ?], Unit](())
+  def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
+
   final case class AbsMerge[T[_[_]], A, Q[_[_[_]]]](
     src: A,
     left: Q[T],

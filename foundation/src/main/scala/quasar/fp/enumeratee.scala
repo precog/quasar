@@ -17,6 +17,7 @@
 package quasar.fp
 
 import quasar.Predef._
+
 import scalaz._
 import scalaz.iteratee._
 

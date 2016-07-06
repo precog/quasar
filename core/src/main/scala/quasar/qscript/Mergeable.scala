@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.namegen._
 
 import simulacrum.typeclass
 import scalaz._
@@ -25,7 +26,7 @@ import scalaz._
   type IT[F[_]]
 
   def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: A, a2: A):
-      Option[Merge[IT, A]]
+      OptionT[State[NameGen, ?], Merge[IT, A]]
 }
 
 object Mergeable {
@@ -40,8 +41,7 @@ object Mergeable {
         left: FreeMap[T],
         right: FreeMap[T],
         p1: Const[A, Unit],
-        p2: Const[A, Unit]):
-          Option[Merge[T, Const[A, Unit]]] =
+        p2: Const[A, Unit]) =
         ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
           case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
         }
@@ -58,8 +58,7 @@ object Mergeable {
         left: FreeMap[IT],
         right: FreeMap[IT],
         cp1: Coproduct[F, G, Unit],
-        cp2: Coproduct[F, G, Unit]):
-          Option[Merge[IT, Coproduct[F, G, Unit]]] = {
+        cp2: Coproduct[F, G, Unit]) = {
         (cp1.run, cp2.run) match {
           case (-\/(left1), -\/(left2)) =>
             mf.mergeSrcs(left, right, left1, left2).map {
@@ -69,7 +68,7 @@ object Mergeable {
             mg.mergeSrcs(left, right, right1, right2).map {
               case AbsMerge(src, left, right) => AbsMerge(Coproduct(\/-(src)), left, right)
             }
-          case (_, _) => None
+          case (_, _) => OptionT.none
         }
       }
     }

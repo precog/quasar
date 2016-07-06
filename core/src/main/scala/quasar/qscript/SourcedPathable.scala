@@ -17,8 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.ejson.{Int => _, _}
 import quasar.fp._
+import quasar.namegen._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._
@@ -61,7 +61,7 @@ sealed abstract class SourcedPathable[T[_[_]], A] {
     extends SourcedPathable[T, A]
 
 object SourcedPathable {
-  implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, SourcedPathable[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, SourcedPathable[T, ?]] =
     new Delay[Equal, SourcedPathable[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -88,7 +88,7 @@ object SourcedPathable {
         }
     }
 
-  implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, SourcedPathable[T, ?]] =
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, SourcedPathable[T, ?]] =
     new Delay[Show, SourcedPathable[T, ?]] {
       def apply[A](s: Show[A]): Show[SourcedPathable[T, A]] = Show.show(_ match {
         case Map(src, mf) => Cord("Map(") ++
@@ -105,7 +105,7 @@ object SourcedPathable {
       })
     }
 
-  implicit def mergeable[T[_[_]]: Corecursive]:
+  implicit def mergeable[T[_[_]]: Corecursive: ShowT]:
       Mergeable.Aux[T, SourcedPathable[T, Unit]] =
     new Mergeable[SourcedPathable[T, Unit]] {
       type IT[F[_]] = T[F]
@@ -114,21 +114,25 @@ object SourcedPathable {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: SourcedPathable[IT, Unit],
-        p2: SourcedPathable[IT, Unit]): Option[Merge[IT, SourcedPathable[IT, Unit]]] =
+        p2: SourcedPathable[IT, Unit]) =
         (p1, p2) match {
-          case (Map(_, m1), Map(_, m2)) => {
-            val lf =
-              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit("tmp1")))
-            val rf =
-              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit("tmp2")))
+          case (Map(_, m1), Map(_, m2)) => OptionT(for {
+            lname <- freshName("mergel")
+            rname <- freshName("merger")
+          } yield {
+            val lf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(lname)))
+            val rf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(rname)))
+
+            //scala.Predef.println(s"lf>>>> ${lf.show}")
+            //scala.Predef.println(s"rf>>>> ${rf.show}")
 
             AbsMerge[IT, SourcedPathable[IT, Unit], FreeMap](Map((), Free.roll[MapFunc[IT, ?], Unit](
-              ConcatObjects(
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(StrLit("tmp1"), rebase(m1, left))),
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(StrLit("tmp2"), rebase(m2, right)))))),
+              ConcatMaps(
+                Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(lname), rebase(m1, left))),
+                Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(rname), rebase(m2, right)))))),
               lf, rf).some
-          }
-          case _ => None
+          })
+          case _ => OptionT(state(None))
         }
     }
 
@@ -139,5 +143,17 @@ object SourcedPathable {
 
       def digForBucket: SourcedPathable[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
         sp => IndexedStateT.stateT(sp.src)
+    }
+
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+      Normalizable[SourcedPathable[T, ?]] =
+    new Normalizable[SourcedPathable[T, ?]] {
+      def normalize = new (SourcedPathable[T, ?] ~> SourcedPathable[T, ?]) {
+        def apply[A](sp: SourcedPathable[T, A]) = sp match {
+          case Map(src, f)          => Map(src, normalizeMapFunc(f))
+          case LeftShift(src, s, r) => LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
+          case Union(src, l, r)     => Union(src, l.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize), r.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize))
+        }
+      }
     }
 }

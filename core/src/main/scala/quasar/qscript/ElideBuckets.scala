@@ -27,6 +27,8 @@ import simulacrum.typeclass
   type InnerPure = IT[QScriptPure[IT, ?]]
 
   def purify: F[InnerPure] => QScriptPure[IT, InnerPure]
+  // #1: F[_]](implicit QSC :<: F, )
+  // #2: transformations work across Free
 }
 
 object ElideBuckets extends ElideBucketsInstances {

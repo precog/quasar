@@ -16,7 +16,6 @@
 
 package quasar.qscript
 
-import quasar.ejson.{Int => _, _}
 import quasar.Predef._
 import quasar.fp._
 
@@ -44,7 +43,7 @@ import scalaz._, Scalaz._
   combine: JoinFunc[T])
 
 object ThetaJoin {
-  implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, ThetaJoin[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ThetaJoin[T, ?]] =
     new Delay[Equal, ThetaJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -62,7 +61,7 @@ object ThetaJoin {
     }
 
 
-  implicit def show[T[_[_]]](implicit s: Show[T[EJson]]): Delay[Show, ThetaJoin[T, ?]] =
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
@@ -84,11 +83,11 @@ object ThetaJoin {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: ThetaJoin[IT, Unit],
-        p2: ThetaJoin[IT, Unit]): Option[Merge[IT, ThetaJoin[IT, Unit]]] =
+        p2: ThetaJoin[IT, Unit]) =
         if (p1 == p2)
-          Some(AbsMerge[IT, ThetaJoin[IT, Unit], FreeMap](p1, UnitF, UnitF))
+          OptionT(state(Some(AbsMerge[IT, ThetaJoin[IT, Unit], FreeMap](p1, UnitF, UnitF))))
         else
-          None
+          OptionT(state(None))
     }
 
   implicit def bucketable[T[_[_]]: Corecursive]:
@@ -98,5 +97,20 @@ object ThetaJoin {
 
       def digForBucket: ThetaJoin[T, Inner] => StateT[QScriptBucket[IT, Inner] \/ ?, Int, Inner] =
         sp => IndexedStateT.stateT(sp.src)
+    }
+
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+      Normalizable[ThetaJoin[T, ?]] =
+    new Normalizable[ThetaJoin[T, ?]] {
+      def normalize = new (ThetaJoin[T, ?] ~> ThetaJoin[T, ?]) {
+        def apply[A](tj: ThetaJoin[T, A]) =
+          ThetaJoin(
+            tj.src,
+            tj.lBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+            tj.rBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+            normalizeMapFunc(tj.on),
+            tj.f,
+            normalizeMapFunc(tj.combine))
+      }
     }
 }

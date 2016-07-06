@@ -17,7 +17,6 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.ejson.{Int => _, _}
 import quasar.fp._
 
 import matryoshka._
@@ -70,7 +69,7 @@ sealed abstract class QScriptCore[T[_[_]], A] {
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  implicit def equal[T[_[_]]](implicit EqT: Equal[T[EJson]]): Delay[Equal, QScriptCore[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -99,7 +98,7 @@ object QScriptCore {
         }
     }
 
-  implicit def show[T[_[_]]](implicit EJ: Show[T[EJson]]): Delay[Show, QScriptCore[T, ?]] =
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
@@ -135,8 +134,8 @@ object QScriptCore {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: QScriptCore[IT, Unit],
-        p2: QScriptCore[IT, Unit]): Option[Merge[IT, QScriptCore[IT, Unit]]] =
-        (p1, p2) match {
+        p2: QScriptCore[IT, Unit]) =
+        OptionT(state((p1, p2) match {
           case (t1, t2) if t1 == t2 =>
             AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](t1, UnitF, UnitF).some
           case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
@@ -153,7 +152,7 @@ object QScriptCore {
               None
           }
           case (_, _) => None
-        }
+        }))
     }
 
   implicit def bucketable[T[_[_]]: Corecursive]:
@@ -169,6 +168,30 @@ object QScriptCore {
           ((s + 1, src)).right[QScriptBucket[T, Inner]]
         }
         case qs => IndexedStateT.stateT(qs.src)
+      }
+    }
+
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+      Normalizable[QScriptCore[T, ?]] =
+    new Normalizable[QScriptCore[T, ?]] {
+      def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
+        def apply[A](qc: QScriptCore[T, A]) = qc match {
+          case Reduce(src, bucket, reducers, repair) =>
+            Reduce(src, normalizeMapFunc(bucket), reducers.map(_.map(normalizeMapFunc(_))), normalizeMapFunc(repair))
+          case Sort(src, bucket, order) =>
+            Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
+          case Filter(src, f) => Filter(src, normalizeMapFunc(f))
+          case Take(src, from, count) =>
+            Take(
+              src,
+              from.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+              count.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize))
+          case Drop(src, from, count) =>
+            Drop(
+              src,
+              from.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+              count.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize))
+        }
       }
     }
 }

@@ -16,7 +16,6 @@
 
 package quasar.qscript
 
-import quasar.ejson.{Int => _, _}
 import quasar.Predef._
 import quasar.fp._
 
@@ -58,7 +57,7 @@ sealed abstract class QScriptBucket[T[_[_]], A] {
     extends QScriptBucket[T, A]
 
 object QScriptBucket {
-  implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, QScriptBucket[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptBucket[T, ?]] =
     new Delay[Equal, QScriptBucket[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -96,7 +95,7 @@ object QScriptBucket {
       }
     }
 
-  implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, QScriptBucket[T, ?]] =
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptBucket[T, ?]] =
     new Delay[Show, QScriptBucket[T, ?]] {
       def apply[A](sh: Show[A]): Show[QScriptBucket[T, A]] =
         Show.show {
@@ -131,7 +130,7 @@ object QScriptBucket {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: QScriptBucket[IT, Unit],
-        p2: QScriptBucket[IT, Unit]): Option[Merge[IT, QScriptBucket[IT, Unit]]] = None
+        p2: QScriptBucket[IT, Unit]) = OptionT(state(None))
     }
 
   implicit def bucketable[T[_[_]]: Corecursive]:

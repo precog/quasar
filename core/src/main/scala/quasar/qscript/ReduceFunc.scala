@@ -20,7 +20,7 @@ import quasar._
 import quasar.fp._
 import quasar.std.StdLib._
 
-import scalaz._
+import scalaz._, Scalaz._
 
 sealed trait ReduceFunc[A]
 
@@ -51,6 +51,18 @@ object ReduceFunc {
         case Arbitrary(a) => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
       }
     }
+
+  implicit val traverse: Traverse[ReduceFunc] = new Traverse[ReduceFunc] {
+    def traverseImpl[G[_]: Applicative, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
+      fa match {
+        case Count(a) => f(a) ∘ (Count(_))
+        case Sum(a) => f(a) ∘ (Sum(_))
+        case Min(a) => f(a) ∘ (Min(_))
+        case Max(a) => f(a) ∘ (Max(_))
+        case Avg(a) => f(a) ∘ (Avg(_))
+        case Arbitrary(a) => f(a) ∘ (Arbitrary(_))
+      }
+  }
 
   def translateReduction[A]: UnaryFunc => A => ReduceFunc[A] = {
     case agg.Count     => Count(_)

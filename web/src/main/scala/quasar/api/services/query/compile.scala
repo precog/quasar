@@ -26,6 +26,7 @@ import quasar.fp.numeric._
 import argonaut._, Argonaut._
 import matryoshka._
 import org.http4s.dsl._
+import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
@@ -35,10 +36,10 @@ object compile {
     Q: QueryFile.Ops[S],
     M: ManageFile.Ops[S]
   ): QHttpService[S] = {
-    def phaseResultsResponse(prs: PhaseResults): Option[QResponse[S]] =
+    def phaseResultsResponse(prs: PhaseResults): Option[Json] =
       prs.lastOption map {
-        case PhaseResult.Tree(name, value)   => Json(name := value).toResponse
-        case PhaseResult.Detail(name, value) => QResponse.string(Ok, name + "\n" + value)
+        case PhaseResult.Tree(name, value)   => value.asJson
+        case PhaseResult.Detail(name, value) => value.asJson
       }
 
     def dataResponse(data: List[Data]): QResponse[S] =
@@ -63,6 +64,11 @@ object compile {
           lp => Q.explain(lp).run.run.map {
             case (phases, \/-(_)) =>
               phaseResultsResponse(phases)
+                .map(physicalPlanJson =>
+                  Json(
+                    "physicalPlan" := physicalPlanJson,
+                    "inputs"       := LogicalPlan.paths(lp).map(p => posixCodec.printPath(p))
+                  ).toResponse[S])
                 .toRightDisjunction(noOutputError(lp))
                 .toResponse[S]
             case (_, -\/(fsErr)) => fsErr.toResponse[S]

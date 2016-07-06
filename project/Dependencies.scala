@@ -10,8 +10,8 @@ object Dependencies {
   private val mongoVersion    = "3.2.2"
   private val monocleVersion  = "1.2.2"
   private val nettyVersion    = "4.0.36.Final"
-  private val pathyVersion    = "0.2.0"
-  private val raptureVersion  = "2.0.0-M5"
+  private val pathyVersion    = "0.2.1"
+  private val raptureVersion  = "2.0.0-M6"
   private val refinedVersion  = "0.4.0"
   private val scalazVersion   = "7.2.3"
   private val scodecVersion   = "1.0.10"
@@ -58,8 +58,8 @@ object Dependencies {
   val web = Seq(
     "org.http4s"           %% "http4s-dsl"            % http4sVersion % "compile, test",
     "org.http4s"           %% "http4s-argonaut"       % http4sVersion % "compile, test",
-    "org.http4s"           %% "http4s-blaze-server"   % http4sVersion  % "compile, test",
-    "org.http4s"           %% "http4s-blaze-client"   % http4sVersion  % "test",
+    "org.http4s"           %% "http4s-blaze-server"   % http4sVersion % "compile, test",
+    "org.http4s"           %% "http4s-blaze-client"   % http4sVersion % "test",
     // This dependency is calling for scalaz 7.1.x which gets evicted. All tests
     // work even though there is a chance of hitting a binary incompatibility at
     // some point.

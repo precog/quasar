@@ -46,11 +46,7 @@ import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
-// Would like to use the argonaut backend, but that's not possible
-// yet because rapture is still on argonaut 6.1 and we are using
-// 6.2-M1. So using another rapture "backend" and printing/parsing
-// in order to do conversions without depending on the argonaut backend
-// that rapture provides.
+// TODO: Consider if possible to use argonaut backend and avoid printing followed by parsing
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

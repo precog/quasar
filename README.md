@@ -14,9 +14,9 @@ SQL² is the dialect of SQL that Quasar understands.
 
 SQL² is a superset of standard SQL. Therefore, in the following documentation SQL² will be used interchangeably with SQL.
 
-TODO: Provide more details on SQL²
+See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
-SQL² supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as additional parameters in the connectionUri using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error when the mount is created or used. These values use the same syntax as the query itself; notably, strings should be surrounded by double quotes. Some acceptable values are `123`, `"CO"`, and `DATE("2015-07-06")`.
+SQL² supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as additional parameters in the url, using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by double quotes. Some acceptable values are `123`, `"CO"`, and `DATE("2015-07-06")`.
 
 ## Using the Pre-Built JARs
 

@@ -1,0 +1,1 @@
+- [SD-1774] Warn and skip failed mounts on startup

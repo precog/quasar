@@ -17,7 +17,6 @@
 package quasar.qscript
 
 import quasar._
-import quasar.ejson
 import quasar.ejson._
 import quasar.Predef._
 import quasar.fp._
@@ -137,41 +136,39 @@ object MapFunc {
         case DupMapKeys(a1) => f(a1) ∘ (DupMapKeys(_))
 
         // binary
-        case Extract(a1, a2) => (f(a1) |@| f(a2))(Extract(_, _))
-        case Add(a1, a2) => (f(a1) |@| f(a2))(Add(_, _))
-        case Multiply(a1, a2) => (f(a1) |@| f(a2))(Multiply(_, _))
-        case Subtract(a1, a2) => (f(a1) |@| f(a2))(Subtract(_, _))
-        case Divide(a1, a2) => (f(a1) |@| f(a2))(Divide(_, _))
-        case Modulo(a1, a2) => (f(a1) |@| f(a2))(Modulo(_, _))
-        case Power(a1, a2) => (f(a1) |@| f(a2))(Power(_, _))
-        case Eq(a1, a2) => (f(a1) |@| f(a2))(Eq(_, _))
-        case Neq(a1, a2) => (f(a1) |@| f(a2))(Neq(_, _))
-        case Lt(a1, a2) => (f(a1) |@| f(a2))(Lt(_, _))
-        case Lte(a1, a2) => (f(a1) |@| f(a2))(Lte(_, _))
-        case Gt(a1, a2) => (f(a1) |@| f(a2))(Gt(_, _))
-        case Gte(a1, a2) => (f(a1) |@| f(a2))(Gte(_, _))
-        case IfUndefined(a1, a2) => (f(a1) |@| f(a2))(IfUndefined(_, _))
-        case And(a1, a2) => (f(a1) |@| f(a2))(And(_, _))
-        case Or(a1, a2) => (f(a1) |@| f(a2))(Or(_, _))
-        case Coalesce(a1, a2) => (f(a1) |@| f(a2))(Coalesce(_, _))
-        case In(a1, a2) => (f(a1) |@| f(a2))(In(_, _))
-        case Within(a1, a2) => (f(a1) |@| f(a2))(Within(_, _))
-        case Constantly(a1, a2) => (f(a1) |@| f(a2))(Constantly(_, _))
-        case MakeObject(a1, a2) => (f(a1) |@| f(a2))(MakeObject(_, _))
-        case ConcatObjects(a1, a2) => (f(a1) |@| f(a2))(ConcatObjects(_, _))
-        case ProjectIndex(a1, a2) => (f(a1) |@| f(a2))(ProjectIndex(_, _))
-        case ProjectField(a1, a2) => (f(a1) |@| f(a2))(ProjectField(_, _))
-        case DeleteField(a1, a2) => (f(a1) |@| f(a2))(DeleteField(_, _))
-        case ConcatArrays(a1, a2) => (f(a1) |@| f(a2))(ConcatArrays(_, _))
-        case Range(a1, a2) => (f(a1) |@| f(a2))(Range(_, _))
+        case Extract(a1, a2) => (f(a1) ⊛ f(a2))(Extract(_, _))
+        case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
+        case Multiply(a1, a2) => (f(a1) ⊛ f(a2))(Multiply(_, _))
+        case Subtract(a1, a2) => (f(a1) ⊛ f(a2))(Subtract(_, _))
+        case Divide(a1, a2) => (f(a1) ⊛ f(a2))(Divide(_, _))
+        case Modulo(a1, a2) => (f(a1) ⊛ f(a2))(Modulo(_, _))
+        case Power(a1, a2) => (f(a1) ⊛ f(a2))(Power(_, _))
+        case Eq(a1, a2) => (f(a1) ⊛ f(a2))(Eq(_, _))
+        case Neq(a1, a2) => (f(a1) ⊛ f(a2))(Neq(_, _))
+        case Lt(a1, a2) => (f(a1) ⊛ f(a2))(Lt(_, _))
+        case Lte(a1, a2) => (f(a1) ⊛ f(a2))(Lte(_, _))
+        case Gt(a1, a2) => (f(a1) ⊛ f(a2))(Gt(_, _))
+        case Gte(a1, a2) => (f(a1) ⊛ f(a2))(Gte(_, _))
+        case IfUndefined(a1, a2) => (f(a1) ⊛ f(a2))(IfUndefined(_, _))
+        case And(a1, a2) => (f(a1) ⊛ f(a2))(And(_, _))
+        case Or(a1, a2) => (f(a1) ⊛ f(a2))(Or(_, _))
+        case Coalesce(a1, a2) => (f(a1) ⊛ f(a2))(Coalesce(_, _))
+        case Within(a1, a2) => (f(a1) ⊛ f(a2))(Within(_, _))
+        case MakeObject(a1, a2) => (f(a1) ⊛ f(a2))(MakeObject(_, _))
+        case ConcatObjects(a1, a2) => (f(a1) ⊛ f(a2))(ConcatObjects(_, _))
+        case ProjectIndex(a1, a2) => (f(a1) ⊛ f(a2))(ProjectIndex(_, _))
+        case ProjectField(a1, a2) => (f(a1) ⊛ f(a2))(ProjectField(_, _))
+        case DeleteField(a1, a2) => (f(a1) ⊛ f(a2))(DeleteField(_, _))
+        case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
+        case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
 
         //  ternary
-        case Between(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Between(_, _, _))
-        case Cond(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Cond(_, _, _))
-        case Like(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Like(_, _, _))
-        case Search(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Search(_, _, _))
-        case Substring(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Substring(_, _, _))
-        case Guard(a1, tpe, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Guard(_, tpe, _, _))
+        case Between(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Between(_, _, _))
+        case Cond(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Cond(_, _, _))
+        case Like(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Like(_, _, _))
+        case Search(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Search(_, _, _))
+        case Substring(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Substring(_, _, _))
+        case Guard(a1, tpe, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Guard(_, tpe, _, _))
       }
   }
 
@@ -220,9 +217,7 @@ object MapFunc {
         case (And(a1, a2), And(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Or(a1, a2), Or(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Coalesce(a1, a2), Coalesce(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (In(a1, a2), In(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Within(a1, a2), Within(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (Constantly(a1, a2), Constantly(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (MakeObject(a1, a2), MakeObject(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatObjects(a1, a2), ConcatObjects(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ProjectIndex(a1, a2), ProjectIndex(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -288,9 +283,7 @@ object MapFunc {
         case And(a1, a2) => Cord("And(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case Or(a1, a2) => Cord("Or(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case Coalesce(a1, a2) => Cord("Coalesce(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case In(a1, a2) => Cord("In(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case Within(a1, a2) => Cord("Within(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Constantly(a1, a2) => Cord("Constantly(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case MakeObject(a1, a2) => Cord("MakeObject(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case ConcatObjects(a1, a2) => Cord("ConcatObjects(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case ProjectIndex(a1, a2) => Cord("ProjectIndex(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
@@ -353,9 +346,7 @@ object MapFunc {
       case relations.And => And(_, _)
       case relations.Or => Or(_, _)
       case relations.Coalesce => Coalesce(_, _)
-      case set.In => In(_, _)
       case set.Within => Within(_, _)
-      case set.Constantly => Constantly(_, _)
       case structural.MakeObject => MakeObject(_, _)
       case structural.ObjectConcat => ConcatObjects(_, _)
       case structural.ArrayProject => ProjectIndex(_, _)
@@ -418,9 +409,7 @@ object MapFuncs {
   @Lenses final case class Cond[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
 
   // set
-  @Lenses final case class In[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Within[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class Constantly[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // string
   @Lenses final case class Lower[T[_[_]], A](a1: A) extends Unary[T, A]

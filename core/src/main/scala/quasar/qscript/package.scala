@@ -68,6 +68,9 @@ package object qscript {
   def ThetaJoinInternal[T[_[_]]] = implicitly[ThetaJoin[T, ?] :<: QScriptInternal[T, ?]]
   def QScriptBucketInternal[T[_[_]]] = implicitly[QScriptBucket[T, ?] :<: QScriptInternal[T, ?]]
 
+  val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
+  val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
+
   sealed trait JoinSide
   final case object LeftSide extends JoinSide
   final case object RightSide extends JoinSide
@@ -96,49 +99,6 @@ package object qscript {
   // replace Unit in `in` with `field`
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
-  implicit def constMergeable[T[_[_]], A](implicit ma: Mergeable.Aux[T, A]):
-      Mergeable.Aux[T, Const[A, Unit]] =
-    new Mergeable[Const[A, Unit]] {
-      type IT[F[_]] = T[F]
-
-      def mergeSrcs(
-        left: FreeMap[T],
-        right: FreeMap[T],
-        p1: Const[A, Unit],
-        p2: Const[A, Unit]):
-          Option[Merge[T, Const[A, Unit]]] =
-        ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
-          case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
-        }
-    }
-
-  implicit def coproductMergeable[T[_[_]], F[_], G[_]](
-    implicit mf: Mergeable.Aux[T, F[Unit]],
-             mg: Mergeable.Aux[T, G[Unit]]):
-      Mergeable.Aux[T, Coproduct[F, G, Unit]] =
-    new Mergeable[Coproduct[F, G, Unit]] {
-      type IT[F[_]] = T[F]
-
-      def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
-        cp1: Coproduct[F, G, Unit],
-        cp2: Coproduct[F, G, Unit]):
-          Option[Merge[IT, Coproduct[F, G, Unit]]] = {
-        (cp1.run, cp2.run) match {
-          case (-\/(left1), -\/(left2)) =>
-            mf.mergeSrcs(left, right, left1, left2).map {
-              case AbsMerge(src, left, right) => AbsMerge(Coproduct(-\/(src)), left, right)
-            }
-          case (\/-(right1), \/-(right2)) =>
-            mg.mergeSrcs(left, right, right1, right2).map {
-              case AbsMerge(src, left, right) => AbsMerge(Coproduct(\/-(src)), left, right)
-            }
-          case (_, _) => None
-        }
-      }
-    }
-
   implicit def constBucketable[T[_[_]]: Corecursive]:
       Bucketable.Aux[T, Const[DeadEnd, ?]] =
     new Bucketable[Const[DeadEnd, ?]] {
@@ -147,20 +107,6 @@ package object qscript {
       def digForBucket: Const[DeadEnd, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
         const => StateT { s =>
           (s, DeadEndInternal[T].inj(const).embed).right[QScriptBucket[T, Inner]]
-        }
-    }
-
-  implicit def coproductBucketable[T[_[_]], F[_], G[_]](
-    implicit mf: Bucketable.Aux[T, F],
-             mg: Bucketable.Aux[T, G]):
-      Bucketable.Aux[T, Coproduct[F, G, ?]] =
-    new Bucketable[Coproduct[F, G, ?]] {
-      type IT[F[_]] = T[F]
-
-      def digForBucket: Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
-        _.run match {
-          case -\/(f) => mf.digForBucket(f)
-          case \/-(g) => mg.digForBucket(g)
         }
     }
 }

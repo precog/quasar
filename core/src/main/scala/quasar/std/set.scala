@@ -277,7 +277,7 @@ trait SetLib extends Library {
   //       also allow us to make simplification non-Corecursive and ∴ operate
   //       on Cofree.
   val In = BinaryFunc(
-    Mapping,
+    Sifting,
     "(in)",
     "Determines whether a value is in a given set.",
     Type.Bool,
@@ -321,7 +321,7 @@ trait SetLib extends Library {
     basicUntyper)
 
   val Constantly = BinaryFunc(
-    Mapping,
+    Transformation,
     "CONSTANTLY", "Always return the same value",
     Type.Bottom,
     Func.Input2(Type.Top, Type.Top),

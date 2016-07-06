@@ -32,4 +32,15 @@ import scalaz._
 
 object Bucketable {
   type Aux[T[_[_]], F[_]] = Bucketable[F] { type IT[G[_]] = T[G] }
+
+  implicit def coproduct[T[_[_]], F[_], G[_]](
+    implicit F: Bucketable.Aux[T, F], G: Bucketable.Aux[T, G]):
+      Bucketable.Aux[T, Coproduct[F, G, ?]] =
+    new Bucketable[Coproduct[F, G, ?]] {
+      type IT[F[_]] = T[F]
+
+      def digForBucket:
+          Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
+        _.run.fold(F.digForBucket, G.digForBucket)
+    }
 }

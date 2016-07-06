@@ -29,32 +29,28 @@ import simulacrum.typeclass
   def purify: F[InnerPure] => QScriptPure[IT, InnerPure]
 }
 
-object ElideBuckets extends Elide2 {
+object ElideBuckets extends ElideBucketsInstances {
   type Aux[T[_[_]], F[_]] = ElideBuckets[F] { type IT[G[_]] = T[G] }
 }
 
-trait Elide1 {
-  implicit def generalElideBuckets[T[_[_]], G[_]](
-    implicit G: G :<: QScriptPure[T, ?]):
-      ElideBuckets.Aux[T, G] =
-    new ElideBuckets[G] {
+trait ElideBucketsInstances0 {
+  implicit def inject[T[_[_]], F[_]](implicit F: F :<: QScriptPure[T, ?]):
+      ElideBuckets.Aux[T, F] =
+    new ElideBuckets[F] {
       type IT[K[_]] = T[K]
 
-      def purify: G[InnerPure] => QScriptPure[IT, InnerPure] = G.inj
+      def purify: F[InnerPure] => QScriptPure[IT, InnerPure] = F.inj
     }
 }
 
-trait Elide2 extends Elide1 {
-  implicit def coproductElideBuckets[T[_[_]], F[_], G[_]](
-    implicit mf: ElideBuckets.Aux[T, F],
-             mg: ElideBuckets.Aux[T, G]):
+trait ElideBucketsInstances extends ElideBucketsInstances0 {
+  implicit def coproduct[T[_[_]], F[_], G[_]](
+    implicit F: ElideBuckets.Aux[T, F], G: ElideBuckets.Aux[T, G]):
       ElideBuckets.Aux[T, Coproduct[F, G, ?]] =
     new ElideBuckets[Coproduct[F, G, ?]] {
       type IT[K[_]] = T[K]
   
-      def purify: Coproduct[F, G, InnerPure] => QScriptPure[IT, InnerPure] = _.run match {
-        case -\/(f) => mf.purify(f)
-        case \/-(g) => mg.purify(g)
-      }
+      def purify: Coproduct[F, G, InnerPure] => QScriptPure[IT, InnerPure] =
+        _.run.fold(F.purify, G.purify)
     }
 }

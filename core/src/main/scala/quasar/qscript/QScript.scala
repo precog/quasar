@@ -17,7 +17,6 @@
 package quasar.qscript
 
 import quasar._
-import quasar.ejson
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
 import quasar.namegen._
@@ -105,12 +104,13 @@ object Read {
 // backends can choose to rewrite joins using EquiJoin
 // can rewrite a ThetaJoin as EquiJoin + Filter
 @Lenses final case class EquiJoin[T[_[_]], A](
+  src: A,
+  lBranch: FreeQS[T],
+  rBranch: FreeQS[T],
   lKey: FreeMap[T],
   rKey: FreeMap[T],
   f: JoinType,
-  src: A,
-  lBranch: FreeQS[T],
-  rBranch: FreeQS[T])
+  combine: JoinFunc[T])
 
 object EquiJoin {
   implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]):
@@ -118,9 +118,15 @@ object EquiJoin {
     new Delay[Equal, EquiJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
-          case (EquiJoin(lk1, rk1, f1, a1, l1, r1),
-                EquiJoin(lk2, rk2, f2, a2, l2, r2)) =>
-            lk1 ≟ lk2 && rk1 ≟ rk2 && f1 ≟ f2 && eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
+          case (EquiJoin(a1, l1, r1, lk1, rk1, f1, c1),
+                EquiJoin(a2, l2, r2, lk2, rk2, f2, c2)) =>
+            eq.equal(a1, a2) &&
+            l1 ≟ l2 &&
+            r1 ≟ r2 &&
+            lk1 ≟ lk2 &&
+            rk1 ≟ rk2 &&
+            f1 ≟ f2 &&
+            c1 ≟ c2
         }
     }
 
@@ -130,7 +136,7 @@ object EquiJoin {
         fa: EquiJoin[T, A])(
         f: A => G[B]) =
         f(fa.src) ∘
-          (EquiJoin(fa.lKey, fa.rKey, fa.f, _, fa.lBranch, fa.rBranch))
+          (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
     }
 }
 
@@ -684,15 +690,11 @@ class Transform[T[_[_]]: Recursive: Corecursive](
       def invoke(tpe: JoinType): QScriptInternal[T, Inner] =
         ThetaJoinInternal[T].inj(invokeThetaJoin(Func.Input3(a1, a2, a3), tpe))
 
-      //scala.Predef.println(s"left:  ${a1.shows}")
-      //scala.Predef.println(s"right: ${a2.shows}")
-      //scala.Predef.println(s"cond:  ${a3.transCata(liftFG((new Optimize[T]).elideNopJoins[QScriptInternal[T, ?]])).shows}")
-
       stateT(func match {
-        case set.InnerJoin => invoke(Inner)
-        case set.LeftOuterJoin => invoke(LeftOuter)
+        case set.InnerJoin      => invoke(Inner)
+        case set.LeftOuterJoin  => invoke(LeftOuter)
         case set.RightOuterJoin => invoke(RightOuter)
-        case set.FullOuterJoin => invoke(FullOuter)
+        case set.FullOuterJoin  => invoke(FullOuter)
       })
   }
 }

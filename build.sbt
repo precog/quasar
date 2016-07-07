@@ -165,7 +165,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql,
+  mongodb, skeleton, postgresql, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -212,6 +212,7 @@ lazy val main = project
   .dependsOn(
     mongodb    % BothScopes,
     skeleton   % BothScopes,
+    sparkcore   % BothScopes,
     postgresql % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
@@ -241,6 +242,16 @@ lazy val postgresql = project
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
+
+lazy val sparkcore = project
+  .settings(name := "quasar-sparkcore-internal")
+  .dependsOn(core % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies +=
+    "org.apache.spark"  %  "spark-core_2.11"           % "1.6.2")
+  .enablePlugins(AutomateHeaderPlugin)
+
 
 // frontends
 

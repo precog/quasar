@@ -372,7 +372,7 @@ trait LowPriorityCoEnvImplicits {
   // TODO: move to matryoshka
 
   implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
-    CoEnv.bitraverse[F, Hole].rightTraverse
+    CoEnv.bitraverse[F, E].rightTraverse
 }
 
 trait CoEnvInstances extends LowPriorityCoEnvImplicits {

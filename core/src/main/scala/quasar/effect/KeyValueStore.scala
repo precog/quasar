@@ -111,7 +111,7 @@ object KeyValueStore {
   }
 
   object Ops {
-    def apply[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
+    implicit def apply[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
       new Ops[K, V, S]
   }
 

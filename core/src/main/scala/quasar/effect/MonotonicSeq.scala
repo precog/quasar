@@ -49,7 +49,7 @@ object MonotonicSeq {
   }
 
   object Ops {
-    def apply[S[_]](implicit S: MonotonicSeq :<: S): Ops[S] =
+    implicit def apply[S[_]](implicit S: MonotonicSeq :<: S): Ops[S] =
       new Ops[S]
   }
 

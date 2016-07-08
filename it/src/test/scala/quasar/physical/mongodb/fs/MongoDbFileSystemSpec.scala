@@ -116,8 +116,14 @@ class MongoDbFileSystemSpec
         "fail to save data to DB path" in {
           val path = rootDir </> file("foo")
 
-          runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must_==
-            -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
+          // NB: We receive the expected shape of error, but it is actually for
+          //     the temp path that is written to first, not the destination path.
+          //
+          //     This sort of thing shouldn't happen once we have primitive
+          //     support for save, see SD-1296.
+          runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must beLike {
+            case -\/(FileSystemError.PathErr(PathError.InvalidPath(_, msg))) => msg must_== "path names a database, but no collection"
+          }
         }
 
         "fail to append data to DB path" in {

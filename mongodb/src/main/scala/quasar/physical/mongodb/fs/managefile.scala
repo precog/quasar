@@ -55,11 +55,19 @@ object managefile {
           .run.liftM[ManageInT]
 
       case TempFile(path) =>
-        EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(path))
-          .leftMap(pathErr(_))
-          .flatMap(db => freshName.liftM[FileSystemErrT] map (n =>
-            rootDir[Sandboxed] </> dir1(Collection.dirNameFromDbName(db)) </> file(n)))
-          .run
+        val checkPath =
+          EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(path))
+            .leftMap(pathErr(_))
+            .void
+
+        val mkTemp =
+          freshName.liftM[FileSystemErrT] map { n =>
+            refineType(path).fold(
+              _ </> file(n),
+              f => fileParent(f) </> file(n))
+          }
+
+        (checkPath *> mkTemp).run
     }
   }
 

@@ -21,12 +21,16 @@ import quasar.Predef._
 import quasar.{Data, TestConfig}
 import quasar.fp._
 
+import org.specs2.ScalaCheck
 import pathy.Path._
+import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
 class ManageFilesSpec extends FileSystemTest[FileSystem](
-    FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
+    FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name))))
+    with ScalaCheck {
+
   import FileSystemTest._, FileSystemError._, PathError._
   import ManageFile._
 
@@ -230,6 +234,23 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
                 }
 
         runLogT(run, p).runEither must beRight(anotherDoc)
+      }
+
+      "temp file should be generated in hint directory" ! prop { rdir: RDir =>
+        val hintDir = managePrefix </> rdir
+
+        runT(run)(manage.tempFile(hintDir))
+          .map(_ relativeTo hintDir)
+          .runEither must beRight(beSome[RFile])
+      }
+
+      "temp file should be generated in parent of hint file" ! prop { rfile: RFile =>
+        val hintFile = managePrefix </> rfile
+        val hintDir  = fileParent(hintFile)
+
+        runT(run)(manage.tempFile(hintFile))
+          .map(_ relativeTo hintDir)
+          .runEither must beRight(beSome[RFile])
       }
 
       step(deleteForManage(fs.setupInterpM).runVoid)

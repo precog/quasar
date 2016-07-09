@@ -463,7 +463,4 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
   val parse: Query => ParsingError \/ T[Sql] =
     parse0(_).map(_.transAna(repeatedly(normalizeƒ)).makeTables(Nil))
-
-  def parseInContext(sql: Query, basePath: ADir): ParsingError \/ T[Sql] =
-    parse(sql).map(_.mkPathsAbsolute(basePath))
 }

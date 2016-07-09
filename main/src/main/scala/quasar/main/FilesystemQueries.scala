@@ -38,19 +38,24 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   def enumerateQuery(
     query: Fix[Sql],
     vars: Variables,
+    basePath: ADir,
     off: Natural,
     lim: Option[Positive]
   ): CompExecM[EnumeratorT[Data, ExecM]] =
-    compToCompExec(queryPlan(query, vars, off, lim))
+    compToCompExec(queryPlan(query, vars, basePath, off, lim))
       .map(_.fold(EnumeratorT.enumList(_), Q.enumerate(_)))
 
   /** Returns the source of values from the result of executing the given
     * SQL^2 query.
     */
   def evaluateQuery(
-    query: Fix[Sql], vars: Variables, off: Natural, lim: Option[Positive]):
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir,
+    off: Natural,
+    lim: Option[Positive]):
       Process[CompExecM, Data] =
-    queryPlan(query, vars, off, lim).sequenceU.fold(
+    queryPlan(query, vars, basePath, off, lim).sequenceU.fold(
       Process(_: _*),
       compToCompExec(_)
         .liftM[Process]
@@ -60,10 +65,13 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     * using the given output file if possible.
     */
   def executeQuery(
-    query: Fix[Sql], vars: Variables, out: AFile)(
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir,
+    out: AFile)(
     implicit W: WriteFile.Ops[S], MF: ManageFile.Ops[S]):
       CompExecM[AFile] =
-    compToCompExec(queryPlan(query, vars, 0L, None))
+    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
       .flatMap(lp => execToCompExec(lp.fold(
         d => fsErrToExec(W.saveThese(out, d.toVector).flatMap(fse => EitherT.fromDisjunction(fse.headOption <\/ out))),
         Q.execute(_, out))))

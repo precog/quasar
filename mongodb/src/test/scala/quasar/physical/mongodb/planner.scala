@@ -73,8 +73,10 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
   }
 
-  def queryPlanner(expr: Fix[Sql], vars: Variables) =
-    queryPlan(expr, vars, 0L, None)
+  val basePath = rootDir[Sandboxed] </> dir("db")
+
+  def queryPlanner(expr: Fix[Sql]) =
+    queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -83,9 +85,9 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         MongoDbPlanner.plan(_).leftMap(CPlannerError(_))))
 
   def plan(query: String): Either[CompilationError, Crystallized] = {
-    fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
+    fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_, Variables(Map())).run).value.toEither
+      queryPlanner(_).run).value.toEither
   }
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] = {
@@ -99,8 +101,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db"))
-    } yield queryPlanner(expr, Variables(Map())).run.written
+      expr <- fixParser.parse(Query(query))
+    } yield queryPlanner(expr).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -3869,7 +3871,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)", "Workflow Builder",
@@ -3879,13 +3881,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "include correct phases with type error" in {
       planLog("select 'a' + 0 from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Annotated Tree", "Logical Plan", "Optimized"))
+          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree", "Logical Plan", "Optimized"))
     }.pendingUntilFixed("SD-1249")
 
     "include correct phases with planner error" in {
       planLog("""select date_part("foo", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)"))

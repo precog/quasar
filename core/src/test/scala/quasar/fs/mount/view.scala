@@ -125,7 +125,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   }
 
   def parseExpr(query: String) =
-    fixParser.parseInContext(Query(query), rootDir[Sandboxed]).toOption.get
+    fixParser.parse(Query(query)).toOption.get.mkPathsAbsolute(rootDir)
 
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
     def render(t: RenderedTree) = t
@@ -135,7 +135,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
-      val lp = queryPlan(expr, Variables.empty, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 

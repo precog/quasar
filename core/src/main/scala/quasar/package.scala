@@ -18,6 +18,7 @@ import quasar.Predef.{List, Long, String, Vector}
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fs.ADir
 import quasar.sql._
 import quasar.std.StdLib.set._
 
@@ -59,7 +60,7 @@ package object quasar {
       }
 
   // TODO: Move this into the SQL package, provide a type class for it in core.
-  def precompile(query: Fix[Sql], vars: Variables)(
+  def precompile(query: Fix[Sql], vars: Variables, basePath: ADir)(
     implicit RT: RenderTree[Fix[Sql]]):
       CompileM[Fix[LogicalPlan]] = {
     import SemanticAnalysis.AllPhases
@@ -68,7 +69,8 @@ package object quasar {
       ast      <- phase("SQL AST", query.right)
       substAst <- phase("Variables Substituted",
                     Variables.substVars(ast, vars) leftMap (_.wrapNel))
-      annTree  <- phase("Annotated Tree", AllPhases(substAst))
+      absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
+      annTree  <- phase("Annotated Tree", AllPhases(absAst))
       logical  <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
     } yield logical
   }
@@ -79,10 +81,10 @@ package object quasar {
     * optimization.
     */
   def queryPlan(
-    query: Fix[Sql], vars: Variables, off: Natural, lim: Option[Positive])(
+    query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive])(
     implicit RT: RenderTree[Fix[Sql]]):
       CompileM[List[Data] \/ Fix[LogicalPlan]] = for {
-    logical     <- precompile(query, vars)
+    logical     <- precompile(query, vars, basePath)
     optimized   <- phase("Optimized", Optimizer.optimize(addOffsetLimit(logical, off, lim)).right)
     typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
   } yield typechecked.project match {

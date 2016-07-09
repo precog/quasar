@@ -19,6 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar._, api._
 import quasar.fp.numeric._
+import quasar.fs.ADir
 import quasar.sql.{Sql, Query}
 
 import scala.collection.Seq
@@ -61,14 +62,14 @@ package object query {
     req: Request,
     offset: Option[ValidationNel[ParseFailure, Natural]],
     limit: Option[ValidationNel[ParseFailure, Positive]]):
-      ApiError \/ (Fix[Sql], Natural, Option[Positive]) =
+      ApiError \/ (Fix[Sql], ADir, Natural, Option[Positive]) =
     for {
-      dir <- decodedDir(req.uri.path)
       qry <- queryParam(req.multiParams)
-      xpr <- sql.fixParser.parseInContext(qry, dir) leftMap (_.toApiError)
+      xpr <- sql.fixParser.parse(qry) leftMap (_.toApiError)
+      dir <- decodedDir(req.uri.path)
       off <- offsetOrInvalid(offset)
       lim <- limitOrInvalid(limit)
-    } yield (xpr, off, lim)
+    } yield (xpr, dir, off, lim)
 
   val bodyMustContainQuery: ApiError =
     ApiError.fromStatus(BadRequest withReason "No SQL^2 query found in message body.")

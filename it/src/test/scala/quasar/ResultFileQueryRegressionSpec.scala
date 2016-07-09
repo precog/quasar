@@ -33,7 +33,7 @@ class ResultFileQueryRegressionSpec
 
   val suiteName = "ResultFile Queries"
 
-  def queryResults(expr: Fix[Sql], vars: Variables) = {
+  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) = {
     import qfTransforms._
 
     type M[A] = FileSystemErrT[F, A]
@@ -43,7 +43,7 @@ class ResultFileQueryRegressionSpec
 
     for {
       tmpFile <- hoistM(manage.tempFile(DataDir)).liftM[Process]
-      outFile <- fsQ.executeQuery(expr, vars, tmpFile).liftM[Process]
+      outFile <- fsQ.executeQuery(expr, vars, basePath, tmpFile).liftM[Process]
       cleanup =  hoistM(manage.delete(tmpFile)).whenM(outFile ≟ tmpFile)
       data    <- read.scanAll(outFile)
                    .translate(hoistM)

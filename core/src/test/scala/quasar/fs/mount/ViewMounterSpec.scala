@@ -149,7 +149,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
           Constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.queryPlan(inner._1, inner._2, 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
+        quasar.queryPlan(inner._1, inner._2, fileParent(p), 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
 
       val vs = Map[APath, MountConfig](
         p -> MountConfig.viewConfig(inner))
@@ -213,7 +213,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val q = viewConfig(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(q._1, q._2, 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
+        quasar.queryPlan(q._1, q._2, rootDir, 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
 
       val vs = Map[APath, MountConfig](p -> MountConfig.viewConfig(q))
 

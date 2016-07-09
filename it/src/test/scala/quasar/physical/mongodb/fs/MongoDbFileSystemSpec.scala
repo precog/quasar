@@ -249,7 +249,7 @@ class MongoDbFileSystemSpec
             def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
-                runExec(fsQ.executeQuery(expr, Variables.fromMap(Map()), out))
+                runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
                   .run.value.unsafePerformSync
               ) must beSome(file))
 

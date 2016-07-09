@@ -66,9 +66,9 @@ object execute {
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
-        respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, off, lim) =>
+        respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          queryPlan(xpr, requestVars(req), off, lim)
+          queryPlan(xpr, requestVars(req), basePath, off, lim)
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
               lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
@@ -81,16 +81,18 @@ object execute {
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
               val parseRes: ApiError \/ Fix[Sql] =
-                sql.fixParser.parseInContext(Query(query), path)
-                  .leftMap(_.toApiError)
+                sql.fixParser.parse(Query(query)).leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =
                 destinationFile(destination.value) map (res =>
                   sandboxAbs(res.map(unsandbox(path) </> _).merge))
 
-              parseRes tuple absDestination
-            } traverse { case (expr, out) =>
-              fsQ.executeQuery(expr, requestVars(req), out).run.run.run map {
+              val basePath: ApiError \/ ADir =
+                decodedDir(req.uri.path)
+
+              parseRes tuple absDestination tuple basePath
+            } traverse { case ((expr, out), basePath) =>
+              fsQ.executeQuery(expr, requestVars(req), basePath, out).run.run.run map {
                 case (phases, result) =>
                   result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
                     .bimap(_ :+ ("phases" := phases), f => Json(

@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.fs.ADir
 import quasar.regression._
 import quasar.sql.Sql
 
@@ -29,6 +30,6 @@ class StreamingQueryRegressionSpec
 
   val suiteName = "Streaming Queries"
 
-  def queryResults(expr: Fix[Sql], vars: Variables) =
-    fsQ.evaluateQuery(expr, vars, 0L, None)
+  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) =
+    fsQ.evaluateQuery(expr, vars, basePath, 0L, None)
 }

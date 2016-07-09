@@ -55,11 +55,12 @@ object compile {
 
     def explainQuery(
       expr: Fix[sql.Sql],
+      vars: Variables,
+      basePath: ADir,
       offset: Natural,
-      limit: Option[Positive],
-      vars: Variables
+      limit: Option[Positive]
     ): Free[S, QResponse[S]] =
-      respond(queryPlan(expr, vars, offset, limit)
+      respond(queryPlan(expr, vars, basePath, offset, limit)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
           κ(Json(
             "physicalPlan" -> jNull,
@@ -80,8 +81,8 @@ object compile {
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse {
-          case (expr, offset, limit) =>
-            explainQuery(expr, offset, limit, requestVars(req))
+          case (expr, basePath, offset, limit) =>
+            explainQuery(expr, requestVars(req), basePath, offset, limit)
         })
     }
   }

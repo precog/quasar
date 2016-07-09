@@ -185,8 +185,8 @@ object Repl {
             for {
               state <- RS.get
               out   =  state.cwd </> file(name)
-              expr  <- DF.unattempt_(sql.fixParser.parseInContext(q, state.cwd).leftMap(_.message))
-              query =  fsQ.executeQuery(expr, Variables.fromMap(state.variables), out)
+              expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+              query =  fsQ.executeQuery(expr, Variables.fromMap(state.variables), state.cwd, out)
               _     <- runQuery(state, query)(p =>
                         P.println(
                           if (p =/= out) "Source file: " + posixCodec.printPath(p)
@@ -195,10 +195,10 @@ object Repl {
           },
           for {
             state <- RS.get
-            expr  <- DF.unattempt_(sql.fixParser.parseInContext(q, state.cwd).leftMap(_.message))
+            expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
             lim   =  Positive(state.summaryCount + 1L)
-            query =  fsQ.enumerateQuery(expr, vars, 0L, lim) flatMap (enum =>
+            query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim) flatMap (enum =>
                        Q.transforms.execToCompExec(enum.drainTo[Vector]))
             _     <- runQuery(state, query)(
                       ds => summarize[S](state.summaryCount, state.format)(ds))

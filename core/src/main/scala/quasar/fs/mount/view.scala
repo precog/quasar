@@ -58,7 +58,7 @@ object view {
 
           def vOpen(e: Fix[Sql], v: Variables):
               Free[S, FileSystemError \/ ReadHandle] = {
-            queryPlan(e, v, off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
+            queryPlan(e, v, fileParent(path), off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
               e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
                 // TODO: more sensible error?
                 Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),

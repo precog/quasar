@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.fp.κ
 import quasar.SemanticError._
 import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST}
 
@@ -52,7 +53,7 @@ object Variables {
           val varName = VarName(vari.symbol)
           vars.lookup(varName) flatMap {
             case Fix(Ident(name)) =>
-              posixCodec.parseAbsFile(name).cata(
+              posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
                 TableRelationAST(_, alias).right,
                 GenericError("bad path: " + name + " (note: absolute file path required)").left)  // FIXME
             case x =>

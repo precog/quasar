@@ -52,7 +52,7 @@ object ViewMounter {
     (implicit S: MountConfigs :<: S)
     : Free[S, MountingError \/ Unit] = {
     val vc = viewConfig(query, vars)
-    queryPlan(query, vars, 0L, None).run.value.fold(
+    queryPlan(query, vars, fileParent(loc), 0L, None).run.value.fold(
       e => invalidConfig(vc, e.map(_.shows)).left.point[Free[S, ?]],
       κ(mntCfgs[S].put(loc, vc).map(_.right)))
   }
@@ -98,7 +98,7 @@ object ViewMounter {
           f => EitherT[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
             lookup[S](f).run.flatMap[SemanticErrors \/ LogicalPlan[(Set[FPath], Fix[LogicalPlan])]] {
               _.cata(
-                { case (expr, vars) => queryPlan(expr, vars, 0L, None).run.run._2.map(p => collapseData(p.map(absolutize(_, fileParent(f))))) },
+                { case (expr, vars) => queryPlan(expr, vars, fileParent(f), 0L, None).run.run._2.map(p => collapseData(p.map(absolutize(_, fileParent(f))))) },
                   i.right)
                 .map(_.unFix.map((e + f, _)))
                 .point[Free[S, ?]]

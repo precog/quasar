@@ -4,7 +4,7 @@
   "data": "smallZips.data",
 
   "variables": {
-    "table": "`/regression/smallZips`"
+    "table": "`smallZips`"
   },
 
   "query": "select count(*) from :table where pop < 1000",

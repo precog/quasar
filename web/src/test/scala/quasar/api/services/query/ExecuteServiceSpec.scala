@@ -124,7 +124,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
       sql.fixParser.parse(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        ast => quasar.queryPlan(ast, vars, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        ast => quasar.queryPlan(ast, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -260,7 +260,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -281,7 +281,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,

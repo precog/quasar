@@ -945,7 +945,7 @@ object MongoDbPlanner {
     node => node match {
       case ReadF(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-        state(Collection.fromPath(mkAbsolute(rootDir, path)).bimap(PlanPathError, WorkflowBuilder.read))
+        state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WorkflowBuilder.read))
       case ConstantF(data) =>
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),

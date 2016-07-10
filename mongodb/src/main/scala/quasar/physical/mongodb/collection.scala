@@ -41,7 +41,23 @@ final case class Collection(databaseName: String, collectionName: String) {
 
 object Collection {
 
-  def fromPath(path: APath): PathError \/ Collection = {
+  /** The collection represented by the given file. */
+  def fromFile(file: AFile): PathError \/ Collection =
+    fromPath(file)
+
+  /** The collection prefix represented by the given directory. */
+  def prefixFromDir(dir: ADir): PathError \/ String =
+    fromPath(dir) map (_.collectionName + ".")
+
+  /** Returns the database name determined by the given path. */
+  def dbNameFromPath(path: APath): PathError \/ String =
+    dbNameAndRest(path) bimap (PathError.invalidPath(path, _), _._1)
+
+  /** Returns the directory name derived from the given database name. */
+  def dirNameFromDbName(dbName: String): DirName =
+    DirName(DatabaseNameUnparser(dbName))
+
+  private def fromPath(path: APath): PathError \/ Collection = {
     import PathError._
 
     val collResult = for {
@@ -58,14 +74,6 @@ object Collection {
 
     collResult leftMap (invalidPath(path, _))
   }
-
-  /** Returns the database name determined by the given path. */
-  def dbNameFromPath(path: APath): PathError \/ String =
-    dbNameAndRest(path) bimap (PathError.invalidPath(path, _), _._1)
-
-  /** Returns the directory name derived from the given database name. */
-  def dirNameFromDbName(dbName: String): DirName =
-    DirName(DatabaseNameUnparser(dbName))
 
   private def dbNameAndRest(path: APath): String \/ (String, IList[String]) =
     flatten(None, None, None, Some(_), Some(_), path)

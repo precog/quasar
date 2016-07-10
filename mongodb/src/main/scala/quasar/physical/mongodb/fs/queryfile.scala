@@ -91,7 +91,7 @@ private final class QueryFileInterpreter[C](
 
   def apply[A](qf: QueryFile[A]) = qf match {
     case ExecutePlan(lp, out) => (for {
-      dst  <- EitherT(Collection.fromPath(out)
+      dst  <- EitherT(Collection.fromFile(out)
                 .leftMap(pathErr(_))
                 .point[MongoLogWF])
       coll <- handlePlan(lp,
@@ -151,7 +151,7 @@ private final class QueryFileInterpreter[C](
       }).liftM[QRT]
 
     case FileExists(file) =>
-      Collection.fromPath(file).fold(
+      Collection.fromFile(file).fold(
         κ(false.point[MQ]),
         coll => MongoDbIO.collectionExists(coll).liftM[QRT])
   }
@@ -260,16 +260,16 @@ private final class QueryFileInterpreter[C](
 
   private def checkPathsExist(lp: Fix[LogicalPlan]): MongoLogWFR[Unit] = {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    def checkPathExists(p: AFile): MongoFsM[Unit] = for {
-      coll <- EitherT.fromDisjunction[MongoDbIO](Collection.fromPath(p))
+    def checkFileExists(f: AFile): MongoFsM[Unit] = for {
+      coll <- EitherT.fromDisjunction[MongoDbIO](Collection.fromFile(f))
                 .leftMap(pathErr(_))
       _    <- EitherT(MongoDbIO.collectionExists(coll)
-                .map(_ either (()) or pathErr(PathError.pathNotFound(p))))
+                .map(_ either (()) or pathErr(PathError.pathNotFound(f))))
     } yield ()
 
     EitherT[MongoLogWF, FileSystemError, Unit](
       (LogicalPlan.paths(lp)
-        .traverse_(path => checkPathExists(mkAbsolute(rootDir, path))).run
+        .traverse_(file => checkFileExists(mkAbsolute(rootDir, file))).run
         .liftM[QRT]: MQ[FileSystemError \/ Unit])
         .liftM[PhaseResultT])
   }

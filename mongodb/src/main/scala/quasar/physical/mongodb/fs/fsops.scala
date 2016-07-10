@@ -32,13 +32,13 @@ object fsops {
   def collectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
     for {
       dbName <- dbNameFromPathM(dir)
-      cName  <- collFromPathM(dir)
-                  .map(_.collectionName)
+      prefix <- collPrefixFromDirM(dir)
                   .getOrElse("")
                   .liftM[FileSystemErrT]
       cs     <- MongoDbIO.collectionsIn(dbName)
-                  .filter(_.collectionName startsWith cName)
-                  .runLog.map(_.toVector).liftM[FileSystemErrT]
+                  .filter(_.collectionName startsWith prefix)
+                  .runLog.map(_.toVector)
+                  .liftM[FileSystemErrT]
       _      <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoFsM, Unit]
                 else ().point[MongoFsM]
     } yield cs
@@ -55,9 +55,13 @@ object fsops {
   def collectionPathSegment(parent: ADir): Collection => Option[PathSegment] =
     _.asFile relativeTo parent flatMap firstSegmentName
 
-  /** The collection represented by the given path. */
-  def collFromPathM(path: APath): MongoFsM[Collection] =
-    EitherT(Collection.fromPath(path).leftMap(pathErr(_)).point[MongoDbIO])
+  /** The collection represented by the given file. */
+  def collFromFileM(file: AFile): MongoFsM[Collection] =
+    EitherT(Collection.fromFile(file).leftMap(pathErr(_)).point[MongoDbIO])
+
+  /** The collection prefix represented by the given directory. */
+  def collPrefixFromDirM(dir: ADir): MongoFsM[String] =
+    EitherT(Collection.prefixFromDir(dir).leftMap(pathErr(_)).point[MongoDbIO])
 
   /** The database referred to by the given path. */
   def dbNameFromPathM(path: APath): MongoFsM[String] =

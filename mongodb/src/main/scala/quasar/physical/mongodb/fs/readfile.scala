@@ -111,7 +111,7 @@ object readfile {
         h    <- recordCursor(f, cur)
       } yield h
 
-    Collection.fromPath(f).fold(
+    Collection.fromFile(f).fold(
       err  => pathErr(err).left.point[MongoRead],
       coll => collectionExists(coll).liftM[ReadStateT].ifM(
                 openCursor0(coll) map (_.right[FileSystemError]),

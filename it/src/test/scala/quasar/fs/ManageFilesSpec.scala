@@ -163,6 +163,29 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
           .runOption must beSome(pathErr(pathNotFound(d1)))
       }
 
+      "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
+        val pnt = managePrefix </> dir("SD-1846")
+        val uf1 = pnt </> dir("Untitled Folder")   </> file("one")
+        val uf2 = pnt </> dir("Untitled Folder 1") </> file("two")
+        val uf3 = pnt </> dir("Untitled Folder 2") </> file("three")
+
+        val thirdDoc: Vector[Data] =
+          Vector(Data.Obj(ListMap("c" -> Data.Int(1))))
+
+        val src = pnt </> dir("Untitled Folder")
+        val dst = pnt </> dir("Untitled Folder 1") </> dir("Untitled Folder")
+
+        val setupAndMove =
+          write.saveThese(uf1, oneDoc)     *>
+          write.saveThese(uf2, anotherDoc) *>
+          write.saveThese(uf3, thirdDoc)   *>
+          manage.moveDir(src, dst, MoveSemantics.FailIfExists)
+
+        (runT(run)(setupAndMove).runOption must beNone) and
+        (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(oneDoc)) and
+        (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
+      }
+
       "deleting a nonexistent file returns PathNotFound" >> {
         val f = managePrefix </> file("delfilenotfound")
         runT(run)(manage.delete(f)).runEither must beLeft(pathErr(pathNotFound(f)))

@@ -37,7 +37,7 @@ object writefile {
   val interpret: WriteFile ~> MongoWrite = new (WriteFile ~> MongoWrite) {
     def apply[A](wf: WriteFile[A]) = wf match {
       case Open(file) =>
-        Collection.fromPath(file) fold (
+        Collection.fromFile(file) fold (
           err => pathErr(err).left.point[MongoWrite],
           col => ensureCollection(col).liftM[WriteStateT] *>
                  recordCollection(file, col) map \/.right)

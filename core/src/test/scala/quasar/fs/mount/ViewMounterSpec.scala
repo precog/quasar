@@ -98,13 +98,13 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
     }
   }
 
-  "lookup" >> {
+  "exists" >> {
     "trivial read with relative path" >> {
       val f = rootDir[Sandboxed] </> dir("foo") </> file("justZips")
       val vc = viewConfig("select * from zips")
       val vs = Map[APath, MountConfig](f -> MountConfig.viewConfig(vc))
 
-      eval(vs)(ViewMounter.lookup[MountConfigs](f).run)._2 must beSome(vc)
+      eval(vs)(ViewMounter.exists[MountConfigs](f))._2 must beTrue
     }
   }
 
@@ -217,7 +217,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       val vs = Map[APath, MountConfig](p -> MountConfig.viewConfig(q))
 
-      eval(vs)(ViewMounter.lookup[MountConfigs](p).run)._2 must beSome(q)
+      eval(vs)(ViewMounter.exists[MountConfigs](p))._2 must beTrue
 
       eval(vs)(ViewMounter.rewrite[MountConfigs](Read(p)).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(qlp) }

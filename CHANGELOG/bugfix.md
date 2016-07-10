@@ -1,0 +1,1 @@
+- [SD-1836] fix `GET /data` from a view that refers to another view

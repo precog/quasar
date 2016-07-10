@@ -75,23 +75,28 @@ package object quasar {
     } yield logical
   }
 
+  /** Optimizes and typechecks a `LogicalPlan` returning the improved plan or
+    * just a list of results, if the query was foldable to a constant.
+    */
+  def preparePlan(lp: Fix[LogicalPlan], off: Natural, lim: Option[Positive])
+      : CompileM[List[Data] \/ Fix[LogicalPlan]] =
+    for {
+      optimized   <- phase("Optimized", Optimizer.optimize(addOffsetLimit(lp, off, lim)).right)
+      typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
+    } yield typechecked.project match {
+      case LogicalPlan.ConstantF(Data.Set(records)) => records.left
+      case LogicalPlan.ConstantF(value)             => List(value).left
+      case _                                        => typechecked.right
+    }
+
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
-    * results, if the query was foldable to a constant. This also takes a
-    * function to apply any extra-query operations to the LP prior to
-    * optimization.
+    * results, if the query was foldable to a constant.
     */
   def queryPlan(
     query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive])(
     implicit RT: RenderTree[Fix[Sql]]):
-      CompileM[List[Data] \/ Fix[LogicalPlan]] = for {
-    logical     <- precompile(query, vars, basePath)
-    optimized   <- phase("Optimized", Optimizer.optimize(addOffsetLimit(logical, off, lim)).right)
-    typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
-  } yield typechecked.project match {
-    case LogicalPlan.ConstantF(Data.Set(records)) => records.left
-    case LogicalPlan.ConstantF(value)             => List(value).left
-    case _                                        => typechecked.right
-  }
+      CompileM[List[Data] \/ Fix[LogicalPlan]] =
+    precompile(query, vars, basePath).flatMap(preparePlan(_, off, lim))
 
   def addOffsetLimit[T[_[_]]: Corecursive](
     lp: T[LogicalPlan], off: Natural, lim: Option[Positive]):

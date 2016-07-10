@@ -125,7 +125,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   }
 
   def parseExpr(query: String) =
-    fixParser.parse(Query(query)).toOption.get.mkPathsAbsolute(rootDir)
+    fixParser.parse(Query(query)).toOption.get
 
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
     def render(t: RenderedTree) = t
@@ -134,7 +134,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "ReadFile.open" should {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = parseExpr("select * from `/zips`")
       val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
@@ -158,7 +158,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "translate limited read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
@@ -181,6 +181,49 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
         _   <- query.transforms.fsErrToExec(
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
+
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+    }
+
+    "translate read with view-view reference" in {
+      val p0 = rootDir[Sandboxed] </> dir("view") </> file("view0")
+      val p1 = rootDir[Sandboxed] </> dir("view") </> file("view1")
+
+      val views = Map(
+        p0 -> parseExpr("select * from `/zips`"),
+        p1 -> parseExpr("select * from view0"))
+
+      val f = (for {
+        h <- read.unsafe.open(p1, 0L, None)
+        _ <- read.unsafe.read(h)
+        _ <- EitherT.right(read.unsafe.close(h))
+      } yield ()).run
+
+      val expQ = Fix(Squash(Fix(Squash(Read(rootDir </> file("zips"))))))
+      val exp = (for {
+        h   <- query.unsafe.eval(expQ)
+        _   <- query.transforms.fsErrToExec(
+                query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(
+                EitherT.right(query.unsafe.close(h)))
+      } yield ()).run.run
+
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+    }
+
+    "translate read with constant" in {
+      val p = rootDir[Sandboxed] </> dir("view") </> file("view0")
+
+      val views = Map(
+        p -> parseExpr("1 + 2"))
+
+      val f = (for {
+        h <- read.unsafe.open(p, 0L, None)
+        _ <- read.unsafe.read(h)
+        _ <- EitherT.right(read.unsafe.close(h))
+      } yield ()).run
+
+      val exp = ().point[Free[FileSystem, ?]]
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
@@ -332,7 +375,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "QueryFile.exec" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
@@ -347,7 +390,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "QueryFile.eval" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
@@ -374,7 +417,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   "QueryFile.explain" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 

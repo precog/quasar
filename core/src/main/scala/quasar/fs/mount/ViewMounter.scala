@@ -37,25 +37,25 @@ object ViewMounter {
     : Free[S, Vector[AFile]] =
     mntCfgs[S].keys.flatMap(_.foldMap(refineType(_).fold(
       κ(Vector.empty[AFile].point[Free[S, ?]]),
-      f => lookup[S](f).fold(κ(Vector(f)), Vector.empty))))
+      f => exists[S](f).map(_ ?? Vector(f)))))
 
-  /** Lookup mounted view */
-  def lookup[S[_]]
+  /** Check whether a view is located at the given path. */
+  def exists[S[_]]
     (loc: AFile)
     (implicit S: MountConfigs :<: S)
-    : OptionT[Free[S, ?], (Fix[Sql], Variables)] =
-    mntCfgs[S].get(loc).flatMap(mc => OptionT.optionT[Free[S, ?]](Free.point(viewConfig.getOption(mc))))
+    : Free[S, Boolean] =
+    mntCfgs[S].contains(loc)
 
   /** Attempts to mount a view at the given location. */
   def mount[S[_]]
     (loc: AFile, query: Fix[Sql], vars: Variables)
     (implicit S: MountConfigs :<: S)
     : Free[S, MountingError \/ Unit] = {
-    val vc = viewConfig(query, vars)
-    queryPlan(query, vars, fileParent(loc), 0L, None).run.value.fold(
-      e => invalidConfig(vc, e.map(_.shows)).left.point[Free[S, ?]],
-      κ(mntCfgs[S].put(loc, vc).map(_.right)))
-  }
+      val vc = viewConfig(query, vars)
+      queryPlan(query, vars, fileParent(loc), 0L, None).run.value.fold(
+        e => invalidConfig(vc, e.map(_.shows)).left.point[Free[S, ?]],
+        κ(mntCfgs[S].put(loc, vc).map(_.right)))
+    }
 
   /** Attempts to move a view at the given location. */
   def move[S[_]]
@@ -69,7 +69,7 @@ object ViewMounter {
     (loc: AFile)
     (implicit S0: MountConfigs :<: S)
     : Free[S, Unit] =
-    lookup[S](loc).flatMapF(κ(mntCfgs[S].delete(loc))).run.void
+    exists[S](loc).flatMap(_.whenM(mntCfgs[S].delete(loc)))
 
   /** Resolve view references within a query. */
   def rewrite[S[_]]
@@ -84,6 +84,10 @@ object ViewMounter {
       EitherT.right[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
         lp.unFix.map((e, _)).point[Free[S, ?]])
 
+    def lookup(loc: AFile): OptionT[Free[S, ?], (Fix[Sql], Variables)] =
+      mntCfgs[S].get(loc).flatMap(mc =>
+        OptionT.optionT[Free[S, ?]](Free.point(viewConfig.getOption(mc))))
+
     /** This collapses literal data results into a LogicalPlan for cases where
       * currently _want_ a Constant plan. This will have to go away when
       * [[quasar.Data.Set]] does.
@@ -96,7 +100,7 @@ object ViewMounter {
       case (e, i @ Embed(r @ LogicalPlan.ReadF(p))) if !(e contains p) =>
         refineTypeAbs(p).fold(
           f => EitherT[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
-            lookup[S](f).run.flatMap[SemanticErrors \/ LogicalPlan[(Set[FPath], Fix[LogicalPlan])]] {
+            lookup(f).run.flatMap[SemanticErrors \/ LogicalPlan[(Set[FPath], Fix[LogicalPlan])]] {
               _.cata(
                 { case (expr, vars) => queryPlan(expr, vars, fileParent(f), 0L, None).run.run._2.map(p => collapseData(p.map(absolutize(_, fileParent(f))))) },
                   i.right)

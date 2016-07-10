@@ -22,7 +22,6 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.sql.Sql
 
 import matryoshka.{free => _, _}
 import pathy.Path._
@@ -56,25 +55,28 @@ object view {
             } yield h
           }.run
 
-          def vOpen(e: Fix[Sql], v: Variables):
-              Free[S, FileSystemError \/ ReadHandle] = {
-            queryPlan(e, v, fileParent(path), off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
-              e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
-                // TODO: more sensible error?
-                Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),
-              _.fold(
-                data => (for {
-                  h <- seq.next.map(ReadHandle(path, _))
-                  _ <- viewState.put(h, ResultSet.Data(data.toVector))
-                } yield h).liftM[FileSystemErrT],
-                lp => for {
-                  qh <- EitherT(queryUnsafe.eval(lp).run.value)
-                  h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
-                  _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
-                } yield h))
-          }.run
+          def vOpen: Free[S, FileSystemError \/ ReadHandle] = {
+            val readLp = LogicalPlan.Read(path)
+            (for {
+              lp <- ViewMounter.rewrite[S](readLp).leftMap(se => planningFailed(readLp, Planner.InternalError(se.shows)))
+              h  <- preparePlan(lp, off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
+                e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
+                  // TODO: more sensible error?
+                  Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),
+                _.fold(
+                  data => (for {
+                    h <- seq.next.map(ReadHandle(path, _))
+                    _ <- viewState.put(h, ResultSet.Data(data.toVector))
+                  } yield h).liftM[FileSystemErrT],
+                  lp => for {
+                    qh <- EitherT(queryUnsafe.eval(lp).run.value)
+                    h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
+                    _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
+                  } yield h))
+            } yield h).run
+          }
 
-          ViewMounter.lookup[S](path).run.flatMap(_.cata((vOpen _).tupled, fOpen))
+          ViewMounter.exists[S](path).ifM(vOpen, fOpen)
 
         case Read(handle) =>
           (for {
@@ -116,9 +118,9 @@ object view {
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wf: WriteFile[A]): Free[S, A] = wf match {
         case Open(p) =>
-          ViewMounter.lookup[S](p).run.flatMap(_.cata(
-            κ(emit[S, A](-\/(pathErr(invalidPath(p, "cannot write to view"))))),
-            writeUnsafe.open(p).run))
+          ViewMounter.exists[S](p).ifM(
+            emit[S, A](-\/(pathErr(invalidPath(p, "cannot write to view")))),
+            writeUnsafe.open(p).run)
 
         case Write(h, chunk) =>
           writeUnsafe.write(h, chunk)
@@ -168,8 +170,8 @@ object view {
       val move = manage.moveFile(src, dst, semantics).run
 
       (
-        ViewMounter.lookup[S](src).run.map(_.isDefined) |@|
-        ViewMounter.lookup[S](dst).run.map(_.isDefined) |@|
+        ViewMounter.exists[S](src) |@|
+        ViewMounter.exists[S](dst) |@|
         query.fileExists(dst)
       ) .tupled
         .flatMap { case (srcViewExists, dstViewExists, dstFileExists) => semantics match {
@@ -259,8 +261,9 @@ object view {
           }}
 
         case FileExists(file) =>
-          ViewMounter.lookup[S](file).run.flatMap(mc =>
-            if(mc.isDefined) true.point[Free[S, ?]] else query.fileExists(file))
+          ViewMounter.exists[S](file).ifM(
+            true.point[Free[S, ?]],
+            query.fileExists(file))
       }
     }
   }

@@ -62,7 +62,7 @@ object mount {
             dst => EitherT[Free[S, ?], ApiError, String] {
               OptionT[Free[S, ?], (AFile, AFile)](
                 (refineType(src).toOption |@| UriPathCodec.parseAbsFile(dst).map(sandboxAbs)).tupled.point[Free[S, ?]])
-                .flatMap { case sd @ (s, _) => ViewMounter.lookup[S](s).map(κ(sd)) }
+                .flatMap { case sd @ (s, _) => OptionT(ViewMounter.exists[S](s).map(_ option sd)) }
                 .map((ViewMounter.move[S] _).tupled(_) *>
                      s"moved ${printPath(src)} to $dst".right[ApiError].point[Free[S, ?]])
                 .getOrElse(refineType(src).fold(

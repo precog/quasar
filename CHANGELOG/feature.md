@@ -1,0 +1,1 @@
+- [SD-1568] handle var as relation (e.g. `select * from :table`)

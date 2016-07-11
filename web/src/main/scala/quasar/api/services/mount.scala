@@ -18,7 +18,6 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._, ToApiError.ops._
-import quasar.effect.KeyValueStore
 import quasar.fp._
 import quasar.fs.{AbsPath, AFile, APath, sandboxAbs}
 import quasar.fs.mount._
@@ -102,26 +101,16 @@ object mount {
     parse: String => Option[Path[Abs, T, Unsandboxed]],
     typeStr: String
   )(implicit
-    M: Mounting.Ops[S],
-    S0: MountConfigs :<: S
-  ): EitherT[Free[S, ?], ApiError, String] = {
-    val mntCfgs = KeyValueStore.Ops[APath, MountConfig, S]
-
-    parse(dstStr).map(sandboxAbs).cata(dst => {
-      val msg = s"moved ${printPath(src)} to ${printPath(dst)}"
-
-      val op = M.remount[T](src, dst).as(msg).leftMap(_.toApiError).run
-
-      EitherT[Free[S, ?], ApiError, String](mntCfgs.get(src).run.flatMap(_.cata(
-        MountConfig.fileSystemConfig.getOption(_).cata(
-          κ(mntCfgs.move(src, dst).as(msg.right[ApiError])),
-          op),
-        op)))
-      },
-      EitherT.leftU[String](ApiError.apiError(
+    M: Mounting.Ops[S]
+  ): EitherT[Free[S, ?], ApiError, String] =
+    parse(dstStr).map(sandboxAbs).cata(dst =>
+      M.remount[T](src, dst)
+        .as(s"moved ${printPath(src)} to ${printPath(dst)}")
+        .leftMap(_.toApiError),
+      ApiError.apiError(
         BadRequest withReason s"Expected an absolute $typeStr.",
-        "path" := transcode(UriPathCodec, posixCodec)(dstStr)).point[Free[S, ?]]))
-  }
+        "path" := transcode(UriPathCodec, posixCodec)(dstStr)
+      ).raiseError[EitherT[M.F, ApiError, ?], String])
 
   private def mount[S[_]](
     path: APath,

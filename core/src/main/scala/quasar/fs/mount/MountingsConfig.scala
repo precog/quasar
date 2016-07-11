@@ -18,8 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.{Map, String, ArrowAssoc}
 import quasar.SKI._
-import quasar.fs.{APath}
-import quasar.fs.PathyCodecJson._
+import quasar.fs.APath
 
 import scala.AnyVal
 
@@ -48,6 +47,6 @@ object MountingsConfig {
     DecodeJson.of[Map[String, MountConfig]]
       .flatMap(m0 => DecodeJson(κ(m0.toList.foldLeftM(Map[APath, MountConfig]()) {
         case (m, (s, mc)) =>
-          jString(s).as[APath](aPathDecodeJson).map(p => m + (p -> mc))
+          jString(s).as[APath](APath.aPathDecodeJson).map(p => m + (p -> mc))
       }))).map(MountingsConfig(_))
 }

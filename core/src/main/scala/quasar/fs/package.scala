@@ -21,6 +21,7 @@ import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
 
+import argonaut._
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
@@ -45,6 +46,16 @@ package object fs {
   type DPath = DirPath[_]
 
   type PathSegment = DirName \/ FileName
+
+  object APath {
+
+    implicit val aPathDecodeJson: DecodeJson[APath] =
+      DecodeJson.of[String] flatMap (s => DecodeJson(hc =>
+        posixCodec.parseAbsFile(s).orElse(posixCodec.parseAbsDir(s))
+          .map(sandboxAbs)
+          .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
+
+  }
 
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]

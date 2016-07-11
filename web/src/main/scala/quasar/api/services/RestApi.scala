@@ -17,8 +17,9 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.api._
+import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam}
+import quasar.fp.liftMT
 import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
@@ -26,7 +27,7 @@ import quasar.fs.mount._
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
 
-import org.http4s.HttpService
+import org.http4s._
 import org.http4s.dsl._
 import org.http4s.server.HttpMiddleware
 import org.http4s.server.middleware.{CORS, CORSConfig, GZip}
@@ -61,8 +62,7 @@ object RestApi {
 
   /** Mount services and apply default middleware to the result.
     *
-    * TODO: Is using `Prefix` necessary? Can we replace with
-    *       `org.http4s.server.Router` instead?
+    * TODO: Replace `Prefix` with `org.http4s.server.Router`.
     */
   def finalizeServices(svcs: Map[String, HttpService]): HttpService = {
     // Sort by prefix length so that foldLeft results in routes processed in
@@ -87,7 +87,7 @@ object RestApi {
     svcs.mapValues(_.toHttpServiceF(f))
 
   def defaultMiddleware: HttpMiddleware =
-    (cors(_)) <<< gzip <<< HeaderParam <<< passOptions
+    cors compose gzip compose HeaderParam compose passOptions compose errorHandling
 
   val cors: HttpMiddleware =
     CORS(_, CORSConfig(
@@ -104,4 +104,12 @@ object RestApi {
     _ orElse HttpService {
       case req if req.method == OPTIONS => Ok()
     }
+
+  val errorHandling: HttpMiddleware =
+    _.mapK(_ handleWith {
+      case msgFail: MessageFailure =>
+        msgFail.toApiError
+          .toResponse[Task]
+          .toHttpResponse(liftMT[Task, ResponseT])
+    })
 }

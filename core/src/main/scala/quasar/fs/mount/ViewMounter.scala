@@ -46,16 +46,24 @@ object ViewMounter {
     : Free[S, Boolean] =
     mntCfgs[S].contains(loc)
 
+  /** Validates a candidate view mount, returning an error if invalid. */
+  def validate(
+    loc: AFile,
+    query: Fix[Sql],
+    vars: Variables
+  ): MountingError \/ Unit =
+    queryPlan(query, vars, fileParent(loc), 0L, None).run.value
+      .leftMap(e => invalidConfig(viewConfig(query, vars), e.map(_.shows)))
+      .void
+
   /** Attempts to mount a view at the given location. */
   def mount[S[_]]
     (loc: AFile, query: Fix[Sql], vars: Variables)
     (implicit S: MountConfigs :<: S)
-    : Free[S, MountingError \/ Unit] = {
-      val vc = viewConfig(query, vars)
-      queryPlan(query, vars, fileParent(loc), 0L, None).run.value.fold(
-        e => invalidConfig(vc, e.map(_.shows)).left.point[Free[S, ?]],
-        κ(mntCfgs[S].put(loc, vc).map(_.right)))
-    }
+    : Free[S, MountingError \/ Unit] =
+      validate(loc, query, vars).fold(
+        _.left[Unit].point[Free[S, ?]],
+        κ(mntCfgs[S].put(loc, viewConfig(query, vars)).map(_.right)))
 
   /** Attempts to move a view at the given location. */
   def move[S[_]]
@@ -64,8 +72,8 @@ object ViewMounter {
     : Free[S, Unit] =
     mntCfgs[S].move(srcLoc, dstLoc)
 
-  /** Unmounts the view at the given location. */
-  def unmount[S[_]]
+  /** Deletes the view configuration for the given location, if it exists. */
+  def delete[S[_]]
     (loc: AFile)
     (implicit S0: MountConfigs :<: S)
     : Free[S, Unit] =

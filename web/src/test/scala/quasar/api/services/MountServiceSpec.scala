@@ -44,8 +44,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
   import posixCodec.printPath
   import PathError._
 
-  type Eff0[A] = Coproduct[Mounting, MountConfigs, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff[A]  = Coproduct[Task, Mounting, A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
@@ -78,13 +77,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
       )
 
       val store: MountConfigs ~> Task = KeyValueStore.fromTaskRef(configsRef)
-
       val mt: MEff ~> Task = NaturalTransformation.refl[Task] :+: store
-
       val tf: Mounting ~> Task = foldMapNT(mt) compose mounter
-
-      def eff: Eff ~> Task =
-        NaturalTransformation.refl[Task] :+: tf :+: store
+      def eff: Eff ~> Task = NaturalTransformation.refl[Task] :+: tf
 
       val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
 
@@ -390,8 +385,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               } yield {
                 (body must_== s"added ${printPath(dst)}")         and
                 (res.status must_== Ok)                           and
-// TODO: This fails due to how we're bypassing Mounting for views, enable and fix.
-//              (mntd must_== Set(MR.mountView(dst, expr, vars))) and
+                (mntd must_== Set(MR.mountView(dst, expr, vars))) and
                 (after must beSome(MountConfig.viewConfig(expr, vars)))
               }
             }
@@ -420,11 +414,10 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               } yield {
                 (body must_== s"added ${printPath(view)}") and
                 (res.status must_== Ok)                    and
-// TODO: This fails due to how we're bypassing Mounting for views, enable and fix.
-//              (mntd must_== Set(
-//                MR.mountFileSystem(fs, StubFs, fooUri),
-//                MR.mountView(view, expr, vars)
-//              ))                                         and
+                (mntd must_== Set(
+                  MR.mountFileSystem(fs, StubFs, fooUri),
+                  MR.mountView(view, expr, vars)
+                ))                                         and
                 (afterFs must beSome)                      and
                 (afterView must beSome(MountConfig.viewConfig(expr, vars)))
               }
@@ -453,11 +446,10 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               } yield {
                 (body must_== s"added ${printPath(vdst)}") and
                 (res.status must_== Ok)                    and
-// TODO: This fails due to how we're bypassing Mounting for views, enable and fix.
-//              (mntd must_== Set(
-//                MR.mountFileSystem(fs, StubFs, fooUri),
-//                MR.mountView(vdst, expr, vars)
-//              ))                                         and
+                (mntd must_== Set(
+                  MR.mountFileSystem(fs, StubFs, fooUri),
+                  MR.mountView(vdst, expr, vars)
+                ))                                         and
                 (after must beSome(MountConfig.viewConfig(expr, vars)))
               }
             }
@@ -521,25 +513,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 Status.BadRequest withReason "Incorrect path type.",
                 "path" := (parent </> viewDir))) and
               (mntd must beEmpty)
-            }
-          }
-        }
-
-        "be 400 with unbound variable in view" ! prop { (parent: ADir, f: RFile) =>
-          !hasDot(parent </> f) ==> {
-            runTest { service =>
-              val cfg = viewConfig("select * from zips where pop < :cutoff")
-              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
-
-              for {
-                req <- reqBuilder(parent, f, cfgStr)
-                r   <- service(req)
-                (res, mntd) = r
-                err <- lift(res.as[ApiError]).into[Eff]
-              } yield {
-                (err must beInvalidConfigError("There is no binding for the variable :cutoff")) and
-                (mntd must beEmpty)
-              }
             }
           }
         }

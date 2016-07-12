@@ -49,8 +49,7 @@ final class EvaluatorMounter[F[_], S[_]](
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFs :<: T,
-                T2: MountConfigs :<: T,
-                T3: EvalFSRef :<: T)
+                T2: EvalFSRef :<: T)
       : Free[T, MountingError \/ Unit] = {
 
     type EvalM[A]    = Free[T, A]
@@ -59,7 +58,7 @@ final class EvaluatorMounter[F[_], S[_]](
     val handleMount: EvalErrM[Unit] =
       EitherT(req match {
         case MountView(f, qry, vars) =>
-          ViewMounter.mount[T](f, qry, vars)
+          ViewMounter.validate(f, qry, vars).point[Free[T, ?]]
 
         case MountFileSystem(d, typ, uri) =>
           fsMounter.mount[T](d, typ, uri)
@@ -72,14 +71,13 @@ final class EvaluatorMounter[F[_], S[_]](
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFs :<: T,
-                T2: EvalFSRef :<: T,
-                T3: MountConfigs :<: T)
+                T2: EvalFSRef :<: T)
       : Free[T, Unit] = {
 
     val handleUnmount: Free[T, Unit] =
       req match {
         case MountView(f, _, _) =>
-          ViewMounter.unmount[T](f)
+          ().point[Free[T, ?]]
 
         case MountFileSystem(d, _, _) =>
           fsMounter.unmount[T](d)

@@ -86,14 +86,14 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
     }
   }
 
-  "unmounting views" >> {
-    "removes plan from mounted views" >> {
+  "deleting views" >> {
+    "removes view config at given location" >> {
       val f  = rootDir </> dir("mnt") </> file("foo")
 
       eval(
         Map(f -> MountConfig.viewConfig(viewConfig("select * from zips")))
         )(
-        ViewMounter.unmount[MountConfigs](f)
+        ViewMounter.delete[MountConfigs](f)
         )._1 must beEmpty
     }
   }

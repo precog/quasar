@@ -17,17 +17,20 @@
 package quasar.server
 
 import quasar.Predef._
+import quasar.{TestConfig, Variables}
 import quasar.config.{ConfigOps, FsPath, WebConfig}
 import quasar.main.MainErrT
 import quasar.api.UriPathCodec
 import quasar.fs._, mount._
 import quasar.server.Server.QuasarConfig
-import quasar.TestConfig
+import quasar.sql.{fixParser, Query}
 
 import java.io.File
 
+import argonaut._, Argonaut._
 import org.http4s.Uri.Authority
 import org.http4s._, Status._
+import org.http4s.argonaut._
 import org.specs2.mutable
 import org.specs2.scalaz.DisjunctionMatchers._
 import pathy.Path._
@@ -102,6 +105,34 @@ class ServiceSpec extends mutable.Specification {
       }
 
       r.map(_.status) must beRightDisjunction(Ok)
+    }
+
+    "[SD-1833] replace view" in {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+      val sel1 = "sql2:///?q=%28select%201%29"
+      val sel2 = "sql2:///?q=%28select%202%29"
+
+      val finalCfg =
+        fixParser.parse(Query("select 2"))
+          .bimap(_.shows, MountConfig.viewConfig(_, Variables.empty))
+
+      val r = withServer(port, configOps.default) { baseUri: Uri =>
+        client.fetch(
+          Request(
+              uri = baseUri / "mount" / "fs" / "viewA",
+              method = Method.PUT)
+            .withBody(s"""{ "view": { "connectionUri" : "$sel1" } }""")
+          )(Task.now) *>
+        client.fetch(
+          Request(
+              uri = baseUri / "mount" / "fs" / "viewA",
+              method = Method.PUT)
+            .withBody(s"""{ "view": { "connectionUri" : "$sel2" } }""")
+          )(Task.now) *>
+        client.getAs[Json](baseUri / "mount" / "fs" / "viewA")
+      }
+
+      r ==== finalCfg.map(_.asJson)
     }
 
     "MOVE view" in {

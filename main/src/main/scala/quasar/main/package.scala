@@ -209,8 +209,7 @@ package object main {
   /** Effect required by the core Quasar services */
   type CoreEff0[A] = Coproduct[Mounting, FileSystem, A]
   type CoreEff1[A] = Coproduct[FileSystemFailure, CoreEff0, A]
-  type CoreEff2[A] = Coproduct[MountConfigs, CoreEff1, A]
-  type CoreEff[A]  = Coproduct[Task, CoreEff2, A]
+  type CoreEff[A]  = Coproduct[Task, CoreEff1, A]
   type CoreEffM[A] = Free[CoreEff, A]
 
   // TODO: Accept an initial set of mounts?
@@ -244,7 +243,6 @@ package object main {
           free.foldMapNT(mnt) compose mounter
 
         liftTask                                :+:
-        injectFT[MountConfigs, CfgsErrsIO]      :+:
         injectFT[FileSystemFailure, CfgsErrsIO] :+:
         mounting                                :+:
         (translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))

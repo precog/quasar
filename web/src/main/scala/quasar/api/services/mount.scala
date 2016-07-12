@@ -19,7 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._, ToApiError.ops._
 import quasar.fp._
-import quasar.fs.{AbsPath, AFile, APath, sandboxAbs}
+import quasar.fs.{AbsPath, APath, sandboxAbs}
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._
@@ -30,23 +30,13 @@ import pathy.argonaut.PosixCodecJson._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-// TODO: Remove the "low level" MountConfigsF effect from mount. It was
-// introduced here as a workaround for a few regressions in the mount api when
-// the appropriate fix at another level wasn't obvious. Relatedly ServiceSpec
-// was introduced to capture a few scenarios that seemingly should have been
-// captured by existing tests, but were not due to the differences between the
-// wiring of interpreters in Server vs tests. Once the server's use of
-// interpreters is closer to the way tests use them the appropriate fix should
-// become apparent and the need for MountConfigsF here should disappear.
-
 object mount {
   import posixCodec.printPath
 
   def service[S[_]](
     implicit
     M: Mounting.Ops[S],
-    S0: Task :<: S,
-    S1: MountConfigs :<: S
+    S0: Task :<: S
   ): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
@@ -58,17 +48,10 @@ object mount {
 
       case req @ MOVE -> AsPath(src) =>
         respond(requiredHeader(Destination, req).map(_.value).fold(
-            err => EitherT.leftU[String](err.point[Free[S, ?]]),
-            dst => EitherT[Free[S, ?], ApiError, String] {
-              OptionT[Free[S, ?], (AFile, AFile)](
-                (refineType(src).toOption |@| UriPathCodec.parseAbsFile(dst).map(sandboxAbs)).tupled.point[Free[S, ?]])
-                .flatMap { case sd @ (s, _) => OptionT(ViewMounter.exists[S](s).map(_ option sd)) }
-                .map((ViewMounter.move[S] _).tupled(_) *>
-                     s"moved ${printPath(src)} to $dst".right[ApiError].point[Free[S, ?]])
-                .getOrElse(refineType(src).fold(
-                  srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
-                  srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file")).run).join
-            }).run)
+          err => EitherT.leftU[String](err.point[Free[S, ?]]),
+          dst => refineType(src).fold(
+            srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
+            srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))).run)
 
       case req @ POST -> AsDirPath(parent) => respond((for {
         hdr <- EitherT.fromDisjunction[M.F](requiredHeader(XFileName, req))
@@ -118,8 +101,7 @@ object mount {
     replaceIfExists: Boolean
   )(implicit
     M: Mounting.Ops[S],
-    S0: Task :<: S,
-    S1: MountConfigs :<: S
+    S0: Task :<: S
   ): EitherT[Free[S, ?], ApiError, Boolean] = {
     type FreeS[A] = Free[S, A]
 
@@ -135,16 +117,7 @@ object mount {
                   (msg, _) => ApiError.fromMsg_(
                     BadRequest, msg).left))
       exists <- EitherT.right(M.lookup(path).isDefined)
-      mnt    =
-        if (replaceIfExists && exists) M.replace(path, bConf)
-        else bConf match {
-          case MountConfig.ViewConfig(expr, vars) =>
-            refineType(path).fold(
-              κ(M.mount(path, bConf)),
-              f => EitherT[Free[S, ?], MountingError, Unit](ViewMounter.mount[S](f, expr, vars)).map(_.right))
-          case mc: MountConfig.FileSystemConfig =>
-            M.mount(path, bConf)
-        }
+      mnt    = if (replaceIfExists && exists) M.replace(path, bConf) else M.mount(path, bConf)
       r      <- mnt.leftMap(_.toApiError)
       _      <- EitherT.fromDisjunction[FreeS](r.leftMap(_.toApiError))
     } yield exists

@@ -201,9 +201,9 @@ object view {
             refineType(path).fold(
               d => viewPaths
                 .foldMap(f => f.relativeTo(d).map(κ(f)).toList)
-                .foldMap(ViewMounter.unmount[S])
+                .foldMap(ViewMounter.delete[S])
                 *> delete,
-              f => viewPaths.contains(f) ? ViewMounter.unmount[S](f).map(_.right[FileSystemError]) | delete)
+              f => viewPaths.contains(f) ? ViewMounter.delete[S](f).map(_.right[FileSystemError]) | delete)
           }
 
         case TempFile(nearTo) =>

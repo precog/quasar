@@ -42,4 +42,12 @@ object Bucketable {
         fg.run.bitraverse(FB.digForBucket[H](_), GB.digForBucket[H](_)) ∘
           (Coproduct(_))
     }
+
+  implicit def const[T[_[_]], A]:
+      Bucketable.Aux[T, Const[A, ?]] =
+    new Bucketable[Const[A, ?]] {
+      type IT[F[_]] = T[F]
+
+      def digForBucket[G[_]](de: Const[A, IT[G]]) = StateT.stateT(de)
+    }
 }

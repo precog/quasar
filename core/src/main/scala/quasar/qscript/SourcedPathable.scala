@@ -117,8 +117,8 @@ object SourcedPathable {
         p2: SourcedPathable[IT, Unit]) =
         (p1, p2) match {
           case (Map(_, m1), Map(_, m2)) => OptionT(for {
-            lname <- freshName("mergel")
-            rname <- freshName("merger")
+            lname <- freshName("leftMap")
+            rname <- freshName("rightMap")
           } yield {
             val lf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(lname)))
             val rf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(rname)))
@@ -126,7 +126,7 @@ object SourcedPathable {
             //scala.Predef.println(s"lf>>>> ${lf.show}")
             //scala.Predef.println(s"rf>>>> ${rf.show}")
 
-            AbsMerge[SourcedPathable[IT, Unit], FreeMap[IT]](Map((), Free.roll[MapFunc[IT, ?], Unit](
+            SrcMerge[SourcedPathable[IT, Unit], FreeMap[IT]](Map((), Free.roll[MapFunc[IT, ?], Unit](
               ConcatMaps(
                 Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(lname), rebase(m1, left))),
                 Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(rname), rebase(m2, right)))))),

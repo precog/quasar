@@ -26,7 +26,7 @@ import scalaz._
   type IT[F[_]]
 
   def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: A, a2: A):
-      OptionT[State[NameGen, ?], Merge[IT, A]]
+      OptionT[State[NameGen, ?], SrcMerge[A, FreeMap[IT]]]
 }
 
 object Mergeable {
@@ -43,7 +43,7 @@ object Mergeable {
         p1: Const[A, Unit],
         p2: Const[A, Unit]) =
         ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
-          case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
+          case SrcMerge(src, l, r) => SrcMerge(Const(src), l, r)
         }
     }
 
@@ -62,11 +62,11 @@ object Mergeable {
         (cp1.run, cp2.run) match {
           case (-\/(left1), -\/(left2)) =>
             mf.mergeSrcs(left, right, left1, left2).map {
-              case AbsMerge(src, left, right) => AbsMerge(Coproduct(-\/(src)), left, right)
+              case SrcMerge(src, left, right) => SrcMerge(Coproduct(-\/(src)), left, right)
             }
           case (\/-(right1), \/-(right2)) =>
             mg.mergeSrcs(left, right, right1, right2).map {
-              case AbsMerge(src, left, right) => AbsMerge(Coproduct(\/-(src)), left, right)
+              case SrcMerge(src, left, right) => SrcMerge(Coproduct(\/-(src)), left, right)
             }
           case (_, _) => OptionT.none
         }

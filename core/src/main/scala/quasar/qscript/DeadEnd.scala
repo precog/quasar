@@ -45,7 +45,7 @@ object DeadEnd {
         p2: DeadEnd) =
         OptionT(state(
           if (p1 ≟ p2)
-            AbsMerge[DeadEnd, FreeMap[IT]](p1, UnitF, UnitF).some
+            SrcMerge[DeadEnd, FreeMap[IT]](p1, UnitF, UnitF).some
           else
             None))
     }

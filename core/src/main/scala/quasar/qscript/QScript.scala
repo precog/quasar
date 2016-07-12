@@ -52,7 +52,7 @@ object JoinType {
 }
 
 trait Helpers[T[_[_]]] {
-  def basicJF: JoinFunc[T] =
+  def equiJF: JoinFunc[T] =
     Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 }
 
@@ -74,11 +74,20 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
   type Inner = T[F]
   type InnerPure = T[QScriptPure[T, ?]]
 
-  type Pures[A] = List[F[A]]
-  type DoublePures = (Pures[Unit], Pures[Unit])
-  type TriplePures = (Pures[Unit], Pures[Unit], Pures[Unit])
+  type Fs[A] = List[F[A]]
 
-  type DoubleFreeMap = (FreeMap[T], FreeMap[T])
+  case class ZipperSides(
+    lSide: FreeMap[T],
+    rSide: FreeMap[T])
+
+  case class ZipperTails(
+    lTail: Fs[Unit],
+    rTail: Fs[Unit])
+
+  case class ZipperAcc(
+    acc: Fs[Unit],
+    sides: ZipperSides,
+    tails: ZipperTails)
 
   type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
 
@@ -97,49 +106,62 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     case h :: t => h.map(_ => t).right
   }
 
-  val consZipped: Algebra[ListF[F[Unit], ?], TriplePures] = {
-    case NilF() => (Nil, Nil, Nil)
-    case ConsF(head, (acc, l, r)) => (head :: acc, l, r)
+  val consZipped: Algebra[ListF[F[Unit], ?], ZipperAcc] = {
+    case NilF() => ZipperAcc(Nil, ZipperSides(UnitF[T], UnitF[T]), ZipperTails(Nil, Nil))
+    case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
   // E, M, F, A => A => M[E[F[A]]] 
-  val zipper: ElgotCoalgebraM[TriplePures \/ ?, State[NameGen, ?], ListF[F[Unit], ?], (DoubleFreeMap, DoublePures)] = {
-    case ((lm, rm), (l :: ls, r :: rs)) => {
+  val zipper: ElgotCoalgebraM[
+      ZipperAcc \/ ?,
+      State[NameGen, ?],
+      ListF[F[Unit], ?],
+      (ZipperSides, ZipperTails)] = {
+    case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) => {
       val ma = implicitly[Mergeable.Aux[T, F[Unit]]]
 
-      ma.mergeSrcs(lm, rm, l, r).fold[TriplePures \/ ListF[F[Unit], (DoubleFreeMap, DoublePures)]]({
-          case AbsMerge(inn, lmf, rmf) => ConsF(inn, ((lmf, rmf), (ls, rs))).right[TriplePures]
-        }, (Nil, l :: ls, r :: rs).left)
+      ma.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[F[Unit], (ZipperSides, ZipperTails)]]({
+          case SrcMerge(inn, lmf, rmf) =>
+            ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
+        }, ZipperAcc(Nil, zs, zt).left)
     }
-    case ((_, _), (l, r)) => (Nil: Pures[Unit], l, r).left.point[State[NameGen, ?]]
+    case (sides, tails) =>
+      ZipperAcc(Nil, sides, tails).left.point[State[NameGen, ?]]
   }
 
-  def merge(left: Inner, right: Inner): State[NameGen, MergeJoin[F, Inner]] = {
-    val lLin: Pures[Unit] = left.cata(linearize).reverse
-    val rLin: Pures[Unit] = right.cata(linearize).reverse
+  def merge(left: Inner, right: Inner): State[NameGen, SrcMerge[Inner, Free[F, Unit]]] = {
+    val lLin: Fs[Unit] = left.cata(linearize).reverse
+    val rLin: Fs[Unit] = right.cata(linearize).reverse
 
-    elgotM((UnitF[T], UnitF[T]), (lLin, rLin))(consZipped(_: ListF[F[Unit], TriplePures]).point[State[NameGen, ?]], zipper) ∘ {
-      case (common, lTail, rTail) =>
-        AbsMerge[Inner, Free[F, Unit]](
-          common.reverse.ana[T, F](delinearizeInner),
-          foldIso(CoEnv.freeIso[Unit, F])
-            .get(lTail.reverse.ana[T, CoEnv[Unit, F, ?]](delinearizeFreeQS[F, Unit] ⋙ (CoEnv(_)))),
-          foldIso(CoEnv.freeIso[Unit, F])
-            .get(rTail.reverse.ana[T, CoEnv[Unit, F, ?]](delinearizeFreeQS[F, Unit] ⋙ (CoEnv(_)))))
+    elgotM((
+      ZipperSides(UnitF[T], UnitF[T]),
+      ZipperTails(lLin, rLin)))(
+      consZipped(_: ListF[F[Unit], ZipperAcc]).point[State[NameGen, ?]], zipper) ∘ {
+        case ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =>
+          val leftRev: FreeUnit[F] =
+            foldIso(CoEnv.freeIso[Unit, F])
+              .get(lTail.reverse.ana[T, CoEnv[Unit, F, ?]](delinearizeFreeQS[F, Unit] >>> (CoEnv(_))))
+
+          val rightRev: FreeUnit[F] =
+            foldIso(CoEnv.freeIso[Unit, F])
+              .get(rTail.reverse.ana[T, CoEnv[Unit, F, ?]](delinearizeFreeQS[F, Unit] >>> (CoEnv(_))))
+
+          SrcMerge[Inner, FreeUnit[F]](
+            common.reverse.ana[T, F](delinearizeInner),
+            rebase(leftRev, Free.roll(SP.inj(Map(().point[Free[F, ?]], lMap)))),
+            rebase(rightRev, Free.roll(SP.inj(Map(().point[Free[F, ?]], rMap)))))
     }
   }
 
   def mergeTheta[A](
     inl: Inner,
     inr: Inner,
-    out: Merge[T, ThetaJoin[T, Inner]] => A): QSState[A] =
+    out: SrcMerge[ThetaJoin[T, Inner], FreeMap[T]] => A): QSState[A] =
     merge(inl, inr).mapK(_.right[PlannerError]) >>= {
-      case AbsMerge(merged, left, right) =>
+      case SrcMerge(merged, left, right) =>
         makeBasicTheta(merged, left, right).map(out)
     }
 
-    // TODO show for FreeQS
-    // scala.Predef.println(s">>>>>>>>>merge2Map \n ${merged.show} \n ${left.show} \n ${right.show}")
   def merge2Map(
     values: Func.Input[Inner, nat._2])(
     func: (FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
@@ -147,7 +169,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     mergeTheta[SourcedPathable[T, Inner]](
       values(0),
       values(1),
-      { case AbsMerge(src, mfl, mfr) =>
+      { case SrcMerge(src, mfl, mfr) =>
         Map(TJ.inj(src).embed, Free.roll(func(mfl, mfr)))
       })
 
@@ -158,7 +180,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     mergeTheta[SourcedPathable[T, Inner]](
       values(0),
       values(1),
-      { case AbsMerge(src, mfl, mfr) =>
+      { case SrcMerge(src, mfl, mfr) =>
         LeftShift(
           TJ.inj(src).embed,
           Free.roll(func(mfl, mfr)),
@@ -175,9 +197,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
   def merge3(a1: Inner, a2: Inner, a3: Inner): QSState[Merge3] = {
     for {
       tup0 <- merge(a1, a2).mapK(_.right[PlannerError])
-      AbsMerge(merged0, first0, second0) = tup0
+      SrcMerge(merged0, first0, second0) = tup0
       tup1 <- merge(merged0, a3).mapK(_.right[PlannerError])
-      AbsMerge(merged, fands0, third0) = tup1
+      SrcMerge(merged, fands0, third0) = tup1
       th1 <- makeBasicTheta(merged0, first0, second0)
       th2 <- makeBasicTheta(TJ.inj(th1.src).embed, fands0, third0)
     } yield {
@@ -199,13 +221,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
   }
 
   def makeBasicTheta[A](src: A, left: Free[F, Unit], right: Free[F, Unit]):
-      QSState[Merge[T, ThetaJoin[T, A]]] =
+      QSState[SrcMerge[ThetaJoin[T, A], FreeMap[T]]] =
     for {
-      leftName <- freshName("left").lift[PlannerError \/ ?]
-      rightName <- freshName("right").lift[PlannerError \/ ?]
+      leftName <- freshName("leftTheta").lift[PlannerError \/ ?]
+      rightName <- freshName("rightTheta").lift[PlannerError \/ ?]
     } yield {
-      AbsMerge[ThetaJoin[T, A], FreeMap[T]](
-        ThetaJoin(src, left.mapSuspension(FI), right.mapSuspension(FI), basicJF, Inner,
+      SrcMerge[ThetaJoin[T, A], FreeMap[T]](
+        ThetaJoin(src, left.mapSuspension(FI), right.mapSuspension(FI), equiJF, Inner,
           Free.roll(ConcatMaps(
             Free.roll(MakeMap(
               StrLit(leftName),
@@ -335,31 +357,30 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
         mergeTheta[(Inner, FreeMap[T], FreeMap[T])](
           src,
           inner,
-          { case AbsMerge(src, mfl, mfr) =>
+          { case SrcMerge(src, mfl, mfr) =>
             (TJ.inj(src).embed, rebase(bucket, mfl), mfr)
           })
       case -\/(BucketField(src, _, name)) =>
         mergeTheta[(Inner, FreeMap[T], FreeMap[T])](
           src,
           inner,
-          { case AbsMerge(src, mfl, mfr) =>
+          { case SrcMerge(src, mfl, mfr) =>
             (TJ.inj(src).embed, rebase(name, mfl), mfr)
           })
       case -\/(BucketIndex(src, _, index)) =>
         mergeTheta[(Inner, FreeMap[T], FreeMap[T])](
           src,
           inner,
-          { case AbsMerge(src, mfl, mfr) =>
+          { case SrcMerge(src, mfl, mfr) =>
             (TJ.inj(src).embed, rebase(index, mfl), mfr)
           })
       case -\/(LeftShiftBucket(src, struct, _, bucket)) =>
         mergeTheta[(Inner, FreeMap[T], FreeMap[T])](
           src,
           inner,
-          { case AbsMerge(src, mfl, mfr) =>
+          { case SrcMerge(src, mfl, mfr) =>
             (TJ.inj(src).embed, rebase(rebase(struct, bucket), mfl), mfr)
           })
-      // TODO in the cases below do we need to merge src?
       case -\/(SquashBucket(src)) =>
         stateT((inner, Free.roll(Nullary(CommonEJson.inj(ejson.Null[T[EJson]]()).embed)), UnitF)) // singleton provenance - one big bucket
       case \/-((qs, 0)) =>
@@ -398,10 +419,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
   def invokeThetaJoin(input: Func.Input[Inner, nat._3], tpe: JoinType): QSState[ThetaJoin[T, Inner]] =
     for {
       tup0 <- merge(input(0), input(1)).mapK(_.right[PlannerError])
-      AbsMerge(src1, jbLeft, jbRight) = tup0
+      SrcMerge(src1, jbLeft, jbRight) = tup0
       tup1 <- merge(src1, input(2)).mapK(_.right[PlannerError])
     } yield {
-      val AbsMerge(src2, bothSides, cond) = tup1
+      val SrcMerge(src2, bothSides, cond) = tup1
 
       val leftBr = rebase(bothSides, jbLeft)
       val rightBr = rebase(bothSides, jbRight)
@@ -411,8 +432,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
           substitute[Free[?[_], JoinSide], F](jbLeft.map[JoinSide](κ(RightSide)), Free.point(LeftSide))))(
           substitute[Free[?[_], JoinSide], F](jbRight.map[JoinSide](κ(RightSide)), Free.point(RightSide)))
 
-      val on: JoinFunc[T] = basicJF // TODO get from onQS to here somehow
+      val on: JoinFunc[T] = equiJF // TODO get from onQS to here somehow
 
+      // TODO namegen
       ThetaJoin(
         src2,
         leftBr.mapSuspension(FI),
@@ -462,7 +484,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       for {
         tmpName <- freshName("let").lift[PlannerError \/ ?]
         tup <- merge(form, body).mapK(_.right[PlannerError])
-        AbsMerge(src, jb1, jb2) = tup
+        SrcMerge(src, jb1, jb2) = tup
         theta <- makeBasicTheta(src, jb1, jb2)
       } yield {
         SP.inj(Map(
@@ -478,18 +500,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _))
         .map(SP.inj)
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Mapping =>
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
       stateT(SP.inj(invokeMapping1(func, Func.Input1(a1))))
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       mergeTheta[F[Inner]](a1, a2, {
-        case AbsMerge(src, mfl, mfr) =>
+        case SrcMerge(src, mfl, mfr) =>
           QB.inj(BucketField(TJ.inj(src).embed, mfl, mfr))
       })
 
     case LogicalPlan.InvokeFUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       mergeTheta[F[Inner]](a1, a2, {
-        case AbsMerge(src, mfl, mfr) =>
+        case SrcMerge(src, mfl, mfr) =>
           QB.inj(BucketIndex(TJ.inj(src).embed, mfl, mfr))
       })
 
@@ -507,13 +529,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-        case AbsMerge(src, jb1, jb2) =>
+        case SrcMerge(src, jb1, jb2) =>
           QC.inj(Take(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI)))
       }
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-        case AbsMerge(src, jb1, jb2) =>
+        case SrcMerge(src, jb1, jb2) =>
           QC.inj(Drop(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI)))
       }
 
@@ -565,45 +587,45 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       mergeTheta[F[Inner]](a1, a2, {
-        case AbsMerge(src, fm1, fm2) =>
+        case SrcMerge(src, fm1, fm2) =>
           SP.inj(Map(
             QC.inj(Filter(TJ.inj(src).embed, fm2)).embed,
             fm1))
       })
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Squashing =>
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Squashing =>
       stateT(func match {
         case identity.Squash => QB.inj(SquashBucket(a1))
       })
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Expansion =>
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Expansion =>
       stateT(invokeExpansion1(func, Func.Input1(a1)))
 
-    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect == Expansion =>
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Expansion =>
       invokeExpansion2(func, Func.Input2(a1, a2)) map {
         SP.inj(_)
       }
 
-    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect == Transformation =>
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Transformation =>
       func match {
         case set.GroupBy =>
           mergeTheta[F[Inner]](a1, a2, {
-            case AbsMerge(merged, source, bucket) =>
+            case SrcMerge(merged, source, bucket) =>
               QB.inj(GroupBy(TJ.inj(merged).embed, source, bucket))
           })
         case set.Union =>
           merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-            case AbsMerge(src, jb1, jb2) =>
+            case SrcMerge(src, jb1, jb2) =>
               SP.inj(Union(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI)))
           }
         case set.Intersect =>
           merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-            case AbsMerge(src, jb1, jb2) =>
-              TJ.inj(ThetaJoin(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI), basicJF, Inner, Free.point(LeftSide)))
+            case SrcMerge(src, jb1, jb2) =>
+              TJ.inj(ThetaJoin(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI), equiJF, Inner, Free.point(LeftSide)))
           }
         case set.Except =>
           merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-            case AbsMerge(src, jb1, jb2) =>
+            case SrcMerge(src, jb1, jb2) =>
               TJ.inj(ThetaJoin(
                 src,
                 jb1.mapSuspension(FI),
@@ -614,7 +636,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
           }
       }
 
-    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))  if func.effect == Transformation=>
+    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))  if func.effect ≟ Transformation=>
       def invoke(tpe: JoinType): QSState[F[Inner]] =
         invokeThetaJoin(Func.Input3(a1, a2, a3), tpe).map(TJ.inj)
 
@@ -632,7 +654,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, UnitF)`
   //       • normalize ⇒ a whole bunch, based on MapFuncs
-  //       • elideNopJoin ⇒ no `ThetaJoin(???, UnitF, UnitF, LeftSide == RightSide, ???, ???)`
+  //       • elideNopJoin ⇒ no `ThetaJoin(???, UnitF, UnitF, LeftSide === RightSide, ???, ???)`
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
@@ -647,7 +669,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     implicit Th: ThetaJoin[T, ?] :<: F, SP: SourcedPathable[T, ?] :<: F):
       ThetaJoin[T, T[F]] => F[T[F]] = {
     case ThetaJoin(src, l, r, on, _, combine)
-        if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ basicJF =>
+        if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ equiJF =>
       SP.inj(Map(src, combine.void))
     case x => Th.inj(x)
   }

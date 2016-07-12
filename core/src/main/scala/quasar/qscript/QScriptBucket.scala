@@ -121,7 +121,7 @@ object QScriptBucket {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Corecursive]:
+  implicit def mergeable[T[_[_]]: Corecursive : EqualT]:
       Mergeable.Aux[T, QScriptBucket[T, Unit]] =
     new Mergeable[QScriptBucket[T, Unit]] {
       type IT[F[_]] = T[F]
@@ -130,7 +130,13 @@ object QScriptBucket {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: QScriptBucket[IT, Unit],
-        p2: QScriptBucket[IT, Unit]) = OptionT(state(None))
+        p2: QScriptBucket[IT, Unit]) =
+        OptionT(state {
+          if (p1 ≟ p2)
+            Some(SrcMerge[QScriptBucket[IT, Unit], FreeMap[T]](p1, left, right))
+          else
+            None
+        })
     }
 
   implicit def bucketable[T[_[_]]: Corecursive]:

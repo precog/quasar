@@ -20,7 +20,6 @@ import quasar.Predef._
 
 import scala.Predef.implicitly
 
-import matryoshka._
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -83,19 +82,7 @@ package object qscript {
 
   def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
 
-  final case class AbsMerge[A, B](src: A, left: B, right: B)
+  final case class SrcMerge[A, B](src: A, left: B, right: B)
 
-  type Merge[T[_[_]], A] = AbsMerge[A, FreeMap[T]]
-  type MergeJoin[F[_], A] = AbsMerge[A, Free[F, Unit]]
-
-  // replace Unit in `in` with `field`
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
-
-  implicit def constBucketable[T[_[_]]: Corecursive]:
-      Bucketable.Aux[T, Const[DeadEnd, ?]] =
-    new Bucketable[Const[DeadEnd, ?]] {
-      type IT[F[_]] = T[F]
-
-      def digForBucket[G[_]](de: Const[DeadEnd, IT[G]]) = StateT.stateT(de)
-    }
 }

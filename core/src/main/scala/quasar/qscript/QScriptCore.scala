@@ -125,7 +125,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]]:
+  implicit def mergeable[T[_[_]]: EqualT]:
       Mergeable.Aux[T, QScriptCore[T, Unit]] =
     new Mergeable[QScriptCore[T, Unit]] {
       type IT[F[_]] = T[F]
@@ -136,14 +136,14 @@ object QScriptCore {
         p1: QScriptCore[IT, Unit],
         p2: QScriptCore[IT, Unit]) =
         OptionT(state((p1, p2) match {
-          case (t1, t2) if t1 == t2 =>
-            AbsMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some
+          case (t1, t2) if t1 ≟ t2 =>
+            SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some
           case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
             val mapL = rebase(bucket1, left)
             val mapR = rebase(bucket2, right)
 
-            if (mapL == mapR)
-              AbsMerge[QScriptCore[IT, Unit], FreeMap[IT]](
+            if (mapL ≟ mapR)
+              SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](
                 Reduce((), mapL, func1 // ++ func2 // TODO: append Sizeds
                   , rep1),
                 UnitF,

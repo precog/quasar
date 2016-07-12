@@ -1,0 +1,1 @@
+- generalize away from QScriptInternal

@@ -1,0 +1,1 @@
+- [SD-1846] Correct generation of mongo collection prefix from dir path

@@ -1,0 +1,1 @@
+- [SD-1839] MongoDB: generate temp file names in same directory as hint path

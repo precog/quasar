@@ -1,0 +1,1 @@
+- [SD-1825] Respond to http4s MessageFailure with BadRequest

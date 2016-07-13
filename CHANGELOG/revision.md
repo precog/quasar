@@ -1,0 +1,1 @@
+Migrate some `quasar.effect` related code from Quasar Advanced

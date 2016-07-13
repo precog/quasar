@@ -1,0 +1,1 @@
+- move QScript projections to their own component so they can be used in static path processing, rather than trying to use a subset of Map.

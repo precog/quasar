@@ -66,8 +66,10 @@ object DecodeError {
 trait Decoder {
   def mediaType: MediaType
   def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data]
+  /* Does not decode in a streaming fashion */
   def decode(txtStream: Process[Task,String]): Task[DecodeError \/ Process[Task, DecodeError \/ Data]] =
     txtStream.runLog.map(_.mkString).map(decode(_))
+  /* Not a streaming decoder */
   def decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = EntityDecoder.decodeBy(mediaType) { msg =>
     EitherT(decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
   }

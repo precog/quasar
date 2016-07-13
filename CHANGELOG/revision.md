@@ -1,0 +1,1 @@
+Call out non streaming behavior in `MessageFormat`

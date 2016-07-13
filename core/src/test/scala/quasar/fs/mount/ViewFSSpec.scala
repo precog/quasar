@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 
 import quasar._, LogicalPlan._
-import quasar.effect._
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp._
 import quasar.fs._
 import quasar.fs.InMemory.{InMemoryFs, InMemState}

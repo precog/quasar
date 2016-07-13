@@ -88,4 +88,7 @@ package object free {
     new (S ~> G) {
       def apply[A](sa: S[A]) = S.prj(sa).fold(g(sa))(f)
     }
+
+  def transform2In[F[_], H[_], S[_], G[_]](f1: F ~> G, f2: H ~> G, g: S ~> G)(implicit S: F :<: S, S1: H :<: S): S ~> G =
+    transformIn(f2, transformIn(f1, g))
 }

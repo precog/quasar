@@ -1,0 +1,2 @@
+- add a `skeleton` filesystem to be copied as a starting point for other ones
+- remove MongoDB filesystem dependencies from `main` subproject

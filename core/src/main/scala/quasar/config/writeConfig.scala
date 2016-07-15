@@ -62,7 +62,7 @@ object writeConfig {
 
     // KeyValueStore[APath, MountConfig, ?] ~> Free[AtomicRef[Map[APath, MountConfig], ?]]:
     val storeToMap: MountConfigs ~> Free[MRef, ?] =
-      KeyValueStore.toAtomicRef[APath, MountConfig]()
+      KeyValueStore.toAtomicRef[APath, MountConfig]
 
     free.foldMapNT(configRef) compose (free.foldMapNT(mapToConfig) compose storeToMap)
   }

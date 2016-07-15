@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
-import quasar.effect.KeyValueStore
+import quasar.effect.{AtomicRef, KeyValueStore}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
@@ -76,10 +76,18 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         mntReq => mountedRef.modify(_ - mntReq).void
       )
 
-      val store: MountConfigs ~> Task = KeyValueStore.fromTaskRef(configsRef)
-      val mt: MEff ~> Task = NaturalTransformation.refl[Task] :+: store
-      val tf: Mounting ~> Task = foldMapNT(mt) compose mounter
-      def eff: Eff ~> Task = NaturalTransformation.refl[Task] :+: tf
+      val store: MountConfigs ~> Task =
+        foldMapNT(AtomicRef.fromTaskRef(configsRef)) compose
+        KeyValueStore.toAtomicRef
+
+      val mt: MEff ~> Task =
+        NaturalTransformation.refl[Task] :+: store
+
+      val tf: Mounting ~> Task =
+        foldMapNT(mt) compose mounter
+
+      def eff: Eff ~> Task =
+        NaturalTransformation.refl[Task] :+: tf
 
       val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
 

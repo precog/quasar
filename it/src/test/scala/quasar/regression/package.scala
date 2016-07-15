@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef.{Long, Map}
 import quasar.effect._
-import quasar.fp.{TaskRef}
+import quasar.fp.TaskRef
 import quasar.fp.free, free._
 import quasar.fs.{QueryFile, FileSystem, ADir}
 
@@ -41,7 +41,8 @@ package object regression {
     def handlesTask(
       ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
     ): MountedResultH ~> Task =
-      KeyValueStore.fromTaskRef(ref)
+      foldMapNT(AtomicRef.fromTaskRef(ref)) compose
+      KeyValueStore.toAtomicRef
 
     def monoSeqTask(ref: TaskRef[Long]): MonotonicSeq ~> Task =
       MonotonicSeq.fromTaskRef(ref)

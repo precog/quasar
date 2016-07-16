@@ -59,6 +59,9 @@ package object quasar {
         (a.set(Vector(pr)): PhaseResultW[A]).liftM[SemanticErrsT]
       }
 
+  /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
+    * typechecked.
+    */
   // TODO: Move this into the SQL package, provide a type class for it in core.
   def precompile(query: Fix[Sql], vars: Variables, basePath: ADir)(
     implicit RT: RenderTree[Fix[Sql]]):
@@ -75,28 +78,31 @@ package object quasar {
     } yield logical
   }
 
-  /** Optimizes and typechecks a `LogicalPlan` returning the improved plan or
-    * just a list of results, if the query was foldable to a constant.
+  /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
     */
-  def preparePlan(lp: Fix[LogicalPlan], off: Natural, lim: Option[Positive])
-      : CompileM[List[Data] \/ Fix[LogicalPlan]] =
+  def preparePlan(lp: Fix[LogicalPlan]): CompileM[Fix[LogicalPlan]] =
     for {
-      optimized   <- phase("Optimized", Optimizer.optimize(addOffsetLimit(lp, off, lim)).right)
+      optimized   <- phase("Optimized", Optimizer.optimize(lp).right)
       typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
-    } yield typechecked.project match {
+    } yield typechecked
+
+  /** Identify plans which reduce to a (set of) constant value(s). */
+  def refineConstantPlan(lp: Fix[LogicalPlan]): List[Data] \/ Fix[LogicalPlan] =
+    lp.project match {
       case LogicalPlan.ConstantF(Data.Set(records)) => records.left
       case LogicalPlan.ConstantF(value)             => List(value).left
-      case _                                        => typechecked.right
+      case _                                        => lp.right
     }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
     * results, if the query was foldable to a constant.
     */
   def queryPlan(
-    query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive])(
-    implicit RT: RenderTree[Fix[Sql]]):
+    query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LogicalPlan]] =
-    precompile(query, vars, basePath).flatMap(preparePlan(_, off, lim))
+    precompile(query, vars, basePath)
+      .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
+      .map(refineConstantPlan)
 
   def addOffsetLimit[T[_[_]]: Corecursive](
     lp: T[LogicalPlan], off: Natural, lim: Option[Positive]):

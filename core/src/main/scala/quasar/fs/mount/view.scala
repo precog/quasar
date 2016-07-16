@@ -56,23 +56,19 @@ object view {
           }.run
 
           def vOpen: Free[S, FileSystemError \/ ReadHandle] = {
-            val readLp = LogicalPlan.Read(path)
+            val readLp = addOffsetLimit(LogicalPlan.Read(path), off, lim)
             (for {
               lp <- ViewMounter.rewrite[S](readLp).leftMap(se => planningFailed(readLp, Planner.InternalError(se.shows)))
-              h  <- preparePlan(lp, off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
-                e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
-                  // TODO: more sensible error?
-                  Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),
-                _.fold(
-                  data => (for {
-                    h <- seq.next.map(ReadHandle(path, _))
-                    _ <- viewState.put(h, ResultSet.Data(data.toVector))
-                  } yield h).liftM[FileSystemErrT],
-                  lp => for {
-                    qh <- EitherT(queryUnsafe.eval(lp).run.value)
-                    h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
-                    _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
-                  } yield h))
+              h  <- refineConstantPlan(lp).fold(
+                data => (for {
+                  h <- seq.next.map(ReadHandle(path, _))
+                  _ <- viewState.put(h, ResultSet.Data(data.toVector))
+                } yield h).liftM[FileSystemErrT],
+                lp => for {
+                  qh <- EitherT(queryUnsafe.eval(lp).run.value)
+                  h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
+                  _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
+                } yield h)
             } yield h).run
           }
 

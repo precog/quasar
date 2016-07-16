@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar._
+import quasar.{Data, Variables, TreeMatchers}
 import quasar.LogicalPlan._
 import quasar.fp._
 import quasar.fs._
@@ -149,18 +149,20 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
           Constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.queryPlan(inner._1, inner._2, fileParent(p), 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
+        quasar.precompile(inner._1, inner._2, fileParent(p)).run.run._2.toOption.get
 
       val vs = Map[APath, MountConfig](
         p -> MountConfig.viewConfig(inner))
 
+      val exp = quasar.preparePlan(Take(
+          Drop(
+            innerLP,
+            Constant(Data.Int(5))).embed,
+          Constant(Data.Int(10))).embed).run.value.toOption.get
+
       eval(vs)(ViewMounter.rewrite[MountConfigs](outer).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Take(
-            Drop(
-              innerLP,
-              Constant(Data.Int(5))).embed,
-            Constant(Data.Int(10))).embed)
+          exp)
       }
     }
 

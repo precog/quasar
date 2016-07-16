@@ -24,7 +24,7 @@ import quasar.fs._
 import quasar.sql.Sql
 
 import eu.timepit.refined.auto._
-import matryoshka._, TraverseT.ops._
+import matryoshka._, TraverseT.ops._, Recursive.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -52,6 +52,7 @@ object ViewMounter {
     query: Fix[Sql],
     vars: Variables
   ): MountingError \/ Unit =
+    // NB: compiled and type-checked plan not actually used here; only the failure
     queryPlan(query, vars, fileParent(loc), 0L, None).run.value
       .leftMap(e => invalidConfig(viewConfig(query, vars), e.map(_.shows)))
       .void
@@ -96,29 +97,24 @@ object ViewMounter {
       mntCfgs[S].get(loc).flatMap(mc =>
         OptionT.optionT[Free[S, ?]](Free.point(viewConfig.getOption(mc))))
 
-    /** This collapses literal data results into a LogicalPlan for cases where
-      * currently _want_ a Constant plan. This will have to go away when
-      * [[quasar.Data.Set]] does.
-      */
-    def collapseData[T[_[_]]: Corecursive](plan: List[Data] \/ T[LogicalPlan]):
-        T[LogicalPlan] =
-      plan.fold(d => LogicalPlan.ConstantF[T[LogicalPlan]](Data.Set(d)).embed, ι)
+    // NB: simplify incoming queries to the raw, idealized LP which is simpler
+    // to manage.
+    val cleaned = lp.cata(Optimizer.elideTypeCheckƒ)
 
-    (Set[FPath](), lp).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LogicalPlan] {
+    (Set[FPath](), cleaned).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LogicalPlan] {
       case (e, i @ Embed(r @ LogicalPlan.ReadF(p))) if !(e contains p) =>
         refineTypeAbs(p).fold(
           f => EitherT[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
             lookup(f).run.flatMap[SemanticErrors \/ LogicalPlan[(Set[FPath], Fix[LogicalPlan])]] {
               _.cata(
-                { case (expr, vars) => queryPlan(expr, vars, fileParent(f), 0L, None).run.run._2.map(p => collapseData(p.map(absolutize(_, fileParent(f))))) },
+                { case (expr, vars) => precompile(expr, vars, fileParent(f)).run.run._2 },
                   i.right)
                 .map(_.unFix.map((e + f, _)))
                 .point[Free[S, ?]]
             }),
           κ(lift(e, i)))
       case (e, i) => lift(e, i)
-    }
-
+    } flatMap (x => EitherT(preparePlan(x).run.value.point[Free[S, ?]]))
   }
 
   /** Enumerate view files and view ancestor directories at a particular location. */

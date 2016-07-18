@@ -1,0 +1,1 @@
+- [SD-1869] fix for reading from views containing certain queries including most joins

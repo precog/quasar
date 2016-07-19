@@ -127,7 +127,8 @@ object FileSystemTest {
 
   def externalFsUT = TestConfig.externalFileSystems {
     fsTestConfig(mongodb.fs.MongoDBFsType, mongodb.fs.mongoDbFileSystemDef) orElse
-    fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)
+    fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)                orElse
+    fsTestConfig(postgresql.fs.FsType, postgresql.fs.definition)
   }
 
   def localFsUT: Task[IList[FileSystemUT[FileSystem]]] =

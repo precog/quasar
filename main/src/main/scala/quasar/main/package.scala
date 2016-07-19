@@ -59,8 +59,9 @@ package object main {
     * to a fixed set of effects that filesystems must interpret into.
     */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] =
-    quasar.physical.skeleton.fs.definition[PhysFsEff] |+|
-    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff]
+    quasar.physical.skeleton.fs.definition[PhysFsEff]          |+|
+    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff] |+|
+    quasar.physical.postgresql.fs.definition[PhysFsEff]
 
   /** The intermediate effect FileSystem operations are interpreted into.
     */

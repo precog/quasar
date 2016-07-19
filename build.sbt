@@ -164,9 +164,9 @@ lazy val root = project.in(file("."))
           ejson,
 //          |
           core,
-//        /   \
-   mongodb,    skeleton,
-//        \   /
+//      / / | \ \
+  mongodb, skeleton, postgresql,
+//      \ \ | / /
           main,
 //        /  \
       repl,   web,
@@ -208,8 +208,9 @@ lazy val core = project
 lazy val main = project
   .settings(name := "quasar-main-internal")
   .dependsOn(
-    mongodb  % BothScopes,
-    skeleton % BothScopes)
+    mongodb    % BothScopes,
+    skeleton   % BothScopes,
+    postgresql % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
@@ -230,6 +231,13 @@ lazy val skeleton = project
   .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   // .settings(publishSettings: _*) // NB: uncomment this line when you copy it
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val postgresql = project
+  .settings(name := "quasar-postgresql-internal")
+  .dependsOn(core % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends

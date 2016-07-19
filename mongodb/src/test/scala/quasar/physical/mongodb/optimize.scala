@@ -34,14 +34,14 @@ class OptimizeSpecs extends Specification with TreeMatchers {
 
   "simplifyGroupƒ" should {
     "elide useless reduction" in {
-      chain(
+      chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap(
             BsonField.Name("city") -> $last($field("city")))),
           $field("city").right))
-        .transCata(orOriginal(simplifyGroupƒ)) must
-      beTree(chain(
+        .transCata(orOriginal(simplifyGroupƒ[WorkflowF])) must
+      beTree(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap()),
@@ -53,7 +53,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "elide useless reduction with complex id" in {
-      chain(
+      chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap(
@@ -61,8 +61,8 @@ class OptimizeSpecs extends Specification with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right,
             BsonField.Name("1") -> $field("state").right)).left))
-        .transCata(orOriginal(simplifyGroupƒ)) must
-      beTree(chain(
+        .transCata(orOriginal(simplifyGroupƒ[WorkflowF])) must
+      beTree(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap()),
@@ -76,7 +76,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "preserve useless-but-array-creating reduction" in {
-      val lp = chain(
+      val lp = chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap(
@@ -84,21 +84,21 @@ class OptimizeSpecs extends Specification with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right)).left))
 
-      lp.transCata(orOriginal(simplifyGroupƒ)) must beTree(lp)
+      lp.transCata(orOriginal(simplifyGroupƒ[WorkflowF])) must beTree(lp)
     }
 
   }
 
   "reorder" should {
     "push $skip before $project" in {
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $project(
          Reshape(ListMap(
            BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("city"))))))),
          IgnoreId),
        $skip(5))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $skip(5),
       $project(
@@ -112,14 +112,14 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "push $skip before $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(MapExpr(JsFn(Name("x"), obj(
            "0" -> Select(ident("x"), "length"))))),
          ListMap()),
        $skip(5))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $skip(5),
       $simpleMap(
@@ -133,7 +133,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "not push $skip before flattening $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(
@@ -147,14 +147,14 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "push $limit before $project" in {
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $project(
          Reshape(ListMap(
            BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("city"))))))),
          IgnoreId),
        $limit(10))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $limit(10),
       $project(
@@ -168,14 +168,14 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "push $limit before $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(MapExpr(JsFn(Name("x"), obj(
            "0" -> Select(ident("x"), "length"))))),
          ListMap()),
        $limit(10))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $limit(10),
       $simpleMap(
@@ -189,7 +189,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "not push $limit before flattening $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(
@@ -203,7 +203,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "push $match before $project" in {
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $project(
          Reshape(ListMap(
@@ -211,7 +211,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
          IgnoreId),
        $match(Selector.Doc(
          BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $match(Selector.Doc(
         (BsonField.Name("address") \ BsonField.Name("city")) -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -224,7 +224,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "push $match before $project with deep reference" in {
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $project(
          Reshape(ListMap(
@@ -232,7 +232,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
          IgnoreId),
        $match(Selector.Doc(
          BsonField.Name("__tmp0") \ BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $match(Selector.Doc(
         (BsonField.Name("address") \ BsonField.Name("city")) -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -245,7 +245,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "not push $match before $project with dependency" in {
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $project(
          Reshape(ListMap(
@@ -261,7 +261,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "push $match before $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -270,7 +270,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
          ListMap()),
        $match(Selector.Doc(
          BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $match(Selector.Doc(
         (BsonField.Name("city")) -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -286,7 +286,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "push $match with deep reference before $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -295,7 +295,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
          ListMap()),
        $match(Selector.Doc(
          BsonField.Name("__tmp0") \ BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $match(Selector.Doc(
         (BsonField.Name("city")) -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -311,7 +311,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "push $match before splicing $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(
@@ -323,7 +323,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
          ListMap()),
        $match(Selector.Doc(
          BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
-     val exp = chain(
+     val exp = chain[Workflow](
       $read(Collection("db", "zips")),
       $match(Selector.Doc(
         (BsonField.Name("city")) -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -341,7 +341,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "not push $match before $simpleMap with dependency" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -358,7 +358,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     "not push $match before flattening $simpleMap" in {
       import quasar.jscore._
 
-      val op = chain(
+      val op = chain[Workflow](
        $read(Collection("db", "zips")),
        $simpleMap(
          NonEmptyList(
@@ -373,7 +373,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
     }
 
     "not push $sort up" in {
-      val op = chain(
+      val op = chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           Reshape(ListMap(

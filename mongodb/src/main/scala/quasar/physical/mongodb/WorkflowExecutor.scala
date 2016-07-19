@@ -97,7 +97,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     *                  If not provided, a `NoDatabase` error is returned instead.
     */
   def evaluate(
-    workflow: Crystallized,
+    workflow: Crystallized[WorkflowF],
     defaultDb: Option[String]
   ): M[List[Bson] \/ WorkflowCursor[C]] =
     Workflow.task(workflow) match {
@@ -130,7 +130,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
   /** Returns the `Collection` containing the results of executing the given
     * (crystallized) `Workflow`.
     */
-  def execute(workflow: Crystallized, dst: Collection): M[Collection] =
+  def execute(workflow: Crystallized[WorkflowF], dst: Collection): M[Collection] =
     execute0(Workflow task workflow, dst).run(Set()) flatMap { case (tmps, coll) =>
       (tmps - coll) traverse_ (c => asM(drop(c))) as coll
     }
@@ -193,7 +193,9 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     }
   }
 
-  private def execute0(wt: WorkflowTask, out: Collection): N[Collection] = {
+  private def execute0(wt: WorkflowTask, out: Collection)
+    (implicit ev: Workflow2_6F :<: WorkflowF)
+    : N[Collection] = {
     def unableToStore[A](bson: Bson): N[A] =
       insertFailed(
         bson,
@@ -226,7 +228,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         for {
           tmp <- tempColl(out.databaseName)
           src <- execute0(source, tmp)
-          _   <- asM(aggregate(src, pipeline ::: List($Out((), out))))
+          _   <- asM(aggregate(src, pipeline ::: List(PipelineOp($OutF((), out).shapePreserving))))
                    .liftM[TempsT]
         } yield out
 
@@ -275,35 +277,35 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     pl match {
       case (Nil, Nil) =>
         find(src, Find(None, None, None, skip, limit)) map (_.right)
-      case (List($Match((), sel)), Nil) =>
+      case (List(PipelineOp2_6($MatchF((), sel))), Nil) =>
         find(src, Find(sel.some, None, None, skip, limit)) map (_.right)
       case (List(Projectable(bson)), Nil) =>
         find(src, Find(None, bson.some, None, skip, limit)) map (_.right)
       case (Nil, List(Projectable(bson))) =>
         find(src, Find(None, bson.some, None, skip, limit)) map (_.right)
-      case (List($Sort((), keys)), Nil) =>
+      case (List(PipelineOp2_6($SortF((), keys))), Nil) =>
         find(src, Find(None, None, keys.some, skip, limit)) map (_.right)
-      case (List($Match((), sel), Projectable(bson)), Nil) =>
+      case (List(PipelineOp2_6($MatchF((), sel)), Projectable(bson)), Nil) =>
         find(src, Find(sel.some, bson.some, None, skip, limit)) map (_.right)
-      case (List($Match((), sel)), List(Projectable(bson))) =>
+      case (List(PipelineOp2_6($MatchF((), sel))), List(Projectable(bson))) =>
         find(src, Find(sel.some, bson.some, None, skip, limit)) map (_.right)
-      case (List($Match((), sel), $Sort((), keys)), Nil) =>
+      case (List(PipelineOp2_6($MatchF((), sel)), PipelineOp2_6($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, None, keys.some, skip, limit)) map (_.right)
-      case (List(Projectable(bson), $Sort((), keys)), Nil) =>
+      case (List(Projectable(bson), PipelineOp2_6($SortF((), keys))), Nil) =>
         find(src, Find(None, bson.some, keys.some, skip, limit)) map (_.right)
-      case (List($Match((), sel), Projectable(bson), $Sort((), keys)), Nil) =>
+      case (List(PipelineOp2_6($MatchF((), sel)), Projectable(bson), PipelineOp2_6($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, bson.some, keys.some, skip, limit)) map (_.right)
       case (List(Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
         labeledCount(src, Count(None, None, None), field) map (_.left)
       case (Nil, List(Countable(field))) =>
         labeledCount(src, Count(None, skip, limit), field) map (_.left)
-      case (List($Match((), sel), Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
+      case (List(PipelineOp2_6($MatchF((), sel)), Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
         labeledCount(src, Count(sel.some, None, None), field) map (_.left)
-      case (List($Match((), sel)), List(Countable(field))) =>
+      case (List(PipelineOp2_6($MatchF((), sel))), List(Countable(field))) =>
         labeledCount(src, Count(sel.some, skip, limit), field) map (_.left)
       case (Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
         distinct(src, Distinct(origField, None), newField) map (_.right)
-      case ($Match((), sel) :: Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
+      case (PipelineOp2_6($MatchF((), sel)) :: Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
         distinct(src, Distinct(origField, sel.some), newField) map (_.right)
       case _ => aggregateCursor(src, pipeline) map (_.right)
     }
@@ -326,7 +328,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 }
 
 object WorkflowExecutor {
-  import Workflow.Crystallized
+  import Workflow.{Crystallized, WorkflowF}
 
   /** A cursor to the result of evaluating a `Workflow`, optionally paired with
     * the cursor's temporary source that should be dropped once the cursor is
@@ -369,7 +371,7 @@ object WorkflowExecutor {
     new JavaScriptWorkflowExecutor
 
   /** Interpret a `Workflow` into an equivalent JavaScript program. */
-  def toJS(workflow: Crystallized): WorkflowExecutionError \/ String =
+  def toJS(workflow: Crystallized[WorkflowF]): WorkflowExecutionError \/ String =
     javaScript.evaluate(workflow, none).run.run("tmp.gen").eval(0).run match {
       case (log, r) if log.isEmpty => r as ""
       case (log, r)                => r as Js.Stmts(log.toList).pprint(0)

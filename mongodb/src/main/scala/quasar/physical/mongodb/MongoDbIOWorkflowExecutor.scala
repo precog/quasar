@@ -38,7 +38,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
   extends WorkflowExecutor[MongoDbIO, BsonCursor] {
 
   import MapReduce._
-  import Workflow.$Sort
+  import Workflow.$SortF
 
   private def foldS[F[_]: Foldable, S, A](fa: F[A])(f: (A, S) => S): State[S, Unit] =
     fa.traverseS_[S, Unit](a => MonadState[State[S,?], S].modify(f(a, _)))
@@ -89,7 +89,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
     val configure = List(
       foldS(cfg.query)((q, fit: FIT) => fit.filter(q.bson)),
       foldS(cfg.projection)((p, fit: FIT) => fit.projection(p)),
-      foldS(cfg.sort)((keys, fit: FIT) => fit.sort($Sort.keyBson(keys))),
+      foldS(cfg.sort)((keys, fit: FIT) => fit.sort($SortF.keyBson(keys))),
       foldS(cfg.skip)((n, fit: FIT) => fit.skip(n.toInt)),
       foldS(cfg.limit)((n, fit: FIT) => fit.limit(n.toInt))
     ).sequenceS_[FIT, Unit].exec _

@@ -30,32 +30,32 @@ package object optimize {
     import Workflow._
     import IdHandling._
 
-    private def deleteUnusedFields0(op: Workflow, usedRefs: Option[Set[DocVar]]):
-        Workflow = {
-      def getRefs[A](op: WorkflowF[Workflow], prev: Option[Set[DocVar]]):
+    private def deleteUnusedFields0[F[_]: Functor: Rewrite](op: Fix[F], usedRefs: Option[Set[DocVar]])
+      (implicit I: Workflow2_6F :<: F): Fix[F] = {
+      def getRefs[A](op: F[Fix[F]], prev: Option[Set[DocVar]]):
           Option[Set[DocVar]] = op match {
-        case $Group(_, _, _)            => Some(refs(op).toSet)
+        case $group(_, _, _)           => Some(Rewrite[F].refs(op).toSet)
         // FIXME: Since we can’t reliably identify which fields are used by a
         //        JS function, we need to assume they all are, until we hit the
-        //        next $Group or $Project.
-        case $Map(_, _, _)             => None
-        case $SimpleMap(_, _, _)       => None
-        case $FlatMap(_, _, _)         => None
-        case $Reduce(_, _, _)          => None
-        case $Project(_, _, IncludeId) => Some(refs(op).toSet + IdVar)
-        case $Project(_, _, _)         => Some(refs(op).toSet)
-        case $FoldLeft(_, _)           => prev.map(_ + IdVar)
-        case _                         => prev.map(_ ++ refs(op))
+        //        next $GroupF or $ProjectF.
+        case $map(_, _, _)             => None
+        case $simpleMap(_, _, _)       => None
+        case $flatMap(_, _, _)         => None
+        case $reduce(_, _, _)          => None
+        case $project(_, _, IncludeId) => Some(Rewrite[F].refs(op).toSet + IdVar)
+        case $project(_, _, _)         => Some(Rewrite[F].refs(op).toSet)
+        case $foldLeft(_, _)           => prev.map(_ + IdVar)
+        case _                         => prev.map(_ ++ Rewrite[F].refs(op))
       }
 
       def unused(defs: Set[DocVar], refs: Set[DocVar]): Set[DocVar] =
         defs.filterNot(d => refs.exists(ref => d.startsWith(ref) || ref.startsWith(d)))
 
-      def getDefs[A](op: WorkflowF[A]): Set[DocVar] = (op match {
-        case p @ $Project(_, _, _)      => p.getAll.map(_._1)
-        case g @ $Group(_, _, _)        => g.getAll.map(_._1)
-        case s @ $SimpleMap(_, _, _)    => s.getAll.getOrElse(Nil)
-        case _                          => Nil
+      def getDefs[A](op: F[A]): Set[DocVar] = (I.prj(op) match {
+        case Some(p @ $ProjectF(_, _, _))   => p.getAll.map(_._1)
+        case Some(g @ $GroupF(_, _, _))     => g.getAll.map(_._1)
+        case Some(s @ $SimpleMapF(_, _, _)) => s.getAll.getOrElse(Nil)
+        case _                             => Nil
       }).map(DocVar.ROOT(_)).toSet
 
       val pruned =
@@ -63,28 +63,29 @@ package object optimize {
           val unusedRefs =
             unused(getDefs(op.unFix), usedRefs).toList.flatMap(_.deref.toList)
           op.unFix match {
-            case p @ $Project(_, _, _)      =>
+            case Workflow2_6F(p @ $ProjectF(_, _, _))   =>
               val p1 = p.deleteAll(unusedRefs)
-              if (p1.shape.value.isEmpty) p1.src.unFix
-              else p1
-            case g @ $Group(_, _, _)        => g.deleteAll(unusedRefs.map(_.flatten.head))
-            case s @ $SimpleMap(_, _, _)    => s.deleteAll(unusedRefs)
-            case o                          => o
+              if (p1.shape.value.isEmpty) p1.pipeline.src.unFix
+              else I.inj(p1)
+            case Workflow2_6F(g @ $GroupF(_, _, _))     => I.inj(g.deleteAll(unusedRefs.map(_.flatten.head)))
+            case Workflow2_6F(s @ $SimpleMapF(_, _, _)) => I.inj(s.deleteAll(unusedRefs))
+            case o                                     => o
           }
         }
 
       Fix(pruned.map(deleteUnusedFields0(_, getRefs(pruned, usedRefs))))
     }
 
-    def deleteUnusedFields(op: Workflow) = deleteUnusedFields0(op, None)
+    def deleteUnusedFields[F[_]: Functor: Rewrite](op: Fix[F])(implicit ev: Workflow2_6F :<: F): Fix[F] =
+      deleteUnusedFields0(op, None)
 
     /** Converts a \$group with fields that duplicate keys into a \$group
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    val simplifyGroupƒ:
-        WorkflowF[Workflow] => Option[WorkflowF[Workflow]] = {
-      case $Group(src, Grouped(cont), id) =>
+    def simplifyGroupƒ[F[_]: Coalesce](implicit ev: Workflow2_6F :<: F):
+        F[Fix[F]] => Option[F[Fix[F]]] = {
+      case $group(src, Grouped(cont), id) =>
         val (newCont, proj) =
           cont.foldLeft[(ListMap[BsonField.Name, Accumulator], ListMap[BsonField.Name, Reshape.Shape])](
             (ListMap(), ListMap())) {
@@ -110,14 +111,16 @@ package object optimize {
         if (newCont == cont)
           None
         else
-          $Project(
-            Fix($Group(src, Grouped(newCont), id)),
-            Reshape(proj),
-            IgnoreId).some
+          chain(src,
+            $group[F](Grouped(newCont), id),
+            $project[F](
+              Reshape(proj),
+              IgnoreId)).unFix.some
       case _ => None
     }
 
-    private val reorderOpsƒ: WorkflowF[Workflow] => Option[WorkflowF[Workflow]] = {
+    private def reorderOpsƒ[F[_]: Coalesce](implicit I: Workflow2_6F :<: F)
+        : F[Fix[F]] => Option[F[Fix[F]]] = {
       def rewriteSelector(sel: Selector, defs: Map[DocVar, DocVar]): Option[Selector] =
         sel.mapUpFieldsM { f =>
           defs.toList.map {
@@ -129,25 +132,35 @@ package object optimize {
         }
 
       {
-        case $Skip(Fix($Project(src0, shape, id)), count) =>
-          $Project(Fix($Skip(src0, count)), shape, id).some
-        case $Skip(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
-          $SimpleMap(Fix($Skip(src0, count)), fn, scope).some
+        case $skip(Fix($project(src0, shape, id)), count) =>
+          chain(src0,
+            $skip[F](count),
+            $project[F](shape, id)).unFix.some
+        case $skip(Fix($simpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
+          chain(src0,
+            $skip[F](count),
+            $simpleMap[F](fn, scope)).unFix.some
 
-        case $Limit(Fix($Project(src0, shape, id)), count) =>
-          $Project(Fix($Limit(src0, count)), shape, id).some
-        case $Limit(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
-          $SimpleMap(Fix($Limit(src0, count)), fn, scope).some
+        case $limit(Fix($project(src0, shape, id)), count) =>
+          chain(src0,
+            $limit[F](count),
+            $project[F](shape, id)).unFix.some
+        case $limit(Fix($simpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
+          chain(src0,
+            $limit[F](count),
+            $simpleMap[F](fn, scope)).unFix.some
 
-        case $Match(Fix(p @ $Project(src0, shape, id)), sel) =>
+        case $match(Fix(Workflow2_6F(p @ $ProjectF(src0, shape, id))), sel) =>
           val defs = p.getAll.collect {
             case (n, $var(x))    => DocField(n) -> x
             case (n, $include()) => DocField(n) -> DocField(n)
           }.toMap
           rewriteSelector(sel, defs).map(sel =>
-            $Project(Fix($Match(src0, sel)), shape, id))
+            chain(src0,
+              $match[F](sel),
+              $project[F](shape, id)).unFix)
 
-        case $Match(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(jsFn), INil()), scope)), sel) => {
+        case $match(Fix($simpleMap(src0, exprs @ NonEmptyList(MapExpr(jsFn), INil()), scope)), sel) => {
           import quasar.javascript._
           def defs(expr: JsCore): Map[DocVar, DocVar] =
             expr.simplify match {
@@ -160,15 +173,19 @@ package object optimize {
               case _ => Map.empty
             }
           rewriteSelector(sel, defs(jsFn.expr)).map(sel =>
-            $SimpleMap(Fix($Match (src0, sel)), fn, scope))
+            chain(src0,
+              $match[F](sel),
+              $simpleMap[F](exprs, scope)).unFix)
         }
 
         case op => None
       }
     }
 
-    def reorderOps(wf: Workflow): Workflow = {
-      val reordered = wf.transCata(orOriginal(reorderOpsƒ))
+    def reorderOps[F[_]: Functor: Coalesce](wf: Fix[F])
+      (implicit I: Workflow2_6F :<: F)
+      : Fix[F] = {
+      val reordered = wf.transCata(orOriginal(reorderOpsƒ[F]))
       if (reordered == wf) wf else reorderOps(reordered)
     }
 
@@ -195,9 +212,9 @@ package object optimize {
       }
 
     private def inlineProject0(r: Reshape, rs: List[Reshape]): Option[Reshape] =
-      inlineProject($Project((), r, IdHandling.IgnoreId), rs)
+      inlineProject($ProjectF((), r, IdHandling.IgnoreId), rs)
 
-    def inlineProject[A](p: $Project[A], rs: List[Reshape]): Option[Reshape] = {
+    def inlineProject[A](p: $ProjectF[A], rs: List[Reshape]): Option[Reshape] = {
       val map = p.getAll.map { case (k, v) =>
         k -> (v match {
           case $include() =>
@@ -259,9 +276,10 @@ package object optimize {
       } yield unwound1 -> Grouped(values1)
     }
 
-    def inlineGroupProjects(g: $Group[Workflow]):
-        Option[(Workflow, Grouped, Reshape.Shape)] = {
-      val (rs, src) = g.src.para(collectShapes)
+    def inlineGroupProjects[F[_]: Functor](g: $GroupF[Fix[F]])
+      (implicit I: Workflow2_6F :<: F)
+      : Option[(Fix[F], Grouped, Reshape.Shape)] = {
+      val (rs, src) = g.src.para(collectShapes[F])
 
       if (src == g.src) None
       else {

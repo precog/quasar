@@ -319,14 +319,14 @@ object MongoDbPlanner {
         case ArrayProject  => Arity2(Access(_, _))
         case MakeObject => args match {
           case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
-            case (field, (sel, inputs)) => 
+            case (field, (sel, inputs)) =>
               (({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, Obj(ListMap(Name(field) -> sel(list)(Ident(JsFn.defaultName))))) },
                 inputs.map(There(1, _))): PartialJs)
           }
         }
         case DeleteField => args match {
           case Sized(a1, a2) => (HasJs(a1) |@| HasStr(a2)) {
-            case ((sel, inputs), field) => 
+            case ((sel, inputs), field) =>
               (({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, Call(ident("remove"),
                 List(sel(list)(Ident(JsFn.defaultName)), Literal(Js.Str(field))))) },
                 inputs.map(There(0, _))): PartialJs)
@@ -601,20 +601,21 @@ object MongoDbPlanner {
     }
   }
 
-  val workflowƒ:
-      LogicalPlan[
+  def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
+    (implicit I: Workflow2_6F :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
+    : LogicalPlan[
         Cofree[LogicalPlan, (
           (OutputM[PartialSelector],
            OutputM[PartialJs]),
-          OutputM[WorkflowBuilder])]] =>
-      State[NameGen, OutputM[WorkflowBuilder]] = {
+          OutputM[WorkflowBuilder[F]])]] =>
+      State[NameGen, OutputM[Fix[WorkflowBuilderF[F, ?]]]] = {
     import WorkflowBuilder._
     import quasar.physical.mongodb.accumulator._
     import quasar.physical.mongodb.expression._
 
     type Input  = (OutputM[PartialSelector], OutputM[PartialJs])
-    type Output = M[WorkflowBuilder]
-    type Ann    = Cofree[LogicalPlan, (Input, OutputM[WorkflowBuilder])]
+    type Output = M[WorkflowBuilder[F]]
+    type Ann    = Cofree[LogicalPlan, (Input, OutputM[WorkflowBuilder[F]])]
 
     import LogicalPlan._
 
@@ -625,7 +626,7 @@ object MongoDbPlanner {
       }
     }
 
-    val HasKeys: Ann => OutputM[List[WorkflowBuilder]] = {
+    val HasKeys: Ann => OutputM[List[WorkflowBuilder[F]]] = {
       case MakeArrayN.Attr(array) => array.traverse(_.head._2)
       case n                      => n.head._2.map(List(_))
     }
@@ -651,7 +652,7 @@ object MongoDbPlanner {
 
     val HasJs: Ann => OutputM[PartialJs] = _.head._1._2
 
-    val HasWorkflow: Ann => OutputM[WorkflowBuilder] = _.head._2
+    val HasWorkflow: Ann => OutputM[WorkflowBuilder[F]] = _.head._2
 
     def invoke[N <: Nat](func: GenericFunc[N], args: Func.Input[Ann, N]): Output = {
 
@@ -687,22 +688,22 @@ object MongoDbPlanner {
       }
 
       def expr1(f: Expression => Expression): Output =
-        lift(Arity1(HasWorkflow)).flatMap(WorkflowBuilder.expr1(_)(f))
+        lift(Arity1(HasWorkflow)).flatMap(WB.expr1(_)(f))
 
       def groupExpr1(f: Expression => Accumulator): Output =
-        lift(Arity1(HasWorkflow).map(reduce(_)(f)))
+        lift(Arity1(HasWorkflow).map(WB.reduce(_)(f)))
 
-      def mapExpr(p: WorkflowBuilder)(f: Expression => Expression): Output =
-        WorkflowBuilder.expr1(p)(f)
+      def mapExpr(p: WorkflowBuilder[F])(f: Expression => Expression): Output =
+        WB.expr1(p)(f)
 
       def expr2[A](f: (Expression, Expression) => Expression): Output =
         lift(Arity2(HasWorkflow, HasWorkflow)).flatMap {
-          case (p1, p2) => WorkflowBuilder.expr2(p1, p2)(f)
+          case (p1, p2) => WB.expr2(p1, p2)(f)
         }
 
       def expr3(f: (Expression, Expression, Expression) => Expression): Output =
         lift(Arity3(HasWorkflow, HasWorkflow, HasWorkflow)).flatMap {
-          case (p1, p2, p3) => WorkflowBuilder.expr(List(p1, p2, p3)) {
+          case (p1, p2, p3) => WB.expr(List(p1, p2, p3)) {
             case List(e1, e2, e3) => f(e1, e2, e3)
           }
         }
@@ -719,7 +720,7 @@ object MongoDbPlanner {
         * selectors causes runtime errors when the expression ends up
         * in a $project or $simpleMap prior to $match.
         */
-      def breaksEvalOrder(ann: Cofree[LogicalPlan, OutputM[WorkflowBuilder]], f: InputFinder): Boolean = {
+      def breaksEvalOrder(ann: Cofree[LogicalPlan, OutputM[WorkflowBuilder[F]]], f: InputFinder): Boolean = {
         def isSimpleRef =
           f(ann).fold(
             κ(true),
@@ -737,15 +738,15 @@ object MongoDbPlanner {
       }
 
       func match {
-        case MakeArray => lift(Arity1(HasWorkflow).map(makeArray))
+        case MakeArray => lift(Arity1(HasWorkflow).map(WB.makeArray))
         case MakeObject =>
           lift(Arity2(HasText, HasWorkflow).map {
-            case (name, wf) => makeObject(wf, name)
+            case (name, wf) => WB.makeObject(wf, name)
           })
         case ObjectConcat =>
-          lift(Arity2(HasWorkflow, HasWorkflow)).flatMap((objectConcat(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasWorkflow)).flatMap((WB.objectConcat(_, _)).tupled)
         case ArrayConcat =>
-          lift(Arity2(HasWorkflow, HasWorkflow)).flatMap((arrayConcat(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasWorkflow)).flatMap((WB.arrayConcat(_, _)).tupled)
         case Filter =>
           args match {
             case Sized(a1, a2) =>
@@ -753,26 +754,26 @@ object MongoDbPlanner {
                 val on = a2.map(_._2)
                 HasSelector(a2).flatMap { case (sel, inputs) =>
                   if (!inputs.exists(breaksEvalOrder(on, _)))
-                    inputs.traverse(_(on)).map(filter(wf, _, sel))
+                    inputs.traverse(_(on)).map(WB.filter(wf, _, sel))
                   else
-                    HasWorkflow(a2).map(wf2 => filter(wf, List(wf2), {
+                    HasWorkflow(a2).map(wf2 => WB.filter(wf, List(wf2), {
                       case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
                     }))
                 } <+>
                   HasJs(a2).flatMap(js =>
                     // TODO: have this pass the JS args as the list of inputs … but right now, those inputs get converted to BsonFields, not ExprOps.
-                    js._2.traverse(_(on)).map(args => filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
+                    js._2.traverse(_(on)).map(args => WB.filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
               }))
           }
         case Drop =>
-          lift(Arity2(HasWorkflow, HasInt).map((skip(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasInt).map((WB.skip(_, _)).tupled))
         case Take =>
-          lift(Arity2(HasWorkflow, HasInt).map((limit(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
         case InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin =>
           args match {
             case Sized(left, right, comp) =>
-              splitConditions(comp).fold[M[WorkflowBuilder]](
-                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder])]].convertTo[LogicalPlan, Fix](comp))))(
+              splitConditions(comp).fold[M[WorkflowBuilder[F]]](
+                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder[F]])]].convertTo[LogicalPlan, Fix](comp))))(
                 c => {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
@@ -783,10 +784,10 @@ object MongoDbPlanner {
                 })
           }
         case GroupBy =>
-          lift(Arity2(HasWorkflow, HasKeys).map((groupBy(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
         case OrderBy =>
           lift(Arity3(HasWorkflow, HasKeys, HasSortDirs).map {
-            case (p1, p2, dirs) => sortBy(p1, p2, dirs)
+            case (p1, p2, dirs) => WB.sortBy(p1, p2, dirs)
           })
 
         case Constantly => expr2((v, s) => v)
@@ -897,25 +898,25 @@ object MongoDbPlanner {
 
         case ToId        =>
           lift(Arity1(HasText).flatMap(str =>
-            BsonCodec.fromData(Data.Id(str)).map(WorkflowBuilder.pure)))
+            BsonCodec.fromData(Data.Id(str)).map(WB.pure)))
 
         case Between       => expr3((x, l, u) => $and($lte(l, x), $lte(x, u)))
 
         case ObjectProject =>
-          lift(Arity2(HasWorkflow, HasText).flatMap((projectField(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasText).flatMap((WB.projectField(_, _)).tupled))
         case ArrayProject =>
           lift(Arity2(HasWorkflow, HasInt).flatMap {
-            case (p, index) => projectIndex(p, index.toInt)
+            case (p, index) => WB.projectIndex(p, index.toInt)
           })
         case DeleteField  =>
-          lift(Arity2(HasWorkflow, HasText).flatMap((deleteField(_, _)).tupled))
-        case FlattenMap   => lift(Arity1(HasWorkflow).map(flattenMap))
-        case FlattenArray => lift(Arity1(HasWorkflow).map(flattenArray))
-        case Squash       => lift(Arity1(HasWorkflow).map(squash))
+          lift(Arity2(HasWorkflow, HasText).flatMap((WB.deleteField(_, _)).tupled))
+        case FlattenMap   => lift(Arity1(HasWorkflow).map(WB.flattenMap(_)))
+        case FlattenArray => lift(Arity1(HasWorkflow).map(WB.flattenArray(_)))
+        case Squash       => lift(Arity1(HasWorkflow).map(WB.squash))
         case Distinct     =>
-          lift(Arity1(HasWorkflow)).flatMap(distinct)
+          lift(Arity1(HasWorkflow)).flatMap(WB.distinct(_))
         case DistinctBy   =>
-          lift(Arity2(HasWorkflow, HasKeys)).flatMap((distinctBy(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasKeys)).flatMap((WB.distinctBy(_, _)).tupled)
 
         case _ => fail(UnsupportedFunction(func.name, "in workflow planner".some))
       }
@@ -930,10 +931,10 @@ object MongoDbPlanner {
     }
 
     def findArgs(partials: List[PartialJs], comp: Ann):
-        OutputM[List[List[WorkflowBuilder]]] =
+        OutputM[List[List[WorkflowBuilder[F]]]] =
       partials.traverse(_._2.traverse(_(comp.map(_._2))))
 
-    def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder]]):
+    def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder[F]]]):
         List[JsFn] =
       (partials zip args).map(l => l._1._1(l._2.map(κ(JsFn.identity))))
 
@@ -945,16 +946,16 @@ object MongoDbPlanner {
     node => node match {
       case ReadF(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-        state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WorkflowBuilder.read))
+        state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WB.read))
       case ConstantF(data) =>
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),
-          WorkflowBuilder.pure))
+          WB.pure))
       case InvokeF(func, args) =>
         val v = invoke(func, args) <+>
           lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
             lift(pjs._2.traverse(_(Cofree(UnsupportedPlan(node, None).left, node.map(_.map(_._2)))))).flatMap(args =>
-              jsExpr(args, x => pjs._1(x.map(JsFn.const))(jscore.Ident(JsFn.defaultName)))))
+              WB.jsExpr(args, x => pjs._1(x.map(JsFn.const))(jscore.Ident(JsFn.defaultName)))))
         State(s => v.run(s).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
@@ -1020,7 +1021,7 @@ object MongoDbPlanner {
             lift(HasWorkflow(cont)))(
             f => lift((HasWorkflow(exp) |@| HasWorkflow(cont) |@| HasWorkflow(fallback))(
               (exp, cont, fallback) => {
-                expr1(exp)(f).flatMap(t => expr(List(t, cont, fallback)) {
+                WB.expr1(exp)(f).flatMap(t => WB.expr(List(t, cont, fallback)) {
                   case List(t, c, a) => $cond(t, c, a)
                 })
               })).join)
@@ -1092,8 +1093,9 @@ object MongoDbPlanner {
     }
   }
 
-  def plan(logical: Fix[LogicalPlan]):
-      EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized] = {
+  def plan0[F[_]: Functor: Coalesce: Crush: Crystallize](logical: Fix[LogicalPlan])
+      (implicit ev0: Workflow2_6F :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
+      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
     import StateT.stateTMonadState
@@ -1103,8 +1105,8 @@ object MongoDbPlanner {
     type PlanT[X[_], A] = EitherT[X, PlannerError, A]
     type GenT[X[_], A]  = StateT[X, NameGen, A]
     type W[A]           = Writer[PhaseResults, A]
-    type F[A]           = PlanT[W, A]
-    type M[A]           = GenT[F, A]
+    type P[A]           = PlanT[W, A]
+    type M[A]           = GenT[P, A]
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
@@ -1113,12 +1115,12 @@ object MongoDbPlanner {
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
-      StateT[F, NameGen, A](ng => EitherT(sa.run(ng).point[W]))
+      StateT[P, NameGen, A](ng => EitherT(sa.run(ng).point[W]))
 
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.point[W]).liftM[GenT]
 
-    val wfƒ = workflowƒ ⋙ (_ ∘ (_ ∘ (_ ∘ normalize)))
+    val wfƒ = workflowƒ[F] ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[F])))
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
@@ -1126,7 +1128,27 @@ object MongoDbPlanner {
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))
-      wf2  <- log("Workflow (crystallized)")             (crystallize(wf1).point[M])
+      wf2  <- log("Workflow (crystallized)")             (Crystallize[F].crystallize(wf1).point[M])
     } yield wf2).evalZero
+  }
+
+  /** Translate the high-level "logical" plan to an executable MongoDB "physical"
+    * plan, taking into account the current runtime environment as captured by
+    * the given context (which is for the time being just the "query model"
+    * associated with the backend version.)
+    * Internally, the type of the plan being built constrains which operators
+    * can be used, but the resulting plan uses the largest, common type so that
+    * callers don't need to worry about it.
+    */
+  def plan(logical: Fix[LogicalPlan], queryContext: MongoQueryModel)
+    : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
+    import MongoQueryModel._
+
+    queryContext match {
+      case `3.2` =>
+        plan0[Workflow3_2F](logical)
+      case _     =>
+        plan0[Workflow2_6F](logical).map(_.inject[Workflow3_2F])
+    }
   }
 }

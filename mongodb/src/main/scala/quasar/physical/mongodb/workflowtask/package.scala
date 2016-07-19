@@ -30,27 +30,23 @@ package object workflowtask {
 
   type Pipeline = List[PipelineOp]
 
-  // TODO: This should work for any WorkflowF that contains $Project – data
-  //       types a la carte.
-  val simplifyProject: PipelineF ~> PipelineF =
-    new (PipelineF ~> PipelineF) {
-      def apply[α](op: PipelineF[α]) = op match {
-        case $Project(src, Reshape(cont), id) =>
-          $Project(src,
-            Reshape(cont.map {
-              case (k, \/-($var(DocField(v)))) if k == v => k -> $include().right
-              case x                                     => x
-            }),
-            id)
-        case _ => op
-      }
+  val simplifyProject: Workflow2_6F[Unit] => Option[PipelineF[Workflow2_6F, Unit]] =
+    {
+      case $ProjectF(src, Reshape(cont), id) =>
+        $ProjectF(src,
+          Reshape(cont.map {
+            case (k, \/-($var(DocField(v)))) if k == v => k -> $include().right
+            case x                                     => x
+          }),
+          id).pipeline.some
+      case _ => None
     }
 
-  val normalize: WorkflowTaskF ~> WorkflowTaskF =
+  def normalize: WorkflowTaskF ~> WorkflowTaskF =
     new (WorkflowTaskF ~> WorkflowTaskF) {
       def apply[α](wt: WorkflowTaskF[α]) = wt match {
         case PipelineTaskF(src, pipeline) =>
-          PipelineTaskF(src, pipeline.map(simplifyProject(_)))
+          PipelineTaskF(src, pipeline.map(_.rewrite[Workflow2_6F](simplifyProject(_))))
         case x => x
       }
     }
@@ -60,16 +56,16 @@ package object workflowtask {
       (DocVar, WorkflowTask) = task match {
     case PipelineTask(src, pipeline) =>
       // possibly toss duplicate `_id`s created by `Unwind`s
-      val uwIdx = pipeline.lastIndexWhere {
-        case $Unwind(_, _) => true;
+      val uwIdx = pipeline.map(_.op.run).lastIndexWhere {
+        case \/-($UnwindF(_, _)) => true
         case _ => false
       }
       // we’re fine if there’s no `Unwind`, or some existing op fixes the `_id`s
       if (uwIdx == -1 ||
-        pipeline.indexWhere(
-          { case $Group(_, _, _)           => true
-            case $Project(_, _, ExcludeId) => true
-            case _                         => false
+        pipeline.map(_.op.run).indexWhere(
+          { case \/-($GroupF(_, _, _))           => true
+            case \/-($ProjectF(_, _, ExcludeId)) => true
+            case _                              => false
           },
           uwIdx) != -1)
         (base, task)
@@ -79,18 +75,18 @@ package object workflowtask {
             PipelineTask(
               src,
               pipeline :+
-              $Project((),
-                Reshape(names.map(_ -> $include().right).toListMap),
-                ExcludeId)))
+                PipelineOp($ProjectF((),
+                  Reshape(names.map(_ -> $include().right).toListMap),
+                  ExcludeId).pipeline)))
 
         case None =>
           (Workflow.ExprVar,
             PipelineTask(
               src,
               pipeline :+
-                $Project((),
+                PipelineOp($ProjectF((),
                   Reshape(ListMap(Workflow.ExprName -> $var(base).right)),
-                  ExcludeId)))
+                  ExcludeId).pipeline)))
       }
     case _ => (base, task)
   }
@@ -98,14 +94,14 @@ package object workflowtask {
   private def shape(p: Pipeline): Option[List[BsonField.Name]] = {
     def src = shape(p.dropRight(1))
 
-    p.lastOption.flatMap(_ match {
-      case op: ShapePreservingF[_]                 => src
+    p.lastOption.flatMap(_.op.run match {
+      case \/-(IsShapePreserving(_))                    => src
 
-      case $Project((), Reshape(shape), _)         => Some(shape.keys.toList)
-      case $Group((), Grouped(shape), _)           => Some(shape.keys.toList)
-      case $Unwind((), _)                          => src
-      case $Redact((), _)                          => None
-      case $GeoNear((), _, _, _, _, _, _, _, _, _) => src.map(_ :+ BsonField.Name("dist"))
+      case \/-($ProjectF((), Reshape(shape), _))         => Some(shape.keys.toList)
+      case \/-($GroupF((), Grouped(shape), _))           => Some(shape.keys.toList)
+      case \/-($UnwindF((), _))                          => src
+      case \/-($RedactF((), _))                          => None
+      case \/-($GeoNearF((), _, _, _, _, _, _, _, _, _)) => src.map(_ :+ BsonField.Name("dist"))
     })
   }
 }

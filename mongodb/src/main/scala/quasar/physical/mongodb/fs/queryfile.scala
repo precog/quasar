@@ -121,7 +121,8 @@ private final class QueryFileInterpreter[C](
         .run.void
 
     case Explain(lp) => (for {
-      wf  <- convertPlanR(lp)(MongoDbPlanner plan lp)
+      ctx <- queryContext(lp)
+      wf  <- convertPlanR(lp)(MongoDbPlanner.plan(lp, ctx))
       db  <- liftMQ(defaultDbName)
       (stmts, r) = execJs.evaluate(wf, db)
                      .leftMap(wfErrToFsErr(lp))
@@ -203,6 +204,20 @@ private final class QueryFileInterpreter[C](
   private val liftMQ: MQ ~> MongoLogWFR =
     liftMT[MongoLogWF, FileSystemErrT] compose liftMT[MQ, PhaseResultT]
 
+  private def queryContext(lp: Fix[LogicalPlan]): MongoLogWFR[MongoQueryModel] = {
+    val model: List[Int] => MongoQueryModel = {
+      case x :: _      if x > 3  => MongoQueryModel.`3.2`
+      case 3 :: x :: _ if x >= 2 => MongoQueryModel.`3.2`
+      case 3 :: _                => MongoQueryModel.`3.0`
+      case _                     => MongoQueryModel.`2.6`
+    }
+
+    def lift[A](fa: MongoDbIO[A]): MongoLogWFR[A] =
+      EitherT.right(WriterT.put(ReaderT((_: (Option[DefaultDb], TaskRef[EvalState[C]])) => fa))(Vector.empty))
+
+    lift(MongoDbIO.serverVersion.map(model))
+  }
+
   private def convertPlanR(lp: Fix[LogicalPlan]): PlanR ~> MongoLogWFR =
     new (PlanR ~> MongoLogWFR) {
       def apply[A](pa: PlanR[A]) = {
@@ -214,11 +229,12 @@ private final class QueryFileInterpreter[C](
 
   private def handlePlan[A](
     lp: Fix[LogicalPlan],
-    log: Crystallized => JsR[_],
-    handle: (Crystallized, String) => WorkflowExecErrT[MQ, A]
+    log: Crystallized[WorkflowF] => JsR[_],
+    handle: (Crystallized[WorkflowF], String) => WorkflowExecErrT[MQ, A]
   ): MongoLogWFR[A] = for {
     _      <- checkPathsExist(lp)
-    wf     <- convertPlanR(lp)(MongoDbPlanner.plan(lp))
+    ctx    <- queryContext(lp)
+    wf     <- convertPlanR(lp)(MongoDbPlanner.plan(lp, ctx))
     prefix <- liftMQ(genPrefix)
     _      <- writeJsLog(lp, log(wf), prefix)
     a      <- EitherT[MongoLogWF, FileSystemError, A](
@@ -234,7 +250,7 @@ private final class QueryFileInterpreter[C](
   } yield a
 
   private def execWorkflow(
-    wf: Crystallized,
+    wf: Crystallized[WorkflowF],
     dst: Collection,
     tmpPrefix: String
   ): WorkflowExecErrT[MQ, Collection] =
@@ -242,7 +258,7 @@ private final class QueryFileInterpreter[C](
       execMongo.execute(wf, dst).run.run(tmpPrefix).eval(0).liftM[QRT])
 
   private def evalWorkflow(
-    wf: Crystallized,
+    wf: Crystallized[WorkflowF],
     defDb: Option[String],
     tmpPrefix: String
   ): WorkflowExecErrT[MQ, ResultCursor[C]] =

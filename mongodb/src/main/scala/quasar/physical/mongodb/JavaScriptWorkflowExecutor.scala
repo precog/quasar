@@ -36,7 +36,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
 
   import JavaScriptWorkflowExecutor._
   import MapReduce.OutputCollection
-  import Workflow.$Sort
+  import Workflow.$SortF
 
   type ExprS[A] = State[Expr, A]
 
@@ -85,7 +85,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
       cfg.query.foldRight(cfg.projection.foldRight(List[Expr]())(_.toJs :: _))(_.bson.toJs :: _))
 
     tell(List(
-      foldExpr(cfg.sort)((keys, f) => Call(Select(f, "sort"), List($Sort.keyBson(keys).toJs))),
+      foldExpr(cfg.sort)((keys, f) => Call(Select(f, "sort"), List($SortF.keyBson(keys).toJs))),
       foldExpr(cfg.skip)((n, f) => Call(Select(f, "skip"), List(num(n)))),
       foldExpr(cfg.limit)((n, f) => Call(Select(f, "limit"), List(num(n)))))
       .sequence_[ExprS, Unit]

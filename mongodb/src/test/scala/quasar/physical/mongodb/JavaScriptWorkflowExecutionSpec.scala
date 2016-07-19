@@ -33,24 +33,24 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
   import Workflow._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =
-    WorkflowExecutor.toJS(crystallize(wf))
+    WorkflowExecutor.toJS(Crystallize[WorkflowF].crystallize(wf))
 
   "Executing 'Workflow' as JavaScript" should {
 
     "write trivial workflow to JS" in {
-      val wf = $read(Collection("db", "zips"))
+      val wf = $read[WorkflowF](Collection("db", "zips"))
 
       toJS(wf) must beRightDisjunction("db.zips.find();\n")
     }
 
     "write trivial workflow to JS with fancy collection name" in {
-      val wf = $read(Collection("db", "tmp.123"))
+      val wf = $read[WorkflowF](Collection("db", "tmp.123"))
 
       toJS(wf) must beRightDisjunction("db.getCollection(\"tmp.123\").find();\n")
     }
 
     "be empty for pure values" in {
-      val wf = $pure(Bson.Arr(List(
+      val wf = $pure[WorkflowF](Bson.Arr(List(
         Bson.Doc(ListMap("foo" -> Bson.Int64(1))),
         Bson.Doc(ListMap("bar" -> Bson.Int64(2))))))
 
@@ -59,8 +59,8 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write simple query to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
@@ -70,8 +70,8 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write limit to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $limit(10))
+        $read[WorkflowF](Collection("db", "zips")),
+        $limit[WorkflowF](10))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find().limit(10);
@@ -80,9 +80,9 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write project and limit to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $limit(10),
-        $project(
+        $read[WorkflowF](Collection("db", "zips")),
+        $limit[WorkflowF](10),
+        $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("city") -> $include().right)),
           IdHandling.ExcludeId))
@@ -94,11 +94,11 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write filter, project, and limit to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Lt(Bson.Int64(1000)))),
-        $limit(10),
-        $project(
+        $limit[WorkflowF](10),
+        $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("city") -> $include().right)),
           IdHandling.ExcludeId))
@@ -113,10 +113,10 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write simple count to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
-        $group(
+        $group[WorkflowF](
           Grouped(ListMap(
             BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
           $literal(Bson.Null).right))
@@ -128,12 +128,12 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write simple distinct to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $group(
+        $read[WorkflowF](Collection("db", "zips")),
+        $group[WorkflowF](
           Grouped(ListMap()),
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right)).left),
-        $project(
+        $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("c") -> $field("_id", "0").right)),
           IdHandling.ExcludeId))
@@ -145,14 +145,14 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write filtered distinct to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
-        $group(
+        $group[WorkflowF](
           Grouped(ListMap()),
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right)).left),
-        $project(
+        $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("c") -> $field("_id", "0").right)),
           IdHandling.ExcludeId))
@@ -165,8 +165,8 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write simple pipeline workflow to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
@@ -176,12 +176,12 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write chained pipeline workflow to JS find()" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-        $match(Selector.Doc(
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
-        $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)))
+        $sort[WorkflowF](NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find(
@@ -196,16 +196,16 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write chained pipeline workflow to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $match(Selector.Doc(
+        $read[WorkflowF](Collection("db", "zips")),
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-        $match(Selector.Doc(
+        $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
-        $group(
+        $group[WorkflowF](
           Grouped(ListMap(
             BsonField.Name("pop") -> $sum($field("pop")))),
           $field("city").right),
-        $sort(NonEmptyList(BsonField.Name("_id") -> SortDir.Ascending)))
+        $sort[WorkflowF](NonEmptyList(BsonField.Name("_id") -> SortDir.Ascending)))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.aggregate(
@@ -225,12 +225,12 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write map-reduce Workflow to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips")),
-        $map($Map.mapKeyVal(("key", "value"),
+        $read[WorkflowF](Collection("db", "zips")),
+        $map[WorkflowF]($MapF.mapKeyVal(("key", "value"),
           Js.Select(Js.Ident("value"), "city"),
           Js.Select(Js.Ident("value"), "pop")),
           ListMap()),
-        $reduce(Js.AnonFunDecl(List("key", "values"), List(
+        $reduce[WorkflowF](Js.AnonFunDecl(List("key", "values"), List(
           Js.Return(Js.Call(
             Js.Select(Js.Ident("Array"), "sum"),
             List(Js.Ident("values")))))),
@@ -252,8 +252,8 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write $where condition to JS" in {
       val wf = chain(
-        $read(Collection("db", "zips2")),
-        $match(Selector.Where(Js.Ident("foo"))))
+        $read[WorkflowF](Collection("db", "zips2")),
+        $match[WorkflowF](Selector.Where(Js.Ident("foo"))))
 
       toJS(wf) must beRightDisjunction(
         """db.zips2.mapReduce(
@@ -272,20 +272,20 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
     "write join Workflow to JS" in {
       val wf =
-        $foldLeft(
+        $foldLeft[WorkflowF](
           chain(
-            $read(Collection("db", "zips1")),
-            $match(Selector.Doc(
+            $read[WorkflowF](Collection("db", "zips1")),
+            $match[WorkflowF](Selector.Doc(
               BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER"))))),
           chain(
-            $read(Collection("db", "zips2")),
-            $match(Selector.Doc(
+            $read[WorkflowF](Collection("db", "zips2")),
+            $match[WorkflowF](Selector.Doc(
               BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-            $map($Map.mapKeyVal(("key", "value"),
+            $map[WorkflowF]($MapF.mapKeyVal(("key", "value"),
               Js.Select(Js.Ident("value"), "city"),
               Js.Select(Js.Ident("value"), "pop")),
               ListMap()),
-            $reduce(Js.AnonFunDecl(List("key", "values"), List(
+            $reduce[WorkflowF](Js.AnonFunDecl(List("key", "values"), List(
               Js.Return(Js.Call(
                 Js.Select(Js.Ident("Array"), "sum"),
                 List(Js.Ident("values")))))),

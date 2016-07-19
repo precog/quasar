@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
-package physical
-package mongodb
-package workflowtask
+package quasar.physical.mongodb.workflowtask
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
+import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
+import quasar.physical.mongodb.Workflow._
 
 import scalaz._, Scalaz._
 
-/** A WorkflowTask approximately represents one request to MongoDB. */
+/** A WorkflowTask approximately represents one request to MongoDB.
+  */
 sealed trait WorkflowTaskF[A]
 object WorkflowTaskF {
-  import Workflow._
   import MapReduce._
 
   /** A task that returns a necessarily small amount of raw data. */
@@ -81,11 +80,11 @@ object WorkflowTaskF {
         }
     }
 
-  implicit def renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
+  implicit val renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
     new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
         val RC = RenderTree[Collection]
-        val RO = RenderTree[WorkflowF[Unit]]
+        val RO = RenderTree[Workflow3_2F[Unit]]
         val RJ = RenderTree[Js]
         val RS = RenderTree[Selector]
 
@@ -107,7 +106,7 @@ object WorkflowTaskF {
             val nt = "PipelineTask" :: WorkflowTaskNodeType
             NonTerminal(nt, None,
               ra.render(source) ::
-              NonTerminal("Pipeline" :: nt, None, pipeline.map(RO.render(_))) ::
+              NonTerminal("Pipeline" :: nt, None, pipeline.map(p => RO.render(p.op))) ::
                 Nil)
 
           case MapReduceTaskF(source, MapReduce(map, reduce, selectorOpt, sortOpt, limitOpt, finalizerOpt, scopeOpt, jsModeOpt, verboseOpt), outAct) =>

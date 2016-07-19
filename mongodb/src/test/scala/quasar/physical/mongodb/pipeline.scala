@@ -39,7 +39,7 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
     Gen.oneOf(ops(0), ops(1), ops.drop(2): _*)
   }) }
 
-  def genProject(size: Int): Gen[$Project[Unit]] = for {
+  def genProject(size: Int): Gen[$ProjectF[Unit]] = for {
     fields <- Gen.nonEmptyListOf(for {
       c  <- Gen.alphaChar
       cs <- Gen.alphaStr
@@ -52,39 +52,39 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
         genExpr.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
     id <- Gen.oneOf(IdHandling.ExcludeId, IdHandling.IncludeId)
-  } yield $Project((), Reshape(ListMap(fields: _*)), id)
+  } yield $ProjectF((), Reshape(ListMap(fields: _*)), id)
 
-  implicit def arbProject = Arbitrary[$Project[Unit]](Gen.resize(5, Gen.sized(genProject)))
+  implicit def arbProject = Arbitrary[$ProjectF[Unit]](Gen.resize(5, Gen.sized(genProject)))
 
   def genRedact = for {
-    value <- Gen.oneOf($Redact.DESCEND, $Redact.KEEP, $Redact.PRUNE)
-  } yield $Redact((), $var(value))
+    value <- Gen.oneOf($RedactF.DESCEND, $RedactF.KEEP, $RedactF.PRUNE)
+  } yield $RedactF((), $var(value))
 
   def unwindGen = for {
     c <- Gen.alphaChar
-  } yield $Unwind((), DocField(BsonField.Name(c.toString)))
+  } yield $UnwindF((), DocField(BsonField.Name(c.toString)))
 
   def genGroup = for {
     i <- Gen.chooseNum(1, 10)
-  } yield $Group((),
+  } yield $GroupF((),
     Grouped(ListMap(BsonField.Name("docsByAuthor" + i.toString) -> $sum($literal(Bson.Int32(1))))),
     \/-($var(DocField(BsonField.Name("author" + i)))))
 
   def genGeoNear = for {
     i <- Gen.chooseNum(1, 10)
-  } yield $GeoNear((), (40.0, -105.0), BsonField.Name("distance" + i), None, None, None, None, None, None, None)
+  } yield $GeoNearF((), (40.0, -105.0), BsonField.Name("distance" + i), None, None, None, None, None, None, None)
 
   def genOut = for {
     i <- Gen.chooseNum(1, 10)
-  } yield $Out((), Collection("db", "result" + i))
+  } yield $OutF((), Collection("db", "result" + i))
 
   def pipelineOpGens(size: Int): List[Gen[PipelineOp]] = {
-    genProject(size) ::
-    genRedact ::
-    unwindGen ::
-    genGroup ::
-    genGeoNear ::
-    genOut ::
+    genProject(size).map(op => PipelineOp(op.pipeline)) ::
+    genRedact.map(op => PipelineOp(op.pipeline)) ::
+    unwindGen.map(op => PipelineOp(op.pipeline)) ::
+    genGroup.map(op => PipelineOp(op.pipeline)) ::
+    genGeoNear.map(op => PipelineOp(op.pipeline)) ::
+    genOut.map(op => PipelineOp(op.shapePreserving)) ::
     arbitraryShapePreservingOpGens.map(g => for { sp <- g } yield sp.op)
   }
 
@@ -101,19 +101,19 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
   def arbitraryShapePreservingOpGens = {
     def matchGen = for {
       c <- Gen.alphaChar
-    } yield ShapePreservingPipelineOp($Match((), Selector.Doc(BsonField.Name(c.toString) -> Selector.Eq(Bson.Int32(-1)))))
+    } yield ShapePreservingPipelineOp(PipelineOp($MatchF((), Selector.Doc(BsonField.Name(c.toString) -> Selector.Eq(Bson.Int32(-1)))).shapePreserving))
 
     def skipGen = for {
       i <- Gen.chooseNum(0, Long.MaxValue)
-    } yield ShapePreservingPipelineOp($Skip((), i))
+    } yield ShapePreservingPipelineOp(PipelineOp($SkipF((), i).shapePreserving))
 
     def limitGen = for {
       i <- Gen.chooseNum(1, Long.MaxValue)
-    } yield ShapePreservingPipelineOp($Limit((), i))
+    } yield ShapePreservingPipelineOp(PipelineOp($LimitF((), i).shapePreserving))
 
     def sortGen = for {
       c <- Gen.alphaChar
-    } yield ShapePreservingPipelineOp($Sort((), NonEmptyList(BsonField.Name("name1") -> SortDir.Ascending)))
+    } yield ShapePreservingPipelineOp(PipelineOp($SortF((), NonEmptyList(BsonField.Name("name1") -> SortDir.Ascending)).shapePreserving))
 
     List(matchGen, limitGen, skipGen, sortGen)
   }
@@ -129,13 +129,13 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
   }) }
 
   "Project.id" should {
-    "be idempotent" ! prop { (p: $Project[Unit]) =>
+    "be idempotent" ! prop { (p: $ProjectF[Unit]) =>
       p.id must_== p.id.id
     }
   }
 
   "Project.get" should {
-    "retrieve whatever value it was set to" ! prop { (p: $Project[Unit], f: BsonField) =>
+    "retrieve whatever value it was set to" ! prop { (p: $ProjectF[Unit], f: BsonField) =>
       val One = $literal(Bson.Int32(1))
 
       p.set(f, \/-(One)).get(DocVar.ROOT(f)) must (beSome(\/-(One)))
@@ -143,13 +143,13 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
   }
 
   "Project.setAll" should {
-    "actually set all" ! prop { (p: $Project[Unit]) =>
+    "actually set all" ! prop { (p: $ProjectF[Unit]) =>
       p.setAll(p.getAll.map(t => t._1 -> \/-(t._2))) must_== p
     }.pendingUntilFixed("result could have `_id -> _id` inserted without changing semantics")
   }
 
   "Project.deleteAll" should {
-    "return empty when everything is deleted" ! prop { (p: $Project[Unit]) =>
+    "return empty when everything is deleted" ! prop { (p: $ProjectF[Unit]) =>
       p.deleteAll(p.getAll.map(_._1)) must_== p.empty
     }
   }
@@ -158,15 +158,15 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
     import jscore._
 
     "remove one un-nested field" in {
-      val op = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val op = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
             "b" -> Select(ident("x"), "y"))))),
         ListMap())
-      val exp = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val exp = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),
@@ -175,8 +175,8 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
     }
 
     "remove one nested field" in {
-      val op = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val op = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -184,8 +184,8 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
               "c" -> Select(ident("x"), "y"),
               "d" -> Select(ident("x"), "z")))))),
         ListMap())
-      val exp = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val exp = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -196,16 +196,16 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
     }
 
     "remove whole nested object" in {
-      val op = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val op = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
             "b" -> obj(
               "c" -> Select(ident("x"), "y")))))),
         ListMap())
-      val exp = $SimpleMap(
-        $read(Collection("db", "foo")),
+      val exp = $SimpleMapF(
+        $read[Workflow2_6F](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),

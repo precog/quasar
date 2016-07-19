@@ -41,8 +41,7 @@ package object regression {
     def handlesTask(
       ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
     ): MountedResultH ~> Task =
-      foldMapNT(AtomicRef.fromTaskRef(ref)) compose
-      KeyValueStore.toAtomicRef
+      KeyValueStore.fromTaskRef(ref)
 
     def monoSeqTask(ref: TaskRef[Long]): MonotonicSeq ~> Task =
       MonotonicSeq.fromTaskRef(ref)

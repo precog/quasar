@@ -17,10 +17,12 @@
 package quasar.effect
 
 import quasar.Predef._
+import quasar.fp.TaskRef
 import quasar.fp.free._
 
 import monocle.Lens
 import scalaz.{Lens => _, _}
+import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 import scalaz.syntax.id._
 import scalaz.syntax.std.boolean._
@@ -124,6 +126,10 @@ object KeyValueStore {
     def apply[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
       new Ops[K, V, S]
   }
+
+  /** Interpret `KeyValueStore[K, V, ?]` using `TaskRef[Map[K, V]]`. */
+  def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
+    foldMapNT(AtomicRef.fromTaskRef(ref)) compose toAtomicRef
 
   /** Interpret `KeyValueStore[K, V, ?]` using `AtomicRef[Map[K, V], ?]`. */
   def toAtomicRef[K, V]: KeyValueStore[K, V, ?] ~> Free[AtomicRef[Map[K, V], ?], ?] = {

@@ -57,13 +57,8 @@ final class KeyValueStoreSpec extends mutable.Specification with ScalaCheck {
     backingRef: TaskRef[IDS],
     fa: Free[TestKvs, A]
   ): Task[A] = {
-    val toRef = KeyValueStore.toAtomicRef[Int, Double]
-
-    val runCache =
-      foldMapNT(AtomicRef.fromTaskRef(cacheRef)) compose toRef
-
-    val runBacking =
-      foldMapNT(AtomicRef.fromTaskRef(backingRef)) compose toRef
+    val runCache = KeyValueStore.fromTaskRef(cacheRef)
+    val runBacking = KeyValueStore.fromTaskRef(backingRef)
 
     fa.flatMapSuspension(KeyValueStore.fullWriteThrough[CachedKvs, Int, Double])
       .foldMap(Cache(runCache) :+: runBacking)

@@ -42,11 +42,11 @@ class ViewReadQueryRegressionSpec
 
   val viewState: Task[KeyValueStore[ReadFile.ReadHandle, ResultSet, ?] ~> Task] =
     TaskRef(Map.empty[ReadFile.ReadHandle, ResultSet])
-      .map(ref => foldMapNT(AtomicRef.fromTaskRef(ref)) compose KeyValueStore.toAtomicRef)
+      .map(KeyValueStore.fromTaskRef)
 
   def mntConfigs(path: APath, expr: Fix[Sql], vars: Variables): Task[MountConfigs ~> Task] =
     TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(expr, vars)))
-      .map(ref => foldMapNT(AtomicRef.fromTaskRef(ref)) compose KeyValueStore.toAtomicRef)
+      .map(KeyValueStore.fromTaskRef)
 
   val seq = TaskRef(0L).map(MonotonicSeq.fromTaskRef)
 

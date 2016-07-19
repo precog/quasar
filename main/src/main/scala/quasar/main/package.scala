@@ -79,19 +79,11 @@ package object main {
       def injTask[E[_]](f: E ~> Task): E ~> FsEvalIOM =
         injectFT[Task, FsEvalIO] compose f
 
-      val viewState =
-        foldMapNT(AtomicRef.fromTaskRef(viewHandlesRef)) compose
-        KeyValueStore.toAtomicRef
-
-      val mountedResH =
-        foldMapNT(AtomicRef.fromTaskRef(mntResRef)) compose
-        KeyValueStore.toAtomicRef
-
-      injectFT[MountConfigs, FsEvalIO]                        :+:
-      foldMapNT(PhysFsEff.toFsEvalIOM)                        :+:
-      injTask[MonotonicSeq](MonotonicSeq.fromTaskRef(seqRef)) :+:
-      injTask[ViewState](viewState) :+:
-      injTask[MountedResultH](mountedResH)
+      injectFT[MountConfigs, FsEvalIO]                              :+:
+      foldMapNT(PhysFsEff.toFsEvalIOM)                              :+:
+      injTask[MonotonicSeq](MonotonicSeq.fromTaskRef(seqRef))       :+:
+      injTask[ViewState](KeyValueStore.fromTaskRef(viewHandlesRef)) :+:
+      injTask[MountedResultH](KeyValueStore.fromTaskRef(mntResRef))
     }
 
     /** A dynamic `FileSystem` evaluator formed by internally fetching an

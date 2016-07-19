@@ -46,8 +46,7 @@ class MounterSpec extends MountingSpec[Mounting] {
     val cfgRef = TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync
 
     val interpMnts: MountConfigs ~> Task =
-      foldMapNT(AtomicRef.fromTaskRef(cfgRef)) compose
-      KeyValueStore.toAtomicRef
+      KeyValueStore.fromTaskRef(cfgRef)
 
     val interpEff: MEff ~> Task =
       NaturalTransformation.refl[Task] :+: interpMnts

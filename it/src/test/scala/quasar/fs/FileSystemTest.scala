@@ -142,8 +142,7 @@ object FileSystemTest {
 
       val memPlus: ViewFileSystem ~> Task =
         interpretViewFileSystem(
-          foldMapNT(AtomicRef.fromTaskRef(mountCfgs)) compose
-            KeyValueStore.toAtomicRef,
+          KeyValueStore.fromTaskRef(mountCfgs),
           viewState,
           MonotonicSeq.fromTaskRef(seqRef),
           mem.testInterp)

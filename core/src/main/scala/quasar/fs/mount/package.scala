@@ -71,9 +71,7 @@ package object mount {
       KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
 
     def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
-      TaskRef(initial) map { ref =>
-        foldMapNT(AtomicRef.fromTaskRef(ref)) compose KeyValueStore.toAtomicRef
-      }
+      TaskRef(initial) map KeyValueStore.fromTaskRef
 
     def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
       KeyValueStore.toState[State[S,?]](l)

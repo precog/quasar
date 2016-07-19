@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef.{Long, Map}
 import quasar.effect._
-import quasar.fp.{TaskRef}
+import quasar.fp.TaskRef
 import quasar.fp.free, free._
 import quasar.fs.{QueryFile, FileSystem, ADir}
 

@@ -18,7 +18,7 @@ package quasar.fs
 
 import quasar.Predef.Map
 import quasar.effect._
-import quasar.fp.{TaskRef}
+import quasar.fp.{evalNT, TaskRef}
 import quasar.fp.free, free._
 
 import scala.collection.immutable.Vector
@@ -30,8 +30,6 @@ import scalaz.concurrent.Task
 package object mount {
   type MntErrT[F[_], A] = EitherT[F, MountingError, A]
 
-  type MountConfigs[A] = KeyValueStore[APath, MountConfig, A]
-
   type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
   def interpretMountingFileSystem[M[_]](
@@ -39,6 +37,19 @@ package object mount {
     fs: FileSystem ~> M
   ): MountingFileSystem ~> M =
     m :+: fs
+
+  type MountConfigs[A] = KeyValueStore[APath, MountConfig, A]
+
+  object MountConfigs {
+    type MCfgs = Map[APath, MountConfig]
+
+    def ephemeral[F[_]: Monad]: MountConfigs ~> F =
+      evalNT[F, MCfgs](Map()) compose
+      KeyValueStore.toState[StateT[F, MCfgs, ?]](Lens.id[MCfgs])
+
+    val atomicRef: MountConfigs ~> Free[AtomicRef[MCfgs, ?], ?] =
+      KeyValueStore.toAtomicRef[APath, MountConfig]
+  }
 
   //-- Views --
 

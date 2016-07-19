@@ -24,7 +24,6 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 
-import monocle.Lens
 import pathy.Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -162,15 +161,6 @@ package object main {
     quasar.fs.mount.Mounter[CompFsEffM, CompleteFsEff](
       mountHandler.mount[CompFsEff](_),
       mountHandler.unmount[CompFsEff](_))
-
-  def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
-    type ST[A] = StateT[F, Map[APath, MountConfig], A]
-
-    val toState: MountConfigs ~> ST =
-      KeyValueStore.toState[ST](Lens.id[Map[APath, MountConfig]])
-
-    evalNT[F, Map[APath, MountConfig]](Map()) compose toState
-  }
 
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.

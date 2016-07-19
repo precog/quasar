@@ -137,7 +137,7 @@ object Main {
       cfgRef       <- TaskRef(config).liftM[MainErrT]
       mntCfgsT     =  writeConfig(CoreConfig.mountings, cfgRef, cfgPath)
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
-      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(ephemeralMountConfigs[Task])) compose coreApi
+      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(MountConfigs.ephemeral[Task])) compose coreApi
       failedMnts   <- attemptMountAll[CoreEff](config.mountings) foldMap ephemeralApi
       _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
 

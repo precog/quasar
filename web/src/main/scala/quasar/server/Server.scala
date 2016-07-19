@@ -23,6 +23,7 @@ import quasar.config._
 import quasar.console.{logErrors, stderr}
 import quasar.fp.TaskRef
 import quasar.fp.free.foldMapNT
+import quasar.fs.mount.MountConfigs
 import quasar.main._
 
 import argonaut.DecodeJson
@@ -124,7 +125,7 @@ object Server {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
       mntCfgsT     =  writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath)
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
-      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(ephemeralMountConfigs[Task])) compose coreApi
+      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(MountConfigs.ephemeral[Task])) compose coreApi
       failedMnts   <- attemptMountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi
       // TODO: Still need to expose these in the HTTP API, see SD-1131
       _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]

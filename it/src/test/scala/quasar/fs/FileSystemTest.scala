@@ -138,12 +138,15 @@ object FileSystemTest {
     ).sequence
 
   def nullViewUT: Task[FileSystemUT[FileSystem]] =
-    (inMemUT |@| TaskRef(0L) |@| ViewState.toTask(Map())) {
-      (mem, seqRef, viewState) =>
+    ( inMemUT                 |@|
+      TaskRef(0L)             |@|
+      ViewState.toTask(Map()) |@|
+      TaskRef(Map.empty[APath, MountConfig])
+    ) { (mem, seqRef, viewState, mountCfgs) =>
 
       val memPlus: ViewFileSystem ~> Task =
         interpretViewFileSystem(
-          KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync),
+          KeyValueStore.fromTaskRef(mountCfgs),
           viewState,
           MonotonicSeq.fromTaskRef(seqRef),
           mem.testInterp)

@@ -1,0 +1,1 @@
+- [SD-1871] Add a write-through cache interpreter to KeyValueStore

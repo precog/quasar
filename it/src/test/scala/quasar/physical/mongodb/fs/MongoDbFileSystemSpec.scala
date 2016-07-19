@@ -20,7 +20,6 @@ import quasar.Predef._
 
 import quasar._
 import quasar.fs._
-import quasar.fs.mount.MountConfig
 import quasar.fp._
 import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection
@@ -373,8 +372,9 @@ object MongoDbFileSystemSpec {
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
   val mongoFsUT: Task[IList[FileSystemUT[FileSystemIO]]] =
-    TestConfig.externalFileSystems {
-      case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
-        quasar.physical.mongodb.filesystems.testFileSystemIO(uri, dir)
-    }
+    (Functor[Task] compose Functor[IList])
+      .map(
+        TestConfig.externalFileSystems(
+          FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef))
+      )(_.liftIO)
 }

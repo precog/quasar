@@ -21,8 +21,7 @@ import quasar._
 import quasar.fp._, free._
 import quasar.fs._
 import quasar.main.FilesystemQueries
-import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
-import quasar.physical.mongodb.fs.MongoDBFsType
+import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
@@ -272,25 +271,16 @@ abstract class QueryRegressionTest[S[_]](
 }
 
 object QueryRegressionTest {
-  import quasar.physical.mongodb.{filesystems => mongofs}
-
   lazy val knownFileSystems = TestConfig.backendNames.toSet
 
-  val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
-    val extFs = TestConfig.externalFileSystems {
-      case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
-        lazy val f = mongofs.testFileSystemIO(uri, dir).unsafePerformSync
-        Task.delay(f)
-    }
-
+  val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] =
     for {
-      uts    <- extFs
+      uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
       hfsUts <- uts.traverse(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f =>
                   ut.copy(testInterp = f).contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
                 })
     } yield hfsUts
-  }
 
   private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
     interpretHfsIO map { hfs =>

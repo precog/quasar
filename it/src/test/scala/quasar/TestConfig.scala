@@ -74,10 +74,10 @@ object TestConfig {
       envName: String,
       p: ADir
     ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
-      TestConfig.loadConfig(envName) map (c =>
-        pf.lift((c, p)) getOrElse Task.fail(new RuntimeException(
-          s"Unsupported filesystem config: $c"
-        )))
+      TestConfig.loadConfig(envName) flatMapF (c =>
+        pf.lift((c, p)).cata(
+          Task.delay(_),
+          Task.fail(new RuntimeException(s"Unsupported filesystem config: $c"))))
 
     def fileSystemNamed(n: BackendName, p: ADir): OptionT[Task, FileSystemUT[S]] = {
       def rsrc(connect: Task[(S ~> Task, Task[Unit])]): Task[TaskResource[(S ~> Task, Task[Unit])]] =

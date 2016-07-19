@@ -22,8 +22,7 @@ import quasar.fp.{eitherTCatchable, TaskRef}
 import quasar.fp.free._
 import quasar.fs.mount._
 import quasar.effect._
-import quasar.physical.mongodb.{filesystems => mongofs}
-import quasar.physical.mongodb.fs.MongoDBFsType
+import quasar.physical._
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
@@ -120,10 +119,15 @@ object FileSystemTest {
       (loc ::: ext) map (ut => ut.contramapF(chroot.fileSystem[FileSystem](ut.testDir)))
     }
 
+  def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
+    : PartialFunction[(MountConfig, ADir), Task[(FileSystem ~> Task, Task[Unit])]] = {
+    case (MountConfig.FileSystemConfig(FileSystemType(fsType.value), uri), dir) =>
+      filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
+  }
+
   def externalFsUT = TestConfig.externalFileSystems {
-    case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
-      lazy val f = mongofs.testFileSystem(uri, dir).unsafePerformSync
-      Task.delay(f)
+    fsTestConfig(mongodb.fs.MongoDBFsType, mongodb.fs.mongoDbFileSystemDef) orElse
+    fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)
   }
 
   def localFsUT: Task[IList[FileSystemUT[FileSystem]]] =

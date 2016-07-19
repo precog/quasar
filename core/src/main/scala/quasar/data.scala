@@ -256,7 +256,7 @@ object Data {
         if (size.isValidInt)
           ejson.z85.decode(data).fold[Data](
             Data.NA)(
-            bv => Data.Binary(ImmutableArray.fromArray(bv.take(size.toInt).toArray)))
+            bv => Data.Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)))
         else Data.NA
       case (EJsonType("_ejson.date"), Data.Obj(map)) =>
         (extract(map.get("year"), _int)(_.toInt) ⊛
@@ -353,7 +353,7 @@ object Data {
           EJsonType("_ejson.interval"))).right
       case Binary(value)    =>
         E.inj(ejson.Meta(
-          Str(ejson.z85.encode(ByteVector.view(value(_), value.size))),
+          Str(ejson.z85.encode(ByteVector.view(value.toArray))),
           EJsonTypeSize("_ejson.binary", value.size))).right
       case Id(value)        =>
         // FIXME: This evilly guesses the backend-specific OID formats

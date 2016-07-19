@@ -129,7 +129,7 @@ class ServiceSpec extends mutable.Specification {
               method = Method.PUT)
             .withBody(s"""{ "view": { "connectionUri" : "$sel2" } }""")
           )(Task.now) *>
-        client.getAs[Json](baseUri / "mount" / "fs" / "viewA")
+        client.expect[Json](baseUri / "mount" / "fs" / "viewA")
       }
 
       r ==== finalCfg.map(_.asJson)

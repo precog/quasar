@@ -98,7 +98,7 @@ object BsonCodec {
         if (size.isValidInt)
           ejson.z85.decode(data).fold[PlannerError \/ Bson](
             NonRepresentableEJson("“" + data + "” is not a valid Z85-encoded string").left)(
-            bv => Bson.Binary(ImmutableArray.fromArray(bv.take(size.toInt).toArray)).right)
+            bv => Bson.Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)).right)
         else NonRepresentableEJson(size.shows + " is too large for binary data").left
       case (EJsonType("_ejson.date"), Bson.Doc(map)) =>
         (extract(map.get("year"), Bson._int32) ⊛
@@ -174,7 +174,7 @@ object BsonCodec {
         EJsonType("_ejson.timestamp"))).right
     case Bson.Binary(value)    =>
       E.inj(ejson.Meta(
-        Bson.Text(ejson.z85.encode(ByteVector.view(value(_), value.size))),
+        Bson.Text(ejson.z85.encode(ByteVector.view(value.toArray))),
         EJsonTypeSize("_ejson.binary", value.size))).right
     case id @ Bson.ObjectId(_) =>
       E.inj(ejson.Meta(Bson.Text(id.str), EJsonType("_bson.oid"))).right

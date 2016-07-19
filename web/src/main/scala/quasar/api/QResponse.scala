@@ -107,7 +107,7 @@ object QResponse {
     * the `F` and see if anything failed before handing the rest of the process
     * to http4s to continue streaming to the client as normal.
     */
-  val PROCESS_EFFECT_THRESHOLD_BYTES = 100
+  val PROCESS_EFFECT_THRESHOLD_BYTES = 100L
 
   final class HttpResponseStreamFailureException(alternate: Response)
     extends java.lang.Exception

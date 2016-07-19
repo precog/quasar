@@ -98,14 +98,14 @@ class QResponseSpec extends mutable.Specification {
       }
 
       "responds with alternate response when a small amount of data before first effect" >> {
-        val pad = Process.emit(ByteVector.low(0 max (PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
+        val pad = Process.emit(ByteVector.low(0L max (PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
         val padStream = failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
         padStream.toHttpResponse(evalStr("one")).as[String].unsafePerformSync must_== "FAIL"
       }
 
       "responds with alternate response when other internal effects before first effect" >> {
         val hi  = ByteVector.high(1)
-        val pad = Process.emit(ByteVector.low(0 max (PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
+        val pad = Process.emit(ByteVector.low(0L max (PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
         val stm = pad.append[StrIOM, ByteVector](failStream.body intersperse hi)
 
         failStream.copy(body = stm).toHttpResponse(evalStr("one"))

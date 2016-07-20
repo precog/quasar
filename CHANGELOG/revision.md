@@ -1,0 +1,4 @@
+- Eliminate some universal == from the test suite.
+- Remove code which duplicates ScalazMatchers.
+- Replace existential in pathy.Path types with scala.Any.
+- Improve build hygiene.

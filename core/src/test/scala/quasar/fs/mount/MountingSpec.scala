@@ -49,7 +49,7 @@ abstract class MountingSpec[S[_]](
   val mntErr = MountingFailure.Ops[S]
   val mmErr = PathMismatchFailure.Ops[S]
   // NB: Without the explicit imports, scalac complains of an import cycle
-  import mnt.{F, lookupConfig, mountView, mountFileSystem, remount, replace, unmount}
+  import mnt.{F, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
 
   implicit class StrOps(s: String) {
     def >>*[A: AsResult](a: => F[A]) =
@@ -91,6 +91,41 @@ abstract class MountingSpec[S[_]](
     mountView(loc, query, noVars)
 
   s"$interpName mounting interpreter" should {
+    "havingPrefix" >> {
+      "returns all prefixed locations and types" >>* {
+        val f1 = rootDir </> dir("d1") </> dir("d1.1") </> file("f1")
+        val f2 = rootDir </> dir("d1") </> file("f2")
+        val dA = rootDir </> dir("d1") </> dir("A")
+        val dB = rootDir </> dir("d2") </> dir("B")
+
+        val mnts = Map[APath, MountType](
+          f1 -> MountType.viewMount(),
+          f2 -> MountType.viewMount(),
+          dA -> MountType.fileSystemMount(dbType)
+        )
+
+        val setup =
+          mountViewNoVars(f1, exprA)        *>
+          mountViewNoVars(f2, exprA)        *>
+          mountFileSystem(dA, dbType, uriA) *>
+          mountFileSystem(dB, dbType, uriB)
+
+        (setup *> havingPrefix(rootDir </> dir("d1")))
+          .map(_ must_=== mnts)
+      }
+
+      "returns nothing when no mounts have the given prefix" >>* {
+        havingPrefix(rootDir </> dir("dne")) map (_ must beEmpty)
+      }
+
+      "does not include a mount at the prefix" >>* {
+        val d = rootDir </> dir("d3") </> dir("someMount")
+
+        (mountFileSystem(d, dbType, uriA) *> havingPrefix(d))
+          .map(_ must beEmpty)
+      }
+    }
+
     "lookupConfig" >> {
       "returns a view config when asked for an existing view path" >>* {
         val f = rootDir </> dir("d1") </> file("f1")
@@ -111,7 +146,31 @@ abstract class MountingSpec[S[_]](
         val d = rootDir </> dir("d3")
 
         lookupConfig(f).run.tuple(lookupConfig(d).run)
-          .map(_ must_== ((None, None)))
+          .map(_ must_=== ((None, None)))
+      }
+    }
+
+    "lookupType" >> {
+      "returns the view type when asked for an existing view path" >>* {
+        val f = rootDir </> dir("d1") </> file("f1")
+
+        (mountViewNoVars(f, exprA) *> lookupType(f).run)
+          .map(_ must beSome(MountType.viewMount()))
+      }
+
+      "returns a filesystem type when asked for an existing fs path" >>* {
+        val d = rootDir </> dir("d1")
+
+        (mountFileSystem(d, dbType, uriA) *> lookupType(d).run)
+          .map(_ must beSome(MountType.fileSystemMount(dbType)))
+      }
+
+      "returns none when nothing mounted at the requested path" >>* {
+        val f = rootDir </> dir("d2") </> file("f2")
+        val d = rootDir </> dir("d3")
+
+        lookupType(f).run.tuple(lookupType(d).run)
+          .map(_ must_=== ((None, None)))
       }
     }
 
@@ -281,7 +340,7 @@ abstract class MountingSpec[S[_]](
           (mnt.mount(d1, fsCfgA) *> remount(d1, d2)) *>
           (lookupConfig(d1).run.tuple(lookupConfig(d2).run))
 
-        r map (_ must_== ((None, Some(fsCfgA))))
+        r map (_ must_=== ((None, Some(fsCfgA))))
       }
 
       "moves the mount at src to dst (file)" >>* {
@@ -292,7 +351,7 @@ abstract class MountingSpec[S[_]](
           (mnt.mount(d1, viewCfgA) *> remount(d1, d2)) *>
           (lookupConfig(d1).run.tuple(lookupConfig(d2).run))
 
-        r map (_ must_== ((None, Some(viewCfgA))))
+        r map (_ must_=== ((None, Some(viewCfgA))))
       }
 
       "succeeds when src == dst" >>* {
@@ -352,7 +411,7 @@ abstract class MountingSpec[S[_]](
         val r = mountViewNoVars(f, exprA) *> replace(f, fsCfgB)
 
         mmErr.attempt(r).tuple(lookupConfig(f).run)
-          .map(_ must_== ((-\/(Mounting.PathTypeMismatch(f)), Some(viewCfgA))))
+          .map(_ must_=== ((-\/(Mounting.PathTypeMismatch(f)), Some(viewCfgA))))
       }
     }
 

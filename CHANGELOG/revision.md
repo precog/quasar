@@ -1,0 +1,4 @@
+- A handful of refactorings to Mounting
+  - Rename Lookup -> LookupConfig
+  - Add a HavingPrefix term
+  - Use failure effects in Mounting.Ops

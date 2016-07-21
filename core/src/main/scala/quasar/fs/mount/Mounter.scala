@@ -22,7 +22,7 @@ import quasar.fs._
 import quasar.fp._, free._
 
 import pathy.Path._
-import scalaz.{:+: => _, _}, Scalaz._
+import scalaz._, Scalaz._
 
 object Mounter {
   import Mounting._, MountConfig._
@@ -67,13 +67,25 @@ object Mounter {
       failIfExisting *> mount0(req) *> putOrUnmount
     }
 
+    def lookupType(p: APath): OptionT[FreeS, MountType] =
+      mountConfigs.get(p).map {
+        case ViewConfig(_, _)         => MountType.viewMount()
+        case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
+      }
+
     new (Mounting ~> FreeS) {
       def apply[A](ma: Mounting[A]) = ma match {
+        case HavingPrefix(dir) =>
+          mountConfigs.keys flatMap { paths =>
+            paths.foldLeftM(Map[APath, MountType]())((m, p) =>
+              if (((dir: APath) =/= p) && p.relativeTo(dir).isDefined)
+                lookupType(p).map(m.updated(p, _)).getOrElse(m)
+              else
+                m.point[FreeS])
+          }
+
         case LookupType(path) =>
-          mountConfigs.get(path).map {
-            case ViewConfig(_, _)         => MountType.viewMount()
-            case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
-          }.run
+          lookupType(path).run
 
         case LookupConfig(path) =>
           mountConfigs.get(path).run

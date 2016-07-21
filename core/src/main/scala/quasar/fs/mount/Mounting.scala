@@ -49,6 +49,13 @@ sealed trait Mounting[A]
 
 object Mounting {
 
+  /** Provides for accessing many mounts at once, which allows certain
+    * operations (like determining which paths in a directory refer to
+    * mounts) to be implemented more efficiently.
+    */
+  final case class HavingPrefix(dir: ADir)
+    extends Mounting[Map[APath, MountType]]
+
   final case class LookupType(path: APath)
     extends Mounting[Option[MountType]]
 
@@ -81,6 +88,10 @@ object Mounting {
     extends LiftedOps[Mounting, S] {
 
     import MountConfig._
+
+    /** Returns mounts located at a path having the given prefix. */
+    def havingPrefix(dir: ADir): F[Map[APath, MountType]] =
+      lift(HavingPrefix(dir))
 
     /** Returns the mount configuration if the given path represents a mount. */
     def lookupConfig(path: APath): OptionT[F, MountConfig] =

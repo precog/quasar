@@ -29,9 +29,7 @@ import org.http4s._, dsl._
 import pathy.Path._
 import scalaz._
 import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
-import scalaz.std.list._
 
 object metadata {
 
@@ -64,14 +62,17 @@ object metadata {
 
   def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
 
-    def mkNode(parent: ADir, name: PathSegment): Q.M[FsNode] =
-      M.lookupType(parent </> name.fold(dir1, file1)).run
-        .map(mntType => FsNode(name, mntType.map(_.fold(_.value, "view"))))
-        .liftM[FileSystemErrT]
+    def mkNodes(parent: ADir, names: Set[PathSegment]): Q.M[Set[FsNode]] =
+      M.havingPrefix(parent).map { mounts =>
+        names map { name =>
+          val path = name.fold(parent </> dir1(_), parent </> file1(_))
+          FsNode(name, mounts.get(path).map(_.fold(_.value, "view")))
+        }
+      }.liftM[FileSystemErrT]
 
     def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(
       Q.ls(d)
-        .flatMap(_.toList.traverse(mkNode(d, _)))
+        .flatMap(mkNodes(d, _))
         .map(nodes => Json.obj("children" := nodes.toList.sorted))
         .run)
 

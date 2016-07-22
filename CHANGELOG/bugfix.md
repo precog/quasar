@@ -1,0 +1,2 @@
+-New provenance model for QScript.
+-Improved QScript optimizations.

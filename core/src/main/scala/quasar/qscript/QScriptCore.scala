@@ -18,8 +18,6 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-// import quasar.namegen._
-// import quasar.qscript.MapFuncs._
 
 import matryoshka._
 import matryoshka.patterns._

@@ -123,13 +123,11 @@ object MapFunc {
       mf: CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         Option[List[T[CoEnv[A, MapFunc[T2, ?], ?]]]] =
       mf.run.fold(
-        {/*scala.Predef.println(s"kappa none ${mf}");*/ κ(None)},
+        κ(None),
         {
           case MakeArray(_) | Nullary(Embed(Inj(ejson.Arr(_)))) =>
-            //scala.Predef.println(s">>>>make array")
             List(mf.embed).some
           case ConcatArrays(h, t) =>
-            //scala.Predef.println(s">>>>concat arrays")
             (unapply(h.project).getOrElse(List(h)) ++
               unapply(t.project).getOrElse(List(t))).some
           case _ => None
@@ -156,13 +154,11 @@ object MapFunc {
       mf: CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         Option[List[T[CoEnv[A, MapFunc[T2, ?], ?]]]] =
       mf.run.fold(
-        {/*scala.Predef.println(s"kappa none ${mf}");*/ κ(None)},
+        κ(None),
         {
           case MakeMap(_, _) | Nullary(Embed(Inj(ejson.Map(_)))) =>
-            //scala.Predef.println(s">>>>make map")
             List(mf.embed).some
           case ConcatMaps(h, t) =>
-            //scala.Predef.println(s">>>>concat maps")
             (unapply(h.project).getOrElse(List(h)) ++
               unapply(t.project).getOrElse(List(t))).some
           case _ => None
@@ -189,7 +185,6 @@ object MapFunc {
             as.lift(index.intValue).map(_.project)
           else None
         case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Nullary(field))))) =>
-          //scala.Predef.println(s"hit normalize case")
           as.collectFirst {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
@@ -200,7 +195,7 @@ object MapFunc {
                 case (k, v) => k ≟ field
               }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
           }
-        case x => {/*scala.Predef.println(s"hit none case with $x");*/ None }
+        case _ => None
       })
   }
 

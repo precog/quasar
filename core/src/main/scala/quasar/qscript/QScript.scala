@@ -119,7 +119,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
-  // E, M, F, A => A => M[E[F[A]]]
   val zipper: ElgotCoalgebra[
       ZipperAcc \/ ?,
       ListF[Target[Hole], ?],
@@ -186,28 +185,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     }
   }
 
-  // foo.bar
-  // foo\bar
-
-  // foo.bar + foo.baz //  MF
-
-  // foo\bar[*] + foo\baz[*] // TJ
-
-  // TJ(foo, BucketField(bar), BucketField(baz) … Add(LS, RS))
-
-
-  // /foo/bar/baz.quux + /foo/bar/baz.zub
-
-  // select sum(baz), quux.name from \foo\bar as bar join \foo\quux as quux on bar.parent = quux.name
-
   def someAnn[A](
     v: Target[Free[Target, A]] \/ A,
     default: T[Target]):
       Ann[T] =
     v.fold(_.ask, κ(default.project.ask))
-
-// CoEnv[Hole, EnvT[Ann, F, ?], ?]
-// EnvT[Ann, CoAnn[Hole, F, ?], ?]
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -286,36 +268,32 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def shiftValues(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
       Target[T[Target]] = {
     val Ann(provs, value) = input.project.ask
-
-    val (buck, newBucks) = concatBuckets(provs)
-    val (shiftedBuck, shiftAccess, buckAccess) =
-      concat(Free.roll(f(value)), buck)
-    val (merged, fullBuckAccess, valAccess) = concat(shiftedBuck, value)
+    val (merged, shiftAccess, valAccess) = concat(Free.roll(f(value)), value)
+    val (sides, leftAccess, rightAccess) =
+      concat(
+        Free.point[MapFunc[T, ?], JoinSide](LeftSide),
+        Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
     EnvT((
       Ann(
-        prov.shiftMap(shiftAccess >> fullBuckAccess) ::
-          newBucks.map(_ >> buckAccess >> fullBuckAccess),
-        HoleF),
-      SP.inj(LeftShift(
-        EnvT((EmptyAnn[T], QC.inj(Map(input, merged)))).embed,
-        valAccess,
-        Free.point(RightSide)))))
+        prov.shiftMap(shiftAccess >> rightAccess) :: provs.map(_ >> leftAccess),
+        valAccess >> rightAccess),
+      SP.inj(LeftShift(input, merged, sides))))
   }
 
   def shiftIds(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
       Target[T[Target]] = {
     val Ann(provs, value) = input.project.ask
-
-    val (buck, newBucks) = concatBuckets(provs)
-    val (merged, buckAccess, valAccess) = concat(buck, Free.roll(f(value)))
+    val (sides, leftAccess, rightAccess) =
+      concat(
+        Free.point[MapFunc[T, ?], JoinSide](LeftSide),
+        Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
     EnvT((
-      Ann(prov.shiftMap(valAccess) :: newBucks.map(_ >> buckAccess), HoleF),
-      SP.inj(LeftShift(
-        EnvT((EmptyAnn[T], QC.inj(Map(input, merged)))).embed,
-        valAccess,
-        Free.point(RightSide)))))
+      Ann(
+        prov.shiftMap(rightAccess) :: provs.map(_ >> leftAccess),
+        rightAccess),
+      SP.inj(LeftShift(input, Free.roll(f(value)), sides))))
   }
 
   def flatten(input: Target[T[Target]]): Target[T[Target]] = {
@@ -381,15 +359,19 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     func match {
       case set.Range =>
         val (src, buckets, lval, rval) = autojoin(values(0), values(1))
-        val (bucksArray, newBucks) = concatBuckets(buckets)
-        val (merged, b, v) = concat[T, Hole](bucksArray, Free.roll(Range(lval, rval)))
+        val (sides, leftAccess, rightAccess) =
+          concat(
+            Free.point[MapFunc[T, ?], JoinSide](LeftSide),
+            Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
         EnvT((
-          Ann[T](NullLit[T, Hole]() :: newBucks.map(b >> _), v),
+          Ann[T](
+            NullLit[T, Hole]() :: buckets.map(_ >> leftAccess),
+            rightAccess),
           SP.inj(LeftShift(
             EnvT((EmptyAnn[T], src)).embed,
-            merged,
-            Free.point[MapFunc[T, ?], JoinSide](RightSide)))))
+            Free.roll(Range(lval, rval)),
+            sides))))
     }
 
   def invokeReduction1(
@@ -462,10 +444,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val combine: JoinFunc[T] = Free.roll(ConcatMaps(
       Free.roll(MakeMap(StrLit[T, JoinSide]("left"), Free.point[MapFunc[T, ?], JoinSide](LeftSide))),
       Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc[T, ?], JoinSide](RightSide)))))
-
-    //println(s">>>>>> left: ${values(0).project.run.show}")
-    //println(s">>>>>> right: ${values(1).project.run.show}")
-    //println(s">>>>>> join cond: ${values(2).project.run.show}")
 
     condError.map { cond =>
       val (commonSrc, lMap, rMap, leftSide, rightSide) = merge(values(0), values(1))
@@ -696,7 +674,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.Except, Sized(a1, a2)) =>
       val (src, lMap, rMap, left, right) = merge(a1, a2)
       EnvT((
-        src.project.ask, // TODO is this the correct provenance?
+        left.resume.fold(_.ask, κ(src.project.ask)),
         TJ.inj(ThetaJoin(
           src,
           rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),

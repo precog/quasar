@@ -23,11 +23,10 @@ import quasar.sql.Query
 import quasar.std._
 
 import matryoshka._
-import org.specs2.mutable._
 import scalaz._, Scalaz._
 import pathy.Path._
 
-trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
+trait CompilerHelpers extends quasar.QuasarSpecification with TermLogicalPlanMatchers {
   import StdLib._
   import structural._
   import LogicalPlan._

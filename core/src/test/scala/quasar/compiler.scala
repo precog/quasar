@@ -21,10 +21,9 @@ import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
 
 import matryoshka.Fix
-import org.specs2.mutable._
 import org.specs2.scalaz._
 
-class CompilerSpec extends Specification with CompilerHelpers with PendingWithAccurateCoverage with DisjunctionMatchers {
+class CompilerSpec extends quasar.QuasarSpecification with CompilerHelpers with PendingWithAccurateCoverage with DisjunctionMatchers {
   import StdLib._
   import agg._
   import array._

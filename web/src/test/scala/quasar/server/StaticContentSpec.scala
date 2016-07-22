@@ -18,12 +18,11 @@ package quasar.server
 
 import quasar.Predef._
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 
 import scalaz._
 
-class StaticContentSpec extends Specification with DisjunctionMatchers {
+class StaticContentSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
   import StaticContent.fromCliOptions
 
   val defLoc = "/static"

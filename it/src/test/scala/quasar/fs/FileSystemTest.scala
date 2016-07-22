@@ -31,7 +31,6 @@ import monocle.Optional
 import monocle.function.Index
 import monocle.std.vector._
 import org.specs2.specification.core.Fragments
-import org.specs2.mutable.Specification
 import org.specs2.execute.{Failure => _, _}
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
@@ -48,7 +47,7 @@ import scalaz.stream.Process
   */
 abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[FileSystemUT[S]]]
-) extends Specification {
+) extends quasar.QuasarSpecification {
 
   args.report(showtimes = true)
 

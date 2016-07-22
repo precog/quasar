@@ -31,15 +31,13 @@ import org.http4s._, Status._
 import org.http4s.argonaut._
 import org.specs2.specification.core.Fragments
 import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
-import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
-class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
+class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Http4s with PathUtils {
   import quasar.fs.mount.ViewMounterSpec._
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch

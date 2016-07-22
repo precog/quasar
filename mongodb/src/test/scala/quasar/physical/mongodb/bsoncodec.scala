@@ -22,11 +22,10 @@ import quasar._
 import scala.collection.immutable.ListMap
 
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import scalaz._
 
-class BsonCodecSpecs extends Specification with ScalaCheck with DisjunctionMatchers {
+class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
   import BsonCodec._
 
   import DataArbitrary._

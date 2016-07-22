@@ -21,12 +21,11 @@ import quasar.Predef._
 import quasar.fs.{ADir, AFile}
 
 import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import org.http4s.dsl.{Path => HPath}
 
-class AsPathSpec extends Specification with ScalaCheck with PathUtils {
+class AsPathSpec extends quasar.QuasarSpecification with ScalaCheck with PathUtils {
   "AsPath" should {
     "decode any Path we can throw at it" >> {
       "AbsFile" ! prop { file: AFile =>

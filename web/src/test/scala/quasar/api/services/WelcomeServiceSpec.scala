@@ -20,9 +20,8 @@ import quasar.Predef._
 import quasar.build
 
 import org.http4s.Request
-import org.specs2.mutable.Specification
 
-class WelcomeServiceSpec extends Specification {
+class WelcomeServiceSpec extends quasar.QuasarSpecification {
   "Welcome service" should {
     "show a welcome message" in {
       val req = Request()

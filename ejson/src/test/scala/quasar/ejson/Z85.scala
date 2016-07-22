@@ -19,12 +19,11 @@ package quasar.ejson.z85
 import quasar.Predef._
 
 import org.scalacheck._
-import org.specs2.mutable._
 import org.typelevel.discipline.specs2.mutable._
 import scalaz._, Scalaz._
 import scodec.bits._
 
-class Z85Specs extends Specification with Discipline {
+class Z85Specs extends quasar.QuasarSpecification with Discipline {
   implicit val arbitraryByteVectors: Arbitrary[ByteVector] =
     Arbitrary(Arbitrary.arbitrary[List[Byte]].map(ByteVector(_)))
 

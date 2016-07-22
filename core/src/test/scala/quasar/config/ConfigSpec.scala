@@ -21,12 +21,11 @@ import quasar.fp._
 import quasar.fs.mount.ConnectionUri
 
 import argonaut._
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import pathy._, Path._
 import scalaz._, concurrent.Task, Scalaz._
 
-abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends Specification with DisjunctionMatchers {
+abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.QuasarSpecification with DisjunctionMatchers {
   import FsPath._, ConfigError._
 
   sequential
@@ -55,7 +54,7 @@ abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends Specification wi
     testConfigFile >>= (fp => f(fp) onFinish κ(deleteIfExists(fp)))
   }
 
-  val ConfigStr =
+  def ConfigStr =
     s"""{
       |  "mountings": {
       |    "/": {
@@ -74,7 +73,7 @@ abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends Specification wi
 
   "toString" should {
     "render same config" in {
-      configOps.asString(TestConfig) must_== ConfigStr
+      configOps.asString(TestConfig) must_= ConfigStr
     }
   }
 

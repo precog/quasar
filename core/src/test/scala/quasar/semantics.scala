@@ -21,10 +21,9 @@ import quasar.specs2._
 import quasar.sql.fixpoint._
 
 import matryoshka._, FunctorT.ops._
-import org.specs2.mutable._
 import pathy.Path._
 
-class SemanticsSpec extends Specification with PendingWithAccurateCoverage with TreeMatchers {
+class SemanticsSpec extends quasar.QuasarSpecification with PendingWithAccurateCoverage with TreeMatchers {
 
   "TransformSelect" should {
     import quasar.SemanticAnalysis._

@@ -93,6 +93,8 @@ object FileSystemError {
     case WriteFailed(d, r) => (d, r)
   } (WriteFailed.tupled)
 
+  implicit val fileSystemErrorEqual: Equal[FileSystemError] = Equal.equalA
+
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {
       case ExecutionFailed(_, rsn, _, c) =>

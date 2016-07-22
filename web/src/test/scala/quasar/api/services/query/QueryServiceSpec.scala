@@ -28,13 +28,12 @@ import argonaut._, Argonaut._
 import org.http4s._
 import org.specs2.specification.core.Fragments
 import org.specs2.ScalaCheck
-import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
-class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemFixture with PathUtils with ScalaCheck {
+class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture with PathUtils with ScalaCheck {
   import queryFixture._
 
   "Execute and Compile Services" should {

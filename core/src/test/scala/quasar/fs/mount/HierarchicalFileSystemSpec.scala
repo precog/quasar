@@ -27,14 +27,13 @@ import quasar.std.SetLib.Take
 import eu.timepit.refined.auto._
 import matryoshka.Fix
 import monocle.Lens
-import org.specs2.mutable
 import pathy.Path._
 import scalaz.{Lens => _, Failure => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
 
-class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFixture {
+class HierarchicalFileSystemSpec extends quasar.QuasarSpecification with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._
@@ -98,20 +97,21 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
     foldMapNT(foldMapNT(interpHEff) compose interpEmpty)
   }
 
+  private type FsErrorOr[A] = FileSystemError \/ A
   // NB: Defining these here for a reuse, but also because using `beLike`
   //     inline triggers a scalac bug that results in malformed class files
   def succeedH[A] =
-    beLike[FileSystemError \/ A] {
+    beLike[FsErrorOr[A]] {
       case \/-(_) => ok
     }
 
   def failDueToInvalidPath[A](p: APath) =
-    beLike[FileSystemError \/ A] {
-      case -\/(PathErr(InvalidPath(p0, _))) => p0 must_== p
+    beLike[FsErrorOr[A]] {
+      case -\/(PathErr(InvalidPath(p0, _))) => p0 must_=== p
     }
 
   def failDueToNoMnts[A] =
-    beLike[FileSystemError \/ A] {
+    beLike[FsErrorOr[A]] {
       case -\/(ExecutionFailed(_, "No mounts defined.", _, _)) => ok
     }
 
@@ -207,18 +207,18 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
       "listing children" >> {
         "of root dir when no mounts should return empty set" >> {
-          runEmpty(query.ls(rootDir).run).eval(emptyMS) must_== Set().right
+          runEmpty(query.ls(rootDir).run).eval(emptyMS) must_=== Set().right
         }
 
         "of mount ancestor dir should return dir names" >> {
-          val dirs = Set(DirName("bar").left, DirName("foo").left)
-          runMntd(query.ls(rootDir).run).eval(emptyMS) must_== dirs.right
+          val dirs = Set[PathSegment](DirName("bar").left, DirName("foo").left)
+          runMntd(query.ls(rootDir).run).eval(emptyMS) must_=== dirs.right
         }
 
         "of mount parent dir should return mount names" >> {
-          val mnts = Set(DirName("mntA").left, DirName("mntB").left)
+          val mnts = Set[PathSegment](DirName("mntA").left, DirName("mntB").left)
           runMntd(query.ls(rootDir </> dir("bar")).run)
-            .eval(emptyMS) must_== mnts.right
+            .eval(emptyMS) must_=== mnts.right
         }
       }
     }
@@ -253,7 +253,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
           f2 -> Vector(Data.Int(42)))))
 
         runMntd(manage.delete(mntB).run)
-          .exec(fss) must_== emptyMS
+          .exec(fss) must_=== emptyMS
       }
 
       "deleting the ancestor of one or more mount points should delete all data in their filesystems" >> {
@@ -271,7 +271,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
             f4 -> Vector(Data.Str("file4")))))
 
         runMntd(manage.delete(rootDir </> dir("bar")).run)
-          .exec(fss) must_== emptyMS
+          .exec(fss) must_=== emptyMS
       }
     }
   }

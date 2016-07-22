@@ -26,7 +26,6 @@ import quasar.qscript._
 import matryoshka.Fix
 import org.scalacheck._
 import org.scalacheck.Arbitrary
-import org.specs2.mutable._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 import shapeless.contrib.scalaz.instances._
@@ -54,7 +53,7 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
   checkAll("CardinalExpr", comonad.laws[CardinalExpr])
 }
 
-class WorkflowSpec extends Specification with TreeMatchers {
+class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
   import quasar.physical.mongodb.accumulator._
   import quasar.physical.mongodb.expression._
   import Workflow._

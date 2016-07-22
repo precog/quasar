@@ -30,13 +30,12 @@ import quasar.std._, IdentityLib.Squash, StdLib._, set._
 import eu.timepit.refined.auto._
 import matryoshka.{free => _, _}
 import monocle.macros.GenLens
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
-class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
+class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
   import TraceFS._
   import FileSystemError._
 
@@ -73,6 +72,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
         interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
 
   case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: A)
+
 
   def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] =
@@ -240,7 +240,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
         _ <- read.unsafe.read(h)
       } yield ()).run
 
-      viewInterpTrace(views, Map(), f).result must_== -\/(unknownReadHandle(ReadFile.ReadHandle(p, 0)))
+      viewInterpTrace(views, Map(), f).result must_=== -\/(unknownReadHandle(ReadFile.ReadHandle(p, 0)))
     }
 
     "double close (no-op)" in {
@@ -255,7 +255,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
 
-      viewInterpTrace(views, Map(), f).result must_== \/-(())
+      viewInterpTrace(views, Map(), f).result must_=== \/-(())
     }
   }
 
@@ -265,10 +265,9 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
-
       val f = write.unsafe.open(p).run
 
-      viewInterpTrace(views, Map(), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
         Vector.empty,
         VS.emptyWithViews(views),
         -\/(FileSystemError.pathErr(PathError.invalidPath(p, "cannot write to view"))))
@@ -285,7 +284,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     def moveShouldSucceed(views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
-      viewInterp(views, files, f) must_== ViewInterpResult(
+      viewInterp(views, files, f) must_=== ViewInterpResult(
         VS.emptyWithViews(Map(dstPath -> expr)),
         \/-(()))
     }
@@ -294,7 +293,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       (views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics, pathError: PathError) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
-      viewInterp(views, files, f) must_== ViewInterpResult(
+      viewInterp(views, files, f) must_=== ViewInterpResult(
         VS.emptyWithViews(views).copy(fs = InMemState.fromFiles(files.map(_ -> Vector[Data]()).toMap)),
         -\/(FileSystemError.pathErr(pathError)))
     }
@@ -335,7 +334,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = manage.move(dirToDir(srcDir, destDir), MoveSemantics.FailIfExists).run
 
-      viewInterp(Map((srcDir </> viewFile) -> expr), List(srcDir </> dataFile), f) must_== ViewInterpResult(
+      viewInterp(Map((srcDir </> viewFile) -> expr), List(srcDir </> dataFile), f) must_=== ViewInterpResult(
         VS.emptyWithViews(Map((destDir </> viewFile) -> expr))
           .copy(fs = InMemState.fromFiles(List(destDir </> dataFile).map(_ -> Vector[Data]()).toMap)),
         \/-(()))
@@ -352,7 +351,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = manage.delete(p).run
 
-      viewInterpTrace(views, Map(), f) must_== ViewInterpResultTrace(Vector.empty, VS.empty, \/-(()))
+      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(Vector.empty, VS.empty, \/-(()))
     }
 
     "delete with view subpath" in {
@@ -364,7 +363,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = manage.delete(vp).run
 
-      viewInterpTrace(views, Map(), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
         traceInterp(f, Map())._1,
         VS.empty,
         \/-(()))
@@ -442,7 +441,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.ls(aDir).run
 
-      viewInterpTrace(views, twoNodes(aDir), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, twoNodes(aDir), f) must_=== ViewInterpResultTrace(
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/-(Set(
@@ -461,7 +460,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.ls(aDir).run
 
-      viewInterpTrace(views, twoNodes(aDir), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, twoNodes(aDir), f) must_=== ViewInterpResultTrace(
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/-(Set(
@@ -474,7 +473,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.ls(aDir).run
 
-      viewInterpTrace(views, Map(aDir -> Set()), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, Map(aDir -> Set()), f) must_=== ViewInterpResultTrace(
         traceInterp(f, Map(aDir -> Set()))._1,
         VS.emptyWithViews(views),
         \/-(Set()))
@@ -486,7 +485,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
         val f = query.ls(aDir).run
 
-        viewInterpTrace(views, Map(), f) must_== ViewInterpResultTrace(
+        viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
           traceInterp(f, Map())._1,
           VS.emptyWithViews(views),
           -\/(FileSystemError.pathErr(PathError.pathNotFound(aDir))))
@@ -498,7 +497,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val f = query.ls(rootDir).run
 
-      viewInterpTrace(views, Map(), f) must_== ViewInterpResultTrace(
+      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
         traceInterp(f, Map())._1,
         VS.emptyWithViews(views),
         \/-(Set()))
@@ -513,10 +512,10 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val hasFile = {
         val paths = Map(fileParent(file) -> Set(fileName(file).right[DirName]))
-        viewInterpTrace(Map(), paths, program) must_== ViewInterpResultTrace(ops, VS.empty, true)
+        viewInterpTrace(Map(), paths, program) must_=== ViewInterpResultTrace(ops, VS.empty, true)
       }
       val noFile = {
-        viewInterpTrace(Map(), Map(), program) must_== ViewInterpResultTrace(ops, VS.empty, false)
+        viewInterpTrace(Map(), Map(), program) must_=== ViewInterpResultTrace(ops, VS.empty, false)
       }
       hasFile and noFile
     }
@@ -526,7 +525,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val program = query.fileExists(file)
 
-      viewInterp(views, Nil, program) must_== ViewInterpResult(
+      viewInterp(views, Nil, program) must_=== ViewInterpResult(
         VS.emptyWithViews(views),
         true)
     }

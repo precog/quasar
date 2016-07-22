@@ -20,17 +20,15 @@ import quasar.Predef._
 import quasar.std._
 
 import matryoshka._, FunctorT.ops._
-import org.specs2.mutable._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 import org.scalacheck._
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
-class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers with ScalaCheck {
+class OptimizerSpec extends quasar.QuasarSpecification with CompilerHelpers with TreeMatchers with ScalaCheck {
   import StdLib.structural._
   import StdLib.set._
   import LogicalPlan._

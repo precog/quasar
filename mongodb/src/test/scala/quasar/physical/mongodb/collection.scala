@@ -20,13 +20,12 @@ import org.specs2.execute.Result
 import quasar.Predef._
 import quasar.fs.SpecialStr
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck._
 
-class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatchers {
+class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
 
   "Collection.fromFile" should {
 

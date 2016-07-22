@@ -21,11 +21,10 @@ import quasar.javascript.Js
 import quasar.fp._
 import quasar.TreeMatchers
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
-class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
+class JsCoreSpecs extends quasar.QuasarSpecification with TreeMatchers with ScalazMatchers {
   "toJs" should {
     "de-sugar Let as AnonFunDecl" in {
       val let =
@@ -58,12 +57,12 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
 
     "don't null-check method call on newly-constructed instance" in {
       val expr = Call(Select(New(Name("Date"), List[JsCore]()), "getUTCSeconds"), List())
-      expr.toJs.pprint(0) must_== "(new Date()).getUTCSeconds()"
+      expr.toJs.pprint(0) must_= "(new Date()).getUTCSeconds()"
     }
 
     "don't null-check method call on newly-constructed Array" in {
       val expr = Call(Select(Arr(List(Literal(Js.Num(0, false)), Literal(Js.Num(1, false)))), "indexOf"), List(ident("x")))
-      expr.toJs.pprint(0) must_== "[0, 1].indexOf(x)"
+      expr.toJs.pprint(0) must_= "[0, 1].indexOf(x)"
     }
 
     "splice obj constructor" in {
@@ -106,7 +105,7 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
         )),
         "a")
 
-      x.simplify must_== ident("x")
+      x.simplify must_=== ident("x")
     }
 
     "inline object components" in {
@@ -120,14 +119,14 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
             Select(ident("a"), "x"),
             Select(ident("a"), "q"))))
 
-      x.simplify must_== Arr(List(ident("y"), ident("y"), If(ident("r"), Select(ident("r"), "foo"), ident("bar"))))
+      x.simplify must_=== Arr(List(ident("y"), ident("y"), If(ident("r"), Select(ident("r"), "foo"), ident("bar"))))
     }
   }
 
   "RenderTree" should {
     "render flat expression" in {
       val expr = Select(ident("foo"), "bar")
-      expr.shows must_== "JsCore(foo.bar)"
+      expr.shows must_= "JsCore(foo.bar)"
     }
 
     "render obj as nested" in {
@@ -163,7 +162,7 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
             Literal(Js.Num(2, false))),
           ident("x")))
 
-      fn(Literal(Js.Num(2, false))) must_== exp
+      fn(Literal(Js.Num(2, false))) must_=== exp
     }
 
     "substitute with shadowing Fun" in {
@@ -181,7 +180,7 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
             ident("x")),
           List(Literal(Js.Num(1, false)))))
 
-      fn(Literal(Js.Num(2, false))) must_== exp
+      fn(Literal(Js.Num(2, false))) must_=== exp
     }
 
     "toString" should {
@@ -203,7 +202,7 @@ class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
         val a = JsFn(Name("val"), Select(ident("val"), "foo"))
         val b = JsFn(Name("val"), Select(ident("val"), "bar"))
 
-        (a >>> b)(x).toJs.pprint(0) must_== "x.foo.bar"
+        (a >>> b)(x).toJs.pprint(0) must_= "x.foo.bar"
       }
     }
   }

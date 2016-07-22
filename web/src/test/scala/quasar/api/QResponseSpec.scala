@@ -21,7 +21,6 @@ import quasar.fp._, free._
 
 import org.http4s.dsl._
 import org.http4s.headers.Host
-import org.specs2.mutable
 import scalaz._
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
@@ -30,7 +29,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 
-class QResponseSpec extends mutable.Specification {
+class QResponseSpec extends quasar.QuasarSpecification {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
   import QResponseSpec._
 

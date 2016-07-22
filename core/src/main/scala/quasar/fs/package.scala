@@ -47,6 +47,9 @@ package object fs extends PhysicalErrorPrisms {
 
   type PathSegment = DirName \/ FileName
 
+  implicit val DirNameOrder: Order[DirName] = Order.orderBy(_.value)
+  implicit val FileNameOrder: Order[FileName] = Order.orderBy(_.value)
+
   object APath {
 
     implicit val aPathDecodeJson: DecodeJson[APath] =

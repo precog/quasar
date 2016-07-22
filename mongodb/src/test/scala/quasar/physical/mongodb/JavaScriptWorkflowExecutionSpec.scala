@@ -26,10 +26,9 @@ import scala.collection.immutable.ListMap
 
 import scalaz._
 import scalaz.syntax.either._
-import org.specs2.mutable._
 import org.specs2.scalaz._
 
-class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatchers {
+class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
   import Workflow._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =

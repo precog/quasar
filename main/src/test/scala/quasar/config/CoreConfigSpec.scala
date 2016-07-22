@@ -35,7 +35,7 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
     )))
   }
 
-  val OldConfigStr =
+  def OldConfigStr =
     s"""{
       |  "mountings": {
       |    "/": {

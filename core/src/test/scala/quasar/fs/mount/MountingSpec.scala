@@ -20,15 +20,13 @@ import quasar.Predef._
 import quasar.Variables
 import quasar.fs.{APath, ADir, AFile, PathError, FileSystemType}
 import quasar.sql, sql.Sql
+import quasar.specs2._
 
 import matryoshka._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
 import monocle.std.tuple2._
 import org.specs2.execute._
-import org.specs2.mutable
-import org.specs2.specification._
-import org.specs2.scalaz.DisjunctionMatchers
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -38,7 +36,7 @@ abstract class MountingSpec[S[_]](
   S0: Mounting :<: S,
   S1: MountingFailure :<: S,
   S2: PathMismatchFailure :<: S
-) extends mutable.Specification with DisjunctionMatchers {
+) extends quasar.QuasarSpecification with DisjunctionMatchers {
 
   import MountConfig.{viewConfig, fileSystemConfig}
 

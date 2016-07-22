@@ -69,7 +69,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
 
       mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
         .tuple(mnt.lookupConfig(loc).run)
-        .map(_ must_== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
+        .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
     }
   }
 }

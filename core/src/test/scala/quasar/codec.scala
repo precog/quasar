@@ -20,14 +20,13 @@ import argonaut._, Argonaut._
 import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
 import quasar.Predef._
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 
 import org.threeten.bp._
-import scalaz._
+import scalaz._, Scalaz._
 
-class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatchers {
+class DataCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
   import DataArbitrary._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }
@@ -211,11 +210,11 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
 
   "Error messages" should {
     "UnrepresentableDataError" ! prop { any: Data =>
-      UnrepresentableDataError(any).message must_== ("not representable: " + any)
+      UnrepresentableDataError(any).message must_= ("not representable: " + any)
     }
     "UnescapedKeyError" in {
       val sample:Json = jString("foo")
-      UnescapedKeyError(sample).message must_== s"un-escaped key: $sample"
+      UnescapedKeyError(sample).message must_= s"un-escaped key: $sample"
     }
   }
 }

@@ -19,9 +19,7 @@ package quasar
 import quasar.Predef._
 
 import argonaut._, Argonaut._
-import org.specs2.mutable._
-
-class RenderedTreeSpec extends Specification {
+class RenderedTreeSpec extends quasar.QuasarSpecification {
   "RenderedTree.diff" should {
 
     "find no differences" in {

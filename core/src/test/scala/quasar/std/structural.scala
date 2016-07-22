@@ -19,13 +19,12 @@ package quasar.std
 import quasar.Predef._
 import quasar._
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
 
 
-class StructuralSpecs extends Specification with ScalaCheck with ValidationMatchers {
+class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers {
   import quasar.Type._
 
   import StructuralLib._

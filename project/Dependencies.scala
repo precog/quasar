@@ -15,6 +15,7 @@ object Dependencies {
   private val scalazVersion     = "7.2.4"
   private val scodecBitsVersion = "1.1.0"
   private val slcVersion        = "0.4"
+  private val specsVersion      = "3.8.4"
 
   val core = Seq(
     "org.scalaz"        %% "scalaz-core"               % scalazVersion           % "compile, test" force(),
@@ -43,7 +44,7 @@ object Dependencies {
     "com.github.tototoshi" %% "scala-csv"              % "1.3.1"                 % "compile",
     "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion            % "test",
     "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion           % "test",
-    "org.specs2"        %% "specs2-core"               % "3.7.3-scalacheck-1.12" % "test",
+    "org.specs2"        %% "specs2-core"               % specsVersion            % "test",
     // Can't upgrade scalacheck until scalaz-scalacheck-binding is upgraded to
     // latest scalacheck which looks like it may never happen:
     // https://github.com/scalaz/scalaz/issues/1096

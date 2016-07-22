@@ -23,7 +23,6 @@ import quasar.specs2.PendingWithAccurateCoverage
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 import org.threeten.bp.{Instant, Duration}
@@ -31,7 +30,7 @@ import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
+class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const

@@ -265,10 +265,10 @@ object SemanticAnalysis {
     //       Order, even) defined properly for Provenance.
     override def equals(that: scala.Any): Boolean = (this, that) match {
       case (x, y) if (x.eq(y.asInstanceOf[AnyRef])) => true
-      case (Relation(v1), Relation(v2)) => v1 == v2
-      case (Either(_, _), that @ Either(_, _)) => this.simplify.flatten == that.simplify.flatten
-      case (Both(_, _), that @ Both(_, _)) => this.simplify.flatten == that.simplify.flatten
-      case (_, _) => false
+      case (Relation(v1), Relation(v2))             => v1 == v2
+      case (Either(_, _), that @ Either(_, _))      => this.simplify.flatten == that.simplify.flatten
+      case (Both(_, _), that @ Both(_, _))          => this.simplify.flatten == that.simplify.flatten
+      case (_, _)                                   => false
     }
 
     override def hashCode = this match {

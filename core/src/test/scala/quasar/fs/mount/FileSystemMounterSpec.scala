@@ -25,11 +25,9 @@ import quasar.effect._
 import monocle.function.Field1
 import monocle.std.tuple2._
 import pathy.Path._
-import org.specs2.mutable
-import scalaz.{Failure => _, _}
-import scalaz.syntax.applicative._
+import scalaz.{Failure => _, _}, Scalaz._
 
-class FileSystemMounterSpec extends mutable.Specification {
+class FileSystemMounterSpec extends quasar.QuasarSpecification {
   import FileSystemDef._
 
   type Abort[A]  = Failure[String, A]
@@ -137,7 +135,7 @@ class FileSystemMounterSpec extends mutable.Specification {
         val cln = "CLEAN"
         val (rmnts, signal) = eval(Mounts.singleton(d, fsResult(cln)))(mount(d))
 
-        (rmnts.toMap.isEmpty must beFalse) and (signal must_== \/.left(cln))
+        (rmnts.toMap.isEmpty must beFalse) and (signal must_=== \/.left(cln))
       }
     }
 
@@ -146,7 +144,7 @@ class FileSystemMounterSpec extends mutable.Specification {
         val d = rootDir </> dir("unmount") </> dir("cleanup")
         val undo = "UNDO"
 
-        eval(Mounts.singleton(d, fsResult(undo)))(unmount(d))._2 must_== \/.left(undo)
+        eval(Mounts.singleton(d, fsResult(undo)))(unmount(d))._2 must_= \/.left(undo)
       }
 
       "deletes the entry from mounts" >> {

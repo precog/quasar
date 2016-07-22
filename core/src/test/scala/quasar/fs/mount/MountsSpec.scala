@@ -18,14 +18,13 @@ package quasar.fs.mount
 
 import quasar.Predef.List
 
-import org.specs2.mutable
 import org.specs2.ScalaCheck
-import org.specs2.scalaz.DisjunctionMatchers
+import quasar.specs2._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.std.list._
 
-class MountsSpec extends mutable.Specification with ScalaCheck with DisjunctionMatchers {
+class MountsSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
   "Mounts" should {
     "adding entries" >> {
       "fails when dir is a prefix of existing" ! prop { mnt: AbsDir[Sandboxed] =>

@@ -25,13 +25,12 @@ import org.http4s.Uri.Authority
 import org.http4s.client.middleware.Retry
 import org.http4s.{Method, Request, Status, Uri}
 import org.http4s.server.syntax._
-import org.specs2.mutable
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 import shapeless.nat._
 
-class ControlServiceSpec extends mutable.Specification {
+class ControlServiceSpec extends quasar.QuasarSpecification {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 

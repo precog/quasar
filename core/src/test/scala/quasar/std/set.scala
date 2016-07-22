@@ -22,10 +22,9 @@ import quasar.fp._
 import quasar.specs2.PendingWithAccurateCoverage
 
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
 import org.specs2.scalaz._
 
-class SetSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
+class SetSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import SetLib._
   import quasar.Data
   import quasar.Type

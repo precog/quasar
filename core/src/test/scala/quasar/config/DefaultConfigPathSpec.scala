@@ -21,7 +21,6 @@ import quasar.SKI._
 
 import scala.util.Properties
 
-import org.specs2.mutable
 import pathy.Path._
 import scalaz.syntax.functor._
 import scalaz.syntax.std.option._
@@ -29,7 +28,7 @@ import scalaz.concurrent.Task
 
 // NB: Not possible to test windows deterministically at this point as cannot
 //     programatically set environment variables like we can with properties.
-class DefaultConfigPathSpec extends mutable.Specification {
+class DefaultConfigPathSpec extends quasar.QuasarSpecification {
   import ConfigOps.defaultPathForOS, FsPath._
 
   sequential

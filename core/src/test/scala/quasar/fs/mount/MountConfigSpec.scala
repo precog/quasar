@@ -21,14 +21,12 @@ import quasar.{Variables, VarName, VarValue}
 import quasar.sql
 import quasar.sql.fixpoint._
 
-import argonaut._, Argonaut._
-import org.specs2.mutable
+import argonaut._, Argonaut._, JsonScalaz._
 import org.specs2.scalaz._
 import scalaz.Scalaz._
-
 import pathy.Path._
 
-class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
+class MountConfigSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
   import MountConfig._
 
   "View config codec" should {
@@ -44,12 +42,12 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
     "encode" >> {
       "no vars" in {
         viewConfig(read, Variables(Map()))
-          .asJson must_== viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29")
+          .asJson must_= viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29")
       }
 
       "with var" in {
         viewConfig(read, Variables(Map(VarName("a") -> VarValue("1"))))
-          .asJson must_== viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29&var.a=1")
+          .asJson must_= viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29&var.a=1")
       }
     }
 

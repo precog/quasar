@@ -30,8 +30,6 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import monocle.{Lens => MLens}
 import org.specs2.ScalaCheck
-import org.specs2.mutable
-import org.specs2.scalaz.DisjunctionMatchers._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -45,7 +43,7 @@ object ViewMounterSpec {
     )
 }
 
-class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMatchers {
+class ViewMounterSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
   import MountingError._
   import ViewMounterSpec._
 
@@ -259,7 +257,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val vs = Map[APath, MountConfig]()
 
       eval(vs)(ViewMounter.ls[MountConfigs](dir))
-        ._2 must_== Set()
+        ._2 must beEmpty
     }
 
     "list view under its parent dir" ! prop { (path: AFile) =>
@@ -267,7 +265,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
         path -> MountConfig.viewConfig(viewConfig("select * from `/foo`")))
 
       eval(vs)(ViewMounter.ls[MountConfigs](fileParent(path)))
-        ._2 must_== Set(fileName(path).right)
+        ._2 must_=== Set[PathSegment](fileName(path).right)
     }
 
     "list view parent under grand-parent dir" ! prop { (dir: ADir) =>
@@ -277,7 +275,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
           (dir </> file("view1")) -> MountConfig.viewConfig(viewConfig("select * from `/foo`")))
 
         eval(vs)(ViewMounter.ls[MountConfigs](parent))
-          ._2 must_== Set(dirName(dir).get.left)
+          ._2 must_=== Set[PathSegment](dirName(dir).get.left)
       }
     }
 

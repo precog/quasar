@@ -25,11 +25,10 @@ import quasar.qscript.SortDir
 import quasar.specs2._
 
 import matryoshka._, FunctorT.ops._
-import org.specs2.mutable._
 import scalaz._, Scalaz._
 
 class WorkflowBuilderSpec
-    extends Specification
+    extends quasar.QuasarSpecification
     with DisjunctionMatchers
     with TreeMatchers
     with PendingWithAccurateCoverage {

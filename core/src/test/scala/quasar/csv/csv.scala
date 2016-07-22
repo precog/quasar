@@ -18,11 +18,9 @@ package quasar.csv
 
 import quasar.Predef._
 
-import org.specs2.mutable._
-
 import scalaz._, Scalaz._
 
-class CsvSpec extends Specification {
+class CsvSpec extends quasar.QuasarSpecification {
   import CsvDetect._
 
   val Standard =

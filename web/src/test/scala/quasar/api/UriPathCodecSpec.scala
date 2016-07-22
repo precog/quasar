@@ -26,7 +26,7 @@ import pathy.scalacheck.PathyArbitrary._
 
 /** This is largely copied from `pathy`. It would be nice to expose from a pathy
   * a function to validate a `PathCodec`. */
-class UriPathCodecSpec extends org.specs2.mutable.Specification with ScalaCheck {
+class UriPathCodecSpec extends quasar.QuasarSpecification with ScalaCheck {
 
   "UriPathCodec" should {
     val codec = UriPathCodec

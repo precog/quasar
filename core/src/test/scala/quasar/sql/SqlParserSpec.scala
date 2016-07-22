@@ -23,12 +23,11 @@ import quasar.specs2._
 import quasar.sql.fixpoint._
 
 import matryoshka._
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
 import pathy.Path._
 
-class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatchers {
+class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
   import SqlQueries._, ExprArbitrary._
 
   implicit def stringToQuery(s: String): Query = Query(s)
@@ -289,25 +288,25 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse is (not) as (!)=" in {
       val q1 = "select * from zips where pop is 1000 and city is not \"BOULDER\""
       val q2 = "select * from zips where pop = 1000 and city != \"BOULDER\""
-      parse(q1) must_== parse(q2)
+      parse(q1) must_=== parse(q2)
     }
 
     "parse `in` and `like` with optional `is`" in {
       val q1 = "select * from zips where pop is in (1000, 2000) and city is like \"BOU%\""
       val q2 = "select * from zips where pop in (1000, 2000) and city like \"BOU%\""
-      parse(q1) must_== parse(q2)
+      parse(q1) must_=== parse(q2)
     }
 
     "parse `not in` and `not like` with optional `is`" in {
       val q1 = "select * from zips where pop is not in (1000, 2000) and city is not like \"BOU%\""
       val q2 = "select * from zips where pop not in (1000, 2000) and city not like \"BOU%\""
-      parse(q1) must_== parse(q2)
+      parse(q1) must_=== parse(q2)
     }
 
     "parse nested joins left to right" in {
       val q1 = "select * from a cross join b cross join c"
       val q2 = "select * from (a cross join b) cross join c"
-      parse(q1) must_== parse(q2)
+      parse(q1) must_=== parse(q2)
     }
 
     "parse nested joins with parens" in {

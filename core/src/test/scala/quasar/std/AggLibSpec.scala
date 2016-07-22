@@ -21,14 +21,14 @@ import quasar.{Data, Func, Type}
 import quasar.DataArbitrary, DataArbitrary._
 import quasar.specs2.ValidationMatchers
 
-import org.specs2.{mutable, ScalaCheck}
+import org.specs2.ScalaCheck
 import org.threeten.bp.Duration
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import scalaz.syntax.foldable1._
 
-class AggLibSpec extends mutable.Specification with ScalaCheck with ValidationMatchers {
+class AggLibSpec extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers {
   import AggLib._
 
   "Arbitrary" should {

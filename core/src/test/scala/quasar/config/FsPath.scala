@@ -19,9 +19,7 @@ package quasar.config
 import quasar.Predef._
 
 import pathy._, Path._
-import org.specs2.mutable._
-
-class FsPathSpec extends Specification {
+class FsPathSpec extends quasar.QuasarSpecification {
   import windowsCodec.printPath
   import FsPath._
 

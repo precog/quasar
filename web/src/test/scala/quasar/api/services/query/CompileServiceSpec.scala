@@ -22,13 +22,12 @@ import quasar._, fs._, InMemory.InMemState
 import argonaut.{Json => AJson}
 import org.http4s._
 import org.http4s.argonaut._
-import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path._, posixCodec._
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 
-class CompileServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
+class CompileServiceSpec extends quasar.QuasarSpecification with FileSystemFixture with ScalaCheck {
   import queryFixture._
 
   "Compile" should {

@@ -35,8 +35,6 @@ import org.http4s.server.middleware.GZip
 import org.specs2.specification.core.Fragments
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
-import org.specs2.mutable.Specification
-import org.specs2.scalaz.ScalazMatchers._
 import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
@@ -53,7 +51,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 
-class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
+class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.{pathExists, pathNotFound}

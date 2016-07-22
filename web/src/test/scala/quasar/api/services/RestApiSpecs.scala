@@ -27,11 +27,10 @@ import quasar.fs.mount._
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
-import org.specs2.mutable.Specification
 import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
-class RestApiSpecs extends Specification {
+class RestApiSpecs extends quasar.QuasarSpecification {
   import InMemory._, Mounting.PathTypeMismatch
 
   type Eff0[A] = Coproduct[FileSystemFailure, MountingFileSystem, A]

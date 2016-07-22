@@ -22,7 +22,7 @@ import quasar.Predef._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-class MessageFormatSpec extends org.specs2.mutable.Specification {
+class MessageFormatSpec extends quasar.QuasarSpecification {
   import org.http4s._, QValue._
   import org.http4s.headers.{Accept}
 

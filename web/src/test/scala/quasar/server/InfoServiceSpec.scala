@@ -20,11 +20,10 @@ import quasar.Predef._
 
 import org.http4s.{Status, Method, Request}
 import org.http4s.argonaut._
-import org.specs2.mutable
 
 import argonaut.Json
 
-class InfoServiceSpec extends mutable.Specification {
+class InfoServiceSpec extends quasar.QuasarSpecification {
 
   "Info Service" should {
     "be capable of providing it's name and version" in {

@@ -18,11 +18,10 @@ package quasar.api
 
 import quasar.Predef._
 
-import org.specs2.mutable.Specification
 
 import scalaz.{\/-, -\/}
 
-class HeaderParamSpec extends Specification {
+class HeaderParamSpec extends quasar.QuasarSpecification {
   import org.http4s.util._
 
   import HeaderParam._

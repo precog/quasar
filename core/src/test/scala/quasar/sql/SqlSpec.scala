@@ -20,11 +20,10 @@ import quasar.Predef._
 import quasar.specs2._
 
 import matryoshka._, Recursive.ops._
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import scalaz._
 
-class SQLSpec extends Specification with ScalaCheck with DisjunctionMatchers {
+class SQLSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
 
   implicit def stringToQuery(s: String): Query = Query(s)
 

@@ -17,10 +17,9 @@
 package quasar
 
 import quasar.Predef._
-import org.specs2.mutable._
 import pathy.Path._
 
-class ProvenanceSpec extends Specification {
+class ProvenanceSpec extends quasar.QuasarSpecification {
   import SemanticAnalysis._
   import Provenance._
   import sql._
@@ -30,35 +29,35 @@ class ProvenanceSpec extends Specification {
 
   "flatten" should {
     "flatten singleton in" in {
-      Value.flatten must_== (Set(Value))
+      Value.flatten must_=== (Set(Value))
     }
 
     "flatten 2-way product in" in {
-      (Value & Empty).flatten must_== (Set(Value, Empty))
+      (Value & Empty).flatten must_=== (Set(Value, Empty))
     }
 
     "flatten 3-way product in" in {
-      (Value & Empty & Rel1).flatten must_== (Set(Value, Empty, Rel1))
+      (Value & Empty & Rel1).flatten must_=== (Set(Value, Empty, Rel1))
     }
 
     "flatten 2-way coproduct in" in {
-      (Value | Empty).flatten must_== (Set(Value, Empty))
+      (Value | Empty).flatten must_=== (Set(Value, Empty))
     }
 
     "flatten 3-way coproduct in" in {
-      (Value | Empty | Rel1).flatten must_== (Set(Value, Empty, Rel1))
+      (Value | Empty | Rel1).flatten must_=== (Set(Value, Empty, Rel1))
     }
   }
 
   "simplify" should {
     "simplify 3-way twice duplicated coproduct" in {
-      (Value | Value | Empty | Empty | Rel1 | Rel1).simplify.flatten must_== (Set(Value, Rel1))
+      (Value | Value | Empty | Empty | Rel1 | Rel1).simplify.flatten must_=== (Set(Value, Rel1))
     }
   }
 
   "equality" should {
     "be order independent for 3-way products" in {
-      (Value & Rel1 & Rel2) must_== (Rel1 & Value & Rel2)
+      (Value & Rel1 & Rel2) must_=== (Rel1 & Value & Rel2)
     }
   }
 }

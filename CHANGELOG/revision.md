@@ -1,0 +1,3 @@
+- Tighten test equalities in core project.
+- Use QuasarSpecification universally.
+- Upgrade specs to version 3.8.4.

@@ -22,11 +22,10 @@ import quasar.qscript._
 import quasar.specs2._
 
 import org.scalacheck._
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import scalaz._
 
-class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with PendingWithAccurateCoverage {
+class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBsonField with PendingWithAccurateCoverage {
   import quasar.physical.mongodb.accumulator._
   import quasar.physical.mongodb.expression._
   import Workflow._

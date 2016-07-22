@@ -24,6 +24,6 @@ import scalaz._
 
 trait QuasarSpecification extends SpecificationLike with ScalazMatchers {
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
-    def must_scalaz_==(rhs: A) = lhs must equal(rhs)
+    def must_=(rhs: A) = lhs must equal(rhs)
   }
 }

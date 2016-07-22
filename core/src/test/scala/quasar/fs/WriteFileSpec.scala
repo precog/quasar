@@ -21,7 +21,6 @@ import quasar.{Data, DataArbitrary}
 import quasar.fp._
 import quasar.specs2.DisjunctionMatchers
 
-import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import org.specs2.specification.core.Fragments
 import pathy.scalacheck.PathyArbitrary._
@@ -30,7 +29,7 @@ import scalaz.std.vector._
 import scalaz.syntax.monad._
 import scalaz.stream._
 
-class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture with DisjunctionMatchers {
+class WriteFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with DisjunctionMatchers {
   import DataArbitrary._, FileSystemError._, PathError._
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
@@ -64,7 +63,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
         p.translate[Result](MemTask.interpretT).runLog.run
           .leftMap(_.wm)
           .run(emptyMem)
-          .unsafePerformSync must_== ((Map.empty, \/.right(xs)))
+          .unsafePerformSync must_=== ((Map.empty, \/.right(xs)))
       }
     }
 
@@ -100,13 +99,13 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
         val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_== \/-(ys)
+        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(ys)
       }
 
       s"$n with empty input should create an empty file" ! prop { f: AFile =>
         val p = wt(f, Process.empty) ++ query.fileExistsM(f).liftM[Process]
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_== \/-(Vector(true))
+        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(Vector(true))
       }
 
       s"$n should leave existing file untouched on failure" ! prop {
@@ -118,7 +117,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
           MemFixTask.runLogWithWrites(ws.toList, p).run
             .leftMap(_.contents.keySet)
             .run(emptyMem)
-            .unsafePerformSync must_== ((Set(f), \/.right(xs)))
+            .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
         }
       }
     }
@@ -154,7 +153,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
         val p = wt(f, xs.toProcess) ++ read.scanAll(f)
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_== \/-(xs)
+        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(xs)
       }
     }
 
@@ -175,7 +174,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
           MemFixTask.runLogWithWrites(ws.toList, p).run
             .leftMap(_.contents.keySet)
             .run(emptyMem)
-            .unsafePerformSync must_== ((Set(f), \/.right(xs)))
+            .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
         }
       }
 
@@ -184,7 +183,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
         val p = write.save(f, xs.toProcess) ++ wt(f, ys.toProcess) ++ read.scanAll(f)
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_== \/-(ys)
+        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(ys)
       }
     }
   }

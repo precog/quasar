@@ -21,10 +21,9 @@ import quasar.TreeMatchers
 import quasar.qscript._
 
 import matryoshka._, FunctorT.ops._
-import org.specs2.mutable._
 import scalaz._, Scalaz._
 
-class OptimizeSpecs extends Specification with TreeMatchers {
+class OptimizeSpecs extends quasar.QuasarSpecification with TreeMatchers {
   import quasar.physical.mongodb.accumulator._
   import quasar.physical.mongodb.expression._
   import Workflow._

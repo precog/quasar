@@ -35,13 +35,12 @@ import org.scalacheck._
 import org.specs2.ScalaCheck
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers with DisjunctionMatchers with PendingWithAccurateCoverage {
+class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with CompilerHelpers with DisjunctionMatchers with PendingWithAccurateCoverage {
   import StdLib.{set => s, _}
   import structural._
   import LogicalPlan._

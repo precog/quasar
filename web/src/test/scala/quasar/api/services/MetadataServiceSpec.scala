@@ -33,7 +33,6 @@ import monocle.Lens
 import org.http4s._
 import org.http4s.argonaut._
 import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
@@ -63,7 +62,7 @@ object MetadataFixture {
       liftMT[Task, ResponseT] compose (runQuery(mem) :+: runMount(mnts)))
 }
 
-class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
+class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
   import metadata.FsNode
   import VariablesArbitrary._, ExprArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._

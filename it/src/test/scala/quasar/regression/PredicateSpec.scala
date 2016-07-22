@@ -24,14 +24,13 @@ import quasar.fp._
 
 import argonaut._
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
 import org.specs2.execute._
 import org.scalacheck.Arbitrary, Arbitrary._
 import scalaz.{Failure => _, Success => _, _}
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-class PredicateSpec extends Specification with ScalaCheck {
+class PredicateSpec extends quasar.QuasarSpecification with ScalaCheck {
   import Predicate._
 
   implicit val jsonArbitrary: Arbitrary[Json] = Arbitrary {

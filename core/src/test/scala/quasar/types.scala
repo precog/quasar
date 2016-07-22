@@ -386,17 +386,17 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
 
   "product" should {
     "have order-independent equality for arbitrary types" ! prop { (t1: Type, t2: Type) =>
-      (t1 ⨯ t2) must_scalaz_== (t2 ⨯ t1)
+      (t1 ⨯ t2) must_= (t2 ⨯ t1)
     }
   }
 
   "coproduct" should {
     "have order-independent equality" in {
-      (Int ⨿ Str) must_scalaz_== (Str ⨿ Int)
+      (Int ⨿ Str) must_= (Str ⨿ Int)
     }
 
     "have order-independent equality for arbitrary types" ! prop { (t1: Type, t2: Type) =>
-      (t1 ⨿ t2) must_scalaz_== (t2 ⨿ t1)
+      (t1 ⨿ t2) must_= (t2 ⨿ t1)
     }
 
     "be Bottom with no args" in {
@@ -438,7 +438,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   "type" should {
     // Properties:
     "have t == t for arbitrary type" ! prop { (t: Type) =>
-      t must_scalaz_== t
+      t must_= t
     }
 
     "simplify int|int to int" in {
@@ -484,28 +484,28 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
 
     // Properties for product:
     "simplify t ⨯ t to t" ! prop { (t: Type) =>
-      simplify(t ⨯ t) must_scalaz_== simplify(t)
+      simplify(t ⨯ t) must_= simplify(t)
     }
 
     "simplify Top ⨯ t to t" ! prop { (t: Type) =>
-      simplify(Top ⨯ t) must_scalaz_== simplify(t)
+      simplify(Top ⨯ t) must_= simplify(t)
     }
 
     "simplify Bottom ⨯ t to Bottom" ! prop { (t: Type) =>
-      simplify(Bottom ⨯ t) must_scalaz_== Bottom
+      simplify(Bottom ⨯ t) must_= Bottom
     }
 
     // Properties for coproduct:
     "simplify t ⨿ t to t" ! prop { (t: Type) =>
-      simplify(t ⨿ t) must_scalaz_== simplify(t)
+      simplify(t ⨿ t) must_= simplify(t)
     }
 
     "simplify Top ⨿ t to Top" ! prop { (t: Type) =>
-      simplify(Top ⨿ t) must_scalaz_== Top
+      simplify(Top ⨿ t) must_= Top
     }
 
     "simplify Bottom ⨿ t to t" ! prop { (t: Type) =>
-      simplify(Bottom ⨿ t) must_scalaz_== simplify(t)
+      simplify(Bottom ⨿ t) must_= simplify(t)
     }
 
 
@@ -623,7 +623,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
     }
 
     "empty array constant is arrayLike" in {
-      Const(Data.Arr(List())).arrayLike must_scalaz_== true
+      Const(Data.Arr(List())).arrayLike must_= true
     }
 
     "arrayType for simple type" in {
@@ -718,19 +718,19 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
     def typJson(typ: Type): Json = typ.asJson
 
     "encode simple types as their name" in {
-      (typJson(Top)       must_scalaz_== jString("Top"))       and
-      (typJson(Bottom)    must_scalaz_== jString("Bottom"))    and
-      (typJson(Null)      must_scalaz_== jString("Null"))      and
-      (typJson(Str)       must_scalaz_== jString("Str"))       and
-      (typJson(Int)       must_scalaz_== jString("Int"))       and
-      (typJson(Dec)       must_scalaz_== jString("Dec"))       and
-      (typJson(Bool)      must_scalaz_== jString("Bool"))      and
-      (typJson(Binary)    must_scalaz_== jString("Binary"))    and
-      (typJson(Timestamp) must_scalaz_== jString("Timestamp")) and
-      (typJson(Date)      must_scalaz_== jString("Date"))      and
-      (typJson(Time)      must_scalaz_== jString("Time"))      and
-      (typJson(Interval)  must_scalaz_== jString("Interval"))  and
-      (typJson(Id)        must_scalaz_== jString("Id"))
+      (typJson(Top)       must_= jString("Top"))       and
+      (typJson(Bottom)    must_= jString("Bottom"))    and
+      (typJson(Null)      must_= jString("Null"))      and
+      (typJson(Str)       must_= jString("Str"))       and
+      (typJson(Int)       must_= jString("Int"))       and
+      (typJson(Dec)       must_= jString("Dec"))       and
+      (typJson(Bool)      must_= jString("Bool"))      and
+      (typJson(Binary)    must_= jString("Binary"))    and
+      (typJson(Timestamp) must_= jString("Timestamp")) and
+      (typJson(Date)      must_= jString("Date"))      and
+      (typJson(Time)      must_= jString("Time"))      and
+      (typJson(Interval)  must_= jString("Interval"))  and
+      (typJson(Id)        must_= jString("Id"))
     }
 
     "encode constant types as their data encoding" ! prop { data: Data =>
@@ -742,11 +742,11 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
     }
 
     "encode arrays as an array of types" ! prop { types: List[Type] =>
-      typJson(Arr(types)) must_scalaz_== Json("Array" := types)
+      typJson(Arr(types)) must_= Json("Array" := types)
     }
 
     "encode flex arrays as components" ! prop { (min: Int, max: Option[Int], mbr: Type) =>
-      typJson(FlexArr(min, max, mbr)) must_scalaz_==
+      typJson(FlexArr(min, max, mbr)) must_=
         Json("FlexArr" := (
           ("minSize" := min)  ->:
           ("maxSize" :?= max) ->?:
@@ -755,7 +755,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
     }
 
     "encode objects" ! prop { (assocs: Map[String, Type], unks: Option[Type]) =>
-      typJson(Obj(assocs, unks)) must_scalaz_==
+      typJson(Obj(assocs, unks)) must_=
         Json("Obj" := (
           ("associations" := assocs) ->:
           ("unknownKeys"  :?= unks)  ->?:
@@ -764,7 +764,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
 
     "encode coproducts as an array of types" ! prop { (t1: Type, t2: Type, ts: List[Type]) =>
       val coprod = ts.foldLeft(Coproduct(t1, t2))(Coproduct(_, _))
-      typJson(coprod) must_scalaz_== Json("Coproduct" := coprod.flatten)
+      typJson(coprod) must_= Json("Coproduct" := coprod.flatten)
     }
   }
 }

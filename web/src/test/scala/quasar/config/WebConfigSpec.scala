@@ -29,7 +29,7 @@ class WebConfigSpec extends ConfigSpec[WebConfig] {
     mountings = MountingsConfig(Map(
       rootDir -> MountConfig.fileSystemConfig(MongoDBFsType, uri))))
 
-  override val ConfigStr =
+  override def ConfigStr =
     s"""{
       |  "server": {
       |    "port": 92

@@ -18,7 +18,6 @@ package quasar.main
 
 import quasar.Predef._
 
-import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 
@@ -28,7 +27,7 @@ import scalaz._
 
 import quasar._
 
-class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatchers  {
+class PrettifySpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers  {
   import Prettify._
 
   "flatten" should {

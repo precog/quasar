@@ -31,13 +31,11 @@ import argonaut._, Argonaut._
 import org.http4s.Uri.Authority
 import org.http4s._, Status._
 import org.http4s.argonaut._
-import org.specs2.mutable
-import org.specs2.scalaz.DisjunctionMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class ServiceSpec extends mutable.Specification {
+class ServiceSpec extends quasar.QuasarSpecification {
   val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient

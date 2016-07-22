@@ -41,8 +41,6 @@ import org.http4s._
 import org.scalacheck.Arbitrary
 import org.specs2.ScalaCheck
 import org.specs2.matcher.MatchResult
-import org.specs2.mutable.Specification
-import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
@@ -52,7 +50,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-class ExecuteServiceSpec extends Specification with FileSystemFixture with ScalaCheck with PathUtils {
+class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixture with ScalaCheck with PathUtils {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_

@@ -23,8 +23,6 @@ import org.specs2.scalaz.ScalazMatchers
 import org.scalacheck.Arbitrary
 import quasar.Predef._
 
-import org.specs2.mutable._
-
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 import scalaz.stream.Process
@@ -42,7 +40,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.auto._
 
-class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
+class ZipSpecs extends quasar.QuasarSpecification with ScalaCheck with ScalazMatchers {
   args.report(showtimes=true)
 
   "zipFiles" should {

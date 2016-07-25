@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
-package fp
+package quasar.fp
 
 import quasar.Predef.{Unit, Boolean}
 

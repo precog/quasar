@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package quasar
-package api
-package services
+package quasar.api.services
 
-import Predef._
+import quasar.Predef._
 import argonaut.{JsonObject, JsonNumber, Json, Argonaut}
 import Argonaut._
 import jawn.{FContext, Facade}

@@ -1,0 +1,1 @@
+- Switch to single package declaration per file

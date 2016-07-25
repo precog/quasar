@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
-package api.services
+package quasar.api.services
 
-import Predef._
+import quasar.Predef._
+import quasar.build
 
 import org.http4s.{StaticFile, MediaType, HttpService}
 import org.http4s.dsl._

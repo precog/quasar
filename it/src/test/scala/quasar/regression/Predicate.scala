@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
-package regression
+package quasar.regression
 
 import quasar.Predef._
 

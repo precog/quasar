@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical
-package skeleton
+package quasar.physical.skeleton
 
 import quasar.fs._
 import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
-package fs
+package quasar.fs
 
 import quasar.Predef._
+import quasar.Data
 import quasar.DataArbitrary._
 import quasar.fp._
 import quasar.fs.PathArbitrary._

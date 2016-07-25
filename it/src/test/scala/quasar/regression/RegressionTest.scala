@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
-package regression
+package quasar.regression
 
 import quasar.Predef._
+import quasar.BackendName
 import quasar.fp._
 
 import argonaut._, Argonaut._

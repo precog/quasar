@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
-package specs2
+package quasar.specs2
 
 import org.specs2.mutable.Specification
 import org.specs2.specification.core.SpecificationStructure

@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package quasar
-package physical
-package mongodb
-package workflowtask
+package quasar.physical.mongodb.workflowtask
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
+import quasar.physical.mongodb._
 
 import scalaz._, Scalaz._
 

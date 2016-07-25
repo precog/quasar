@@ -109,7 +109,7 @@ object SourcedPathable {
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Normalizable[SourcedPathable[T, ?]] =
     new Normalizable[SourcedPathable[T, ?]] {
       val opt = new Optimize[T]

@@ -37,7 +37,7 @@ sealed abstract class QScriptCore[T[_[_]], A] {
 
 object ReduceIndex {
   implicit def equal: Equal[ReduceIndex] =
-    Equal.equal((a, b) => a.idx ≟ b.idx)
+    Equal.equalBy(_.idx)
 
   implicit def show: Show[ReduceIndex] =
     Show.show {
@@ -197,7 +197,8 @@ object QScriptCore {
         }
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+  // show is needed for debugging
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Normalizable[QScriptCore[T, ?]] =
     new Normalizable[QScriptCore[T, ?]] {
       val opt = new Optimize[T]

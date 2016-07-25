@@ -1,0 +1,1 @@
+-Optimization for Reduce, removing unused fields.

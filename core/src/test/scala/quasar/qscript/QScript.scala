@@ -125,8 +125,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 StrLit("name"))))))).embed.some)
     }
 
-    // TODO: Needs list compaction
-    "convert a basic reduction" in pending {
+    "convert a basic reduction" in {
       QueryFile.convertToQScript(
         agg.Sum[FLP](lpRead("/person"))).toOption must
       equal(
@@ -137,8 +136,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           Free.point(ReduceIndex(0)))).embed.some)
     }
 
-    // TODO: Needs list compaction, and simplification of join with Map
-    "convert a basic reduction wrapped in an object" in pending {
+    "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
       QueryFile.convertToQScript(
         makeObj(
@@ -224,14 +222,14 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 StrLit("loc"))))),
             Free.roll(Multiply(Free.point(RightSide), IntLit(10))))).embed,
           HoleF,
-          Sized[List](ReduceFuncs.UnshiftArray(HoleF[Fix])),
-          Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], Fin[nat._1]]](
-            StrLit[Fix, Fin[nat._1]]("0"),
-            Free.point(Fin[nat._0, nat._1]))))).embed.some)
+          List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
+          Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
+            StrLit[Fix, ReduceIndex]("0"),
+            Free.point(ReduceIndex(0)))))).embed.some)
     }
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
-    "convert" in pending {
+    "convert magical query" in pending {
       // "select * from person, car",
       QueryFile.convertToQScript(
         LogicalPlan.Let('__tmp0,

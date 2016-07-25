@@ -89,7 +89,7 @@ object ThetaJoin {
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Normalizable[ThetaJoin[T, ?]] =
     new Normalizable[ThetaJoin[T, ?]] {
       val opt = new Optimize[T]

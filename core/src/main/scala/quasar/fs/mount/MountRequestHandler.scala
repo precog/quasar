@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
   * @tparam F the base effect that `FileSystem` operations are translated into
   * @tparam S the composite effect, supporting the base and hierarchical effects
   */
-final class EvaluatorMounter[F[_], S[_]](
+final class MountRequestHandler[F[_], S[_]](
   fsDef: FileSystemDef[F]
 )(implicit
   S0: F :<: S,
@@ -82,7 +82,7 @@ final class EvaluatorMounter[F[_], S[_]](
 
   ////
 
-  private val fsm = FileSystemMounter[F](fsDef)
+  private val fsm = FileSystemMountHandler[F](fsDef)
   private val fsDir = mountFileSystem composeLens Field1.first
 
   /** Builds the hierarchical interpreter from the currently mounted filesystems,
@@ -114,13 +114,13 @@ final class EvaluatorMounter[F[_], S[_]](
     } yield ()
 }
 
-object EvaluatorMounter {
+object MountRequestHandler {
   def apply[F[_], S[_]](
     fsDef: FileSystemDef[F]
   )(implicit
     S0: F :<: S,
     S1: MountedResultH :<: S,
     S2: MonotonicSeq :<: S
-  ): EvaluatorMounter[F, S] =
-    new EvaluatorMounter[F, S](fsDef)
+  ): MountRequestHandler[F, S] =
+    new MountRequestHandler[F, S](fsDef)
 }

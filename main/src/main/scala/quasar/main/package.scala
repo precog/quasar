@@ -222,7 +222,7 @@ package object main {
   /** Provides the mount handlers to update the hierarchical
     * filesystem whenever a mount is added or removed.
     */
-  val mountHandler = EvaluatorMounter[PhysFsEffM, HierarchicalFsEff](physicalFileSystems)
+  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](physicalFileSystems)
   import mountHandler.HierarchicalFsRef
 
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]

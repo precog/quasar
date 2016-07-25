@@ -27,7 +27,7 @@ import monocle.std.tuple2._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class FileSystemMounterSpec extends quasar.QuasarSpecification {
+class FileSystemMountHandlerSpec extends quasar.QuasarSpecification {
   import FileSystemDef._
 
   type Abort[A]  = Failure[String, A]
@@ -89,13 +89,13 @@ class FileSystemMounterSpec extends quasar.QuasarSpecification {
     PathError.invalidPath  composeLens
     Field1.first
 
-  val fsMounter = FileSystemMounter(fsDef)
+  val fsMounter = FileSystemMountHandler(fsDef)
   val testType = FileSystemType("test")
   val testUri = ConnectionUri("https://test.example.com")
   def mount(d: ADir) = fsMounter.mount[Eff](d, testType, testUri)
   val unmount = fsMounter.unmount[Eff] _
 
-  "FileSystemMounter" should {
+  "FileSystemMountHandler" should {
     "mounting" >> {
       "fails when mounting above an exsiting mount" >> {
         val d1 = rootDir </> dir("foo")
@@ -118,7 +118,7 @@ class FileSystemMounterSpec extends quasar.QuasarSpecification {
       "fails when filesystem creation fails" >> {
         val d = rootDir </> dir("create") </> dir("fails")
         val fsd = Monoid[FileSystemDef[AbortM]].zero
-        val fsm = FileSystemMounter(fsd)
+        val fsm = FileSystemMountHandler(fsd)
 
         eval(Mounts.empty)(fsm.mount[Eff](d, testType, testUri))._2 must beLike {
           case \/-(-\/(MountingError.InvalidConfig(_, _))) => ok

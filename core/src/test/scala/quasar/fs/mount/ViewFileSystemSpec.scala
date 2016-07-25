@@ -35,7 +35,7 @@ import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
+class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch

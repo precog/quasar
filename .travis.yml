@@ -1,6 +1,5 @@
 language: scala
-scala:
-- 2.11.7
+scala: 2.11.8 # but this setting isn't used when there's an explicit script
 jdk: oraclejdk8
 sudo: false
 script:
@@ -17,6 +16,16 @@ notifications:
       %{build_url}"
   slack:
     secure: KPCXtCAjtlpRQcH7TQtprrf67yIqPVpht9L6/+wbbNd14Tj3x53fiZ3OTabHVx3SL2ZWxbWq+FJGxdIFMyxC/fC0bV9flB7PlRtqHJV1Q7g49odAMAZL7syWr7vFP5bJt+TXuxHvMBihDHFk1Cehy4a1cnrOMReDgqGIFCwQtbI=
+
+cache:
+  directories:
+  - $HOME/.ivy2/cache
+  - $HOME/.sbt
+
+before_cache:
+- find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
+- find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
+
 env:
   matrix:
   - MONGO_RELEASE=2_6

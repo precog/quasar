@@ -31,16 +31,16 @@ class UriPathCodecSpec extends quasar.QuasarSpecification with ScalaCheck {
   "UriPathCodec" should {
     val codec = UriPathCodec
     "print and parse again should produce same Path" >> {
-      "absolute file" ! prop { path: AFile =>
+      "absolute file" >> prop { path: AFile =>
         codec.parseAbsFile(codec.printPath(path)) must_== Some(path)
       }
-      "relative file" ! prop { path: RFile =>
+      "relative file" >> prop { path: RFile =>
         codec.parseRelFile(codec.printPath(path)) must_== Some(path)
       }
-      "absolute dir" ! prop { path: ADir =>
+      "absolute dir" >> prop { path: ADir =>
         codec.parseAbsDir(codec.printPath(path)) must_== Some(path)
       }
-      "relative dir" ! prop { path: RDir =>
+      "relative dir" >> prop { path: RDir =>
         codec.parseRelDir(codec.printPath(path)) must_== Some(path)
       }
     }

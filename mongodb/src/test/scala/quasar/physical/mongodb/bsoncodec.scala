@@ -43,7 +43,7 @@ class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
       fromData(Data.Id("invalid")) must beLeftDisjunction
     }
 
-    "be isomorphic for preserved values" ! prop { (data: Data) =>
+    "be isomorphic for preserved values" >> prop { (data: Data) =>
       // (fromData >=> toData) == identity, except for values that are known not to be preserved
 
       import Data._
@@ -64,7 +64,7 @@ class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
       }
     }
 
-    "be 'semi'-isomorphic for all Bson values" ! prop { (bson: Bson) =>
+    "be 'semi'-isomorphic for all Bson values" >> prop { (bson: Bson) =>
       // (toData >=> fromData >=> toData) == toData
 
       val data = toData(bson)
@@ -77,7 +77,7 @@ class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
       toData(Bson.MinKey) must_== Data.NA
     }
 
-    "be 'semi'-isomorphic for all Data values" ! prop { (data: Data) =>
+    "be 'semi'-isomorphic for all Data values" >> prop { (data: Data) =>
       // (fromData >=> toData >=> fromData) == fromData
       // Which is to say, every Bson value that results from conversion
       // can be converted to Data and back to Bson, recovering the same
@@ -89,7 +89,7 @@ class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
     }
   }
 
-  "round trip to repr (all Data types)" ! prop { (data: Data) =>
+  "round trip to repr (all Data types)" >> prop { (data: Data) =>
       val v = fromData(data)
       v.isRight ==> {
         val wrapped = v.map(bson => Bson.Doc(ListMap("value" -> bson)))

@@ -32,7 +32,7 @@ class CompileServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
 
   "Compile" should {
 
-    "plan simple query" ! prop { filesystem: SingleFileMemState =>
+    "plan simple query" >> prop { filesystem: SingleFileMemState =>
       // Representation of the directory as a string without the leading slash
       val pathString = printPath(filesystem.file).drop(1)
       get[AJson](compileService)(
@@ -46,7 +46,7 @@ class CompileServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
       )
     }
 
-    "plan query with var" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int) =>
+    "plan query with var" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int) =>
       val pathString = printPath(filesystem.file).drop(1)
       val query = selectAllWithVar(file1(filesystem.filename),varName.value)
       get[AJson](compileService)(

@@ -98,7 +98,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
-        "if file does not exist" ! prop { file: AFile =>
+        "if file does not exist" >> prop { file: AFile =>
           val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
           response.status must_== Status.NotFound
           response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
@@ -112,7 +112,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
         }
         "in correct format" >> {
-          "readable and line delimited json by default" ! prop { filesystem: SingleFileMemState =>
+          "readable and line delimited json by default" >> prop { filesystem: SingleFileMemState =>
             val response = service(filesystem.state)(Request(uri = pathUri(filesystem.file))).unsafePerformSync
             isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
           }
@@ -142,10 +142,10 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                   testProp(jsonPreciseArray)
                 }
               }
-              "csv" ! prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) =>
+              "csv" >> prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) =>
                 test(format, filesystem)
               }
-              "or a more complicated proposition" ! prop { filesystem: SingleFileMemState =>
+              "or a more complicated proposition" >> prop { filesystem: SingleFileMemState =>
                 val request = Request(
                   uri = pathUri(filesystem.file),
                   headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
@@ -153,7 +153,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                 isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
               }
             }
-            "in the request-headers" ! prop { filesystem: SingleFileMemState =>
+            "in the request-headers" >> prop { filesystem: SingleFileMemState =>
               val contentType = JsonContentType(Precise, LineDelimited)
               val request = Request(
                 uri = pathUri(filesystem.file).+?("request-headers", s"""{"Accept": "application/ldjson; mode=precise" }"""))
@@ -162,7 +162,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             }
           }
         }
-        "with gziped encoding when specified" ! prop { filesystem: SingleFileMemState =>
+        "with gziped encoding when specified" >> prop { filesystem: SingleFileMemState =>
           val request = Request(
             uri = pathUri(filesystem.file),
             headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
@@ -170,7 +170,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
           response.status must_== Status.Ok
         }
-        "support disposition" ! prop { filesystem: SingleFileMemState =>
+        "support disposition" >> prop { filesystem: SingleFileMemState =>
           val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
           val request = Request(
             uri = pathUri(filesystem.file),
@@ -179,7 +179,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           response.headers.get(`Content-Disposition`) must_== Some(disposition)
         }
         "support offset and limit" >> {
-          "return expected result if user supplies valid values" ! prop {
+          "return expected result if user supplies valid values" >> prop {
             (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: Int @@ RPositive, format: MessageFormat) =>
               val request = Request(
                 uri = pathUri(filesystem.file).+?("offset", offset.toString).+?("limit", limit.toString),
@@ -188,7 +188,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
               isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
           }
           "return 400 if provided with" >> {
-            "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
+            "a non-positive limit (0 is invalid)" >> prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
               (limit < 1) ==> {
                 val request = Request(
                   uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
@@ -197,14 +197,14 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                   Status.BadRequest withReason "Invalid query parameter.")
               }
             }
-            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
+            "a negative offset" >> prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
               val response = service(InMemState.empty)(request).unsafePerformSync
               response.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Invalid query parameter.")
             }
-            "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
+            "if provided with multiple limits?" >> prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
               val limits = limit1 :: limit2 :: otherLimits
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limits.map(_.shows)))
@@ -212,7 +212,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
               response.status must_== Status.BadRequest
               response.as[Json].unsafePerformSync must_== Json("error" := s"Two limits were provided, only supply one limit")
             }.pendingUntilFixed("SD-1082")
-            "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
+            "if provided with multiple offsets?" >> prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
               (offsets.length >= 2) ==> {
                 val request = Request(
                   uri = pathUri(path).+?("offset", offsets.map(_.shows)).+?("limit", limit.shows))
@@ -223,13 +223,13 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                      // and going against that default behavior would be more work
               }
             }.pendingUntilFixed("SD-1082")
-            "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
+            "an unparsable limit" >> prop { path: AbsFile[Sandboxed] =>
               val request = Request(uri = pathUri(path).+?("limit", "a"))
               val response = service(InMemState.empty)(request).unsafePerformSync
               response.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Invalid query parameter.")
             }
-            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
+            "if provided with both an invalid offset and limit" >> prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
               (limit < 1) ==> {
                 val request = Request(uri = pathUri(path).+?("limit", limit.shows).+?("offset", offset.shows))
                 val response = service(InMemState.empty)(request).unsafePerformSync
@@ -260,7 +260,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           }
         }
       }
-      "download as zipped directory" ! prop { filesystem: NonEmptyDir =>
+      "download as zipped directory" >> prop { filesystem: NonEmptyDir =>
         val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
         val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
         val request = Request(
@@ -284,7 +284,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
       }
       testBoth { method =>
         "fail when media-type is" >> {
-          "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
+          "not supported" >> prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
               method = method).withBody("zip code: 34561 and zip code: 78932").unsafePerformSync
@@ -292,7 +292,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             response.as[ApiError].unsafePerformSync must beApiErrorLike[DecodeFailure](
               MediaTypeMismatch(MediaType.`text/plain`, MessageFormat.supportedMediaTypes))
           }
-          "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
+          "not supplied" >> prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
               method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").unsafePerformSync.replaceAllHeaders(Headers.empty)
@@ -318,7 +318,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             ref.unsafePerformSync must_== emptyMem
           }
           "invalid body" >> {
-            "no body" ! prop { file: AFile =>
+            "no body" >> prop { file: AFile =>
               be400(
                 file,
                 reqBody = "",
@@ -326,7 +326,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                   Status.BadRequest withReason "Request has no body."))
               )
             }.set(minTestsOk = 5) // NB: seems like the parser is slow
-            "invalid JSON" ! prop { file: AFile =>
+            "invalid JSON" >> prop { file: AFile =>
               be400(
                 file,
                 reqBody = "{",
@@ -336,7 +336,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
               )
             }.set(minTestsOk = 5)  // NB: seems like the parser is slow
             "invalid CSV" >> {
-              "empty (no headers)" ! prop { file: AFile =>
+              "empty (no headers)" >> prop { file: AFile =>
                 be400(
                   file,
                   reqBody = "",
@@ -345,7 +345,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                   mediaType = csv
                 )
               }.set(minTestsOk = 5)  // NB: seems like the parser is slow
-              "if broken (after the tenth data line)" ! prop { file: AFile =>
+              "if broken (after the tenth data line)" >> prop { file: AFile =>
                 val brokenBody = "\"a\",\"b\"\n1,2\n3,4\n5,6\n7,8\n9,10\n11,12\n13,14\n15,16\n17,18\n19,20\n\",\n"
                   be400(
                     file,
@@ -358,12 +358,12 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             }
           }
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
-          "if path is invalid (parent directory does not exist)" ! prop { (file: AFile, json: Json) =>
+          "if path is invalid (parent directory does not exist)" >> prop { (file: AFile, json: Json) =>
             Path.depth(file) != 1 ==> {
               be400(file, reqBody = json.spaces4, (_: Json) must_== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
             }
           }.pendingUntilFixed("What do we want here, create it or not?")
-          "produce two errors with partially invalid JSON" ! prop { file: AFile =>
+          "produce two errors with partially invalid JSON" >> prop { file: AFile =>
             val twoErrorJson = """{"a": 1}
                                  |"unmatched
                                  |{"b": 2}
@@ -441,7 +441,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             }
           }
         }
-        "be 500 when error during writing" ! prop {
+        "be 500 when error during writing" >> prop {
           (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
             val destination = rootDir[Sandboxed] </> file1(fileName)
             val request = Request(uri = pathUri(destination), method = method).withBody(body.list.toList)
@@ -481,12 +481,12 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
         }
         ref.unsafePerformSync.contents must_=== expectedNewContents
       }
-      "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
+      "be 400 for missing Destination header" >> prop { path: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(path), method = Method.MOVE)
         val response = service(emptyMem)(request).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
       }
-      "be 404 for missing source file" ! prop { (file: AFile, destFile: AFile) =>
+      "be 404 for missing source file" >> prop { (file: AFile, destFile: AFile) =>
         testMove(
           from = file,
           to = destFile,
@@ -495,7 +495,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
           newState = Unchanged)
       }
-      "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AFile) =>
+      "be 400 if attempting to move a dir into a file" >> prop {(fs: NonEmptyDir, file: AFile) =>
         testMove(
           from = fs.dir,
           to = file,
@@ -507,7 +507,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             "dstPath" := file),
           newState = Unchanged)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
-      "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: ADir) =>
+      "be 400 if attempting to move a file into a dir" >> prop {(fs: SingleFileMemState, dir: ADir) =>
         testMove(
           from = fs.file,
           to = dir,
@@ -519,7 +519,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             "dstPath" := dir),
           newState = Unchanged)
       }
-      "be 201 with file" ! prop {(fs: SingleFileMemState, file: AFile) =>
+      "be 201 with file" >> prop {(fs: SingleFileMemState, file: AFile) =>
         (fs.file ≠ file) ==>
           testMove(
             from = fs.file,
@@ -529,7 +529,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             body = (str: String) => str must_== "",
             newState = Changed(Map(file -> fs.contents)))
       }
-      "be 201 with dir" ! prop {(fs: NonEmptyDir, dir: ADir) =>
+      "be 201 with dir" >> prop {(fs: NonEmptyDir, dir: ADir) =>
         (fs.dir ≠ dir) ==>
           testMove(
             from = fs.dir,
@@ -539,7 +539,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             body = (str: String) => str must_== "",
             newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
-      "be 409 with file to same location" ! prop {(fs: SingleFileMemState) =>
+      "be 409 with file to same location" >> prop {(fs: SingleFileMemState) =>
         testMove(
           from = fs.file,
           to = fs.file,
@@ -548,7 +548,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
           body = (_: ApiError) must beApiErrorLike(pathExists(fs.file)),
           newState = Unchanged)
       }
-      "be 409 with dir to same location" ! prop {(fs: NonEmptyDir) =>
+      "be 409 with dir to same location" >> prop {(fs: NonEmptyDir) =>
         testMove(
           from = fs.dir,
           to = fs.dir,
@@ -562,26 +562,26 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
     }
     "DELETE" >> {
-      "be 204 with existing file" ! prop { filesystem: SingleFileMemState =>
+      "be 204 with existing file" >> prop { filesystem: SingleFileMemState =>
         val request = Request(uri = pathUri(filesystem.file), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
         response.status must_== Status.NoContent
         ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that file
       }
-      "be 204 with existing dir" ! prop { filesystem: NonEmptyDir =>
+      "be 204 with existing dir" >> prop { filesystem: NonEmptyDir =>
         val request = Request(uri = pathUri(filesystem.dir), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
         response.status must_== Status.NoContent
         ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
-      "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
+      "be 404 with missing file" >> prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
         val response = service(emptyMem)(request).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
       }
-      "be 404 with missing dir" ! prop { dir: AbsDir[Sandboxed] =>
+      "be 404 with missing dir" >> prop { dir: AbsDir[Sandboxed] =>
         val request = Request(uri = pathUri(dir), method = Method.DELETE)
         val response = service(emptyMem)(request).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(dir))

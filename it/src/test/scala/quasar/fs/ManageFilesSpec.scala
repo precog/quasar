@@ -259,7 +259,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
         runLogT(run, p).runEither must beRight(anotherDoc)
       }
 
-      "temp file should be generated in hint directory" ! prop { rdir: RDir =>
+      "temp file should be generated in hint directory" >> prop { rdir: RDir =>
         val hintDir = managePrefix </> rdir
 
         runT(run)(manage.tempFile(hintDir))
@@ -267,7 +267,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
           .runEither must beRight(beSome[RFile])
       }
 
-      "temp file should be generated in parent of hint file" ! prop { rfile: RFile =>
+      "temp file should be generated in parent of hint file" >> prop { rfile: RFile =>
         val hintFile = managePrefix </> rfile
         val hintDir  = fileParent(hintFile)
 

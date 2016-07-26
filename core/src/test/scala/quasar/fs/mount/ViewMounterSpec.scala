@@ -253,14 +253,14 @@ class ViewMounterSpec extends quasar.QuasarSpecification with ScalaCheck with Tr
   }
 
   "ls" >> {
-    "be empty" ! prop { (dir: ADir) =>
+    "be empty" >> prop { (dir: ADir) =>
       val vs = Map[APath, MountConfig]()
 
       eval(vs)(ViewMounter.ls[MountConfigs](dir))
         ._2 must beEmpty
     }
 
-    "list view under its parent dir" ! prop { (path: AFile) =>
+    "list view under its parent dir" >> prop { (path: AFile) =>
       val vs = Map[APath, MountConfig](
         path -> MountConfig.viewConfig(viewConfig("select * from `/foo`")))
 
@@ -268,7 +268,7 @@ class ViewMounterSpec extends quasar.QuasarSpecification with ScalaCheck with Tr
         ._2 must_=== Set[PathSegment](fileName(path).right)
     }
 
-    "list view parent under grand-parent dir" ! prop { (dir: ADir) =>
+    "list view parent under grand-parent dir" >> prop { (dir: ADir) =>
       (dir ≠ rootDir) ==> {
         val parent = parentDir(dir).get
         val vs = Map[APath, MountConfig](

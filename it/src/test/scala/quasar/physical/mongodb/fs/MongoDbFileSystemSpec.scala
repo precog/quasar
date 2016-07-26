@@ -99,7 +99,7 @@ class MongoDbFileSystemSpec
         val invalidData = testPrefix.map(_ </> dir("invaliddata"))
                             .liftM[FileSystemErrT]
 
-        "fail with `InvalidData` when attempting to save non-documents" ! prop {
+        "fail with `InvalidData` when attempting to save non-documents" >> prop {
           (data: Data, fname: Int) => isNotObj(data) ==> {
             val path = invalidData map (_ </> file(fname.toHexString))
 

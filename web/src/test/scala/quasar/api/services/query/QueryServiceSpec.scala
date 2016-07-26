@@ -48,7 +48,7 @@ class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture
 
     testBoth { service =>
       "GET" >> {
-        "be 404 for missing directory" ! prop { (dir: ADir, file: AFile) =>
+        "be 404 for missing directory" >> prop { (dir: ADir, file: AFile) =>
           get(service)(
             path = dir,
             query = Some(Query(selectAll(file))),
@@ -58,7 +58,7 @@ class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture
           )
         }.pendingUntilFixed("SD-773")
 
-        "be 400 for missing query" ! prop { filesystem: SingleFileMemState =>
+        "be 400 for missing query" >> prop { filesystem: SingleFileMemState =>
           get(service)(
             path = filesystem.parent,
             query = None,
@@ -69,7 +69,7 @@ class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture
           )
         }
 
-        "be 400 for query error" ! prop { filesystem: SingleFileMemState =>
+        "be 400 for query error" >> prop { filesystem: SingleFileMemState =>
           get(service)(
             path = filesystem.parent,
             query = Some(Query("select date where")),
@@ -86,7 +86,7 @@ class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture
             case _ => None
           }
 
-        "be 400 for bad path (file instead of dir)" ! prop { filesystem: SingleFileMemState =>
+        "be 400 for bad path (file instead of dir)" >> prop { filesystem: SingleFileMemState =>
           filesystem.parent =/= rootDir ==> {
 
             val parentAsFile = asFile(filesystem.parent).get

@@ -126,7 +126,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
 
   "Execute" should {
     "execute a simple query" >> {
-      "GET" ! prop { filesystem: SingleFileMemState =>
+      "GET" >> prop { filesystem: SingleFileMemState =>
         val query = selectAll(file(filesystem.filename.value))
         get(executeService)(
           path = filesystem.parent,
@@ -136,7 +136,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
           response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString("")
         )
       }
-      "POST" ! prop { (filesystem: SingleFileMemState, destination: FPath) => {
+      "POST" >> prop { (filesystem: SingleFileMemState, destination: FPath) => {
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
         post[AJson](fileSystem)(
           path = filesystem.parent,
@@ -157,7 +157,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
       }
-      "GET" ! prop { (
+      "GET" >> prop { (
         filesystem: SingleFileMemState,
         varName: AlphaCharacters,
         var_ : Int,
@@ -190,7 +190,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
               jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync
                 .drop(offset.get).take(limit.get).mkString(""))
       }
-      "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
+      "POST" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
         post[AJson](fileSystem)(
@@ -206,7 +206,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
       }
     }
     "POST (error conditions)" >> {
-      "be 404 for missing directory" ! prop { (dir: ADir, destination: AFile, filename: FileName) =>
+      "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
         post[String](fileSystem)(
           path = dir,
           query = Some(Query(selectAll(file(filename.value)))),
@@ -216,7 +216,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
           response = _ must_== "???"
         )
       }.pendingUntilFixed("SD-773")
-      "be 400 with missing query" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
+      "be 400 with missing query" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
           path = filesystem.parent,
           query = None,
@@ -227,7 +227,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
             Status.BadRequest withReason "No SQL^2 query found in message body."))
         )
       }
-      "be 400 with missing Destination header" ! prop { filesystem: SingleFileMemState =>
+      "be 400 with missing Destination header" >> prop { filesystem: SingleFileMemState =>
         post[ApiError](fileSystem)(
           path = filesystem.parent,
           query = Some(Query(selectAll(file(filesystem.filename.value)))),
@@ -237,7 +237,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
           response = _ must beHeaderMissingError("Destination")
         )
       }
-      "be 400 for query error" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
+      "be 400 for query error" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
           path = filesystem.parent,
           query = Some(Query("select date where")),
@@ -248,7 +248,7 @@ class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixtu
             Status.BadRequest withReason "Malformed SQL^2 query.")
         )
       }
-      "be 400 for compile error" ! prop { (fs: SingleFileMemState, dst: AFile) =>
+      "be 400 for compile error" >> prop { (fs: SingleFileMemState, dst: AFile) =>
         val q = "select sum(1, 2, 3, 4)"
 
         val err: SemanticError =

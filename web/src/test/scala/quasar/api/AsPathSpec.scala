@@ -28,13 +28,13 @@ import org.http4s.dsl.{Path => HPath}
 class AsPathSpec extends quasar.QuasarSpecification with ScalaCheck with PathUtils {
   "AsPath" should {
     "decode any Path we can throw at it" >> {
-      "AbsFile" ! prop { file: AFile =>
+      "AbsFile" >> prop { file: AFile =>
         !hasDot(file) ==> {
           val httpPath = HPath(UriPathCodec.printPath(file))
           AsFilePath.unapply(httpPath) must_== Some(file)
         }
       }
-      "AbsDir" ! prop { dir : ADir =>
+      "AbsDir" >> prop { dir : ADir =>
         !hasDot(dir) ==> {
           val httpPath = HPath(UriPathCodec.printPath(dir))
           AsDirPath.unapply(httpPath) must_== Some(dir)

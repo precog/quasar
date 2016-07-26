@@ -432,7 +432,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
     def twoNodes(aDir: ADir) =
       Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
 
-    "preserve files and dirs in the presence of non-conflicting views" ! prop { (aDir: ADir) =>
+    "preserve files and dirs in the presence of non-conflicting views" >> prop { (aDir: ADir) =>
       val expr = parseExpr("select * from zips")
 
       val views = Map(
@@ -451,7 +451,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
           DirName("views").left)))
     }
 
-    "overlay files and dirs with conflicting paths" ! prop { (aDir: ADir) =>
+    "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
       val expr = parseExpr("select * from zips")
 
       val views = Map(
@@ -468,7 +468,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
           DirName("adir").left)))  // no conflict with same dir
     }
 
-    "preserve empty dir result" ! prop { (aDir: ADir) =>
+    "preserve empty dir result" >> prop { (aDir: ADir) =>
       val views = Map[AFile, Fix[Sql]]()
 
       val f = query.ls(aDir).run
@@ -479,7 +479,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
         \/-(Set()))
     }
 
-    "preserve error for non-existent dir" ! prop { (aDir: ADir) =>
+    "preserve error for non-existent dir" >> prop { (aDir: ADir) =>
       (aDir =/= rootDir) ==> {
         val views = Map[AFile, Fix[Sql]]()
 
@@ -505,7 +505,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
   }
 
   "QueryFile.fileExists" should {
-    "behave as underlying interpreter" ! prop { file: AFile =>
+    "behave as underlying interpreter" >> prop { file: AFile =>
       val program = query.fileExists(file)
 
       val ops = traceInterp(program, Map())._1
@@ -520,7 +520,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
       hasFile and noFile
     }
 
-    "return true if there is a view at that path" ! prop { (file: AFile, expr: Fix[Sql]) =>
+    "return true if there is a view at that path" >> prop { (file: AFile, expr: Fix[Sql]) =>
       val views = Map(file -> expr)
 
       val program = query.fileExists(file)

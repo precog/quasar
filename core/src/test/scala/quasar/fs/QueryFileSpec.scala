@@ -42,7 +42,7 @@ class QueryFileSpec
 
   "QueryFile" should {
     "descendantFiles" >> {
-      "returns all descendants of the given directory" ! prop {
+      "returns all descendants of the given directory" >> prop {
         (target: ADir, descendants: NonEmptyList[RFile], others: List[AFile]) =>
           val data = Vector(Data.Str("foo"))
           val outsideOfTarget = others.filterNot(_.relativeTo(target).isDefined)
@@ -56,24 +56,24 @@ class QueryFileSpec
       }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
-      "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
+      "returns not found when dir does not exist" >> prop { d: ADir => (d =/= rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
           .toEither must beLeft(pathErr(pathNotFound(d)))
       }}
     }
 
     "fileExists" >> {
-      "return true when file exists" ! prop { s: SingleFileMemState =>
+      "return true when file exists" >> prop { s: SingleFileMemState =>
         Mem.interpret(query.fileExists(s.file)).eval(s.state) ==== true
       }
 
-      "return false when file doesn't exist" ! prop { (absentFile: AFile, s: SingleFileMemState) =>
+      "return false when file doesn't exist" >> prop { (absentFile: AFile, s: SingleFileMemState) =>
         absentFile ≠ s.file ==> {
           Mem.interpret(query.fileExists(absentFile)).eval(s.state) ==== false
         }
       }
 
-      "return false when dir exists with same name as file" ! prop { (f: AFile, data: Vector[Data]) =>
+      "return false when dir exists with same name as file" >> prop { (f: AFile, data: Vector[Data]) =>
         val n = fileName(f)
         val fd = parentDir(f).get </> dir(n.value) </> file("different.txt")
 
@@ -82,7 +82,7 @@ class QueryFileSpec
     }
 
     "evaluate" >> {
-      "streams the results of evaluating the logical plan" ! prop { s: SingleFileMemState =>
+      "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
         val query = LogicalPlan.Read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.runLog[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
@@ -91,7 +91,7 @@ class QueryFileSpec
     }
 
     "enumerate" >> {
-      "streams results until an empty vector is received" ! prop {
+      "streams results until an empty vector is received" >> prop {
         s: SingleFileMemState =>
 
         val query = LogicalPlan.Read(s.file)
@@ -103,7 +103,7 @@ class QueryFileSpec
           .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents)))
       }
 
-      "closes result handle when terminated early" ! prop {
+      "closes result handle when terminated early" >> prop {
         s: SingleFileMemState =>
 
         val n = s.contents.length / 2

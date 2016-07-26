@@ -28,7 +28,7 @@ class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileS
   import DataArbitrary._, FileSystemError._, PathError._
 
   "ReadFile" should {
-    "scan should read data until an empty vector is received" ! prop {
+    "scan should read data until an empty vector is received" >> prop {
       (f: AFile, xs: Vector[Data]) =>
 
       val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
@@ -36,7 +36,7 @@ class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileS
       MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(xs)
     }
 
-    "scan should automatically close the read handle when terminated early" ! prop {
+    "scan should automatically close the read handle when terminated early" >> prop {
       (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
         val n = xs.length / 2
         val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f).take(n)
@@ -46,7 +46,7 @@ class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileS
       }
     }
 
-    "scan should automatically close the read handle on failure" ! prop {
+    "scan should automatically close the read handle on failure" >> prop {
       (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
         val reads = List(xs.right, pathErr(pathNotFound(f)).left)
 

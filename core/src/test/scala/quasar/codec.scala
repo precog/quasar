@@ -78,7 +78,7 @@ class DataCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("""{ "$na": null }""") }
     }
 
-    "round-trip" ! prop { (data: Data) =>
+    "round-trip" >> prop { (data: Data) =>
       representable(data) ==> {
         DataCodec.render(data).flatMap(DataCodec.parse) must beRightDisjunction(data)
       }
@@ -156,7 +156,7 @@ class DataCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("null") }
     }
 
-    "round-trip" ! prop { (data: Data) =>
+    "round-trip" >> prop { (data: Data) =>
       representable(data) ==> {
         DataCodec.render(data).flatMap(DataCodec.parse) must beRightDisjunction(data)
       }
@@ -209,7 +209,7 @@ class DataCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with Dis
   }
 
   "Error messages" should {
-    "UnrepresentableDataError" ! prop { any: Data =>
+    "UnrepresentableDataError" >> prop { any: Data =>
       UnrepresentableDataError(any).message must_= ("not representable: " + any)
     }
     "UnescapedKeyError" in {

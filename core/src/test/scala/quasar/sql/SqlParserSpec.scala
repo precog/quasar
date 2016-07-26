@@ -549,7 +549,7 @@ class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with Disj
       }.pendingUntilFixed("SD-1536")
     }
 
-    "round-trip to SQL and back" ! prop { (node: Fix[Sql]) =>
+    "round-trip to SQL and back" >> prop { (node: Fix[Sql]) =>
       val parsed = parse(pprint(node))
 
       parsed.fold(

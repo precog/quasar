@@ -66,7 +66,7 @@ class SetSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitr
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
-    "maintain first type for constantly" ! prop { (t1 : Type, t2 : Type) =>
+    "maintain first type for constantly" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Constantly.tpe(Func.Input2(t1, t2))
       (t1, t2) match {
         case (Const(r), Const(Data.Set(l))) =>

@@ -54,7 +54,7 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
   }
 
   "encoding" should {
-    "round-trip any well-formed config" ! prop { (cfg: CoreConfig) =>
+    "round-trip any well-formed config" >> prop { (cfg: CoreConfig) =>
       val json = CoreConfig.codec.encode(cfg)
       val cfg2 = CoreConfig.codec.decode(json.hcursor)
       cfg2.result must beRight(cfg)

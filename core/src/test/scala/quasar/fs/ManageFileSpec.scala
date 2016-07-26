@@ -29,7 +29,7 @@ class ManageFileSpec extends quasar.QuasarSpecification with ScalaCheck with Fil
 
   "ManageFile" should {
     "renameFile" >> {
-      "moves the existing file to a new name in the same directory" ! prop {
+      "moves the existing file to a new name in the same directory" >> prop {
         (s: SingleFileMemState, name: String) => {
           val rename =
             manage.renameFile(s.file, name).liftM[Process]

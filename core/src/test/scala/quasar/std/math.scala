@@ -85,12 +85,12 @@ class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbit
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
-    "eliminate multiply by dec zero (on the right)" ! prop { (c : Const) =>
+    "eliminate multiply by dec zero (on the right)" >> prop { (c : Const) =>
       val expr = Multiply.tpe(Func.Input2(c, Const(Dec(0.0))))
       expr should beSuccessful(TZero())
     }
 
-    "eliminate multiply by zero (on the left)" ! prop { (c : Const) =>
+    "eliminate multiply by zero (on the left)" >> prop { (c : Const) =>
       val expr = Multiply.tpe(Func.Input2(TZero(), c))
       expr should beSuccessful(TZero())
     }
@@ -155,16 +155,16 @@ class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbit
       expr must beFailing
     }
 
-    "typecheck number raised to 0th power" ! prop { (t: Type) =>
+    "typecheck number raised to 0th power" >> prop { (t: Type) =>
       Power.tpe(Func.Input2(t, TZero())) should beSuccessful(TOne())
     }.setArbitrary(arbitraryNumeric)
 
-    "typecheck 0 raised to any (non-zero) power" ! prop { (t: Type) =>
+    "typecheck 0 raised to any (non-zero) power" >> prop { (t: Type) =>
       (t != TZero()) ==>
         (Power.tpe(Func.Input2(TZero(), t)) should beSuccessful(TZero()))
     }.setArbitrary(arbitraryNumeric)
 
-    "typecheck any number raised to 1st power" ! prop { (t: Type) =>
+    "typecheck any number raised to 1st power" >> prop { (t: Type) =>
       Power.tpe(Func.Input2(t, TOne())) should beSuccessful(t)
     }.setArbitrary(arbitraryNumeric)
 

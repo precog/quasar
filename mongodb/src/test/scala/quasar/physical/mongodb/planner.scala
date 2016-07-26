@@ -3387,7 +3387,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     args.report(showtimes = true)
 
-    "plan multiple reducing projections (all, distinct, orderBy)" ! Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
+    "plan multiple reducing projections (all, distinct, orderBy)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3420,7 +3420,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       }
     }
 
-    "plan multiple reducing projections (all, distinct)" ! Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (all, distinct)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3435,7 +3435,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       }
     }.set(maxSize = 10)
 
-    "plan multiple reducing projections (all)" ! Prop.forAll(select(notDistinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (all)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3451,7 +3451,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }.set(maxSize = 10)
 
     // NB: tighter constraint because we know there's no filter.
-    "plan multiple reducing projections (no filter)" ! Prop.forAll(select(notDistinct, maybeReducingExpr, noFilter, Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (no filter)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, noFilter, Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)

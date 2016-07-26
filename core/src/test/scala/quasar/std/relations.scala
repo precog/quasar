@@ -38,7 +38,7 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
 
   "RelationsLib" should {
 
-    "type eq with matching arguments" ! prop { (t : Type) =>
+    "type eq with matching arguments" >> prop { (t : Type) =>
       val expr = Eq.tpe(Func.Input2(t, t))
       t match {
         case Const(_) => expr should beSuccessful(Const(Bool(true)))
@@ -61,12 +61,12 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       expr should beSuccessful(Const(Bool(false)))
     }
 
-    "type Eq with Top" ! prop { (t : Type) =>
+    "type Eq with Top" >> prop { (t : Type) =>
       Eq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
       Eq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
     }
 
-    "type Neq with Top" ! prop { (t : Type) =>
+    "type Neq with Top" >> prop { (t : Type) =>
       Neq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
       Neq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
     }
@@ -78,12 +78,12 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
 
     // TODO: similar for the rest of the simple relations
 
-    "fold cond with true" ! prop { (t1 : Type, t2 : Type) =>
+    "fold cond with true" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Const(Bool(true)), t1, t2))
       expr must beSuccessful(t1)
     }
 
-    "fold cond with false" ! prop { (t1 : Type, t2 : Type) =>
+    "fold cond with false" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Const(Bool(false)), t1, t2))
       expr must beSuccessful(t2)
     }
@@ -93,12 +93,12 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       expr must beSuccessful(Type.Int)
     }
 
-    "find lub for cond with arbitrary args" ! prop { (t1 : Type, t2 : Type) =>
+    "find lub for cond with arbitrary args" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Type.Bool, t1, t2))
       expr must beSuccessful(Type.lub(t1, t2))
     }
 
-    "fold coalesce with right null type" ! prop { (t1 : Type) =>
+    "fold coalesce with right null type" >> prop { (t1 : Type) =>
       val expr = Coalesce.tpe(Func.Input2(t1, Type.Null))
       expr must beSuccessful(t1 match {
         case Const(Null) => Type.Null
@@ -106,12 +106,12 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       })
     }
 
-    "fold coalesce with left null type" ! prop { (t2 : Type) =>
+    "fold coalesce with left null type" >> prop { (t2 : Type) =>
       val expr = Coalesce.tpe(Func.Input2(Type.Null, t2))
       expr must beSuccessful(t2)
     }
 
-    "fold coalesce with right null value" ! prop { (t1 : Type) =>
+    "fold coalesce with right null value" >> prop { (t1 : Type) =>
       val expr = Coalesce.tpe(Func.Input2(t1, Const(Null)))
       expr must beSuccessful(t1 match {
         case Type.Null => Const(Null)
@@ -119,12 +119,12 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       })
     }
 
-    "fold coalesce with left null value" ! prop { (t2 : Type) =>
+    "fold coalesce with left null value" >> prop { (t2 : Type) =>
       val expr = Coalesce.tpe(Func.Input2(Const(Null), t2))
       expr must beSuccessful(t2)
     }
 
-    "fold coalesce with left value" ! prop { (t2 : Type) =>
+    "fold coalesce with left value" >> prop { (t2 : Type) =>
       val expr = Coalesce.tpe(Func.Input2(Const(Int(3)), t2))
       expr must beSuccessful(Const(Int(3)))
     }
@@ -134,7 +134,7 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       expr must beSuccessful(Type.Int)
     }
 
-    "find lub for coalesce with arbitrary args" ! prop { (t1: Type, t2: Type) =>
+    "find lub for coalesce with arbitrary args" >> prop { (t1: Type, t2: Type) =>
       val expr = Coalesce.tpe(Func.Input2(t1, t2))
       if (t1 == Type.Null || t1 == Const(Null))
         expr must beSuccessful(t2)

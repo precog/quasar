@@ -93,7 +93,7 @@ class ZipSpecs extends quasar.QuasarSpecification with ScalaCheck with ScalazMat
       unzip(read)(p)
     }
 
-    "zip files of constant bytes" ! prop { (filesAndSize: Map[RelFile[Sandboxed], Positive], byte: Byte) =>
+    "zip files of constant bytes" >> prop { (filesAndSize: Map[RelFile[Sandboxed], Positive], byte: Byte) =>
       def byteStream(size: Positive): Process[Task, ByteVector] =
         Process.emit(ByteVector.view(Array.fill(size.toInt)(byte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
@@ -101,7 +101,7 @@ class ZipSpecs extends quasar.QuasarSpecification with ScalaCheck with ScalazMat
       counts(z).unsafePerformSync must_== filesAndSize.toList
     }.set(minTestsOk = 10) // This test is relatively slow
 
-    "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
+    "zip files of random bytes" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       def byteStream(size: Positive): Process[Task, ByteVector] =
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
@@ -137,7 +137,7 @@ class ZipSpecs extends quasar.QuasarSpecification with ScalaCheck with ScalazMat
       z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
-    "read twice without conflict" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
+    "read twice without conflict" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       def byteStream(size: Positive): Process[Task, ByteVector] =
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)

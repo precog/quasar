@@ -226,7 +226,7 @@ class PrettifySpecs extends quasar.QuasarSpecification with ScalaCheck with Disj
       case _              => true
     }
 
-    "round-trip all representable values" ! prop { (data: Data) =>
+    "round-trip all representable values" >> prop { (data: Data) =>
       representable(data) ==> {
         val r = render(data).value
         parse(r) must beSome(data)
@@ -239,7 +239,7 @@ class PrettifySpecs extends quasar.QuasarSpecification with ScalaCheck with Disj
       case _ => true
     }
 
-    "round-trip all flat rendered values that aren't \"\"" ! prop { (data: Data) =>
+    "round-trip all flat rendered values that aren't \"\"" >> prop { (data: Data) =>
       val r = render(data).value
       (isFlat(data) && r != "") ==> {
         parse(r).map(render(_).value) must beSome(r)

@@ -120,7 +120,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
-      "scan with offset k > 0 and no limit skips first k data" ! prop { k: Int Refined RPositive =>
+      "scan with offset k > 0 and no limit skips first k data" >> prop { k: Int Refined RPositive =>
         val r = runLogT(run, read.scan(smallFile.file, widenPositive(k), None))
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
                   .dropWhile(_._2 < k.get).map(_._1)
@@ -128,14 +128,14 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight(d.toList)
       }.set(minTestsOk = 10)
 
-      "scan with offset zero and limit j stops after j data" ! prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
+      "scan with offset zero and limit j stops after j data" >> prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
         val limit = Positive(j.get.toLong).get // Not ideal, but simplest solution for now
         val r = runLogT(run, read.scan(smallFile.file, 0L, Some(limit)))
 
         r.runEither must beRight(smallFile.data.take(j.get).toList)
       }.set(minTestsOk = 10)
 
-      "scan with offset k and limit j takes j data, starting from k" ! Prop.forAll(
+      "scan with offset k and limit j takes j data, starting from k" >> Prop.forAll(
         chooseRefinedNum[Refined, Int, RPositive](1, 200),
         chooseRefinedNum[Refined, Int, NonNegative](0, 200)
       ) { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
@@ -147,7 +147,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight(d.toList)
       }.set(minTestsOk = 5)
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[SmallFileSize] =>
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> prop { j: Int Refined Greater[SmallFileSize] =>
           val limit = Some(Positive(j.get.toLong).get) // Not ideal, but simplest solution for now
           val r = runLogT(run, read.scan(smallFile.file, 0L, limit))
 

@@ -128,7 +128,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
         beRightDisjunction
     }
 
-    "never emit an invalid db name" ! prop { (db: SpecialStr, c: SpecialStr) =>
+    "never emit an invalid db name" >> prop { (db: SpecialStr, c: SpecialStr) =>
       val f = rootDir </> dir(db.str) </> file(c.str)
       val notTooLong = posixCodec.printPath(f).length < 30
       // NB: as long as the path is not too long, it should convert to something that's legal
@@ -141,7 +141,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
       }
     }.set(maxSize = 5)
 
-    "round-trip" ! prop { f: AbsFileOf[SpecialStr] =>
+    "round-trip" >> prop { f: AbsFileOf[SpecialStr] =>
       // NB: the path might be too long to convert
       val r = Collection.fromFile(f.path)
       (r.isRight) ==> {
@@ -224,7 +224,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
     }
   }
 
-  "dbName <-> dirName are inverses" ! prop { db: SpecialStr =>
+  "dbName <-> dirName are inverses" >> prop { db: SpecialStr =>
     val name = Collection.dbNameFromPath(rootDir </> dir(db.str))
     // NB: can fail if the path has enough multi-byte chars to exceed 64 bytes
     name.isRight ==> {

@@ -95,19 +95,19 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
     }
 
     // Properties:
-    "succeed with same arbitrary type" ! prop { (t: Type) =>
+    "succeed with same arbitrary type" >> prop { (t: Type) =>
       typecheck(t, t).toOption should beSome
     }
 
-    "succeed with Top/arbitrary type" ! prop { (t: Type) =>
+    "succeed with Top/arbitrary type" >> prop { (t: Type) =>
       typecheck(Top, t).toOption should beSome
     }
 
-    "succeed with widening of product" ! prop { (t1: Type, t2: Type) =>
+    "succeed with widening of product" >> prop { (t1: Type, t2: Type) =>
       typecheck(t1, t1 ⨯ t2).toOption should beSome
     }.setArbitrary1(arbitrarySimpleType).setArbitrary2(arbitrarySimpleType)
 
-    "fail with narrowing to product" ! prop { (t1: Type, t2: Type) =>
+    "fail with narrowing to product" >> prop { (t1: Type, t2: Type) =>
       // Note: using only non-product/coproduct input types here because otherwise this test
       // rejects many large inputs and the test is very slow.
       typecheck(t2, t1).isFailure ==> {
@@ -115,11 +115,11 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       }
     }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
-    "succeed with widening to coproduct" ! prop { (t1: Type, t2: Type) =>
+    "succeed with widening to coproduct" >> prop { (t1: Type, t2: Type) =>
       typecheck(t1 ⨿ t2, t1).toOption should beSome
     }.setArbitrary1(arbitrarySimpleType).setArbitrary2(arbitrarySimpleType)
 
-    "fail with narrowing from coproduct" ! prop { (t1: Type, t2: Type) =>
+    "fail with narrowing from coproduct" >> prop { (t1: Type, t2: Type) =>
       // Note: using only non-product/coproduct input types here because otherwise this test
       // rejects many large inputs and the test is very slow.
       typecheck(t1, t2).isFailure ==> {
@@ -127,43 +127,43 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       }
     }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
-    "match under Obj with matching field name" ! prop { (t1: Type, t2: Type) =>
+    "match under Obj with matching field name" >> prop { (t1: Type, t2: Type) =>
       typecheck(Obj(Map("a" -> t1), None), Obj(Map("a" -> t2), None)) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "fail under Obj with non-matching field name and arbitrary types" ! prop { (t1: Type, t2: Type) =>
+    "fail under Obj with non-matching field name and arbitrary types" >> prop { (t1: Type, t2: Type) =>
       typecheck(Obj(Map("a" -> t1), None), Obj(Map("b" -> t2), None)).toOption should beNone
     }
 
-    "match unknowns under Obj" ! prop { (t1: Type, t2: Type) =>
+    "match unknowns under Obj" >> prop { (t1: Type, t2: Type) =>
       typecheck(Obj(Map(), Some(t1)), Obj(Map(), Some(t2))) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "match under unknown/known Objs" ! prop { (t1: Type, t2: Type) =>
+    "match under unknown/known Objs" >> prop { (t1: Type, t2: Type) =>
       typecheck(Obj(Map(), Some(t1)), Obj(Map("a" -> t2), None)) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "match under Arr with matching index" ! prop { (t1: Type, t2: Type) =>
+    "match under Arr with matching index" >> prop { (t1: Type, t2: Type) =>
       typecheck(Arr(List(t1)), Arr(List(t2))) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "match under FlexArr" ! prop { (t1: Type, t2: Type) =>
+    "match under FlexArr" >> prop { (t1: Type, t2: Type) =>
       typecheck(FlexArr(0, None, t1), FlexArr(0, None, t2)) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "match under FlexArr/Arr" ! prop { (t1: Type, t2: Type) =>
+    "match under FlexArr/Arr" >> prop { (t1: Type, t2: Type) =>
       typecheck(FlexArr(0, None, t1), Arr(List(t2))) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
   }
 
   "objectField" should {
-    "reject arbitrary simple type" ! prop { (t: Type) =>
+    "reject arbitrary simple type" >> prop { (t: Type) =>
       t.objectField(const("a")).toOption should beNone
     }.setArbitrary(arbitrarySimpleType)
 
@@ -226,11 +226,11 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   }
 
   "children" should {
-    "be Nil for arbitrary simple type" ! prop { (t: Type) =>
+    "be Nil for arbitrary simple type" >> prop { (t: Type) =>
       children(t) should_== Nil
     }.setArbitrary(arbitraryTerminal)
 
-    "be list of one for arbitrary const type" ! prop { (t: Type) =>
+    "be list of one for arbitrary const type" >> prop { (t: Type) =>
       children(t).length should_== 1
     }.setArbitrary(arbitraryConst)
 
@@ -293,7 +293,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   "mapUp" should {
     val idp: PartialFunction[Type, Type] = { case t => t }
 
-    "preserve arbitrary types" ! prop { (t: Type) =>
+    "preserve arbitrary types" >> prop { (t: Type) =>
       mapUp(t)(idp) should_== t
     }
 
@@ -329,7 +329,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   "mapUpM" should {
     import scalaz.Id._
 
-    "preserve arbitrary types" ! prop { (t: Type) =>
+    "preserve arbitrary types" >> prop { (t: Type) =>
       mapUpM[Id](t)(ι) should_== t
     }
 
@@ -385,7 +385,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   }
 
   "product" should {
-    "have order-independent equality for arbitrary types" ! prop { (t1: Type, t2: Type) =>
+    "have order-independent equality for arbitrary types" >> prop { (t1: Type, t2: Type) =>
       (t1 ⨯ t2) must_= (t2 ⨯ t1)
     }
   }
@@ -395,7 +395,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       (Int ⨿ Str) must_= (Str ⨿ Int)
     }
 
-    "have order-independent equality for arbitrary types" ! prop { (t1: Type, t2: Type) =>
+    "have order-independent equality for arbitrary types" >> prop { (t1: Type, t2: Type) =>
       (t1 ⨿ t2) must_= (t2 ⨿ t1)
     }
 
@@ -437,7 +437,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
 
   "type" should {
     // Properties:
-    "have t == t for arbitrary type" ! prop { (t: Type) =>
+    "have t == t for arbitrary type" >> prop { (t: Type) =>
       t must_= t
     }
 
@@ -483,28 +483,28 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
 
 
     // Properties for product:
-    "simplify t ⨯ t to t" ! prop { (t: Type) =>
+    "simplify t ⨯ t to t" >> prop { (t: Type) =>
       simplify(t ⨯ t) must_= simplify(t)
     }
 
-    "simplify Top ⨯ t to t" ! prop { (t: Type) =>
+    "simplify Top ⨯ t to t" >> prop { (t: Type) =>
       simplify(Top ⨯ t) must_= simplify(t)
     }
 
-    "simplify Bottom ⨯ t to Bottom" ! prop { (t: Type) =>
+    "simplify Bottom ⨯ t to Bottom" >> prop { (t: Type) =>
       simplify(Bottom ⨯ t) must_= Bottom
     }
 
     // Properties for coproduct:
-    "simplify t ⨿ t to t" ! prop { (t: Type) =>
+    "simplify t ⨿ t to t" >> prop { (t: Type) =>
       simplify(t ⨿ t) must_= simplify(t)
     }
 
-    "simplify Top ⨿ t to Top" ! prop { (t: Type) =>
+    "simplify Top ⨿ t to Top" >> prop { (t: Type) =>
       simplify(Top ⨿ t) must_= Top
     }
 
-    "simplify Bottom ⨿ t to t" ! prop { (t: Type) =>
+    "simplify Bottom ⨿ t to t" >> prop { (t: Type) =>
       simplify(Bottom ⨿ t) must_= simplify(t)
     }
 
@@ -570,35 +570,35 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       glb(Str, Const(Data.Str("a"))) should_== Const(Data.Str("a"))
     }
 
-    "lub with Top" ! prop { (t: Type) =>
+    "lub with Top" >> prop { (t: Type) =>
       lub(t, Top) should_== Top
     }
 
-    "lub with Bottom" ! prop { (t: Type) =>
+    "lub with Bottom" >> prop { (t: Type) =>
       lub(t, Bottom) should_== t
     }
 
-    "lub symmetric for nonnested" ! prop { (t1: Type, t2: Type) =>
+    "lub symmetric for nonnested" >> prop { (t1: Type, t2: Type) =>
       lub(t1, t2) should_== lub(t2, t1)
     }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
-    "lub symmetric" ! prop { (t1: Type, t2: Type) =>
+    "lub symmetric" >> prop { (t1: Type, t2: Type) =>
       lub(t1, t2) should_== lub(t2, t1)
     }
 
-    "glb with Top" ! prop { (t: Type) =>
+    "glb with Top" >> prop { (t: Type) =>
       glb(t, Top) should_== t
     }
 
-    "glb with Bottom" ! prop { (t: Type) =>
+    "glb with Bottom" >> prop { (t: Type) =>
       glb(t, Bottom) should_== Bottom
     }
 
-    "glb symmetric for non-nested" ! prop { (t1: Type, t2: Type) =>
+    "glb symmetric for non-nested" >> prop { (t1: Type, t2: Type) =>
       glb(t1, t2) should_== glb(t2, t1)
     }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
-    "glb symmetric" ! prop { (t1: Type, t2: Type) =>
+    "glb symmetric" >> prop { (t1: Type, t2: Type) =>
       glb(t1, t2) should_== glb(t2, t1)
     }
 
@@ -648,11 +648,11 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
   }
 
   "arrayElem" should {
-    "fail for non-array type" ! prop { (t: Type) =>
+    "fail for non-array type" >> prop { (t: Type) =>
       t.arrayElem(Const(Data.Int(0))) should beFailing//WithClass[TypeError]
     }.setArbitrary(arbitrarySimpleType)
 
-    "fail for non-int index"  ! prop { (t: Type) =>
+    "fail for non-int index"  >> prop { (t: Type) =>
       // TODO: this occasionally get stuck... maybe lub() is diverging?
       lub(t, Int) != Int ==> {
         val arr = Const(Data.Arr(Nil))
@@ -733,7 +733,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       (typJson(Id)        must_= jString("Id"))
     }
 
-    "encode constant types as their data encoding" ! prop { data: Data =>
+    "encode constant types as their data encoding" >> prop { data: Data =>
       val exp = DataCodec.Precise.encode(data)
       exp.isRight ==> {
         (Right(typJson(Const(data))): scala.Either[DataEncodingError, Json]) must_===
@@ -741,11 +741,11 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
       }
     }
 
-    "encode arrays as an array of types" ! prop { types: List[Type] =>
+    "encode arrays as an array of types" >> prop { types: List[Type] =>
       typJson(Arr(types)) must_= Json("Array" := types)
     }
 
-    "encode flex arrays as components" ! prop { (min: Int, max: Option[Int], mbr: Type) =>
+    "encode flex arrays as components" >> prop { (min: Int, max: Option[Int], mbr: Type) =>
       typJson(FlexArr(min, max, mbr)) must_=
         Json("FlexArr" := (
           ("minSize" := min)  ->:
@@ -754,7 +754,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
           jEmptyObject))
     }
 
-    "encode objects" ! prop { (assocs: Map[String, Type], unks: Option[Type]) =>
+    "encode objects" >> prop { (assocs: Map[String, Type], unks: Option[Type]) =>
       typJson(Obj(assocs, unks)) must_=
         Json("Obj" := (
           ("associations" := assocs) ->:
@@ -762,7 +762,7 @@ class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with Validati
           jEmptyObject))
     }
 
-    "encode coproducts as an array of types" ! prop { (t1: Type, t2: Type, ts: List[Type]) =>
+    "encode coproducts as an array of types" >> prop { (t1: Type, t2: Type, ts: List[Type]) =>
       val coprod = ts.foldLeft(Coproduct(t1, t2))(Coproduct(_, _))
       typJson(coprod) must_= Json("Coproduct" := coprod.flatten)
     }

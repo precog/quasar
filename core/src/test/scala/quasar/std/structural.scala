@@ -37,37 +37,37 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
     // else is known about it.
     val unknown = AnyArray ⨿ Str
 
-    "type combination of arbitrary strs as str" ! prop { (st1: Type, st2: Type) =>
+    "type combination of arbitrary strs as str" >> prop { (st1: Type, st2: Type) =>
       ConcatOp.tpe(Func.Input2(st1, st2)).map(Str contains _) must beSuccessful(true)
       ConcatOp.tpe(Func.Input2(st2, st1)).map(Str contains _) must beSuccessful(true)
     }.setArbitrary1(arbStrType).setArbitrary2(arbStrType)
 
-    "type arbitrary str || unknown as Str" ! prop { (st: Type) =>
+    "type arbitrary str || unknown as Str" >> prop { (st: Type) =>
       ConcatOp.tpe(Func.Input2(st, unknown)) must beSuccessful(Str)
       ConcatOp.tpe(Func.Input2(unknown, st)) must beSuccessful(Str)
     }.setArbitrary(arbStrType)
 
-    "fold constant Strings" ! prop { (s1: String, s2: String) =>
+    "fold constant Strings" >> prop { (s1: String, s2: String) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Str(s1)), Const(Data.Str(s2)))) must
         beSuccessful(Const(Data.Str(s1 + s2)))
     }
 
-    "type combination of arbitrary arrays as array" ! prop { (at1: Type, at2: Type) =>
+    "type combination of arbitrary arrays as array" >> prop { (at1: Type, at2: Type) =>
       ConcatOp.tpe(Func.Input2(at1, at2)).map(_.arrayLike) must beSuccessful(true)
       ConcatOp.tpe(Func.Input2(at2, at1)).map(_.arrayLike) must beSuccessful(true)
     }.setArbitrary1(arbArrayType).setArbitrary2(arbArrayType)
 
-    "type arbitrary array || unknown as array" ! prop { (at: Type) =>
+    "type arbitrary array || unknown as array" >> prop { (at: Type) =>
       ConcatOp.tpe(Func.Input2(at, unknown)).map(_.arrayLike) must beSuccessful(true)
       ConcatOp.tpe(Func.Input2(unknown, at)).map(_.arrayLike) must beSuccessful(true)
     }.setArbitrary(arbArrayType)
 
-    "fold constant arrays" ! prop { (ds1: List[Data], ds2: List[Data]) =>
+    "fold constant arrays" >> prop { (ds1: List[Data], ds2: List[Data]) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Arr(ds1)), Const(Data.Arr(ds2)))) must
         beSuccessful(Const(Data.Arr(ds1 ++ ds2)))
     }
 
-    "fail with mixed Str and array args" ! prop { (st: Type, at: Type) =>
+    "fail with mixed Str and array args" >> prop { (st: Type, at: Type) =>
       ConcatOp.tpe(Func.Input2(st, at)) must beFailing
       ConcatOp.tpe(Func.Input2(at, st)) must beFailing
     }.setArbitrary1(arbStrType).setArbitrary2(arbArrayType)
@@ -78,7 +78,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "FlattenMap" should {
-    "only accept maps" ! prop { (nonMap: Type) =>
+    "only accept maps" >> prop { (nonMap: Type) =>
       FlattenMap.tpe(Func.Input1(nonMap)) must beFailing
     }.setArbitrary(arbArrayType)
 
@@ -92,7 +92,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "FlattenMapKeys" should {
-    "only accept maps" ! prop { (nonMap: Type) =>
+    "only accept maps" >> prop { (nonMap: Type) =>
       FlattenMapKeys.tpe(Func.Input1(nonMap)) must beFailing
     }.setArbitrary(arbArrayType)
 
@@ -106,7 +106,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "FlattenArray" should {
-    "only accept arrays" ! prop { (nonArr: Type) =>
+    "only accept arrays" >> prop { (nonArr: Type) =>
       FlattenArray.tpe(Func.Input1(nonArr)) must beFailing
     }.setArbitrary(arbStrType)
 
@@ -120,7 +120,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "FlattenArrayIndices" should {
-    "only accept arrays" ! prop { (nonArr: Type) =>
+    "only accept arrays" >> prop { (nonArr: Type) =>
       FlattenArrayIndices.tpe(Func.Input1(nonArr)) must beFailing
     }.setArbitrary(arbStrType)
 
@@ -133,13 +133,13 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" ! prop { (nonInt: Type) =>
+    "only untype from ints" >> prop { (nonInt: Type) =>
       FlattenArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
     }.setArbitrary(arbStrType)
   }
 
   "ShiftMap" should {
-    "only accept maps" ! prop { (nonMap: Type) =>
+    "only accept maps" >> prop { (nonMap: Type) =>
       ShiftMap.tpe(Func.Input1(nonMap)) must beFailing
     }.setArbitrary(arbArrayType)
 
@@ -153,7 +153,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "ShiftMapKeys" should {
-    "only accept maps" ! prop { (nonMap: Type) =>
+    "only accept maps" >> prop { (nonMap: Type) =>
       ShiftMapKeys.tpe(Func.Input1(nonMap)) must beFailing
     }.setArbitrary(arbArrayType)
 
@@ -167,7 +167,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "ShiftArray" should {
-    "only accept arrays" ! prop { (nonArr: Type) =>
+    "only accept arrays" >> prop { (nonArr: Type) =>
       ShiftArray.tpe(Func.Input1(nonArr)) must beFailing
     }.setArbitrary(arbStrType)
 
@@ -181,7 +181,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
   }
 
   "ShiftArrayIndices" should {
-    "only accept arrays" ! prop { (nonArr: Type) =>
+    "only accept arrays" >> prop { (nonArr: Type) =>
       ShiftArrayIndices.tpe(Func.Input1(nonArr)) must beFailing
     }.setArbitrary(arbStrType)
 
@@ -194,7 +194,7 @@ class StructuralSpecs extends quasar.QuasarSpecification with ScalaCheck with Va
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" ! prop { (nonInt: Type) =>
+    "only untype from ints" >> prop { (nonInt: Type) =>
       ShiftArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
     }.setArbitrary(arbStrType)
   }

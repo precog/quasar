@@ -27,11 +27,11 @@ import scalaz.std.list._
 class MountsSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
   "Mounts" should {
     "adding entries" >> {
-      "fails when dir is a prefix of existing" ! prop { mnt: AbsDir[Sandboxed] =>
+      "fails when dir is a prefix of existing" >> prop { mnt: AbsDir[Sandboxed] =>
         Mounts.singleton(mnt </> dir("c1"), 1).add(mnt, 2) must beLeftDisjunction
       }
 
-      "fails when dir is prefixed by existing" ! prop { mnt: AbsDir[Sandboxed] =>
+      "fails when dir is prefixed by existing" >> prop { mnt: AbsDir[Sandboxed] =>
         Mounts.singleton(mnt, 1).add(mnt </> dir("c2"), 2) must beLeftDisjunction
       }
 
@@ -42,7 +42,7 @@ class MountsSpec extends quasar.QuasarSpecification with ScalaCheck with Disjunc
         Mounts.fromFoldable(List((mnt1, 1), (mnt2, 2))) must beRightDisjunction
       }
 
-      "succeeds when replacing value at existing" ! prop { mnt: AbsDir[Sandboxed] =>
+      "succeeds when replacing value at existing" >> prop { mnt: AbsDir[Sandboxed] =>
         Mounts.singleton(mnt, 1)
           .add(mnt, 2)
           .toOption

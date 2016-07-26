@@ -72,17 +72,17 @@ class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck wit
   "Metadata Service" should {
     "respond with NotFound" >> {
       // TODO: escaped paths do not survive being embedded in error messages
-      "if directory does not exist" ! prop { dir: ADir => (dir != rootDir) ==> {
+      "if directory does not exist" >> prop { dir: ADir => (dir != rootDir) ==> {
         val response = service(InMemState.empty, Map())(Request(uri = pathUri(dir))).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(dir))
       }}
 
-      "file does not exist" ! prop { file: AFile =>
+      "file does not exist" >> prop { file: AFile =>
         val response = service(InMemState.empty, Map())(Request(uri = pathUri(file))).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
       }
 
-      "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
+      "if file with same name as existing directory (without trailing slash)" >> prop { s: SingleFileMemState =>
         depth(s.file) > 1 ==> {
           val parent = fileParent(s.file)
           // .get here is because we know thanks to the property guard, that the parent directory has a name
@@ -99,14 +99,14 @@ class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck wit
           .as[Json].unsafePerformSync must_== Json("children" := List[FsNode]())
       }
 
-      "and list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
+      "and list of children for existing nonempty directory" >> prop { s: NonEmptyDir =>
         val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
           .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
 
-      "and mounts when any children happen to be mount points" ! prop { (
+      "and mounts when any children happen to be mount points" >> prop { (
         fName: FileName,
         dName: DirName,
         mName: DirName,
@@ -133,7 +133,7 @@ class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck wit
           ).sorted)
       }}
 
-      "and empty object for existing file" ! prop { s: SingleFileMemState =>
+      "and empty object for existing file" >> prop { s: SingleFileMemState =>
         service(s.state, Map())(Request(uri = pathUri(s.file)))
           .as[Json].unsafePerformSync must_=== Json.obj()
       }

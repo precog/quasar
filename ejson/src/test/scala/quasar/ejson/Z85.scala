@@ -49,7 +49,7 @@ class Z85Specs extends quasar.QuasarSpecification with Discipline {
   }
 
   "decode >>> encode" should {
-    "be identity, modulo padding" ! prop { (b: ByteVector) =>
+    "be identity, modulo padding" >> prop { (b: ByteVector) =>
       decode(encode(b)) must beSome(padBV(b))
     }
   }

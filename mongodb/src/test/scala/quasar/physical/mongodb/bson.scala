@@ -49,7 +49,7 @@ class BsonSpecs extends quasar.QuasarSpecification with ScalaCheck {
 
     import BsonGen._
 
-    "be (fully) isomorphic for representable types" ! prop { (bson: Bson) =>
+    "be (fully) isomorphic for representable types" >> prop { (bson: Bson) =>
       val representable = bson match {
         case JavaScript(_)         => false
         case JavaScriptScope(_, _) => false
@@ -65,7 +65,7 @@ class BsonSpecs extends quasar.QuasarSpecification with ScalaCheck {
         fromRepr(wrapped.repr) must_== Doc(ListMap("value" -> Undefined))
     }.setGen(simpleGen)
 
-    "be 'semi' isomorphic for all types" ! prop { (bson: Bson) =>
+    "be 'semi' isomorphic for all types" >> prop { (bson: Bson) =>
       val wrapped = Doc(ListMap("value" -> bson)).repr
 
       // (fromRepr >=> repr >=> fromRepr) == fromRepr
@@ -76,7 +76,7 @@ class BsonSpecs extends quasar.QuasarSpecification with ScalaCheck {
   "toJs" should {
     import BsonGen._
 
-    "correspond to Data.toJs where toData is defined" ! prop { (bson: Bson) =>
+    "correspond to Data.toJs where toData is defined" >> prop { (bson: Bson) =>
       val data = BsonCodec.toData(bson)
       (data != Data.NA && !data.isInstanceOf[Data.Set]) ==> {
         data match {

@@ -1,0 +1,1 @@
+-Adds QScript optimizations related to LeftShift.

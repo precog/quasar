@@ -1,0 +1,1 @@
+- Publish the foundation project's test artifacts for access to QuasarSpecification

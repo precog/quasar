@@ -180,7 +180,9 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
-  .settings(libraryDependencies ++= Dependencies.core)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    publishArtifact in (Test, packageBin) := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val ejson = project

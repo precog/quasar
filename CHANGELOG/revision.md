@@ -1,0 +1,1 @@
+- [SD-1871] Refactor view filesystem in terms of 'Mounting' to allow it to work with multiple implementations of 'Mounting'.

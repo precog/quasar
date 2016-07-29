@@ -361,8 +361,6 @@ object Workflow {
       of the collection.
       */
     def crush(op: F[(Fix[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask)
-
-    def pipeline(op: PipelineF[F, Fix[F]]): Option[(DocVar, WorkflowTask, List[PipelineOp])]
   }
 
   implicit def crush3_2(implicit I: Workflow2_6F :<: Workflow3_2F): Crush[Workflow3_2F] = new Crush[Workflow3_2F] {
@@ -517,9 +515,6 @@ object Workflow {
     new Crush[F] {
       def crush(op: F[(Fix[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask) =
         CG.crush(I.inj(op.map { case (f, t) => (f.transCata(I.inj(_)), t) }))
-
-      def pipeline(p: PipelineF[F, Fix[F]]): Option[(DocVar, WorkflowTask, List[PipelineOp])] =
-        CG.pipeline(p.fmap(_.transCata(I.inj(_)), I))
     }
 
   implicit val crush2_6: Crush[Workflow2_6F] = crushInjected[Workflow2_6F, Workflow3_2F]
@@ -870,78 +865,79 @@ object Workflow {
   // NB: no need for a typeclass if implementing this way, but will be needed as
   // soon as we need to coalesce anything _into_ a type that isn't 2.6.
   def crystallizeAll[F[_]: Functor: Classify: Coalesce: Refs](implicit I: Workflow2_6F :<: F, ev1: F :<: Workflow3_2F): Crystallize[F] = new Crystallize[F] {
-  // probable conversions
-  // to $MapF:          $ProjectF
-  // to $FlatMapF:      $MatchF, $LimitF (using scope), $SkipF (using scope), $UnwindF, $GeoNearF
-  // to $MapF/$ReduceF:  $GroupF
-  // ???:              $RedactF
-  // none:             $SortF
-  // NB: We don’t convert a $ProjectF after a map/reduce op because it could
-  //     affect the final shape unnecessarily.
-  def crystallize(op: Fix[F]): Crystallized[F] = {
-    def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
-      uw.src.unFix match {
-        case Workflow2_6F(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
-        case src => src
+    // probable conversions
+    // to $MapF:          $ProjectF
+    // to $FlatMapF:      $MatchF, $LimitF (using scope), $SkipF (using scope), $UnwindF, $GeoNearF
+    // to $MapF/$ReduceF:  $GroupF
+    // ???:              $RedactF
+    // none:             $SortF
+    // NB: We don’t convert a $ProjectF after a map/reduce op because it could
+    //     affect the final shape unnecessarily.
+    def crystallize(op: Fix[F]): Crystallized[F] = {
+      def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
+        uw.src.unFix match {
+          case Workflow2_6F(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
+          case src => src
+        }
+
+      val uncleanƒ: F[Fix[F]] => Fix[F] = {
+        case Workflow2_6F(x @ $SimpleMapF(_, _, _)) => Fix(I.inj(x.raw))
+        case x                                     => Fix(x)
       }
 
-    val uncleanƒ: F[Fix[F]] => Fix[F] = {
-      case Workflow2_6F(x @ $SimpleMapF(_, _, _)) => Fix(I.inj(x.raw))
-      case x                                     => Fix(x)
-    }
+      val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
+        case Workflow2_6F(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.unFix match {
+          case $project(src, shape, _)  =>
+            shape.toJs.fold(
+              κ(I.inj(mr)),
+              x => {
+                val base = jscore.Name("__rez")
+                mr.singleSource.fmap(ι, I).reparentW(
+                  chain(src,
+                    $simpleMap[F](
+                      NonEmptyList(MapExpr(JsFn(base, x(jscore.Ident(base))))),
+                      ListMap()))).unFix
+              })
+          case Workflow2_6F(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
+            mr.singleSource.fmap(ι, I).reparentW(Fix(I.inj(uw.flatmapop))).unFix
+          case _                        => I.inj(mr)
+        }
+        case Workflow2_6F($FoldLeftF(head, tail)) =>
+          I.inj($FoldLeftF[Fix[F]](
+            chain(head,
+              $project[F](
+                Reshape(ListMap(ExprName -> \/-($$ROOT))),
+                IncludeId)),
+            tail.map(x => x.unFix match {
+              case $reduce(_, _, _) => x
+              case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
+            })))
 
-    val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
-      case Workflow2_6F(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.unFix match {
-        case $project(src, shape, _)  =>
-          shape.toJs.fold(
-            κ(I.inj(mr)),
-            x => {
-              val base = jscore.Name("__rez")
-              mr.singleSource.fmap(ι, I).reparentW(
-                chain(src,
-                  $simpleMap[F](
-                    NonEmptyList(MapExpr(JsFn(base, x(jscore.Ident(base))))),
-                    ListMap()))).unFix
-            })
-        case Workflow2_6F(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
-          mr.singleSource.fmap(ι, I).reparentW(Fix(I.inj(uw.flatmapop))).unFix
-        case _                        => I.inj(mr)
+        case op => op
       }
-      case Workflow2_6F($FoldLeftF(head, tail)) =>
-        I.inj($FoldLeftF[Fix[F]](
-          chain(head,
-            $project[F](
-              Reshape(ListMap(ExprName -> \/-($$ROOT))),
-              IncludeId)),
-          tail.map(x => x.unFix match {
-            case $reduce(_, _, _) => x
-            case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
-          })))
 
-      case op => op
+      val finished =
+        deleteUnusedFields(reorderOps(op.transCata(orOriginal(simplifyGroupƒ[F]))))
+
+      def fixShape(wf: Fix[F]) =
+        Workflow.simpleShape(wf).fold(
+          finished)(
+          n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
+
+      def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.unFix match {
+        case $simpleMap(_, _, _)   => fixShape(wf)
+        case IsShapePreserving(sp) => promoteKnownShape(sp.src)
+        case _                     => finished
+      }
+
+      Crystallized(
+        promoteKnownShape(finished).transAna(crystallizeƒ).transCata[F](Coalesce[F].coalesce)
+          // TODO: this can coalesce more cases, but hasn’t been done thus far and
+          //       requires rewriting many tests in a much less readable way.
+          // .cata[Workflow](x => coalesce(uncleanƒ(x).unFix))
+      )
     }
-
-    val finished =
-      deleteUnusedFields(reorderOps(op.transCata(orOriginal(simplifyGroupƒ[F]))))
-
-    def fixShape(wf: Fix[F]) =
-      Workflow.simpleShape(wf).fold(
-        finished)(
-        n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
-
-    def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.unFix match {
-      case $simpleMap(_, _, _)   => fixShape(wf)
-      case IsShapePreserving(sp) => promoteKnownShape(sp.src)
-      case _                     => finished
-    }
-
-    Crystallized(
-      promoteKnownShape(finished).transAna(crystallizeƒ).transCata[F](Coalesce[F].coalesce)
-        // TODO: this can coalesce more cases, but hasn’t been done thus far and
-        //       requires rewriting many tests in a much less readable way.
-        // .cata[Workflow](x => coalesce(uncleanƒ(x).unFix))
-    )
-  }}
+  }
 
   implicit lazy val crystallize2_6: Crystallize[Workflow2_6F] = crystallizeAll[Workflow2_6F]
   implicit lazy val crystallize3_2: Crystallize[Workflow3_2F] = crystallizeAll[Workflow3_2F]
@@ -996,11 +992,6 @@ object Workflow {
 
   final case class $ProjectF[A](src: A, shape: Reshape, idExclusion: IdHandling)
       extends Workflow2_6F[A] { self =>
-    def pipelineRhs: Bson.Doc = idExclusion match {
-      case IdHandling.ExcludeId =>
-        Bson.Doc(shape.bson.value + (Workflow.IdLabel -> Bson.Bool(false)))
-      case _         => shape.bson
-    }
     def pipeline: PipelineF[Workflow2_6F, A] =
       new PipelineF[Workflow2_6F, A] {
         def wf = self
@@ -1010,6 +1001,12 @@ object Workflow {
         def op = "$project"
         def rhs = self.pipelineRhs
       }
+    // NB: this is exposed separately so that the type can be narrower
+    def pipelineRhs: Bson.Doc = idExclusion match {
+      case IdHandling.ExcludeId =>
+        Bson.Doc(shape.bson.value + (Workflow.IdLabel -> Bson.Bool(false)))
+      case _         => shape.bson
+    }
     def empty: $ProjectF[A] = $ProjectF.EmptyDoc(src)
 
     def set(field: BsonField, value: Reshape.Shape): $ProjectF[A] =

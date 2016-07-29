@@ -43,8 +43,7 @@ private[mongodb] object execution {
     skip:       Option[Long],
     limit:      Option[Long])
 
-  /** Extractor to determine whether a `$GroupF` represents a simple `count()`.
-    */
+  /** Extractor to determine whether a `$GroupF` represents a simple `count()`. */
   object Countable {
     def unapply(op: PipelineOp): Option[BsonField.Name] = op match {
       case PipelineOp2_6($GroupF((), Grouped(map), \/-($literal(Bson.Null)))) if map.size ≟ 1 =>

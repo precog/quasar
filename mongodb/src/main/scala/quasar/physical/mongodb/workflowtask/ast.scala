@@ -19,15 +19,14 @@ package quasar.physical.mongodb.workflowtask
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
-import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
-import quasar.physical.mongodb.Workflow._
+import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector, Workflow}
 
 import scalaz._, Scalaz._
 
-/** A WorkflowTask approximately represents one request to MongoDB.
-  */
+/** A WorkflowTask approximately represents one request to MongoDB. */
 sealed trait WorkflowTaskF[A]
 object WorkflowTaskF {
+  import Workflow._
   import MapReduce._
 
   /** A task that returns a necessarily small amount of raw data. */

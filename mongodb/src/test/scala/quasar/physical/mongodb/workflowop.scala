@@ -583,9 +583,6 @@ class WorkflowSpec extends Specification with TreeMatchers {
     import quasar.physical.mongodb.workflowtask._
     import quasar.jscore._
 
-    // val WF: Workflow2_6F[Unit] => WorkflowF[Unit] = Inject[Workflow2_6F, WorkflowF].inj(_)
-
-
     "convert $match with $where into map/reduce" in {
       task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),

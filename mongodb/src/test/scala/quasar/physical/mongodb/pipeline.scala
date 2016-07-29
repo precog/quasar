@@ -159,14 +159,14 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
 
     "remove one un-nested field" in {
       val op = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
             "b" -> Select(ident("x"), "y"))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),
@@ -176,7 +176,7 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
 
     "remove one nested field" in {
       val op = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -185,7 +185,7 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
               "d" -> Select(ident("x"), "z")))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -197,7 +197,7 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
 
     "remove whole nested object" in {
       val op = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -205,7 +205,7 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
               "c" -> Select(ident("x"), "y")))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[Workflow2_6F](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](Collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),

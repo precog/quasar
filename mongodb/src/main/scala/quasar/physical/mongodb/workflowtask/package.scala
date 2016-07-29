@@ -30,7 +30,7 @@ package object workflowtask {
 
   type Pipeline = List[PipelineOp]
 
-  val simplifyProject: Workflow2_6F[Unit] => Option[PipelineF[Workflow2_6F, Unit]] =
+  val simplifyProject: WorkflowOpCoreF[Unit] => Option[PipelineF[WorkflowOpCoreF, Unit]] =
     {
       case $ProjectF(src, Reshape(cont), id) =>
         $ProjectF(src,
@@ -46,7 +46,7 @@ package object workflowtask {
     new (WorkflowTaskF ~> WorkflowTaskF) {
       def apply[α](wt: WorkflowTaskF[α]) = wt match {
         case PipelineTaskF(src, pipeline) =>
-          PipelineTaskF(src, pipeline.map(_.rewrite[Workflow2_6F](simplifyProject(_))))
+          PipelineTaskF(src, pipeline.map(_.rewrite[WorkflowOpCoreF](simplifyProject(_))))
         case x => x
       }
     }

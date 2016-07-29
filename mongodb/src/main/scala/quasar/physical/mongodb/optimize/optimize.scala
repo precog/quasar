@@ -31,7 +31,7 @@ package object optimize {
     import IdHandling._
 
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
-      (implicit I: Workflow2_6F :<: F): Fix[F] = {
+      (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {
       def getRefs[A](op: F[Fix[F]], prev: Option[Set[DocVar]]):
           Option[Set[DocVar]] = op match {
         case $group(_, _, _)           => Some(Refs[F].refs(op).toSet)
@@ -63,12 +63,12 @@ package object optimize {
           val unusedRefs =
             unused(getDefs(op.unFix), usedRefs).toList.flatMap(_.deref.toList)
           op.unFix match {
-            case Workflow2_6F(p @ $ProjectF(_, _, _))   =>
+            case WorkflowOpCoreF(p @ $ProjectF(_, _, _))   =>
               val p1 = p.deleteAll(unusedRefs)
               if (p1.shape.value.isEmpty) p1.pipeline.src.unFix
               else I.inj(p1)
-            case Workflow2_6F(g @ $GroupF(_, _, _))     => I.inj(g.deleteAll(unusedRefs.map(_.flatten.head)))
-            case Workflow2_6F(s @ $SimpleMapF(_, _, _)) => I.inj(s.deleteAll(unusedRefs))
+            case WorkflowOpCoreF(g @ $GroupF(_, _, _))     => I.inj(g.deleteAll(unusedRefs.map(_.flatten.head)))
+            case WorkflowOpCoreF(s @ $SimpleMapF(_, _, _)) => I.inj(s.deleteAll(unusedRefs))
             case o                                     => o
           }
         }
@@ -76,14 +76,14 @@ package object optimize {
       Fix(pruned.map(deleteUnusedFields0(_, getRefs(pruned, usedRefs))))
     }
 
-    def deleteUnusedFields[F[_]: Functor: Refs](op: Fix[F])(implicit ev: Workflow2_6F :<: F): Fix[F] =
+    def deleteUnusedFields[F[_]: Functor: Refs](op: Fix[F])(implicit ev: WorkflowOpCoreF :<: F): Fix[F] =
       deleteUnusedFields0(op, None)
 
     /** Converts a \$group with fields that duplicate keys into a \$group
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    def simplifyGroupƒ[F[_]: Coalesce](implicit ev: Workflow2_6F :<: F):
+    def simplifyGroupƒ[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F):
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case $group(src, Grouped(cont), id) =>
         val (newCont, proj) =
@@ -119,7 +119,7 @@ package object optimize {
       case _ => None
     }
 
-    private def reorderOpsƒ[F[_]: Coalesce](implicit I: Workflow2_6F :<: F)
+    private def reorderOpsƒ[F[_]: Coalesce](implicit I: WorkflowOpCoreF :<: F)
         : F[Fix[F]] => Option[F[Fix[F]]] = {
       def rewriteSelector(sel: Selector, defs: Map[DocVar, DocVar]): Option[Selector] =
         sel.mapUpFieldsM { f =>
@@ -150,7 +150,7 @@ package object optimize {
             $limit[F](count),
             $simpleMap[F](fn, scope)).unFix.some
 
-        case $match(Fix(Workflow2_6F(p @ $ProjectF(src0, shape, id))), sel) =>
+        case $match(Fix(WorkflowOpCoreF(p @ $ProjectF(src0, shape, id))), sel) =>
           val defs = p.getAll.collect {
             case (n, $var(x))    => DocField(n) -> x
             case (n, $include()) => DocField(n) -> DocField(n)
@@ -183,7 +183,7 @@ package object optimize {
     }
 
     def reorderOps[F[_]: Functor: Coalesce](wf: Fix[F])
-      (implicit I: Workflow2_6F :<: F)
+      (implicit I: WorkflowOpCoreF :<: F)
       : Fix[F] = {
       val reordered = wf.transCata(orOriginal(reorderOpsƒ[F]))
       if (reordered == wf) wf else reorderOps(reordered)
@@ -277,7 +277,7 @@ package object optimize {
     }
 
     def inlineGroupProjects[F[_]: Functor](g: $GroupF[Fix[F]])
-      (implicit I: Workflow2_6F :<: F)
+      (implicit I: WorkflowOpCoreF :<: F)
       : Option[(Fix[F], Grouped, Reshape.Shape)] = {
       val (rs, src) = g.src.para(collectShapes[F])
 

@@ -2782,7 +2782,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     def joinStructure0(
       left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
       leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
-      fin: WorkflowOp[WorkflowF],
+      fin: FixOp[WorkflowF],
       swapped: Boolean) = {
 
       val (leftLabel, rightLabel) =
@@ -2839,7 +2839,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     def joinStructure(
         left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
         leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
-        fin: WorkflowOp[WorkflowF],
+        fin: FixOp[WorkflowF],
         swapped: Boolean) =
       Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 

@@ -194,7 +194,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
   }
 
   private def execute0(wt: WorkflowTask, out: Collection)
-    (implicit ev: Workflow2_6F :<: WorkflowF)
+    (implicit ev: WorkflowOpCoreF :<: WorkflowF)
     : N[Collection] = {
     def unableToStore[A](bson: Bson): N[A] =
       insertFailed(
@@ -277,35 +277,35 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     pl match {
       case (Nil, Nil) =>
         find(src, Find(None, None, None, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($MatchF((), sel))), Nil) =>
+      case (List(PipelineOpCore($MatchF((), sel))), Nil) =>
         find(src, Find(sel.some, None, None, skip, limit)) map (_.right)
       case (List(Projectable(bson)), Nil) =>
         find(src, Find(None, bson.some, None, skip, limit)) map (_.right)
       case (Nil, List(Projectable(bson))) =>
         find(src, Find(None, bson.some, None, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($SortF((), keys))), Nil) =>
+      case (List(PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(None, None, keys.some, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($MatchF((), sel)), Projectable(bson)), Nil) =>
+      case (List(PipelineOpCore($MatchF((), sel)), Projectable(bson)), Nil) =>
         find(src, Find(sel.some, bson.some, None, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($MatchF((), sel))), List(Projectable(bson))) =>
+      case (List(PipelineOpCore($MatchF((), sel))), List(Projectable(bson))) =>
         find(src, Find(sel.some, bson.some, None, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($MatchF((), sel)), PipelineOp2_6($SortF((), keys))), Nil) =>
+      case (List(PipelineOpCore($MatchF((), sel)), PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, None, keys.some, skip, limit)) map (_.right)
-      case (List(Projectable(bson), PipelineOp2_6($SortF((), keys))), Nil) =>
+      case (List(Projectable(bson), PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(None, bson.some, keys.some, skip, limit)) map (_.right)
-      case (List(PipelineOp2_6($MatchF((), sel)), Projectable(bson), PipelineOp2_6($SortF((), keys))), Nil) =>
+      case (List(PipelineOpCore($MatchF((), sel)), Projectable(bson), PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, bson.some, keys.some, skip, limit)) map (_.right)
       case (List(Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
         labeledCount(src, Count(None, None, None), field) map (_.left)
       case (Nil, List(Countable(field))) =>
         labeledCount(src, Count(None, skip, limit), field) map (_.left)
-      case (List(PipelineOp2_6($MatchF((), sel)), Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
+      case (List(PipelineOpCore($MatchF((), sel)), Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
         labeledCount(src, Count(sel.some, None, None), field) map (_.left)
-      case (List(PipelineOp2_6($MatchF((), sel))), List(Countable(field))) =>
+      case (List(PipelineOpCore($MatchF((), sel))), List(Countable(field))) =>
         labeledCount(src, Count(sel.some, skip, limit), field) map (_.left)
       case (Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
         distinct(src, Distinct(origField, None), newField) map (_.right)
-      case (PipelineOp2_6($MatchF((), sel)) :: Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
+      case (PipelineOpCore($MatchF((), sel)) :: Distinctable(origField, newField), Nil) if skip ≟ None && limit ≟ None =>
         distinct(src, Distinct(origField, sel.some), newField) map (_.right)
       case _ => aggregateCursor(src, pipeline) map (_.right)
     }

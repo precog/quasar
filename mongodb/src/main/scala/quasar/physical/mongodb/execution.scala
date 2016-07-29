@@ -46,7 +46,7 @@ private[mongodb] object execution {
   /** Extractor to determine whether a `$GroupF` represents a simple `count()`. */
   object Countable {
     def unapply(op: PipelineOp): Option[BsonField.Name] = op match {
-      case PipelineOp2_6($GroupF((), Grouped(map), \/-($literal(Bson.Null)))) if map.size ≟ 1 =>
+      case PipelineOpCore($GroupF((), Grouped(map), \/-($literal(Bson.Null)))) if map.size ≟ 1 =>
         map.headOption
           .filter(_._2 == $sum($literal(Bson.Int32(1))))
           .map(_._1)
@@ -58,8 +58,8 @@ private[mongodb] object execution {
     def unapply(pipeline: workflowtask.Pipeline): Option[(BsonField.Name, BsonField.Name)] =
       pipeline match {
         case List(
-          PipelineOp2_6($GroupF((), Grouped(map), by)),
-          PipelineOp2_6($ProjectF((), Reshape(fields), IdHandling.IgnoreId | IdHandling.ExcludeId)))
+          PipelineOpCore($GroupF((), Grouped(map), by)),
+          PipelineOpCore($ProjectF((), Reshape(fields), IdHandling.IgnoreId | IdHandling.ExcludeId)))
             if map.isEmpty && fields.size ≟ 1 =>
           fields.headOption.fold[Option[(BsonField.Name, BsonField.Name)]] (None)(field =>
             (by, field) match {
@@ -78,7 +78,7 @@ private[mongodb] object execution {
 
   object Projectable {
     def unapply(op: PipelineOp): Option[Bson.Doc] = op match {
-      case PipelineOp2_6(proj @ $ProjectF((), Reshape(map), _))
+      case PipelineOpCore(proj @ $ProjectF((), Reshape(map), _))
           if map.all(_ == \/-($include())) =>
         proj.pipelineRhs.some
       case _ => None
@@ -90,12 +90,12 @@ private[mongodb] object execution {
         (Option[Long], Option[Long])) =
     pipeline match {
       case Nil                             => ((Nil, Nil), (None,   None))
-      case PipelineOp2_6($LimitF((), l)) ::
-            PipelineOp2_6($SkipF((), s)) ::
+      case PipelineOpCore($LimitF((), l)) ::
+            PipelineOpCore($SkipF((), s)) ::
             t                              => ((Nil, t),   (s.some, (l - s).some))
-      case PipelineOp2_6($LimitF((), l)) ::
+      case PipelineOpCore($LimitF((), l)) ::
             t                              => ((Nil, t),   (None,   l.some))
-      case PipelineOp2_6($SkipF((), s))  ::
+      case PipelineOpCore($SkipF((), s))  ::
             t                              => ((Nil, t),   (s.some, None))
       case h                            ::
             t                              => (h :: (_: workflowtask.Pipeline)).first.first(extractRange(t))

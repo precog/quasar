@@ -83,7 +83,7 @@ object WorkflowTaskF {
     new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
         val RC = RenderTree[Collection]
-        val RO = RenderTree[Workflow3_2F[Unit]]
+        val RO = RenderTree[WorkflowF[Unit]]
         val RJ = RenderTree[Js]
         val RS = RenderTree[Selector]
 

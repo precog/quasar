@@ -602,7 +602,7 @@ object MongoDbPlanner {
   }
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
-    (implicit I: Workflow2_6F :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
+    (implicit I: WorkflowOpCoreF :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
     : LogicalPlan[
         Cofree[LogicalPlan, (
           (OutputM[PartialSelector],
@@ -1094,7 +1094,7 @@ object MongoDbPlanner {
   }
 
   def plan0[F[_]: Functor: Coalesce: Crush: Crystallize](logical: Fix[LogicalPlan])
-      (implicit ev0: Workflow2_6F :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
+      (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad

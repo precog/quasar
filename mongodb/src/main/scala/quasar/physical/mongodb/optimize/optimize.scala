@@ -30,11 +30,11 @@ package object optimize {
     import Workflow._
     import IdHandling._
 
-    private def deleteUnusedFields0[F[_]: Functor: Rewrite](op: Fix[F], usedRefs: Option[Set[DocVar]])
+    private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: Workflow2_6F :<: F): Fix[F] = {
       def getRefs[A](op: F[Fix[F]], prev: Option[Set[DocVar]]):
           Option[Set[DocVar]] = op match {
-        case $group(_, _, _)           => Some(Rewrite[F].refs(op).toSet)
+        case $group(_, _, _)           => Some(Refs[F].refs(op).toSet)
         // FIXME: Since we can’t reliably identify which fields are used by a
         //        JS function, we need to assume they all are, until we hit the
         //        next $GroupF or $ProjectF.
@@ -42,10 +42,10 @@ package object optimize {
         case $simpleMap(_, _, _)       => None
         case $flatMap(_, _, _)         => None
         case $reduce(_, _, _)          => None
-        case $project(_, _, IncludeId) => Some(Rewrite[F].refs(op).toSet + IdVar)
-        case $project(_, _, _)         => Some(Rewrite[F].refs(op).toSet)
+        case $project(_, _, IncludeId) => Some(Refs[F].refs(op).toSet + IdVar)
+        case $project(_, _, _)         => Some(Refs[F].refs(op).toSet)
         case $foldLeft(_, _)           => prev.map(_ + IdVar)
-        case _                         => prev.map(_ ++ Rewrite[F].refs(op))
+        case _                         => prev.map(_ ++ Refs[F].refs(op))
       }
 
       def unused(defs: Set[DocVar], refs: Set[DocVar]): Set[DocVar] =
@@ -76,7 +76,7 @@ package object optimize {
       Fix(pruned.map(deleteUnusedFields0(_, getRefs(pruned, usedRefs))))
     }
 
-    def deleteUnusedFields[F[_]: Functor: Rewrite](op: Fix[F])(implicit ev: Workflow2_6F :<: F): Fix[F] =
+    def deleteUnusedFields[F[_]: Functor: Refs](op: Fix[F])(implicit ev: Workflow2_6F :<: F): Fix[F] =
       deleteUnusedFields0(op, None)
 
     /** Converts a \$group with fields that duplicate keys into a \$group

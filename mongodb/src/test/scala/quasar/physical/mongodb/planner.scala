@@ -3362,7 +3362,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       wf.foldMap(_.unFix match {
         case IsSingleSource(op) =>
           Workflow.simpleShape(op.src).map { shape =>
-            val refs = Rewrite[WorkflowF].refs(op.wf)
+            val refs = Refs[WorkflowF].refs(op.wf)
             val missing = refs.collect { case v @ DocVar(_, Some(f)) if !shape.contains(f.flatten.head) => v }
             if (missing.isEmpty) Nil
             else List(missing.map(_.bson).mkString(", ") + " missing in\n" + Fix[WorkflowF](op.wf).show)

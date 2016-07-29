@@ -329,9 +329,27 @@ object Workflow {
   implicit lazy val coalesce2_6: Coalesce[Workflow2_6F] = coalesceAll[Workflow2_6F]
   implicit lazy val coalesce3_2: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
 
-  def toPipelineOp[F[_]: Rewrite: Functor, A](op: PipelineF[F, A], base: DocVar)(implicit I: F :<: Workflow3_2F): PipelineOp =
-    PipelineOp(I.inj(Rewrite[F].rewriteRefs(op.wf.void, prefixBase(base))), op.bson)
-
+  def toPipelineOp[F[_]: Functor, A](op: PipelineF[F, A], base: DocVar)(implicit I: F :<: Workflow3_2F): PipelineOp = {
+    val prefix = prefixBase(base)
+    PipelineOp(I.inj(op.wf.void).run.fold(
+      op => (op match {
+        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(op, prefix).pipeline
+        case op @ $SampleF(_, _)          => rewriteRefs3_2(op, prefix).pipeline
+      }).fmap(ι, Inject[WorkflowNewIn3_2F, Workflow3_2F]),
+      op => (op match {
+        case op @ $MatchF(_, _)           => rewriteRefs2_6(op, prefix).shapePreserving
+        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(op, prefix).pipeline
+        case op @ $RedactF(_, _)          => rewriteRefs2_6(op, prefix).pipeline
+        case op @ $SkipF(_, _)            => rewriteRefs2_6(op, prefix).shapePreserving
+        case op @ $LimitF(_, _)           => rewriteRefs2_6(op, prefix).shapePreserving
+        case op @ $UnwindF(_, _)          => rewriteRefs2_6(op, prefix).pipeline
+        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(op, prefix).pipeline
+        case op @ $SortF(_, _)            => rewriteRefs2_6(op, prefix).shapePreserving
+        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(op, prefix).pipeline
+        case op @ $OutF(_, _)             => rewriteRefs2_6(op, prefix).shapePreserving
+        case _ => scala.sys.error("never happens")
+      }).fmap(ι, Inject[Workflow2_6F, Workflow3_2F])))
+  }
 
   /** Operations that are applied to a completed workflow to produce an
     * executable WorkflowTask. NB: when this is applied, information about the
@@ -366,7 +384,7 @@ object Workflow {
                 }),
                 $ReduceF.reduceNOP,
                 // TODO: Get rid of this asInstanceOf!
-                selection = Some(Rewrite[Workflow2_6F].rewriteRefs(Functor[Workflow2_6F].void(op), prefixBase(base)).asInstanceOf[$MatchF[Workflow2_6]].selector)),
+                selection = Some(rewriteRefs2_6(Functor[Workflow2_6F].void(op).asInstanceOf[$MatchF[Workflow2_6]], prefixBase(base)).selector)),
               None))
         }
         pipeline($MatchF[Workflow3_2](src, selector).shapePreserving.fmap(ι, I)) match {
@@ -470,7 +488,7 @@ object Workflow {
       }
 
     def alwaysPipePipe(op: PipelineF[Workflow3_2F, Fix[Workflow3_2F]])
-      : (DocVar, WorkflowTask, Pipeline) = {
+      : (DocVar, WorkflowTask, List[PipelineOp]) = {
       lazy val (base, crushed) = (finish(_, _)).tupled(op.src.para(crush))
       // TODO: this is duplicated in `WorkflowBuilder.rewrite`
       def repairBase(base: DocVar) = I.prj(op.wf) match {
@@ -478,23 +496,20 @@ object Workflow {
         case Some($ProjectF(_, _, _)) => DocVar.ROOT()
         case _                       => base
       }
-      op.src.unFix match {
-        case IsPipeline(p) => pipeline(p).cata(
-          {
-            case (base, up, prev) =>
-              val (nb, task) = finish(base, up)
-              (repairBase(nb),
-                task,
-                prev :+ toPipelineOp(op, nb))
-          },
-          (repairBase(base),
-            crushed,
-            List(toPipelineOp(op, base))))
-        case _ =>
-          (repairBase(base),
-            crushed,
-            List(toPipelineOp(op, base)))
-      }
+      (op.src.unFix match {
+        case IsPipeline(p) => pipeline(p)
+        case _             => None
+      }).cata(
+        {
+          case (base, up, prev) =>
+            val (nb, task) = finish(base, up)
+            (repairBase(nb),
+              task,
+              prev :+ toPipelineOp(op, nb))
+        },
+        (repairBase(base),
+          crushed,
+          List(toPipelineOp(op, base))))
     }
   }
 
@@ -515,38 +530,43 @@ object Workflow {
       case Some($ProjectF(src, shape, _)) =>
         ((x: List[Reshape]) => shape :: x).first(src._2)
       case Some(x)                       => (Nil, Fix(I.inj(x.map(_._1))))
-      case None                          => ???  // TODO
+      case None                          => ???  // TODO: implement for 3.2 ops
     }
 
   // helper for rewriteRefs
   def prefixBase(base: DocVar): PartialFunction[DocVar, DocVar] =
     PartialFunction(base \\ _)
 
-  // TODO: this is almost exclusively use for `refs`, which could be implemented
-  // in a simpler way. There is exactly one use of `rewriteRefs`, which is in
-  // this file.
-  @typeclass sealed trait Rewrite[F[_]] {
-    def rewriteRefs[A](op: F[A], applyVar: PartialFunction[DocVar, DocVar]): F[A]
 
-    final def refs[A](op: F[A]): List[DocVar] = {
-      // FIXME: Sorry world
-      val vf = new scala.collection.mutable.ListBuffer[DocVar]
-      ignore(rewriteRefs(op, { case v => ignore(vf += v); v }))
-      vf.toList
-    }
-
-    // def rewriteBase[A](op: F[A], base: DocVar): DocVar
-
-    // def rewrite[A](op: F[A], base: DocVar): (F[A], DocVar) =
-    //   (rewriteRefs(op, prefixBase(base)), rewriteBase(op, base))
+  @typeclass sealed trait Refs[F[_]] {
+    def refs[A](op: F[A]): List[DocVar]
   }
 
-  implicit val rewrite2_6: Rewrite[Workflow2_6F] = new Rewrite[Workflow2_6F] {
+  private def refsFromRewrite[F[_]](rewrite: (F[_], PartialFunction[DocVar, DocVar]) => F[_]) = new Refs[F] {
+    def refs[A](op: F[A]): List[DocVar] = {
+      // FIXME: Sorry world
+      val vf = new scala.collection.mutable.ListBuffer[DocVar]
+      ignore(rewrite(op, { case v => ignore(vf += v); v }))
+      vf.toList
+    }
+  }
+
+  implicit val refs2_6: Refs[Workflow2_6F] = refsFromRewrite[Workflow2_6F](rewriteRefs2_6)
+  implicit val refs3_2: Refs[WorkflowNewIn3_2F] = refsFromRewrite[WorkflowNewIn3_2F](rewriteRefs3_2)
+
+  implicit def coproductRefs[F[_], G[_]](implicit RF: Refs[F], RG: Refs[G]): Refs[Coproduct[F, G, ?]] =
+    new Refs[Coproduct[F, G, ?]] {
+      def refs[A](op: Coproduct[F, G, A]): List[DocVar] =
+        op.run.fold(RF.refs, RG.refs)
+    }
+
+  // NB: it's useful to be able to return the precise type here, so this is
+  // explicitly implemented for each version's trait.
   // TODO: Make this a trait, and implement it for actual types, rather than all
   //       in here (already done for ExprOp and Reshape). (#438)
-  def rewriteRefs[A](
-    op: Workflow2_6F[A], applyVar0: PartialFunction[DocVar, DocVar]):
-      Workflow2_6F[A] = {
+  private def rewriteRefs2_6[A <: Workflow2_6F[_]](
+    op: A, applyVar0: PartialFunction[DocVar, DocVar]):
+      A = {
     val applyVar = (f: DocVar) => applyVar0.lift(f).getOrElse(f)
 
     def applyFieldName(name: BsonField): BsonField = {
@@ -575,34 +595,23 @@ object Workflow {
           distanceField = applyFieldName(g.distanceField),
           query = g.query.map(applySelector))
       case _                          => op
-    })//.asInstanceOf[Workflow2_6F[A]]
+    }).asInstanceOf[A]
   }
 
-    // def rewriteBase[A <: Workflow2_6F[_]](op: A, base: DocVar) = op match {
-    //   case $GroupF(_, _, _)   => DocVar.ROOT()
-    //   case $ProjectF(_, _, _) => DocVar.ROOT()
-    //   case _                 => base
-    // }
-  }
+  def rewriteRefs3_2[A <: WorkflowNewIn3_2F[_]]
+      (op: A, applyVar0: PartialFunction[DocVar, DocVar]): A =
+      // TODO: implement for 3.2 ops
+      op
 
-  def rewriteNothing[F[_]]: Rewrite[F] = new Rewrite[F] {
-    def rewriteRefs[A]
-      (op: F[A], applyVar0: PartialFunction[DocVar, DocVar]) = op
-
-    // def rewriteBase[A <: F[_]](op: A, base: DocVar) = base
-  }
-
-  implicit val rewrite3_2: Rewrite[WorkflowNewIn3_2F] = rewriteNothing[WorkflowNewIn3_2F]
-
-  implicit def coproductRewrite[F[_], G[_]](implicit RF: Rewrite[F], RG: Rewrite[G]): Rewrite[Coproduct[F, G, ?]] = new Rewrite[Coproduct[F, G, ?]] {
-    def rewriteRefs[A](op: Coproduct[F, G, A], applyVar0: PartialFunction[DocVar, DocVar]) =
-      op.run.fold(
-        fa => Coproduct.leftc(RF.rewriteRefs(fa, applyVar0)),
-        ga => Coproduct.rightc(RG.rewriteRefs(ga, applyVar0)))
-
-    // def rewriteBase[A <: Coproduct[F, G, _]](op: A, base: DocVar) =
-    //   base
-  }
+  // implicit def coproductRewrite[F[_], G[_]](implicit RF: Rewrite[F], RG: Rewrite[G]): Rewrite[Coproduct[F, G, ?]] = new Rewrite[Coproduct[F, G, ?]] {
+  //   def rewriteRefsx[A](op: Coproduct[F, G, A], applyVar0: PartialFunction[DocVar, DocVar]) =
+  //     op.run.fold(
+  //       fa => Coproduct.leftc(RF.rewriteRefsx(fa, applyVar0)),
+  //       ga => Coproduct.rightc(RG.rewriteRefsx(ga, applyVar0)))
+  //
+  //   // def rewriteBase[A <: Coproduct[F, G, _]](op: A, base: DocVar) =
+  //   //   base
+  // }
 
   def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: Workflow3_2F): Option[List[BsonField.Name]] = {
     I.inj(op.unFix).run.fold[Option[List[BsonField.Name]]](
@@ -646,20 +655,20 @@ object Workflow {
     }
 
     override def singleSource[A](op: Workflow2_6F[A]) = op match {
-      case op @ $MatchF(src, _)        => op.shapePreserving.widen[A].some
-      case op @ $ProjectF(src, _, _)   => op.pipeline.widen[A].some
-      case op @ $RedactF(src, _)       => op.pipeline.widen[A].some
-      case op @ $SkipF(src, _)         => op.shapePreserving.widen[A].some
-      case op @ $LimitF(src, _)        => op.shapePreserving.widen[A].some
-      case op @ $UnwindF(src, _)       => op.pipeline.widen[A].some
-      case op @ $GroupF(src, _, _)     => op.pipeline.widen[A].some
-      case op @ $SortF(src, _)         => op.shapePreserving.widen[A].some
+      case op @ $MatchF(_, _)        => op.shapePreserving.widen[A].some
+      case op @ $ProjectF(_, _, _)   => op.pipeline.widen[A].some
+      case op @ $RedactF(_, _)       => op.pipeline.widen[A].some
+      case op @ $SkipF(_, _)         => op.shapePreserving.widen[A].some
+      case op @ $LimitF(_, _)        => op.shapePreserving.widen[A].some
+      case op @ $UnwindF(_, _)       => op.pipeline.widen[A].some
+      case op @ $GroupF(_, _, _)     => op.pipeline.widen[A].some
+      case op @ $SortF(_, _)         => op.shapePreserving.widen[A].some
       case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $OutF(src, _)          => op.shapePreserving.widen[A].some
-      case op @ $MapF(src, _, _)       => op.singleSource.widen[A].some
-      case op @ $SimpleMapF(src, _, _) => op.singleSource.widen[A].some
-      case op @ $FlatMapF(src, _, _)   => op.singleSource.widen[A].some
-      case op @ $ReduceF(src, _, _)    => op.singleSource.widen[A].some
+      case op @ $OutF(_, _)          => op.shapePreserving.widen[A].some
+      case op @ $MapF(_, _, _)       => op.singleSource.widen[A].some
+      case op @ $SimpleMapF(_, _, _) => op.singleSource.widen[A].some
+      case op @ $FlatMapF(_, _, _)   => op.singleSource.widen[A].some
+      case op @ $ReduceF(_, _, _)    => op.singleSource.widen[A].some
       case _ => None
     }
 
@@ -667,13 +676,13 @@ object Workflow {
       case op @ $MatchF(_, _)      => op.shapePreserving.widen[A].some
       case op @ $ProjectF(_, _, _) => op.pipeline.widen[A].some
       case op @ $RedactF(_, _)     => op.pipeline.widen[A].some
-      case op @ $SkipF(src, _)     => op.shapePreserving.widen[A].some
-      case op @ $LimitF(src, _)    => op.shapePreserving.widen[A].some
-      case op @ $UnwindF(src, _)   => op.pipeline.widen[A].some
-      case op @ $GroupF(src, _, _) => op.pipeline.widen[A].some
-      case op @ $SortF(src, _)     => op.shapePreserving.widen[A].some
+      case op @ $SkipF(_, _)       => op.shapePreserving.widen[A].some
+      case op @ $LimitF(_, _)      => op.shapePreserving.widen[A].some
+      case op @ $UnwindF(_, _)     => op.pipeline.widen[A].some
+      case op @ $GroupF(_, _, _)   => op.pipeline.widen[A].some
+      case op @ $SortF(_, _)       => op.shapePreserving.widen[A].some
       case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $OutF(src, _)      => op.shapePreserving.widen[A].some
+      case op @ $OutF(_, _)        => op.shapePreserving.widen[A].some
       case _ => None
     }
 
@@ -692,13 +701,13 @@ object Workflow {
       None
 
     override def singleSource[A](op: WorkflowNewIn3_2F[A]) = op match {
-      case op @ $LookupF(src, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $SampleF(src, _)          => op.pipeline.widen[A].some
+      case op @ $LookupF(_, _, _, _, _) => op.pipeline.widen[A].some
+      case op @ $SampleF(_, _)          => op.pipeline.widen[A].some
     }
 
     override def pipeline[A](op: WorkflowNewIn3_2F[A]) = op match {
-      case op @ $LookupF(src, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $SampleF(src, _)          => op.pipeline.widen[A].some
+      case op @ $LookupF(_, _, _, _, _) => op.pipeline.widen[A].some
+      case op @ $SampleF(_, _)          => op.pipeline.widen[A].some
     }
 
     override def shapePreserving[A](op: WorkflowNewIn3_2F[A]) =
@@ -860,7 +869,7 @@ object Workflow {
 
   // NB: no need for a typeclass if implementing this way, but will be needed as
   // soon as we need to coalesce anything _into_ a type that isn't 2.6.
-  def crystallizeAll[F[_]: Functor: Classify: Coalesce: Rewrite](implicit I: Workflow2_6F :<: F, ev1: F :<: Workflow3_2F): Crystallize[F] = new Crystallize[F] {
+  def crystallizeAll[F[_]: Functor: Classify: Coalesce: Refs](implicit I: Workflow2_6F :<: F, ev1: F :<: Workflow3_2F): Crystallize[F] = new Crystallize[F] {
   // probable conversions
   // to $MapF:          $ProjectF
   // to $FlatMapF:      $MatchF, $LimitF (using scope), $SkipF (using scope), $UnwindF, $GeoNearF
@@ -1772,7 +1781,7 @@ object Workflow {
       (implicit I: Workflow2_6F :<: F): Fix[F] =
       Fix(Coalesce[F].coalesce(I.inj($FoldLeftF(first, NonEmptyList.nel(second, IList.fromList(rest.toList))))))
 
-    // FIXME: the rsult should be in NonEmptyList, but it gives a compile error
+    // FIXME: the result should be in NonEmptyList, but it gives a compile error
     // saying "this is a GADT skolem"
     def unapply[F[_], A](op: F[A])(implicit I: Workflow2_6F :<: F)
       : Option[(A, List[A])] =

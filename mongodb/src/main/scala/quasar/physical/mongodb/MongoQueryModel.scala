@@ -27,8 +27,8 @@ object MongoQueryModel {
   /** Adds a few operators. */
   case object `3.0` extends MongoQueryModel
 
-  /** Adds `$lookup` and `$distinct`, several new operators, and makes
-    * accumulation operators available in `$project`. */
+  /** Adds \$lookup and \$distinct, several new operators, and makes
+    * accumulation operators available in \$project. */
   case object `3.2` extends MongoQueryModel
 
   implicit val semigroup: Semigroup[MongoQueryModel] =

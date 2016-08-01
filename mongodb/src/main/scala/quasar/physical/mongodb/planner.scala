@@ -1148,7 +1148,7 @@ object MongoDbPlanner {
       case `3.2` =>
         plan0[Workflow3_2F](logical)
       case _     =>
-        plan0[Workflow2_6F](logical).map(_.inject[Workflow3_2F])
+        plan0[Workflow2_6F](logical).map(_.inject[WorkflowF])
     }
   }
 }

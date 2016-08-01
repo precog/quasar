@@ -45,6 +45,8 @@ class WorkflowBuilderSpec
   val readZips = read(Collection("db", "zips"))
   def pureInt(n: Int) = pure(Bson.Int32(n))
 
+  implicit val workflowEqual: Equal[Fix[WorkflowF]] = Equal.equalA
+
   "WorkflowBuilder" should {
 
     "make simple read" in {
@@ -650,7 +652,7 @@ class WorkflowBuilderSpec
         pop <- projectField(grouped, "pop")
       } yield reduce(pop)($sum(_))
       op.map(render) must beRightDisjunction(
-        """GroupBuilder(48712dc)
+        """GroupBuilder
           |├─ ExprBuilder
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $ReadF(db; zips)

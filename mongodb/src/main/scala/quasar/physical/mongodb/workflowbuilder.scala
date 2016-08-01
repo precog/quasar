@@ -72,26 +72,19 @@ object WorkflowBuilder {
   }
 
   /** For instance, \$match, \$skip, \$limit, \$sort */
-  final case class ShapePreservingBuilderF[F[_]: Coalesce, A](
+  final case class ShapePreservingBuilderF[F[_], A](
     src: A,
     inputs: List[A],
-    op: PartialFunction[List[BsonField], FixOp[F]])(implicit ev: WorkflowOpCoreF :<: F)
+    op: PartialFunction[List[BsonField], FixOp[F]])
       extends WorkflowBuilderF[F, A]
   {
-    lazy val dummyOp =
+    def dummyOp(implicit ev0: WorkflowOpCoreF :<: F, ev1: Coalesce[F]): Fix[F] =
       op(
         inputs.zipWithIndex.map {
           case (_, index) => BsonField.Name("_" + index)
         })(
         // Nb. This read is an arbitrary value that allows us to compare the partial function
         $read[F](Collection("", "")))
-
-    override def equals(that: scala.Any) = that match {
-      case that @ ShapePreservingBuilderF(src1, inputs1, op1) =>
-        src == src1 && inputs == inputs1 && dummyOp == that.dummyOp
-      case _ => false
-    }
-    override def hashCode = List(src, inputs, dummyOp).hashCode
   }
   object ShapePreservingBuilder {
     def apply[F[_]: Coalesce](
@@ -250,7 +243,8 @@ object WorkflowBuilder {
   }
 
   // NB: This instance can’t be derived, because of `dummyOp`.
-  implicit def WorkflowBuilderEqualF[F[_]]: EqualF[WorkflowBuilderF[F, ?]] =
+  implicit def WorkflowBuilderEqualF[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F)
+    : EqualF[WorkflowBuilderF[F, ?]] =
     new EqualF[WorkflowBuilderF[F, ?]] {
       def equal[A: Equal](v1: WorkflowBuilderF[F, A], v2: WorkflowBuilderF[F, A]) = (v1, v2) match {
         case (CollectionBuilderF(g1, b1, s1), CollectionBuilderF(g2, b2, s2)) =>
@@ -1331,14 +1325,14 @@ object WorkflowBuilder {
     def expr2
       (wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
       (f: (Expression, Expression) => Expression)
-      (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb1, wb2)) { case List(e1, e2) => f(e1, e2) }
 
     def expr
       (wbs: List[WorkflowBuilder[F]])
       (f: List[Expression] => Expression)
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1350,7 +1344,7 @@ object WorkflowBuilder {
       ExprBuilder(wb, -\/(js))
 
     def jsExpr(wbs: List[WorkflowBuilder[F]], f: List[JsCore] => JsCore)
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1501,7 +1495,7 @@ object WorkflowBuilder {
         })
 
     def distinct(src: WorkflowBuilder[F])
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findKeys(src).fold(
         lift(deleteField(src, "_id")).flatMap(del => distinctBy(del, List(del))))(
@@ -1524,13 +1518,13 @@ object WorkflowBuilder {
         })
 
     def distinctBy(src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]])
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findSort(src)(s => reduce(groupBy(s, keys))($first(_)).point[M])
 
     // TODO: handle concating value, expr, or collection with group (#439)
     def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine): M[WorkflowBuilder[F]] = {
         def delegate = impl(wb2, wb1, combine.flip)
@@ -1773,7 +1767,7 @@ object WorkflowBuilder {
     }
 
     def arrayConcat(left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev0: Show[WorkflowBuilder[F]])
+      (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine):
           M[WorkflowBuilder[F]] = {
@@ -1896,11 +1890,12 @@ object WorkflowBuilder {
       new Ops[F]
   }
 
-  implicit def WorkflowBuilderRenderTree[F[_]]
+  implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
     (implicit
       RG: RenderTree[Contents[GroupValue[Expression]]],
       RC: RenderTree[Contents[Expr]],
-      RF: RenderTree[Fix[F]]
+      RF: RenderTree[Fix[F]],
+      ev: WorkflowOpCoreF :<: F
     ): RenderTree[Fix[WorkflowBuilderF[F, ?]]] =
     new RenderTree[Fix[WorkflowBuilderF[F, ?]]] {
       val nodeType = "WorkflowBuilder" :: Nil
@@ -1940,7 +1935,7 @@ object WorkflowBuilder {
               Nil)
         case GroupBuilderF(src, keys, content) =>
           val nt = "GroupBuilder" :: nodeType
-          NonTerminal(nt, Some(keys.hashCode.toHexString),
+          NonTerminal(nt, None,
             render(src) ::
               NonTerminal("By" :: nt, None, keys.map(render)) ::
               RG.render(content).copy(nodeType = "Content" :: nt) ::

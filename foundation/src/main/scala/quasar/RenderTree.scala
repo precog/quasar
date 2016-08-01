@@ -368,6 +368,13 @@ object RenderTree extends RenderTreeInstances {
         NonTerminal(List("Cofree"), None, List(t.head.render, RF(cofreeRenderTree[F, A]).render(t.tail)))
       }
     }
+
+  implicit def coproductRenderTree[F[_], G[_], A]
+    (implicit RF: RenderTree[F[A]], RG: RenderTree[G[A]])
+    : RenderTree[Coproduct[F, G, A]] = new RenderTree[Coproduct[F, G, A]] {
+    def render(v: Coproduct[F, G, A]) =
+      v.run.fold(RF.render, RG.render)
+  }
 }
 
 sealed abstract class RenderTreeInstances {

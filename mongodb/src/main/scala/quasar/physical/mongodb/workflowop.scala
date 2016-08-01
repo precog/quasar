@@ -235,6 +235,10 @@ object Workflow {
 
   // NB: no need for a typeclass if implementing this way, but will be needed as
   // soon as we need to coalesce anything _into_ a type that isn't 2.6.
+  // Furthermore, if this implementation is made implicit, then lots of functions
+  // that require it are able to resolve it from other evidence. Since that seems
+  // likely to be a short-lived phenomenon, instead for now implicits are defined
+  // below for just the specific types being used.
   def coalesceAll[F[_]: Functor](implicit I: WorkflowOpCoreF :<: F): Coalesce[F] = new Coalesce[F] {
     def coalesceƒ: F[Fix[F]] => Option[F[Fix[F]]] = {
       case $match(src, selector) => src.unFix match {
@@ -326,8 +330,8 @@ object Workflow {
       case _ => None
     }
   }
-  implicit lazy val coalesce2_6: Coalesce[WorkflowOpCoreF] = coalesceAll[WorkflowOpCoreF]
-  implicit lazy val coalesce3_2: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
+  implicit val coalesce2_6: Coalesce[WorkflowOpCoreF] = coalesceAll[WorkflowOpCoreF]
+  implicit val coalesce3_2: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
 
   def toPipelineOp[F[_]: Functor, A](op: PipelineF[F, A], base: DocVar)(implicit I: F :<: WorkflowF): PipelineOp = {
     val prefix = prefixBase(base)
@@ -362,8 +366,15 @@ object Workflow {
       */
     def crush(op: F[(Fix[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask)
   }
+  object Crush {
+    implicit def crushInjected[F[_]: Functor, G[_]: Functor](implicit I: F :<: G, CG: Crush[G]): Crush[F] =
+      new Crush[F] {
+        def crush(op: F[(Fix[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask) =
+          CG.crush(I.inj(op.map { case (f, t) => (f.transCata(I.inj(_)), t) }))
+      }
+  }
 
-  implicit def crush3_2(implicit I: WorkflowOpCoreF :<: WorkflowF): Crush[WorkflowF] = new Crush[WorkflowF] {
+  implicit def crushWorkflowF(implicit I: WorkflowOpCoreF :<: WorkflowF): Crush[WorkflowF] = new Crush[WorkflowF] {
     def crush(op: WorkflowF[(Fix[WorkflowF], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask) = op match {
       case $pure(value) => (DocVar.ROOT(), PureTask(value))
       case $read(coll)  => (DocVar.ROOT(), ReadTask(coll))
@@ -511,13 +522,7 @@ object Workflow {
     }
   }
 
-  def crushInjected[F[_]: Functor, G[_]: Functor](implicit I: F :<: G, CG: Crush[G]): Crush[F] =
-    new Crush[F] {
-      def crush(op: F[(Fix[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask) =
-        CG.crush(I.inj(op.map { case (f, t) => (f.transCata(I.inj(_)), t) }))
-    }
-
-  implicit val crush2_6: Crush[WorkflowOpCoreF] = crushInjected[WorkflowOpCoreF, WorkflowF]
+  implicit val crush2_6: Crush[WorkflowOpCoreF] = Crush.crushInjected[WorkflowOpCoreF, WorkflowF]
 
   def collectShapes[F[_]](implicit I: WorkflowOpCoreF :<: F)
     : F[(Fix[F], (List[Reshape], Fix[F]))] => (List[Reshape], Fix[F]) =
@@ -536,24 +541,26 @@ object Workflow {
   @typeclass sealed trait Refs[F[_]] {
     def refs[A](op: F[A]): List[DocVar]
   }
-
-  private def refsFromRewrite[F[_]](rewrite: (F[_], PartialFunction[DocVar, DocVar]) => F[_]) = new Refs[F] {
-    def refs[A](op: F[A]): List[DocVar] = {
-      // FIXME: Sorry world
-      val vf = new scala.collection.mutable.ListBuffer[DocVar]
-      ignore(rewrite(op, { case v => ignore(vf += v); v }))
-      vf.toList
+  object Refs {
+    def fromRewrite[F[_]](rewrite: (F[_], PartialFunction[DocVar, DocVar]) => F[_]) = new Refs[F] {
+      def refs[A](op: F[A]): List[DocVar] = {
+        // FIXME: Sorry world
+        val vf = new scala.collection.mutable.ListBuffer[DocVar]
+        ignore(rewrite(op, { case v => ignore(vf += v); v }))
+        vf.toList
+      }
     }
+
+    implicit def coproductRefs[F[_], G[_]](implicit RF: Refs[F], RG: Refs[G]): Refs[Coproduct[F, G, ?]] =
+      new Refs[Coproduct[F, G, ?]] {
+        def refs[A](op: Coproduct[F, G, A]): List[DocVar] =
+          op.run.fold(RF.refs, RG.refs)
+      }
   }
 
-  implicit val refs2_6: Refs[WorkflowOpCoreF] = refsFromRewrite[WorkflowOpCoreF](rewriteRefs2_6)
-  implicit val refs3_2: Refs[WorkflowOp3_2F] = refsFromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
+  implicit val refs2_6: Refs[WorkflowOpCoreF] = Refs.fromRewrite[WorkflowOpCoreF](rewriteRefs2_6)
+  implicit val refs3_2: Refs[WorkflowOp3_2F] = Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
 
-  implicit def coproductRefs[F[_], G[_]](implicit RF: Refs[F], RG: Refs[G]): Refs[Coproduct[F, G, ?]] =
-    new Refs[Coproduct[F, G, ?]] {
-      def refs[A](op: Coproduct[F, G, A]): List[DocVar] =
-        op.run.fold(RF.refs, RG.refs)
-    }
 
   // NB: it's useful to be able to return the precise type here, so this is
   // explicitly implemented for each version's trait.
@@ -642,6 +649,31 @@ object Workflow {
     def pipeline[A](op: F[A]):        Option[PipelineF[F, A]]
     def shapePreserving[A](op: F[A]): Option[ShapePreservingF[F, A]]
   }
+  object Classify {
+    implicit def coproductClassify[F[_]: Functor, G[_]: Functor, A]
+      (implicit CF: Classify[F], CG: Classify[G])
+      : Classify[Coproduct[F, G, ?]] = new Classify[Coproduct[F, G, ?]] {
+      def source[A](v: Coproduct[F, G, A]) =
+        v.run.fold(
+          CF.source(_).map(_.fmap(Coproduct.leftc[F, G, A](_))),
+          CG.source(_).map(_.fmap(Coproduct.rightc[F, G, A](_))))
+
+      def singleSource[A](v: Coproduct[F, G, A]) =
+        v.run.fold(
+          CF.singleSource(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
+          CG.singleSource(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
+
+      def pipeline[A](v: Coproduct[F, G, A]) =
+        v.run.fold(
+          CF.pipeline(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
+          CG.pipeline(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
+
+      def shapePreserving[A](v: Coproduct[F, G, A]) =
+        v.run.fold(
+          CF.shapePreserving(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
+          CG.shapePreserving(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
+    }
+  }
 
   implicit val classify2_6: Classify[WorkflowOpCoreF] = new Classify[WorkflowOpCoreF] {
     override def source[A](op: WorkflowOpCoreF[A]) = op match {
@@ -691,7 +723,7 @@ object Workflow {
     }
   }
 
-  implicit val classifyNewIn3_2: Classify[WorkflowOp3_2F] = new Classify[WorkflowOp3_2F] {
+  implicit val classify3_2: Classify[WorkflowOp3_2F] = new Classify[WorkflowOp3_2F] {
     override def source[A](op: WorkflowOp3_2F[A]) =
       None
 
@@ -709,37 +741,12 @@ object Workflow {
       None
   }
 
-  implicit def coproductClassify[F[_]: Functor, G[_]: Functor, A]
-    (implicit CF: Classify[F], CG: Classify[G])
-    : Classify[Coproduct[F, G, ?]] = new Classify[Coproduct[F, G, ?]] {
-    def source[A](v: Coproduct[F, G, A]) =
-      v.run.fold(
-        CF.source(_).map(_.fmap(Coproduct.leftc[F, G, A](_))),
-        CG.source(_).map(_.fmap(Coproduct.rightc[F, G, A](_))))
-
-    def singleSource[A](v: Coproduct[F, G, A]) =
-      v.run.fold(
-        CF.singleSource(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
-        CG.singleSource(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
-
-    def pipeline[A](v: Coproduct[F, G, A]) =
-      v.run.fold(
-        CF.pipeline(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
-        CG.pipeline(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
-
-    def shapePreserving[A](v: Coproduct[F, G, A]) =
-      v.run.fold(
-        CF.shapePreserving(_).map(_.fmap(ι, Inject[F, Coproduct[F, G, ?]])),
-        CG.shapePreserving(_).map(_.fmap(ι, Inject[G, Coproduct[F, G, ?]])))
-  }
-
-
   /** Newtype for source ops (that is, ops that are themselves sources). */
   // TODO: prevent construction of invalid instances
-  final case class SourceF[F[_]: Functor, A](wf: F[A]) {
-    def op: F[Unit] = wf.void
+  final case class SourceF[F[_], A](wf: F[A]) {
+    def op(implicit ev: Functor[F]): F[Unit] = wf.void
 
-    def fmap[G[_]: Functor, B](f: F[A] => G[B]): SourceF[G, B] =
+    def fmap[G[_], B](f: F[A] => G[B]): SourceF[G, B] =
       SourceF(f(wf))
   }
   object IsSource {
@@ -761,7 +768,7 @@ object Workflow {
     // comment referring to?
     def reparentW(newSrc: Fix[F]): Fix[F] = Fix(reparent(newSrc).wf)
 
-    def fmap[G[_]: Functor, B](f: A => B, g: F ~> G): SingleSourceF[G, B] =
+    def fmap[G[_], B](f: A => B, g: F ~> G): SingleSourceF[G, B] =
       new SingleSourceF[G, B] {
         val src = f(self.src)
         val wf = g(self.reparent(src).wf)
@@ -787,7 +794,7 @@ object Workflow {
     def bson: Bson.Doc = Bson.Doc(ListMap(op -> rhs))
 
     // NB: narrows the result type
-    override def fmap[G[_]: Functor, B](f: A => B, g: F ~> G): PipelineF[G, B] =
+    override def fmap[G[_], B](f: A => B, g: F ~> G): PipelineF[G, B] =
       new PipelineF[G, B] {
         val src = f(self.src)
         val wf = g(self.reparent(src).wf)
@@ -812,7 +819,7 @@ object Workflow {
     def reparent[B](newSrc: B): ShapePreservingF[F, B]
 
     // NB: narrows the result type
-    override def fmap[G[_]: Functor, B](f: A => B, g: F ~> G): ShapePreservingF[G, B] =
+    override def fmap[G[_], B](f: A => B, g: F ~> G): ShapePreservingF[G, B] =
       new ShapePreservingF[G, B] {
         val src = f(self.src)
         val wf = g(self.reparent(src).wf)
@@ -862,9 +869,9 @@ object Workflow {
     def crystallize(op: Fix[F]): Crystallized[F]
   }
 
-  // NB: no need for a typeclass if implementing this way, but will be needed as
-  // soon as we need to coalesce anything _into_ a type that isn't 2.6.
-  def crystallizeAll[F[_]: Functor: Classify: Coalesce: Refs](implicit I: WorkflowOpCoreF :<: F, ev1: F :<: Workflow3_2F): Crystallize[F] = new Crystallize[F] {
+  // NB: no need for a typeclass if implementing this way, but it will be needed
+  // as soon as we need to match on anything here that isn't in core.
+  implicit def crystallizeWorkflowF[F[_]: Functor: Classify: Coalesce: Refs](implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF): Crystallize[F] = new Crystallize[F] {
     // probable conversions
     // to $MapF:          $ProjectF
     // to $FlatMapF:      $MatchF, $LimitF (using scope), $SkipF (using scope), $UnwindF, $GeoNearF
@@ -938,9 +945,6 @@ object Workflow {
       )
     }
   }
-
-  implicit lazy val crystallize2_6: Crystallize[WorkflowOpCoreF] = crystallizeAll[WorkflowOpCoreF]
-  implicit lazy val crystallize3_2: Crystallize[Workflow3_2F] = crystallizeAll[Workflow3_2F]
 
   final case class $PureF(value: Bson) extends WorkflowOpCoreF[Nothing]
   object $pure {
@@ -1875,14 +1879,6 @@ object Workflow {
       case $SampleF(_, size) =>
         Terminal("$SampleF" :: wfType, Some(size.toString))
     }
-  }
-
-  // TODO: where does this belong?
-  implicit def coproductRenderTree[F[_], G[_], A]
-    (implicit RF: RenderTree[F[A]], RG: RenderTree[G[A]])
-    : RenderTree[Coproduct[F, G, A]] = new RenderTree[Coproduct[F, G, A]] {
-    def render(v: Coproduct[F, G, A]) =
-      v.run.fold(RF.render, RG.render)
   }
 
   implicit def WorkflowRenderTree[F[_]: Traverse: Classify]

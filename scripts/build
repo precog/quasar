@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 
-[[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS
+[[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 

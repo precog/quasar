@@ -10,8 +10,7 @@ script:
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
-  - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - ./scripts/build $MONGO_RELEASE | ts
+  - ./bin/run-travis.sh
 after_success: ./scripts/afterSuccess
 notifications:
   irc:

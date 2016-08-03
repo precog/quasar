@@ -15,16 +15,14 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
-val travisSettings = sys.env get "TRAVIS" match {
-  case None => Seq()
-  case _    =>
-    Seq(
-      ivyLoggingLevel := UpdateLogging.Quiet,
-      logLevel in Global := Level.Warn,
-      logLevel in Compile := Level.Warn,
-      logLevel in Test := Level.Info
-    )
-}
+def quietSettings = Seq(
+      ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+  evictionWarningOptions in update := EvictionWarningOptions.empty,
+                logLevel in Global := Level.Warn,
+               logLevel in Compile := Level.Warn,
+                  logLevel in Test := Level.Info
+)
+def travisSettings = if (sys.env contains "TRAVIS") quietSettings else Seq()
 
 val BothScopes = "test->test;compile->compile"
 
@@ -54,7 +52,6 @@ lazy val commonSettings = travisSettings ++ Seq(
   },
   autoCompilerPlugins := true,
   autoAPIMappings := true,
-  exportJars := true,
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),

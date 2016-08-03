@@ -26,4 +26,4 @@ runTests () {
   ./scripts/build $MONGO_RELEASE
 }
 
-runTests | ts '%H:%M:%.S'
+runTests

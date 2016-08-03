@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
+#
 
+[[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
@@ -60,20 +62,17 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   echo "Using local MongoDB config"
 fi
 
+runSbt () {
+  "$SBT" -v -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@"
+}
+
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
-  # Require that all header comments are present before proceeding, then
-  # build and run all tests everywhere (including integration) and then re-compile without coverage
-  # in order to get a jar that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean checkHeaders coverage test exclusive:test coverageReport "set coverageEnabled := false" oneJar doc
+  runSbt checkHeaders coverage test exclusive:test coverageReport
+  runSbt oneJar doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
-  TEST_STATUS=$?
-
-  echo "Result of Quasar JAR test: $TEST_STATUS"
-
-  exit $TEST_STATUS
 else
   # Not the first job in Travis (no sense generating a jar and doc on all of them)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} test exclusive:test
+  runSbt test exclusive:test
 fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 
-set -xeuo pipefail
+set -euo pipefail
 
 jobId="${TRAVIS_JOB_NUMBER##*.}"
 pullReq=0

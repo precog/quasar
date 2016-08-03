@@ -2,12 +2,16 @@ language: scala
 scala: 2.11.8 # but this setting isn't used when there's an explicit script
 jdk: oraclejdk8
 sudo: false
+addons:
+  apt:
+    packages:
+      - moreutils # for ts
 script:
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - ./scripts/build $MONGO_RELEASE
+  - ./scripts/build $MONGO_RELEASE | ts
 after_success: ./scripts/afterSuccess
 notifications:
   irc:

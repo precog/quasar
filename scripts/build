@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 #
 
+ANSI_CLEAR="\033[0K"
+
+travis_fold() {
+  local action=$1
+  local name=$2
+  echo -en "travis_fold:${action}:${name}\r${ANSI_CLEAR}"
+}
+
+travis_fold start quasar-setup
+
 [[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
@@ -62,23 +72,13 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   echo "Using local MongoDB config"
 fi
 
-ANSI_CLEAR="\033[0K"
-
-travis_fold() {
-  local action=$1
-  local name=$2
-  echo -en "travis_fold:${action}:${name}\r${ANSI_CLEAR}"
-}
-
-runCmd () {
-  travis_fold start "$1"
-  "$@" | ts '%H:%M:%.S'
-  travis_fold end "$1"
-}
-
 runSbt () {
-  runCmd "$SBT" -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@"
+  travis_fold start sbt
+  "$SBT" -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@" | ts '%H:%M:%.S'
+  travis_fold end sbt
 }
+
+travis_fold end quasar-setup
 
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
   runSbt -q update

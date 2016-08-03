@@ -63,12 +63,13 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
 fi
 
 runSbt () {
-  "$SBT" -v -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@"
+  "$SBT" -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@"
 }
 
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
-  runSbt checkHeaders coverage test exclusive:test coverageReport
-  runSbt oneJar doc
+  runSbt -q update
+  runSbt -v checkHeaders coverage test exclusive:test coverageReport
+  runSbt -v oneJar doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"

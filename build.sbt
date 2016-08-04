@@ -190,7 +190,7 @@ lazy val foundation = project
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
-    libraryDependencies ++= Dependencies.core,
+    libraryDependencies ++= Dependencies.foundation,
     publishArtifact in (Test, packageBin) := true)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -199,7 +199,6 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
-  .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
@@ -220,7 +219,7 @@ lazy val js = project
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes, foundation % BothScopes)
+  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
@@ -241,6 +240,7 @@ lazy val main = project
     postgresql % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.main)
   .enablePlugins(AutomateHeaderPlugin)
 
 // filesystems (backends)
@@ -250,8 +250,7 @@ lazy val mongodb = project
   .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
-  .settings(libraryDependencies +=
-    "org.mongodb" % "mongodb-driver-async" % "3.2.2")
+  .settings(libraryDependencies ++= Dependencies.mongodb)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val skeleton = project
@@ -263,7 +262,7 @@ lazy val skeleton = project
 
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
@@ -311,9 +310,7 @@ lazy val web = project
 
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(
-    main % BothScopes,
-    web  % BothScopes)
+  .dependsOn(web % BothScopes)
   .settings(commonSettings: _*)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)

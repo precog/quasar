@@ -1,0 +1,2 @@
+- Eliminate unused dependencies
+- Introduce dependencies to projects only as needed

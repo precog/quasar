@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
+#
 
-set -euo pipefail # STRICT MODE
-IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
-
-source "$(dirname $0)/constants"
+source "./bin/bashlib.sh"
+set -v
 
 # NB: This assumes Linux
 CONFIG_DIR=$HOME/.config/quasar
@@ -20,29 +19,23 @@ QUASAR_LOG_FILE="$TEMP_DIR/quasarout.log"
 
 echo "Launching Quasar JAR..."
 
-java -jar "$QUASAR_WEB_JAR_PATH" &> "$QUASAR_LOG_FILE" &
+java -verbose -jar "$QUASAR_WEB_JAR_PATH" |& tee "$QUASAR_LOG_FILE" &
 QUASAR_PID=$!
 
 echo "Quasar PID: $QUASAR_PID"
 
 sleep 10s
-
-cat $QUASAR_LOG_FILE
+cat "$QUASAR_LOG_FILE"
 
 echo "Killing Quasar JAR..."
-
 kill -9 $QUASAR_PID
 KILL_STATUS=$?
-
 echo "Status code from killing Quasar: $KILL_STATUS"
 
-if [[ $(cat "$QUASAR_LOG_FILE") == *"$QUASAR_SUCCESS_OUTPUT"* ]]
-then
+if grep -q "$QUASAR_SUCCESS_OUTPUT" "$QUASAR_LOG_FILE"; then
   echo "Quasar successfully started"
-
-  exit 0
 else
-  >&2 echo "Quasar failed to start"
-
+  echo "Quasar failed to start"
+  cat "$QUASAR_LOG_FILE"
   exit 1
 fi

@@ -3,6 +3,22 @@
 
 source "./bin/bashlib.sh"
 
+export MONGO_2_6_LINUX=2.6.11
+export MONGO_2_6_PORT=27018
+export MONGO_2_6_AUTH=""
+export MONGO_3_0_LINUX=3.0.7
+export MONGO_3_0_PORT=27019
+export MONGO_3_0_AUTH=""
+export MONGO_3_0_RO_LINUX=3.0.9
+export MONGO_3_0_RO_PORT=27019
+export MONGO_3_0_RO_AUTH="--auth"
+export MONGO_3_2_LINUX=3.2.3
+export MONGO_3_2_PORT=27020
+export MONGO_3_2_AUTH=""
+export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
+export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
+export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
+
 exitSuccess () {
   echo "$@" && exit 0
 }
@@ -12,13 +28,16 @@ runTestJar () {
   set +x
 }
 runCoverage() {
-  runSbt "sbt-update" -v update checkHeaders
+  runSbt "sbt-update" -v clean update checkHeaders
   runSbt "sbt-test-with-coverage" -v coverage test exclusive:test coverageReport
+  pip install --user codecov && codecov
 }
 runJarAndDoc() {
-  runSbt "sbt-update" -v update
+  runSbt "sbt-update" -v clean update
+  runSbt "sbt-compile" -v compile
   runSbt "sbt-oneJar" -v oneJar
   runSbt "sbt-doc" -v doc
+  "$SCRIPT_DIR/publishJarIfMaster"
 }
 runTests() {
   runSbt "sbt-update" -v update

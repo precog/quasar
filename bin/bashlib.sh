@@ -13,6 +13,10 @@ case $TRAVIS_PULL_REQUEST in
             *) pullReq=0 ;;
 esac
 
+die () {
+  echo >&2 "$@"
+  exit 1
+}
 travis_fold() {
   local action=$1
   local name=$2
@@ -27,6 +31,8 @@ travis_fold_eval () {
 
 quasar_mongo_init () {
   echo "Installing mongo..."
+  QUASAR_MONGODB_RELEASE="$MONGO_RELEASE"
+
   ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
 
   echo "Setting up quasar test run..."
@@ -47,40 +53,27 @@ quasar_mongo_init () {
 
   # Enables running tests for a single mongo release by specifying an argument of
   # "2_6", "3_0", or "3_2" for the MongoDB 2.6.x, 3.0.x, and 3.2.x releases.
-  if [[ "$#" == "1" ]]; then
-    QUASAR_MONGODB_RELEASE="$1"
-  else
-    QUASAR_MONGODB_RELEASE="ALL"
-  fi
 
   # Perform setup for integration tests:
-  if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
-    export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
+  export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
 
-    if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
-      export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
-    elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
-      export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
-    elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-      export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
-      export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
-    elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
-      export QUASAR_MONGODB_3_2="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_2}\"}}"
-    else
-      export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
-      export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
-      export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
-      export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
-      export QUASAR_MONGODB_3_2="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_2}\"}}"
-    fi
+  setRO () {
+    export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+    export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+  }
 
-    echo "Using local MongoDB config"
-  fi
+  case "$QUASAR_MONGODB_RELEASE" in
+      2_6) export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}" ;;
+      3_0) export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}" ;;
+      3_2) export QUASAR_MONGODB_3_2="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_2}\"}}" ;;
+   3_0_RO) setRO ;;
+        *) die "Unknown mongodb release: $QUASAR_MONGODB_RELEASE" ;;
+  esac
 }
 
 runSbtDirect () {
   echo "% sbt ++$TRAVIS_SCALA_VERSION -batch $@"
-  ./sbt ++$TRAVIS_SCALA_VERSION -batch "$@"
+  ./sbt ++$TRAVIS_SCALA_VERSION -batch -DisIsolatedEnv=true "$@"
 }
 runSbt () {
   local foldid="$1" && shift

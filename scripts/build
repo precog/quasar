@@ -82,7 +82,7 @@ runSbt () {
 }
 
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
-  runSbt "sbt-update" -q update
+  runSbt "sbt-update" -v update
   runSbt "sbt-test-with-coverage" -v checkHeaders coverage test exclusive:test coverageReport
   runSbt "sbt-oneJar-doc" -v oneJar doc
 

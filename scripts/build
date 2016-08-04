@@ -72,22 +72,24 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   echo "Using local MongoDB config"
 fi
 
-runSbt () {
-  travis_fold start sbt
-  "$SBT" -batch -J-Xmx2g -J-Xss2m -DisIsolatedEnv=${ISOLATED_ENV:=false} "$@" | ts '%H:%M:%.S'
-  travis_fold end sbt
-}
-
 travis_fold end quasar-setup
 
+runSbt () {
+  local foldid="$1" && shift
+  travis_fold start $foldid
+  ./sbt ++$TRAVIS_SCALA_VERSION -batch "$@" | ts '%H:%M:%.S'
+  travis_fold end $foldid
+}
+
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
-  runSbt -q update
-  runSbt -v checkHeaders coverage test exclusive:test coverageReport
-  runSbt -v oneJar doc
+  runSbt "sbt-update" -q update
+  runSbt "sbt-test-with-coverage" -v checkHeaders coverage test exclusive:test coverageReport
+  runSbt "sbt-oneJar-doc" -v oneJar doc
 
   # Test to ensure the JAR file is valid:
+  echo "Attempting to run testJar..."
   "$SCRIPT_DIR/testJar"
 else
   # Not the first job in Travis (no sense generating a jar and doc on all of them)
-  runSbt test exclusive:test
+  runSbt "sbt-test" test exclusive:test
 fi

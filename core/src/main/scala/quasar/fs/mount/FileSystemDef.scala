@@ -16,53 +16,51 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{PartialFunction, String, Unit}
+import quasar.Predef.{None, Option, PartialFunction, String, Unit}
+import quasar.SKI.κ
 import quasar.EnvironmentError
 import quasar.fs.{FileSystem, FileSystemType}
 
 import scala.StringContext
+
 import scalaz._
+import scalaz.syntax.either._
+import scalaz.syntax.monadError._
 
 import FileSystemDef._
 
-final case class FileSystemDef[F[_]](run: FsCfg => DefErrT[F, DefinitionResult[F]]) {
+final case class FileSystemDef[F[_]](run: FsCfg => Option[DefErrT[F, DefinitionResult[F]]]) {
+  def apply(typ: FileSystemType, uri: ConnectionUri)(implicit F: Monad[F]): DefErrT[F, DefinitionResult[F]] =
+    run((typ, uri)).getOrElse(NonEmptyList(
+      s"Unsupported filesystem type: ${typ.value}"
+    ).left[EnvironmentError].raiseError[DefErrT[F, ?], DefinitionResult[F]])
 
-  def apply(typ: FileSystemType, uri: ConnectionUri): DefErrT[F, DefinitionResult[F]] =
-    run((typ, uri))
+  def orElse(other: => FileSystemDef[F]): FileSystemDef[F] =
+    FileSystemDef(cfg => run(cfg) orElse other.run(cfg))
 
   def translate[G[_]: Functor](f: F ~> G): FileSystemDef[G] =
-    FileSystemDef(c => EitherT(f(run(c).run)).map(_.translate(f)))
+    FileSystemDef(c => run(c).map(r => EitherT(f(r.run)).map(_ translate f)))
 }
 
 object FileSystemDef {
-  type FsCfg                  = (FileSystemType, ConnectionUri)
+  type FsCfg            = (FileSystemType, ConnectionUri)
   /** Reasons why the configuration is invalid or an environment error. */
-  type DefinitionError        = NonEmptyList[String] \/ EnvironmentError
-  type DefErrT[F[_], A]       = EitherT[F, DefinitionError, A]
+  type DefinitionError  = NonEmptyList[String] \/ EnvironmentError
+  type DefErrT[F[_], A] = EitherT[F, DefinitionError, A]
 
   final case class DefinitionResult[F[_]](run: FileSystem ~> F, close: F[Unit]) {
     def translate[G[_]](f: F ~> G): DefinitionResult[G] =
       DefinitionResult(f compose run, f(close))
   }
 
-  def fromPF[F[_]: Monad](
+  def fromPF[F[_]](
     pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
   ): FileSystemDef[F] =
-    FileSystemDef(cfg => pf.lift(cfg).getOrElse(Monoid[FileSystemDef[F]].zero.run(cfg)))
+    FileSystemDef(pf.lift)
 
-  implicit def fileSystemDefMonoid[F[_]](implicit F: Monad[F]): Monoid[FileSystemDef[F]] =
+  implicit def fileSystemDefMonoid[F[_]]: Monoid[FileSystemDef[F]] =
     new Monoid[FileSystemDef[F]] {
-      def zero = FileSystemDef { case (typ, uri) =>
-        MonadError[EitherT[F,DefinitionError,?], DefinitionError]
-          .raiseError(\/.left(NonEmptyList(s"Unsupported filesystem type: ${typ.value}")))
-      }
-
-      // TODO{scalaz-7.2}: Use `orElse` once we upgrade to a version 7.2+ as
-      //                   the version in 7.1 is broken
-      def append(d1: FileSystemDef[F], d2: => FileSystemDef[F]) =
-        FileSystemDef(cfg => EitherT(F.bind(d1.run(cfg).run) {
-          case -\/(_) => d2.run(cfg).run
-          case \/-(f) => F.point(\/.right(f))
-        }))
+      def zero = FileSystemDef(κ(None))
+      def append(d1: FileSystemDef[F], d2: => FileSystemDef[F]) = d1 orElse d2
     }
 }

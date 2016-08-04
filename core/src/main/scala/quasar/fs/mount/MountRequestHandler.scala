@@ -55,7 +55,8 @@ final class MountRequestHandler[F[_], S[_]](
   )(implicit
     T0: F :<: T,
     T1: fsm.MountedFsRef :<: T,
-    T2: HierarchicalFsRef :<: T
+    T2: HierarchicalFsRef :<: T,
+    F: Monad[F]
   ): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {

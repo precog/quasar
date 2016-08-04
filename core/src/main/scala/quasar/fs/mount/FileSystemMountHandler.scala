@@ -40,7 +40,7 @@ final class FileSystemMountHandler[F[_]](fsDef: FileSystemDef[F]) {
     */
   def mount[S[_]]
       (loc: ADir, typ: FileSystemType, uri: ConnectionUri)
-      (implicit S0: F :<: S, S1: MountedFsRef :<: S)
+      (implicit S0: F :<: S, S1: MountedFsRef :<: S, F: Monad[F])
       : Free[S, MountingError \/ Unit] = {
 
     type M[A] = Free[S, A]
@@ -52,9 +52,10 @@ final class FileSystemMountHandler[F[_]](fsDef: FileSystemDef[F]) {
 
     val createFs: MntErrT[M, DefinitionResult[F]] =
       EitherT[M, DefinitionError, DefinitionResult[F]](
-        free.lift(fsDef(typ, uri).run).into[S]).leftMap(_.fold(
-          invalidConfig(fileSystemConfig(typ, uri), _),
-          environmentError(_)))
+        free.lift(fsDef(typ, uri).run).into[S]
+      ).leftMap(_.fold(
+        invalidConfig(fileSystemConfig(typ, uri), _),
+        environmentError(_)))
 
     def addMount(fsr: DefinitionResult[F]): MntErrT[M, Unit] = {
       def cleanupOnError(err: String) =

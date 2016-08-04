@@ -10,6 +10,7 @@ travis_fold() {
 }
 
 travis_fold start quasar-setup
+echo "Setting up quasar test run..."
 
 [[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
 set -euo pipefail # STRICT MODE
@@ -77,6 +78,7 @@ travis_fold end quasar-setup
 runSbt () {
   local foldid="$1" && shift
   travis_fold start $foldid
+  echo "% sbt ++$TRAVIS_SCALA_VERSION -batch $@"
   ./sbt ++$TRAVIS_SCALA_VERSION -batch "$@" | ts '%H:%M:%.S'
   travis_fold end $foldid
 }

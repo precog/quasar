@@ -1,29 +1,44 @@
 #!/usr/bin/env bash
 #
 
-set -euo pipefail
+source "./bin/bashlib.sh"
 
-jobId="${TRAVIS_JOB_NUMBER##*.}"
-pullReq=0
+exitSuccess () {
+  echo "$@" && exit 0
+}
+runTestJar () {
+  set -x
+  travis_fold_eval "run-test-jar" "$SCRIPT_DIR/testJar"
+  set +x
+}
+runCoverage() {
+  runSbt "sbt-update" -v update checkHeaders
+  runSbt "sbt-test-with-coverage" -v coverage test exclusive:test coverageReport
+}
+runJarAndDoc() {
+  runSbt "sbt-update" -v update
+  runSbt "sbt-oneJar" -v oneJar
+  runSbt "sbt-doc" -v doc
+}
+runTests() {
+  runSbt "sbt-update" -v update
+  runSbt "sbt-test" -v test exclusive:test
+}
 
-case $TRAVIS_PULL_REQUEST in
-  [0-9][0-9]*) pullReq="$TRAVIS_PULL_REQUEST" ;;
-esac
-
-if (( jobId > 1)); then
+if (( jobId > 2 )); then
   if (( pullReq > 0 )); then
-    echo "Skipping job $TRAVIS_JOB_NUMBER on pull request $pullReq"
-    exit 0
-  fi
-  if [[ "$TRAVIS_BRANCH" != "master" ]]; then
-    echo "Skipping job $TRAVIS_JOB_NUMBER on push to non-master branch $TRAVIS_BRANCH"
-    exit 0
+    exitSuccess "Skipping job $jobId on pull request $pullReq"
+  elif [[ "$TRAVIS_BRANCH" != "master" ]]; then
+    exitSuccess "Skipping job $jobId on push to non-master branch $TRAVIS_BRANCH"
   fi
 fi
 
-runTests () {
-  ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  ./scripts/build $MONGO_RELEASE
-}
+travis_fold_eval "quasar-mongo-init" quasar_mongo_init
 
-runTests
+if [[ -n ${CODE_COVERAGE:-} ]]; then
+  runCoverage
+elif (( jobId <= 2 )); then
+  runJarAndDoc
+else
+  runTests
+fi

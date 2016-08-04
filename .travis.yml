@@ -29,10 +29,11 @@ before_cache:
 - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
 - find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
 
-# At the momenet only the first job is run on pull requests,
-# so it's mongo 3.2 as the most relevant and fastest.
+# At the momenet only the first two jobs are run on pull requests,
+# so those get mongo 3.2 as the most relevant and fastest.
 env:
   matrix:
+  - MONGO_RELEASE=3_2 CODE_COVERAGE=true
   - MONGO_RELEASE=3_2
   - MONGO_RELEASE=2_6
   - MONGO_RELEASE=3_0

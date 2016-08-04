@@ -8,6 +8,7 @@ SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 WS_DIR="$SCRIPT_DIR/.."
 
 SBT="$WS_DIR/sbt"
+ANSI_CLEAR="\033[0K"
 
 TEMP_DIR="$WS_DIR/tmp"
 

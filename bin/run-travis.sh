@@ -22,22 +22,17 @@ export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
 exitSuccess () {
   echo "$@" && exit 0
 }
-runTestJar () {
-  set -x
-  travis_fold_eval "run-test-jar" "$SCRIPT_DIR/testJar"
-  set +x
-}
 runCoverage() {
   runSbt "sbt-update" -v clean update checkHeaders
-  runSbt "sbt-test-with-coverage" -v coverage test exclusive:test coverageReport
-  pip install --user codecov && codecov
+  runSbt "sbt-test-coverage" -v coverage test exclusive:test coverageReport
+  travis_fold_eval "publish-coverage" pip install --user codecov '&&' codecov
 }
 runJarAndDoc() {
   runSbt "sbt-update" -v clean update
   runSbt "sbt-compile" -v compile
   runSbt "sbt-oneJar" -v oneJar
   runSbt "sbt-doc" -v doc
-  "$SCRIPT_DIR/publishJarIfMaster"
+  travis_fold_eval "jar-test-publish" "$SCRIPT_DIR/testJar" '&&' "$SCRIPT_DIR/publishJarIfMaster"
 }
 runTests() {
   runSbt "sbt-update" -v update

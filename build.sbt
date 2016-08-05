@@ -17,10 +17,10 @@ import scoverage._
 
 def quietSettings = Seq(
       ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
-  evictionWarningOptions in update := EvictionWarningOptions.empty,
-                logLevel in Global := Level.Warn,
-               logLevel in Compile := Level.Warn,
-                  logLevel in Test := Level.Info
+  evictionWarningOptions in update := EvictionWarningOptions.empty
+  //               logLevel in Global := Level.Warn,
+  //              logLevel in Compile := Level.Warn,
+  //                 logLevel in Test := Level.Info
 )
 def travisSettings = if (sys.env contains "TRAVIS") quietSettings else Seq()
 

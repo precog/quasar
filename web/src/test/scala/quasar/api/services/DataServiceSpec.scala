@@ -140,7 +140,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
                 }
                 s"precise and in a single json array (${jsonPreciseArray.mediaType.renderString})" >> {
                   testProp(jsonPreciseArray)
-                }
+                }.flakyTest
               }
               "csv" ! prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) =>
                 test(format, filesystem)
@@ -506,7 +506,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             "srcPath" := fs.dir,
             "dstPath" := file),
           newState = Unchanged)
-      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      }.set(minTestsOk = 10).flakyTest  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: ADir) =>
         testMove(
           from = fs.file,

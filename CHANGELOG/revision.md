@@ -1,0 +1,3 @@
+- Hardening and reducing load on CI rig
+- Updated bundled sbt from sbt-extras to current version
+- Added timestamps to build output

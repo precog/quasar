@@ -55,6 +55,7 @@ class QueryFileSpec
             beRight(containTheSameElementsAs(expected))
       }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
+        .flakyTest("see issue #1295")
 
       "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)

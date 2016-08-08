@@ -9,6 +9,9 @@ docker run --name some-mongo -p 27017:27017 -d mongo
 echo "set QUASAR_MONGODB_3_2 variable"
 export QUASAR_MONGODB_3_2="{\"mongodb\":{\"connectionUri\":\"mongodb://localhost:27017\"}}"
 
+echo "set QUASAR_SPARK_LOCAL to local-cluster mode"
+export QUASAR_SPARK_LOCAL="{\"sparklocal\":{\"connectionUri\":\"local[*]\"}}"
+
 echo "run tests"
 ./sbt test
 

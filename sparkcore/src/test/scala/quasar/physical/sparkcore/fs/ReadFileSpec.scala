@@ -101,7 +101,6 @@ class ReadFileSpec extends Specification with ScalaCheck  {
     slData <- OptionT(Task.now(uriData.asInstanceOf[Obj].value.get("sparklocal")))
     uri <- OptionT(Task.now(slData.asInstanceOf[Obj].value.get("connectionUri")))
   } yield {
-    println("************ ")
     val master = uri.asInstanceOf[Str].value
     val config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
     new SparkContext(config)

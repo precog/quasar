@@ -27,7 +27,7 @@ import org.specs2.ScalaCheck
 import argonaut.JsonScalaz._
 import scalaz.Scalaz._
 
-class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
+class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers {
   import Type._
   import TypeArbitrary._, DataArbitrary._
 

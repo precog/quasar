@@ -1,0 +1,1 @@
+- More declarative sbt publishing settings

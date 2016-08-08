@@ -1,0 +1,1 @@
+- Update specs dependency to compatible version

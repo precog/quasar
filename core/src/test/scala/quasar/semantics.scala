@@ -17,13 +17,12 @@
 package quasar
 
 import quasar.Predef._
-import quasar.specs2._
 import quasar.sql.fixpoint._
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
 
-class SemanticsSpec extends quasar.QuasarSpecification with PendingWithAccurateCoverage with TreeMatchers {
+class SemanticsSpec extends quasar.QuasarSpecification with TreeMatchers {
 
   "TransformSelect" should {
     import quasar.SemanticAnalysis._

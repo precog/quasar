@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.specs2
+package quasar
 
 import quasar.Predef._
 
@@ -27,6 +27,7 @@ import org.specs2.execute._
  */
 trait PendingWithAccurateCoverage extends PendingUntilFixed {
   def isCoverageRun: Boolean = quasar.build.BuildInfo.coverageEnabled
+  def isCIBuild: Boolean = quasar.build.BuildInfo.isCIBuild
 
   /** Overrides the standard specs2 implicit. */
   implicit def toPendingWithAccurateCoverage[T: AsResult](t: => T) = new PendingWithAccurateCoverage(t)
@@ -36,6 +37,7 @@ trait PendingWithAccurateCoverage extends PendingUntilFixed {
 
     def pendingUntilFixed(m: String): Result =
       if (isCoverageRun) Skipped(m + " (pending example skipped during coverage run)")
+      else if (isCIBuild) Skipped(m + " (pending example skipped during CI build)")
       else toPendingUntilFixed(t).pendingUntilFixed(m)
   }
 }

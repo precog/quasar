@@ -19,14 +19,14 @@ package quasar.std
 import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
-import quasar.specs2.PendingWithAccurateCoverage
+
 
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 import scalaz.Validation, Validation.FlatMap._
 
-class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
+class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
   import RelationsLib._
   import quasar.Type
   import quasar.Type.Const

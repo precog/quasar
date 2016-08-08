@@ -17,8 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan, Data, CompilerHelpers}
-import quasar.{LogicalPlan => LP}
+import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
 import quasar.ejson
 import quasar.fp._
 import quasar.fs._
@@ -42,20 +41,20 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
-  def RootR = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
+  def RootR: Fix[QS] = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
 
   def ProjectFieldR[A](src: FreeMap[Fix], field: FreeMap[Fix]): FreeMap[Fix] =
     Free.roll(ProjectField(src, field))
 
   def lpRead(path: String): Fix[LP] =
-    LogicalPlan.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
-       QueryFile.convertToQScript(LogicalPlan.Constant(Data.Bool(true))).toOption must
+       QueryFile.convertToQScript(LP.Constant(Data.Bool(true))).toOption must
        equal(
          QC.inj(Map(RootR, BoolLit(true))).embed.some)
     }
@@ -63,7 +62,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
       QueryFile.convertToQScript(
-        LogicalPlan.Constant(Data.Set(List(
+        LP.Constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
           Data.Obj(ListMap("0" -> Data.Int(3))))))).toOption must
       equal(None)
@@ -142,7 +141,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           makeObj(
             "name" -> structural.ObjectProject(
               lpRead("/city"),
-              LogicalPlan.Constant(Data.Str("name")))))).toOption must
+              LP.Constant(Data.Str("name")))))).toOption must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -180,7 +179,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       QueryFile.convertToQScript(
         makeObj(
           "0" ->
-            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LogicalPlan.Constant(Data.Str("height")))))).toOption must
+            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))).toOption must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
@@ -205,7 +204,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         makeObj(
           "loc" ->
             structural.FlattenArray[FLP](
-              structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
+              structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))).toOption must
       equal(
         SP.inj(LeftShift(
           SP.inj(LeftShift(
@@ -222,13 +221,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
-        LogicalPlan.Let('x, lpRead("/foo/bar"),
+        LP.Let('x, lpRead("/foo/bar"),
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("baz"))),
-                structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("quux")))),
-              structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("ducks"))))))).toOption must
+                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
+                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
+              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))).toOption must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -248,8 +247,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             structural.UnshiftArray[FLP](
               math.Multiply[FLP](
                 structural.ShiftArrayIndices[FLP](
-                  structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))),
-                LogicalPlan.Constant(Data.Int(10)))))).toOption must
+                  structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))),
+                LP.Constant(Data.Int(10)))))).toOption must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
@@ -266,16 +265,37 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             Free.point(ReduceIndex(0)))))).embed.some)
     }
 
+    "convert a filter" in pending {
+      // "select * from foo where bar between 1 and 10"
+      QueryFile.convertToQScript(
+        set.Filter[FLP](
+          lpRead("/foo"),
+          relations.Between[FLP](
+            structural.ObjectProject(lpRead("/foo"), LP.Constant(Data.Str("bar"))),
+            LP.Constant(Data.Int(1)),
+            LP.Constant(Data.Int(10))))).toOption must
+      equal(
+        QC.inj(Filter(
+          SP.inj(LeftShift(
+            RootR,
+            Free.roll(ProjectField(HoleF, StrLit("foo"))),
+            Free.point(RightSide))).embed,
+          Free.roll(Between(
+            Free.roll(ProjectField(HoleF, StrLit("bar"))),
+            IntLit(1),
+            IntLit(10))))).embed.some)
+    }
+
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in pending {
       // "select * from person, car",
       QueryFile.convertToQScript(
-        LogicalPlan.Let('__tmp0,
-          set.InnerJoin(lpRead("/person"), lpRead("/car"), LogicalPlan.Constant(Data.Bool(true))),
+        LP.Let('__tmp0,
+          set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
           identity.Squash[FLP](
             structural.ObjectConcat[FLP](
-              structural.ObjectProject(LogicalPlan.Free('__tmp0), LogicalPlan.Constant(Data.Str("left"))),
-              structural.ObjectProject(LogicalPlan.Free('__tmp0), LogicalPlan.Constant(Data.Str("right"))))))).toOption must
+              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
+              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))).toOption must
       equal(RootR.some) // TODO incorrect expectation
     }
 

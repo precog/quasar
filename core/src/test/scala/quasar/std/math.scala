@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
-import quasar.specs2.PendingWithAccurateCoverage
+
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
@@ -30,7 +30,7 @@ import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
+class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const

@@ -1,0 +1,1 @@
+- Enable more optimizations for join branches.

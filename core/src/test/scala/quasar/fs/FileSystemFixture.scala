@@ -170,7 +170,7 @@ object FileSystemFixture {
 
   type ReadWriteT[F[_], A] = StateT[F, ReadWrites, A]
 
-  /** Transforms a [[ReadFile]] interpreter, intercepting responses to `Read`s
+  /** Transforms a `ReadFile` interpreter, intercepting responses to `Read`s
     * until the provided state is empty, falling back to the base interperter
     * thereafter. All other operations use the base interpreter.
     *
@@ -191,7 +191,7 @@ object FileSystemFixture {
       }
     }
 
-  /** Transforms a [[WriteFile]] interpreter, amending errors to `Write`s
+  /** Transforms a `WriteFile` interpreter, amending errors to `Write`s
     * until the provided state is empty, falling back to the base interpreter
     * thereafter. All other operations use the base interpreter.
     *

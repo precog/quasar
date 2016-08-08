@@ -18,12 +18,11 @@ package quasar
 
 import quasar.Predef._
 import quasar.std._
-import quasar.specs2.PendingWithAccurateCoverage
 
 import matryoshka.Fix
 import org.specs2.scalaz._
 
-class CompilerSpec extends quasar.QuasarSpecification with CompilerHelpers with PendingWithAccurateCoverage with DisjunctionMatchers {
+class CompilerSpec extends quasar.QuasarSpecification with CompilerHelpers with DisjunctionMatchers {
   import StdLib._
   import agg._
   import array._

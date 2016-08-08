@@ -19,12 +19,12 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Func, TypeArbitrary}
 import quasar.fp._
-import quasar.specs2.PendingWithAccurateCoverage
+
 
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 
-class SetSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
+class SetSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
   import SetLib._
   import quasar.Data
   import quasar.Type

@@ -23,7 +23,7 @@ import quasar.javascript._
 import quasar.qscript.SortDir
 import quasar.sql.{ParsingError, Query}
 import quasar.std._
-import quasar.specs2.PendingWithAccurateCoverage
+
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
@@ -40,7 +40,7 @@ import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with CompilerHelpers with DisjunctionMatchers with PendingWithAccurateCoverage {
+class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with CompilerHelpers with DisjunctionMatchers {
   import StdLib.{set => s, _}
   import structural._
   import LogicalPlan._

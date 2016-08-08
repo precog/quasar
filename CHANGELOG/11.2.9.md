@@ -1,0 +1,1 @@
+- improve build stability by treating "pending" regression tests as "skipped" in CI

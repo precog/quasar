@@ -30,8 +30,7 @@ import scalaz._, Scalaz._
 class WorkflowBuilderSpec
     extends quasar.QuasarSpecification
     with DisjunctionMatchers
-    with TreeMatchers
-    with PendingWithAccurateCoverage {
+    with TreeMatchers {
   import Workflow._
   import WorkflowBuilder._
   import IdHandling._

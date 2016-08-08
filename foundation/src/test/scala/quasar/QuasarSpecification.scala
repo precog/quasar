@@ -22,7 +22,7 @@ import org.specs2.mutable._
 import org.specs2.scalaz.ScalazMatchers
 import scalaz._
 
-trait QuasarSpecification extends SpecificationLike with ScalazMatchers {
+trait QuasarSpecification extends SpecificationLike with ScalazMatchers with PendingWithAccurateCoverage {
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
     def must_=(rhs: A) = lhs must equal(rhs)
   }

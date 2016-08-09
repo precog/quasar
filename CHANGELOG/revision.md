@@ -1,0 +1,1 @@
+- Add plugin sbt-dependency-graph

@@ -19,21 +19,23 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.Data._
+import quasar.console
 import quasar.fp.TaskRef
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
+import quasar.Data
+import quasar.DataCodec
+
+import java.io._
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
-
-import java.io._
 import pathy.Path.posixCodec
-
 import scalaz._, Scalaz._, concurrent.Task
-
 import org.apache.spark._
 
 
@@ -47,25 +49,26 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
   "readfile" should {
     "open - read chunk - close" in {
-      // given
-      import quasar.Data._
-      implicit val sc = newSc()
-
-      val content = List(
-        """{"login" : "john", "age" : 28}""",
-        """{"login" : "kate", "age" : 31}"""
-      )
-      val path: String = tempFile(content)
-      val aFile: AFile = sandboxAbs(posixCodec.parseAbsFile(path).get)
-      // when
-      readOneChunk(aFile).run.foldMap(inter).unsafePerformSync must beLike {
-        case \/-(results) =>
-          // then
-          results.size must be_==(2)
-          results must contain(Obj(ListMap("login" -> Str("john"), "age" -> Int(28))))
-          results must contain(Obj(ListMap("login" -> Str("kate"), "age" -> Int(31))))
-      }
-      sc.stop()
+      // run tests only when spark cluster is present
+      (newSc().map { sc =>
+        // given
+        import quasar.Data._
+        val content = List(
+          """{"login" : "john", "age" : 28}""",
+          """{"login" : "kate", "age" : 31}"""
+        )
+        val path: String = tempFile(content)
+        val aFile: AFile = sandboxAbs(posixCodec.parseAbsFile(path).get)
+        // when
+        readOneChunk(aFile).run.foldMap(inter(sc)).unsafePerformSync must beLike {
+          case \/-(results) =>
+            // then
+            results.size must be_==(2)
+            results must contain(Obj(ListMap("login" -> Str("john"), "age" -> Int(28))))
+            results must contain(Obj(ListMap("login" -> Str("kate"), "age" -> Int(31))))
+        }
+        sc.stop()
+      }).run.unsafePerformSync
       ok
     }
   }
@@ -92,8 +95,14 @@ class ReadFileSpec extends Specification with ScalaCheck  {
   private def inter(implicit sc: SparkContext): ReadFile ~> Task =
     readfile.interpret[Eff](local_readfile.input[Eff]) andThen foldMapNT[Eff, Task](run)
 
-  private def newSc(): SparkContext = {
-    val config = new SparkConf().setMaster("local[*]").setAppName(this.getClass().getName())
+  private def newSc(): OptionT[Task, SparkContext] = for {
+    uriStr <- console.readEnv("QUASAR_SPARK_LOCAL")
+    uriData <- OptionT(Task.now(DataCodec.parse(uriStr)(DataCodec.Precise).toOption))
+    slData <- OptionT(Task.now(uriData.asInstanceOf[Obj].value.get("sparklocal")))
+    uri <- OptionT(Task.now(slData.asInstanceOf[Obj].value.get("connectionUri")))
+  } yield {
+    val master = uri.asInstanceOf[Str].value
+    val config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
     new SparkContext(config)
   }
 

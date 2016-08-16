@@ -197,17 +197,52 @@ class QScriptSpec extends CompilerHelpers with QScriptHelpers with ScalazMatcher
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array" in pending {
+    "convert a constant shift array of size one" in {
       // this query never makes it to LP->QS transform because it's a constant value
-      // "foo := (1,2,3); select * from foo"
+      // "foo := (7); select * from foo"
+      QueryFile.convertToQScript(
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))).toOption must
+      equal(
+        SP.inj(LeftShift(
+          RootR,
+          Free.roll(Nullary(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+          Free.point(RightSide))).embed.some)
+    }
+
+    "convert a constant shift array of size two" in {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8); select * from foo"
+      QueryFile.convertToQScript(
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.ArrayConcat[FLP](
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))).toOption must
+      equal(
+        SP.inj(LeftShift(
+          RootR,
+          Free.roll(Nullary(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+          Free.point(RightSide))).embed.some)
+    }
+
+    "convert a constant shift array of size three" in {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8,9); select * from foo"
       QueryFile.convertToQScript(
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(1))),
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(2)))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))).toOption must
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(8)))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))).toOption must
       equal(
         SP.inj(LeftShift(
           RootR,

@@ -254,7 +254,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       }
       case None =>
         EnvT((
-          Ann[T](Nil, HoleF[T]),
+          EmptyAnn[T],
           QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, func(lval, rval).embed))))
     }
   }
@@ -554,6 +554,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.project.ask
+      scala.Predef.println(s"<><><><><>res is ${MapFunc.translateUnaryMapping(func)(HoleF[T])} with ${a1.show}")
       concatBuckets(buckets) match {
         case Some((buck, newBuckets)) => {
           println(s">>>>>>>>>>>>buck in unary are $buck")   // HERE EMPTY ARRAY
@@ -565,6 +566,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
             QC.inj(Map(a1, mf)))).right
         }
         case None =>
+          scala.Predef.println(s"|||||||||||||||stuff is ${QC.inj(Map(a1, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))).show}")
           EnvT((
             EmptyAnn[T],
             QC.inj(Map(a1, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))))).right

@@ -94,6 +94,7 @@ package object qscript {
     buckets match {
       case Nil => None
       case head :: tail =>
+        scala.Predef.println(s"buckets are $buckets")
         (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
           NEL(head, tail).zipWithIndex.map(p =>
             Free.roll(ProjectIndex[T, FreeMap[T]](
@@ -113,11 +114,15 @@ package object qscript {
 
   def concat3[T[_[_]]: Corecursive, A](
     l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
-      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
+    scala.Predef.println(s"l2 is ${l}")
+    scala.Predef.println(s"c2 is ${c}")
+    scala.Predef.println(s"r2 is ${r}")
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+  }
 
   // TODO: move to matryoshka
 

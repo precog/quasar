@@ -341,19 +341,19 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      F[T[F]] => F[T[F]] = //scala.Predef.identity[F[T[F]]]
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
-      Normalizable[F].normalize ⋙
-      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
-      liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
-      liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
-      liftFG(simplifySP[F, F](optionIdF[F])) ⋙
-      liftFG(compactLeftShift[F, F]) ⋙
-      Normalizable[F].normalize ⋙
-      liftFF(compactReduction[F]) ⋙
-      liftFG(elideNopMap[F])
+      F[T[F]] => F[T[F]] = scala.Predef.identity[F[T[F]]]
+    //(quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
+    //  Normalizable[F].normalize ⋙
+    //  quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+    //  liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
+    //  liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
+    //  liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
+    //  liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
+    //  liftFG(simplifySP[F, F](optionIdF[F])) ⋙
+    //  liftFG(compactLeftShift[F, F]) ⋙
+    //  Normalizable[F].normalize ⋙
+    //  liftFF(compactReduction[F]) ⋙
+    //  liftFG(elideNopMap[F])
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
@@ -361,17 +361,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] = //thing => CoEnv(thing.right[Hole])
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
-      Normalizable[F].normalize ⋙
-      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
-      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
-      Normalizable[F].normalize ⋙
-      liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
-      (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
+      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] = thing => CoEnv(thing.right[Hole])
+    //(quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
+    //  Normalizable[F].normalize ⋙
+    //  quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+    //  liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
+    //  liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
+    //  liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+    //  liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+    //  liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+    //  liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
+    //  Normalizable[F].normalize ⋙
+    //  liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
+    //  (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
 }

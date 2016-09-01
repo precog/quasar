@@ -78,9 +78,9 @@ lazy val buildSettings = Seq(
     Wart.Serializable,          // /
     Wart.ToString),
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
+  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
   // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
+  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
   // Tasks tagged with `ExclusiveTest` should be run exclusively.
   concurrentRestrictions in Global := Seq(Tags.exclusive(ExclusiveTest)),
 

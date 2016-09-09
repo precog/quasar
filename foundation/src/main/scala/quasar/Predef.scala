@@ -21,7 +21,17 @@ import scala.{collection => C}
 import scala.collection.{immutable => I}
 import scala.{runtime => R}
 
-object Predef extends Predef
+object Predef extends Predef {
+  object -> {
+    final class Extract[A, B](val get: A -> B) extends scala.AnyVal {
+      def isEmpty = false
+      def _1: A   = get._1
+      def _2: B   = get._2
+    }
+    def apply[A, B](x: A, y: B): A -> B         = scala.Tuple2(x, y)
+    def unapply[A, B](x: A -> B): Extract[A, B] = new Extract(x)
+  }
+}
 
 class Predef extends LowPriorityImplicits {
   /** The typelevel Predef additions which makes literal
@@ -35,6 +45,8 @@ class Predef extends LowPriorityImplicits {
    *  lower version.
    */
   type EndoK[F[X]] = scalaz.NaturalTransformation[F, F]
+
+  type ->[+A, +B] = (A, B)
 
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec

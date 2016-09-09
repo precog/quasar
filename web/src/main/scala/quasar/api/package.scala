@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure

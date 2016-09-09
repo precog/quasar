@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._

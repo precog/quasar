@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.SKI._
 import quasar.api._
 import quasar.contrib.pathy._

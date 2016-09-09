@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.build
 
 import org.http4s.{StaticFile, MediaType, HttpService}

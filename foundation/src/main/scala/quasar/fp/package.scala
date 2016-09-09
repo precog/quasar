@@ -32,9 +32,9 @@ import simulacrum.typeclass
 
 sealed trait LowerPriorityTreeInstances {
   implicit def Tuple2RenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
-      RenderTree[(A, B)] =
-    new RenderTree[(A, B)] {
-      def render(t: (A, B)) =
+      RenderTree[A -> B] =
+    new RenderTree[A -> B] {
+      def render(t: A -> B) =
         NonTerminal("tuple" :: Nil, None,
           RA.render(t._1) ::
             RB.render(t._2) ::
@@ -44,9 +44,9 @@ sealed trait LowerPriorityTreeInstances {
 
 sealed trait LowPriorityTreeInstances extends LowerPriorityTreeInstances {
   implicit def LeftTuple3RenderTree[A, B, C](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C]):
-      RenderTree[((A, B), C)] =
-    new RenderTree[((A, B), C)] {
-      def render(t: ((A, B), C)) =
+      RenderTree[A -> B -> C] =
+    new RenderTree[A -> B -> C] {
+      def render(t: A -> B -> C) =
         NonTerminal("tuple" :: Nil, None,
           RA.render(t._1._1) ::
             RB.render(t._1._2) ::
@@ -57,9 +57,9 @@ sealed trait LowPriorityTreeInstances extends LowerPriorityTreeInstances {
 
 sealed trait TreeInstances extends LowPriorityTreeInstances {
   implicit def LeftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
-      RenderTree[(((A, B), C), D)] =
-    new RenderTree[(((A, B), C), D)] {
-      def render(t: (((A, B), C), D)) =
+      RenderTree[A -> B -> C -> D] =
+    new RenderTree[A -> B -> C -> D] {
+      def render(t: A -> B -> C -> D) =
         NonTerminal("tuple" :: Nil, None,
            RA.render(t._1._1._1) ::
             RB.render(t._1._1._2) ::

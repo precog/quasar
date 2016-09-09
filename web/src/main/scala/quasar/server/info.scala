@@ -16,7 +16,7 @@
 
 package quasar.server
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.build.BuildInfo
 
 import argonaut._, Argonaut._

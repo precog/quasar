@@ -24,6 +24,7 @@ import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
+import quasar.physical.mongodb.planner.MongoDbPlanner
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._

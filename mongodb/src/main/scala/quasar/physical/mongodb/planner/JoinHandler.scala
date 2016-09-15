@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-// TOOD: move to .planner package
-package quasar.physical.mongodb
+package quasar.physical.mongodb.planner
 
 import quasar.Predef._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.namegen._
+// import quasar.namegen._
 import quasar.std.StdLib._
+import quasar.physical.mongodb._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._

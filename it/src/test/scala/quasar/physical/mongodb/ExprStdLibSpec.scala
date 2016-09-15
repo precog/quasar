@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.fs.DataCursor
 import quasar.std.{StdLibSpec, StdLibTestRunner}
 import quasar.physical.mongodb.fs._, bsoncursor._
+import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 

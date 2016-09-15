@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-// TODO: move to .planner package
-package quasar.physical.mongodb
+package quasar.physical.mongodb.planner
 
 import quasar.Predef._
 

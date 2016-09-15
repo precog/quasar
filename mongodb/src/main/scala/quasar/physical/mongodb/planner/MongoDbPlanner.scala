@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.physical.mongodb.planner
 
 import quasar.Predef._
-import quasar._
+import quasar.{fs => _, _}, Planner.UnsupportedPlan
 import quasar.fp._
 import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
+import quasar.physical.mongodb._
 import quasar.physical.mongodb.javascript._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
@@ -1090,11 +1091,11 @@ object MongoDbPlanner {
     }
   }
 
-  def plan0[F[_]: Functor: Coalesce: Crush: Crystallize]
-    (joinHandler: JoinHandler[F, WorkflowBuilder.M])
+  def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize]
+    (joinHandler: JoinHandler[WF, WorkflowBuilder.M])
     (logical: Fix[LogicalPlan])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
-      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[Fix[WorkflowBuilderF[WF, ?]]], ev2: RenderTree[Fix[WF]])
+      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WF]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
     import StateT.stateTMonadState
@@ -1119,7 +1120,7 @@ object MongoDbPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.point[W]).liftM[GenT]
 
-    val wfƒ = workflowƒ[F](joinHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[F])))
+    val wfƒ = workflowƒ[WF](joinHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[WF])))
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
@@ -1127,7 +1128,7 @@ object MongoDbPlanner {
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))
-      wf2  <- log("Workflow (crystallized)")             (Crystallize[F].crystallize(wf1).point[M])
+      wf2  <- log("Workflow (crystallized)")             (Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
   }
 

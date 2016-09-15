@@ -27,6 +27,7 @@ import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
+import quasar.physical.mongodb.planner.{JoinHandler, JoinSource, InputFinder, Here, There}
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._, string._ // TODO: remove this

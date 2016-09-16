@@ -943,7 +943,7 @@ object WorkflowOpCoreF {
           val nt = "$GroupF" :: wfType
           NonTerminal(nt, None,
             grouped.render ::
-              Terminal("By" :: nt, Some(expr.toString)) ::
+              expr.render.retype(κ("By" :: nt)) ::
               Nil)
         case $SortF(_, value)   =>
           val nt = "$SortF" :: wfType

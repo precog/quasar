@@ -378,16 +378,6 @@ object ExprOpCoreF {
     }
   }
 
-  implicit val renderTree: Delay[RenderTree, ExprOpCoreF] =
-    new Delay[RenderTree, ExprOpCoreF] {
-      def apply[A](r: RenderTree[A]) =
-        new RenderTree[ExprOpCoreF[A]] {
-          def render(expr: ExprOpCoreF[A]) = expr match {
-            case _ => Terminal(List("ExprOpCore"), Some(expr.toString))
-          }
-        }
-    }
-
   /** "Fixed" constructors, with the corecursive type and the coproduct type
     * captured when an instance is created. */
   final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOpCoreF :<: EX) {

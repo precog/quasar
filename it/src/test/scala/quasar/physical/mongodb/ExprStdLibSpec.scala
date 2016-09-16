@@ -56,6 +56,8 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
       case StringLib.Decimal  => notHandled.left
       case StringLib.ToString => notHandled.left
 
+      case DateLib.TimeOfDay if TestConfig.isMongoReadOnly(backend) => notHandled.left
+
       case _                  => ().right
     }
 
@@ -63,6 +65,14 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
     def shortCircuit: AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
       case LogicalPlan.InvokeF(func, _) => shortCircuitInvoke(func)
       case _ => ().right
+    }
+
+    /** Intercept and transform expected values into the form that's actually
+      * produced by the MongoDB backend, in cases where MongoDB cannot represent
+      * the type natively. */
+    def massage(expected: Data): Data = expected match {
+      case Data.Time(time) => Data.Str(time.toString)
+      case _               => expected
     }
 
 
@@ -122,7 +132,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
 
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          rez must_= List(Data.Obj(ListMap("result" -> expected)))
+          rez must_= List(Data.Obj(ListMap("result" -> massage(expected))))
         }).unsafePerformSync.toResult)
 
 

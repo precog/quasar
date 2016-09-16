@@ -71,6 +71,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
   val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprCoreFp._
+  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  import expr3_0Fp._
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
@@ -96,6 +98,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
   def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
+
+  def plan3_0(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None))
 
   def plan3_2(query: String,
     stats: Collection => Option[CollectionStatistics],
@@ -2516,9 +2521,20 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             ExcludeId)))
     }
 
-    "plan time_of_day" in {
+    "plan time_of_day (JS)" in {
       plan("select time_of_day(ts) from foo") must
         beRight // NB: way too complicated to spell out here, and will change as JS generation improves
+    }
+
+    "plan time_of_day (pipeline)" in {
+      import FormatSpecifier._
+
+      plan3_0("select time_of_day(ts) from foo") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "foo")),
+          $project(
+            reshape("0" -> $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts"))),
+            IgnoreId)))
     }
 
     "plan filter on date" in {

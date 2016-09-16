@@ -25,10 +25,8 @@ import scalaz._, Scalaz._
 
 package object accumulator {
 
-  type Accumulator = AccumOp[Fix[ExprOpCoreF]]
-
-  def rewriteGroupRefs(t: Accumulator)(applyVar: PartialFunction[DocVar, DocVar])
-      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): Accumulator =
+  def rewriteGroupRefs[EX[_]: Functor](t: AccumOp[Fix[EX]])(applyVar: PartialFunction[DocVar, DocVar])
+      (implicit exprOps: ExprOpOps.Uni[EX]): AccumOp[Fix[EX]] =
     t.map(_.cata(exprOps.rewriteRefs(applyVar)))
 
   val groupBsonƒ: AccumOp[Bson] => Bson = {
@@ -42,6 +40,6 @@ package object accumulator {
     case $sum(value)      => Bson.Doc("$sum" -> value)
   }
 
-  def groupBson(g: Accumulator)(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+  def groupBson[EX[_]: Functor](g: AccumOp[Fix[EX]])(implicit exprOps: ExprOpOps.Uni[EX]) =
     groupBsonƒ(g.map(_.cata(exprOps.bson)))
 }

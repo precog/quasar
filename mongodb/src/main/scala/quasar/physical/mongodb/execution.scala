@@ -46,8 +46,8 @@ private[mongodb] object execution {
 
   // NB: need to construct core exprs in the type used for pipeline ops.
   // FIXME: For now, that's just the core type itself.
-  private val coreFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
-  import coreFp._
+  private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
+  import exprCoreFp._
 
   /** Extractor to determine whether a `$GroupF` represents a simple `count()`. */
   object Countable {

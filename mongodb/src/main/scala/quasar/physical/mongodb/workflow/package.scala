@@ -80,7 +80,9 @@ package object workflow {
   val IdName   = BsonField.Name(IdLabel)
   val IdVar    = DocVar.ROOT(IdName)
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  // NB: it's only safe to emit "core" expr ops here, but we always use the
+  // largest type here, so they're immediately injected into ExprOp.
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprFp._
 
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
@@ -233,7 +235,7 @@ package object workflow {
   // TODO: Make this a trait, and implement it for actual types, rather than all
   //       in here (already done for ExprOp and Reshape). (#438)
   private [workflow] def rewriteRefs2_6(f: PartialFunction[DocVar, DocVar])
-      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) = new RewriteRefs[WorkflowOpCoreF](f) {
+      (implicit exprOps: ExprOpOps.Uni[ExprOp]) = new RewriteRefs[WorkflowOpCoreF](f) {
     def apply[A <: WorkflowOpCoreF[_]](op: A) = {
       (op match {
         case $ProjectF(src, shape, xId) =>
@@ -582,7 +584,7 @@ package object workflow {
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
   implicit def crystallizeWorkflowF[F[_]: Functor: Classify: Coalesce: Refs](
-    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF, ev2: ExprOpOps.Uni[ExprOpCoreF]):
+    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF, ev2: ExprOpOps.Uni[ExprOp]):
       Crystallize[F] =
     new Crystallize[F] {
       // probable conversions

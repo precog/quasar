@@ -19,7 +19,9 @@ package quasar.physical.mongodb.accumulator
 import quasar.Predef._
 import quasar.RenderTree
 import quasar.fp._
+import quasar.physical.mongodb.expression.ExprOp
 
+import matryoshka.Fix
 import scalaz._
 
 sealed trait AccumOp[A]
@@ -65,8 +67,8 @@ object AccumOp {
         }
     }
 
-  implicit val AccumOpRenderTree: RenderTree[Accumulator] =
-    RenderTree.fromToString[Accumulator]("AccumOp")
+  implicit val AccumOpRenderTree: RenderTree[AccumOp[Fix[ExprOp]]] =
+    RenderTree.fromToString[AccumOp[Fix[ExprOp]]]("AccumOp")
 }
 
 object $addToSet {

@@ -32,7 +32,7 @@ import scalaz.syntax.either._
 class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
   import CollectionUtil._
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprFp._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =

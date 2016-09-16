@@ -36,7 +36,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
   val builder = WorkflowBuilder.Ops[WorkflowF]
   import builder._
 
-  private val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  private val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprCoreFp._
 
   val readZips = read(collection("db", "zips"))

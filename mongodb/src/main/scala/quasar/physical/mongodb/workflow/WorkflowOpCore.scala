@@ -83,7 +83,7 @@ object $match {
     }
 }
 
-final case class $ProjectF[A](src: A, shape: Reshape[ExprOpCoreF], idExclusion: IdHandling)
+final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHandling)
     extends WorkflowOpCoreF[A] { self =>
   def pipeline: PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
@@ -101,27 +101,27 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOpCoreF], idExclusion: 
   }
   def empty: $ProjectF[A] = $ProjectF.EmptyDoc(src)
 
-  def set(field: BsonField, value: Reshape.Shape[ExprOpCoreF]): $ProjectF[A] =
+  def set(field: BsonField, value: Reshape.Shape[ExprOp]): $ProjectF[A] =
     $ProjectF(src,
       shape.set(field, value),
       if (field == IdName) IncludeId else idExclusion)
 
-  def get(ref: DocVar): Option[Reshape.Shape[ExprOpCoreF]] = ref match {
+  def get(ref: DocVar): Option[Reshape.Shape[ExprOp]] = ref match {
     case DocVar(_, Some(field)) => shape.get(field)
     case _                      => Some(-\/(shape))
   }
 
-  def getAll: List[(BsonField, Fix[ExprOpCoreF])] = {
+  def getAll: List[(BsonField, Fix[ExprOp])] = {
     val all = Reshape.getAll(shape)
     idExclusion match {
       case IncludeId => all.collectFirst {
         case (IdName, _) => all
-      }.getOrElse((IdName, ExprOpCoreF.fixpoint[Fix, ExprOpCoreF].$include()) :: all)
+      }.getOrElse((IdName, ExprOpCoreF.fixpoint[Fix, ExprOp].$include()) :: all)
       case _         => all
     }
   }
 
-  def setAll(fvs: Iterable[(BsonField, Reshape.Shape[ExprOpCoreF])]): $ProjectF[A] =
+  def setAll(fvs: Iterable[(BsonField, Reshape.Shape[ExprOp])]): $ProjectF[A] =
     $ProjectF(
       src,
       Reshape.setAll(shape, fvs),
@@ -129,7 +129,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOpCoreF], idExclusion: 
 
   def deleteAll(fields: List[BsonField]): $ProjectF[A] =
     $ProjectF(src,
-      Reshape.setAll(Reshape.emptyDoc[ExprOpCoreF],
+      Reshape.setAll(Reshape.emptyDoc[ExprOp],
         Reshape.getAll(this.shape)
           .filterNot(t => fields.exists(t._1.startsWith(_)))
           .map(t => t._1 -> \/-(t._2))),
@@ -147,7 +147,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOpCoreF], idExclusion: 
             case (k, v) =>
               v.fold(
                 r => -\/(loop(Some(nest(k)), $ProjectF(p.src, r, p.idExclusion)).shape),
-                κ(\/-(ExprOpCoreF.fixpoint[Fix, ExprOpCoreF].$var(DocVar.ROOT(nest(k))))))
+                κ(\/-(ExprOpCoreF.fixpoint[Fix, ExprOp].$var(DocVar.ROOT(nest(k))))))
           }),
         p.idExclusion)
     }
@@ -156,14 +156,14 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOpCoreF], idExclusion: 
   }
 }
 object $ProjectF {
-  def EmptyDoc[A](src: A) = $ProjectF(src, Reshape.emptyDoc[ExprOpCoreF], ExcludeId)
+  def EmptyDoc[A](src: A) = $ProjectF(src, Reshape.emptyDoc[ExprOp], ExcludeId)
 }
 object $project {
-  def apply[F[_]: Coalesce](shape: Reshape[ExprOpCoreF], id: IdHandling)
+  def apply[F[_]: Coalesce](shape: Reshape[ExprOp], id: IdHandling)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($ProjectF(src, shape, id))))
 
-  def apply[F[_]: Coalesce](shape: Reshape[ExprOpCoreF])
+  def apply[F[_]: Coalesce](shape: Reshape[ExprOp])
     (implicit ev: WorkflowOpCoreF :<: F)
     : FixOp[F] =
     $project[F](
@@ -171,15 +171,15 @@ object $project {
       shape.get(IdName).fold[IdHandling](IgnoreId)(κ(IncludeId)))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Reshape[ExprOpCoreF], IdHandling)] =
+    : Option[(A, Reshape[ExprOp], IdHandling)] =
     I.prj(op) collect {
       case $ProjectF(src, shape, id) => (src, shape, id)
     }
 }
 
-final case class $RedactF[A](src: A, value: Fix[ExprOpCoreF])
+final case class $RedactF[A](src: A, value: Fix[ExprOp])
   extends WorkflowOpCoreF[A] { self =>
-  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): PipelineF[WorkflowOpCoreF, A] =
+  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOp]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
       def src = self.src
@@ -198,12 +198,12 @@ object $RedactF {
   val KEEP    = DocVar(DocVar.Name("KEEP"),     None)
 }
 object $redact {
-  def apply[F[_]: Coalesce](value: Fix[ExprOpCoreF])
+  def apply[F[_]: Coalesce](value: Fix[ExprOp])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($RedactF(src, value))))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Fix[ExprOpCoreF])] =
+    : Option[(A, Fix[ExprOp])] =
     I.prj(op) collect {
       case $RedactF(src, value) => (src, value)
     }
@@ -280,10 +280,10 @@ object $unwind {
     }
 }
 
-final case class $GroupF[A](src: A, grouped: Grouped, by: Reshape.Shape[ExprOpCoreF])
+final case class $GroupF[A](src: A, grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
     extends WorkflowOpCoreF[A] { self =>
 
-  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): PipelineF[WorkflowOpCoreF, A] =
+  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOp]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
       def src = self.src
@@ -296,24 +296,24 @@ final case class $GroupF[A](src: A, grouped: Grouped, by: Reshape.Shape[ExprOpCo
       }
     }
 
-  def empty = copy(grouped = Grouped(ListMap()))
+  def empty = copy(grouped = Grouped[ExprOp](ListMap()))
 
-  def getAll: List[(BsonField.Name, Accumulator)] =
+  def getAll: List[(BsonField.Name, AccumOp[Fix[ExprOp]])] =
     grouped.value.toList
 
   def deleteAll(fields: List[BsonField.Name]): $GroupF[A] = {
     empty.setAll(getAll.filterNot(t => fields.contains(t._1)))
   }
 
-  def setAll(vs: Seq[(BsonField.Name, Accumulator)]) = copy(grouped = Grouped(ListMap(vs: _*)))
+  def setAll(vs: Seq[(BsonField.Name, AccumOp[Fix[ExprOp]])]) = copy(grouped = Grouped[ExprOp](ListMap(vs: _*)))
 }
 object $group {
-  def apply[F[_]: Coalesce](grouped: Grouped, by: Reshape.Shape[ExprOpCoreF])
+  def apply[F[_]: Coalesce](grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($GroupF(src, grouped, by))))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Grouped, Reshape.Shape[ExprOpCoreF])] =
+    : Option[(A, Grouped[ExprOp], Reshape.Shape[ExprOp])] =
     I.prj(op) collect {
       case $GroupF(src, grouped, shape) => (src, grouped, shape)
     }

@@ -44,9 +44,9 @@ object FuncHandler {
       def translateTernary(func: TernaryFunc) = ternary.lift(func)
     }
 
-  val handle2_6: FuncHandler[Expr2_6] = FuncHandler.fromPartial[Expr2_6](
+  val handleOpsCore: FuncHandler[ExprOpCoreF] = FuncHandler.fromPartial[ExprOpCoreF](
     {
-      val coreFp = ExprOpCoreF.fixpoint[Unary, Expr2_6]
+      val coreFp = ExprOpCoreF.fixpoint[Unary, ExprOpCoreF]
       import coreFp._
       import Unary._
       {
@@ -113,17 +113,38 @@ object FuncHandler {
       }
     })
 
-  def handle3_0(implicit I: Expr2_6 :<: Expr3_0): FuncHandler[Expr3_0] = new FuncHandler[Expr3_0] {
-    // TODO
-    def translateUnary(func: UnaryFunc) = handle2_6.translateUnary(func).map(_.mapSuspension(I))
-    def translateBinary(func: BinaryFunc) = handle2_6.translateBinary(func).map(_.mapSuspension(I))
-    def translateTernary(func: TernaryFunc) = handle2_6.translateTernary(func).map(_.mapSuspension(I))
+  val handleOps3_0: FuncHandler[ExprOp3_0F] = FuncHandler.fromPartial[ExprOp3_0F](
+      {
+        val fp = ExprOp3_0F.fixpoint[Unary, ExprOp3_0F]
+        import fp._
+        import Unary._
+        import FormatSpecifier._
+        {
+          case date.TimeOfDay =>
+            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, arg)
+        }
+      },
+      PartialFunction.empty,
+      PartialFunction.empty)
+
+  val handleOps3_2: FuncHandler[ExprOp3_2F] = FuncHandler.fromPartial[ExprOp3_2F](
+      PartialFunction.empty,
+      PartialFunction.empty,
+      PartialFunction.empty)
+
+  private def fallback[F[_], G[_], H[_]](f: FuncHandler[F], g: FuncHandler[G])(implicit injF: F :<: H, injG: G :<: H): FuncHandler[H] = new FuncHandler[H] {
+    def translateUnary(func: UnaryFunc) =
+      f.translateUnary(func).map(_.mapSuspension(injF)) orElse
+      g.translateUnary(func).map(_.mapSuspension(injG))
+    def translateBinary(func: BinaryFunc) =
+      f.translateBinary(func).map(_.mapSuspension(injF)) orElse
+      g.translateBinary(func).map(_.mapSuspension(injG))
+    def translateTernary(func: TernaryFunc) =
+      f.translateTernary(func).map(_.mapSuspension(injF)) orElse
+      g.translateTernary(func).map(_.mapSuspension(injG))
   }
 
-  def handle3_2(implicit I: Expr2_6 :<: Expr3_2): FuncHandler[Expr3_2] = new FuncHandler[Expr3_2] {
-    // TODO
-    def translateUnary(func: UnaryFunc) = handle2_6.translateUnary(func).map(_.mapSuspension(I))
-    def translateBinary(func: BinaryFunc) = handle2_6.translateBinary(func).map(_.mapSuspension(I))
-    def translateTernary(func: TernaryFunc) = handle2_6.translateTernary(func).map(_.mapSuspension(I))
-  }
+  val handle2_6: FuncHandler[Expr2_6] = handleOpsCore
+  val handle3_0: FuncHandler[Expr3_0] = fallback(handleOps3_0, handle2_6)
+  val handle3_2: FuncHandler[Expr3_2] = fallback(handleOps3_2, handle3_0)
 }

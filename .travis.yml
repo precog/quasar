@@ -12,7 +12,7 @@ script:
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
-  - travis_wait ./scripts/build $MONGO_RELEASE
+  - travis_wait 240 ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
 notifications:
   irc:

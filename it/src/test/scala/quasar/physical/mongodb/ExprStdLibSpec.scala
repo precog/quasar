@@ -49,6 +49,8 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
 
     val notHandled = Skipped("not implemented in aggregation")
 
+    def is2_6 = backend == TestConfig.MONGO_2_6
+
     /** Identify constructs that are expected not to be implemented in the pipeline. */
     def shortCircuitInvoke[N <: Nat](func: GenericFunc[N]): Result \/ Unit = func match {
       case StringLib.Length   => notHandled.left
@@ -56,7 +58,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
       case StringLib.Decimal  => notHandled.left
       case StringLib.ToString => notHandled.left
 
-      case DateLib.TimeOfDay if TestConfig.isMongoReadOnly(backend) => notHandled.left
+      case DateLib.TimeOfDay if is2_6 => Skipped("not implemented for MongoDB 2.6").left
 
       case _                  => ().right
     }

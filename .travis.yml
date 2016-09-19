@@ -6,6 +6,8 @@ addons:
   postgresql: 9.4
 services:
   postgresql
+install:
+  travis_wait mvn install
 script:
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"

@@ -21,6 +21,9 @@ import quasar.Predef._
 import matryoshka._
 import scalaz._
 
+/** "Generic" types for building partially-constructed trees in some
+  * "functorized" type. */
+// TODO: submit to matryoshka?
 package object tree {
   /** A tree structure with one kind of hole. See `eval1`. */
   type Unary[F[_]] = Free[F, UnaryArg]
@@ -72,15 +75,18 @@ package object tree {
     case object _3 extends TernaryArg
   }
 
-  def eval1[T[_[_]]: Corecursive, F[_]: Traverse](t: Unary[F]): T[F] => T[F] =
-    arg => freeCata[F, UnaryArg, T[F]](t)(interpret(_.fold(arg), _.embed))
+  implicit class UnaryOps[F[_]](self: Unary[F]) {
+    def eval[T[_[_]]: Corecursive](implicit F: Traverse[F]): T[F] => T[F] =
+      arg => freeCata[F, UnaryArg, T[F]](self)(interpret(_.fold(arg), _.embed))
+  }
 
-  def eval2[T[_[_]]: Corecursive, F[_]: Traverse](t: Binary[F]): (T[F], T[F]) => T[F] =
-    (arg1, arg2) => freeCata[F, BinaryArg, T[F]](t)(interpret(_.fold(arg1, arg2), _.embed))
+  implicit class BinaryOps[F[_]](self: Binary[F]) {
+    def eval[T[_[_]]: Corecursive](implicit F: Traverse[F]): (T[F], T[F]) => T[F] =
+      (arg1, arg2) => freeCata[F, BinaryArg, T[F]](self)(interpret(_.fold(arg1, arg2), _.embed))
+  }
 
-  def eval3[T[_[_]]: Corecursive, F[_]: Traverse](t: Ternary[F]): (T[F], T[F], T[F]) => T[F] =
-    (arg1, arg2, arg3) => freeCata[F, TernaryArg, T[F]](t)(interpret(_.fold(arg1, arg2, arg3), _.embed))
-
-  // TODO
-  // implicit def unaryRenderTree(implicit Delay[RenderTree, ???]): RenderTree[Unary[F]]
+  implicit class TernaryOps[F[_]](self: Ternary[F]) {
+    def eval[T[_[_]]: Corecursive](implicit F: Traverse[F]): (T[F], T[F], T[F]) => T[F] =
+      (arg1, arg2, arg3) => freeCata[F, TernaryArg, T[F]](self)(interpret(_.fold(arg1, arg2, arg3), _.embed))
+  }
 }

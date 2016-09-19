@@ -17,134 +17,109 @@
 package quasar.physical.mongodb.planner
 
 import quasar.Predef._
-import quasar.{UnaryFunc, BinaryFunc, TernaryFunc}
-import quasar.fp.tree._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
-import quasar.std.StdLib._
+import quasar.qscript._, MapFuncs._
 
 import org.threeten.bp.Instant
 import matryoshka._
-import scalaz._
+import scalaz.{Divide => _, _}, Scalaz._
 
-trait FuncHandler[EX[_]] {
-  def translateUnary(func: UnaryFunc): Option[Unary[EX]]
-  def translateBinary(func: BinaryFunc): Option[Binary[EX]]
-  def translateTernary(func: TernaryFunc): Option[Ternary[EX]]
-}
+final case class FuncHandler[T[_[_]], F[_]](run: MapFunc[T, ?] ~> λ[α => Option[Free[F, α]]]) { self =>
 
-object FuncHandler {
-  def fromPartial[EX[_]](
-    unary: PartialFunction[UnaryFunc, Unary[EX]],
-    binary: PartialFunction[BinaryFunc, Binary[EX]],
-    ternary: PartialFunction[TernaryFunc, Ternary[EX]]): FuncHandler[EX] =
-    new FuncHandler[EX] {
-      def translateUnary(func: UnaryFunc) = unary.lift(func)
-      def translateBinary(func: BinaryFunc) = binary.lift(func)
-      def translateTernary(func: TernaryFunc) = ternary.lift(func)
+  def orElse[G[_], H[_]](other: FuncHandler[T, G])
+      (implicit injF: F :<: H, injG: G :<: H): FuncHandler[T, H] =
+    new FuncHandler[T, H](λ[MapFunc[T, ?] ~> λ[α => Option[Free[H, α]]]](f =>
+      self.run(f).map(_.mapSuspension(injF)) orElse
+      other.run(f).map(_.mapSuspension(injG))))
     }
 
-  val handleOpsCore: FuncHandler[ExprOpCoreF] = FuncHandler.fromPartial[ExprOpCoreF](
-    {
-      val coreFp = ExprOpCoreF.fixpoint[Unary, ExprOpCoreF]
-      import coreFp._
-      import Unary._
-      {
-        case math.Negate        => $multiply($literal(Bson.Int32(-1)), arg)
+object FuncHandler {
+  type M[F[_], A] = Option[Free[F, A]]
 
-        case string.Lower       => $toLower(arg)
-        case string.Upper       => $toUpper(arg)
+  def handleOpsCore[T[_[_]]]: FuncHandler[T, ExprOpCoreF] = {
+    def hole[D](d: D): Free[ExprOpCoreF, D] = Free.pure(d)
 
-        case relations.Not      => $not(arg)
+    new FuncHandler[T, ExprOpCoreF](new (MapFunc[T, ?] ~> M[ExprOpCoreF, ?]) {
+      def apply[A](fa: MapFunc[T, A]): M[ExprOpCoreF, A] = {
+        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], ExprOpCoreF]
+        import fp._
 
-        case string.Null        =>
-          $cond($eq(arg, $literal(Bson.Text("null"))),
-            $literal(Bson.Null),
-            $literal(Bson.Undefined))
+        fa.some collect {
+          case Add(a1, a2)           => $add(hole(a1), hole(a2))
+          case Multiply(a1, a2)      => $multiply(hole(a1), hole(a2))
+          case Subtract(a1, a2)      => $subtract(hole(a1), hole(a2))
+          case Divide(a1, a2)        => $divide(hole(a1), hole(a2))
+          case Modulo(a1, a2)        => $mod(hole(a1), hole(a2))
+          case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), hole(a1))
 
-        case string.Boolean     =>
-          $cond($eq(arg, $literal(Bson.Text("true"))),
-            $literal(Bson.Bool(true)),
-            $cond($eq(arg, $literal(Bson.Text("false"))),
-              $literal(Bson.Bool(false)),
-              $literal(Bson.Undefined)))
+          case Eq(a1, a2)            => $eq(hole(a1), hole(a2))
+          case Neq(a1, a2)           => $neq(hole(a1), hole(a2))
+          case Lt(a1, a2)            => $lt(hole(a1), hole(a2))
+          case Lte(a1, a2)           => $lte(hole(a1), hole(a2))
+          case Gt(a1, a2)            => $gt(hole(a1), hole(a2))
+          case Gte(a1, a2)           => $gte(hole(a1), hole(a2))
 
-        case date.ToTimestamp   => $add($literal(Bson.Date(Instant.ofEpochMilli(0))), arg)
-      }
-    },
-    {
-      val coreFp = ExprOpCoreF.fixpoint[Binary, Expr2_6]
-      import coreFp._
-      import Binary._
-      {
-        case set.Constantly     => arg1
+          case Coalesce(a1, a2)      => $ifNull(hole(a1), hole(a2))
 
-        case math.Add           => $add(arg1, arg2)
-        case math.Multiply      => $multiply(arg1, arg2)
-        case math.Subtract      => $subtract(arg1, arg2)
-        case math.Divide        => $divide(arg1, arg2)
-        case math.Modulo        => $mod(arg1, arg2)
+          case ConcatArrays(a1, a2)  => $concat(hole(a1), hole(a2))  // NB: this is valid for strings only
+          case Lower(a1)             => $toLower(hole(a1))
+          case Upper(a1)             => $toUpper(hole(a1))
+          case Substring(a1, a2, a3) => $substr(hole(a1), hole(a2), hole(a3))
 
-        case relations.Eq       => $eq(arg1, arg2)
-        case relations.Neq      => $neq(arg1, arg2)
-        case relations.Lt       => $lt(arg1, arg2)
-        case relations.Lte      => $lte(arg1, arg2)
-        case relations.Gt       => $gt(arg1, arg2)
-        case relations.Gte      => $gte(arg1, arg2)
+          case Cond(a1, a2, a3)      => $cond(hole(a1), hole(a2), hole(a3))
 
-        case relations.Coalesce => $ifNull(arg1, arg2)
+          case Or(a1, a2)            => $or(hole(a1), hole(a2))
+          case And(a1, a2)           => $and(hole(a1), hole(a2))
+          case Not(a1)               => $not(hole(a1))
 
-        case string.Concat      => $concat(arg1, arg2)
+          case Null(a1) =>
+            $cond($eq(hole(a1), $literal(Bson.Text("null"))),
+              $literal(Bson.Null),
+              $literal(Bson.Undefined))
 
-        case relations.Or       => $or(arg1, arg2)
-        case relations.And      => $and(arg1, arg2)
-      }
-    },
-    {
-      val coreFp = ExprOpCoreF.fixpoint[Ternary, Expr2_6]
-      import coreFp._
-      import Ternary._
-      {
-        case string.Substring   => $substr(arg1, arg2, arg3)
+          case Bool(a1) =>
+            $cond($eq(hole(a1), $literal(Bson.Text("true"))),
+              $literal(Bson.Bool(true)),
+              $cond($eq(hole(a1), $literal(Bson.Text("false"))),
+                $literal(Bson.Bool(false)),
+                $literal(Bson.Undefined)))
 
-        case relations.Cond     => $cond(arg1, arg2, arg3)
+          case ToTimestamp(a1) =>
+            $add($literal(Bson.Date(Instant.ofEpochMilli(0))), hole(a1))
 
-        case relations.Between  => $and($lte(arg2, arg1), $lte(arg1, arg3))
+          case Between(a1, a2, a3)   => $and($lte(hole(a2), hole(a1)),
+                                              $lte(hole(a1), hole(a3)))
+        }
       }
     })
-
-  val handleOps3_0: FuncHandler[ExprOp3_0F] = FuncHandler.fromPartial[ExprOp3_0F](
-      {
-        val fp = ExprOp3_0F.fixpoint[Unary, ExprOp3_0F]
-        import fp._
-        import Unary._
-        import FormatSpecifier._
-        {
-          case date.TimeOfDay =>
-            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, arg)
-        }
-      },
-      PartialFunction.empty,
-      PartialFunction.empty)
-
-  val handleOps3_2: FuncHandler[ExprOp3_2F] = FuncHandler.fromPartial[ExprOp3_2F](
-      PartialFunction.empty,
-      PartialFunction.empty,
-      PartialFunction.empty)
-
-  private def fallback[F[_], G[_], H[_]](f: FuncHandler[F], g: FuncHandler[G])(implicit injF: F :<: H, injG: G :<: H): FuncHandler[H] = new FuncHandler[H] {
-    def translateUnary(func: UnaryFunc) =
-      f.translateUnary(func).map(_.mapSuspension(injF)) orElse
-      g.translateUnary(func).map(_.mapSuspension(injG))
-    def translateBinary(func: BinaryFunc) =
-      f.translateBinary(func).map(_.mapSuspension(injF)) orElse
-      g.translateBinary(func).map(_.mapSuspension(injG))
-    def translateTernary(func: TernaryFunc) =
-      f.translateTernary(func).map(_.mapSuspension(injF)) orElse
-      g.translateTernary(func).map(_.mapSuspension(injG))
   }
 
-  val handle2_6: FuncHandler[Expr2_6] = handleOpsCore
-  val handle3_0: FuncHandler[Expr3_0] = fallback(handleOps3_0, handle2_6)
-  val handle3_2: FuncHandler[Expr3_2] = fallback(handleOps3_2, handle3_0)
+  def handleOps3_0[T[_[_]]]: FuncHandler[T, ExprOp3_0F] = {
+    def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
+    new FuncHandler[T, ExprOp3_0F](new (MapFunc[T, ?] ~> M[ExprOp3_0F, ?]) {
+      def apply[A](fa: MapFunc[T, A]): M[ExprOp3_0F, A] = {
+        val fp = ExprOp3_0F.fixpoint[Free[?[_], A], ExprOp3_0F]
+        import fp._
+        import FormatSpecifier._
+
+        fa.some collect {
+          case TimeOfDay(a1) =>
+            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, hole(a1))
+        }
+      }
+    })
+  }
+
+  def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
+    new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
+      def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
+        None
+      }
+    })
+  }
+
+  def handle2_6[T[_[_]]]: FuncHandler[T, Expr2_6] = handleOpsCore
+  def handle3_0[T[_[_]]]: FuncHandler[T, Expr3_0] = handleOps3_0 orElse handle2_6
+  def handle3_2[T[_[_]]]: FuncHandler[T, Expr3_2] = handleOps3_2 orElse handle3_0
 }

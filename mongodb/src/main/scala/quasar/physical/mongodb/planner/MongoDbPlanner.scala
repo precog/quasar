@@ -19,6 +19,7 @@ package quasar.physical.mongodb.planner
 import quasar.Predef._
 import quasar.{fs => _, _}, Planner.UnsupportedPlan
 import quasar.fp._
+import quasar.fp.tree._
 import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -26,7 +27,7 @@ import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.javascript._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.{MapFunc, SortDir}
 import quasar.std.StdLib._
 import quasar.Type._
 
@@ -612,7 +613,7 @@ object MongoDbPlanner {
   import quasar.physical.mongodb.accumulator._
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: FuncHandler[EX])
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
     (implicit
       ev0: WorkflowOpCoreF :<: F,
       ev1: Show[WorkflowBuilder[F]],
@@ -737,29 +738,41 @@ object MongoDbPlanner {
         }
       }
 
-      (args match {
-        case Sized(a1) =>
-          for {
-            wb1 <- HasWorkflow(a1).toOption
-            // foo: MapFunc[Fix, UnaryArg] = MapFunc.translateUnaryMapping(func.asInstanceOf[UnaryFunc])(UnaryArg._1)
-            t   <- funcHandler.translateUnary(func.asInstanceOf[UnaryFunc])
-          } yield WB.expr1(wb1)(tree.eval1[Fix, ExprOp](t.transCata(inj)))
-        case Sized(a1, a2) =>
-          for {
-            wb1 <- HasWorkflow(a1).toOption
-            wb2 <- HasWorkflow(a2).toOption
-            t   <- funcHandler.translateBinary(func.asInstanceOf[BinaryFunc])
-          } yield WB.expr2(wb1, wb2)(tree.eval2[Fix, ExprOp](t.transCata(inj)))
-        case Sized(a1, a2, a3) =>
-          for {
-            wb1 <- HasWorkflow(a1).toOption
-            wb2 <- HasWorkflow(a2).toOption
-            wb3 <- HasWorkflow(a3).toOption
-            t   <- funcHandler.translateTernary(func.asInstanceOf[TernaryFunc])
-          } yield WB.expr(List(wb1, wb2, wb3)) {
-            case List(_1, _2, _3) =>
-              tree.eval3[Fix, ExprOp](t.transCata(inj)).apply(_1, _2, _3)
+      ((func, args) match {
+        // NB: this one is missing from MapFunc.
+        case (ToId, _) => None
+
+        // NB: this would get mapped to the same MapFunc as string.Concat, which
+        // doesn't make sense here.
+        case (ArrayConcat, _) => None
+
+        case (func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          (HasWorkflow(a1).toOption |@|
+            funcHandler.run(mf)) { (wb1, f) =>
+            val exp: Unary[ExprOp] = FunctorT[Free[?[_], UnaryArg]].transCata(f)(inj)
+            WB.expr1(wb1)(exp.eval)
           }
+        case (func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          (HasWorkflow(a1).toOption |@|
+            HasWorkflow(a2).toOption |@|
+            funcHandler.run(mf)) { (wb1, wb2, f) =>
+            val exp: Binary[ExprOp] = FunctorT[Free[?[_], BinaryArg]].transCata(f)(inj)
+            WB.expr2(wb1, wb2)(exp.eval)
+          }
+        case (func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          (HasWorkflow(a1).toOption |@|
+            HasWorkflow(a2).toOption |@|
+            HasWorkflow(a3).toOption |@|
+            funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
+            val exp: Ternary[ExprOp] = FunctorT[Free[?[_], TernaryArg]].transCata(f)(inj)
+            WB.expr(List(wb1, wb2, wb3)) {
+              case List(_1, _2, _3) => exp.eval[Fix].apply(_1, _2, _3)
+            }
+          }
+        case _ => None
       }).getOrElse(func match {
         case MakeArray => lift(Arity1(HasWorkflow).map(WB.makeArray))
         case MakeObject =>
@@ -1064,7 +1077,7 @@ object MongoDbPlanner {
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: FuncHandler[EX])
+    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
     (logical: Fix[LogicalPlan])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,

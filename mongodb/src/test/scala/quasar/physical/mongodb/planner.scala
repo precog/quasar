@@ -2522,18 +2522,24 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan time_of_day (JS)" in {
-      plan("select time_of_day(ts) from foo") must
+      plan("select time_of_day(ts) from days") must
         beRight // NB: way too complicated to spell out here, and will change as JS generation improves
     }
 
     "plan time_of_day (pipeline)" in {
       import FormatSpecifier._
 
-      plan3_0("select time_of_day(ts) from foo") must
+      plan3_0("select time_of_day(ts) from days") must
         beWorkflow(chain[Workflow](
-          $read(collection("db", "foo")),
+          $read(collection("db", "days")),
           $project(
-            reshape("0" -> $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts"))),
+            reshape("0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Date(Instant.parse("1970-01-01T00:00:00Z"))), $field("ts")),
+                  $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
+                $literal(Bson.Undefined))),
             IgnoreId)))
     }
 

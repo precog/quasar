@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar.api._
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._

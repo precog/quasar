@@ -18,6 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar._
+import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._

@@ -17,13 +17,12 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.contrib.pathy._
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
-import quasar.fs._
+import quasar.fs._, FileSystemError.pathErr, PathError.pathNotFound
 import quasar.fs.impl._
-import quasar.fs.FileSystemError.pathErr
-import quasar.fs.PathError.pathNotFound
-import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.physical.marklogic.xcc._
 
 import scalaz._, Scalaz._

@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.contrib.pathy._
 import quasar.fp.liftMT
 import quasar.fs._
 import quasar.regression._

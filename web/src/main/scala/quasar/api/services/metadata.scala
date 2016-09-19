@@ -19,6 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.SKI._
 import quasar.api._
+import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount._
 

@@ -19,22 +19,26 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.ejson.EJson
-import quasar.fp._
+import quasar.fp.ShowT
+import quasar.physical.marklogic.MonadError_
 import quasar.physical.marklogic.ejson.AsXQuery
+import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.xquery.xml.{NCName, QName}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
+import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
-import scalaz.Monad
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
+import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
   import expr.{if_, let_}, axes._
 
-  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
 
     // math
@@ -68,48 +72,57 @@ object MapFuncPlanner {
 
     // structural
     case MakeArray(x) =>
-      ejson.singletonArray(x).point[F]
+      ejson.singletonArray[F] apply x
 
     // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
     case MakeMap(k, v) =>
-      ejson.singletonMap(k, v).point[F]
+      ejson.singletonMap[F] apply (k, v)
 
     case ConcatArrays(x, y) =>
-      ejson.arrayConcat(x, y)
+      ejson.arrayConcat[F] apply (x, y)
 
     case ProjectField(src, field) => field match {
       case XQuery.Step(_) =>
         (src `/` field).point[F]
 
       case XQuery.StringLit(s) =>
-        for {
-          m      <- freshVar[F]
-          lookup <- ejson.mapLookup(m.xqy, s.xs)
-        } yield {
-          let_(m -> src) return_ {
-            if_ (ejson.isMap(m.xqy))
-            .then_ { lookup }
-            .else_ { m.xqy `/` child(s) }
+        refineV[IsNCName](s).disjunction map { ncname =>
+          val qn = QName.local(NCName(ncname))
+
+          for {
+            m      <- freshVar[F]
+            lookup <- ejson.mapLookup[F] apply (m.xqy, qn.xs)
+            isMap  <- ejson.isMap[F] apply (m.xqy)
+          } yield {
+            let_(m -> src) return_ {
+              if_ (isMap)
+              .then_ { lookup }
+              .else_ { m.xqy `/` child(qn) }
+            }
           }
+        } getOrElse {
+          MonadError_[F, MarkLogicPlannerError].raiseError(
+            MarkLogicPlannerError.invalidQName(s))
         }
 
       case _ =>
         for {
-          m <- freshVar[F]
-          k <- freshVar[F]
-          v <- ejson.mapLookup(m.xqy, k.xqy)
+          m     <- freshVar[F]
+          k     <- freshVar[F]
+          v     <- ejson.mapLookup[F] apply (m.xqy, k.xqy)
+          isMap <- ejson.isMap[F] apply (m.xqy)
         } yield {
           let_(m -> src, k -> field) return_ {
-            if_ (ejson.isMap(m.xqy)) then_ v else_ (m.xqy `/` k.xqy)
+            if_ (isMap) then_ v else_ (m.xqy `/` k.xqy)
           }
         }
     }
 
     // TODO: What other types should this work with?
     case ProjectIndex(arr, idx) =>
-      freshVar[F] map { i =>
+      (freshVar[F] |@| ejson.arrayEltN.qn) { (i, arrElt) =>
         let_(i -> idx) return_ {
-          arr `/` child(ejson.arrayEltName)(i.xqy + 1.xqy) `/` child.node()
+          arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
         }
       }
 
@@ -118,15 +131,16 @@ object MapFuncPlanner {
 
     case ZipMapKeys(m) =>
       for {
-        src  <- freshVar[F]
-        zmk  <- ejson.zipMapKeys(src.xqy)
-        zmnk <- local.zipMapNodeKeys(src.xqy)
+        src   <- freshVar[F]
+        zmk   <- ejson.zipMapKeys apply src.xqy
+        zmnk  <- qscript.zipMapNodeKeys apply src.xqy
+        isMap <- ejson.isMap apply (src.xqy)
       } yield {
         let_(src -> m) return_ {
           // TODO: Should this be necessary?
           if_(fn.empty(src.xqy))
           .then_ { src.xqy }
-          .else_ { if_(ejson.isMap(src.xqy)) then_ zmk else_ zmnk }
+          .else_ { if_(isMap) then_ zmk else_ zmnk }
         }
       }
 

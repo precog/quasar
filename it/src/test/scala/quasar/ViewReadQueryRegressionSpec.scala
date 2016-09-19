@@ -17,9 +17,10 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
-import quasar.fs.{ADir, APath, Empty, PhysicalError, ReadFile}
+import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 import quasar.regression._

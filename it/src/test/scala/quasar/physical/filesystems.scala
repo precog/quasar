@@ -19,6 +19,7 @@ package quasar.physical
 import quasar.Predef._
 import quasar.{EnvironmentError, EnvErr}
 import quasar.config.{CfgErr, ConfigError}
+import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._

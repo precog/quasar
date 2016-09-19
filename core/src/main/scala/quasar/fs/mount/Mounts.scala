@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.fs.ADir
+import quasar.contrib.pathy.ADir
 
 import pathy.Path._
 import scalaz._, Scalaz._

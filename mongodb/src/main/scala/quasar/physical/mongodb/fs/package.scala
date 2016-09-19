@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{EnvironmentError, EnvErrT, EnvErr, NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._

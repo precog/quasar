@@ -17,64 +17,63 @@
 package quasar.physical.marklogic
 
 import quasar.SKI.κ
-import quasar.{NameGenerator, PhaseResultT, PlannerErrT}
+import quasar.NameGenerator
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery.{PrologW, XQuery}
 
 import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
-  type PlanningT[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
-
-  type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
+  type MonadPlanErr[F[_]]            = MonadError_[F, MarkLogicPlannerError]
+  type MarkLogicPlanErrT[F[_], A]    = EitherT[F, MarkLogicPlannerError, A]
+  type MarkLogicPlanner[F[_], QS[_]] = Planner[F, QS, XQuery]
 
   object MarkLogicPlanner {
-    implicit def qScriptCore[T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[QScriptCore[T, ?]] =
-      new QScriptCorePlanner[T]
+    def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP
 
-    implicit def constDeadEnd: MarkLogicPlanner[Const[DeadEnd, ?]] =
-      new DeadEndPlanner
+    implicit def qScriptCore[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
+      new QScriptCorePlanner[F, T]
 
-    implicit def constRead: MarkLogicPlanner[Const[Read, ?]] =
-      new ReadPlanner
+    implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
+      new DeadEndPlanner[F]
 
-    implicit def constShiftedRead: MarkLogicPlanner[Const[ShiftedRead, ?]] =
-      new ShiftedReadPlanner
+    implicit def constRead[F[_]: Applicative]: MarkLogicPlanner[F, Const[Read, ?]] =
+      new ReadPlanner[F]
 
-    implicit def projectBucket[T[_[_]]]: MarkLogicPlanner[ProjectBucket[T, ?]] =
-      new ProjectBucketPlanner[T]
+    implicit def constShiftedRead[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead, ?]] =
+      new ShiftedReadPlanner[F]
 
-    implicit def thetajoin[T[_[_]]]: MarkLogicPlanner[ThetaJoin[T, ?]] =
-      new ThetaJoinPlanner[T]
+    implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
+      new ProjectBucketPlanner[F, T]
 
-    implicit def equiJoin[T[_[_]]]: MarkLogicPlanner[EquiJoin[T, ?]] =
-      new EquiJoinPlanner[T]
+    implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
+      new ThetaJoinPlanner[F, T]
+
+    implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
+      new EquiJoinPlanner[F, T]
   }
 
-  def liftP[F[_]: Monad, A](fa: F[A]): PlanningT[F, A] =
-    fa.liftM[PhaseResultT].liftM[PlannerErrT]
-
-  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](fm: FreeMap[T], src: XQuery): F[XQuery] =
+  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
     planMapFunc[T, F, Hole](fm)(κ(src))
 
-  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
     planMapFunc[T, F, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad, A](
+  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
     freeMap: Free[MapFunc[T, ?], A])(
     recover: A => XQuery
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](fqs: FreeQS[T], src: XQuery): PlanningT[F, XQuery] = {
+  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](
+    fqs: FreeQS[T], src: XQuery
+  ): F[XQuery] = {
     import MarkLogicPlanner._
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-    freeCataM(fqs)(interpretM(κ(src.point[PlanningT[F, ?]]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
+    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
   }
 }

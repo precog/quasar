@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.TestConfig
+import quasar.contrib.pathy._
 import quasar.fp._
 
 import monocle.std.{disjunction => D}

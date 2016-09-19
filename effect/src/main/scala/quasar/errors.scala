@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp._, eitherT._
 
 import scalaz._
 import scalaz.concurrent._

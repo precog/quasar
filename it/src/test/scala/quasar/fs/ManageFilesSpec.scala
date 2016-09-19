@@ -17,15 +17,15 @@
 package quasar.fs
 
 import quasar.Predef._
-
 import quasar.{Data, TestConfig}
+import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fs.FileSystemTest.allFsUT
 
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
-import FileSystemTest.allFsUT
 
 class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
   import FileSystemTest._, FileSystemError._, PathError._

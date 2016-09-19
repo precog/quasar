@@ -18,7 +18,9 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendName, Data, TestConfig}
-import quasar.fp.{eitherTCatchable, TaskRef, reflNT}
+import quasar.contrib.pathy._
+import quasar.fp.{TaskRef, reflNT}
+import quasar.fp.eitherT._
 import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
@@ -132,6 +134,7 @@ object FileSystemTest {
     fsTestConfig(mongodb.fs.MongoDBFsType, mongodb.fs.mongoDbFileSystemDef) orElse
     fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)                orElse
     fsTestConfig(postgresql.fs.FsType, postgresql.fs.definition)            orElse
+    fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)  orElse
     fsTestConfig(marklogic.fs.FsType, marklogic.fs.definition)
   }
 

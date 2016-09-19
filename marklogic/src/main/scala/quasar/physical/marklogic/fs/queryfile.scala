@@ -17,25 +17,28 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, Planner => QPlanner}
 import quasar.SKI.κ
-import quasar.{LogicalPlan, PhaseResult, PhaseResults}
+import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
-import quasar.fs._
-import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fp._
+import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fs._
+import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
-  import MarkLogicPlanner._
+  import MarkLogicPlanner._, MarkLogicPlannerError._
 
   // TODO: Still need to implement ExecutePlan.
   def interpret[S[_]](
@@ -49,22 +52,36 @@ object queryfile {
   ): QueryFile ~> Free[S, ?] = {
     def plannedLP[A](
       lp: Fix[LogicalPlan])(
-      f: XQuery => ContentSourceIO[A]
+      f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
+      type PrologsT[F[_], A] = WriterT[F, Prologs, A]
+      type M[A] = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import EitherT.eitherTMonad
+      import WriterT.writerTMonad
+      val optimize = new Optimize[Fix]
 
-      def phase(xqy: XQuery): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", xqy.toString))
+      def phase(main: MainModule): PhaseResults =
+        Vector(PhaseResult.Detail("XQuery", main.render))
 
-      val listContents: ConvertPath.ListContents[Free[S, ?]] =
-        adir => lift(ops.ls(adir)).into[S].liftM[FileSystemErrT]
+      val listContents: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
+        adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
+
+      def plan(qs: Fix[QScriptTotal[Fix, ?]]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
+        qs.cataM(MarkLogicPlanner[M, QScriptTotal[Fix, ?]].plan).run map {
+          case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
+        }
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        xqy <- qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[Free[S, ?]])
-                 .leftMap(planningFailed(lp, _))
-        a   <- WriterT.put(lift(f(xqy)).into[S])(phase(xqy)).liftM[FileSystemErrT]
+        shifted = transFutu(qs)(ShiftRead[Fix, QScriptTotal[Fix, ?], QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)((_: QScriptTotal[Fix, Fix[QScriptTotal[Fix, ?]]]))).transCata(optimize.applyAll)
+        mod <- plan(shifted).leftMap(mlerr => mlerr match {
+          case InvalidQName(s) =>
+            FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
+              // TODO: Change to include the QScript context when supported
+              LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+        })
+        a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 
       planning.run.run
@@ -74,14 +91,13 @@ object queryfile {
       plannedLP(lp)(κ(out.point[ContentSourceIO]))
 
     def eval(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(xqy =>
+      plannedLP(lp)(main =>
         ContentSourceIO.resultCursor(
-          SessionIO.evaluateQuery_(xqy),
+          SessionIO.evaluateModule_(main),
           resultsChunkSize))
 
     def explain(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(xqy =>
-        ExecutionPlan(FsType, xqy.toString).point[ContentSourceIO])
+      plannedLP(lp)(main => ExecutionPlan(FsType, main.render).point[ContentSourceIO])
 
     def exists(file: AFile): Free[S, Boolean] =
       lift(ops.exists(file)).into[S]

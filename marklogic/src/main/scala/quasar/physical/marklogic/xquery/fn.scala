@@ -40,6 +40,9 @@ object fn {
   def doc(uri: XQuery): XQuery =
     XQuery(s"fn:doc($uri)")
 
+  def documentUri(node: XQuery): XQuery =
+    XQuery(s"fn:document-uri($node)")
+
   def empty(seq: XQuery): XQuery =
     XQuery(s"fn:empty($seq)")
 

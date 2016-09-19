@@ -18,7 +18,8 @@ package quasar.physical.mongodb.fs
 
 import quasar.Predef._
 import quasar._
-import quasar.fs.{ADir, FileSystemType}
+import quasar.contrib.pathy.ADir
+import quasar.fs.FileSystemType
 import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig._
 import quasar.physical.mongodb.Collection
 

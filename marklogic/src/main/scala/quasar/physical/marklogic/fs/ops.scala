@@ -18,15 +18,18 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.{Data, DataCodec}
-import quasar.fs._
+import quasar.contrib.pathy._
 import quasar.fp.free.lift
+import quasar.fs._
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.xml._
 import quasar.physical.marklogic.xquery.syntax._
 
 import scala.math.{ceil, log}
 
+import eu.timepit.refined.auto._
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions.XQueryException
 import com.marklogic.xcc.types.XSBoolean
@@ -41,6 +44,10 @@ import scalaz.stream.Process
 //     make multiple requests) rather than to sequence them as expressions in XQuery.
 object ops {
   import expr.{func, if_, for_, let_}, axes.child
+
+  val prop           = NSPrefix(NCName("prop"))
+  val propProperties = prop(NCName("properties"))
+  val propDirectory  = prop(NCName("directory"))
 
   def appendToFile[S[_]](
     dstFile: AFile,
@@ -125,7 +132,7 @@ object ops {
     val uri = pathUri(dir)
 
     def isMLDir(u: XQuery) =
-      fn.exists(xdmp.documentProperties(u) `/` child("prop:properties") `/` child("prop:directory"))
+      fn.exists(xdmp.documentProperties(u) `/` child(propProperties) `/` child(propDirectory))
 
     val prefixPathsXqy =
       fn.filter(

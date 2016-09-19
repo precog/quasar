@@ -18,6 +18,7 @@ package quasar.api.services
 
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._

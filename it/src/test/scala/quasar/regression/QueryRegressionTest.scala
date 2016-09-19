@@ -18,7 +18,8 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
-import quasar.fp._, free._
+import quasar.contrib.pathy._
+import quasar.fp._, eitherT._, free._
 import quasar.fs._
 import quasar.main.FilesystemQueries
 import quasar.fs.mount.{Mounts, hierarchical}
@@ -144,9 +145,6 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Task[Result] = {
     val liftRun: CompExecM ~> Task = {
-      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import EitherT.eitherTMonad
-
       type H1[A] = PhaseResultT[Task, A]
       type H2[A] = SemanticErrsT[H1, A]
       type H3[A] = FileSystemErrT[H2, A]

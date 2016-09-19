@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._

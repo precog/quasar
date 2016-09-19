@@ -18,7 +18,8 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.Variables
-import quasar.fs.{APath, ADir, AFile, PathError, FileSystemType}
+import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.fs.{PathError, FileSystemType}
 import quasar.sql, sql.Sql
 
 import matryoshka._

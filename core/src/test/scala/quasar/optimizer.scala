@@ -17,21 +17,18 @@
 package quasar
 
 import quasar.Predef._
-import quasar.std._
+import quasar.LogicalPlan._
+import quasar.sql.CompilerHelpers
+import quasar.std._, StdLib.set._, StdLib.structural._
 
 import matryoshka._, FunctorT.ops._
-import pathy.Path._
-import scalaz._, Scalaz._
-
 import org.scalacheck._
+import pathy.Path._
+import scalaz.{Free => _, _}, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
 class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
-  import StdLib.structural._
-  import StdLib.set._
-  import LogicalPlan._
-
   "simplify" should {
 
     "inline trivial binding" in {

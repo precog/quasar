@@ -17,8 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
-
-import quasar.fs.{APath}
+import quasar.contrib.pathy.{APath}
 
 import org.http4s.{Uri}
 import pathy.Path, Path._

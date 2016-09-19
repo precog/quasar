@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.BackendName
+import quasar.contrib.pathy._
 import quasar.fp.free, free._
 
 import scalaz._

@@ -17,8 +17,9 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
-import quasar.SKI.κ
 import quasar.NameGenerator
+import quasar.SKI.κ
+import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs._
 import quasar.physical.mongodb._

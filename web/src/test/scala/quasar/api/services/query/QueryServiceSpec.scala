@@ -17,10 +17,11 @@
 package quasar.api.services.query
 
 import quasar.Predef._
-import quasar._, fs._
-import quasar.api.matchers._
 import quasar.api.ApiError
 import quasar.api.ApiErrorEntityDecoder._
+import quasar.api.PathUtils._
+import quasar.api.matchers._
+import quasar.contrib.pathy._
 import quasar.fs._, InMemory._
 
 import argonaut._, Argonaut._
@@ -30,7 +31,6 @@ import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
-import quasar.api.PathUtils._
 
 class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._

@@ -349,7 +349,6 @@ trait CoEnvInstances extends LowPriorityCoEnvImplicits {
 package object fp
     extends TreeInstances
     with ListMapInstances
-    with fp.EitherTInstances
     with OptionTInstances
     with StateTInstances
     with WriterTInstances

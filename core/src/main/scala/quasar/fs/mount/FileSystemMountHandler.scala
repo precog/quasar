@@ -17,8 +17,10 @@
 package quasar.fs.mount
 
 import quasar.Predef.{Unit, String}
+import quasar.contrib.pathy.ADir
+import quasar.fp.numeric._
 import quasar.effect.AtomicRef
-import quasar.fs.{ADir, FileSystemType, PathError}
+import quasar.fs.{FileSystemType, PathError}
 import quasar.fp.free
 
 import scalaz._

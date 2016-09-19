@@ -18,12 +18,12 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.SKI._
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
 
 import java.net.URI
 import scala.collection.JavaConverters._
 
-import com.marklogic.xcc._
+import com.marklogic.xcc.{Version => _, _}
 import com.marklogic.xcc.exceptions.RequestException
 import com.marklogic.xcc.types.XdmItem
 import scalaz._, Scalaz._
@@ -52,18 +52,30 @@ object SessionIO {
   def connectionUri: OptionT[SessionIO, URI] =
     OptionT(SessionIO(s => Option(s.getConnectionUri)))
 
+  def evaluateModule(main: MainModule, options: RequestOptions): SessionIO[QueryResults] =
+    evaluateModule0(main, options) map (new QueryResults(_))
+
+  def evaluateModule_(main: MainModule): SessionIO[QueryResults] =
+    evaluateModule(main, new RequestOptions)
+
+  def executeModule(main: MainModule, options: RequestOptions): SessionIO[Executed] = {
+    options.setCacheResult(false)
+    evaluateModule0(main, options)
+      .flatMap(rs => liftT(Task.delay(rs.close())))
+      .as(executed)
+  }
+
+  def executeModule_(main: MainModule): SessionIO[Executed] =
+    executeModule(main, new RequestOptions)
+
   def evaluateQuery(query: XQuery, options: RequestOptions): SessionIO[QueryResults] =
-    evaluateQuery0(query, options) map (new QueryResults(_))
+    evaluateModule(defaultModule(query), options)
 
   def evaluateQuery_(query: XQuery): SessionIO[QueryResults] =
     evaluateQuery(query, new RequestOptions)
 
-  def executeQuery(query: XQuery, options: RequestOptions): SessionIO[Executed] = {
-    options.setCacheResult(false)
-    evaluateQuery0(query, options)
-      .flatMap(rs => liftT(Task.delay(rs.close())))
-      .as(executed)
-  }
+  def executeQuery(query: XQuery, options: RequestOptions): SessionIO[Executed] =
+    executeModule(defaultModule(query), options)
 
   def executeQuery_(query: XQuery): SessionIO[Executed] =
     executeQuery(query, new RequestOptions)
@@ -115,8 +127,11 @@ object SessionIO {
   private def apply[A](f: Session => A): SessionIO[A] =
     lift(s => Task.delay(f(s)))
 
-  def evaluateQuery0(query: XQuery, options: RequestOptions): SessionIO[ResultSequence] =
-    SessionIO(s => s.submitRequest(s.newAdhocQuery(query.toQuery, options)))
+  private def defaultModule(query: XQuery): MainModule =
+    MainModule(Version.`1.0-ml`, ISet.empty, query)
+
+  private def evaluateModule0(main: MainModule, options: RequestOptions): SessionIO[ResultSequence] =
+    SessionIO(s => s.submitRequest(s.newAdhocQuery(main.render, options)))
 
   private def lift[A](f: Session => Task[A]): SessionIO[A] =
     new SessionIO(Kleisli(f))

@@ -1,0 +1,1 @@
+- Implement map func constant folding.

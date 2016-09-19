@@ -26,74 +26,73 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
+  extends MarkLogicPlanner[F, QScriptCore[T, ?]] {
+
   import expr.{func, for_, let_}
 
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
+  val plan: AlgebraM[F, QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
-      liftP(for {
+      for {
         x <- freshVar[F]
         g <- mapFuncXQuery(f, x.xqy)
-      } yield fn.map(func(x) { g }, src))
+      } yield fn.map(func(x) { g }, src)
 
     case LeftShift(src, struct, repair) =>
-      liftP(for {
+      for {
         s       <- freshVar[F]
         l       <- freshVar[F]
         r       <- freshVar[F]
         extract <- mapFuncXQuery(struct, s.xqy)
-        lshift  <- local.leftShift(l.xqy)
+        lshift  <- qscript.leftShift[F] apply (l.xqy)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
-      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge)
+      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge
 
     case Reduce(src, bucket, reducers, repair) =>
-      XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
+      XQuery(s"((: REDUCE :)$src)").point[F]
 
     case Sort(src, bucket, order) =>
-      liftP(for {
+      for {
         x           <- freshVar[F]
         xQueryOrder <- order.traverse { case (func, sortDir) =>
-          mapFuncXQuery(func, x.xqy).strengthR(SortDirection.fromQScript(sortDir))
-        }
+                         mapFuncXQuery(func, x.xqy).strengthR(SortDirection.fromQScript(sortDir))
+                       }
         bucketOrder <- mapFuncXQuery(bucket, x.xqy).strengthR(SortDirection.Ascending)
-      } yield
-        expr
-          .for_(x -> src)
-          .orderBy(bucketOrder, xQueryOrder: _*)
-          .return_(x.xqy))
+      } yield for_(x -> src) orderBy (bucketOrder, xQueryOrder: _*) return_ x.xqy
 
     case Union(src, lBranch, rBranch) =>
       for {
-        s <- liftP(freshVar[F])
+        s <- freshVar[F]
         l <- rebaseXQuery(lBranch, s.xqy)
         r <- rebaseXQuery(rBranch, s.xqy)
       } yield let_(s -> src) return_ (l union r)
 
     case Filter(src, f) =>
-      liftP(for {
+      for {
         x <- freshVar[F]
         p <- mapFuncXQuery(f, x.xqy)
-      } yield fn.filter(func(x) { p }, src))
+      } yield fn.filter(func(x) { p }, src)
 
     // NB: XQuery sequences use 1-based indexing.
     case Take(src, from, count) =>
       for {
-        s   <- liftP(freshVar[F])
-        f   <- liftP(freshVar[F])
-        c   <- liftP(freshVar[F])
+        s   <- freshVar[F]
+        f   <- freshVar[F]
+        c   <- freshVar[F]
         fm  <- rebaseXQuery(from, s.xqy)
         ct  <- rebaseXQuery(count, s.xqy)
       } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
 
     case Drop(src, from, count) =>
       for {
-        s  <- liftP(freshVar[F])
-        f  <- liftP(freshVar[F])
-        c  <- liftP(freshVar[F])
+        s  <- freshVar[F]
+        f  <- freshVar[F]
+        c  <- freshVar[F]
         fm <- rebaseXQuery(from, s.xqy)
         ct <- rebaseXQuery(count, s.xqy)
       } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
+
     case Unreferenced() =>
-      expr.emptySeq.point[PlanningT[F, ?]]
+      expr.emptySeq.point[F]
   }
 }

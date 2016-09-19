@@ -18,21 +18,26 @@ package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
 import quasar.{Data, DataCodec, DataEncodingError}
-import quasar.fs._
-import quasar.fs.PathError._
-import quasar.fs.FileSystemError._
-import quasar.fs.WriteFile._
-import quasar.fp.free._
+import quasar.contrib.pathy._
 import quasar.effect._
+import quasar.fp.free._
+import quasar.fs._, FileSystemError._, PathError._, WriteFile._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 
 import pathy.Path._
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object writefile {
+
+
+  def chrooted[S[_]](prefix: ADir)(implicit
+    s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,
+    s1: MonotonicSeq :<: S,
+    s2: Task :<: S
+  ) : WriteFile ~> Free[S, ?] =
+    flatMapSNT(interpret) compose chroot.writeFile[WriteFile](prefix)
 
   def interpret[S[_]](implicit
     s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,

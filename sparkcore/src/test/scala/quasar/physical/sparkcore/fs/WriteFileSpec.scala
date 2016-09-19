@@ -18,20 +18,20 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.contrib.pathy._
+import quasar.effect._
 import quasar.fp.TaskRef
 import quasar.fp.numeric._
 import quasar.fp.free._
-import quasar.fs._
-import quasar.fs.WriteFile.WriteHandle
-import quasar.effect._
+import quasar.fs._, WriteFile.WriteHandle
 
 import java.lang.System
 import java.io._
 import java.nio.file._
 
-import pathy.Path.posixCodec
 import pathy.Path._
-import scalaz._, Scalaz._, concurrent.Task
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 class WriteFileSpec extends quasar.Qspec {
 

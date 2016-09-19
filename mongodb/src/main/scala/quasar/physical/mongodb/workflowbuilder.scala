@@ -895,19 +895,17 @@ object WorkflowBuilder {
   //       shape of any DocVar in the source.
   @tailrec def findKeys[F[_]](wb: WorkflowBuilder[F]): Option[Base] = {
     wb.unFix match {
-      case CollectionBuilderF(_, _, s2)       => s2.map(s => Subset(s.toSet))
-      case DocBuilderF(_, shape)              => Subset(shape.keySet).some
-      case FlatteningBuilderF(src, _)         => findKeys(src)
-      case GroupBuilderF(src, _,
-            Expr(\/-($$ROOT)))     => findKeys(src)
-      case GroupBuilderF(_, _, Doc(obj))      => Subset(obj.keySet).some
-      case ShapePreservingBuilderF(src, _, _) => findKeys(src)
-      case ExprBuilderF(src,
-            \/-($$ROOT))           => findKeys(src)
-      case ExprBuilderF(_, _)                 => Root().some
-      case ValueBuilderF(Bson.Doc(shape)) =>
-        Subset(shape.keySet.map(BsonField.Name(_))).some
-      case _ => None
+      case CollectionBuilderF(_, _, s2)             => s2.map(s => Subset(s.toSet))
+      case DocBuilderF(_, shape)                    => Subset(shape.keySet).some
+      case FlatteningBuilderF(src, _)               => findKeys(src)
+      case GroupBuilderF(src, _, Expr(\/-($$ROOT))) => findKeys(src)
+      case GroupBuilderF(_, _, Doc(obj))            => Subset(obj.keySet).some
+      case ShapePreservingBuilderF(src, _, _)       => findKeys(src)
+      case ExprBuilderF(src, \/-($$ROOT))           => findKeys(src)
+      case ExprBuilderF(_, _)                       => Root().some
+      case ValueBuilderF(Bson.Doc(shape))           => Subset(shape.keySet
+                                                        .map(BsonField.Name(_))).some
+      case _                                        => None
     }
   }
 

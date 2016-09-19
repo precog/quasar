@@ -1,0 +1,1 @@
+-Disable sbt-header plugin for marklogic-validation until exclusion is available.

@@ -17,6 +17,9 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xquery.xml.QName
+
+import scalaz.syntax.show._
 
 /** XPath [Axes](https://www.w3.org/TR/xquery/#axes) expressions.
   *
@@ -33,8 +36,8 @@ object axes {
   val descendant: Axis = Axis("child")
 
   final case class Axis(name: String) {
-    def apply(elementName: String): XQuery =
-      xqy(elementName)
+    def apply(elementName: QName): XQuery =
+      xqy(elementName.shows)
 
     val * : XQuery =
       xqy("*")

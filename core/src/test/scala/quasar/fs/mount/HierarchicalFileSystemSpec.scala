@@ -18,6 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.{Data, Func, LogicalPlan}
+import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.fs._

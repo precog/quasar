@@ -18,16 +18,18 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.Data
-import quasar.fp._, free._, numeric._
-import quasar.fs._
-import quasar.fs.ReadFile.ReadHandle
+import quasar.contrib.pathy._
 import quasar.effect._
+import quasar.fp._
+import quasar.fp.free._
+import quasar.fp.numeric._
+import quasar.fs._, ReadFile.ReadHandle
 
 import java.io._
 
-import scalaz._, Scalaz._, concurrent.Task
-
 import org.apache.spark._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 class ReadFileSpec extends quasar.Qspec {
   type Eff[A] = (

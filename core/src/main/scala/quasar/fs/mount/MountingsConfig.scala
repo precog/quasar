@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.{Map, String, ArrowAssoc}
 import quasar.SKI._
-import quasar.fs.APath
+import quasar.contrib.pathy.APath
 
 import scala.AnyVal
 

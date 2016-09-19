@@ -17,10 +17,11 @@
 package quasar.fs.mount
 
 import quasar.Predef.String
-import quasar.fp.{liftMT}
-import quasar.fp.free, free._
-import quasar.fs.{FileSystem, FileSystemType, PathError, ADir}
+import quasar.contrib.pathy.{ADir}
 import quasar.effect._
+import quasar.fp.liftMT
+import quasar.fp.free, free._
+import quasar.fs.{FileSystem, FileSystemType, PathError}
 
 import monocle.function.Field1
 import monocle.std.tuple2._

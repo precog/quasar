@@ -17,12 +17,12 @@
 package quasar.api
 
 import quasar.Predef._
+import quasar.api.PathUtils._
+import quasar.contrib.pathy.{ADir, AFile}
 
-import quasar.fs.{ADir, AFile}
+import org.http4s.dsl.{Path => HPath}
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
-import org.http4s.dsl.{Path => HPath}
-import quasar.api.PathUtils._
 
 class AsPathSpec extends quasar.Qspec {
   "AsPath" should {

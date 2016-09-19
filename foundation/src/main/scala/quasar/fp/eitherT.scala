@@ -46,7 +46,7 @@ trait EitherTInstances extends EitherTInstances0 {
     }
 }
 
-trait EitherTInstances0 {
+trait EitherTInstances0 extends EitherTInstances1 {
   implicit def eitherTMonadReader[F[_], R, E](implicit F: MonadReader[F, R]): MonadReader[EitherT[F, E, ?], R] =
     new MonadReader[EitherT[F, E, ?], R] {
       def ask = EitherT.right(F.ask)
@@ -55,6 +55,11 @@ trait EitherTInstances0 {
       def bind[A, B](fa: EitherT[F, E, A])(f: A => EitherT[F, E, B]) = fa flatMap f
       def point[A](a: => A) = F.point(a).liftM[EitherT[?[_], E, ?]]
     }
+}
+
+trait EitherTInstances1 {
+  implicit def eitherTMonadTell[F[_], W, E](implicit F: MonadTell[F, W]): MonadTell[EitherT[F, E, ?], W] =
+    EitherT.monadTell[F, W, E]
 }
 
 object eitherT extends EitherTInstances

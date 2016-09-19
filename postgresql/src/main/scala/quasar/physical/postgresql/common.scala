@@ -17,6 +17,7 @@
 package quasar.physical.postgresql
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.fs._
 
 import doobie.imports._

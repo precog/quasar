@@ -23,7 +23,12 @@ import scalaz._
 sealed abstract class XQuery {
   import XQuery._
 
-  def apply(predicate: XQuery): XQuery = XQuery(s"$this[$predicate]")
+  def apply(predicate: XQuery): XQuery =
+    this match {
+      case XQuery.Step(s) => XQuery.Step(s"$s[$predicate]")
+      case _              => XQuery(s"$this[$predicate]")
+    }
+
   def unary_- : XQuery = XQuery(s"-$this")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
   def +(other: XQuery): XQuery = XQuery(s"$this + $other")
@@ -79,18 +84,6 @@ sealed abstract class XQuery {
 
   def except(other: XQuery): XQuery =
     XQuery(s"$this except $other")
-
-  // TODO: Accept a list of namespaces? Or somehow gather namespaces used in
-  //       constructing the query in order to be able to output them here.
-  def toQuery: String =
-    s"""
-      xquery version "1.0-ml";
-      import module namespace json = "http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
-      declare namespace ejson  = "http://quasar-analytics.org/ejson";
-      declare namespace quasar = "http://quasar-analytics.org/quasar";
-
-      $this
-    """
 }
 
 object XQuery {

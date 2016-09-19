@@ -1,0 +1,1 @@
+- Move MarkLogic planner effect to typeclass param and constraints to instance defns

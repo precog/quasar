@@ -16,6 +16,8 @@
 
 package quasar
 
+import scala.Predef.implicitly
+
 import java.lang.String
 
 import matryoshka._, FunctorT.ops._
@@ -31,11 +33,21 @@ package object ejson {
 
   type EJson[A] = Coproduct[Extension, Common, A]
 
+  val ExtEJson = implicitly[Extension :<: EJson]
+  val CommonEJson = implicitly[Common :<: EJson]
+
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
 
     def fromJsonT[T[_[_]]: FunctorT: Corecursive]: T[Json] => T[EJson] =
       _.transAna(fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
+
+    def fromCommon[T[_[_]]: Corecursive]: Common[T[EJson]] => T[EJson] =
+      CommonEJson.inj(_).embed
+
+    def fromExt[T[_[_]]: Corecursive]: Extension[T[EJson]] => T[EJson] =
+      ExtEJson.inj(_).embed
+
   }
 }

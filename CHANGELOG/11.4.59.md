@@ -1,0 +1,1 @@
+- Elide ThetaJoin with one side Undefined.

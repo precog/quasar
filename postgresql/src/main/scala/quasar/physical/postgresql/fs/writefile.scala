@@ -18,6 +18,7 @@ package quasar.physical.postgresql.fs
 
 import quasar.Predef._
 import quasar.{Data, DataCodec}
+import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free._
 import quasar.fs._

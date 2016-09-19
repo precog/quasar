@@ -17,8 +17,9 @@
 package quasar.physical.postgresql.fs
 
 import quasar.Predef._
-import quasar.fs._
-import quasar.fp.{κ, free}, free._
+import quasar.contrib.pathy._
+import quasar.fp.κ
+import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.postgresql.common._
 

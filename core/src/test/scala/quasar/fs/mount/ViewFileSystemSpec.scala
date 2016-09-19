@@ -19,12 +19,11 @@ package quasar.fs.mount
 import quasar.Predef._
 
 import quasar._, LogicalPlan._
+import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._
-import quasar.fs._
-import quasar.fs.InMemory.InMemState
-import quasar.sql.{InnerJoin => _, _}
-import quasar.sql.ExprArbitrary._
+import quasar.fp._, eitherT._
+import quasar.fs._, InMemory.InMemState
+import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._

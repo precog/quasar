@@ -22,10 +22,11 @@ import quasar.DataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.fs._, PathArbitrary._
+import quasar.fs._
 
 import argonaut.Json
 import argonaut.Argonaut._
@@ -438,7 +439,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
                 Data.Obj(ListMap("a" -> Data.Int(1))),
                 Data.Obj(ListMap("b" -> Data.Str("[1|2|3]"))))
               accept(Csv("a|b\n1|\n|'[1|2|3]'\n"), weirdData)
-            }
+            }.flakyTest
           }
         }
         "be 500 when error during writing" >> prop {

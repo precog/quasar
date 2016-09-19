@@ -34,6 +34,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.Variables
+import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fs._

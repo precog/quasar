@@ -34,6 +34,7 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
     "com.slamdata"               %% "matryoshka-core"           %     "0.11.1",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
+    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
@@ -50,7 +51,7 @@ object Dependencies {
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
     "com.slamdata"               %% "pathy-argonaut" %  pathyVersion
   )
-  def main = Seq(
+  def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
@@ -72,6 +73,9 @@ object Dependencies {
       .exclude("org.spark-project.spark", "unused")
       .exclude("io.netty", "netty-all")
   )
+  def marklogicValidation = Seq(
+    "eu.timepit" %% "refined" %  refinedVersion
+  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
@@ -80,7 +84,6 @@ object Dependencies {
     "org.spire-math"             %% "jawn-parser"         % jawnVersion
   )
   def web = Seq(
-    "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,

@@ -35,8 +35,17 @@ object cts {
   def documentOrder(direction: XQuery): XQuery =
     XQuery(s"cts:document-order($direction)")
 
+  def elementValueQuery(elementName: XQuery, textOrOptionsOrWeight: XQuery*): XQuery =
+    XQuery(s"cts:element-value-query${mkSeq_(elementName, textOrOptionsOrWeight: _*)}")
+
+  def jsonPropertyValueQuery(propertyName: XQuery, propertyNameOrValueOrOptionsOrWeight: XQuery*): XQuery =
+    XQuery(s"cts:json-property-value-query${mkSeq_(propertyName, propertyNameOrValueOrOptionsOrWeight: _*)}")
+
   def indexOrder(index: XQuery, options: XQuery*) =
     XQuery(s"cts:index-order($index, ${mkSeq(options)})")
+
+  def orQuery(query: XQuery, queryOrOptions: XQuery*): XQuery =
+    XQuery(s"cts:or-query${mkSeq_(query, queryOrOptions: _*)}")
 
   def search(
     expr: XQuery,

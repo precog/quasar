@@ -18,9 +18,9 @@ package quasar
 
 import quasar.Predef._
 import quasar.api.ToQResponse.ops._
+import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fs._
 
 import java.io.File
 

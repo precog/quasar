@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -25,9 +24,11 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class EquiJoinPlanner[T[_[_]]] extends MarkLogicPlanner[EquiJoin[T, ?]] {
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], EquiJoin[T, ?], XQuery] = {
+private[qscript] final class EquiJoinPlanner[F[_]: Applicative, T[_[_]]]
+  extends MarkLogicPlanner[F, EquiJoin[T, ?]] {
+
+  val plan: AlgebraM[F, EquiJoin[T, ?], XQuery] = {
     case EquiJoin(src, lBranch, rBranch, leftKey, rightKey, joinType, combineFunc) =>
-      s"((: EquiJoin :)$src)".xqy.point[PlanningT[F, ?]]
+      s"((: EquiJoin :)$src)".xqy.point[F]
   }
 }

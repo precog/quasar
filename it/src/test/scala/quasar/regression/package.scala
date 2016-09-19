@@ -17,10 +17,11 @@
 package quasar
 
 import quasar.Predef.{Long, Map}
+import quasar.contrib.pathy.ADir
 import quasar.effect._
 import quasar.fp.{TaskRef}
 import quasar.fp.free, free._
-import quasar.fs.{QueryFile, FileSystem, ADir}
+import quasar.fs.{QueryFile, FileSystem}
 
 import scalaz.{Failure => _, _}
 import scalaz.concurrent._

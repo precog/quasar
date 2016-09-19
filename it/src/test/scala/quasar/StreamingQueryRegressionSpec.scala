@@ -16,14 +16,14 @@
 
 package quasar
 
-import quasar.fs.ADir
+import quasar.contrib.pathy.ADir
 import quasar.regression._
 import quasar.sql.Sql
 
 import scala.None
 
 import eu.timepit.refined.auto._
-import matryoshka.{Fix}
+import matryoshka.Fix
 
 class StreamingQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS) {

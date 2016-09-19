@@ -18,14 +18,24 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.physical.marklogic.validation._
+import quasar.physical.marklogic.xquery.xml._
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.string.Uri
 import scalaz._
 import scalaz.std.string._
 import scalaz.std.iterable._
+import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.std.option._
 
 package object xquery {
+
+  type XPath = String
+
+  type Prologs = ISet[Prolog]
+  type PrologW[F[_]] = MonadTell[F, Prologs]
 
   sealed abstract class SortDirection
 
@@ -40,10 +50,51 @@ package object xquery {
     }
   }
 
-  type XPath = String
+  final case class ParamName(value: QName) {
+    def as(tpe: SequenceType): FunctionParam = FunctionParam(this, tpe)
+    def xqy: XQuery = XQuery(s"$$${value}")
+  }
+
+  object ParamName {
+    implicit val order: Order[ParamName] =
+      Order.orderBy(_.value)
+
+    implicit val show: Show[ParamName] =
+      Show.shows(_.xqy.toString)
+  }
+
+  final case class SequenceType(override val toString: String) extends scala.AnyVal
+
+  object SequenceType {
+    val Top: SequenceType = SequenceType("item()*")
+
+    implicit val order: Order[SequenceType] =
+      Order.orderBy(_.toString)
+
+    implicit val show: Show[SequenceType] =
+      Show.showFromToString
+  }
+
+  final case class FunctionParam(name: ParamName, tpe: SequenceType) {
+    def render: String = s"${name.xqy} as $tpe"
+  }
+
+  object FunctionParam {
+    implicit val order: Order[FunctionParam] =
+      Order.orderBy(fp => (fp.name, fp.tpe))
+
+    implicit val show: Show[FunctionParam] =
+      Show.shows(fp => s"FunctionParam(${fp.render})")
+  }
 
   def asArg(opt: Option[XQuery]): String =
     opt.map(", " + _.toString).orZero
+
+  def declare(fname: QName): FunctionDecl.FunctionDeclDsl =
+    FunctionDecl.FunctionDeclDsl(fname)
+
+  def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
+    declare(NSPrefix.local(fname))
 
   def freshVar[F[_]: NameGenerator: Functor]: F[String] =
     NameGenerator[F].prefixedName("$v")
@@ -53,6 +104,12 @@ package object xquery {
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
+
+  def module(prefix: String Refined IsNCName, uri: String Refined Uri, locs: (String Refined Uri)*): ModuleImport =
+    ModuleImport(Some(NSPrefix(NCName(prefix))), NSUri(uri), locs.map(NSUri(_)).toIList)
+
+  def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =
+    NamespaceDecl(NSPrefix(NCName(prefix)), NSUri(uri))
 
   def xmlElement(name: String, content: String): String =
     s"<$name>$content</$name>"

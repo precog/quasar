@@ -19,6 +19,7 @@ package quasar.repl
 import quasar.Predef._
 
 import quasar.{Data, DataCodec, PhaseResult, Variables}
+import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.fp._
@@ -35,6 +36,9 @@ import scalaz.concurrent.Task
 
 object Repl {
   import Command.{XDir, XFile}
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
   val HelpMessage =
     """Quasar REPL, Copyright © 2014–2016 SlamData Inc.
@@ -96,9 +100,6 @@ object Repl {
     S2: Task :<: S
   ): Free[S, Unit] = {
     import Command._
-
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
 
     val RS = AtomicRef.Ops[RunState, S]
     val DF = Failure.Ops[String, S]

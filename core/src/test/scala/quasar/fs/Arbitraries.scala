@@ -22,7 +22,6 @@ import org.scalacheck.Gen
 
 trait Arbitraries extends
   FileSystemTypeArbitrary with
-  PathArbitrary with
   InMemoryArbitrary with
   MoveSemanticsArbitrary
 

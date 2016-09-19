@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.contrib.pathy._
 import quasar.fp._
 
 import pathy.{Path => PPath}, PPath._

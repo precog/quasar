@@ -18,8 +18,8 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.config.FsPath._
+import quasar.contrib.pathy._
 import quasar.Errors.ETask
-import quasar.fs._
 
 import java.nio.file.{Path => _, _}
 import java.nio.charset._

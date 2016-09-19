@@ -18,19 +18,19 @@ package quasar.server
 
 import quasar.Predef._
 import quasar.{TestConfig, Variables}
-import quasar.config.{ConfigOps, FsPath, WebConfig}
-import quasar.main.MainErrT
 import quasar.api.UriPathCodec
+import quasar.config.{ConfigOps, FsPath, WebConfig}
+import quasar.contrib.pathy.APath
 import quasar.internal.MountServiceConfig
-import quasar.fs._, mount._
+import quasar.main.MainErrT
+import quasar.fs.mount._
 import quasar.server.Server.QuasarConfig
 import quasar.sql.{fixParser, Query}
 
 import java.io.File
 
 import argonaut._, Argonaut._
-import org.http4s.Uri.Authority
-import org.http4s._, Status._
+import org.http4s._, Status._, Uri.Authority
 import org.http4s.argonaut._
 import pathy.Path._
 import scalaz._, Scalaz._

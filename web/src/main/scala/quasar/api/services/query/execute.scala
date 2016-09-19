@@ -18,20 +18,20 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._
-import quasar.api._
-import quasar.api.ToApiError.ops._
+import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.main.FilesystemQueries
-import quasar.sql.{Sql, Query}
+import quasar.sql.{Query, Sql}
 
 import argonaut._, Argonaut._
 import matryoshka.Fix
-import org.http4s.headers.Accept
 import org.http4s._
 import org.http4s.dsl._
+import org.http4s.headers.Accept
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

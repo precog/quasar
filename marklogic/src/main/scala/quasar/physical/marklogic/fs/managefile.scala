@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.fp.free.lift
 import quasar.fs._
 import quasar.physical.marklogic.xcc.SessionIO

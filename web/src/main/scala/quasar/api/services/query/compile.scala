@@ -17,12 +17,13 @@
 package quasar.api.services.query
 
 import quasar.Predef._
-import quasar.fp._
-import quasar.RenderTree.ops._
-import quasar._, api._, fs._
+import quasar._, RenderTree.ops._
+import quasar.api._, ToQResponse.ops._
 import quasar.api.services._
-import quasar.api.ToQResponse.ops._
+import quasar.contrib.pathy._
+import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fs._
 
 import argonaut._, Argonaut._
 import matryoshka._

@@ -18,17 +18,13 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._
-import quasar.api._
-import quasar.api.services.Fixture._
-import quasar.api.matchers._
-import quasar.api.ApiError
-import quasar.api.ApiErrorEntityDecoder._
-import quasar.api.ToApiError.ops._
+import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
 import quasar.api.services.Fixture._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fs._, InMemory._, PathArbitrary._
+import quasar.fs._, InMemory._
 import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._

@@ -17,9 +17,10 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar._, api._
+import quasar._
+import quasar.api._
+import quasar.contrib.pathy.ADir
 import quasar.fp.numeric._
-import quasar.fs.ADir
 import quasar.sql.{Sql, Query}
 
 import scala.collection.Seq

@@ -17,13 +17,11 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar._
-import quasar.DataArbitrary._
+import quasar._, DataArbitrary._
+import quasar.contrib.pathy._
+import quasar.fs.InMemory.InMemState
 
-import InMemory.InMemState
-
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.{arbitrary => arb}
+import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
 import pathy.scalacheck.PathyArbitrary._
 
 trait InMemoryArbitrary {

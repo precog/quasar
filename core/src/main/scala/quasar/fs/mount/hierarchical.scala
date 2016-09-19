@@ -18,8 +18,9 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.{LogicalPlan, PhaseResults}
+import quasar.contrib.pathy._
 import quasar.effect._
-import quasar.fp._, free._
+import quasar.fp._, free._, eitherT._
 import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._

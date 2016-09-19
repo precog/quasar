@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef.Map
-import quasar.fs.{APath, PathArbitrary}
+import quasar.contrib.pathy.{APath, PathArbitrary}
 
 // NB: Something in here is needed by scalacheck's Arbitrary defs
 //     for scala collections.

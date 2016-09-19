@@ -17,8 +17,8 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar._
-import fs._
+import quasar.contrib.pathy._
+
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
 

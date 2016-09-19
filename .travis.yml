@@ -7,11 +7,11 @@ addons:
 services:
   postgresql
 script:
-  - travis_wait export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
-  - travis_wait export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
-  - travis_wait export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
-  - travis_wait ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - travis_wait psql -c 'CREATE DATABASE "quasar-test";' -U postgres
+  - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
+  - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
+  - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
+  - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
+  - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - travis_wait ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
 notifications:

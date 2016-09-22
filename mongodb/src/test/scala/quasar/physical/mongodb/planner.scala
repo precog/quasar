@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
 import quasar.sql.{fixpoint => sql, _}
@@ -68,8 +69,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
   }
 
-  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprCoreFp._
+  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  import expr3_0Fp._
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
@@ -95,6 +98,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
   def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
+
+  def plan3_0(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None))
 
   def plan3_2(query: String,
     stats: Collection => Option[CollectionStatistics],
@@ -131,8 +137,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
   implicit def toBsonField(name: String) = BsonField.Name(name)
-  implicit def toLeftShape(shape: Reshape[ExprOpCoreF]): Reshape.Shape[ExprOpCoreF] = -\/ (shape)
-  implicit def toRightShape(exprOp: Fix[ExprOpCoreF]):   Reshape.Shape[ExprOpCoreF] =  \/-(exprOp)
+  implicit def toLeftShape(shape: Reshape[ExprOp]): Reshape.Shape[ExprOp] = -\/ (shape)
+  implicit def toRightShape(exprOp: Fix[ExprOp]):   Reshape.Shape[ExprOp] =  \/-(exprOp)
 
   def isNumeric(field: BsonField): Selector =
     Selector.Or(
@@ -1535,10 +1541,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $read(collection("db", "zips")),
         $project(
           reshape(
-            "__tmp3" -> reshape[ExprOpCoreF](
+            "__tmp3" -> reshape(
               "city"  -> $field("city"),
               "state" -> $field("state")),
-            "__tmp4" -> reshape[ExprOpCoreF](
+            "__tmp4" -> reshape(
               "__tmp2" ->
                 $cond(
                   $and(
@@ -1649,7 +1655,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $read (collection("db", "zips")),
         $project(
           reshape(
-            "__tmp5" -> reshape[ExprOpCoreF](
+            "__tmp5" -> reshape(
               "pop" -> $field("pop"),
               "2"   ->
                 $cond(
@@ -1662,7 +1668,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
-            "__tmp6" -> reshape[ExprOpCoreF](
+            "__tmp6" -> reshape(
               "__tmp2" ->
                 $cond(
                   $and(
@@ -2515,9 +2521,26 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             ExcludeId)))
     }
 
-    "plan time_of_day" in {
-      plan("select time_of_day(ts) from foo") must
+    "plan time_of_day (JS)" in {
+      plan("select time_of_day(ts) from days") must
         beRight // NB: way too complicated to spell out here, and will change as JS generation improves
+    }
+
+    "plan time_of_day (pipeline)" in {
+      import FormatSpecifier._
+
+      plan3_0("select time_of_day(ts) from days") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "days")),
+          $project(
+            reshape("0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Date(Instant.parse("1970-01-01T00:00:00Z"))), $field("ts")),
+                  $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
+                $literal(Bson.Undefined))),
+            IgnoreId)))
     }
 
     "plan filter on date" in {
@@ -2631,15 +2654,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     def joinStructure0(
-      left: Workflow, leftName: String, leftBase: Fix[ExprOpCoreF], right: Workflow,
-      leftKey: Reshape.Shape[ExprOpCoreF], rightKey: (String, Fix[ExprOpCoreF], Reshape.Shape[ExprOpCoreF]) \/ JsCore,
+      left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+      leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
       fin: FixOp[WorkflowF],
       swapped: Boolean) = {
 
       val (leftLabel, rightLabel) =
         if (swapped) ("right", "left") else ("left", "right")
       def initialPipeOps(
-        src: Workflow, name: String, base: Fix[ExprOpCoreF], key: Reshape.Shape[ExprOpCoreF], mainLabel: String, otherLabel: String):
+        src: Workflow, name: String, base: Fix[ExprOp], key: Reshape.Shape[ExprOp], mainLabel: String, otherLabel: String):
           Workflow =
         chain[Workflow](
           src,
@@ -2688,8 +2711,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     def joinStructure(
-        left: Workflow, leftName: String, leftBase: Fix[ExprOpCoreF], right: Workflow,
-        leftKey: Reshape.Shape[ExprOpCoreF], rightKey: (String, Fix[ExprOpCoreF], Reshape.Shape[ExprOpCoreF]) \/ JsCore,
+        left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+        leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
         fin: FixOp[WorkflowF],
         swapped: Boolean) =
       Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
@@ -2700,7 +2723,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           joinStructure(
             $read(collection("db", "zips")), "__tmp0", $$ROOT,
             $read(collection("db", "zips2")),
-            reshape[ExprOpCoreF]("0" -> $field("_id")),
+            reshape("0" -> $field("_id")),
             Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
             chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -2842,7 +2865,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         joinStructure(
           $read(collection("db", "foo")), "__tmp0", $$ROOT,
           $read(collection("db", "bar")),
-          reshape[ExprOpCoreF]("0" -> $field("id")),
+          reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -2991,7 +3014,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         joinStructure(
           $read(collection("db", "foo")), "__tmp0", $$ROOT,
           $read(collection("db", "bar")),
-          reshape[ExprOpCoreF]("0" -> $field("id")),
+          reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain[Workflow](_,
             $project(
@@ -3042,7 +3065,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         joinStructure(
           $read(collection("db", "foo")), "__tmp0", $$ROOT,
           $read(collection("db", "bar")),
-          reshape[ExprOpCoreF]("0" -> $field("id")),
+          reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -3154,7 +3177,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           joinStructure0(
             $read(collection("db", "foo")), "__tmp0", $$ROOT,
             $read(collection("db", "bar")),
-            reshape[ExprOpCoreF]("0" -> $field("id")),
+            reshape("0" -> $field("id")),
             Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
             chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -3163,7 +3186,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $unwind(DocField(BsonField.Name("left"))),
               $unwind(DocField(BsonField.Name("right")))),
             false),
-          reshape[ExprOpCoreF]("0" -> $field("bar_id")),
+          reshape("0" -> $field("bar_id")),
           Obj(ListMap(Name("0") -> Select(Select(ident("value"), "right"), "id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -3293,7 +3316,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               ListMap())),
           "__tmp7", $field("__tmp5"),
           $read(collection("db", "slamengine_commits")),
-          reshape[ExprOpCoreF](
+          reshape(
             "0" -> $field("__tmp4"),
             "1" -> $field("__tmp6")),
           obj(
@@ -3370,8 +3393,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 "__tmp4" -> $$ROOT),
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp3")))),
-          reshape[ExprOpCoreF]("0" -> $field("__tmp0")),
-          ("__tmp5", $field("__tmp4"), reshape[ExprOpCoreF](
+          reshape("0" -> $field("__tmp0")),
+          ("__tmp5", $field("__tmp4"), reshape(
             "0" -> $field("__tmp3")).left).left,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](

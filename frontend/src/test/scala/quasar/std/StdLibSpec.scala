@@ -22,6 +22,7 @@ import quasar.{Data, LogicalPlan, Qspec}, LogicalPlan._
 import matryoshka._
 import org.specs2.execute._
 import org.scalacheck.{Arbitrary, Gen}
+import org.threeten.bp.{Instant, ZoneOffset}
 
 trait StdLibTestRunner {
   def nullary(
@@ -215,6 +216,18 @@ abstract class StdLibSpec extends Qspec {
         // "interval" >> prop { (x: Duration) =>
         //   unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
         // }
+      }
+    }
+
+    "DateLib" >> {
+      import DateLib._
+
+      "TimeOfDay" >> {
+        "timestamp" >> {
+          val now = Instant.now
+          val expected = now.atZone(ZoneOffset.UTC).toLocalTime
+          unary(TimeOfDay(_).embed, Data.Timestamp(now), Data.Time(expected))
+        }
       }
     }
   }

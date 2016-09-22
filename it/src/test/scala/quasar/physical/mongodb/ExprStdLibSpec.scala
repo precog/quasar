@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.fs.DataCursor
 import quasar.std.{StdLibSpec, StdLibTestRunner}
 import quasar.physical.mongodb.fs._, bsoncursor._
+import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
@@ -48,12 +49,16 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
 
     val notHandled = Skipped("not implemented in aggregation")
 
+    def is2_6 = backend == TestConfig.MONGO_2_6
+
     /** Identify constructs that are expected not to be implemented in the pipeline. */
     def shortCircuitInvoke[N <: Nat](func: GenericFunc[N]): Result \/ Unit = func match {
       case StringLib.Length   => notHandled.left
       case StringLib.Integer  => notHandled.left
       case StringLib.Decimal  => notHandled.left
       case StringLib.ToString => notHandled.left
+
+      case DateLib.TimeOfDay if is2_6 => Skipped("not implemented for MongoDB 2.6").left
 
       case _                  => ().right
     }
@@ -62,6 +67,14 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
     def shortCircuit: AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
       case LogicalPlan.InvokeF(func, _) => shortCircuitInvoke(func)
       case _ => ().right
+    }
+
+    /** Intercept and transform expected values into the form that's actually
+      * produced by the MongoDB backend, in cases where MongoDB cannot represent
+      * the type natively. */
+    def massage(expected: Data): Data = expected match {
+      case Data.Time(time) => Data.Str(time.toString)
+      case _               => expected
     }
 
 
@@ -121,7 +134,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
 
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          rez must_= List(Data.Obj(ListMap("result" -> expected)))
+          rez must_= List(Data.Obj(ListMap("result" -> massage(expected))))
         }).unsafePerformSync.toResult)
 
 

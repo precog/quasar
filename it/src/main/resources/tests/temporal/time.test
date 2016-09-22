@@ -2,7 +2,6 @@
   "name": "filter on time_of_day",
 
   "backends": {
-    "mongodb_read_only": "pending",
     "postgresql":        "pending"
   },
 

@@ -17,12 +17,12 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.Type, Type.⨿
+import quasar.{Type, RenderTree, Terminal}, Type.⨿
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.Planner.{PlannerError, UnsupportedJS}
 import quasar.physical.mongodb.javascript._
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import monocle.Prism
 import scalaz._, Scalaz._
 
@@ -130,5 +130,11 @@ package object expression {
       def expr = Traverse[EX].map(t)(_._1).embed
       def js = Traverse[EX].traverse(t)(_._2)
       translate[T, EX].lift(expr).getOrElse(js.flatMap(ops.toJsSimple))
+    }
+
+  // FIXME: no way to put this in anybody's companion where it will be found?
+  implicit def exprOpRenderTree[T[_[_]]: Recursive, EX[_]: Functor](implicit ops: ExprOpOps.Uni[EX]): RenderTree[T[EX]] =
+    new RenderTree[T[EX]] {
+      def render(v: T[EX]) = Terminal(List("ExprOp"), v.cata(ops.bson).toJs.pprint(0).some)
     }
 }

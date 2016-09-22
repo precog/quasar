@@ -44,15 +44,15 @@ object WorkflowBuilder {
     * An arbitrary javascript is more powerful but less performant because it
     * gets materialized into a Map/Reduce operation.
     */
-  type Expr = JsFn \/ Fix[ExprOpCoreF]
-  private def exprToJs(expr: Expr)(implicit ev: ExprOpOps.Uni[ExprOpCoreF])
+  type Expr = JsFn \/ Fix[ExprOp]
+  private def exprToJs(expr: Expr)(implicit ev: ExprOpOps.Uni[ExprOp])
       : PlannerError \/ JsFn =
     expr.fold(\/-(_), _.para(toJs))
   implicit val ExprRenderTree: RenderTree[Expr] = new RenderTree[Expr] {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
   import exprFp._
 
   /**
@@ -173,7 +173,7 @@ object WorkflowBuilder {
   }
 
   type GroupValue[A] = AccumOp[A] \/ A
-  type GroupContents = DocContents[GroupValue[Fix[ExprOpCoreF]]]
+  type GroupContents = DocContents[GroupValue[Fix[ExprOp]]]
 
   final case class GroupBuilderF[F[_], A](
     src: A, keys: List[A], contents: GroupContents)
@@ -218,7 +218,7 @@ object WorkflowBuilder {
     */
   final case class SpliceBuilderF[F[_], A](src: A, structure: List[DocContents[Expr]])
       extends WorkflowBuilderF[F, A] {
-    def toJs(implicit ev: ExprOpOps.Uni[ExprOpCoreF]): PlannerError \/ JsFn =
+    def toJs(implicit ev: ExprOpOps.Uni[ExprOp]): PlannerError \/ JsFn =
       structure.traverse {
         case Expr(unknown) => exprToJs(unknown)
         case Doc(known)    => known.toList.traverse { case (k, v) =>
@@ -234,7 +234,7 @@ object WorkflowBuilder {
 
   final case class ArraySpliceBuilderF[F[_], A](src: A, structure: List[ArrayContents[Expr]])
       extends WorkflowBuilderF[F, A] {
-    def toJs(implicit ev: ExprOpOps.Uni[ExprOpCoreF]): PlannerError \/ JsFn =
+    def toJs(implicit ev: ExprOpOps.Uni[ExprOp]): PlannerError \/ JsFn =
       structure.traverse {
         case Expr(unknown) => exprToJs(unknown)
         case Array(known)  => known.traverse(exprToJs).map(
@@ -318,11 +318,11 @@ object WorkflowBuilder {
     * harder to pattern match. Should be applied before `objectConcat`,
     * `arrayConcat`, or `merge`.
     */
-  def normalizeƒ[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOpCoreF])
+  def normalizeƒ[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp])
     : WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]] => Option[WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]]] = {
 
     def collapse(outer: Expr, inner: ListMap[BsonField.Name, Expr]): Option[Expr] = {
-      def rewriteExpr(t: Fix[ExprOpCoreF])(applyExpr: PartialFunction[ExprOpCoreF[Expr], Option[Expr]]): Option[Expr] =
+      def rewriteExpr(t: Fix[ExprOp])(applyExpr: PartialFunction[ExprOp[Expr], Option[Expr]]): Option[Expr] =
         t.cataM[Option, Expr] { x =>
           applyExpr.lift(x).getOrElse {
             x.sequence.fold(
@@ -367,18 +367,18 @@ object WorkflowBuilder {
           })
     }
 
-    def inln(outerExpr: Expr, cont: DocContents[_ \/ Fix[ExprOpCoreF]]) =
+    def inln(outerExpr: Expr, cont: DocContents[_ \/ Fix[ExprOp]]) =
       outerExpr.fold(
         κ(None),
         expr => (cont match {
           case Expr(\/-($var(dv))) =>
             Some(expr.cata(exprOps.rewriteRefs(prefixBase(dv))))
-          case Expr(\/-(ex)) => expr.cataM[Option, Fix[ExprOpCoreF]] {
+          case Expr(\/-(ex)) => expr.cataM[Option, Fix[ExprOp]] {
             case $varF(DocVar.ROOT(None)) => ex.some
             case $varF(_)                 => None
             case x                        => Fix(x).some
           }
-          case Doc(map) => expr.cataM[Option, Fix[ExprOpCoreF]] {
+          case Doc(map) => expr.cataM[Option, Fix[ExprOp]] {
             case $varF(DocField(field)) =>
               field.flatten.toList match {
                 case (name @ BsonField.Name(_)) :: Nil =>
@@ -430,19 +430,19 @@ object WorkflowBuilder {
     }
   }
 
-  def normalize[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+  def normalize[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp]) =
     repeatedly(normalizeƒ[F])
 
   private def rewriteObjRefs
-    (obj: ListMap[BsonField.Name, GroupValue[Fix[ExprOpCoreF]]])
+    (obj: ListMap[BsonField.Name, GroupValue[Fix[ExprOp]]])
     (f: PartialFunction[DocVar, DocVar])
-    (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+    (implicit exprOps: ExprOpOps.Uni[ExprOp]) =
     obj ∘ (_.bimap(accumulator.rewriteGroupRefs(_)(f), _.cata(exprOps.rewriteRefs(f))))
 
   private def rewriteGroupRefs
     (contents: GroupContents)
     (f: PartialFunction[DocVar, DocVar])
-    (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+    (implicit exprOps: ExprOpOps.Uni[ExprOp]) =
     contents match {
       case Expr(expr) =>
         Expr(expr.bimap(accumulator.rewriteGroupRefs(_)(f), _.cata(exprOps.rewriteRefs(f))))
@@ -450,11 +450,11 @@ object WorkflowBuilder {
     }
 
   private def rewriteDocPrefix(doc: ListMap[BsonField.Name, Expr], base: Base)
-      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): ListMap[BsonField.Name, Expr] =
+      (implicit exprOps: ExprOpOps.Uni[ExprOp]): ListMap[BsonField.Name, Expr] =
     doc ∘ (rewriteExprPrefix(_, base))
 
   private def rewriteExprPrefix(expr: Expr, base: Base)
-      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): Expr =
+      (implicit exprOps: ExprOpOps.Uni[ExprOp]): Expr =
     expr.bimap(base.toDocVar.toJs >>> _, _.cata(exprOps.rewriteRefs(prefixBase0(base))))
 
   private def prefixBase0(base: Base): PartialFunction[DocVar, DocVar] =
@@ -478,14 +478,14 @@ object WorkflowBuilder {
       l => \/-(\/-(l)))
   }
 
-  private def commonShape(shape: ListMap[BsonField.Name, Expr])(implicit ev: ExprOpOps.Uni[ExprOpCoreF]) =
-    commonMap(shape)(_.para(toJs[Fix, ExprOpCoreF]))
+  private def commonShape(shape: ListMap[BsonField.Name, Expr])(implicit ev: ExprOpOps.Uni[ExprOp]) =
+    commonMap(shape)(_.para(toJs[Fix, ExprOp]))
 
   private val jsBase = jscore.Name("__val")
 
   private def toCollectionBuilder[F[_]: Coalesce]
     (wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : M[CollectionBuilderF[F]] =
     wb.unFix match {
       case cb @ CollectionBuilderF(_, _, _) => emit(cb)
@@ -642,12 +642,12 @@ object WorkflowBuilder {
               toCollectionBuilder(ExprBuilder(src, \/-(expr)))
             case Doc(obj) =>
               val (grouped, ungrouped) =
-                obj.foldLeft[(ListMap[BsonField.Name, Accumulator], ListMap[BsonField.Name, Fix[ExprOpCoreF]])]((ListMap.empty[BsonField.Name, Accumulator], ListMap.empty[BsonField.Name, Fix[ExprOpCoreF]]))((acc, item) =>
+                obj.foldLeft[(ListMap[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap[BsonField.Name, Fix[ExprOp]])]((ListMap.empty[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap.empty[BsonField.Name, Fix[ExprOp]]))((acc, item) =>
                   item match {
                     case (k, -\/(v)) =>
-                      ((x: ListMap[BsonField.Name, Accumulator]) => x + (k -> v)).first(acc)
+                      ((x: ListMap[BsonField.Name, AccumOp[Fix[ExprOp]]]) => x + (k -> v)).first(acc)
                     case (k, \/-(v)) =>
-                      ((x: ListMap[BsonField.Name, Fix[ExprOpCoreF]]) => x + (k -> v)).second(acc)
+                      ((x: ListMap[BsonField.Name, Fix[ExprOp]]) => x + (k -> v)).second(acc)
                   })
               if (grouped.isEmpty)
                 toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
@@ -730,7 +730,7 @@ object WorkflowBuilder {
     }
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
 
@@ -755,7 +755,7 @@ object WorkflowBuilder {
   }
 
   def build[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[Fix[F]] =
     toCollectionBuilder(wb).map {
       case CollectionBuilderF(graph, base, struct) =>
@@ -771,8 +771,8 @@ object WorkflowBuilder {
   }
 
   private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOpCoreF])
-    : Option[M[(WorkflowBuilder[F], List[Fix[ExprOpCoreF]])]] =
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
+    : Option[M[(WorkflowBuilder[F], List[Fix[ExprOp]])]] =
     builders match {
       case Nil             => None
       case builder :: Nil  => Some(emit((builder, List($$ROOT))))
@@ -781,7 +781,7 @@ object WorkflowBuilder {
           (builder, $literal(bson) +: fields)
         })
       case builder :: rest =>
-        Some(rest.foldLeftM[M, (WorkflowBuilder[F], List[Fix[ExprOpCoreF]])](
+        Some(rest.foldLeftM[M, (WorkflowBuilder[F], List[Fix[ExprOp]])](
           (builder, List($$ROOT))) {
           case ((wf, fields), Fix(ValueBuilderF(bson))) =>
             emit((wf, fields :+ $literal(bson)))
@@ -793,7 +793,7 @@ object WorkflowBuilder {
     }
 
   private def foldBuilders[F[_]: Coalesce](src: WorkflowBuilder[F], others: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[(WorkflowBuilder[F], Base, List[Base])] =
     others.foldLeftM[M, (WorkflowBuilder[F], Base, List[Base])](
       (src, Root(), Nil)) {
@@ -912,7 +912,7 @@ object WorkflowBuilder {
   private def findSort[F[_]: Coalesce]
     (src: WorkflowBuilder[F])
     (distincting: WorkflowBuilder[F] => M[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[WorkflowBuilder[F]] = {
     @tailrec
     def loop(wb: WorkflowBuilder[F]): M[WorkflowBuilder[F]] =
@@ -940,7 +940,7 @@ object WorkflowBuilder {
   }
 
   private def merge[F[_]: Coalesce](left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
-    (implicit I: WorkflowOpCoreF :<: F, ev0: Show[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOpCoreF])
+    (implicit I: WorkflowOpCoreF :<: F, ev0: Show[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
     : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
     def delegate =
       merge(right, left).map { case (r, l, merged) => (l, r, merged) }
@@ -1135,7 +1135,7 @@ object WorkflowBuilder {
     }
   }
 
-  final class Ops[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOpCoreF]) {
+  final class Ops[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]) {
     def read(coll: Collection): WorkflowBuilder[F] =
       CollectionBuilder($read[F](coll), Root(), None)
 
@@ -1158,21 +1158,21 @@ object WorkflowBuilder {
 
     def expr1
       (wb: WorkflowBuilder[F])
-      (f: Fix[ExprOpCoreF] => Fix[ExprOpCoreF])
+      (f: Fix[ExprOp] => Fix[ExprOp])
       (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb)) { case List(e) => f(e) }
 
     def expr2
       (wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (f: (Fix[ExprOpCoreF], Fix[ExprOpCoreF]) => Fix[ExprOpCoreF])
+      (f: (Fix[ExprOp], Fix[ExprOp]) => Fix[ExprOp])
       (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb1, wb2)) { case List(e1, e2) => f(e1, e2) }
 
     def expr
       (wbs: List[WorkflowBuilder[F]])
-      (f: List[Fix[ExprOpCoreF]] => Fix[ExprOpCoreF])
+      (f: List[Fix[ExprOp]] => Fix[ExprOp])
       (implicit ev2: Show[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
@@ -1314,7 +1314,7 @@ object WorkflowBuilder {
       : WorkflowBuilder[F] =
       GroupBuilder(src, keys, Expr(\/-($$ROOT)))
 
-    def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOpCoreF] => Accumulator): WorkflowBuilder[F] =
+    def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]]): WorkflowBuilder[F] =
       wb.unFix match {
         case GroupBuilderF(wb0, keys, Expr(\/-(expr))) =>
           GroupBuilder(wb0, keys, Expr(-\/(f(expr))))
@@ -1351,7 +1351,7 @@ object WorkflowBuilder {
               findKeys(newSrc)
                 .cata(
                   {
-                    case Subset(fields) => fields.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOpCoreF]]).right
+                    case Subset(fields) => fields.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).right
                     case b => InternalError(s"Expected a Subset but found $b").left
                   },
                   List().right)
@@ -1728,13 +1728,13 @@ object WorkflowBuilder {
     }
   }
   object Ops {
-    implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOpCoreF]): Ops[F] =
+    implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =
       new Ops[F]
   }
 
   implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
     (implicit
-      RG: RenderTree[Contents[GroupValue[Fix[ExprOpCoreF]]]],
+      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
       RC: RenderTree[Contents[Expr]],
       RF: RenderTree[Fix[F]],
       ev: WorkflowOpCoreF :<: F

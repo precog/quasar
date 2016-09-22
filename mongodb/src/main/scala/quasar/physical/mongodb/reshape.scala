@@ -26,21 +26,24 @@ import quasar.physical.mongodb.expression._
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
-final case class Grouped(value: ListMap[BsonField.Name, Accumulator]) {
-  def bson = Bson.Doc(value.map(t => t._1.asText -> groupBson(t._2)))
+final case class Grouped[EX[_]](value: ListMap[BsonField.Name, AccumOp[Fix[EX]]]) {
+  def bson(implicit ev0: ExprOpOps.Uni[EX], ev1: Functor[EX]) =
+    Bson.Doc(value.map(t => t._1.asText -> groupBson(t._2)))
 
-  def rewriteRefs(f: PartialFunction[DocVar, DocVar]): Grouped =
+  def rewriteRefs(f: PartialFunction[DocVar, DocVar])
+      (implicit ev0: ExprOpOps.Uni[EX], ev1: Functor[EX]): Grouped[EX] =
     Grouped(value.transform((_, v) => rewriteGroupRefs(v)(f)))
 }
 object Grouped {
 
-  def grouped(shape: (String, Accumulator)*) =
+  def grouped[EX[_]](shape: (String, AccumOp[Fix[EX]])*) =
     Grouped(ListMap(shape.map { case (k, v) => BsonField.Name(k) -> v}: _*))
 
-  implicit def GroupedRenderTree: RenderTree[Grouped] = new RenderTree[Grouped] {
+  implicit def GroupedRenderTree[EX[_]: Functor](implicit ev: ExprOpOps.Uni[EX])
+      : RenderTree[Grouped[EX]] = new RenderTree[Grouped[EX]] {
     val GroupedNodeType = List("Grouped")
 
-    def render(grouped: Grouped) =
+    def render(grouped: Grouped[EX]) =
       NonTerminal(GroupedNodeType, None,
         (grouped.value.map { case (name, expr) => Terminal("Name" :: GroupedNodeType, Some(name.bson.toJs.pprint(0) + " -> " + groupBson(expr).toJs.pprint(0))) } ).toList)
   }
@@ -120,7 +123,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
 object Reshape {
   type Shape[EX[_]] = Reshape[EX] \/ Fix[EX]
 
-  def reshape[EX[_]](shape: (String, Shape[EX])*) =
+  def reshape(shape: (String, Shape[ExprOp])*) =
     Reshape(ListMap(shape.map { case (k, v) => BsonField.Name(k) -> v}: _*))
 
   def emptyDoc[EX[_]] = Reshape[EX](ListMap())

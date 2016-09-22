@@ -1,0 +1,1 @@
+- Add QueryFile template (methods implemented with ???)

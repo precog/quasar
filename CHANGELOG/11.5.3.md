@@ -1,0 +1,1 @@
+- improve build stability by hard-coding the concurrent task limit when running in Travis

@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fs._
 import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
 import quasar.effect._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
@@ -70,7 +71,7 @@ package object local {
   }
 
   private def fsInterpret(fsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-    queryfile.chrooted[Eff](fsConf.prefix),
+    corequeryfile.chrooted[Eff](queryfile.input, fsConf.prefix),
     corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
     writefile.chrooted[Eff](fsConf.prefix),
     managefile.chrooted[Eff](fsConf.prefix))

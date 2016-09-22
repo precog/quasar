@@ -17,6 +17,8 @@ import scoverage._
 
 val BothScopes = "test->test;compile->compile"
 
+def isTravis: Boolean = sys.env contains "TRAVIS"
+
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -84,8 +86,6 @@ lazy val buildSettings = Seq(
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
-  // Tasks tagged with `ExclusiveTest` should be run exclusively.
-  concurrentRestrictions in Global := Seq(Tags.exclusive(ExclusiveTest)),
 
   console <<= console in Test, // console alias test:console
 
@@ -95,6 +95,20 @@ lazy val buildSettings = Seq(
     if ((createHeaders in Compile).value.nonEmpty)
       sys.error("headers not all present")
   })
+
+// In Travis, the processor count is reported as 32, but only ~2 cores are
+// actually available to run.
+concurrentRestrictions in Global := {
+  val maxTasks = 2
+  if (isTravis)
+    // Recreate the default rules with the task limit hard-coded:
+    Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
+  else
+    (concurrentRestrictions in Global).value
+}
+
+// Tasks tagged with `ExclusiveTest` should be run exclusively.
+concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = Seq(
   organizationName := "SlamData Inc.",
@@ -209,7 +223,7 @@ lazy val foundation = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(libraryDependencies ++= Dependencies.foundation,
-    isCIBuild := sys.env contains "TRAVIS",
+    isCIBuild := isTravis,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     exclusiveTestTag := "exclusive",
     buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),

@@ -236,7 +236,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val (fullSrc, fullBuckets, bval, rval) =
       autojoin(EnvT((Ann[T](lbuckets, HoleF), lsrc)).embed, right)
 
-    (fullSrc, fullBuckets, bval >> lval, bval >> cval, rval)
+    // the holes in `bval` reference `fullSrc`
+    // so we replace the holes in `lval` with `bval` because the holes in `lval >> bval` must reference `fullSrc`
+    // and `bval` applied to `fullSrc` gives us access to `lsrc`, so we apply `lval` after `bval`
+    (fullSrc, fullBuckets, lval >> bval, cval >> bval, rval)
   }
 
   def merge2Map(

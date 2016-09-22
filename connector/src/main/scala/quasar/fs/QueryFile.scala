@@ -174,7 +174,7 @@ object QueryFile {
     val transforms = Transforms[F]
     import transforms._
 
-    /** Returns the path to the result of executing the given [[LogicalPlan]],
+    /** Returns the path to the result of executing the given `LogicalPlan`,
       * using the provided path if possible.
       *
       * Execution of certain plans may return a result file other than the
@@ -185,7 +185,7 @@ object QueryFile {
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])
 
     /** Returns an enumerator of data resulting from evaluating the given
-      * [[LogicalPlan]].
+      * `LogicalPlan`.
       */
     def enumerate(plan: Fix[LogicalPlan]): EnumeratorT[Data, ExecM] = {
       import Iteratee._
@@ -209,7 +209,7 @@ object QueryFile {
     }
 
     /** Returns the stream of data resulting from evaluating the given
-      * [[LogicalPlan]].
+      * `LogicalPlan`.
       */
     def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
@@ -290,7 +290,7 @@ object QueryFile {
     val transforms = Transforms[F]
     import transforms._
 
-    /** Returns a handle to the results of evaluating the given [[LogicalPlan]]
+    /** Returns a handle to the results of evaluating the given `LogicalPlan`
       * that can be used to read chunks of result data.
       *
       * Care must be taken to `close` the returned handle in order to avoid

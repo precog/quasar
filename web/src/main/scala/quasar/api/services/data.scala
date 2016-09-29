@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 
 import java.nio.charset.StandardCharsets
 

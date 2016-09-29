@@ -16,12 +16,15 @@
 
 package quasar
 
-class QuasarSpecSpec extends Qspec {
-  "flaky tests" should {
-    "pass if they pass" in true.flakyTest
-    "be skipped if they fail" in false.flakyTest
-    "be skipped and explain themselves if they can" in {
-      5 must_=== 6
-    }.flakyTest("I'm a flaky test")
+import quasar.Predef._
+
+class PredefSpec extends Qspec {
+  "Predef" should {
+    "create tuples with ->" >> ((5 -> "a") must_=== ((5, "a")))
+    "deconstruct tuples with ->" >> {
+      def list[A](x: A -> A): List[A] = x match { case k -> v => List(k, v) }
+
+      list(5 -> 15) must_=== List(5, 15)
+    }
   }
 }

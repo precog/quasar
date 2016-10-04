@@ -1,0 +1,1 @@
+Add `sbtopts` with larger maximum heap

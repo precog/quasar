@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._

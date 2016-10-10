@@ -8,6 +8,7 @@ SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 WS_DIR="$SCRIPT_DIR/.."
 
 SBT="$WS_DIR/sbt"
+SBT_TRAVIS="$WS_DIR/bin/sbt-travis.sh"
 
 TEMP_DIR="$WS_DIR/tmp"
 

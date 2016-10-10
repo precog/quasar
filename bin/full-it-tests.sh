@@ -20,4 +20,4 @@ trap cleanup EXIT
 
 set -x
 export QUASAR_MONGODB_3_2="{\"mongodb\":{\"connectionUri\":\"mongodb://localhost:27017\"}}"
-./sbt "$@"
+./bin/sbt-travis.sh "$@"

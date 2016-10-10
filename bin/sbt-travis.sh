@@ -21,8 +21,14 @@ Reapplying
 downloading
 \[SUCCESSFUL\s*\]
 Passed: Total 0,
+0 example,
 ScalaCheck
 not simplified
+not implemented in aggregation
+Server started listening
+Stopped last server
+TODO
+log4j:
 EOT
 
 ignore_start='(\[info\][[:space:]]*)?'

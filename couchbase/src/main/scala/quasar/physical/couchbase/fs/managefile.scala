@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.{MonotonicSeq, Read}
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.physical.couchbase.common._
 
@@ -74,9 +75,12 @@ object managefile {
                       ().right[FileSystemError]
                   }).point[Free[S, ?]])
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
+      cond      =  refineType(scenario.src).fold(
+                    κ(s"""type like "${src.collection}%""""),
+                    κ(s"""type="${src.collection}""""))
       qStr      =  s"""update `${bkt.name}`
                        set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where type like "${src.collection}%""""
+                       where $cond"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -97,8 +101,10 @@ object managefile {
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).point[Free[S, ?]])
-      qStr      =  s"""delete from `${bktCol.bucket}`
-                       where type like "${bktCol.collection}%""""
+      cond      =  refineType(path).fold(
+                     κ(s"""type like "${bktCol.collection}%""""),
+                     κ(s"""type="${bktCol.collection}""""))
+      qStr      =  s"""delete from `${bktCol.bucket}` where $cond"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]

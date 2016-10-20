@@ -1,0 +1,1 @@
+- Couchbase: Utilize `=` instead of `like` for files

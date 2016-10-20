@@ -75,12 +75,9 @@ object managefile {
                       ().right[FileSystemError]
                   }).point[Free[S, ?]])
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
-      cond      =  refineType(scenario.src).fold(
-                    κ(s"""type like "${src.collection}%""""),
-                    κ(s"""type="${src.collection}""""))
       qStr      =  s"""update `${bkt.name}`
                        set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where $cond"""
+                       where ${typeCond(scenario.src, src.collection)}"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -101,10 +98,8 @@ object managefile {
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).point[Free[S, ?]])
-      cond      =  refineType(path).fold(
-                     κ(s"""type like "${bktCol.collection}%""""),
-                     κ(s"""type="${bktCol.collection}""""))
-      qStr      =  s"""delete from `${bktCol.bucket}` where $cond"""
+      qStr      =  s"""delete from `${bktCol.bucket}`
+                       where ${typeCond(path, bktCol.collection)}"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -122,5 +117,10 @@ object managefile {
         f => fileParent(f) </> tmpFilename
       ).right
     }
+
+  def typeCond(path: APath, collection: String): String =
+    refineType(path).fold(
+      κ(s"""type like "$collection%""""),
+      κ(s"""type="$collection""""))
 
 }

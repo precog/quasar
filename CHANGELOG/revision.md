@@ -1,0 +1,1 @@
+- Couchbase: Increase query timeout

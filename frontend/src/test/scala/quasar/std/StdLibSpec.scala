@@ -17,7 +17,8 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Qspec, Type}, LogicalPlan._
+import quasar.{Data, Qspec, Type}
+import quasar.logicalPlan._
 
 import matryoshka._
 import org.specs2.execute._

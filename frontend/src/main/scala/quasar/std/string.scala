@@ -17,9 +17,12 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, LogicalPlan => LP, Type, Mapping, SemanticError}, LP._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, Type, Mapping, SemanticError},
+  SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
+
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failureNel}
 import shapeless.{Data => _, :: => _, _}
@@ -97,8 +100,8 @@ trait StringLib extends Library {
               None
             else
               Search(str.embed,
-                Constant[T[LP]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
-                Constant[T[LP]](Data.Bool(false)).embed).some
+                constant[T[LP]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
+                constant[T[LP]](Data.Bool(false)).embed).some
           case _ => None
         }
     },

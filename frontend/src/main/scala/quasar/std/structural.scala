@@ -17,8 +17,9 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, _}, LP._, SemanticError._
+import quasar._, SemanticError._
 import quasar.fp._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, Validation.{success, failure}

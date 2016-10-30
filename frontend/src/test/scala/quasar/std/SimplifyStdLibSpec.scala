@@ -17,9 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, GenericFunc, LogicalPlan => LP}, LP._
+import quasar.{Data, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
@@ -62,8 +63,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
   /** Identify constructs that are expected not to be implemented. */
   def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
-    case LP.Invoke(func, _) => shortCircuit(func, args)
-    case _ => ().right
+    case Invoke(func, _) => shortCircuit(func, args)
+    case _               => ().right
   }
 
   def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
@@ -71,8 +72,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
       .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
   def run(lp: Fix[LP], expected: Data): Result =
-    ensureCorrectTypes(lp).disjunction match {
-      case  \/-(Fix(LP.Constant(d))) => (d must closeTo(expected)).toResult
+    lpf.ensureCorrectTypes(lp).disjunction match {
+      case  \/-(Embed(Constant(d))) => (d must closeTo(expected)).toResult
       case  \/-(v) => Failure("not a constant", v.render.shows)
       case -\/ (err) => Failure("simplification failed", err.toString)
     }

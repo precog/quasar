@@ -18,7 +18,7 @@ package quasar.physical.mongodb.planner
 
 import scala.Predef.$conforms
 import quasar.Predef._
-import quasar.{fs => _, LogicalPlan => LP, _}, RenderTree.ops._, Type._
+import quasar.{fs => _, _}, RenderTree.ops._, Type._
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.shapeless._
@@ -27,6 +27,7 @@ import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
@@ -35,15 +36,15 @@ import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import pathy.Path.rootDir
-import scalaz._, Scalaz._
+import scalaz.{Free => _, _}, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
 object MongoDbPlanner {
-  import LP._
   import Planner._
   import WorkflowBuilder._
 
-  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+  private val optimizer = new Optimizer[Fix]
+  private val lpr = optimizer.lpr
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -219,7 +220,7 @@ object MongoDbPlanner {
       case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case Invoke(f, a)    => invoke(f, a)
       case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
-      case LP.Let(_, _, body) => body
+      case logicalPlan.Let(_, _, body) => body
       case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
@@ -515,10 +516,7 @@ object MongoDbPlanner {
     val check = Check[Fix, ExprOp]
 
     object HasData {
-      def unapply(node: LP[Ann]): Option[Data] = node match {
-        case LP.Constant(data) => Some(data)
-        case _                           => None
-      }
+      def unapply(node: LP[Ann]): Option[Data] = constant.getOption(node)
     }
 
     val HasKeys: Ann => OutputM[List[WorkflowBuilder[F]]] = {
@@ -864,7 +862,7 @@ object MongoDbPlanner {
   private def elideJoin(in: Func.Input[Fix[LP], nat._3]): Func.Input[LPorLP, nat._3] =
     in match {
       case Sized(l, r, cond) =>
-        Func.Input3(\/-(l), \/-(r), -\/(cond.cata(Optimizer.elideTypeCheckƒ)))
+        Func.Input3(\/-(l), \/-(r), -\/(cond.cata(optimizer.elideTypeCheckƒ)))
     }
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
@@ -885,13 +883,13 @@ object MongoDbPlanner {
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
         case Typecheck(expr, typ, cont, fb) =>
-          alignCondition(lt, rt)(cont).map(cont => lpr.typecheck(expr, typ, cont, fb))
+          alignCondition(lt, rt)(cont).map(lpr.typecheck(expr, typ, _, fb))
         case InvokeUnapply(And, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(And, v))
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(lpr.invoke(And, _))
         case InvokeUnapply(Or, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(Or, v))
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(lpr.invoke(Or, _))
         case InvokeUnapply(Not, Sized(t1)) =>
-          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(Not, v))
+          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(lpr.invoke(Not, _))
         case x @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
             \/-(lpr.invoke(func, Func.Input2(left, right)))
@@ -902,16 +900,16 @@ object MongoDbPlanner {
           else -\/(UnsupportedJoinCondition(Fix(x)))
 
         case Let(name, form, in) =>
-          alignCondition(lt, rt)(in).map(body => lpr.let(name, form, body))
+          alignCondition(lt, rt)(in).map(lpr.let(name, form, _))
 
-        case x => \/-(Fix(x))
+        case x => \/-(x.embed)
       }
 
     {
       case x @ InvokeUnapply(JoinFunc(f), Sized(l, r, cond)) =>
         alignCondition(l, r)(cond).map(c => lpr.invoke(f, Func.Input3(l, r, c)))
 
-      case x => \/-(Fix(x))
+      case x => \/-(x.embed)
     }
   }
 
@@ -922,21 +920,21 @@ object MongoDbPlanner {
     */
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
-    case x @ Let(n, r @ Fix(Read(_)),
-      Fix(Typecheck(Fix(Free(nf)), typ, cont, _)))
+    case x @ Let(n, r @ Embed(Read(_)),
+      Embed(Typecheck(Embed(Free(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
           \/-(lpr.let(n, r, cont))
         case Type.Obj(_, _) =>
-          \/-(Fix(x))
+          \/-(x.embed)
         case _ =>
           -\/(UnsupportedPlan(x,
             Some("collections can only contain objects, but a(n) " +
               typ +
               " is expected")))
       }
-    case x => \/-(Fix(x))
+    case x => \/-(x.embed)
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -972,9 +970,9 @@ object MongoDbPlanner {
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘  Optimizer.simplifyRepeatedly[Fix])))
-      prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
-      wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
+      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
+      prep <- log("Logical Plan (projections preferred)")(optimizer.preferProjections(align).point[M])
+      wb   <- log("Workflow Builder")                    (swizzle(swapM(lpr.lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))
       wf2  <- log("Workflow (crystallized)")             (Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero

@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fs.PathError
+import quasar.logicalPlan.LogicalPlan
 
 import matryoshka._
 import monocle.Prism

@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, _}
+import quasar._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
@@ -25,6 +25,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
+import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP, Optimizer}
 import quasar.sql.Sql
 
 import matryoshka.{free => _, _}, TraverseT.ops._, Recursive.ops._
@@ -32,7 +33,8 @@ import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 object view {
-  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+  private val optimizer = new Optimizer[Fix]
+  private val lpr = optimizer.lpr
 
   /** Translate reads on view paths to the equivalent queries. */
   def readFile[S[_]](
@@ -77,7 +79,7 @@ object view {
       for {
         lp <- resolveViewRefs[S](readLP).leftMap(se =>
                 planningFailed(readLP, Planner.InternalError(se.shows)))
-        h  <- refineConstantPlan(lp).fold(d => dataHandle(d).liftM[FileSystemErrT], queryHandle)
+        h  <- refineConstantPlan(lp).fold(dataHandle(_).liftM[FileSystemErrT], queryHandle)
       } yield h
     }
 
@@ -325,12 +327,12 @@ object view {
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
 
   /** Resolve view references in the given `LP`. */
-  def resolveViewRefs[S[_]](lp: Fix[LP])(implicit M: Mounting.Ops[S])
+  def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])
     : SemanticErrsT[Free[S, ?], Fix[LP]] = {
     import MountConfig._
 
-    def lift(e: Set[FPath], lp: Fix[LP]) =
-      lp.unFix.map((e, _)).point[SemanticErrsT[Free[S, ?], ?]]
+    def lift(e: Set[FPath], plan: Fix[LP]) =
+      plan.project.map((e, _)).point[SemanticErrsT[Free[S, ?], ?]]
 
     def lookup(loc: AFile): OptionT[Free[S, ?], (Fix[Sql], Variables)] =
       OptionT(M.lookupConfig(loc).run.map(_.flatMap(viewConfig.getOption)))
@@ -342,10 +344,10 @@ object view {
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.
-    val cleaned = lp.cata(Optimizer.elideTypeCheckƒ)
+    val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
     (Set[FPath](), cleaned).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LP] {
-      case (e, i @ Embed(r @ LP.Read(p))) if !(e contains p) =>
+      case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
         refineTypeAbs(p).swap.map(f =>
           EitherT(compiledView(f) getOrElse i.right).map(_.unFix.map((e + f, _)))
         ).getOrElse(lift(e, i))

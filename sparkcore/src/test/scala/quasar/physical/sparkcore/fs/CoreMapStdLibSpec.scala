@@ -17,13 +17,13 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, _}
 import quasar.Planner.PlannerError
+import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.std._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
-import quasar.contrib.matryoshka._
+import quasar.std._
 
 import matryoshka._, Recursive.ops._
 import org.scalacheck.Arbitrary.arbitrary

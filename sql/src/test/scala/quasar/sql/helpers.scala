@@ -17,9 +17,10 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Optimizer, TermLogicalPlanMatchers}
+import quasar.{Data, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
+import quasar.logicalPlan.{LogicalPlan, Optimizer}
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
@@ -39,10 +40,13 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     } yield cld
   }
 
+  val optimizer = new Optimizer[Fix]
+  val lpr = optimizer.lpr
+
   // Compile -> Optimize -> Typecheck
   val fullCompile: String => String \/ Fix[LogicalPlan] =
-    q => compile(q).map(Optimizer.optimize).flatMap(lp =>
-      LogicalPlan.ensureCorrectTypes(lp)
+    q => compile(q).map(optimizer.optimize).flatMap(lp =>
+      lpr.ensureCorrectTypes(lp)
         .disjunction.leftMap(_.list.toList.mkString(";")))
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
@@ -52,7 +56,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def compileExp(query: String): Fix[LogicalPlan] =
     compile(query).fold(
       e => throw new RuntimeException("could not compile query for expected value: " + query + "; " + e),
-      lp => (LogicalPlan.normalizeLets _ >>> LogicalPlan.normalizeTempNames _)(Optimizer.simplify(lp)))
+      lp => (lpr.normalizeLets _ >>> lpr.normalizeTempNames _)(optimizer.simplify(lp)))
 
   // Compile the given query, including optimization and typechecking
   def fullCompileExp(query: String): Fix[LogicalPlan] =
@@ -60,7 +64,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
       throw new RuntimeException(s"could not full-compile query for expected value '$query': $e"))
 
   def testLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) = {
-    compile(query).map(Optimizer.optimize).toEither must beRight(equalToPlan(expected))
+    compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
   }
 
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) =

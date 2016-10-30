@@ -17,10 +17,11 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
-import quasar.{LogicalPlan => LP, _}, LP._
 
 import scala.collection.immutable.NumericRange
 

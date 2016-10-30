@@ -16,14 +16,14 @@
 
 package quasar.qscript
 
-import quasar.{LogicalPlan => LP, _}
+import quasar.Predef.{ Eq => _, _ }
+import quasar._, Planner._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
+import quasar.{logicalPlan => lp}
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
-import quasar.Planner._
-import quasar.Predef.{ Eq => _, _ }
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
@@ -443,15 +443,15 @@ class Transform
     quasar.qscript.Map(src, ann.values)
 
   // TODO: Replace disjunction with validation.
-  def lpToQScript: AlgebraM[PlannerError \/ ?, LP, Target[F]] = {
-    case LP.Read(path) =>
+  def lpToQScript: AlgebraM[PlannerError \/ ?, lp.LogicalPlan, Target[F]] = {
+    case lp.Read(path) =>
       // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
       //       however doing that would break the old Mongo backend, and we can
       //       handle it here for now. But it should be moved to the SQL²
       //       compiler when the old Mongo backend is replaced. (#1298)
       shiftValues(pathToProj(path), ZipMapKeys(_)).right
 
-    case LP.Constant(data) =>
+    case lp.Constant(data) =>
       fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](
         {
           case Data.NA => Undefined[T, FreeMap]().right
@@ -462,23 +462,23 @@ class Transform
           Ann(Nil, Free.roll[MapFunc, Hole](mf)),
           QC.inj(Unreferenced[T, T[F]]()).embed))
 
-    case LP.Free(name) =>
+    case lp.Free(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[Target[F]]
 
-    case LP.Let(name, form, body) =>
+    case lp.Let(name, form, body) =>
       (Planner.InternalError("un-elided Let"): PlannerError).left[Target[F]]
 
-    case LP.Typecheck(expr, typ, cont, fallback) =>
+    case lp.Typecheck(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
-    case LP.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
+    case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.ann
       Target(
         Ann(buckets, Free.roll[MapFunc, Hole](MapFunc.translateUnaryMapping(func)(value))),
         a1.value).right
 
-    case LP.InvokeUnapply(structural.ObjectProject, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       // FIXME: This is a workaround because ProjectBucket doesn’t currently
       //        propagate provenance. (#1573)
@@ -488,7 +488,7 @@ class Transform
       // (Ann[T](buckets, HoleF[T]),
       //   PB.inj(BucketField(src, lval, rval)).embed).right
 
-    case LP.InvokeUnapply(structural.ArrayProject, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       // FIXME: This is a workaround because ProjectBucket doesn’t currently
       //        propagate provenance. (#1573)
@@ -498,26 +498,26 @@ class Transform
       // (Ann[T](buckets, HoleF[T]),
       //   PB.inj(BucketIndex(src, lval, rval)).embed).right
 
-    case LP.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
+    case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Mapping =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
         Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(func)(lval, rval))),
         base.src).right[PlannerError]
 
-    case LP.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
+    case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
       merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(func)).right[PlannerError]
 
-    case LP.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
+    case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>
       invokeReduction1(func, Func.Input1(a1)).right
 
-    case LP.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
+    case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Reduction =>
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
-    case LP.InvokeUnapply(set.Distinct, Sized(a1)) =>
+    case lp.InvokeUnapply(set.Distinct, Sized(a1)) =>
       // TODO: This currently duplicates a _portion_ of the bucket in the
       //       reducer list, we could perhaps avoid doing that, or normalize it
       //       away later.
@@ -530,7 +530,7 @@ class Transform
               a1.ann.values),
             a1.value))).right
 
-    case LP.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       invokeReduction1(
         agg.Arbitrary,
@@ -541,17 +541,17 @@ class Transform
               lval),
             base.src))).right
 
-    case LP.InvokeUnapply(set.Take, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Take, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Take, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
-    case LP.InvokeUnapply(set.Drop, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Drop, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
-    case LP.InvokeUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
+    case lp.InvokeUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val AutoJoinResult(base, dataset, keys) = autojoin(a1, a2)
 
       val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
@@ -588,30 +588,27 @@ class Transform
             prov.genBuckets(base.buckets).fold(NullLit[T, Hole]())(_._2),
             keysList.zip(dirs))).embed))
 
-    case LP.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
         Ann[T](base.buckets, lval),
         QC.inj(Filter(base.src, rval)).embed).right
 
-    case LP.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
-        if func.effect ≟ Squashing =>
+    case lp.InvokeUnapply(identity.Squash, Sized(a1)) =>
       val Ann(buckets, value) = a1.ann
       Target(Ann(prov.squashProvenances(buckets), value), a1.value).right
 
-    case LP.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
-        if func.effect ≟ Expansion =>
+    case lp.InvokeUnapply(func @ UnaryFunc(Expansion, _, _, _, _, _, _), Sized(a1)) =>
       invokeExpansion1(func, Func.Input1(a1)).right
 
-    case LP.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
-        if func.effect ≟ Expansion =>
+    case lp.InvokeUnapply(func @ BinaryFunc(Expansion, _, _, _, _, _, _), Sized(a1, a2)) =>
       invokeExpansion2(func, Func.Input2(a1, a2)).right
 
-    case LP.InvokeUnapply(set.GroupBy, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.GroupBy, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
       Target(Ann(prov.swapProvenances(provenance.Value(join.rval) :: join.base.buckets), join.lval), join.base.src).right
 
-    case LP.InvokeUnapply(set.Union, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Union, Sized(a1, a2)) =>
       val MergeResult(src, lfree, rfree) = merge(a1.value, a2.value)
       val lbranch = Free.roll(FI.inject(QC.inj(reifyResult(a1.ann, lfree))))
       val rbranch = Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, rfree))))
@@ -649,7 +646,7 @@ class Transform
             InternalError("unaligned union provenances").left)
       }
 
-    case LP.InvokeUnapply(set.Intersect, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Intersect, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
 
       Target(Ann(prov.joinProvenances(a1.ann.provenance, a2.ann.provenance), HoleF),
@@ -661,7 +658,7 @@ class Transform
           Inner,
           LeftSideF)).embed).right
 
-    case LP.InvokeUnapply(set.Except, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(set.Except, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
 
       Target(Ann(a1.ann.provenance, HoleF),
@@ -673,8 +670,7 @@ class Transform
           LeftOuter,
           LeftSideF)).embed).right
 
-    case LP.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
-        if func.effect ≟ Transformation =>
+    case lp.InvokeUnapply(func @ TernaryFunc(Transformation, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
       invokeThetaJoin(
         Func.Input3(a1, a2, a3),
         func match {

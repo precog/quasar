@@ -17,12 +17,13 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.LogicalPlan
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.effect._
-import quasar.fp._, free._, eitherT._
+import quasar.fp._, eitherT._
+import quasar.fp.free._
 import quasar.fs._
+import quasar.{logicalPlan => lp}, lp.LogicalPlan
 
 import matryoshka.{free => _, _}, Recursive.ops._
 import pathy.Path._
@@ -287,10 +288,9 @@ object hierarchical {
 
   private def mountForPlan[A](
     mounts: Mounts[A],
-    lp: Fix[LogicalPlan],
+    plan: Fix[LogicalPlan],
     out: Option[AFile]
   ): FileSystemError \/ (ADir, A) = {
-    import LogicalPlan._
 
     type MntA = (ADir, A)
     type F[A] = State[Option[MntA], A]
@@ -319,17 +319,17 @@ object hierarchical {
     } yield ()
 
     out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
-      lp.cataM[M, Unit] {
+      plan.cataM[M, Unit] {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-        case Read(p) => mountFor(mkAbsolute(rootDir, p))
-        case _       => ().point[M]
+        case lp.Read(p) => mountFor(mkAbsolute(rootDir, p))
+        case _          => ().point[M]
       }.run.run(initMnt) match {
         // NB: If mnt is empty, then there were no `Read`, so we should
         // be able to get a result without needing an actual filesystem,
         // and we just pass it to an arbitrary mount, if there is at
         // least one present.
         case (mntA, r) =>
-          r *> (mntA.orElse(mounts.toMap.toList.headOption) \/> noMountsDefined(lp))
+          r *> (mntA.orElse(mounts.toMap.toList.headOption) \/> noMountsDefined(plan))
       })
   }
 

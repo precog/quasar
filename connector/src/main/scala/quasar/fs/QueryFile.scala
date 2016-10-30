@@ -27,6 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.eitherT._
 import quasar.frontend.SemanticErrsT
+import quasar.logicalPlan.{LogicalPlan, Optimizer}
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
@@ -62,10 +63,11 @@ object QueryFile {
       show:           Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
+    val optimizer = new Optimizer[T]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
+    lp.transCata[LogicalPlan](orOriginal(optimizer.elideLets))
       .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna(eval)))))
       .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata(eval))
   }

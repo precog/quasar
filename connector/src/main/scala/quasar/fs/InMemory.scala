@@ -17,14 +17,14 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
+import quasar.Planner.UnsupportedPlan
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.numeric._
 import quasar.fp.ski._
-import numeric._
-import quasar.Optimizer
-import quasar.Planner.UnsupportedPlan
+import quasar.{logicalPlan => lp}, lp._
 
 import matryoshka.{Fix, Recursive}, Recursive.ops._
 import pathy.Path._
@@ -205,14 +205,15 @@ object InMemory {
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
 
+    private val optimizer = new Optimizer[Fix]
+
     private def simpleEvaluation(lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
-      val optLp = Optimizer.optimize(lp0)
+      val optLp = optimizer.optimize(lp0)
       EitherT[InMemoryFs, FileSystemError, Vector[Data]](State.gets { mem =>
-        import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
         optLp.para[FileSystemError \/ Vector[Data]] {
-          case Read(path) =>
+          case lp.Read(path) =>
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
@@ -223,7 +224,7 @@ object InMemory {
           case InvokeUnapply(Squash, Sized((_,src))) => src
           case Constant(data) => Vector(data).right
           case other =>
-            queryResponsesL.get(mem).mapKeys(Optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))
+            queryResponsesL.get(mem).mapKeys(optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))
         }
       })
     }

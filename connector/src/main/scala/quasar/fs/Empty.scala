@@ -16,13 +16,13 @@
 
 package quasar.fs
 
-import quasar.Predef.{Vector, None, Set}
+import quasar.Predef._
 import quasar.Planner.UnsupportedPlan
-import quasar.LogicalPlan
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
+import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
 
-import matryoshka.Fix
+import matryoshka._, Recursive.ops._
 import pathy.Path._
 import scalaz.{~>, \/, Applicative}
 import scalaz.syntax.equal._
@@ -88,16 +88,18 @@ object Empty {
 
   ////
 
-  private def lpResult[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
-    LogicalPlan.paths(lp)
+  private val lp = new LogicalPlanR[Fix]
+
+  private def lpResult[F[_]: Applicative, A](plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
+    lp.paths(plan)
       .headOption
       // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)), unsupportedPlan[F, A](lp))
+      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)), unsupportedPlan[F, A](plan))
       .strengthL(Vector())
 
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
     pathErr(pathNotFound(p)).left.point[F]
 
   private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
-    planningFailed(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]
+    planningFailed(lp, UnsupportedPlan(lp.project, None)).left.point[F]
 }

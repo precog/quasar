@@ -17,9 +17,11 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError},
+  SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, LogicalPlan => LP, Type, Mapping, SemanticError}, LP._, SemanticError._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}

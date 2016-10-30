@@ -17,13 +17,14 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.{BinaryFunc, Data, Func, GenericFunc, LogicalPlan => LP, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
+import quasar.{BinaryFunc, Data, Func, GenericFunc, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
   SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.binder._
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.std.StdLib, StdLib._
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
@@ -36,7 +37,7 @@ trait Compiler[F[_]] {
   import identity._
   import JoinDir._
 
-  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+  val lpr = new LogicalPlanR[Fix]
 
   // HELPERS
   private type M[A] = EitherT[F, SemanticError, A]
@@ -571,7 +572,7 @@ trait Compiler[F[_]] {
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
-          case Fix(LP.Constant(Data.Str(part))) :: expr :: Nil =>
+          case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
             (part.some collect {
               case "century"      => date.ExtractCentury
               case "day"          => date.ExtractDayOfMonth
@@ -646,7 +647,7 @@ trait Compiler[F[_]] {
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
               (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
-                (Fix(relations.Eq(expr, cse)), expr2))
+                (relations.Eq(expr, cse).embed, expr2))
           }
         } yield cases
 
@@ -673,8 +674,6 @@ trait Compiler[F[_]] {
 }
 
 object Compiler {
-  import LP._
-
   def apply[F[_]]: Compiler[F] = new Compiler[F] {}
 
   def trampoline = apply[scalaz.Free.Trampoline]

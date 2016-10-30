@@ -17,11 +17,10 @@
 package quasar.physical.mongodb.planner
 
 import quasar.Predef._
+import quasar.logicalPlan.LogicalPlan
 
-import quasar.{LogicalPlan}
-
-import matryoshka.{Recursive}
-import scalaz.{Cofree}
+import matryoshka.Recursive
+import scalaz.Cofree
 
 sealed abstract class InputFinder {
   def apply[A](t: Cofree[LogicalPlan, A]): A

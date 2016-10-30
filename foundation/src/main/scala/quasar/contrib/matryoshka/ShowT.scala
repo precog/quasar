@@ -18,22 +18,26 @@ package quasar.contrib.matryoshka
 
 import quasar.Predef._
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import scalaz._
 import simulacrum.typeclass
 
 @typeclass trait ShowT[T[_[_]]] {
-  def show[F[_]](tf: T[F])(implicit del: Delay[Show, F]): Cord =
+  def show[F[_]: Functor](tf: T[F])(implicit del: Delay[Show, F]): Cord =
     Cord(shows(tf))
-  def shows[F[_]](tf: T[F])(implicit del: Delay[Show, F]): String =
+  def shows[F[_]: Functor](tf: T[F])(implicit del: Delay[Show, F]): String =
     show(tf).toString
-  def showT[F[_]](delay: Delay[Show, F]): Show[T[F]] =
-    Show.show[T[F]](show[F](_)(delay))
+  def showT[F[_]: Functor](implicit del: Delay[Show, F]): Show[T[F]] =
+    Show.show[T[F]](show[F](_))
 }
 
 object ShowT {
-  implicit val fix: ShowT[Fix] = new ShowT[Fix] {
-    override def show[F[_]](tf: Fix[F])(implicit del: Delay[Show, F]): Cord =
-      del(showT[F](del)).show(tf.unFix)
+  def recursive[T[_[_]]: Recursive]: ShowT[T] = new ShowT[T] {
+    override def show[F[_]: Functor](tf: T[F])(implicit del: Delay[Show, F]) =
+      tf.cata(del(Cord.CordShow).show)
   }
+
+  implicit val fix: ShowT[Fix] = recursive
+  implicit val mu:  ShowT[Mu]  = recursive
+  implicit val nu:  ShowT[Nu]  = recursive
 }

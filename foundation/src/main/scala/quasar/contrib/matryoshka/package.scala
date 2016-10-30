@@ -25,13 +25,15 @@ import scalaz._, Scalaz._
 
 package object matryoshka extends CoEnvInstances {
 
-  implicit def equalTEqual[T[_[_]], F[_]](implicit T: EqualT[T], F: Delay[Equal, F])
+  implicit def equalTEqual[T[_[_]], F[_]: Functor]
+    (implicit T: EqualT[T], F: Delay[Equal, F])
       : Equal[T[F]] =
-    T.equalT[F](F)
+    T.equalT[F]
 
-  implicit def showTShow[T[_[_]], F[_]](implicit T: ShowT[T], F: Delay[Show, F]):
+  implicit def showTShow[T[_[_]], F[_]: Functor]
+    (implicit T: ShowT[T], F: Delay[Show, F]):
       Show[T[F]] =
-    T.showT[F](F)
+    T.showT[F]
 
   def elgotM[M[_]: Monad, F[_]: Traverse, A, B](a: A)(φ: F[B] => M[B], ψ: A => M[B \/ F[A]]):
       M[B] = {

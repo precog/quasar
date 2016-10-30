@@ -16,9 +16,10 @@
 
 package quasar.std
 
-import quasar.Func
 import quasar.Predef._
-import quasar.TypeArbitrary
+import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
+import quasar.frontend.fixpoint.lpf
+import quasar.logicalPlan._
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
@@ -29,13 +30,7 @@ import shapeless._
 
 class MathSpec extends quasar.Qspec with TypeArbitrary {
   import MathLib._
-  import quasar.Type
-  import quasar.Type.Const
-  import quasar.Type.Obj
   import quasar.Data._
-  import quasar.SemanticError
-  import quasar.LogicalPlan, LogicalPlan._
-  import quasar.frontend.fixpoint.lpf
 
   "MathLib" should {
     "type simple add with ints" in {
@@ -172,7 +167,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
 
     "simplify expression raised to 1st power" in {
       Power.simplify(Power(lpf.free('x), lpf.constant(Int(1)))) should
-        beSome(Free[Fix[LogicalPlan]]('x))
+        beSome(free[Fix[LogicalPlan]]('x))
     }
 
     "fold a complex expression (10-4)/3 + (5*8)" in {
@@ -196,7 +191,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     }
 
     "fail with object and int constant" in {
-      val expr = Add.tpe(Func.Input2(Obj(Map("x" -> Type.Int), None), TOne()))
+      val expr = Add.tpe(Func.Input2(Type.Obj(Map("x" -> Type.Int), None), TOne()))
       expr should beFailing
     }
 

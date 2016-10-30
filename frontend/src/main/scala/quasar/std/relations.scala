@@ -17,7 +17,8 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, LogicalPlan => LP, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}, LP._
+import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.success

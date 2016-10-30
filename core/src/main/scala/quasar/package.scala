@@ -15,17 +15,15 @@
  */
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
 import quasar.common.{PhaseResult, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
+import quasar.logicalPlan.{LogicalPlan => LP, _}
 import quasar.sql._
 import quasar.std.StdLib.set._
-
-import scala.Option
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Leibniz._
@@ -61,20 +59,23 @@ package object quasar {
     } yield logical
   }
 
+  private val optimizer = new Optimizer[Fix]
+  private val lpr = optimizer.lpr
+
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
     */
   def preparePlan(lp: Fix[LP]): CompileM[Fix[LP]] =
     for {
-      optimized   <- phase("Optimized", Optimizer.optimize(lp).right)
-      typechecked <- phase("Typechecked", LP.ensureCorrectTypes(optimized).disjunction)
+      optimized   <- phase("Optimized", optimizer.optimize(lp).right)
+      typechecked <- phase("Typechecked", lpr.ensureCorrectTypes(optimized).disjunction)
     } yield typechecked
 
   /** Identify plans which reduce to a (set of) constant value(s). */
   def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
     lp.project match {
-      case LP.Constant(Data.Set(records)) => records.left
-      case LP.Constant(value)             => List(value).left
-      case _                                        => lp.right
+      case Constant(Data.Set(records)) => records.left
+      case Constant(value)             => List(value).left
+      case _                           => lp.right
     }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
@@ -91,9 +92,9 @@ package object quasar {
     lp: T[LP], off: Natural, lim: Option[Positive]):
       T[LP] = {
     val skipped =
-      Drop(lp, LP.Constant[T[LP]](Data.Int(off.get)).embed).embed
+      Drop(lp, constant[T[LP]](Data.Int(off.get)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, LP.Constant[T[LP]](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T[LP]](Data.Int(l.get)).embed).embed)
   }
 }

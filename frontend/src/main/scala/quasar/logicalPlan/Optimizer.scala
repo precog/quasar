@@ -14,29 +14,92 @@
  * limitations under the License.
  */
 
-package quasar
-
-import scala.Predef.$conforms
+package quasar.logicalPlan
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
+import quasar._
+import quasar.contrib.matryoshka._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._
+import quasar.fp.ski._
+import quasar.logicalPlan.{LogicalPlan => LP}
 import quasar.namegen._
 import quasar.sql.JoinDir
-import quasar.fp.ski._
+
+import scala.Predef.$conforms
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
-object Optimizer {
-  import LP._
+sealed abstract class Component[T[_[_]], A] {
+  def run(l: T[LP], r: T[LP]): A
+}
+/** A condition that refers to left and right sources using equality, so may be
+  * rewritten into the join condition.
+  */
+final case class EquiCond[T[_[_]], A](run0: (T[LP], T[LP]) => A)
+    extends Component[T, A] {
+  def run(l: T[LP], r: T[LP]) = run0(l,r)
+}
+/** A condition which refers only to the left source */
+final case class LeftCond[T[_[_]], A](run0: T[LP] => A)
+    extends Component[T, A] {
+  def run(l: T[LP], r: T[LP]) = run0(l)
+}
+/** A condition which refers only to the right source. */
+final case class RightCond[T[_[_]], A](run0: T[LP] => A)
+    extends Component[T, A] {
+  def run(l: T[LP], r: T[LP]) = run0(r)
+}
+/** A condition which refers to both sources but doesn't have the right shape to
+  * become the join condition.
+  */
+final case class OtherCond[T[_[_]], A](run0: (T[LP], T[LP]) => A)
+    extends Component[T, A] {
+  def run(l: T[LP], r: T[LP]) = run0(l,r)
+}
+/** An expression that doesn't refer to any source. */
+final case class NeitherCond[T[_[_]], A](run0: A) extends Component[T, A] {
+  def run(l: T[LP], r: T[LP]) = run0
+}
+
+object Component {
+  implicit def applicative[T[_[_]]]: Applicative[Component[T, ?]] =
+    new Applicative[Component[T, ?]] {
+      def point[A](a: => A) = NeitherCond(a)
+
+      def ap[A, B](fa: => Component[T, A])(f: => Component[T, A => B]) =
+        (fa, f) match {
+          // A             // A => B
+          case (NeitherCond(a), NeitherCond(g)) => NeitherCond(g(a))
+
+          // A             // LP => A => B
+          case (NeitherCond(a), LeftCond(g))    => LeftCond(g(_)(a))
+          // A             // LP => A => B
+          case (NeitherCond(a), RightCond(g))   => RightCond(g(_)(a))
+
+          // LP => A       // A => B
+          case (LeftCond(a),    NeitherCond(g)) => LeftCond(g <<< a) // lp => g(a(lp))
+                                                                     // LP => A       // LP => A => B
+          case (LeftCond(a),    LeftCond(g))    => LeftCond(lp => g(lp)(a(lp)))
+
+          // LP => A       // A => B
+          case (RightCond(a),   NeitherCond(g)) => RightCond(g <<< a)
+          // LP => A       // LP => A => B
+          case (RightCond(a),   RightCond(g))   => RightCond(lp => g(lp)(a(lp)))
+
+          case (ca, cg)                         => OtherCond((l, r) => cg.run(l, r)(ca.run(l, r)))
+        }
+    }
+}
+
+class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
   import quasar.std.StdLib._
   import set._
   import structural._
 
-  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+  val lpr = new LogicalPlanR[T]
 
   private def countUsageƒ(target: Symbol): Algebra[LP, Int] = {
     case Free(symbol) if symbol == target => 1
@@ -44,7 +107,7 @@ object Optimizer {
     case x => x.fold
   }
 
-  private def inlineƒ[T[_[_]], A](target: Symbol, repl: LP[T[LP]]):
+  private def inlineƒ[A](target: Symbol, repl: LP[T[LP]]):
       LP[(T[LP], T[LP])] => LP[T[LP]] =
   {
     case Free(symbol) if symbol == target => repl
@@ -53,12 +116,11 @@ object Optimizer {
     case x => x.map(_._2)
   }
 
-  private def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
-      LP[T[LP]] => Option[LP[T[LP]]] = {
+  val simplifyƒ: LP[T[LP]] => Option[LP[T[LP]]] = {
     case inv @ Invoke(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
-      case Constant(_)
-         | Free(_) => in.transPara(inlineƒ(ident, form.project)).project.some
+      case Constant(_) | Free(_) =>
+        in.transPara(inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
         case 0 => in.project.some
         case 1 => in.transPara(inlineƒ(ident, form.project)).project.some
@@ -68,29 +130,24 @@ object Optimizer {
     case _ => None
   }
 
-  def simplifyRepeatedly[T[_[_]]: Recursive: Corecursive]:
-      LP[T[LP]] => LP[T[LP]] =
-    repeatedly(simplifyƒ[T])
-
-  def simplify[T[_[_]]: Recursive: Corecursive](t: T[LP]): T[LP] =
-    t.transCata[LP](simplifyRepeatedly[T])
+  def simplify(t: T[LP]): T[LP] = t.transCata(repeatedly(simplifyƒ))
 
   /** Like `simplifyƒ`, but eliminates _all_ `Let` (and any bound `Free`) nodes.
     */
-  def elideLets[T[_[_]]: Recursive: FunctorT]:
+  val elideLets:
       LP[T[LP]] => Option[LP[T[LP]]] = {
     case Let(ident, form, in) =>
       in.transPara(inlineƒ(ident, form.project)).project.some
     case _ => None
   }
 
-  private val namesƒ: Algebra[LP, Set[Symbol]] = {
+  val namesƒ: Algebra[LP, Set[Symbol]] = {
     case Free(name) => Set(name)
-    case x           => x.fold
+    case x          => x.fold
   }
 
   def uniqueName[F[_]: Functor: Foldable](
-    prefix: String, plans: F[Fix[LP]]):
+    prefix: String, plans: F[T[LP]]):
       Symbol = {
     val existingNames = plans.map(_.cata(namesƒ)).fold
     def loop(pre: String): Symbol =
@@ -101,7 +158,7 @@ object Optimizer {
     loop(prefix)
   }
 
-  private val shapeƒ: GAlgebra[(Fix[LP], ?), LP, Option[List[Fix[LP]]]] = {
+  val shapeƒ: GAlgebra[(T[LP], ?), LP, Option[List[T[LP]]]] = {
     case Let(_, _, body) => body._2
     case Constant(Data.Obj(map)) =>
       Some(map.keys.map(n => lpr.constant(Data.Str(n))).toList)
@@ -125,103 +182,50 @@ object Optimizer {
     case _ => None
   }
 
-  private def preserveFree0[A](x: (Fix[LP], A))(f: A => Fix[LP]):
-      Fix[LP] = x._1.unFix match {
-    case Free(_) => x._1
-    case _        => f(x._2)
-  }
+  private def preserveFree0[A](x: (T[LP], A))(f: A => T[LP])
+      : T[LP] =
+    x._1.project match {
+      case Free(_) => x._1
+      case _       => f(x._2)
+    }
 
   // TODO: implement `preferDeletions` for other backends that may have more
   //       efficient deletes. Even better, a single function that takes a
   //       function parameter deciding which way each case should be converted.
   private val preferProjectionsƒ:
       GAlgebra[
-        (Fix[LP], ?),
+        (T[LP], ?),
         LP,
-        (Fix[LP], Option[List[Fix[LP]]])] = { node =>
+        (T[LP], Option[List[T[LP]]])] = { node =>
 
-    def preserveFree(x: (Fix[LP], (Fix[LP], Option[List[Fix[LP]]]))) =
+    def preserveFree(x: (T[LP], (T[LP], Option[List[T[LP]]]))) =
       preserveFree0(x)(_._1)
 
     (node match {
       case InvokeUnapply(DeleteField, Sized(src, field)) =>
         src._2._2.fold(
-          lpr.invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field)))) {
+          DeleteField(preserveFree(src), preserveFree(field)).embed) {
           fields =>
             val name = uniqueName("src", fields)
               lpr.let(name, preserveFree(src),
-                Fix(MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> lpr.invoke(ObjectProject, Func.Input2(lpr.free(name), f))): _*)))
+                MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
+                  f -> ObjectProject(lpr.free(name), f).embed): _*).embed)
         }
-      case lp => Fix(lp.map(preserveFree))
+      case lp => lp.map(preserveFree).embed
     },
       shapeƒ(node.map(_._2)))
   }
 
-  def preferProjections(t: Fix[LP]): Fix[LP] =
-    simplify(boundPara(t)(preferProjectionsƒ)._1)
+  def preferProjections(t: T[LP]): T[LP] =
+    boundPara(t)(preferProjectionsƒ)._1.transCata(repeatedly(simplifyƒ))
 
-  val elideTypeCheckƒ: Algebra[LP, Fix[LP]] = {
-    case Let(n, b, Fix(Typecheck(Fix(Free(nf)), _, cont, _)))
+  // FIXME: Make this a transformation instead of an algebra.
+  val elideTypeCheckƒ: Algebra[LP, T[LP]] = {
+    case Let(n, b, Embed(Typecheck(Embed(Free(nf)), _, cont, _)))
         if n == nf =>
       lpr.let(n, b, cont)
-    case x => Fix(x)
+    case x => x.embed
   }
-
-  sealed trait Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]): A
-  }
-  // A condition that refers to left and right sources using equality, so may
-  // be rewritten into the join condition:
-  final case class EquiCond[A](run0: (Fix[LP], Fix[LP]) => A) extends Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]) = run0(l,r)
-  }
-  // A condition which refers only to the left source:
-  final case class LeftCond[A](run0: Fix[LP] => A) extends Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]) = run0(l)
-  }
-  // A condition which refers only to the right source:
-  final case class RightCond[A](run0: Fix[LP] => A) extends Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]) = run0(r)
-  }
-  // A condition which refers to both sources but doesn't have the right shape
-  // to become the join condition:
-  final case class OtherCond[A](run0: (Fix[LP], Fix[LP]) => A) extends Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]) = run0(l,r)
-  }
-  // An expression that doesn't refer to any source.
-  final case class NeitherCond[A](run0: A) extends Component[A] {
-    def run(l: Fix[LP], r: Fix[LP]) = run0
-  }
-
-  // TODO add scalaz propery test
-  implicit val ComponentApplicative: Applicative[Component] =
-    new Applicative[Component] {
-      def point[A](a: => A): Component[A] = NeitherCond(a)
-
-      def ap[A, B](fa: => Component[A])(f: => Component[A => B]): Component[B] =
-        (fa, f) match {
-          // A             // A => B
-          case (NeitherCond(a), NeitherCond(g)) => NeitherCond(g(a))
-
-          // A             // LP => A => B
-          case (NeitherCond(a), LeftCond(g))    => LeftCond(g(_)(a))
-          // A             // LP => A => B
-          case (NeitherCond(a), RightCond(g))   => RightCond(g(_)(a))
-
-          // LP => A       // A => B
-          case (LeftCond(a),    NeitherCond(g)) => LeftCond(g <<< a) // lp => g(a(lp))
-                                                                     // LP => A       // LP => A => B
-          case (LeftCond(a),    LeftCond(g))    => LeftCond(lp => g(lp)(a(lp)))
-
-          // LP => A       // A => B
-          case (RightCond(a),   NeitherCond(g)) => RightCond(g <<< a)
-          // LP => A       // LP => A => B
-          case (RightCond(a),   RightCond(g))   => RightCond(lp => g(lp)(a(lp)))
-
-          case (ca, cg)                         => OtherCond((l, r) => cg.run(l, r)(ca.run(l, r)))
-        }
-    }
 
   /** Rewrite joins and subsequent filtering so that:
     * 1) Filtering that is equivalent to an equi-join is rewritten into the join condition.
@@ -229,45 +233,43 @@ object Optimizer {
     * The input plan must have been simplified already so that the structure
     * is in a canonical form for inspection.
     */
-  private val rewriteCrossJoinsƒ: LP[(Fix[LP], Fix[LP])] => State[NameGen, Fix[LP]] = { node =>
-    import quasar.fp._
+  val rewriteCrossJoinsƒ: LP[(T[LP], T[LP])] => State[NameGen, T[LP]] = { node =>
+    def preserveFree(x: (T[LP], T[LP])) = preserveFree0(x)(ι)
 
-    def preserveFree(x: (Fix[LP], Fix[LP])) = preserveFree0(x)(ι)
-
-    def flattenAnd: Fix[LP] => List[Fix[LP]] = {
-      case Fix(InvokeUnapply(relations.And, ts)) => ts.unsized.flatMap(flattenAnd)
-      case t                                      => List(t)
+    def flattenAnd: T[LP] => List[T[LP]] = {
+      case Embed(InvokeUnapply(relations.And, ts)) => ts.unsized.flatMap(flattenAnd)
+      case t                                       => List(t)
     }
 
-    def toComp(left: Fix[LP], right: Fix[LP])(c: Fix[LP]):
-        Component[Fix[LP]] = {
-      c.para[Component[Fix[LP]]] {
-        case t if t.map(_._1) ≟ left.unFix  => LeftCond(ι)
-        case t if t.map(_._1) ≟ right.unFix => RightCond(ι)
+    def toComp(left: T[LP], right: T[LP])(c: T[LP]):
+        Component[T, T[LP]] = {
+      c.para[Component[T, T[LP]]] {
+        case t if t.map(_._1) ≟ left.project  => LeftCond(ι)
+        case t if t.map(_._1) ≟ right.project => RightCond(ι)
 
         case InvokeUnapply(relations.Eq, Sized((_, LeftCond(lc)), (_, RightCond(rc)))) =>
-          EquiCond((l, r) => Fix(relations.Eq(lc(l), rc(r))))
+          EquiCond((l, r) => relations.Eq(lc(l), rc(r)).embed)
         case InvokeUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
-          EquiCond((l, r) => Fix(relations.Eq(rc(r), lc(l))))
+          EquiCond((l, r) => relations.Eq(rc(r), lc(l)).embed)
 
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
-          Func.Input1(t1).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
+          Func.Input1(t1).traverse(_._2).map(lpr.invoke(func, _))
 
         case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
-          Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
+          Func.Input2(t1, t2).traverse(_._2).map(lpr.invoke(func, _))
 
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
-          Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
+          Func.Input3(t1, t2, t3).traverse(_._2).map(lpr.invoke(func, _))
 
-        case t => NeitherCond(Fix(t.map(_._1)))
+        case t => NeitherCond(t.map(_._1).embed)
       }
     }
 
-    def assembleCond(conds: List[Fix[LP]]): Fix[LP] =
-      conds.foldLeft(lpr.constant(Data.True))((acc, c) => Fix(relations.And(acc, c)))
+    def assembleCond(conds: List[T[LP]]): T[LP] =
+      conds.foldLeft(lpr.constant(Data.True))(relations.And(_, _).embed)
 
-    def newJoin(lSrc: Fix[LP], rSrc: Fix[LP], comps: List[Component[Fix[LP]]]):
-        State[NameGen, Fix[LP]] = {
+    def newJoin(lSrc: T[LP], rSrc: T[LP], comps: List[Component[T, T[LP]]])
+        : State[NameGen, T[LP]] = {
       val equis    = comps.collect { case c @ EquiCond(_) => c }
       val lefts    = comps.collect { case c @ LeftCond(_) => c }
       val rights   = comps.collect { case c @ RightCond(_) => c }
@@ -284,27 +286,29 @@ object Optimizer {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
           lpr.let(lName, lSrc,
-            lpr.let(lFName, Fix(Filter(lpr.free(lName), assembleCond(lefts.map(_.run0(lpr.free(lName)))))),
+            lpr.let(lFName,
+              Filter(lpr.free(lName), assembleCond(lefts.map(_.run0(lpr.free(lName))))).embed,
               lpr.let(rName, rSrc,
-                lpr.let(rFName, Fix(Filter(lpr.free(rName), assembleCond(rights.map(_.run0(lpr.free(rName)))))),
+                lpr.let(rFName,
+                  Filter(lpr.free(rName), assembleCond(rights.map(_.run0(lpr.free(rName))))).embed,
                   lpr.let(jName,
-                    Fix(InnerJoin(lpr.free(lFName), lpr.free(rFName),
-                      assembleCond(equis.map(_.run(lpr.free(lFName), lpr.free(rFName)))))),
-                    Fix(Filter(lpr.free(jName), assembleCond(
+                    InnerJoin(lpr.free(lFName), lpr.free(rFName),
+                      assembleCond(equis.map(_.run(lpr.free(lFName), lpr.free(rFName))))).embed,
+                    Filter(lpr.free(jName), assembleCond(
                       others.map(_.run0(JoinDir.Left.projectFrom(lpr.free(jName)), JoinDir.Right.projectFrom(lpr.free(jName)))) ++
-                      neithers.map(_.run0))))))))))
+                      neithers.map(_.run0))).embed))))))
       }
     }
 
 
     node match {
-      case InvokeUnapply(Filter, Sized((src, Fix(InvokeUnapply(InnerJoin, Sized(joinL, joinR, joinCond)))), (cond, _))) =>
+      case InvokeUnapply(Filter, Sized((src, Embed(InvokeUnapply(InnerJoin, Sized(joinL, joinR, joinCond)))), (cond, _))) =>
         val comps = flattenAnd(joinCond).map(toComp(joinL, joinR)) ++
                     flattenAnd(cond).map(toComp(JoinDir.Left.projectFrom(src), JoinDir.Right.projectFrom(src)))
         newJoin(joinL, joinR, comps)
       case InvokeUnapply(InnerJoin, Sized((srcL, _), (srcR, _), (_, joinCond))) =>
         newJoin(srcL, srcR, flattenAnd(joinCond).map(toComp(srcL, srcR)))
-      case _ => State.state(Fix(node.map(preserveFree)))
+      case _ => State.state(node.map(preserveFree).embed)
     }
   }
 
@@ -313,28 +317,28 @@ object Optimizer {
     * input is expected to come straight from the SQL^2 compiler or
     * another source of un-optimized queries.
     */
-  val optimize: Fix[LP] => Fix[LP] =
-    NonEmptyList[Fix[LP] => Fix[LP]](
+  val optimize: T[LP] => T[LP] =
+    NonEmptyList[T[LP] => T[LP]](
       // Eliminate extraneous constants, etc.:
-      simplify[Fix],
+      simplify,
 
       // NB: must precede normalizeLets to eliminate possibility of shadowing:
-      normalizeTempNames,
+      lpr.normalizeTempNames,
 
       // NB: must precede rewriteCrossJoins to normalize Filter/Join shapes:
-      normalizeLets,
+      lpr.normalizeLets,
 
       // Now for the big one:
       boundParaS(_)(rewriteCrossJoinsƒ).evalZero,
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
-      simplify[Fix],
+      simplify,
 
       // Final pass to normalize the resulting plans for better matching in tests:
-      normalizeLets,
+      lpr.normalizeLets,
 
       // This time, fix the names last so they will read naturally:
-      normalizeTempNames
+      lpr.normalizeTempNames
 
     ).foldLeft1(_ >>> _)
 }

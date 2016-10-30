@@ -18,6 +18,7 @@ package quasar
 
 import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.logicalPlan.{LogicalPlan, Optimizer}
 
 import matryoshka._
 import org.specs2.matcher._
@@ -26,8 +27,10 @@ import scalaz._, Scalaz._
 trait TermLogicalPlanMatchers {
   case class equalToPlan(expected: Fix[LogicalPlan])
       extends Matcher[Fix[LogicalPlan]] {
+    val optimizer = new Optimizer[Fix]
+
     def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
-      val normed = Optimizer.simplify[Fix](s.value)
+      val normed = optimizer.simplify(s.value)
       val diff = (normed.render diff expected.render).shows
       result(
         expected ≟ normed,

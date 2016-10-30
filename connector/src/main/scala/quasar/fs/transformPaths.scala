@@ -16,10 +16,10 @@
 
 package quasar.fs
 
-import quasar.{LogicalPlan => LP}
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
+import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP}
 
 import matryoshka.{FunctorT, Fix}, FunctorT.ops._
 import monocle.{Lens, Optional}
@@ -246,7 +246,7 @@ object transformPaths {
 
   private def transformLPPaths(f: AFile => AFile) = λ[LP ~> LP] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    case LP.Read(p) => LP.Read(f(mkAbsolute(rootDir, p)))
+    case lp.Read(p) => lp.read(f(mkAbsolute(rootDir, p)))
     case lp         => lp
   }
 }

@@ -17,7 +17,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
@@ -26,6 +26,7 @@ import quasar.fs.ManageFile._
 import quasar.fs.ManageFile.MoveSemantics._
 import quasar.fp.free._
 import quasar.fp.numeric._
+import quasar.logicalPlan.LogicalPlan
 
 import matryoshka.Fix
 import scalaz._, Scalaz._

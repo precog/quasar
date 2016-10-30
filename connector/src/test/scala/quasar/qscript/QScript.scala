@@ -17,8 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan => LP, Type}
+import quasar.{Data, Type}
 import quasar.fp._
+import quasar.{logicalPlan => lp}
 import quasar.qscript.MapFuncs._
 import quasar.sql.{CompilerHelpers, JoinDir}
 import quasar.std.StdLib, StdLib._
@@ -375,7 +376,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // select (baz || quux || ducks)[*] from `/foo/bar`
       convert(
         None,
-        LP.Let('x, lpRead("/foo/bar"),
+        lp.let('x, lpRead("/foo/bar"),
           structural.ShiftArray(
             structural.ArrayConcat(
               structural.ArrayConcat(
@@ -479,7 +480,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // "select * from person, car",
       convert(
         listContents.some,
-        LP.Let('__tmp0,
+        lp.let('__tmp0,
           StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), lpf.constant(Data.Bool(true))).embed,
           identity.Squash(
             structural.ObjectConcat(

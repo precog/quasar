@@ -17,9 +17,10 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
 import quasar.Planner.PlannerError
 import quasar.fp._
+import quasar.logicalPlan.LogicalPlan
 
 import argonaut.JsonObject
 import matryoshka._

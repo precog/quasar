@@ -25,6 +25,7 @@ import quasar.fp.ski._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
+import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 import quasar.physical.mongodb.planner.MongoDbPlanner
 
@@ -102,6 +103,8 @@ private final class QueryFileInterpreter[C](
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
+
+  private val lpr = new LogicalPlanR[Fix]
 
   type QRT[F[_], A] = QueryRT[F, C, A]
   type MQ[A]        = QRT[MongoDbIO, A]
@@ -287,7 +290,7 @@ private final class QueryFileInterpreter[C](
 
   private def collections(lp: Fix[LogicalPlan]): PathError \/ Set[Collection] =
     // NB: documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    LogicalPlan.paths(lp).toList
+    lpr.paths(lp).toList
       .traverse(file => Collection.fromFile(mkAbsolute(rootDir, file)))
       .map(_.toSet)
 

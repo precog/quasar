@@ -17,15 +17,18 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
-import quasar.fp._, eitherT._, free._, ski._
+import quasar.fp._, eitherT._
+import quasar.fp.free._
+import quasar.fp.ski._
 import quasar.fs._
+import quasar.logicalPlan.LogicalPlan
 import quasar.physical.couchbase._, common._, N1QL._, planner._
 import quasar.qscript.{Read => _, _}
 

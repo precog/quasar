@@ -26,6 +26,9 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend._
 import quasar.fs._
+import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
+
+import scala.Predef.$conforms
 
 import scala.Predef.$conforms
 
@@ -36,6 +39,8 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
+  private val lpr = new LogicalPlanR[Fix]
+
   def service[S[_]](
     implicit
     Q: QueryFile.Ops[S],
@@ -75,7 +80,7 @@ object compile {
                 .map(physicalPlanJson =>
                   Json(
                     "physicalPlan" := physicalPlanJson,
-                    "inputs"       := LogicalPlan.paths(lp).map(p => posixCodec.printPath(p))
+                    "inputs"       := lpr.paths(lp).map(posixCodec.printPath)
                   ).toResponse[S])
                 .toRightDisjunction(noOutputError(lp))
                 .toResponse[S]

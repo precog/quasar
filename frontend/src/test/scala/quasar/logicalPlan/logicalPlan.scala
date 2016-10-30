@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.logicalPlan
 
 import quasar.Predef._
+import quasar.{Data, Func}
+import quasar.DataArbitrary._
 import quasar.fp._
+import quasar.frontend.fixpoint.lpf
+import quasar.std
 
-import matryoshka.Fix
+import matryoshka._
 import org.scalacheck._
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
@@ -28,13 +32,11 @@ import shapeless.contrib.scalaz.instances._
 import pathy.Path._
 
 class LogicalPlanSpecs extends Spec {
-  import LogicalPlan._
-
-  implicit val arbLogicalPlan: Arbitrary ~> λ[α => Arbitrary[LogicalPlan[α]]] =
-    new (Arbitrary ~> λ[α => Arbitrary[LogicalPlan[α]]]) {
-      def apply[α](arb: Arbitrary[α]): Arbitrary[LogicalPlan[α]] =
+  implicit val arbLogicalPlan: Delay[Arbitrary, LogicalPlan] =
+    new Delay[Arbitrary, LogicalPlan] {
+      def apply[A](arb: Arbitrary[A]) =
         Arbitrary {
-          Gen.oneOf(readGen[α], addGen(arb), constGen[α], letGen(arb), freeGen[α](Nil))
+          Gen.oneOf(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
         }
     }
 
@@ -47,30 +49,27 @@ class LogicalPlanSpecs extends Spec {
   def letGen[A: Arbitrary]: Gen[LogicalPlan[A]] = for {
     n            <- Gen.choose(0, 1000)
     (form, body) <- Arbitrary.arbitrary[(A, A)]
-  } yield Let(Symbol("tmp" + n), form, body)
+  } yield let(Symbol("tmp" + n), form, body)
 
-  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(Read(rootDir </> file("foo")))
-
-  import DataArbitrary._
+  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(read(rootDir </> file("foo")))
 
   def constGen[A]: Gen[LogicalPlan[A]] = for {
     data <- Arbitrary.arbitrary[Data]
-  } yield Constant(data)
+  } yield constant(data)
 
   def freeGen[A](vars: List[Symbol]): Gen[LogicalPlan[A]] = for {
     n <- Gen.choose(0, 1000)
-  } yield Free(Symbol("tmp" + n))
+  } yield free(Symbol("tmp" + n))
 
   implicit val arbIntLP = arbLogicalPlan(Arbitrary.arbInt)
 
   checkAll(traverse.laws[LogicalPlan])
 
   import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._, math._
-  import quasar.frontend.fixpoint.lpf
 
   "normalizeTempNames" should {
     "rename simple nested lets" in {
-      LogicalPlan.normalizeTempNames(
+      lpf.normalizeTempNames(
         lpf.let('foo, lpf.read(file("foo")),
           lpf.let('bar, lpf.read(file("bar")),
             Fix(MakeObjectN(
@@ -84,7 +83,7 @@ class LogicalPlanSpecs extends Spec {
     }
 
     "rename shadowed name" in {
-      LogicalPlan.normalizeTempNames(
+      lpf.normalizeTempNames(
         lpf.let('x, lpf.read(file("foo")),
           lpf.let('x, Fix(MakeObjectN(
               lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('x), lpf.constant(Data.Str("x")))))),
@@ -98,23 +97,23 @@ class LogicalPlanSpecs extends Spec {
 
   "normalizeLets" should {
     "re-nest" in {
-      LogicalPlan.normalizeLets(
+      lpf.normalizeLets(
         lpf.let('bar,
           lpf.let('foo,
             lpf.read(file("foo")),
-            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))), 
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))),
           Fix(MakeObjectN(
             lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must_==
         lpf.let('foo,
           lpf.read(file("foo")),
           lpf.let('bar,
-            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))), 
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))),
             Fix(MakeObjectN(
               lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))
     }
 
     "re-nest deep" in {
-      LogicalPlan.normalizeLets(
+      lpf.normalizeLets(
         lpf.let('baz,
           lpf.let('bar,
             lpf.let('foo,
@@ -133,8 +132,8 @@ class LogicalPlanSpecs extends Spec {
                 lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))))
     }
 
-    "hoist multiple lpf.lets" in {
-      LogicalPlan.normalizeLets(
+    "hoist multiple Lets" in {
+      lpf.normalizeLets(
         Fix(Add(
           lpf.let('x, lpf.constant(Data.Int(0)), Fix(Add(lpf.free('x), lpf.constant(Data.Int(1))))),
           lpf.let('y, lpf.constant(Data.Int(2)), Fix(Add(lpf.free('y), lpf.constant(Data.Int(3)))))))) must_==
@@ -145,8 +144,8 @@ class LogicalPlanSpecs extends Spec {
               Fix(Add(lpf.free('y), lpf.constant(Data.Int(3))))))))
     }
 
-    "hoist deep lpf.let by one level" in {
-      LogicalPlan.normalizeLets(
+    "hoist deep Let by one level" in {
+      lpf.normalizeLets(
         Fix(Add(
           lpf.constant(Data.Int(0)),
           Fix(Add(

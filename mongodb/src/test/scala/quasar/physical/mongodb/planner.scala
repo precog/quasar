@@ -127,7 +127,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
-      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
+      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
       phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
     } yield phys).run.value.toEither
@@ -3973,7 +3973,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           lpf.let(
             'check0,
             identity.Squash(read("db/zips")),
-            LogicalPlan.Typecheck(
+            lpf.typecheck(
               lpf.free('check0),
               Type.Obj(Map(), Some(Type.Top)),
               lpf.free('check0),
@@ -3990,7 +3990,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                         lpf.let(
                           'check1,
                           ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
-                          LogicalPlan.Typecheck(
+                          lpf.typecheck(
                             lpf.free('check1),
                             Type.FlexArr(0, None, Type.Str),
                             lpf.free('check1),

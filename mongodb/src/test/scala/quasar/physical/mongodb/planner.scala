@@ -22,6 +22,7 @@ import quasar.common._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
+import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
@@ -45,7 +46,6 @@ import quasar.specs2.QuasarMatchers._
 class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
   import StdLib.{set => s, _}
   import structural._
-  import LogicalPlan._
   import Grouped.grouped
   import Reshape.reshape
   import jscore._
@@ -124,10 +124,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
-  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
+  def plan(logical: Fix[LP]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
-      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
+      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
       _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
       phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
     } yield phys).run.value.toEither
@@ -3878,7 +3878,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   "alignJoinsƒ" should {
     "leave well enough alone" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3900,7 +3900,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "swap a reversed condition" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3922,7 +3922,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "swap multiple reversed conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3944,7 +3944,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "fail with “mixed” conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](

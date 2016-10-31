@@ -22,6 +22,7 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
+import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
@@ -46,7 +47,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
+  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
 
   def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_2_6
@@ -64,8 +65,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     }
 
     /** Identify constructs that are expected not to be implemented. */
-    def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
-      case LogicalPlan.Invoke(func, _) => shortCircuit(backend, func, args)
+    def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
+      case lp.Invoke(func, _) => shortCircuit(backend, func, args)
       case _ => ().right
     }
 
@@ -78,7 +79,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
       } yield rez
 
-    def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
+    def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
       prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
@@ -95,7 +96,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       check)
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
-    def run(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan], expected: Data): Result =
+    def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
       check(args, prg).getOrElse(
         (for {
           coll <- MongoDbSpec.tempColl(prefix)
@@ -124,24 +125,24 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
     val runner = new StdLibTestRunner with MongoDbDomain {
       def nullary(
-        prg: Fix[LogicalPlan],
+        prg: Fix[LP],
         expected: Data): Result =
         run(Nil, κ(prg), expected)
 
       def unary(
-        prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+        prg: Fix[LP] => Fix[LP],
         arg: Data,
         expected: Data): Result =
         run(List(arg), { case List(arg) => prg(arg) }, expected)
 
       def binary(
-        prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        prg: (Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data,
         expected: Data): Result =
         run(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }, expected)
 
       def ternary(
-        prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data, arg3: Data,
         expected: Data): Result =
         run(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }, expected)

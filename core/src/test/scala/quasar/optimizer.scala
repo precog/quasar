@@ -122,23 +122,23 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
   "preferProjections" should {
     "ignore a delete with unknown shape" in {
       optimizer.preferProjections(
-        DeleteField(read(file("zips")),
+        DeleteField(lpf.read(file("zips")),
           lpf.constant(Data.Str("pop")))) must
         beTree[Fix[LogicalPlan]](
-          DeleteField(read(file("zips")),
+          DeleteField(lpf.read(file("zips")),
             lpf.constant(Data.Str("pop"))))
     }
 
     "convert a delete after a projection" in {
       optimizer.preferProjections(
-        lpf.let('meh, read(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           DeleteField[FLP](
             makeObj(
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
               "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
             lpf.constant(Data.Str("pop"))))) must
       beTree(
-        lpf.let('meh, read(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           makeObj(
             "city" ->
               ObjectProject(
@@ -152,7 +152,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
     "convert a delete when the shape is hidden by a Free" in {
       optimizer.preferProjections(
-        lpf.let('meh, read(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           lpf.let('meh2,
             makeObj(
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
@@ -162,7 +162,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "cleaned" ->
                 DeleteField(lpf.free('meh2), lpf.constant(Data.Str("pop"))))))) must
       beTree(
-        lpf.let('meh, read(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           lpf.let('meh2,
             makeObj(
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),

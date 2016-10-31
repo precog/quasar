@@ -27,6 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
+import quasar.logicalPlan.LogicalPlan
 import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._
@@ -150,7 +151,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
       }}
     }
     "execute a query with offset and limit and a variable" >> {
-      def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String,Fix[LogicalPlan]) = {
+      def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String, Fix[LogicalPlan]) = {
         val query = selectAllWithVar(file1(fileName(aFile)), varName.value)
         val inlineQuery = selectAllWithVar(aFile, varName.value)
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))

@@ -16,12 +16,13 @@
 
 package quasar.physical.sparkcore.fs
 
+import quasar._
 import quasar.Predef._
 import quasar.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP, Free => _}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 import quasar.std._
 
@@ -66,19 +67,19 @@ class CoreMapStdLibSpec extends StdLibSpec {
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
-      case LP.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
+      case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateUnaryMapping(func)(a1))
 
-      case LP.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
+      case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
 
-      case LP.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
+      case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 
-      case LP.Free(sym) => Free.pure(args(sym))
+      case lp.Free(sym) => Free.pure(args(sym))
     }
 
   // TODO: figure out how to pass the args to shortCircuit tso they can be inspected

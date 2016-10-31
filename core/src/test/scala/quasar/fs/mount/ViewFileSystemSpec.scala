@@ -21,10 +21,10 @@ import quasar.Predef._
 import quasar._
 import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp.{free => _, _}, eitherT._
+import quasar.fp._, eitherT._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
-import quasar.logicalPlan.{Free => _, _}
+import quasar.logicalPlan.{Free => _, free => _, _}
 import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 

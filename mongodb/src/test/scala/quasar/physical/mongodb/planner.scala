@@ -43,7 +43,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
+class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers with TreeMatchers {
   import StdLib.{set => s, _}
   import structural._
   import Grouped.grouped
@@ -3886,16 +3886,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap a reversed condition" in {
@@ -3908,16 +3910,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap multiple reversed conditions" in {
@@ -3930,16 +3934,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "fail with “mixed” conditions" in {
@@ -3954,13 +3960,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beLeftDisjunction(UnsupportedJoinCondition(
-        relations.Eq[FLP](
-          math.Add[FLP](
-            ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-            ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
-          ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case -\/(UnsupportedJoinCondition(cond)) =>
+          cond must beTree(
+            relations.Eq[FLP](
+              math.Add[FLP](
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
+                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
+              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))).embed)
+      }
     }
 
     "plan with extra squash and flattening" in {

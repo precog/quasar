@@ -704,10 +704,11 @@ object Compiler {
       (Fix(t.map(_._1)),
         groupedKeys(t.map(_._1), Fix(t.map(_._1))).getOrElse(t.foldMap(_._2)))
     }
-    val keys: List[Fix[LP]] = boundCata(tree)(keysƒ)._2
+    // use scalaz.IList so we can use scalaz.Equal[LP]
+    val keys: IList[Fix[LP]] = IList.fromList(boundCata(tree)(keysƒ)._2)
 
     // Step 1: annotate nodes containing the keys.
-    val ann: Cofree[LP, Boolean] = boundAttribute(tree)(keys.contains)
+    val ann: Cofree[LP, Boolean] = boundAttribute(tree)(keys.element)
 
     // Step 2: transform from the top, inserting Arbitrary where a key is not
     // otherwise reduced.

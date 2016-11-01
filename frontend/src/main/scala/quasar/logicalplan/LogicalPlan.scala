@@ -38,7 +38,7 @@ final case class Constant[A](data: Data) extends LogicalPlan[A]
 final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N])
     extends LogicalPlan[A] {
   override def equals(that: scala.Any): Boolean = scala.sys.error("oops")
-  }
+}
 // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
 // https://issues.scala-lang.org/browse/SI-5900
 object InvokeUnapply {
@@ -168,13 +168,13 @@ object LogicalPlan {
       def bindings[T[_[_]]: Recursive, A](t: LogicalPlan[T[LogicalPlan]], b: G[A])(f: LogicalPlan[T[LogicalPlan]] => A): G[A] =
         t match {
           case Let(ident, form, _) => b + (ident -> f(form.project))
-          case _                    => b
+          case _                   => b
         }
 
       def subst[T[_[_]]: Recursive, A](t: LogicalPlan[T[LogicalPlan]], b: G[A]): Option[A] =
         t match {
           case Free(symbol) => b.get(symbol)
-          case _             => None
+          case _            => None
         }
     }
 }

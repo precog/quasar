@@ -51,7 +51,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
               BsonField.Name("city") -> $field("_id").right)),
             IgnoreId))
 
-      simplifyGroup[WorkflowF](op) must beTree(exp)
+      simplifyGroup[WorkflowF](op) must beTreeEq(exp)
     }
 
     "elide useless reduction with complex id" in {
@@ -78,7 +78,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
               BsonField.Name("city") -> $field("_id", "0").right)),
             IgnoreId))
 
-      simplifyGroup[WorkflowF](op) must beTree(exp)
+      simplifyGroup[WorkflowF](op) must beTreeEq(exp)
     }
 
     "preserve useless-but-array-creating reduction" in {
@@ -90,7 +90,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right)).left))
 
-      simplifyGroup[WorkflowF](op) must beTree(op)
+      simplifyGroup[WorkflowF](op) must beTreeEq(op)
     }
   }
 
@@ -111,7 +111,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("city"))))))),
         IgnoreId))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "push $skip before $simpleMap" in {
@@ -132,7 +132,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           "0" -> Select(ident("x"), "length"))))),
         ListMap()))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "not push $skip before flattening $simpleMap" in {
@@ -148,7 +148,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
          ListMap()),
        $skip(5))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
 
     "push $limit before $project" in {
@@ -167,7 +167,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("city"))))))),
         IgnoreId))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "push $limit before $simpleMap" in {
@@ -188,7 +188,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           "0" -> Select(ident("x"), "length"))))),
         ListMap()))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "not push $limit before flattening $simpleMap" in {
@@ -204,7 +204,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
          ListMap()),
        $limit(10))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
 
     "push $match before $project" in {
@@ -225,7 +225,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           BsonField.Name("city") -> \/-($var(DocField(BsonField.Name("address") \ BsonField.Name("city")))))),
         IgnoreId))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "push $match before $project with deep reference" in {
@@ -246,7 +246,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           BsonField.Name("__tmp0") -> \/-($var(DocField(BsonField.Name("address")))))),
         IgnoreId))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "not push $match before $project with dependency" in {
@@ -260,7 +260,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
        $match(Selector.Doc(
          BsonField.Name("__tmp0") -> Selector.Eq(Bson.Text("boulder")))))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
 
     "push $match before $simpleMap" in {
@@ -285,7 +285,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           "city" -> Select(ident("x"), "city"))))),
         ListMap()))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "push $match with deep reference before $simpleMap" in {
@@ -310,7 +310,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           "pop" -> Select(ident("x"), "pop"))))),
         ListMap()))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "push $match before splicing $simpleMap" in {
@@ -340,7 +340,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
               "city" -> Select(ident("x"), "city"))))))),
         ListMap()))
 
-      reorderOps(op) must beTree(exp)
+      reorderOps(op) must beTreeEq(exp)
     }
 
     "not push $match before $simpleMap with dependency" in {
@@ -357,7 +357,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
        $match(Selector.Doc(
          BsonField.Name("__sd_tmp_0") -> Selector.Lt(Bson.Int32(1000)))))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
 
     "not push $match before flattening $simpleMap" in {
@@ -374,7 +374,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
        $match(Selector.Doc(
          BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
 
     "not push $sort up" in {
@@ -386,7 +386,7 @@ class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)))
 
-      reorderOps(op) must beTree(op)
+      reorderOps(op) must beTreeEq(op)
     }
   }
 

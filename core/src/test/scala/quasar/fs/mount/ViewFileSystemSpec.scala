@@ -170,7 +170,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate limited read to query" in {
@@ -199,7 +199,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate read with view-view reference" in {
@@ -225,7 +225,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate read with constant" in {
@@ -242,7 +242,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = ().point[Free[FileSystem, ?]]
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "read from closed handle (error)" in {
@@ -411,7 +411,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = query.execute(Fix(Squash(lpf.read(rootDir </> file("zips")))), rootDir </> file("tmp")).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 
@@ -438,7 +438,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
               query.unsafe.close(h))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 
@@ -453,7 +453,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = query.explain(Fix(Squash(lpf.read(rootDir </> file("zips"))))).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 
@@ -571,7 +571,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
-        beRightDisjunction.like { case r => r must beTree(lpf.read(rootDir </> file("zips"))) }
+        beRightDisjunction.like { case r => r must beTreeEq(lpf.read(rootDir </> file("zips"))) }
     }
 
     "trivial read" >> {
@@ -579,7 +579,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from `/zips`"))
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
-        case r => r must beTree(
+        case r => r must beTreeEq(
           Fix(Squash(lpf.read(rootDir </> file("zips"))))
         )
       }
@@ -590,7 +590,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from zips"))
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
-        case r => r must beTree(
+        case r => r must beTreeEq(
           Fix(Squash(lpf.read(rootDir </> dir("foo") </> file("zips"))))
         )
       }
@@ -620,7 +620,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed).run.value.toOption.get
 
       resolvedRefs(vs, outer) must beRightDisjunction.like {
-        case r => r must beTree(exp)
+        case r => r must beTreeEq(exp)
       }
     }
 
@@ -632,7 +632,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           unsafeParse("select * from view1"))
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
-        beRightDisjunction.like { case r => r must beTree(
+        beRightDisjunction.like { case r => r must beTreeEq(
           Squash(Squash(lpf.read(rootDir </> file("zips"))).embed).embed)
         }
     }
@@ -660,7 +660,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         Squash(lpf.read(zp)).embed,
         lpf.constant(Data.Bool(true))).embed
 
-      resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTree(exp) }
+      resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTreeEq(exp) }
     }
 
     "self reference" >> {
@@ -678,7 +678,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like { case r => r must beTree(qlp) }
+      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like { case r => r must beTreeEq(qlp) }
     }
 
     "circular reference" >> {
@@ -697,7 +697,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         v2p -> unsafeParse(s"select * from `${posixCodec.printPath(v1p)}` limit 10"))
 
       resolvedRefs(vs, lpf.read(v2p)) must beRightDisjunction.like {
-        case r => r must beTree(
+        case r => r must beTreeEq(
           Take(
             Squash(Drop(
               Squash(lpf.read(v2p)).embed,

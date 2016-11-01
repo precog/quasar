@@ -75,7 +75,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)))
 
-      given must beTree(expected)
+      given must beTreeEq(expected)
     }
 
     "choose smallest limit" in {
@@ -85,7 +85,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
     }
 
     "sum skips" in {
-      chain[Workflow](readFoo, $skip(10), $skip(5)) must beTree(chain[Workflow](readFoo, $skip(15)))
+      chain[Workflow](readFoo, $skip(10), $skip(5)) must beTreeEq(chain[Workflow](readFoo, $skip(15)))
     }
 
     "flatten foldLefts when possible" in {
@@ -99,7 +99,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $read(collection("db", "zips")),
         $read(collection("db", "olympics")))
 
-      given must beTree(expected)
+      given must beTreeEq(expected)
     }
 
     "flatten project into group/unwind" in {
@@ -122,7 +122,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           \/-($field("lEft"))),
         $unwind(DocField(BsonField.Name("city"))))
 
-      given must beTree(expected: Workflow)
+      given must beTreeEq(expected: Workflow)
     }.pendingUntilFixed("SD-538")
 
     "not flatten project into group/unwind with _id excluded" in {
@@ -137,7 +137,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           BsonField.Name("city") -> \/-($field("value", "city")))),
           ExcludeId))
 
-      given must beTree(given: Workflow)
+      given must beTreeEq(given: Workflow)
     }
 
     "resolve `Include`" in {
@@ -297,7 +297,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x"))))),
           ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "coalesce previous projection into a flatMap" in {
@@ -318,7 +318,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo")))),
           ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "convert previous projection before a reduce" in {
@@ -336,7 +336,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           ListMap()),
         $reduce($ReduceF.reduceNOP, ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "coalesce previous unwind into a map" in {
@@ -355,7 +355,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
               BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x"))))),
           ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "coalesce previous unwind into a flatMap" in {
@@ -374,7 +374,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             FlatExpr(JsFn(Name("x"), Select(ident("x"), "lat")))),
           ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "convert previous unwind before a reduce" in {
@@ -390,7 +390,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           ListMap()),
         $reduce($ReduceF.reduceNOP, ListMap()))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "patch $FoldLeftF" in {
@@ -402,7 +402,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           IncludeId)),
         chain[Workflow](readZips, $reduce($ReduceF.reduceFoldLeft, ListMap())))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "patch $FoldLeftF with existing reduce" in {
@@ -418,7 +418,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             IncludeId)),
         chain[Workflow](readZips, $reduce($ReduceF.reduceNOP, ListMap())))
 
-      crystallize(given) must beTree(Crystallized(expected))
+      crystallize(given) must beTreeEq(Crystallized(expected))
     }
 
     "avoid dangling map with known shape" in {
@@ -429,7 +429,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             "first" -> Select(ident("x"), "pop"),
             "second" -> Select(ident("x"), "city"))))),
           ListMap()))) must
-      beTree(Crystallized(chain[Workflow](
+      beTreeEq(Crystallized(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -452,7 +452,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
               "second" -> ident("x")))),
             FlatExpr(JsFn(Name("x"), Select(ident("x"), "city")))),
           ListMap()))) must
-      beTree(Crystallized(chain[Workflow](
+      beTreeEq(Crystallized(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(
           NonEmptyList(
@@ -474,7 +474,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj("0" -> Select(ident("x"), "loc"))))),
           ListMap()))) must
-      beTree(Crystallized(chain[Workflow](
+      beTreeEq(Crystallized(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(
           NonEmptyList(
@@ -497,7 +497,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj("0" -> Select(ident("x"), "loc"))))),
           ListMap()))) must
-        beTree(Crystallized(chain[Workflow](
+        beTreeEq(Crystallized(chain[Workflow](
           $read(collection("db", "zips")),
           $project(Reshape(ListMap(
               BsonField.Name("loc") -> \/-($field("loc")))),
@@ -524,7 +524,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
               "0" -> Select(ident("x"), "bar"),
               "1" -> Select(ident("x"), "baz"))))),
           ListMap()))) must
-      beTree(Crystallized(chain[Workflow](
+      beTreeEq(Crystallized(chain[Workflow](
         $read(collection("db", "foo")),
         $simpleMap(
           NonEmptyList(
@@ -555,7 +555,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
               "0" -> Select(ident("x"), "bar"),
               "1" -> Select(ident("x"), "baz"))))),
           ListMap()))) must
-      beTree(Crystallized(chain[Workflow](
+      beTreeEq(Crystallized(chain[Workflow](
         $read(collection("db", "foo")),
         $project(Reshape(ListMap(
             BsonField.Name("loc") -> \/-($field("loc")))),
@@ -586,7 +586,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $match(Selector.Where(Js.BinOp("<",
           Js.Select(Js.Select(Js.Ident("this"), "city"), "length"),
           Js.Num(4, false))))))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
           MapReduce($MapF.mapFn($MapF.mapNOP), $ReduceF.reduceNOP,
@@ -618,7 +618,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           BsonField.Name("a") -> \/-($include()),
           BsonField.Name("b") -> \/-($include()))),
           IncludeId)))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         PipelineTask(ReadTask(collection("db", "zips")),
           List(
             $GroupF((),
@@ -658,7 +658,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           ListMap()),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
         $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
           MapReduce(
@@ -689,7 +689,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           ListMap()),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
         $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
           MapReduce(
@@ -717,7 +717,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $limit(100),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
         $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
           MapReduce(
@@ -740,7 +740,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj("0" -> Select(ident("x"), "loc"))))),
           ListMap())))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         PipelineTask(
           MapReduceTask(
             ReadTask(collection("db", "zips")),
@@ -789,7 +789,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
               "0" -> Select(ident("x"), "bar"),
               "1" -> Select(ident("x"), "baz"))))),
           ListMap())))) must
-      beTree[WorkflowTask](
+      beTreeEq[WorkflowTask](
         PipelineTask(
           MapReduceTask(
             ReadTask(collection("db", "foo")),

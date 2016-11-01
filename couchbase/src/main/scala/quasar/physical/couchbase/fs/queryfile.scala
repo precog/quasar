@@ -28,7 +28,7 @@ import quasar.fp._, eitherT._
 import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.physical.couchbase._, common._, N1QL._, planner._
 import quasar.qscript.{Read => _, _}
 

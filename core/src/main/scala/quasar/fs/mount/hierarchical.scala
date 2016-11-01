@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp._, eitherT._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.{logicalPlan => lp}, lp.LogicalPlan
+import quasar.{logicalplan => lp}, lp.LogicalPlan
 
 import matryoshka.{free => _, _}, Recursive.ops._
 import pathy.Path._

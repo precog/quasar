@@ -22,7 +22,7 @@ import quasar.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP, Free => _}
+import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP, Free => _}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 import quasar.std._
 

@@ -27,7 +27,7 @@ import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
@@ -220,7 +220,7 @@ object MongoDbPlanner {
       case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case Invoke(f, a)    => invoke(f, a)
       case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
-      case logicalPlan.Let(_, _, body) => body
+      case logicalplan.Let(_, _, body) => body
       case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {

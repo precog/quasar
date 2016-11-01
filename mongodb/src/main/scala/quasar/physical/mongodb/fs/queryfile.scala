@@ -25,7 +25,7 @@ import quasar.fp.ski._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
-import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
+import quasar.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 import quasar.physical.mongodb.planner.MongoDbPlanner
 

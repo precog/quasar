@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Planner.UnsupportedPlan
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
+import quasar.logicalplan.{LogicalPlan, LogicalPlanR}
 
 import matryoshka._, Recursive.ops._
 import pathy.Path._

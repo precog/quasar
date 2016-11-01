@@ -21,7 +21,7 @@ import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql._
 import quasar.std.StdLib.set._
 

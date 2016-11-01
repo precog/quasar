@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.logicalPlan._
+import quasar.logicalplan._
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.set._, StdLib.structural._
 

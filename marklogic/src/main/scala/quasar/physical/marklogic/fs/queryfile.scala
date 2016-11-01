@@ -28,7 +28,7 @@ import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
-import quasar.logicalPlan.{constant, LogicalPlan}
+import quasar.logicalplan.{constant, LogicalPlan}
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml.NCName

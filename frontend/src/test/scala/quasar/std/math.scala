@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
 import quasar.frontend.fixpoint.lpf
-import quasar.logicalPlan._
+import quasar.logicalplan._
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary

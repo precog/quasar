@@ -21,7 +21,7 @@ import quasar._, Planner._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
-import quasar.{logicalPlan => lp}
+import quasar.{logicalplan => lp}
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.sql.JoinDir

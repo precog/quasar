@@ -26,7 +26,7 @@ import monocle.Prism
 import shapeless.Nat
 import scalaz._
 
-package object logicalPlan {
+package object logicalplan {
   def read[A] =
     Prism.partial[LogicalPlan[A], FPath] { case Read(p) => p } (Read(_))
 

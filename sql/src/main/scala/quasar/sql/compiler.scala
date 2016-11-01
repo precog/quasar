@@ -24,7 +24,7 @@ import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.binder._
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib, StdLib._
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.Planner.PlannerError
 import quasar.fp._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 
 import argonaut.JsonObject
 import matryoshka._

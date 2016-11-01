@@ -24,7 +24,7 @@ import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski._
-import quasar.{logicalPlan => lp}, lp._
+import quasar.{logicalplan => lp}, lp._
 
 import matryoshka.{Fix, Recursive}, Recursive.ops._
 import pathy.Path._

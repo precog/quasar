@@ -19,7 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{Data, Type}
 import quasar.fp._
-import quasar.{logicalPlan => lp}
+import quasar.{logicalplan => lp}
 import quasar.qscript.MapFuncs._
 import quasar.sql.{CompilerHelpers, JoinDir}
 import quasar.std.StdLib, StdLib._

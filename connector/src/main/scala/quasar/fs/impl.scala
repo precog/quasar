@@ -26,7 +26,7 @@ import quasar.fs.ManageFile._
 import quasar.fs.ManageFile.MoveSemantics._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 
 import matryoshka.Fix
 import scalaz._, Scalaz._

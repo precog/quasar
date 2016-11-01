@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.eitherT._
 import quasar.frontend.SemanticErrsT
-import quasar.logicalPlan.{LogicalPlan, Optimizer}
+import quasar.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._

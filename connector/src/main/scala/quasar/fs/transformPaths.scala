@@ -19,7 +19,7 @@ package quasar.fs
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
-import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP}
+import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP}
 
 import matryoshka.{FunctorT, Fix}, FunctorT.ops._
 import monocle.{Lens, Optional}

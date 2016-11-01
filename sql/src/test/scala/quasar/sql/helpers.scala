@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
-import quasar.logicalPlan.{LogicalPlan, Optimizer}
+import quasar.logicalplan.{LogicalPlan, Optimizer}
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 

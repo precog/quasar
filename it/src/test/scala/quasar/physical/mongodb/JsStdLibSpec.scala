@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
 import quasar.std.StdLib._
 import quasar.jscore._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 

@@ -23,7 +23,7 @@ import quasar.effect.MonotonicSeq
 import quasar.fp._, eitherT._
 import quasar.fp.free._
 import quasar.fp.ski.ι
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.physical.couchbase.N1QL._
 import quasar.physical.couchbase.fs.queryfile._
 import quasar.physical.couchbase.planner._, Planner._

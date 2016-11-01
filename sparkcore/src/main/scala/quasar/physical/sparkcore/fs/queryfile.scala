@@ -27,7 +27,7 @@ import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._, eitherT._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, QueryFile._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._

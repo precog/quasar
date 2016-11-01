@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
 
 import scala.collection.immutable.NumericRange

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._

@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._

@@ -26,7 +26,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend._
 import quasar.fs._
-import quasar.logicalPlan.{LogicalPlan, LogicalPlanR}
+import quasar.logicalplan.{LogicalPlan, LogicalPlanR}
 
 import scala.Predef.$conforms
 
@@ -60,7 +60,7 @@ object compile {
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(
         InternalServerError withReason "No explain output for plan.",
-        "logicalPlan" := lp.render)
+        "logicalplan" := lp.render)
 
     def explainQuery(
       expr: Fix[sql.Sql],

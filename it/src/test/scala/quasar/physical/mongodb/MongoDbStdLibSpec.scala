@@ -22,7 +22,7 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
-import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP}
+import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor

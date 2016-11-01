@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.fs._
-import quasar.logicalPlan.LogicalPlan
+import quasar.logicalplan.LogicalPlan
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 

@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
 import quasar.fs._
-import quasar.logicalPlan.{LogicalPlan => LP}
+import quasar.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._
 
 import scala.Predef.implicitly

@@ -25,7 +25,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.{logicalPlan => lp}, lp.{LogicalPlan => LP, Optimizer}
+import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 import quasar.sql.Sql
 
 import matryoshka.{free => _, _}, TraverseT.ops._, Recursive.ops._

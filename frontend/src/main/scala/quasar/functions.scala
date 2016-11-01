@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.logicalPlan.{LogicalPlan => LP, _}
+import quasar.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._

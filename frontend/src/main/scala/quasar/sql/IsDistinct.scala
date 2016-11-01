@@ -14,22 +14,18 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
-import quasar.fp._
 
-import matryoshka._
-import org.specs2.matcher._
-import scalaz._, Scalaz._
+import scalaz._
 
-trait TreeMatchers {
-  def beTree[A: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
-    def apply[S <: A](ex: Expectable[S]) = {
-      val actual: A = ex.value
-      val diff: String = (RenderTree[A].render(actual) diff expected.render).shows
-      result(actual == expected, s"trees match:\n$diff", s"trees do not match:\n$diff", ex)
-    }
-  }
+sealed trait IsDistinct extends Product with Serializable
+
+final case object SelectDistinct extends IsDistinct
+final case object SelectAll extends IsDistinct
+
+object IsDistinct {
+  implicit val equal: Equal[IsDistinct] = Equal.equalRef
+  implicit val show: Show[IsDistinct] = Show.showFromToString
 }

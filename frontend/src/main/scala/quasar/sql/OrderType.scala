@@ -14,22 +14,18 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
-import quasar.fp._
 
-import matryoshka._
-import org.specs2.matcher._
-import scalaz._, Scalaz._
+import scalaz._
 
-trait TreeMatchers {
-  def beTree[A: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
-    def apply[S <: A](ex: Expectable[S]) = {
-      val actual: A = ex.value
-      val diff: String = (RenderTree[A].render(actual) diff expected.render).shows
-      result(actual == expected, s"trees match:\n$diff", s"trees do not match:\n$diff", ex)
-    }
-  }
+sealed trait OrderType extends Product with Serializable
+
+final case object ASC extends OrderType
+final case object DESC extends OrderType
+
+object OrderType {
+  implicit val equal: Equal[OrderType] = Equal.equalRef
+  implicit val show: Show[OrderType] = Show.showFromToString
 }

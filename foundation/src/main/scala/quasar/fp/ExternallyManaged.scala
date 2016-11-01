@@ -30,7 +30,7 @@ import scalaz._
   */
 sealed abstract class ExternallyManaged
 
-case object Extern extends ExternallyManaged
+final case object Extern extends ExternallyManaged
 
 object ExternallyManaged {
   def unit = Iso[ExternallyManaged, Unit](κ(()))(κ(Extern))

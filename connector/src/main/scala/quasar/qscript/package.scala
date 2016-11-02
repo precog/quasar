@@ -249,11 +249,12 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: EqualT, F[_]](implicit F: Delay[Equal, F])
+    implicit def equal[T[_[_]]: EqualT, F[_]: Functor]
+      (implicit F: Delay[Equal, F])
         : Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
 
-    implicit def show[T[_[_]]: ShowT, F[_]](implicit F: Delay[Show, F])
+    implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])
         : Show[Target[T, F]] =
       Show.show(target =>
         Cord("Target(") ++

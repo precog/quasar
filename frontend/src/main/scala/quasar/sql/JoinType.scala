@@ -14,24 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.planner
+package quasar.sql
 
 import quasar.Predef._
-import quasar.logicalplan.LogicalPlan
 
-import matryoshka.Recursive
-import scalaz.Cofree
+import scalaz._
 
-sealed abstract class InputFinder {
-  def apply[A](t: Cofree[LogicalPlan, A]): A
-}
+sealed abstract class JoinType(val sql: String) extends Product with Serializable
 
-case object Here extends InputFinder {
-  def apply[A](a: Cofree[LogicalPlan, A]): A =
-    a.head
-}
+final case object LeftJoin extends JoinType("left join")
+final case object RightJoin extends JoinType("right join")
+final case object InnerJoin extends JoinType("inner join")
+final case object FullJoin extends JoinType("full join")
 
-final case class There(index: Int, next: InputFinder) extends InputFinder {
-  def apply[A](a: Cofree[LogicalPlan, A]): A =
-    next((Recursive[Cofree[?[_], A]].children(a).apply)(index))
+object JoinType {
+  implicit val equal: Equal[JoinType] = Equal.equalRef
+  implicit val show: Show[JoinType] = Show.showFromToString
 }

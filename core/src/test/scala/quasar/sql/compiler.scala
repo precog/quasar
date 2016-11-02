@@ -25,7 +25,6 @@ import matryoshka.Fix
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
   //     need to do a better job of handling this.
-  import quasar.LogicalPlan._
   import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
   import quasar.frontend.fixpoint.lpf
 
@@ -128,11 +127,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           InnerJoin(read("foo"), read("bar"), lpf.constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const[Fix]),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const[Fix]),
                     lpf.constant(Data.Str("address"))))))))
     }
 
@@ -145,13 +144,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             ObjectConcat[FLP](
               ObjectProject[FLP](
                 ObjectProject[FLP](
-                  ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+                  ObjectProject(lpf.free('__tmp0), JoinDir.Left.const[Fix]),
                   lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Str("baz"))),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const[Fix]),
                     lpf.constant(Data.Str("address"))))))))
     }
 
@@ -572,8 +571,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           InnerJoin(read("person"), read("car"), lpf.constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
-              ObjectProject(lpf.free('__tmp0), JoinDir.Right.const)))))
+              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const[Fix]),
+              ObjectProject(lpf.free('__tmp0), JoinDir.Right.const[Fix])))))
     }
 
     "compile two term multiplication from two tables" in {
@@ -586,10 +585,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               "0" ->
                 Multiply[FLP](
                   ObjectProject[FLP](
-                    ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Left.const[Fix]),
                     lpf.constant(Data.Str("age"))),
                   ObjectProject[FLP](
-                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const[Fix]),
                     lpf.constant(Data.Str("modelYear"))))))))
     }
 
@@ -704,35 +703,35 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile union" in {
       testLogicalPlanCompile(
         "select loc, pop from zips union select city from zips",
-          normalizeLets(normalizeLets(
+          lpf.normalizeLets(lpf.normalizeLets(
             Distinct[FLP](Union[FLP](setA, setB)))))
     }
 
     "compile union all" in {
       testLogicalPlanCompile(
         "select loc, pop from zips union all select city from zips",
-        normalizeLets(normalizeLets(
+        lpf.normalizeLets(lpf.normalizeLets(
           Union[FLP](setA, setB))))
     }
 
     "compile intersect" in {
       testLogicalPlanCompile(
         "select loc, pop from zips intersect select city from zips",
-        normalizeLets(normalizeLets(
+        lpf.normalizeLets(lpf.normalizeLets(
           Distinct[FLP](Intersect[FLP](setA, setB)))))
     }
 
     "compile intersect all" in {
       testLogicalPlanCompile(
         "select loc, pop from zips intersect all select city from zips",
-        normalizeLets(normalizeLets(
+        lpf.normalizeLets(lpf.normalizeLets(
           Intersect[FLP](setA, setB))))
     }
 
     "compile except" in {
       testLogicalPlanCompile(
         "select loc, pop from zips except select city from zips",
-        normalizeLets(normalizeLets(
+        lpf.normalizeLets(lpf.normalizeLets(
           Except[FLP](setA, setB))))
     }
 
@@ -1114,11 +1113,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const[Fix]),
                       lpf.constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const[Fix]),
                       lpf.constant(Data.Str("address")))))))))
     }
 
@@ -1179,10 +1178,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     Fix(Squash(
                        makeObj(
                          "name" -> ObjectProject[FLP](
-                           ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
+                           ObjectProject(lpf.free('__tmp4), JoinDir.Left.const[Fix]),
                            lpf.constant(Data.Str("name"))),
                          "address" -> ObjectProject[FLP](
-                           ObjectProject(lpf.free('__tmp4), JoinDir.Right.const),
+                           ObjectProject(lpf.free('__tmp4), JoinDir.Right.const[Fix]),
                            lpf.constant(Data.Str("address"))))))))))))
     }
 
@@ -1216,10 +1215,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   Fix(Squash(
                     makeObj(
                       "name" -> ObjectProject[FLP](
-                        ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
+                        ObjectProject(lpf.free('__tmp4), JoinDir.Left.const[Fix]),
                         lpf.constant(Data.Str("name"))),
                       "address" -> ObjectProject[FLP](
-                        ObjectProject(lpf.free('__tmp4), JoinDir.Right.const),
+                        ObjectProject(lpf.free('__tmp4), JoinDir.Right.const[Fix]),
                         lpf.constant(Data.Str("address"))))))))))))
     }
 
@@ -1238,11 +1237,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const[Fix]),
                       lpf.constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const[Fix]),
                       lpf.constant(Data.Str("address")))))))))
     }
 
@@ -1270,21 +1269,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                         lpf.constant(Data.Str("bar_id"))),
                       ObjectProject[FLP](
                         ObjectProject(lpf.free('__tmp2),
-                          JoinDir.Right.const),
+                          JoinDir.Right.const[Fix]),
                         lpf.constant(Data.Str("id"))))),
                   Squash(
                     makeObj(
                       "name" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
-                            JoinDir.Left.const),
+                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const[Fix]),
+                            JoinDir.Left.const[Fix]),
                           lpf.constant(Data.Str("name"))),
                       "address" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
-                            JoinDir.Right.const),
+                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const[Fix]),
+                            JoinDir.Right.const[Fix]),
                           lpf.constant(Data.Str("address")))))))))))
     }
 

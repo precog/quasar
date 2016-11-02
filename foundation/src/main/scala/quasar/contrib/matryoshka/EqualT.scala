@@ -18,21 +18,27 @@ package quasar.contrib.matryoshka
 
 import quasar.Predef._
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import scalaz._
 import simulacrum.typeclass
 
 @typeclass trait EqualT[T[_[_]]] {
-  def equal[F[_]](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F]): Boolean
+  def equal[F[_]: Functor](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F])
+      : Boolean
 
-  def equalT[F[_]](delay: Delay[Equal, F]): Equal[T[F]] =
-    Equal.equal[T[F]](equal[F](_, _)(delay))
+  def equalT[F[_]: Functor](implicit del: Delay[Equal, F]): Equal[T[F]] =
+    Equal.equal[T[F]](equal[F](_, _))
 }
 
 object EqualT {
-  implicit val fix: EqualT[Fix] = new EqualT[Fix] {
-    def equal[F[_]](tf1: Fix[F], tf2: Fix[F])(implicit del: Delay[Equal, F])
-        : Boolean =
-      del(equalT[F](del)).equal(tf1.unFix, tf2.unFix)
-  }
+  def recursive[T[_[_]]: Recursive]: EqualT[T] = new EqualT[T] {
+    def equal[F[_]: Functor]
+      (tf1: T[F], tf2: T[F])
+      (implicit del: Delay[Equal, F]) =
+      del(equalT[F]).equal(tf1.project, tf2.project)
+    }
+
+  implicit val fix: EqualT[Fix] = recursive
+  implicit val mu:  EqualT[Mu]  = recursive
+  implicit val nu:  EqualT[Mu]  = recursive
 }

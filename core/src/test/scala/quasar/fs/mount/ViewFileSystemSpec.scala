@@ -18,12 +18,13 @@ package quasar.fs.mount
 
 import quasar.Predef._
 
-import quasar._, LogicalPlan.{Free => _, _}
+import quasar._
 import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._, eitherT._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
+import quasar.logicalplan.{Free => _, free => _, _}
 import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
@@ -169,7 +170,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate limited read to query" in {
@@ -198,7 +199,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate read with view-view reference" in {
@@ -224,7 +225,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "translate read with constant" in {
@@ -241,7 +242,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = ().point[Free[FileSystem, ?]]
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
 
     "read from closed handle (error)" in {
@@ -410,7 +411,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = query.execute(Fix(Squash(lpf.read(rootDir </> file("zips")))), rootDir </> file("tmp")).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 
@@ -437,7 +438,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
               query.unsafe.close(h))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 
@@ -452,7 +453,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = query.explain(Fix(Squash(lpf.read(rootDir </> file("zips"))))).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTreeEq(traceInterp(exp, Map())._1)
     }
   }
 

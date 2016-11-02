@@ -22,6 +22,7 @@ import quasar.common._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
+import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
@@ -42,10 +43,9 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
+class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers with TreeMatchers {
   import StdLib.{set => s, _}
   import structural._
-  import LogicalPlan._
   import Grouped.grouped
   import Reshape.reshape
   import jscore._
@@ -124,10 +124,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
-  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
+  def plan(logical: Fix[LP]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
-      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
+      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
       _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
       phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
     } yield phys).run.value.toEither
@@ -3878,7 +3878,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   "alignJoinsƒ" should {
     "leave well enough alone" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3886,21 +3886,23 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap a reversed condition" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3908,21 +3910,23 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap multiple reversed conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3930,21 +3934,23 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-              ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTree(
+            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
+              relations.And[FLP](
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
+                relations.Eq[FLP](
+                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "fail with “mixed” conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        Invoke(s.InnerJoin,
+        lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
             relations.And[FLP](
               relations.Eq[FLP](
@@ -3954,13 +3960,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
               relations.Eq[FLP](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must
-      beLeftDisjunction(UnsupportedJoinCondition(
-        relations.Eq[FLP](
-          math.Add[FLP](
-            ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-            ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
-          ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))))))
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case -\/(UnsupportedJoinCondition(cond)) =>
+          cond must beTree(
+            relations.Eq[FLP](
+              math.Add[FLP](
+                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
+                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
+              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))).embed)
+      }
     }
 
     "plan with extra squash and flattening" in {
@@ -3973,7 +3981,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           lpf.let(
             'check0,
             identity.Squash(read("db/zips")),
-            LogicalPlan.Typecheck(
+            lpf.typecheck(
               lpf.free('check0),
               Type.Obj(Map(), Some(Type.Top)),
               lpf.free('check0),
@@ -3990,7 +3998,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                         lpf.let(
                           'check1,
                           ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
-                          LogicalPlan.Typecheck(
+                          lpf.typecheck(
                             lpf.free('check1),
                             Type.FlexArr(0, None, Type.Str),
                             lpf.free('check1),

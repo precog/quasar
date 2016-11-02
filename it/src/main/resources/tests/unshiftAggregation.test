@@ -1,17 +1,19 @@
 {
     "name": "unshift aggregation",
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "skip",
-        "couchbase":  "skip"
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_3_2":       "pending",
+        "postgresql":        "pending",
+        "couchbase":         "skip"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
     "predicate": "containsAtLeast",
-    "COMMENT": "MongoDB can’t get these in the right order. Once other backends are actually testing this, we should fix the order and mark _Mongo_ pending.",
     "expected": [
-        { "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116], "state": "AK", "city": "ANCHORAGE" },
-        { "pop": [13886, 422],                                                          "state": "AK", "city": "KETCHIKAN" },
-        { "pop": [426],                                                                 "state": "AK", "city": "POINT BAKER" }
+        { "state": "AK", "city": "ANCHORAGE",   "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116] },
+        { "state": "AK", "city": "KETCHIKAN",   "pop": [13886, 422]                                                          },
+        { "state": "AK", "city": "POINT BAKER", "pop": [426]                                                                 }
     ]
 }

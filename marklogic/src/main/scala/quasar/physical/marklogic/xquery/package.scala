@@ -116,7 +116,4 @@ package object xquery {
 
   def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =
     NamespaceDecl(Namespace(NSPrefix(NCName(prefix)), NSUri(uri)))
-
-  def xmlElement(name: String, content: String): String =
-    s"<$name>$content</$name>"
 }

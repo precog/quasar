@@ -57,13 +57,13 @@ object readfile {
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- lift(Task.delay(
+      qResult <- EitherT(lift(Task.delay(
                    bkt.query(n1qlQuery(qStr))
                      .allRows
                      .asScala
                      .toVector
-                     .map(_.value)
-                 )).into.liftM[FileSystemErrT]
+                     .traverse(rowToData)
+                 )).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](
@@ -71,7 +71,7 @@ object readfile {
   )(implicit
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
-    resultsFromCursor(cursor).point[Free[S, ?]]
+    resultsFromCursor(cursor).right.point[Free[S, ?]]
 
   def close[S[_]](
     cursor: Cursor

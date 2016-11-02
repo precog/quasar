@@ -1,0 +1,1 @@
+- Couchbase: Handle connection refused

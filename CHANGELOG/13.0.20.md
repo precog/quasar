@@ -1,0 +1,1 @@
+- Fix MarkLogic issue with Reduce initialization

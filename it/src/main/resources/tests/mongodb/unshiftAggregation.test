@@ -1,0 +1,16 @@
+{
+    "name": "unshift aggregation (MongoDB)",
+    "backends": {
+        "postgresql": "skip",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
+    "data": "../zips.data",
+    "query": "select state, city, [pop ...] as pop from `../zips` group by state, city",
+    "predicate": "containsAtLeast",
+    "expected": [
+        { "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116], "state": "AK", "city": "ANCHORAGE" },
+        { "pop": [13886, 422],                                                          "state": "AK", "city": "KETCHIKAN" },
+        { "pop": [426],                                                                 "state": "AK", "city": "POINT BAKER" }
+    ]
+}

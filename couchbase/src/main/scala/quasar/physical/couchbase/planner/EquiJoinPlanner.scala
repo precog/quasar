@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.common.PhaseResult.Detail
+import quasar.common.PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
@@ -59,7 +59,7 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Core
       cN1ql   <- freeCataM(combine)(interpretM(
                    i => partialQueryString(i.shows).point[M],
                    mapFuncPlanner[F, T].plan))
-      _       <- prtell[M](Vector(Detail(
+      _       <- prtell[M](Vector(detail(
                    "N1QL EquiJoin",
                    s"""  src:     $sN1ql
                       |  lBranch: $lbN1ql

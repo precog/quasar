@@ -145,38 +145,45 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                      "N1QL Reduce",
                      s"""  src:      ${n1ql(src)}
                         |  bucket:   $bN1ql
-                        |  reducers: $red
                         |  repair:   $repN1ql
                         |  n1ql:     $sN1ql""".stripMargin('|'))))
       } yield s
 
     case qscript.Sort(src, bucket, order) =>
       for {
-        tmpName <- genName[M]
-        b       <- processFreeMap(bucket, tmpName)
-        o       <- order.traverse { case (or, d) =>
-                     val dir = d match {
-                       case SortDir.Ascending  => "ASC"
-                       case SortDir.Descending => "DESC"
-                     }
-                     processFreeMap(or, tmpName) ∘ (ord => s"${n1ql(ord)} $dir")
-                   }.map(_.mkString(", "))
-        bN1ql   =  n1ql(b)
-        s       =  select(
-                     value         = true,
-                     resultExprs   = tmpName.wrapNel,
-                     keyspace      = src,
-                     keyspaceAlias = tmpName)     |>
-                   groupBy.set(bN1ql.some) >>>
-                   orderBy.set(o.some)
-        _       <- prtell[M](Vector(detail(
-                     "N1QL Sort",
-                     s"""  src:    ${n1ql(src)}
-                        |  bucket: $bN1ql
-                        |  order:  $o
-                        |  n1ql:   ${n1ql(s)}""".stripMargin('|'))))
-
-      } yield s
+        tmpName1 <- genName[M]
+        tmpName2 <- genName[M]
+        tmpName3 <- genName[M]
+        b        <- processFreeMap(bucket, tmpName1)
+        o        <- order.traverse { case (or, d) =>
+                      val dir = d match {
+                        case SortDir.Ascending  => "ASC"
+                        case SortDir.Descending => "DESC"
+                      }
+                      processFreeMap(or, tmpName3) ∘ (ord => s"${n1ql(ord)} $dir")
+                    }.map(_.mkString(", "))
+        bN1ql    =  n1ql(b)
+        bN1qlN   =  s"ifnull($bN1ql, $tmpName1)"
+        s        =  select(
+                      value         = true,
+                      resultExprs   = s"array_agg($tmpName1)".wrapNel,
+                      keyspace      = src,
+                      keyspaceAlias = tmpName1) |>
+                    groupBy.set(bN1qlN.some)
+        r        =  select(
+                      value         = true,
+                      resultExprs   = tmpName3.wrapNel,
+                      keyspace      = s,
+                      keyspaceAlias = tmpName2) |>
+                    unnest.set(s"$tmpName2 $tmpName3".some) >>>
+                    orderBy.set(o.some)
+        _        <- prtell[M](Vector(detail(
+                      "N1QL Sort",
+                      s"""  src:    ${n1ql(src)}
+                         |  bucket: $bN1ql
+                         |  order:  $o
+                         |  n1ql:   ${n1ql(r)}""".stripMargin('|'))))
+      } yield r
 
     case qscript.Filter(src, f) =>
       for {
@@ -249,7 +256,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                     resultExprs   = fN1ql.wrapNel,
                     keyspace      = src,
                     keyspaceAlias = tmpName1)
-      slice    =  takeOrDrop.bimap(κ(s"0:$tmpName2[0]"), κ(s"$tmpName2[0]:")).merge
+      slice    =  takeOrDrop.bimap(
+                    κ(s"0:least(array_length($tmpName3), $tmpName2[0])"),
+                    κ(s"$tmpName2[0]:")
+                  ).merge
       slc      =  select(
                     value         = true,
                     resultExprs   = s"$tmpName3[$slice]".wrapNel,

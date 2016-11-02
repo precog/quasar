@@ -2,13 +2,12 @@
     "name": "group by array",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "slamengine_commits.data",
-    "query": "select distinct count(*) from slamengine_commits group by parents",
+    "query": "select distinct count(*) as cnt from slamengine_commits group by parents",
     "predicate": "containsExactly",
-    "expected": [{ "0": 3 },
-                 { "0": 2 },
-                 { "0": 1 }]
+    "expected": [{ "cnt": 3 },
+                 { "cnt": 2 },
+                 { "cnt": 1 }]
 }

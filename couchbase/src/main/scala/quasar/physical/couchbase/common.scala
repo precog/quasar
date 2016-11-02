@@ -27,8 +27,7 @@ import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.cluster.ClusterManager
-import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.query.{N1qlParams, N1qlQuery}
+import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
 import scalaz._, Scalaz._
@@ -42,7 +41,7 @@ object common {
 
   final case class DocIdType(id: String, tpe: String)
 
-  final case class Cursor(result: Vector[JsonObject])
+  final case class Cursor(result: Vector[Data])
 
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
@@ -101,10 +100,14 @@ object common {
         Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
     ).into)
 
-  def resultsFromCursor(cursor: Cursor): FileSystemError \/ (Cursor, Vector[Data]) =
-    cursor.result.traverse(jObj =>
-      DataCodec.parse(jObj.toString)(DataCodec.Precise).leftMap(err =>
-        FileSystemError.readFailed(jObj.toString, err.shows))
-    ).strengthL(Cursor(Vector.empty))
+  def resultsFromCursor(cursor: Cursor): (Cursor, Vector[Data]) =
+    (Cursor(Vector.empty), cursor.result)
+
+  def rowToData(row: N1qlQueryRow): FileSystemError \/ Data = {
+    val rowStr = new String(row.byteValue)
+
+    DataCodec.parse(rowStr)(DataCodec.Precise).leftMap(err =>
+      FileSystemError.readFailed(rowStr, err.shows))
+  }
 
 }

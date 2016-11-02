@@ -24,15 +24,14 @@ import quasar.physical.marklogic.xquery.{xs => xxs}
 import scala.math.Integral
 
 import eu.timepit.refined.api.Refined
-import scalaz.{Functor, ISet, Id}
+import scalaz._, Scalaz._
 import scalaz.std.iterable._
-import scalaz.syntax.either._
-import scalaz.syntax.functor._
-import scalaz.syntax.show._
 
 object syntax {
   import FunctionDecl._
   import expr.TypeswitchCaseClause
+
+  val ST = SequenceType
 
   final case class NameBuilder(decl: NamespaceDecl, local: NCName) {
     def qn[F[_]](implicit F: PrologW[F]): F[QName] =
@@ -92,6 +91,9 @@ object syntax {
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)
+
+    def declare[F[_]: PrologW](local: String Refined IsNCName): F[FunctionDeclDsl] =
+      name(local).qn[F] map (quasar.physical.marklogic.xquery.declare)
   }
 
   final implicit class ModuleImportOps(val mod: ModuleImport) extends scala.AnyVal {

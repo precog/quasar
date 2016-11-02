@@ -19,7 +19,7 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
-import quasar.common.PhaseResult.Detail
+import quasar.common.PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
@@ -53,21 +53,21 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Date(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$dateRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$dateRegex") then v
          else null
          end)"""
       ).point[M]
     case Time(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$timeRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$timeRegex") then v
          else null
          end)"""
       ).point[M]
     case Timestamp(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$timestampRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$timestampRegex") then v
          else null
          end)"""
       ).point[M]
@@ -139,7 +139,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a2N1ql =  n1ql(a2)
       val a3N1ql =  n1ql(a3)
       val b      =  s"$a1N1ql >= $a2N1ql and $a1N1ql <= $a3N1ql"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL Between",
         s"""  a1:   $a1N1ql
            |  a2:   $a2N1ql
@@ -200,18 +200,18 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a3N1ql = n1ql(a3)
       partialQueryString(s"""
         (case
-         when $a3N1ql then regexp_contains("$a1N1ql", "(?i)" || "$a2N1ql")
-         else regexp_contains("$a1N1ql", "$a2N1ql")
+         when $a3N1ql then regexp_contains($a1N1ql, "(?i)" || $a2N1ql)
+         else regexp_contains($a1N1ql, $a2N1ql)
          end)"""
        ).point[M]
     case Substring(a1, a2, a3) =>
-      partialQueryString(s"""substr("${n1ql(a1)}", "${n1ql(a2)}", "${n1ql(a3)}")""").point[M]
+      partialQueryString(s"""substr(${n1ql(a1)}, ${n1ql(a2)}, ${n1ql(a3)})""").point[M]
 
     // structural
     case MakeArray(a1)                            =>
       val a1N1ql  = n1ql(a1)
       val n1qlStr = s"[$a1N1ql]"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL MakeArray",
         s"""  a1:   $a1N1ql
            |  n1ql: $n1qlStr""".stripMargin('|')
@@ -219,23 +219,45 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})""").point[M]
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"""object_add({}, $a1N1ql, $a2N1ql)"""
+      prtell[M](Vector(detail(
+        "N1QL MakeMap",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ConcatArrays(a1, a2)                     =>
-      partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"ifnull($a1N1ql || $a2N1ql, array_concat($a1N1ql, $a2N1ql))"
+      prtell[M](Vector(detail(
+        "N1QL ConcatArrays",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ConcatMaps(a1, a2)                       =>
-      val a1N1ql = n1ql(a1)
-      val a2N1ql = n1ql(a2)
-      prtell[M](Vector(Detail(
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"object_concat($a1N1ql, $a2N1ql)"
+      prtell[M](Vector(detail(
         "N1QL ConcatMaps",
         s"""  a1:   $a1N1ql
            |  a2:   $a2N1ql
-           |  n1ql: ???""".stripMargin('|')
-      ))) *>
-      unimplementedP("ConcatMaps")
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ProjectField(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
       val n1qlStr = s"$a1.[$a2N1ql]"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL ProjectField(PartialQueryString(_), _)",
         s"""  a1:   $a1
            |  a2:   $a2N1ql
@@ -254,7 +276,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
                       keyspace      = a1,
                       keyspaceAlias = tempName)
         sN1ql    =  n1ql(s)
-        _        <- prtell[M](Vector(Detail(
+        _        <- prtell[M](Vector(detail(
                       "N1QL ProjectField(_, _)",
                       s"""  a1:   $a1N1ql
                          |  a2:   $a2N1ql
@@ -263,7 +285,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case ProjectIndex(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
       val n1qlStr = s"$a1[$a2N1ql]"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL ProjectIndex(PartialQueryString(_), _)",
         s"""  a1:   $a1
            |  a2:   $a2N1ql
@@ -279,21 +301,21 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         a2N1ql   =  n1ql(a2)
                     // TODO: custom select for the moment
         n1qlStr  =  s"(select value $tmpName1[$a2N1ql] let $tmpName1 = (select value array_agg($tmpName2) from $a1N1ql $tmpName2))"
-        _        <- prtell[M](Vector(Detail(
+        _        <- prtell[M](Vector(detail(
                       "N1QL ProjectIndex(_, _)",
                       s"""  a1:   $a1N1ql
                          |  a2:   $a2N1ql
                          |  n1ql: $n1qlStr""".stripMargin('|'))))
       } yield partialQueryString(n1qlStr)
     case DeleteField(a1, a2)                      =>
-      partialQueryString(s"object_remove(${n1ql(a2)}, ${n1ql(a1)})").point[M]
+      partialQueryString(s"object_remove(${n1ql(a1)}, ${n1ql(a2)})").point[M]
 
     // helpers & QScript-specific
     case DupMapKeys(a1)                   => unimplementedP("DupMapKeys")
     case DupArrayIndices(a1)              => unimplementedP("DupArrayIndices")
     case ZipMapKeys(a1)                   =>
       val a1N1ql = n1ql(a1)
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL ZipMapKeys",
         s"""  a1:   $a1N1ql
            |  n1ql: ???""".stripMargin('|')

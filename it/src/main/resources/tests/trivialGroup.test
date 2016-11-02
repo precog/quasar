@@ -1,13 +1,12 @@
 {
     "name": "trivial group by",
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "skip",
-        "couchbase":  "skip"
+        "postgresql":        "pending"
     },
     "description": "Should project the result at the root (not under 'value').",
-    "data": "zips.data",
-    "query": "select city, sum(pop) as totalPop from zips group by city",
+    "data": "largeZips.data",
+    "query": "select city, sum(pop) as totalPop from largeZips group by city",
     "predicate": "containsAtLeast",
+    "ignoreFieldOrder": true,
     "expected": [{ "totalPop": 110948, "city": "BOULDER" }]
 }

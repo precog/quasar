@@ -17,7 +17,7 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
-import quasar.Data
+import quasar.{Data, DataCodec}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
@@ -36,6 +36,7 @@ import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
+import com.couchbase.client.java.transcoder.JsonTranscoder
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import pathy.Path._
 import rx.lang.scala._, JavaConverters._
@@ -50,6 +51,10 @@ object queryfile {
   implicit class LiftP[F[_]: Monad, A](p: F[A]) {
     val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
+
+  implicit val codec = DataCodec.Precise
+
+  val jsonTranscoder = new JsonTranscoder
 
   // TODO: Streaming
   def interpret[S[_]](
@@ -84,7 +89,11 @@ object queryfile {
                   e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
                   _.point[Free[S, ?]].liftP
                 ).merge
-      docs   <- r.traverse(d => GenUUID.Ops[S].asks(uuid =>
+      rObj   <- EitherT(r.traverse(d => DataCodec.render(d).bimap(
+                  err => FileSystemError.writeFailed(d, err.shows),
+                  str => jsonTranscoder.stringToJsonObject(str))
+                ).point[PhaseResultT[Free[S, ?], ?]])
+      docs   <- rObj.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
                     JsonObject
@@ -129,7 +138,7 @@ object queryfile {
   ): Free[S, FileSystemError \/ Vector[Data]] =
     (for {
       h <- results.get(handle).toRight(FileSystemError.unknownResultHandle(handle))
-      r <- EitherT(resultsFromCursor(h).point[Free[S, ?]])
+      r <- resultsFromCursor(h).point[FileSystemErrT[Free[S, ?], ?]]
       _ <- results.put(handle, r._1).liftM[FileSystemErrT]
     } yield r._2).run
 
@@ -179,7 +188,7 @@ object queryfile {
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
-  ): Plan[S, Vector[JsonObject]] = {
+  ): Plan[S, Vector[Data]] = {
     val n1qlStr = outerN1ql(n1ql)
 
     for {
@@ -190,13 +199,13 @@ object queryfile {
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
                  )).into.liftP
-      r       <- lift(Task.delay(
+      r       <- EitherT(lift(Task.delay(
                    bkt.query(n1qlQuery(n1qlStr))
                      .allRows
                      .asScala
                      .toVector
-                     .map(_.value)
-                 )).into.liftP
+                     .traverse(rowToData)
+                 )).into.liftM[PhaseResultT])
     } yield r
   }
 

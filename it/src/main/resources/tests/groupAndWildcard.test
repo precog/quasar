@@ -3,13 +3,14 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "skip",
     "couchbase":  "skip"
   },
 
   "query": "select * from zips where _id like \"8030%\" group by city",
 
   "predicate": "containsExactly",
+
+  "ignoredFields": ["_id"],
 
   "expected": [
       { "city": "BOULDER", "loc": [ -105.21426 , 40.049733], "pop": 18174, "state": "CO" },

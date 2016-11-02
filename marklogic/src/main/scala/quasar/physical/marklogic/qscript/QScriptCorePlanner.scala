@@ -54,7 +54,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case Reduce(src, bucket, reducers, repair) =>
       for {
         inits <- reducers traverse (reduceFuncInit)
-        init  <- qscript.zipApply[F] apply (mkSeq(inits))
+        init  <- qscript.combineApply[F] apply (mkSeq(inits))
         cmbs  <- reducers traverse (reduceFuncCombine)
         cmb   <- qscript.combineN[F] apply (mkSeq(cmbs))
         fnls  <- reducers traverse (reduceFuncFinalize)

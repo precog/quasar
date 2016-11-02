@@ -3,20 +3,19 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "skip",
     "couchbase":  "skip"
   },
 
   "data": "zips.data",
 
-  "query": "select count(*) from zips where pop < 5 group by pop",
+  "query": "select count(*) as cnt from zips where pop < 5 group by pop",
 
   "predicate": "containsExactly",
   "expected": [
-    { "0": 66 },
-    { "0": 10 },
-    { "0":  9 },
-    { "0":  3 },
-    { "0":  1 }
+    { "cnt": 66 },
+    { "cnt": 10 },
+    { "cnt":  9 },
+    { "cnt":  3 },
+    { "cnt":  1 }
   ]
 }

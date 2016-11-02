@@ -17,22 +17,113 @@
 package quasar.sql
 
 import quasar.Predef._
-
-import scala.Any
+import quasar._
+import quasar.fp._
 
 import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
-import pathy.Path._
-
-trait IsDistinct extends Product with Serializable
-final case object SelectDistinct extends IsDistinct
-final case object SelectAll extends IsDistinct
-
-@Lenses final case class Proj[A](expr: A, alias: Option[String])
 
 sealed trait Sql[A]
 object Sql {
+  implicit val equal: Delay[Equal, Sql] =
+    new Delay[Equal, Sql] {
+      def apply[A](fa: Equal[A]) = {
+        implicit val eqA = fa
+        Equal.equal {
+          case (Select(d1, p1, r1, f1, g1, o1), Select(d2, p2, r2, f2, g2, o2)) =>
+            d1 ≟ d2 && p1 ≟ p2 && r1 ≟ r2 && f1 ≟ f2 && g1 ≟ g2 && o1 ≟ o2
+
+          case (Vari(s1), Vari(s2))                 => s1 ≟ s2
+          case (SetLiteral(e1), SetLiteral(e2))     => e1 ≟ e2
+          case (ArrayLiteral(e1), ArrayLiteral(e2)) => e1 ≟ e2
+          case (MapLiteral(e1), MapLiteral(e2))     => e1 ≟ e2
+          case (Splice(e1), Splice(e2))             => e1 ≟ e2
+
+          case (Binop(l1, r1, o1), Binop(l2, r2, o2)) => l1 ≟ l2 && r1 ≟ r2 && o1 ≟ o2
+          case (Unop(e1, o1), Unop(e2, o2))           => e1 ≟ e2 && o1 ≟ o2
+          case (Ident(n1), Ident(n2))                 => n1 ≟ n2
+
+          case (InvokeFunction(n1, a1), InvokeFunction(n2, a2)) => n1 ≟ n2 && a1 ≟ a2
+          case (Match(e1, c1, d1), Match(e2, c2, d2))           => e1 ≟ e2 && c1 ≟ c2 && d1 ≟ d2
+          case (Switch(c1, d1), Switch(c2, d2))                 => c1 ≟ c2 && d1 ≟ d2
+          case (Let(n1, f1, b1), Let(n2, f2, b2))               => n1 ≟ n2 && f1 ≟ f2 && b1 ≟ b2
+
+          case (IntLiteral(v1), IntLiteral(v2))       => v1 ≟ v2
+          case (FloatLiteral(v1), FloatLiteral(v2))   => v1 ≟ v2
+          case (StringLiteral(v1), StringLiteral(v2)) => v1 ≟ v2
+          case (NullLiteral(), NullLiteral())         => true
+          case (BoolLiteral(v1), BoolLiteral(v2))     => v1 ≟ v2
+
+          case (_, _) => false
+        }
+      }
+    }
+
+  private val astType = "AST" :: Nil
+
+  implicit val SqlRenderTree: Delay[RenderTree, Sql] =
+    new Delay[RenderTree, Sql] {
+      def apply[A](ra: RenderTree[A]): RenderTree[Sql[A]] = new RenderTree[Sql[A]] {
+        def renderCase(c: Case[A]): RenderedTree =
+          NonTerminal("Case" :: astType, None, ra.render(c.cond) :: ra.render(c.expr) :: Nil)
+
+        def render(n: Sql[A]) = n match {
+          case Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
+            val nt = "Select" :: astType
+            NonTerminal(nt,
+              isDistinct match { case `SelectDistinct` => Some("distinct"); case _ => None },
+              projections.map { p =>
+                NonTerminal("Proj" :: astType, p.alias, ra.render(p.expr) :: Nil)
+              } ⊹
+                (relations.map(SqlRelation.renderTree(ra).render) ::
+                  filter.map(ra.render) ::
+                  groupBy.map {
+                    case GroupBy(keys, Some(having)) => NonTerminal("GroupBy" :: astType, None, keys.map(ra.render) :+ ra.render(having))
+                    case GroupBy(keys, None)         => NonTerminal("GroupBy" :: astType, None, keys.map(ra.render))
+                  } ::
+                  orderBy.map {
+                    case OrderBy(keys) =>
+                      val nt = "OrderBy" :: astType
+                      NonTerminal(nt, None,
+                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil)})
+                  } ::
+                  Nil).foldMap(_.toList))
+
+          case SetLiteral(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
+          case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
+          case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
+
+          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
+
+          case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
+          case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
+
+          case Switch(cases, Some(default)) => NonTerminal("Switch" :: astType, None, cases.map(renderCase) :+ ra.render(default))
+          case Switch(cases, None)          => NonTerminal("Switch" :: astType, None, cases.map(renderCase))
+
+          case Binop(lhs, rhs, op) => NonTerminal("Binop" :: astType, Some(op.sql), ra.render(lhs) :: ra.render(rhs) :: Nil)
+
+          case Unop(expr, op) => NonTerminal("Unop" :: astType, Some(op.sql), ra.render(expr) :: Nil)
+
+          case Splice(expr) => NonTerminal("Splice" :: astType, None, expr.toList.map(ra.render))
+
+          case Ident(name) => Terminal("Ident" :: astType, Some(name))
+
+          case Vari(name) => Terminal("Variable" :: astType, Some(":" + name))
+
+          case Let(name, form, body) =>
+            NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
+
+          case IntLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case FloatLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case StringLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case NullLiteral() => Terminal("LiteralExpr" :: astType, None)
+          case BoolLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+        }
+      }
+    }
+
   implicit val traverse: Traverse[Sql] = new Traverse[Sql] {
     def traverseImpl[G[_], A, B](
       fa: Sql[A])(
@@ -118,163 +209,58 @@ object Sql {
 @Lenses final case class NullLiteral[A] private[sql] () extends Sql[A]
 @Lenses final case class BoolLiteral[A] private[sql] (value: Boolean) extends Sql[A]
 
-sealed abstract class BinaryOperator(val sql: String) extends Product with Serializable {
-  def apply[A](lhs: A, rhs: A): Sql[A] = binop(lhs, rhs, this)
-
-  val name = "(" + sql + ")"
-
-  override def equals(that: Any) = that match {
-    case x: BinaryOperator => sql ≟ x.sql
-    case _                 => false
-  }
-
-  override def hashCode = sql.hashCode
-
-  override def toString = sql
-}
-
-final case object IfUndefined  extends BinaryOperator("??")
-final case object Range        extends BinaryOperator("..")
-final case object Or           extends BinaryOperator("or")
-final case object And          extends BinaryOperator("and")
-final case object Eq           extends BinaryOperator("=")
-final case object Neq          extends BinaryOperator("<>")
-final case object Ge           extends BinaryOperator(">=")
-final case object Gt           extends BinaryOperator(">")
-final case object Le           extends BinaryOperator("<=")
-final case object Lt           extends BinaryOperator("<")
-final case object Concat       extends BinaryOperator("||")
-final case object Plus         extends BinaryOperator("+")
-final case object Minus        extends BinaryOperator("-")
-final case object Mult         extends BinaryOperator("*")
-final case object Div          extends BinaryOperator("/")
-final case object Mod          extends BinaryOperator("%")
-final case object Pow          extends BinaryOperator("^")
-final case object In           extends BinaryOperator("in")
-final case object FieldDeref   extends BinaryOperator("{}")
-final case object IndexDeref   extends BinaryOperator("[]")
-final case object Limit        extends BinaryOperator("limit")
-final case object Offset       extends BinaryOperator("offset")
-final case object Union        extends BinaryOperator("union")
-final case object UnionAll     extends BinaryOperator("union all")
-final case object Intersect    extends BinaryOperator("intersect")
-final case object IntersectAll extends BinaryOperator("intersect all")
-final case object Except       extends BinaryOperator("except")
-final case object UnshiftMap   extends BinaryOperator("{...}")
-
-sealed abstract class UnaryOperator(val sql: String)
-    extends Product with Serializable {
-  def apply[A](expr: A): Sql[A] = unop(expr, this)
-
-  val name = sql
-
-  override def equals(that: Any) = that match {
-    case x: UnaryOperator => sql ≟ x.sql
-    case _                => false
-  }
-
-  override def hashCode = sql.hashCode
-
-  override def toString = sql
-}
-
-final case object Not                 extends UnaryOperator("not")
-final case object Exists              extends UnaryOperator("exists")
-final case object Positive            extends UnaryOperator("+")
-final case object Negative            extends UnaryOperator("-")
-final case object Distinct            extends UnaryOperator("distinct")
-final case object FlattenMapKeys      extends UnaryOperator("{*:}")
-final case object FlattenMapValues    extends UnaryOperator("flatten_map")
-final case object ShiftMapKeys        extends UnaryOperator("{_:}")
-final case object ShiftMapValues      extends UnaryOperator("shift_map")
-final case object FlattenArrayIndices extends UnaryOperator("[*:]")
-final case object FlattenArrayValues  extends UnaryOperator("flatten_array")
-final case object ShiftArrayIndices   extends UnaryOperator("[_:]")
-final case object ShiftArrayValues    extends UnaryOperator("shift_array")
-final case object UnshiftArray        extends UnaryOperator("[...]")
-
 @Lenses final case class Case[A](cond: A, expr: A)
-
-sealed trait SqlRelation[A] extends Product with Serializable {
-  def namedRelations: Map[String, List[NamedRelation[A]]] = {
-    def collect(n: SqlRelation[A]): List[(String, NamedRelation[A])] =
-      n match {
-        case JoinRelation(left, right, _, _) => collect(left) ++ collect(right)
-        case t: NamedRelation[A] => (t.aliasName -> t) :: Nil
+object Case {
+  implicit val equal: Delay[Equal, Case] =
+    new Delay[Equal, Case] {
+      def apply[A](fa: Equal[A]) = {
+        implicit val eqA = fa
+        Equal.equal {
+          case (Case(c1, e1), Case(c2, e2)) => c1 ≟ c2 && e1 ≟ e2
+          case (_, _)                       => false
+        }
+      }
     }
-
-    collect(this).groupBy(_._1).mapValues(_.map(_._2))
-  }
-
-  def mapPathsM[F[_]: Monad](f: FUPath => F[FUPath]): F[SqlRelation[A]] = this match {
-    case IdentRelationAST(_, _) => this.point[F]
-    case VariRelationAST(_, _) => this.point[F]
-    case TableRelationAST(path, alias) => f(path).map(TableRelationAST(_, alias))
-    case rel @ JoinRelation(left, right, _, _) =>
-      (left.mapPathsM(f) |@| right.mapPathsM(f))((l,r) => rel.copy(left = l, right = r))
-    case ExprRelationAST(_,_) => this.point[F]
-  }
-
-  def transformM[F[_]: Monad, B](f: SqlRelation[A] => F[SqlRelation[B]], g: A => F[B]): F[SqlRelation[B]] = this match {
-    case JoinRelation(left, right, tpe, clause) =>
-      (left.transformM[F, B](f, g) |@|
-        right.transformM[F, B](f, g) |@|
-        g(clause))((l,r,c) =>
-          JoinRelation(l, r, tpe, c))
-    case rel => f(rel)
-  }
-}
-
-sealed trait NamedRelation[A] extends SqlRelation[A] {
-  def aliasName: String
-}
-
-/**
- * IdentRelationAST allows us to reference a let binding in relation (i.e. table)
- * context. ExprF.IdentF allows us to reference a let binding in expression context.
- * Ideally we can unify these two contexts, providing a single way to reference a
- * let binding.
- */
-@Lenses final case class IdentRelationAST[A](name: String, alias: Option[String])
-    extends NamedRelation[A] {
-  def aliasName = alias.getOrElse(name)
-}
-
-@Lenses final case class VariRelationAST[A](vari: Vari[A], alias: Option[String])
-    extends NamedRelation[A] {
-  def aliasName = alias.getOrElse(vari.symbol)
-}
-
-
-@Lenses final case class TableRelationAST[A](tablePath: FUPath, alias: Option[String])
-    extends NamedRelation[A] {
-  def aliasName = alias.getOrElse(fileName(tablePath).value)
-}
-@Lenses final case class ExprRelationAST[A](expr: A, aliasName: String)
-    extends NamedRelation[A]
-
-@Lenses final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
-    extends SqlRelation[A]
-
-sealed abstract class JoinType(val sql: String)
-    extends Product with Serializable
-final case object LeftJoin extends JoinType("left join")
-final case object RightJoin extends JoinType("right join")
-final case object InnerJoin extends JoinType("inner join")
-final case object FullJoin extends JoinType("full join")
-
-object JoinType {
-  implicit val show: Show[JoinType] = Show.showFromToString
-}
-
-sealed trait OrderType extends Product with Serializable
-final case object ASC extends OrderType
-final case object DESC extends OrderType
-
-object OrderType {
-  implicit val show: Show[OrderType] = Show.showFromToString
 }
 
 @Lenses final case class GroupBy[A](keys: List[A], having: Option[A])
+object GroupBy {
+  implicit val equal: Delay[Equal, GroupBy] =
+    new Delay[Equal, GroupBy] {
+      def apply[A](fa: Equal[A]) = {
+        implicit val eqA = fa
+        Equal.equal {
+          case (GroupBy(k1, h1), GroupBy(k2, h2)) => k1 ≟ k2 && h1 ≟ h2
+          case (_, _)                             => false
+        }
+      }
+    }
+}
 
 @Lenses final case class OrderBy[A](keys: List[(OrderType, A)])
+object OrderBy {
+  implicit val equal: Delay[Equal, OrderBy] =
+    new Delay[Equal, OrderBy] {
+      def apply[A](fa: Equal[A]) = {
+        implicit val eqA = fa
+        Equal.equal {
+          case (OrderBy(k1), OrderBy(k2)) => k1 ≟ k2
+          case (_, _)                     => false
+        }
+      }
+    }
+}
+
+@Lenses final case class Proj[A](expr: A, alias: Option[String])
+object Proj {
+  implicit val equal: Delay[Equal, Proj] =
+    new Delay[Equal, Proj] {
+      def apply[A](fa: Equal[A]) = {
+        implicit val eqA = fa
+        Equal.equal {
+          case (Proj(e1, a1), Proj(e2, a2)) => e1 ≟ e2 && a1 ≟ a2
+          case (_, _)                       => false
+        }
+      }
+    }
+}

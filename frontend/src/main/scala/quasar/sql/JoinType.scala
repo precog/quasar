@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
-import quasar.fp._
 
-import matryoshka._
-import org.specs2.matcher._
-import scalaz._, Scalaz._
+import scalaz._
 
-trait TreeMatchers {
-  def beTree[A: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
-    def apply[S <: A](ex: Expectable[S]) = {
-      val actual: A = ex.value
-      val diff: String = (RenderTree[A].render(actual) diff expected.render).shows
-      result(actual == expected, s"trees match:\n$diff", s"trees do not match:\n$diff", ex)
-    }
-  }
+sealed abstract class JoinType(val sql: String) extends Product with Serializable
+
+final case object LeftJoin extends JoinType("left join")
+final case object RightJoin extends JoinType("right join")
+final case object InnerJoin extends JoinType("inner join")
+final case object FullJoin extends JoinType("full join")
+
+object JoinType {
+  implicit val equal: Equal[JoinType] = Equal.equalRef
+  implicit val show: Show[JoinType] = Show.showFromToString
 }

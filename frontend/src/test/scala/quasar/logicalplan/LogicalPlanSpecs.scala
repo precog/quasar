@@ -36,7 +36,7 @@ class LogicalPlanSpecs extends Spec with TreeMatchers {
     new Delay[Arbitrary, LogicalPlan] {
       def apply[A](arb: Arbitrary[A]) =
         Arbitrary {
-          Gen.oneOf(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
+          quasar.pkg.tests.oneOfGen(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
         }
     }
 

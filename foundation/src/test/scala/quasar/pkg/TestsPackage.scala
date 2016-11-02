@@ -78,6 +78,12 @@ trait ScalacheckSupport {
   def containerOfAtMostN[C[X] <: scTraversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
     sized(size => for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
+  // `Gen.oneOf` calls `==` through `Gen.const`
+  // Use this if `==` is incorrect on `T` (e.g. replaced with `scalaz.Equal[T]`)
+  def oneOfGen[T](gs: Gen[T]*): Gen[T] = {
+    Gen.choose(0, gs.size - 1).flatMap(gs(_))
+  }
+
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
   def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]     = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
   def listOf[A](gen: Gen[A]): Gen[List[A]]         = containerOfAtMostN[List, A](maxSequenceLength, gen)

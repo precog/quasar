@@ -74,7 +74,7 @@ package object fs {
     // TODO: retrieve from connectionUri params
     val env = DefaultCouchbaseEnvironment
       .builder()
-      .queryTimeout(SECONDS.toMillis(150))
+      .queryTimeout(SECONDS.toMillis(250))
       .build()
 
     val cbCtx: DefErrT[Task, Context] =

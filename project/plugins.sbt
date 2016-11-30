@@ -8,6 +8,7 @@ addSbtPlugin("com.jsuereth"          % "sbt-pgp"         % "1.0.0")
 addSbtPlugin("org.wartremover"       % "sbt-wartremover" % "1.1.1")
 addSbtPlugin("de.heikoseeberger"     % "sbt-header"      % "1.5.0")
 addSbtPlugin("com.eed3si9n"          % "sbt-buildinfo"   % "0.6.1")
+addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-M12")
 
 val commonScalacOptions = Seq(
   "-deprecation",

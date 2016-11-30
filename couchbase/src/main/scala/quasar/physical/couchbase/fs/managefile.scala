@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.{MonotonicSeq, Read}
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.physical.couchbase.common._
 
@@ -76,7 +77,7 @@ object managefile {
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
       qStr      =  s"""update `${bkt.name}`
                        set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where type like "${src.collection}%""""
+                       where ${typeCond(scenario.src, src.collection)}"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -98,7 +99,7 @@ object managefile {
                      else ().right
                    ).point[Free[S, ?]])
       qStr      =  s"""delete from `${bktCol.bucket}`
-                       where type like "${bktCol.collection}%""""
+                       where ${typeCond(path, bktCol.collection)}"""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -116,5 +117,10 @@ object managefile {
         f => fileParent(f) </> tmpFilename
       ).right
     }
+
+  def typeCond(path: APath, collection: String): String =
+    refineType(path).fold(
+      κ(s"""type like "$collection%""""),
+      κ(s"""type="$collection""""))
 
 }

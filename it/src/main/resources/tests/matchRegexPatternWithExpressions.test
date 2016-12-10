@@ -3,8 +3,7 @@
 
   "backends": {
     "mongodb_read_only": "pending",
-    "postgresql":        "pending",
-    "couchbase":         "skipCI"
+    "postgresql":        "pending"
   },
 
   "data": "largeZips.data",

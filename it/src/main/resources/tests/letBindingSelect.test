@@ -2,8 +2,7 @@
     "name": "handle select in form of let",
 
     "backends": {
-        "postgresql": "pending",
-        "couchbase":  "skipCI"
+        "postgresql": "pending"
     },
 
     "data": "zips.data",

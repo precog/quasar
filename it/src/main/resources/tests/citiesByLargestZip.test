@@ -1,11 +1,9 @@
 {
   "name": "cities with largest individual zip codes",
   "backends": {
-    "postgresql": "pending",
-    "marklogic":  "skip",
-    "couchbase":  "skip",
+    "postgresql":  "pending",
     "spark_local": "skip",
-    "spark_hdfs": "skip"
+    "spark_hdfs":  "skip"
   },
   "note": "This is tricky because the sort key does not appear in the result. The
           result can be verified by running a similar query with 'select city, pop'.",

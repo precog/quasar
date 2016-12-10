@@ -1,8 +1,7 @@
 {
     "name": "match regex pattern",
     "backends": {
-        "postgresql": "pending",
-        "couchbase":  "skipCI"
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select city from zips where city ~ \"OULD.{0,2} CIT\"",

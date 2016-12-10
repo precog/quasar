@@ -2,8 +2,7 @@
     "name": "handle nested let binding and selects",
 
     "backends": {
-        "postgresql": "pending",
-        "couchbase":  "skipCI"
+        "postgresql": "pending"
     },
 
     "data": "zips.data",

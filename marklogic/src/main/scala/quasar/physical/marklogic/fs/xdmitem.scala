@@ -32,6 +32,7 @@ import java.time._
 import scalaz._, Scalaz._
 
 object xdmitem {
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = xdm match {
     case item: CtsBox                   =>
       Data.singletonObj("cts:box", Data.Obj(ListMap(
@@ -96,7 +97,7 @@ object xdmitem {
     case item: XSString                 => Data._str(item.asString).point[F]
     case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._time(_))
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
-    case other                          => s"No Data representation for '$other'.".wrapNel.raiseError[F, Data]
+    case other                          => noReprError[F, Data](other.toString)
   }
 
   ////
@@ -120,13 +121,21 @@ object xdmitem {
     parse(str).fold(s"Failed to parse '$str' as a $name.".wrapNel.raiseError[F, A])(_.point[F])
 
   private def xmlToData[F[_]: MonadErrMsgs](xmlString: String): F[Data] = {
-    val el = SecureXML.loadString(xmlString).fold(_.toString.wrapNel.raiseError[F, Elem], _.point[F])
+    val elem = SecureXML.loadString(xmlString).fold(
+                 _.toString.wrapNel.raiseError[F, Elem],
+                 _.point[F])
 
-    el flatMap { e =>
-      if (Option(e.prefix) exists (_ === xml.namespaces.ejsonNs.prefix.shows))
-        data.decodeXml[F](e)
-      else
-        xml.toData(e).point[F]
-    }
+    def singletonValue(d: Data): Data =
+      Data._obj.getOption(d) map (_.toList) collect {
+        case (_, value) :: Nil => value
+      } getOrElse d
+
+    elem flatMap (e => OptionT(data.decodeXml[F]({
+      case n: Elem => singletonValue(xml.toEJsonData(n)).point[F]
+      case other   => noReprError[F, Data](other.toString)
+    })(e)) getOrElse xml.toEJsonData(e))
   }
+
+  private def noReprError[F[_]: MonadErrMsgs, A](form: String): F[A] =
+    s"No Data representation for '$form'.".wrapNel.raiseError[F, A]
 }

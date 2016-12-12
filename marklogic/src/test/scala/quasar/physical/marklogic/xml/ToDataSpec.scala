@@ -20,10 +20,10 @@ import quasar.Predef._
 import quasar.Data._
 
 class ToDataSpec extends quasar.Qspec {
-  "toData" should {
+  "toEJsonData" should {
     "simple text node" in {
       val sample = <foo>hello</foo>
-      toData(sample) must_= Obj(ListMap("foo" -> Str("hello")))
+      toEJsonData(sample) must_= Obj(ListMap("foo" -> Str("hello")))
     }
 
     "simple nested structure" in {
@@ -35,7 +35,7 @@ class ToDataSpec extends quasar.Qspec {
       val expected =
         Obj(ListMap("foo" ->
           Obj(ListMap("bar" -> Arr(List(Str("msg1"), Str("msg2")))))))
-      toData(sample) must_= expected
+      toEJsonData(sample) must_= expected
     }
 
     "support attributes" >> {
@@ -47,13 +47,13 @@ class ToDataSpec extends quasar.Qspec {
         val expected =
           Obj(ListMap(
             "foo" -> Obj(ListMap(
-              "_attributes" -> Obj(ListMap(
+              "_xml.attributes" -> Obj(ListMap(
                 "type" -> Str("baz")
               )),
               "bar" -> Str("msg")
             ))
           ))
-        toData(sample) must_= expected
+        toEJsonData(sample) must_= expected
       }
 
       "element with attribute but only text" in {
@@ -61,13 +61,25 @@ class ToDataSpec extends quasar.Qspec {
         val expected =
           Obj(ListMap(
             "foo" -> Obj(ListMap(
-              "_attributes" -> Obj(ListMap(
+              "_xml.attributes" -> Obj(ListMap(
                 "type" -> Str("baz")
               )),
-              "_text" -> Str("msg")
+              "_xml.text" -> Str("msg")
           ))
         ))
-        toData(sample) must_= expected
+        toEJsonData(sample) must_= expected
+      }
+
+      "element with just attributes" in {
+        val sample = <foo type="baz" quux="bar" />
+        val expected = Obj(
+          "foo" -> Obj(
+            "_xml.attributes" -> Obj(
+              "type" -> Str("baz"),
+              "quux" -> Str("bar")
+            ),
+            "_xml.text" -> Str("")))
+        toEJsonData(sample) must_= expected
       }
     }
 
@@ -77,7 +89,7 @@ class ToDataSpec extends quasar.Qspec {
         Obj(ListMap(
           "quasar:foo" -> Str("hello")
         ))
-      toData(sample) must_= expected
+      toEJsonData(sample) must_= expected
     }
 
     "empty element" in {
@@ -86,7 +98,7 @@ class ToDataSpec extends quasar.Qspec {
         Obj(ListMap(
           "foo" -> Str("")
         ))
-      toData(sample) must_= expected
+      toEJsonData(sample) must_= expected
     }
 
     "multiple empty elements" in {
@@ -102,7 +114,7 @@ class ToDataSpec extends quasar.Qspec {
             "bar" -> Arr(List(Str(""), Str(""), Str("")))
           ))
         ))
-      toData(sample) must_= expected
+      toEJsonData(sample) must_= expected
     }
 
     "example" in {
@@ -118,7 +130,7 @@ class ToDataSpec extends quasar.Qspec {
       val expected =
         Obj(ListMap(
           "foo" -> Obj(ListMap(
-            "_attributes" -> Obj(ListMap(
+            "_xml.attributes" -> Obj(ListMap(
               "type" -> Str("baz"),
               "id"   -> Str("1")
             )),
@@ -129,7 +141,7 @@ class ToDataSpec extends quasar.Qspec {
             "quux"        -> Str("lorem ipsum")
           ))
         ))
-      toData(sample) must_= expected
+      toEJsonData(sample) must_= expected
     }
   }
 }

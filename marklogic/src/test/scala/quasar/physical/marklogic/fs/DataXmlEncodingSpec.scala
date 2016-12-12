@@ -16,31 +16,52 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef.List
+import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml}
+import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml, decodeXmlStrict}
 import quasar.physical.marklogic.xml.SecureXML
+
+import scala.xml.Elem
 
 import scalaz._, Scalaz._
 
 final class DataXmlEncodingSpec extends quasar.Qspec {
   type Result[A] = ErrorMessages \/ A
 
+  def parseXML(s: String): Result[Elem] =
+    SecureXML.loadString(s).leftMap(_.toString.wrapNel)
+
   "Data <-> XML encoding" should {
     "roundtrip" >> prop { xd: XmlSafeData =>
-      encodeXml[Result](xd.data).flatMap(decodeXml[Result]) must_= xd.data.right
+      (encodeXml[Result](xd.data) >>= decodeXmlStrict[Result] _) must_= xd.data.some.right
     }
 
     "roundtrip through serialization" >> prop { xd: XmlSafeData =>
-      val rt = for {
-        xml <- encodeXml[Result](xd.data)
-        el  <- SecureXML.loadString(xml.toString)
-                 .leftMap(e => e.toString.wrapNel)
-        d   <- decodeXml[Result](el)
-      } yield d
+      val rt = encodeXml[Result](xd.data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
+      rt must_= xd.data.some.right
+    }
 
-      rt must_= xd.data.right
+    "None on attempt to decode non-data XML" >> {
+      (parseXML("<foo>bar</foo>") >>= decodeXmlStrict[Result]) must_= None.right
+    }
+
+    "handle untyped nodes with recovery function" >> {
+      val orig = s"""
+        <ejson:ejson ejson:type="object" xmlns:ejson="http://quasar-analytics.org/ejson">
+          <foo ejson:type="integer">34</foo>
+          <bar ejson:type="id">123</bar>
+          <baz>no types here</baz>
+        </ejson:ejson>
+      """
+
+      val exp = Data._obj(ListMap(
+        "foo" -> Data._int(34),
+        "bar" -> Data._id("123"),
+        "baz" -> Data._dec(42.0)
+      ))
+
+      (parseXML(orig) >>= decodeXml[Result](_ => Data._dec(42.0).right)) must_= exp.some.right
     }
 
     "error when object key is not a valid QName" >> {

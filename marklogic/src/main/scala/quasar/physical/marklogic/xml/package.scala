@@ -28,6 +28,13 @@ package object xml {
 
   final case class KeywordConfig(attributesKeyName: String, textKeyName: String)
 
+  object KeywordConfig {
+    val ejsonCompliant =
+      KeywordConfig(
+        attributesKeyName = "_xml.attributes",
+        textKeyName       = "_xml.text")
+  }
+
   import Data._
 
   /** Example
@@ -57,15 +64,10 @@ package object xml {
     */
   def toData(elem: Elem, config: KeywordConfig): Data = {
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
-      case Seq() => Str("")
-      case Seq(Text(str)) =>
-        m.flatMap(attrToData).cata(
-          m => Obj(ListMap(
-            config.attributesKeyName  -> m,
-            config.textKeyName        -> Str(str)
-          )),
-          Str(str)
-        )
+      case Seq() =>
+        m.cata(attrsAndText(_,  ""), _str(""))
+      case LeafText(txt) =>
+        m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
         val childrenByName = elements(xs) groupBy qualifiedName
         val childrenData = childrenByName.mapValues {
@@ -77,18 +79,49 @@ package object xml {
     }
 
     def attrToData(meta: MetaData): Option[Data] = meta match {
-      case scala.xml.Null => None
-      case m              => Obj(ListMap(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*)).some
+      case scala.xml.Null => none
+      case m              => some(Obj(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*))
     }
+
+    def attrsAndText(attrs: MetaData, txt: String): Data =
+      attrToData(attrs).fold(_str(txt))(d => _obj(ListMap(
+        config.attributesKeyName -> d,
+        config.textKeyName       -> _str(txt))))
 
     Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
 
-  def toData(elem: Elem): Data = toData(elem, KeywordConfig(attributesKeyName = "_attributes", textKeyName = "_text"))
+  /** Converts the given element to `Data` using EJson-compliant synthetic keys. */
+  def toEJsonData(elem: Elem): Data =
+    toData(elem, KeywordConfig.ejsonCompliant)
 
   def elements(nodes: Seq[Node]): Seq[Elem] =
     nodes.collect { case e: Elem => e }
 
   def qualifiedName(elem: Elem): String =
     Option(elem.prefix).fold("")(_ + ":") + elem.label
+
+  /** Extract the child sequence from a node. */
+  object Children {
+    def unapply(node: Node): Option[Seq[Node]] =
+      some(node.child)
+  }
+
+  /** Matches a sequence devoid of `Elem` nodes. */
+  object Leaf {
+    def unapply(nodes: Seq[Node]): Option[Seq[Node]] =
+      nodes.forall({
+        case _: Elem => false
+        case _       => true
+      }) option nodes
+  }
+
+  /** Extracts all of the text from a leaf sequence. */
+  object LeafText {
+    def unapply(nodes: Seq[Node]): Option[String] =
+      Leaf.unapply(nodes) map (_.collect({
+        case Text(s)   => s
+        case PCData(s) => s
+      }).mkString)
+  }
 }

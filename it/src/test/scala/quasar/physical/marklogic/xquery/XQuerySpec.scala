@@ -35,7 +35,7 @@ abstract class XQuerySpec extends quasar.Qspec {
 
   def xquerySpec(desc: BackendName => String)(tests: (M[XQuery] => ErrorMessages \/ Data) => Fragment): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-      contentSourceAt(uri).map(cs => desc(backend) >> tests(evaluateXQuery(cs, _))).void
+      contentSourceAt(uri).map(cs => desc(backend.name) >> tests(evaluateXQuery(cs, _))).void
     }).unsafePerformSync
 
   ////

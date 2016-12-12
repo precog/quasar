@@ -51,7 +51,6 @@ object prisms {
 
   private val DurationEncoding = "(-?\\d+)(?:\\.(\\d+))?".r
 
-  // private def temporal[T <: TemporalAccessor](q: TemporalQuery[T], fmt: DateTimeFormatter): Prism[String, T] =
   private def temporal[T <: TemporalAccessor](f: TemporalAccessor => T, fmt: DateTimeFormatter): Prism[String, T] = {
     val tq = new TemporalQuery[T] { def queryFrom(q: TemporalAccessor): T = f(q) }
     Prism[String, T](s => \/.fromTryCatchNonFatal(fmt.parse(s, tq)).toOption)(fmt.format)

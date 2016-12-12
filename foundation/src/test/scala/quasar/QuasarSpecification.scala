@@ -44,7 +44,7 @@ trait QuasarSpecification extends AnyRef
 
   // Fail fast and report all timings when running on CI.
   if (scala.sys.env contains "TRAVIS") {
-    args(stopOnFail = ArgProperty(true))
+    args(stopOnFail = ArgProperty(false))
     args.report(showtimes = ArgProperty(true))
   }
 

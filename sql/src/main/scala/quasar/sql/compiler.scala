@@ -251,7 +251,8 @@ trait Compiler[F[_]] {
       "flatten_map"             -> structural.FlattenMap,
       "flatten_array"           -> structural.FlattenArray,
       "shift_map"               -> structural.ShiftMap,
-      "shift_array"             -> structural.ShiftArray)
+      "shift_array"             -> structural.ShiftArray,
+      "meta"                    -> structural.Meta)
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LP])(f: Case[CoExpr] => CompilerM[(Fix[LP], Fix[LP])]) =
       cases.traverse(f).map(_.foldRight(default) {

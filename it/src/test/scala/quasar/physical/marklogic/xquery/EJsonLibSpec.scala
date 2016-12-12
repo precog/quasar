@@ -17,55 +17,64 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.{Data, TestConfig}
-import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.fs._
+import quasar.Data
 import quasar.physical.marklogic.xquery.syntax._
 
-import com.marklogic.xcc.ContentSource
-import scalaz._, Scalaz._
+import scalaz._
 
-final class EJsonLibSpec extends quasar.Qspec {
-  type M[A] = Writer[Prologs, A]
+final class EJsonLibSpec extends XQuerySpec {
+  import expr.{attribute, element, emptySeq}
 
-  def evaluateXQuery(xqy: M[XQuery], cs: ContentSource): ErrorMessages \/ Data = {
-    val (prologs, body) = xqy.run
+  xquerySpec(bn => s"XQuery EJSON Library (${bn.name})") { eval =>
+    "attributes" >> {
+      "returns element attributes as an object" >> {
+        val book = element("book".xs)(mkSeq_(
+          attribute("author".xs)("Ursula K. LeGuin".xs),
+          attribute("published".xs)(1972.xqy),
+          "The Farthest Shore".xs
+        ))
 
-    val result = for {
-      qr <- SessionIO.evaluateModule_(MainModule(Version.`1.0-ml`, prologs, body))
-      rs <- SessionIO.liftT(qr.toImmutableArray)
-      xi =  rs.headOption \/> "No results found.".wrapNel
-    } yield xi >>= xdmitem.toData[ErrorMessages \/ ?] _
-
-    (ContentSourceIO.runNT(cs) compose ContentSourceIO.runSessionIO)
-      .apply(result)
-      .unsafePerformSync
-  }
-
-  TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceAt(uri).map { cs =>
-      val eval: M[XQuery] => ErrorMessages \/ Data = evaluateXQuery(_, cs)
-      s"XQuery EJSON Library (${backend.name})" >> {
-        "many-to-array" >> {
-          "passes through empty seq" >> {
-            eval(ejson.manyToArray[M] apply expr.emptySeq).toOption must beNone
-          }
-
-          "passes through single item" >> {
-            eval(ejson.manyToArray[M] apply "foo".xs) must_= Data._str("foo").right
-          }
-
-          "returns array for more than one item" >> {
-            val three = mkSeq_("foo".xs, "bar".xs, "baz".xs)
-            eval(ejson.manyToArray[M] apply three) must_= Data._arr(List(
-              Data._str("foo"),
-              Data._str("bar"),
-              Data._str("baz")
-            )).right
-          }
-        }
+        eval(ejson.attributes[M] apply book) must resultIn(Data.Obj(
+          "author"    -> Data._str("Ursula K. LeGuin"),
+          "published" -> Data._str("1972")
+        ))
       }
-    }.void
-  }).unsafePerformSync
+
+      "returns attributes of an empty element" >> {
+        val person = element("person".xs)(attribute("name".xs)("Alice".xs))
+        eval(ejson.attributes[M] apply person) must resultIn(Data.Obj(
+          "name" -> Data._str("Alice")
+        ))
+      }
+
+      "returns an empty object when element has no attributes" >> {
+        val foo = element("foo".xs)("bar".xs)
+        eval(ejson.attributes[M] apply foo) must resultIn(Data.Obj())
+      }
+
+      "returns an empty object when empty element has no attributes" >> {
+        val baz = element("baz".xs)(emptySeq)
+        eval(ejson.attributes[M] apply baz) must resultIn(Data.Obj())
+      }
+    }
+
+    "many-to-array" >> {
+      "passes through empty seq" >> {
+        eval(ejson.manyToArray[M] apply expr.emptySeq).toOption must beNone
+      }
+
+      "passes through single item" >> {
+        eval(ejson.manyToArray[M] apply "foo".xs) must resultIn(Data._str("foo"))
+      }
+
+      "returns array for more than one item" >> {
+        val three = mkSeq_("foo".xs, "bar".xs, "baz".xs)
+        eval(ejson.manyToArray[M] apply three) must resultIn(Data._arr(List(
+          Data._str("foo"),
+          Data._str("bar"),
+          Data._str("baz")
+        )))
+      }
+    }
+  }
 }

@@ -72,6 +72,19 @@ trait StructuralLib extends Library {
       case FlexArr(_, _, elemType)     => Func.Input1(elemType)
     })
 
+  val Meta = UnaryFunc(
+    Mapping,
+    "Returns the metadata associated with a value.",
+    Top,
+    Func.Input1(Top),
+    noSimplification,
+    {
+      // TODO: This should actually result in metadata when we switch to EJson.
+      case Sized(Const(_)) => success(Const(Data.NA))
+      case _               => success(Top)
+    },
+    basicUntyper[nat._1])
+
   val ObjectConcat: BinaryFunc = BinaryFunc(
     Mapping,
     "A right-biased merge of two objects into one object",

@@ -75,6 +75,19 @@ object ejson {
       }
     }
 
+  // ejson:attributes($elt as element()) as element()
+  def attributes[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.declare("attributes") flatMap (_(
+      $("elt") as ST("element()")
+    ).as(ST("element()")) { (elt: XQuery) =>
+      val a       = $("a")
+      val entries = renameOrWrap[F] apply (fn.nodeName(~a), fn.data(~a)) map { entry =>
+                      fn.map(func(a.render)(entry), elt `/` axes.attribute.*)
+                    }
+
+      entries flatMap (mkObject[F] apply _)
+    })
+
   // ejson:cast-as-ascribed($item as item()?) as item()?
   def castAsAscribed[F[_]: PrologW]: F[FunctionDecl1] =
     ejs.declare("cast-as-ascribed") flatMap (_(

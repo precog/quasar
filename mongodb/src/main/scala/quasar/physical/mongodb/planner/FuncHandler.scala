@@ -32,7 +32,7 @@ final case class FuncHandler[T[_[_]], F[_]](run: MapFunc[T, ?] ~> λ[α => Optio
     new FuncHandler[T, H](λ[MapFunc[T, ?] ~> λ[α => Option[Free[H, α]]]](f =>
       self.run(f).map(_.mapSuspension(injF)) orElse
       other.run(f).map(_.mapSuspension(injG))))
-    }
+}
 
 object FuncHandler {
   type M[F[_], A] = Option[Free[F, A]]

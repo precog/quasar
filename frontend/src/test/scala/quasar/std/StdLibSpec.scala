@@ -1035,6 +1035,11 @@ abstract class StdLibSpec extends Qspec {
           binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
         }
       }
+
+      "Meta" >> {
+        // FIXME: Implement once we've switched to EJson in LogicalPlan.
+        "returns metadata associated with a value" >> skipped("Requires EJson.")
+      }
     }
   }
 }

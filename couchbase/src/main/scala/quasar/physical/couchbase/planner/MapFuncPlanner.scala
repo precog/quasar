@@ -454,6 +454,9 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case DeleteField(a1, a2)                      =>
       partialQueryString(s"object_remove(${n1ql(a1)}, ${n1ql(a2)})").point[M]
 
+    case Meta(a1) =>
+      partialQueryString(s"meta(${n1ql(a1)})").point[M]
+
     // helpers & QScript-specific
     case Range(a1, a2)             =>
       val a1N1ql = n1ql(a1)

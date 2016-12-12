@@ -107,7 +107,7 @@ object queryfile {
 
       for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
-        shifted =  shiftRead[Fix](qs)
+        shifted =  shiftRead[Fix, QSR, MLQScript].apply(qs)
         _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
         optmzed =  shifted
                      .transAna(

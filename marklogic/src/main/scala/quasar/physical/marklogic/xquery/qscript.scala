@@ -259,6 +259,15 @@ object qscript {
       }
     }
 
+  // qscript:meta($item as item()?) as element()?
+  def meta[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.declare("meta") flatMap (_(
+      $("item") as ST("item()?")
+    ).as(ST("element()?")) { item: XQuery =>
+      val eltClause = $("e") as ST("element()") return_ (ejson.attributes[F] apply _)
+      eltClause map (ec => typeswitch(item)(ec) default emptySeq)
+    })
+
   // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
   def projectField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("project-field") map (_(

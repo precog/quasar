@@ -349,6 +349,7 @@ object MapFunc {
         case Null(a1) => f(a1) ∘ (Null(_))
         case ToString(a1) => f(a1) ∘ (ToString(_))
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
+        case Meta(a1) => f(a1) ∘ (Meta(_))
 
         // binary
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
@@ -431,6 +432,7 @@ object MapFunc {
         case (Null(a1), Null(b1)) => in.equal(a1, b1)
         case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
+        case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -518,6 +520,7 @@ object MapFunc {
           case Null(a1) => shz("Null", a1)
           case ToString(a1) => shz("ToString", a1)
           case MakeArray(a1) => shz("MakeArray", a1)
+          case Meta(a1) => shz("Meta", a1)
 
           // binary
           case Add(a1, a2) => shz("Add", a1, a2)
@@ -615,6 +618,7 @@ object MapFunc {
           case Null(a1) => nAry("Null", a1)
           case ToString(a1) => nAry("ToString", a1)
           case MakeArray(a1) => nAry("MakeArray", a1)
+          case Meta(a1) => nAry("Meta", a1)
 
           // binary
           case Add(a1, a2) => nAry("Add", a1, a2)
@@ -692,6 +696,7 @@ object MapFunc {
       case string.Null => Null(_)
       case string.ToString => ToString(_)
       case structural.MakeArray => MakeArray(_)
+      case structural.Meta => Meta(_)
     }
   }
 
@@ -851,6 +856,7 @@ object MapFuncs {
     def a1 = src
     def a2 = field
   }
+  @Lenses final case class Meta[T[_[_]], A](a1: A) extends Unary[T, A]
 
   @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
     def a1 = from

@@ -151,8 +151,8 @@ object MapFuncPlanner {
 
       prj flatMap (ejson.manyToArray[F] apply _)
 
-    case DeleteField(src, field)      =>
-      qscript.deleteField[F] apply (src, field)
+    case DeleteField(src, field)      => qscript.deleteField[F] apply (src, field)
+    case Meta(x)                      => qscript.meta[F] apply x
 
     // other
     case Range(x, y)                  => (x to y).point[F]

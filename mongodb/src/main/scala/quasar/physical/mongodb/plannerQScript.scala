@@ -857,8 +857,7 @@ object MongoDbQScriptPlanner {
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(
-        shiftRead(qs)
-          .transCata[MongoQScript](SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet))
+        simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
           .transAna(
             repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
             repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙

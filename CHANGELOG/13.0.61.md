@@ -1,0 +1,1 @@
+- Consolidate call sites of SimplifyJoin.

@@ -190,17 +190,34 @@ package object qscript {
       : F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
 
-  // TODO: Un-hardcode the coproduct, and make this simply a transform itself,
-  //       rather than a full traversal.
-  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
-    type FixedQScriptRead[A]      = QScriptRead[T, A]
-    type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
+  // TODO: make this simply a transform itself, rather than a full traversal.
+  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Functor, G[_]: Traverse]
+    (implicit QC: QScriptCore[T, ?] :<: G,
+              TJ: ThetaJoin[T, ?] :<: G,
+              SR: Const[ShiftedRead, ?] :<: G,
+              GI: Injectable.Aux[G, QScriptTotal[T, ?]],
+              S: ShiftRead.Aux[T, F, G],
+              C: Coalesce.Aux[T, G, G],
+              N: Normalizable[G])
+      : T[F] => T[G] = {
     val rewrite = new Rewrite[T]
-    transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
+    transFutu(_)(S.shiftRead(idPrism.reverseGet)(_: F[T[F]]))
       .transCata(
-        rewrite.normalize[FixedQScriptShiftRead] ⋙
-          liftFG(injectRepeatedly(quasar.qscript.Coalesce[T, FixedQScriptShiftRead, FixedQScriptShiftRead].coalesceSR[FixedQScriptShiftRead](idPrism))))
+        rewrite.normalize[G] ⋙
+          liftFG(injectRepeatedly(C.coalesceSR[G](idPrism))))
   }
+
+  def simplifyRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Functor, G[_]: Traverse, H[_]: Functor]
+    (implicit QC: QScriptCore[T, ?] :<: G,
+              TJ: ThetaJoin[T, ?] :<: G,
+              SR: Const[ShiftedRead, ?] :<: G,
+              GI: Injectable.Aux[G, QScriptTotal[T, ?]],
+              S: ShiftRead.Aux[T, F, G],
+              J: SimplifyJoin.Aux[T, G, H],
+              C: Coalesce.Aux[T, G, G],
+              N: Normalizable[G])
+      : T[F] => T[H] =
+    shiftRead[T, F, G].apply(_).transCata(J.simplifyJoin(idPrism.reverseGet))
 
   // Helpers for creating `Injectable` instances
 

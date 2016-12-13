@@ -1,7 +1,8 @@
 {
     "name": "largest cities",
     "backends": {
-        "postgresql": "pending"
+        "postgresql": "pending",
+        "couchbase":  "skipCI"
     },
     "data": "zips.data",
     "ignoreFieldOrder": [ "mongodb_2_6", "mongodb_3_0", "mongodb_3_2", "mongodb_read_only" ],

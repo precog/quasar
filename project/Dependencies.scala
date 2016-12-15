@@ -81,7 +81,7 @@ object Dependencies {
 
   def buildSparkScope = if(buildSparkCore == "yes") "provided" else "compile"
 
-  val sparkDepCore = ("org.apache.spark" %% "spark-core" % "2.0.1")
+  val sparkDepCore = ("org.apache.spark" %% "spark-core" % "2.0.2")
     .exclude("aopalliance", "aopalliance")
     .exclude("javax.inject", "javax.inject")
     .exclude("commons-collections", "commons-collections")

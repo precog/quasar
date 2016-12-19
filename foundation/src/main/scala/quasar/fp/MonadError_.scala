@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.fp
 
 import scalaz.MonadError
 

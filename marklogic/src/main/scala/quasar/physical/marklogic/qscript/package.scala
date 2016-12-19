@@ -18,7 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.ejson.{Common, Str}
-import quasar.fp.{coproductShow, QuasarFreeOps}
+import quasar.fp.{coproductShow, QuasarFreeOps, MonadError_}
 import quasar.fp.ski.κ
 import quasar.contrib.matryoshka.{freeCataM, interpretM}
 import quasar.physical.marklogic.validation._

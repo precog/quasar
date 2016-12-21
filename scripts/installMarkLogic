@@ -21,6 +21,7 @@ ML_IMG_NAME="marklogic:${ML_VERSION}"
 ML_CNT_NAME="ml8"
 
 ML_ADMIN_PREFIX="http://localhost:8001/admin/v1"
+ML_MANAGE_PREFIX="http://localhost:8002/manage/v2"
 ML_USERNAME="marklogic"
 ML_PASSWORD="marklogic"
 
@@ -70,4 +71,8 @@ sleep 20
 # Add the admin user
 curl -i -X POST --data "admin-username=${ML_USERNAME}&admin-password=${ML_PASSWORD}" ${ML_ADMIN_PREFIX}/instance-admin
 
-# TODO: Add indexes as needed to speedup tests
+# Allow the server to restart
+sleep 20
+
+# Adjust memory settings
+curl -i -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: application/json" --data-raw '{"in-memory-list-size": 64, "in-memory-tree-size": 64}' ${ML_MANAGE_PREFIX}/databases/Documents/properties

@@ -16,8 +16,8 @@
 
 package quasar.fp
 
+import quasar.Predef.Throwable
 import scalaz._, Scalaz._
-
 
 trait StateTInstances {
 
@@ -32,6 +32,19 @@ trait StateTInstances {
         StateT{(s: S) =>
           (merr.handleError[A](fa.run(s).map(_._2))((e: E) => f(e).run(s).map(_._2))).map((s, _))
         }
+    }
+
+  implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
+    new Catchable[StateT[F, S, ?]] {
+      def attempt[A](fa: StateT[F, S, A]) =
+        StateT[F, S, Throwable \/ A](s =>
+          Catchable[F].attempt(fa.run(s)) map {
+            case -\/(t)       => (s, t.left)
+            case \/-((s1, a)) => (s1, a.right)
+          })
+
+      def fail[A](t: Throwable) =
+        StateT[F, S, A](_ => Catchable[F].fail(t))
     }
 }
 

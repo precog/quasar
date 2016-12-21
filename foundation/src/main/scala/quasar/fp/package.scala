@@ -167,21 +167,6 @@ trait OptionTInstances {
     }
 }
 
-trait StateTInstances {
-  implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
-    new Catchable[StateT[F, S, ?]] {
-      def attempt[A](fa: StateT[F, S, A]) =
-        StateT[F, S, Throwable \/ A](s =>
-          Catchable[F].attempt(fa.run(s)) map {
-            case -\/(t)       => (s, t.left)
-            case \/-((s1, a)) => (s1, a.right)
-          })
-
-      def fail[A](t: Throwable) =
-        StateT[F, S, A](_ => Catchable[F].fail(t))
-    }
-}
-
 trait WriterTInstances {
   implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
     new Catchable[WriterT[F, W, ?]] {

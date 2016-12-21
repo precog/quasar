@@ -42,7 +42,7 @@ object FuncHandler {
 
     new FuncHandler[T, EX](new (MapFunc[T, ?] ~> M[EX, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[EX, A] = {
-        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], EX]
+        val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
         import fp._
 
         fa.some collect {
@@ -140,7 +140,7 @@ object FuncHandler {
     implicit def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
     new FuncHandler[T, ExprOp3_0F](new (MapFunc[T, ?] ~> M[ExprOp3_0F, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOp3_0F, A] = {
-        val fp = ExprOp3_0F.fixpoint[Free[?[_], A], ExprOp3_0F]
+        val fp = new ExprOp3_0F.fixpoint[Free[ExprOp3_0F, A], ExprOp3_0F](Free.roll)
         import fp._
         import FormatSpecifier._
 
@@ -156,7 +156,7 @@ object FuncHandler {
     implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
     new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
-        val fp = ExprOp3_2F.fixpoint[Free[?[_], A], ExprOp3_2F]
+        val fp = new ExprOp3_2F.fixpoint[Free[ExprOp3_2F, A], ExprOp3_2F](Free.roll)
         import fp._
 
         fa.some collect {
@@ -170,7 +170,7 @@ object FuncHandler {
   def trunc2_6[EX[_]: Functor](implicit inj: ExprOpCoreF :<: EX): Free[EX, ?] ~> Free[EX, ?] =
     new (Free[EX, ?] ~> Free[EX, ?]) {
       def apply[A](expr: Free[EX, A]): Free[EX, A] = {
-        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], EX]
+        val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
         import fp._
 
         $subtract(expr, $mod(expr, $literal(Bson.Int32(1))))
@@ -180,7 +180,7 @@ object FuncHandler {
   def trunc3_2[EX[_]: Functor](implicit inj: ExprOp3_2F :<: EX): Free[EX, ?] ~> Free[EX, ?] =
     new (Free[EX, ?] ~> Free[EX, ?]) {
       def apply[A](expr: Free[EX, A]): Free[EX, A] = {
-        val fp = ExprOp3_2F.fixpoint[Free[?[_], A], EX]
+        val fp = new ExprOp3_2F.fixpoint[Free[EX, A], EX](Free.roll)
         import fp._
 
         $trunc(expr)

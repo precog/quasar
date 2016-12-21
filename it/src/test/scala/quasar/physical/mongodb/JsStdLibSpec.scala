@@ -24,7 +24,9 @@ import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat

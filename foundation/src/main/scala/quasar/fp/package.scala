@@ -17,16 +17,15 @@
 package quasar
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 
-import matryoshka._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
-import simulacrum.typeclass
 
 sealed trait LowerPriorityTreeInstances {
   implicit def Tuple2RenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
@@ -336,23 +335,6 @@ package object fp
   // `type KleisliK[M[_], F[_], G[_]] = F ~> (M ∘ G)#λ`
   type NTComp[F[X], G[Y]] = scalaz.NaturalTransformation[F, matryoshka.∘[G, F]#λ]
 
-  implicit def ShowShowF[F[_], A: Show, FF[A] <: F[A]](implicit FS: ShowF[F]):
-      Show[FF[A]] =
-    new Show[FF[A]] { override def show(fa: FF[A]) = FS.show(fa) }
-
-  implicit def ShowFNT[F[_]](implicit SF: ShowF[F]) =
-    λ[Show ~> λ[α => Show[F[α]]]](st => ShowShowF(st, SF))
-
-  implicit def EqualEqualF[F[_], A: Equal, FF[A] <: F[A]](implicit FE: EqualF[F]):
-      Equal[FF[A]] =
-    new Equal[FF[A]] { def equal(fa1: FF[A], fa2: FF[A]) = FE.equal(fa1, fa2) }
-
-  implicit def EqualFNT[F[_]](implicit EF: EqualF[F]):
-      Equal ~> λ[α => Equal[F[α]]] =
-    new (Equal ~> λ[α => Equal[F[α]]]) {
-      def apply[α](eq: Equal[α]): Equal[F[α]] = EqualEqualF(eq, EF)
-    }
-
   def unzipDisj[A, B](ds: List[A \/ B]): (List[A], List[B]) = {
     val (as, bs) = ds.foldLeft((List[A](), List[B]())) {
       case ((as, bs), -\/ (a)) => (a :: as, bs)
@@ -393,39 +375,42 @@ package object fp
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
-  def liftR[T[_[_]]: Corecursive: Recursive, F[_]: Traverse, G[_]: Traverse](orig: T[F] => T[F])(implicit F: F:<: G):
+  def liftR[T[_[_]]: BirecursiveT, F[_]: Traverse, G[_]: Traverse](orig: T[F] => T[F])(implicit F: F:<: G):
       T[G] => T[G] =
     tg => prjR[T, F, G](tg).fold(tg)(orig.andThen(injR[T, F, G]))
 
-  def injR[T[_[_]]: Corecursive: Recursive, F[_]: Functor, G[_]: Functor](orig: T[F])(implicit F: F :<: G):
+  def injR[T[_[_]]: BirecursiveT, F[_]: Functor, G[_]: Functor](orig: T[F])(implicit F: F :<: G):
       T[G] =
-    orig.transCata[G](F.inj)
+    orig.transCata[T[G]](F.inj)
 
-  def prjR[T[_[_]]: Corecursive: Recursive, F[_]: Traverse, G[_]: Traverse](orig: T[G])(implicit F: F :<: G):
+  def prjR[T[_[_]]: BirecursiveT, F[_]: Traverse, G[_]: Traverse](orig: T[G])(implicit F: F :<: G):
       Option[T[F]] =
-    orig.transCataM[Option, F](F.prj)
+    orig.transAnaM[Option, T[F], F](F.prj)
 
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
 
-  implicit def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]) = λ[Equal ~> DelayedFG[F, G]#Equal](eq =>
-    Equal equal ((cp1, cp2) =>
-      (cp1.run, cp2.run) match {
-        case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
-        case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
-        case (_,       _)       => false
-      }
-    )
-  )
-  implicit def coproductShow[F[_], G[_]](implicit F: Delay[Show, F], G: Delay[Show, G]) =
-    λ[Show ~> DelayedFG[F, G]#Show](sh => Show show (_.run.fold(F(sh).show, G(sh).show)))
+  implicit def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]): Delay[Equal, Coproduct[F, G, ?]] =
+    Delay.fromNT(λ[Equal ~> DelayedFG[F, G]#Equal](eq =>
+      Equal equal ((cp1, cp2) =>
+        (cp1.run, cp2.run) match {
+          case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
+          case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
+          case (_,       _)       => false
+        })))
 
-  implicit def constEqual[A: Equal] =
-    λ[Equal ~> DelayedA[A]#Equal](_ => Equal equal (_.getConst === _.getConst))
+  implicit def coproductShow[F[_], G[_]](implicit F: Delay[Show, F], G: Delay[Show, G]): Delay[Show, Coproduct[F, G, ?]] =
+    Delay.fromNT(λ[Show ~> DelayedFG[F, G]#Show](sh =>
+      Show show (_.run.fold(F(sh).show, G(sh).show))))
 
-  implicit def constShow[A: Show] =
-    λ[Show ~> DelayedA[A]#Show](_ => Show show (Show[A] show _.getConst))
+  implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] =
+    Delay.fromNT(λ[Equal ~> DelayedA[A]#Equal](_ =>
+      Equal equal (_.getConst ≟ _.getConst)))
+
+  implicit def constShow[A: Show]: Delay[Show, Const[A, ?]] =
+    Delay.fromNT(λ[Show ~> DelayedA[A]#Show](_ =>
+      Show show (Show[A] show _.getConst)))
 
   implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
     Equal.equal((a, b) => a.unsized ≟ b.unsized)
@@ -448,13 +433,10 @@ package object fp
 
     def resumeTwice(implicit F: Functor[F]): Step[Step[Self]] =
       self.resume leftMap (_ map (_.resume))
-
-    def toCoEnv[T[_[_]]: Corecursive](implicit F: Functor[F]): T[CoEnv[A, F, ?]] =
-      self ana CoEnv.freeIso[A, F].reverseGet
   }
 
-  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
-      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
+  def liftCo[T[_[_]], F[_], A, B](f: F[B] => CoEnv[A, F, B])
+      : CoEnv[A, F, B] => CoEnv[A, F, B] =
     co => co.run.fold(κ(co), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
@@ -467,20 +449,6 @@ package object fp
 }
 
 package fp {
-  @typeclass
-  trait ShowF[F[_]] {
-    def show[A](fa: F[A])(implicit sa: Show[A]): Cord
-  }
-  @typeclass
-  trait EqualF[F[_]] {
-    @op("≟", true) def equal[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]): Boolean
-    @op("≠") def notEqual[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]): Boolean = !equal(fa1, fa2)
-  }
-  @typeclass
-  trait SemigroupF[F[_]] {
-    @op("⊹", true) def append[A: Semigroup](fa1: F[A], fa2: F[A]): F[A]
-  }
-
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
     *
     * NB: Uses partial application of `F[_]` for better type inference, usage:

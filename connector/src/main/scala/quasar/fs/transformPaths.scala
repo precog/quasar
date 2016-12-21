@@ -21,7 +21,8 @@ import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 
-import matryoshka.{FunctorT, Fix}, FunctorT.ops._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._
 import monocle.std.tuple2._
@@ -137,7 +138,7 @@ object transformPaths {
   }
 
   private def transformFile(inPath: EndoK[AbsPath])(lp: Fix[LP]): Fix[LP] =
-    lp.transAna[LP](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
+    lp.transAna[Fix[LP]](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
 
   /** Returns a natural transformation that transforms all paths in `QueryFile`
     * operations using the given functions.

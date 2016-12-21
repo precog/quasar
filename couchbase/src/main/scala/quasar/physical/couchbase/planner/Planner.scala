@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
-import quasar.contrib.matryoshka.ShowT
 import quasar.physical.couchbase._
 import quasar.qscript._
 
@@ -51,31 +50,31 @@ object Planner {
     : Planner[T, F, Const[Read, ?]] =
     new UnreachablePlanner[T, F, Const[Read, ?]]
 
-  implicit def constShiftedRead[T[_[_]]: Corecursive, F[_]: Monad: NameGenerator]
+  implicit def constShiftedRead[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
     : Planner[T, F, Const[ShiftedRead, ?]] =
     new ShiftedReadPlanner[T, F]
 
-  implicit def equiJoinPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, MapFunc[T, ?]] =
     new MapFuncPlanner[T, F]
 
-  implicit def projectBucketPlanner[T[_[_]]: Recursive: ShowT, F[_]: Monad: NameGenerator]
+  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 
-  def reduceFuncPlanner[T[_[_]]: Corecursive, F[_]: Monad]
+  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad]
     : Planner[T, F, ReduceFunc] =
     new ReduceFuncPlanner[T, F]
 
-  implicit def thetaJoinPlanner[T[_[_]]: Recursive: ShowT, F[_]: Monad: NameGenerator]
+  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, ThetaJoin[T, ?]] =
     new UnreachablePlanner[T, F, ThetaJoin[T, ?]]
 

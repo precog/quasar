@@ -19,7 +19,7 @@ package quasar.physical.mongodb.workflowtask
 import quasar.Predef._
 import quasar.physical.mongodb._
 
-import matryoshka._
+import matryoshka.data.Fix
 import scalaz._
 
 object PureTask {

@@ -29,7 +29,9 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib, StdLib._
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
@@ -322,13 +324,13 @@ trait Compiler[F[_]] {
       val relations =
         if (namedRel.size <= 1) namedRel
         else {
-          val filtered = namedRel.filter(x => x._1 ≟ pprint(node.convertTo[Fix]))
+          val filtered = namedRel.filter(x => x._1 ≟ pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](node)))
           if (filtered.isEmpty) namedRel else filtered
         }
       relations.toList match {
-        case Nil             => -\/ (NoTableDefined(node.convertTo[Fix]))
+        case Nil             => -\/ (NoTableDefined(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](node)))
         case List((name, _)) =>  \/-(name)
-        case x               => -\/ (AmbiguousReference(node.convertTo[Fix], x.map(_._2).join))
+        case x               => -\/ (AmbiguousReference(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](node), x.map(_._2).join))
       }
     }
 
@@ -403,7 +405,7 @@ trait Compiler[F[_]] {
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
         val namesOrError: SemanticError \/ List[Option[String]] =
-          projectionNames[CoAnn](projections, relationName(node).toOption).map(_.map {
+          projectionNames[Fix[Sql]](projections.map(_.map(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations])), relationName(node).toOption).map(_.map {
             case (name, Embed(expr)) => expr match {
               case Splice(_) => None
               case _         => name.some
@@ -599,7 +601,7 @@ trait Compiler[F[_]] {
               fail(UnexpectedDatePart("\"" + part + "\"")))
 
           case _ :: _ :: Nil =>
-            fail(UnexpectedDatePart(pprint[Cofree[?[_], Annotations]](args(0))))
+            fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](args(0)))))
 
           case _ =>
             fail(WrongArgumentCount("DATE_PART", 2, args.length))
@@ -720,13 +722,13 @@ object Compiler {
 
       t => t.tail match {
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
-          Invoke[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
+          Invoke[nat._1, Cofree[LP, Boolean]](func, Func.Input1(strip(arg)))
 
         case _ =>
           if (t.head) Invoke(agg.Arbitrary, Func.Input1(strip(t)))
           else t.tail
       }
     }
-    ann.ana[Fix, LP](rewriteƒ)
+    ann.ana[Fix[LP]](rewriteƒ)
   }
 }

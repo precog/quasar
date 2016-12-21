@@ -21,18 +21,23 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.physical.mongodb.{Bson, BsonField}
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.scalacheck._, Arbitrary.arbitrary
 import scalaz._
 import scalacheck.ScalazArbitrary._
 
 object ArbitraryExprOp {
 
-  val fpCore: ExprOpCoreF.fixpoint[Fix, Expr2_6] = ExprOpCoreF.fixpoint[Fix, Expr2_6]
+  val fpCore: ExprOpCoreF.fixpoint[Fix[Expr2_6], Expr2_6] =
+    new ExprOpCoreF.fixpoint[Fix[Expr2_6], Expr2_6](_.embed)
   import fpCore._
-  val fp3_0: ExprOp3_0F.fixpoint[Fix, Expr3_0] = ExprOp3_0F.fixpoint[Fix, Expr3_0]
+  val fp3_0: ExprOp3_0F.fixpoint[Fix[Expr3_0], Expr3_0] =
+    new ExprOp3_0F.fixpoint[Fix[Expr3_0], Expr3_0](_.embed)
   import fp3_0._
-  val fp3_2: ExprOp3_2F.fixpoint[Fix, Expr3_2] = ExprOp3_2F.fixpoint[Fix, Expr3_2]
+  val fp3_2: ExprOp3_2F.fixpoint[Fix[Expr3_2], Expr3_2] =
+    new ExprOp3_2F.fixpoint[Fix[Expr3_2], Expr3_2](_.embed)
   import fp3_2._
 
   implicit val formatSpecifierArbitrary: Arbitrary[FormatSpecifier] = Arbitrary {
@@ -53,7 +58,7 @@ object ArbitraryExprOp {
       Gen.alphaChar.map(c => $var(DocField(BsonField.Name(c.toString)))))
 
   lazy val genExpr3_0: Gen[Fix[Expr3_0]] = {
-    def inj(expr: Fix[Expr2_6]): Fix[Expr3_0] = expr.transCata(Inject[Expr2_6, Expr3_0])
+    def inj(expr: Fix[Expr2_6]) = expr.transCata[Fix[Expr3_0]](Inject[Expr2_6, Expr3_0])
     Gen.oneOf(
       genExpr.map(inj),
       arbitrary[FormatString].map(fmt =>
@@ -61,8 +66,8 @@ object ArbitraryExprOp {
   }
 
   lazy val genExpr3_2: Gen[Fix[Expr3_2]] = {
-    def inj(expr: Fix[Expr2_6]): Fix[Expr3_2] = expr.transCata(Inject[Expr2_6, Expr3_2])
-    def inj3_0(expr: Fix[Expr3_0]): Fix[Expr3_2] = expr.transCata(Inject[Expr3_0, Expr3_2])
+    def inj(expr: Fix[Expr2_6])  = expr.transCata[Fix[Expr3_2]](Inject[Expr2_6, Expr3_2])
+    def inj3_0(expr: Fix[Expr3_0]) = expr.transCata[Fix[Expr3_2]](Inject[Expr3_0, Expr3_2])
     Gen.oneOf(
       genExpr3_0.map(inj3_0),
       genExpr.map(inj).flatMap(x => Gen.oneOf(
@@ -85,7 +90,7 @@ object ArbitraryExprOp {
 
 class ExpressionSpec extends quasar.Qspec {
   import fixExprOp._
-  val fp3_0 = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  val fp3_0 = new ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   import fp3_0._
 
   val ops = ExprOpOps[ExprOp]
@@ -152,7 +157,7 @@ class ExpressionSpec extends quasar.Qspec {
     "handle addition with epoch date literal" in {
       $add(
         $literal(Bson.Date(Instant.ofEpochMilli(0))),
-        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix, ExprOp]) must beRightDisjunction(
+        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
         JsFn(JsFn.defaultName, New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
     }
   }

@@ -22,13 +22,14 @@ import quasar.physical.couchbase.N1QL._
 import quasar.qscript, qscript.{ReduceFunc, ReduceFuncs => RF}
 
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ReduceFuncPlanner[T[_[_]]: Corecursive, F[_]: Monad] extends Planner[T, F, ReduceFunc] {
+final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad] extends Planner[T, F, ReduceFunc] {
 
   def plan: AlgebraM[M, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[M])
 
-  val planʹ: AlgebraicTransform[T, ReduceFunc, N1QL] = {
+  val planʹ: Transform[T[N1QL], ReduceFunc, N1QL] = {
     case RF.Arbitrary(a1)      => Min(a1)
     case RF.Avg(a1)            => Avg(a1)
     case RF.Count(a1)          => Count(a1)

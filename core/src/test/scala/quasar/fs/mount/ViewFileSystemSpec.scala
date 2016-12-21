@@ -29,7 +29,9 @@ import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._
-import matryoshka.{free => _, _}
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.macros.Lenses
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._

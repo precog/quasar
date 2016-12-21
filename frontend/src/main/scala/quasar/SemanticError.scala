@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.sql._
 
 import matryoshka._
+import matryoshka.data._
 import monocle._
 import pathy.Path, Path._
 import scalaz._, Scalaz._

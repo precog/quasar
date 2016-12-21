@@ -22,7 +22,7 @@ import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.FileSystemType
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 
 sealed trait MountRequest {

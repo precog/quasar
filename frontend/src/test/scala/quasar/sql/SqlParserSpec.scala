@@ -22,6 +22,8 @@ import quasar.fp._
 import quasar.sql.fixpoint._
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import pathy.Path._
 import quasar.specs2.QuasarMatchers._
@@ -30,8 +32,6 @@ class SQLParserSpec extends quasar.Qspec {
   import SqlQueries._, ExprArbitrary._
 
   implicit def stringToQuery(s: String): Query = Query(s)
-
-  implicit val sqlEqual: Equal[Fix[Sql]] = Equal.equalA
 
   def parse(query: Query): ParsingError \/ Fix[Sql] =
     fixParser.parse(query).map(_.makeTables(Nil))
@@ -538,7 +538,7 @@ class SQLParserSpec extends quasar.Qspec {
       // left-recursive expression with many unneeded parenes, which
       // happens to be exactly what pprint produces.
       val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
-      parse(q).map(pprint[Fix]) must beRightDisjunction(q)
+      parse(q).map(pprint[Fix[Sql]]) must beRightDisjunction(q)
     }
 
     "should not parse query with a single backslash in an identifier" should {

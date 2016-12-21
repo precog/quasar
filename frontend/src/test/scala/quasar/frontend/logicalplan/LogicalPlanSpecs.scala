@@ -24,6 +24,7 @@ import quasar.frontend.fixpoint.lpf
 import quasar.std
 
 import matryoshka._
+import matryoshka.data.Fix
 import org.scalacheck._
 import org.specs2.scalaz.{ScalazMatchers, Spec}
 import scalaz._, Scalaz._

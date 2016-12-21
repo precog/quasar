@@ -17,13 +17,13 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._, Planner._
 
 import matryoshka._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Prism
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}

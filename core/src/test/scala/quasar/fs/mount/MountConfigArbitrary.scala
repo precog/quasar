@@ -21,7 +21,7 @@ import quasar.VariablesArbitrary._
 import quasar.fs._, FileSystemTypeArbitrary._
 import quasar.sql._, ExprArbitrary._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
 
 trait MountConfigArbitrary {

@@ -18,7 +18,9 @@ package quasar.sql
 
 import quasar.Predef._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._
 
 class SQLSpec extends quasar.Qspec {

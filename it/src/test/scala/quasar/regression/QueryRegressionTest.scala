@@ -35,7 +35,7 @@ import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._

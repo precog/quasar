@@ -16,18 +16,18 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef.{ Eq => _, _ }
-import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}
+import quasar.Predef.{Eq => _, _}
 import quasar.Data
-import quasar.qscript._
 import quasar.Planner._
 import quasar.fp.ski._
-
-import scala.math
+import quasar.qscript._, MapFuncs._
+import quasar.std.{DateLib, StringLib}
 
 import java.time._
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import scala.math
+
+import matryoshka._
+import matryoshka.implicits._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
@@ -35,7 +35,7 @@ object CoreMap extends Serializable {
   private val undefined = Data.NA
 
   // TODO: replace Data.NA with something safer
-  def change[T[_[_]] : Recursive]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
+  def change[T[_[_]]: RecursiveT]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
     case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
     case Undefined() => κ[Data, Data](Data.NA).right // TODO compback to this one, needs reviewv
 

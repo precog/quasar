@@ -30,10 +30,9 @@ import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
 import scala.Predef.$conforms
 
-import scala.Predef.$conforms
-
 import argonaut._, Argonaut._
 import matryoshka._
+import matryoshka.data.Fix
 import org.http4s.dsl._
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._

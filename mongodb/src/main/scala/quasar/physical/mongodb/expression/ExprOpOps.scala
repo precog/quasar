@@ -22,6 +22,7 @@ import quasar.physical.mongodb.Bson
 import quasar.jscore, jscore.JsFn
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._
 
 trait ExprOpOps[IN[_]] {

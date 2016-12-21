@@ -20,7 +20,6 @@ import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, SortDir}
-import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
@@ -37,8 +36,10 @@ import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
-import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
-import matryoshka.patterns.CoEnv
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 object MongoDbQScriptPlanner {
@@ -72,9 +73,9 @@ object MongoDbQScriptPlanner {
           })(
           Some(_))
 
-  def processMapFuncExpr[T[_[_]]: Recursive: ShowT, EX[_]: Traverse, A](
+  def processMapFuncExpr[T[_[_]]: RecursiveT: ShowT, EX[_]: Traverse, A](
     funcHandler: FuncHandler[T, EX])(
-    fm: T[CoEnv[A, MapFunc[T, ?], ?]])(
+    fm: FreeMapA[T, A])(
     recovery: A => OutputM[Fix[ExprOp]])(
     implicit inj: EX :<: ExprOp):
       OutputM[Fix[ExprOp]] =
@@ -83,8 +84,8 @@ object MongoDbQScriptPlanner {
         recovery,
         expression(funcHandler)))
 
-  def processMapFunc[T[_[_]]: Recursive: ShowT, A](
-    fm: T[CoEnv[A, MapFunc[T, ?], ?]])(
+  def processMapFunc[T[_[_]]: RecursiveT: ShowT, A](
+    fm: FreeMapA[T, A])(
     recovery: A => JsCore):
       OutputM[JsCore] =
     fm.cataM(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
@@ -107,10 +108,10 @@ object MongoDbQScriptPlanner {
     }
   }
 
-  private def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
-    freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
+  private def unpack[T[_[_]]: BirecursiveT, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
+    t.cata(interpret[F, T[F], T[F]](ι, _.embed))
 
-  def expression[T[_[_]]: Recursive: ShowT, EX[_]: Traverse](
+  def expression[T[_[_]]: RecursiveT: ShowT, EX[_]: Traverse](
     funcHandler: FuncHandler[T, EX])(
       implicit inj: EX :<: ExprOp):
       AlgebraM[OutputM, MapFunc[T, ?], Fix[ExprOp]] = {
@@ -160,7 +161,7 @@ object MongoDbQScriptPlanner {
     mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: Recursive: ShowT]: AlgebraM[OutputM, MapFunc[T, ?], JsCore] = {
+  def javascript[T[_[_]]: RecursiveT: ShowT]: AlgebraM[OutputM, MapFunc[T, ?], JsCore] = {
     import jscore.{
       Add => _, In => _,
       Lt => _, Lte => _, Gt => _, Gte => _, Eq => _, Neq => _,
@@ -169,7 +170,7 @@ object MongoDbQScriptPlanner {
 
     import MapFuncs._
 
-    val mjs = quasar.physical.mongodb.javascript[Fix]
+    val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
 
     def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
@@ -256,7 +257,7 @@ object MongoDbQScriptPlanner {
    * expressions which can be turned into selectors, factoring out the leftovers
    * for conversion using \$where.
    */
-  def selector[T[_[_]]: Recursive: ShowT]:
+  def selector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector]] = { node =>
     import MapFuncs._
 
@@ -521,7 +522,7 @@ object MongoDbQScriptPlanner {
             .liftM[GenT]
       }
 
-    implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: ShowT]:
+    implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT]:
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
@@ -539,7 +540,7 @@ object MongoDbQScriptPlanner {
           //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder(funcHandler)(src, bucket) ⊛
-              reducers.traverse(_.traverse(fm => getExpr(funcHandler)(fm.toCoEnv[T]))) ⊛
+              reducers.traverse(_.traverse(fm => getExpr(funcHandler)(fm))) ⊛
               handleRedRepair(funcHandler, repair))((b, red, rep) =>
               ExprBuilder(
                 GroupBuilder(src,
@@ -574,7 +575,7 @@ object MongoDbQScriptPlanner {
         }
       }
 
-    implicit def equiJoin[T[_[_]]: Recursive: Corecursive: ShowT]:
+    implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
@@ -599,8 +600,8 @@ object MongoDbQScriptPlanner {
               case LeftOuter => set.LeftOuterJoin
               case RightOuter => set.RightOuterJoin
             },
-            JoinSource(lb, List(lk), getJsFn(qs.lKey.toCoEnv[T]).toOption.map(List(_))),
-            JoinSource(rb, List(rk), getJsFn(qs.rKey.toCoEnv[T]).toOption.map(List(_))))).join
+            JoinSource(lb, List(lk), getJsFn(qs.lKey).toOption.map(List(_))),
+            JoinSource(rb, List(rk), getJsFn(qs.rKey).toOption.map(List(_))))).join
       }
 
     implicit def coproduct[T[_[_]], F[_], G[_]](
@@ -675,22 +676,22 @@ object MongoDbQScriptPlanner {
       }
   }
 
-  def getExpr[T[_[_]]: Recursive: ShowT, EX[_]: Traverse](
+  def getExpr[T[_[_]]: RecursiveT: ShowT, EX[_]: Traverse](
     funcHandler: FuncHandler[T, EX])(
-    fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])(
+    fm: FreeMap[T])(
     implicit ev: EX :<: ExprOp): OutputM[Fix[ExprOp]] =
     processMapFuncExpr(funcHandler)(fm)(κ($$ROOT.right))
 
-  def getJsFn[T[_[_]]: Recursive: ShowT](fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+  def getJsFn[T[_[_]]: RecursiveT: ShowT](fm: FreeMap[T])
       : OutputM[JsFn] =
     processMapFunc(fm)(κ(jscore.Ident(JsFn.defaultName))) ∘ (JsFn(JsFn.defaultName, _))
 
-  def getExprBuilder[T[_[_]]: Recursive: Corecursive: ShowT, WF[_], EX[_]: Traverse](
+  def getExprBuilder[T[_[_]]: BirecursiveT: ShowT, WF[_], EX[_]: Traverse](
     funcHandler: FuncHandler[T, EX])(
     src: WorkflowBuilder[WF], fm: FreeMap[T])(
     implicit ev: EX :<: ExprOp):
       OutputM[WorkflowBuilder[WF]] =
-    fm.toCoEnv[T].project match {
+    fm.project match {
       // TODO: identify cases for SpliceBuilder.
       case MapFunc.StaticArray(elems) =>
         elems.traverse(handleFreeMap(funcHandler, _)) ∘ (ArrayBuilder(src, _))
@@ -704,9 +705,9 @@ object MongoDbQScriptPlanner {
       case co => handleFreeMap(funcHandler, co.embed) ∘ (ExprBuilder(src, _))
     }
 
-  def getJsMerge[T[_[_]]: Recursive: Corecursive: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):
+  def getJsMerge[T[_[_]]: BirecursiveT: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):
       OutputM[JsFn] =
-    processMapFunc(jf.toCoEnv[T]) {
+    processMapFunc(jf) {
       case LeftSide => a1
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
@@ -715,26 +716,26 @@ object MongoDbQScriptPlanner {
       : M[Expr] =
     exf(a).map(_.right[JsFn]) <+> jsf(a).map(_.left[Fix[ExprOp]])
 
-  def handleFreeMap[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX], fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+  def handleFreeMap[T[_[_]]: RecursiveT: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
     (implicit ev: EX :<: ExprOp)
       : OutputM[Expr] =
     exprOrJs(fm)(getExpr(funcHandler)(_), getJsFn[T])
 
-  def handleRedRepair[T[_[_]]: Recursive: Corecursive: ShowT, EX[_]: Traverse]
+  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
     (implicit ev: EX :<: ExprOp)
       : OutputM[Expr] =
-    exprOrJs(jr.toCoEnv[T])(getExprRed(funcHandler)(_), getJsRed[T])
+    exprOrJs(jr)(getExprRed(funcHandler)(_), getJsRed[T])
 
-  def getExprRed[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: RecursiveT: ShowT, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
-    (jr: T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]])
+    (jr: FreeMapA[T, ReduceIndex])
     (implicit ev: EX :<: ExprOp)
       : OutputM[Fix[ExprOp]] =
     processMapFuncExpr(funcHandler)(jr)(ri => $field(ri.idx.toString).right)
 
-  def getJsRed[T[_[_]]: Recursive: ShowT](jr: T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]]):
+  def getJsRed[T[_[_]]: RecursiveT: ShowT](jr: Free[MapFunc[T, ?], ReduceIndex]):
       OutputM[JsFn] =
     processMapFunc(jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.toString))) ∘ (JsFn(JsFn.defaultName, _))
 
@@ -749,7 +750,7 @@ object MongoDbQScriptPlanner {
              ev2: WorkflowBuilder.Ops[WF],
              ev3: EX :<: ExprOp):
       StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
-    freeCataM(free)(
+    free.cataM(
       interpretM[StateT[OutputM, NameGen, ?], QScriptTotal[T, ?], qscript.Hole, WorkflowBuilder[WF]](κ(StateT.stateT(src)), F.plan(joinHandler, funcHandler)))
 
   // TODO: Need `Delay[Show, WorkflowBuilder]`
@@ -764,7 +765,7 @@ object MongoDbQScriptPlanner {
   }
 
   // This is maybe worth putting in Matryoshka?
-  def findFirst[T[_[_]]: Recursive, F[_]: Functor: Foldable, A](
+  def findFirst[T[_[_]]: RecursiveT, F[_]: Functor: Foldable, A](
     f: PartialFunction[T[F], A]):
       CoalgebraM[A \/ ?, F, T[F]] =
     tf => (f.lift(tf) \/> tf.project).swap
@@ -778,9 +779,9 @@ object MongoDbQScriptPlanner {
     def unapply[S[_]: Functor, A](obj: Free[S, A]): Option[A] = obj.resume.toOption
   }
 
-  def elideMoreGeneralGuards[T[_[_]]: Recursive](subType: Type):
-      CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] =>
-        PlannerError \/ CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] = {
+  def elideMoreGeneralGuards[T[_[_]]: RecursiveT](subType: Type):
+      CoEnv[Hole, MapFunc[T, ?], FreeMap[T]] =>
+        PlannerError \/ CoEnv[Hole, MapFunc[T, ?], FreeMap[T]] = {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
       if (typ.contains(subType)) cont.project.right
       else if (!subType.contains(typ))
@@ -794,20 +795,20 @@ object MongoDbQScriptPlanner {
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
   //       generate more correct PatternGuards in the first place, rather than
   //       trying to strip out unnecessary ones after the fact
-  def assumeReadType[T[_[_]]: Recursive: Corecursive, F[_]: Functor](typ: Type)(
+  def assumeReadType[T[_[_]]: BirecursiveT, F[_]: Functor](typ: Type)(
     implicit QC: QScriptCore[T, ?] :<: F, R: Const[Read, ?] :<: F):
       QScriptCore[T, T[F]] => PlannerError \/ F[T[F]] = {
     case m @ qscript.Map(src, mf) =>
       R.prj(src.project).fold(
         QC.inj(m).right[PlannerError])(
-        κ(freeTransCataM(mf)(elideMoreGeneralGuards(typ)) ∘
+        κ(mf.transCataM(elideMoreGeneralGuards(typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))))
     case qc => QC.inj(qc).right
   }
 
   type GenT[X[_], A]  = StateT[X, NameGen, A]
 
-  def plan0[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT,
+  def plan0[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse](
     joinHandler: JoinHandler[WF, WorkflowBuilder.M],
@@ -841,10 +842,10 @@ object MongoDbQScriptPlanner {
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
-      StateT[F, NameGen, A](ng => EitherT(sa.run(ng).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]))
+      StateT[F, NameGen, A](ng => EitherT(sa.run(ng).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)).point[W]))
 
     def liftError[A](ea: PlannerError \/ A): M[A] =
-      EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
+      EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)).point[W]).liftM[GenT]
 
     val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
@@ -858,14 +859,14 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(
         simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
-          .transAna(
+          .transHylo(
+            rewrite.optimize(reflNT[MongoQScript]),
             repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
-            repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
-            repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
-            repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
-          .transCata(rewrite.optimize(idPrism.reverseGet))
+              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
+              repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
+              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
           .point[M])
-      wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
+      wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize))))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
@@ -878,7 +879,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT](
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
     logical: T[LogicalPlan], queryContext: fs.QueryContext):
       EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._

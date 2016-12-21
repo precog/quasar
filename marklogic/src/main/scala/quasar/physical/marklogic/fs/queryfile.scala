@@ -19,7 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, Planner => QPlanner}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
 import quasar.fp._, eitherT._
@@ -40,7 +39,9 @@ import scala.util.control.NonFatal
 
 import com.marklogic.xcc.types.{XdmItem, XSString}
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -110,12 +111,12 @@ object queryfile {
         shifted =  shiftRead[Fix, QSR, MLQScript].apply(qs)
         _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
         optmzed =  shifted
-                     .transAna(
+                     .transHylo(
+                       rewrite.optimize(reflNT[MLQScript]),
                        repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
-                       repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
-                       repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
-                       repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
-                     .transCata(rewrite.optimize(reflNT))
+                         repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
+                         repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
+                         repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>

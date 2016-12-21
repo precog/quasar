@@ -18,10 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -98,7 +98,7 @@ object EquiJoin {
           (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
     }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Mergeable.Aux[T, EquiJoin[T, ?]] =
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]

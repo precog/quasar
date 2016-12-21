@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.specs2.execute._
 import org.scalacheck.Gen
 

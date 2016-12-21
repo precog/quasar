@@ -18,13 +18,15 @@ package quasar.physical.mongodb.workflow
 
 import quasar.RenderTree, RenderTree.ops._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._
 
 /** A type for a `Workflow` which has had `crystallize` applied to it. */
 final case class Crystallized[F[_]](op: Fix[F]) {
   def inject[G[_]: Functor](implicit F: Functor[F], I: F :<: G): Crystallized[G] =
-    copy(op = op.transCata(I.inj(_)))
+    copy(op = op.transCata[Fix[G]](I.inj(_)))
 }
 
 object Crystallized {

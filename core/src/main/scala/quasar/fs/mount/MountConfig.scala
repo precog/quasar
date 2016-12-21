@@ -22,7 +22,7 @@ import quasar.fs.FileSystemType
 import quasar.sql, sql.Sql
 
 import argonaut._, Argonaut._
-import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import scalaz._, Scalaz._
 

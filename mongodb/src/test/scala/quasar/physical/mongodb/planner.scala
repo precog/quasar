@@ -33,7 +33,9 @@ import quasar.std._
 import scala.Either
 
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
@@ -77,9 +79,11 @@ class PlannerSpec extends
   }
 
   import fixExprOp._
-  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp] =
+    new ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   import expr3_0Fp._
-  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix, ExprOp] = ExprOp3_2F.fixpoint[Fix, ExprOp]
+  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp] =
+    new ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   import expr3_2Fp._
 
   val basePath = rootDir[Sandboxed] </> dir("db")
@@ -595,7 +599,7 @@ class PlannerSpec extends
     }
 
     "plan simple js filter" in {
-      val mjs: javascript[Fix] = javascript[Fix]
+      val mjs = javascript[JsCore](_.embed)
       import mjs._
 
       plan("select * from zips where length(city) < 4") must
@@ -622,7 +626,7 @@ class PlannerSpec extends
     }
 
     "plan filter with js and non-js" in {
-      val mjs: javascript[Fix] = javascript[Fix]
+      val mjs = javascript[JsCore](_.embed)
       import mjs._
 
       plan("select * from zips where length(city) < 4 and pop < 20000") must

@@ -24,6 +24,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators available in all supported version of MongoDB
@@ -212,7 +213,7 @@ object ExprOpCoreF {
   implicit def ops[F[_]: Functor](implicit I: ExprOpCoreF :<: F): ExprOpOps.Aux[ExprOpCoreF, F] = new ExprOpOps[ExprOpCoreF] {
     type OUT[A] = F[A]
 
-    val fp = fixpoint[Fix, F]
+    val fp = fixpoint[Fix[F], F](Fix(_))
 
     def simplify: AlgebraM[Option, ExprOpCoreF, Fix[F]] = {
       case $condF(Fix($literalF(Bson.Bool(true))),  c, _) => c.some
@@ -292,7 +293,7 @@ object ExprOpCoreF {
     // FIXME: Define a proper `Show[ExprOpCoreF]` instance.
     @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOpCoreF, JsFn] = {
-      val mjs = quasar.physical.mongodb.javascript[Fix]
+      val mjs = quasar.physical.mongodb.javascript[JsCore](Fix(_))
       import mjs._
 
       def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
@@ -396,90 +397,91 @@ object ExprOpCoreF {
   }
 
   /** "Fixed" constructors, with the corecursive type and the coproduct type
-    * captured when an instance is created. */
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOpCoreF :<: EX) {
-    @inline private implicit def convert(expr: ExprOpCoreF[T[EX]]): T[EX] =
-      I.inj(expr).embed
+    * captured when an instance is created.
+    */
+  final case class fixpoint[T, EX[_]: Functor]
+    (embed: EX[T] => T)
+    (implicit I: ExprOpCoreF :<: EX) {
+    @inline private def convert(expr: ExprOpCoreF[T]): T = embed(I.inj(expr))
 
-    def $include(): T[EX]                            = $includeF[T[EX]]()
-    def $var(docVar: DocVar): T[EX]                  = $varF[T[EX]](docVar)
+    def $include(): T                    = convert($includeF[T]())
+    def $var(docVar: DocVar): T          = convert($varF[T](docVar))
 
-    def $and(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = $andF(first, second, others: _*)
-    def $or(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = $orF(first, second, others: _*)
-    def $not(value: T[EX]): T[EX]                    = $notF(value)
+    def $and(first: T, second: T, others: T*): T
+                                         = convert($andF(first, second, others: _*))
+    def $or(first: T, second: T, others: T*): T
+                                         = convert($orF(first, second, others: _*))
+    def $not(value: T): T                = convert($notF(value))
 
-    def $setEquals(left: T[EX], right: T[EX]): T[EX] = $setEqualsF(left, right)
-    def $setIntersection(left: T[EX], right: T[EX]): T[EX]
-                                                     = $setIntersectionF(left, right)
-    def $setDifference(left: T[EX], right: T[EX]): T[EX]
-                                                     = $setDifferenceF(left, right)
-    def $setUnion(left: T[EX], right: T[EX]): T[EX]  = $setUnionF(left, right)
-    def $setIsSubset(left: T[EX], right: T[EX]): T[EX]
-                                                     = $setIsSubsetF(left, right)
+    def $setEquals(left: T, right: T): T = convert($setEqualsF(left, right))
+    def $setIntersection(left: T, right: T): T
+                                         = convert($setIntersectionF(left, right))
+    def $setDifference(left: T, right: T): T
+                                         = convert($setDifferenceF(left, right))
+    def $setUnion(left: T, right: T): T  = convert($setUnionF(left, right))
+    def $setIsSubset(left: T, right: T): T
+                                         = convert($setIsSubsetF(left, right))
 
-    def $anyElementTrue(value: T[EX]): T[EX]         = $anyElementTrueF(value)
-    def $allElementsTrue(value: T[EX]): T[EX]        = $allElementsTrueF(value)
+    def $anyElementTrue(value: T): T     = convert($anyElementTrueF(value))
+    def $allElementsTrue(value: T): T    = convert($allElementsTrueF(value))
 
-    def $cmp(left: T[EX], right: T[EX]): T[EX]       = $cmpF(left, right)
-    def $eq(left: T[EX], right: T[EX]): T[EX]        = $eqF(left, right)
-    def $gt(left: T[EX], right: T[EX]): T[EX]        = $gtF(left, right)
-    def $gte(left: T[EX], right: T[EX]): T[EX]       = $gteF(left, right)
-    def $lt(left: T[EX], right: T[EX]): T[EX]        = $ltF(left, right)
-    def $lte(left: T[EX], right: T[EX]): T[EX]       = $lteF(left, right)
-    def $neq(left: T[EX], right: T[EX]): T[EX]       = $neqF(left, right)
+    def $cmp(left: T, right: T): T       = convert($cmpF(left, right))
+    def $eq(left: T, right: T): T        = convert($eqF(left, right))
+    def $gt(left: T, right: T): T        = convert($gtF(left, right))
+    def $gte(left: T, right: T): T       = convert($gteF(left, right))
+    def $lt(left: T, right: T): T        = convert($ltF(left, right))
+    def $lte(left: T, right: T): T       = convert($lteF(left, right))
+    def $neq(left: T, right: T): T       = convert($neqF(left, right))
 
-    def $add(left: T[EX], right: T[EX]): T[EX]       = $addF(left, right)
-    def $divide(left: T[EX], right: T[EX]): T[EX]    = $divideF(left, right)
-    def $mod(left: T[EX], right: T[EX]): T[EX]       = $modF(left, right)
-    def $multiply(left: T[EX], right: T[EX]): T[EX]  = $multiplyF(left, right)
-    def $subtract(left: T[EX], right: T[EX]): T[EX]  = $subtractF(left, right)
+    def $add(left: T, right: T): T       = convert($addF(left, right))
+    def $divide(left: T, right: T): T    = convert($divideF(left, right))
+    def $mod(left: T, right: T): T       = convert($modF(left, right))
+    def $multiply(left: T, right: T): T  = convert($multiplyF(left, right))
+    def $subtract(left: T, right: T): T  = convert($subtractF(left, right))
 
-    def $concat(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = $concatF(first, second, others: _*)
-    def $strcasecmp(left: T[EX], right: T[EX]): T[EX]
-                                                     = $strcasecmpF(left, right)
-    def $substr(value: T[EX], start: T[EX], count: T[EX]): T[EX]
-                                                     = $substrF(value, start, count)
-    def $toLower(value: T[EX]): T[EX]                = $toLowerF(value)
-    def $toUpper(value: T[EX]): T[EX]                = $toUpperF(value)
+    def $concat(first: T, second: T, others: T*): T
+                                         = convert($concatF(first, second, others: _*))
+    def $strcasecmp(left: T, right: T): T
+                                         = convert($strcasecmpF(left, right))
+    def $substr(value: T, start: T, count: T): T
+                                         = convert($substrF(value, start, count))
+    def $toLower(value: T): T            = convert($toLowerF(value))
+    def $toUpper(value: T): T            = convert($toUpperF(value))
 
-    def $meta(): T[EX]                               = $metaF[T[EX]]()
+    def $meta(): T                       = convert($metaF[T]())
 
-    def $size(array: T[EX]): T[EX]                   = $sizeF(array)
+    def $size(array: T): T               = convert($sizeF(array))
 
-    def $arrayMap(input: T[EX], as: DocVar.Name, in: T[EX]): T[EX]
-                                                     = $arrayMapF(input, as, in)
-    def $let(vars: ListMap[DocVar.Name, T[EX]], in: T[EX]): T[EX]
-                                                     = $letF(vars, in)
-    def $literal(value: Bson): T[EX]                 = $literalF[T[EX]](value)
+    def $arrayMap(input: T, as: DocVar.Name, in: T): T
+                                         = convert($arrayMapF(input, as, in))
+    def $let(vars: ListMap[DocVar.Name, T], in: T): T
+                                         = convert($letF(vars, in))
+    def $literal(value: Bson): T         = convert($literalF[T](value))
 
-    def $dayOfYear(date: T[EX]): T[EX]               = $dayOfYearF(date)
-    def $dayOfMonth(date: T[EX]): T[EX]              = $dayOfMonthF(date)
-    def $dayOfWeek(date: T[EX]): T[EX]               = $dayOfWeekF(date)
-    def $year(date: T[EX]): T[EX]                    = $yearF(date)
-    def $month(date: T[EX]): T[EX]                   = $monthF(date)
-    def $week(date: T[EX]): T[EX]                    = $weekF(date)
-    def $hour(date: T[EX]): T[EX]                    = $hourF(date)
-    def $minute(date: T[EX]): T[EX]                  = $minuteF(date)
-    def $second(date: T[EX]): T[EX]                  = $secondF(date)
-    def $millisecond(date: T[EX]): T[EX]             = $millisecondF(date)
+    def $dayOfYear(date: T): T           = convert($dayOfYearF(date))
+    def $dayOfMonth(date: T): T          = convert($dayOfMonthF(date))
+    def $dayOfWeek(date: T): T           = convert($dayOfWeekF(date))
+    def $year(date: T): T                = convert($yearF(date))
+    def $month(date: T): T               = convert($monthF(date))
+    def $week(date: T): T                = convert($weekF(date))
+    def $hour(date: T): T                = convert($hourF(date))
+    def $minute(date: T): T              = convert($minuteF(date))
+    def $second(date: T): T              = convert($secondF(date))
+    def $millisecond(date: T): T         = convert($millisecondF(date))
 
-    def $cond(predicate: T[EX], ifTrue: T[EX], ifFalse: T[EX]): T[EX]
-                                                     = $condF(predicate, ifTrue, ifFalse)
-    def $ifNull(expr: T[EX], replacement: T[EX]): T[EX]
-                                                     = $ifNullF(expr, replacement)
+    def $cond(predicate: T, ifTrue: T, ifFalse: T): T
+                                         = convert($condF(predicate, ifTrue, ifFalse))
+    def $ifNull(expr: T, replacement: T): T
+                                         = convert($ifNullF(expr, replacement))
 
-    val $$ROOT: T[EX]    = $var(DocVar.ROOT())
-    val $$CURRENT: T[EX] = $var(DocVar.CURRENT())
+    val $$ROOT: T    = $var(DocVar.ROOT())
+    val $$CURRENT: T = $var(DocVar.CURRENT())
 
     // FIXME: used only by tests and should live in src/test somewhere
-    def $field(field: String, others: String*): T[EX] =
+    def $field(field: String, others: String*): T =
       $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))
   }
 }
-
 
 // "Unfixed" constructors/extractors, which inject/project ops into an arbitrary
 // expression type, but handle any type for the recursive arguments.
@@ -872,38 +874,38 @@ object $ifNullF {
 // NB: for now, only the handful of extractors we actually use are defined here,
 // and the constructors are defined in the companion's `fixpoint` class.
 object $include {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Boolean =
-    $includeF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Boolean =
+    $includeF.unapply(T.project(expr))
 }
 object $var {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[DocVar] =
-    $varF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[DocVar] =
+    $varF.unapply(T.project(expr))
 }
 
 object $and {
-  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX], Seq[T[EX]])] =
-    $andF.unapplySeq(Recursive[T].project(expr))
+  def unapplySeq[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[(T, T, Seq[T])] =
+    $andF.unapplySeq(T.project(expr))
 }
 object $or {
-  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX], Seq[T[EX]])] =
-    $orF.unapplySeq(Recursive[T].project(expr))
+  def unapplySeq[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[(T, T, Seq[T])] =
+    $orF.unapplySeq(T.project(expr))
 }
 
 object $lt {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
-    $ltF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[(T, T)] =
+    $ltF.unapply(T.project(expr))
 }
 object $lte {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
-    $lteF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[(T, T)] =
+    $lteF.unapply(T.project(expr))
 }
 
 object $add {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
-    $addF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[(T, T)] =
+    $addF.unapply(T.project(expr))
 }
 
 object $literal {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[Bson] =
-    $literalF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[Bson] =
+    $literalF.unapply(T.project(expr))
 }

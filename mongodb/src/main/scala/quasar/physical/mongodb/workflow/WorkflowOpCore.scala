@@ -30,7 +30,9 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Ops that are provided by all supported MongoDB versions (since 2.6), or are

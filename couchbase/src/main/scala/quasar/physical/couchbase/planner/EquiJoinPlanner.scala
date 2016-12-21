@@ -17,7 +17,6 @@
 package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
-import quasar.contrib.matryoshka._
 import quasar.physical.couchbase._
 import quasar.qscript._
 
@@ -31,7 +30,7 @@ import scalaz._
 // When falling back to Map/Reduce can quickly arrive at "error (reduction too large)"
 // ╰─ https://github.com/couchbase/couchstore/search?utf8=%E2%9C%93&q=MAX_REDUCTION_SIZE
 
-final class EquiJoinPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   def plan: AlgebraM[M, EquiJoin[T, ?], T[N1QL]] = {

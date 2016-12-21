@@ -25,9 +25,10 @@ import quasar.physical.couchbase.common.BucketCollection
 import quasar.qscript, qscript._
 
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ShiftedReadPlanner[T[_[_]]: Corecursive, F[_]: Monad: NameGenerator]
+final class ShiftedReadPlanner[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, Const[ShiftedRead, ?]] {
 
   def str(v: String) = Data[T[N1QL]](QData.Str(v))
@@ -35,7 +36,7 @@ final class ShiftedReadPlanner[T[_[_]]: Corecursive, F[_]: Monad: NameGenerator]
 
   val plan: AlgebraM[M, Const[ShiftedRead, ?], T[N1QL]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      (genId[T, M] ⊛
+      (genId[T[N1QL], M] ⊛
        EitherT(
          BucketCollection.fromPath(absFile)
            .leftMap[PlannerError](PlanPathError(_)).η[F].liftM[PhaseResultT])

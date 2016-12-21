@@ -40,6 +40,7 @@ import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
 import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
 import org.specs2.execute.Result
 import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers

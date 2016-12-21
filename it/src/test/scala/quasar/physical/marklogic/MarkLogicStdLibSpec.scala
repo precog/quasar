@@ -30,6 +30,7 @@ import quasar.std._
 
 import com.marklogic.xcc.ContentSource
 import matryoshka._
+import matryoshka.data.Fix
 import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._

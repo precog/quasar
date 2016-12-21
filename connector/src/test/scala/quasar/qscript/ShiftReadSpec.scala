@@ -17,17 +17,18 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.Data
-import quasar.contrib.matryoshka._
+import quasar.{Data, TreeMatchers}
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
+class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
   import quasar.frontend.fixpoint.lpf
 
   val rewrite = new Rewrite[Fix]
@@ -41,12 +42,16 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
           ReadR(sampleFile),
           QC.inj(LeftShift((), HoleF, ExcludeId, Free.point(RightSide))))
 
-      val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
+      val newQScript =
+        qScript.codyna(
+          rewrite.normalize[QST] >>> (_.embed),
+          ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))
 
-      newQScript.transCata(rewrite.normalize) must_=
-      Fix(QCT.inj(Map(
-        Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
-        Free.roll(ProjectIndex(HoleF, IntLit(1))))))
+      newQScript must
+      beTreeEqual(
+        Fix(QCT.inj(Map(
+          Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
+          Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
     }
 
     "shift a simple aggregated read" in {
@@ -54,9 +59,10 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
         structural.MakeObject(
           lpf.constant(Data.Str("0")),
           agg.Count(lpRead("/foo/bar")).embed).embed).map(
-        transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
-          .transCata(rewrite.normalize[QST])) must
-      equal(chain(
+        _.codyna(
+          rewrite.normalize[QST] >>> (_.embed),
+          ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
+      beTreeEqual(chain(
         SRT.inj(Const[ShiftedRead, Fix[QST]](
           ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
         QCT.inj(Reduce((),

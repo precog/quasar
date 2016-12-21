@@ -40,7 +40,7 @@ package object logicalplan {
   def invoke[A] =
     Prism.partial[LogicalPlan[A], (GenericFunc[Nat], Func.Input[A, Nat])] {
       case Invoke(f, as) => (f, as)
-    } ((Invoke[A, Nat](_, _)).tupled)
+    } ((Invoke[Nat, A](_, _)).tupled)
 
   def free[A] =
     Prism.partial[LogicalPlan[A], Symbol] { case Free(n) => n } (Free(_))

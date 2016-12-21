@@ -19,13 +19,15 @@ package quasar.physical.sparkcore.fs
 import quasar._
 import quasar.Predef._
 import quasar.Planner.PlannerError
-import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner, FreeMapA}, MapFuncs._
 import quasar.std._
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import matryoshka.patterns._
 import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
@@ -44,12 +46,12 @@ class CoreMapStdLibSpec extends StdLibSpec {
 
   // TODO: figure out how to pass the args to shortCircuit so they can be inspected
   def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
-    freeCataM(fm)(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
+    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
 
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
   def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
-    val run = freeCataM(fm)(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
+    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
       a => κ(args(a)).right, CoreMap.change))
     (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }

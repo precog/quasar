@@ -26,7 +26,7 @@ import quasar.main._
 import quasar.regression._
 import quasar.sql.Sql
 
-import matryoshka.{Fix}
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task

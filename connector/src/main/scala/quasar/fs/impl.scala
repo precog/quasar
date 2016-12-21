@@ -28,7 +28,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.logicalplan.LogicalPlan
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 

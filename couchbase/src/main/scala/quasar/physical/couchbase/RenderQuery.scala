@@ -22,7 +22,8 @@ import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
 import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
 
-import matryoshka._, FunctorT.ops._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 object RenderQuery {
@@ -30,7 +31,7 @@ object RenderQuery {
 
   implicit val codec = common.CBDataCodec
 
-  def compact[T[_[_]]: Recursive: Corecursive](a: T[N1QL]): PlannerError \/ String = {
+  def compact[T[_[_]]: BirecursiveT](a: T[N1QL]): PlannerError \/ String = {
     val q = a.cataM(alg)
 
     a.project match {

@@ -25,7 +25,9 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.frontend.{logicalplan => lp}, lp.LogicalPlan
 
-import matryoshka.{free => _, _}, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 

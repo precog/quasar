@@ -22,7 +22,9 @@ import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{~>, \/, Applicative}
 import scalaz.syntax.equal._

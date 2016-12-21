@@ -28,7 +28,9 @@ import quasar.physical.mongodb.workflow._
 import quasar.physical.mongodb.workflowtask._
 import WorkflowExecutionError._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Implements the necessary operations for executing a `Workflow` against

@@ -17,23 +17,21 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 
-import matryoshka._,
-  Recursive.ops._,
-  FunctorT.ops._,
-  TraverseT.nonInheritedOps._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _},
   Inject.{ reflexiveInjectInstance => _, _ },
   Leibniz._,
   Scalaz._
 
-class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] {
+class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   private val UnrefedSrc: QScriptTotal[FreeQS] =
     Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
 
@@ -42,20 +40,18 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
     src: T[F])(
     implicit FI: Injectable.Aux[F, QScriptTotal]):
       Option[T[F]] =
-    freeCata[QScriptTotal, T[QScriptTotal], T[QScriptTotal]](
-      target.as(src.transAna(FI.inject)))(recover(_.embed)).transAnaM(FI project _)
+    target.as(src.transAna[T[QScriptTotal]](FI.inject)).cata(recover(_.embed)).transAnaM(FI project _)
 
-  def rebaseTCo[F[_]: Traverse](
-    target: FreeQS)(
-    srcCo: T[CoEnv[Hole, F, ?]])(
-    implicit FI: Injectable.Aux[F, QScriptTotal]):
-      Option[T[CoEnv[Hole, F, ?]]] =
+  def rebaseTCo[F[_]: Traverse]
+    (target: FreeQS)
+    (srcCo: T[CoEnv[Hole, F, ?]])
+    (implicit FI: Injectable.Aux[F, QScriptTotal])
+      : Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
-    //       target.transAnaM(_.htraverse(FI project _)) ∘ (srcCo >> _)
-    freeTransCataM[T, Option, QScriptTotal, F, Hole, Hole](
-      target)(
-      coEnvHtraverse(λ[QScriptTotal ~> (Option ∘ F)#λ](FI.project(_))).apply)
-      .map(targ => (targ >> srcCo.fromCoEnv).toCoEnv[T])
+    //       target.transAnaM(_.htraverse(FI project _)) ∘ (_ >> srcCo)
+    target.cataM[Option, T[CoEnv[Hole, F, ?]]](
+      CoEnv.htraverse(λ[QScriptTotal ~> (Option ∘ F)#λ](FI.project(_))).apply(_) ∘ (_.embed)) ∘
+      (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
@@ -246,8 +242,9 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
              QC: QScriptCore :<: F,
              TJ: ThetaJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
-      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo)
+      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
+    in => applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo).apply(in ∘ (_.convertTo[T[CoEnv[Hole, F, ?]]])) ∘
+      (_.convertTo[Free[F, Hole]])
 
   def normalize[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],

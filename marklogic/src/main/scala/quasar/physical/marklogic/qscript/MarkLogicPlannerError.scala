@@ -22,6 +22,7 @@ import quasar.fp.{coproductEqual, coproductShow}
 import quasar.physical.marklogic.ErrorMessages
 
 import matryoshka._
+import matryoshka.data._
 import monocle.Prism
 import scalaz._
 import scalaz.std.option._

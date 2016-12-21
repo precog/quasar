@@ -25,7 +25,9 @@ import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 final case class Grouped[EX[_]](value: ListMap[BsonField.Name, AccumOp[Fix[EX]]]) {
@@ -60,7 +62,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
       ev2: Traverse[EX],
       ev3: Equal[Fix[EX]]): PlannerError \/ JsFn =
     value.map { case (key, expr) =>
-      key.asText -> expr.fold[PlannerError \/ JsFn](_.toJs, _.para(expression.toJs[Fix, EX]))
+      key.asText -> expr.fold[PlannerError \/ JsFn](_.toJs, _.para(expression.toJs[Fix[EX], EX]))
     }.sequence.map { l => JsFn(JsFn.defaultName,
       jscore.Obj(l.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(JsFn.defaultName)) }))
     }
@@ -85,7 +87,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
     Reshape(value.transform((k, v) => v.bimap(
       _.rewriteRefs(applyVar),
       x => (x match {
-        case $include() => ExprOpCoreF.fixpoint[Fix, EX].$var(DocField(k))
+        case $include() => (new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)).$var(DocField(k))
         case _          => x
       }).cata(ops.rewriteRefs(applyVar)))))
 

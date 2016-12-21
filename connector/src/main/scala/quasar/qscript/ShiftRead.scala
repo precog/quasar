@@ -17,12 +17,12 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 import ShiftRead._
@@ -37,12 +37,11 @@ trait ShiftRead[F[_]] {
 
   // NB: This could be either a futumorphism (as it is) or an apomorphism. Not
   //     sure if one is clearly better.
-  def shiftRead[H[_]](GtoH: G ~> H): F >> H
+  def shiftRead[H[_]](GtoH: G ~> H): F ~> FixFreeH[H, ?]
 }
 
 object ShiftRead {
   type FixFreeH[H[_], A] = H[Free[H, A]]
-  type >>[-F[_], H[_]]   = F ~> FixFreeH[H, ?]
 
   // NB: The `T` parameter is unused, but without it, the `read` instance
   //     doesn’t get resolved.
@@ -50,16 +49,17 @@ object ShiftRead {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[T, F, G]) = ev
 
-  private def ShiftTotal[T[_[_]]: Recursive: Corecursive] =
+  private def ShiftTotal[T[_[_]]: BirecursiveT] =
     ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]]
 
-  def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T]):
+  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]):
       FreeQS[T] =
-    freeTransFutu(branch)((co: CoEnv[Hole, QScriptTotal[T, ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]) => co.run.fold(
-      κ(co.map(Free.point[CoEnv[Hole, QScriptTotal[T, ?], ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]])),
-      ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
+    branch.futu[FreeQS[T]](
+      _.project.run.fold(
+        h => CoEnv(h.left[QScriptTotal[T, Free[CoEnv[Hole, QScriptTotal[T, ?], ?], FreeQS[T]]]]),
+        ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
-  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]]
+  implicit def read[T[_[_]]: BirecursiveT, F[_]]
     (implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
       : ShiftRead.Aux[T, Const[Read, ?], F] =
     new ShiftRead[Const[Read, ?]] {
@@ -77,7 +77,7 @@ object ShiftRead {
        )
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]](implicit QC: QScriptCore[T, ?] :<: F):
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](implicit QC: QScriptCore[T, ?] :<: F):
       ShiftRead.Aux[T, QScriptCore[T, ?], F] =
     new ShiftRead[QScriptCore[T, ?]] {
       type G[A] = F[A]
@@ -92,7 +92,7 @@ object ShiftRead {
       )
     }
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F):
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F):
       ShiftRead.Aux[T, ThetaJoin[T, ?], F] =
     new ShiftRead[ThetaJoin[T, ?]] {
       type G[A] = F[A]
@@ -107,7 +107,7 @@ object ShiftRead {
       )
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit EJ: EquiJoin[T, ?] :<: F):
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](implicit EJ: EquiJoin[T, ?] :<: F):
       ShiftRead.Aux[T, EquiJoin[T, ?], F] =
     new ShiftRead[EquiJoin[T, ?]] {
       type G[A] = F[A]

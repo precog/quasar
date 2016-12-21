@@ -21,7 +21,9 @@ import quasar.fp.ski._
 import quasar.SemanticError._
 import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST}
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
@@ -66,7 +68,7 @@ object Variables {
   }
 
   // FIXME: Get rid of this
-  def substVars(expr: Fix[Sql], variables: Variables):
-      SemanticError \/ Fix[Sql] =
+  def substVars(expr: Fix[Sql], variables: Variables)
+      : SemanticError \/ Fix[Sql] =
     expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables))
 }

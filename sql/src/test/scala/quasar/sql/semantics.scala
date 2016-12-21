@@ -21,7 +21,8 @@ import quasar.TreeMatchers
 import quasar.sql.SemanticAnalysis._
 import quasar.sql.fixpoint._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -31,8 +32,11 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
     val compiler = Compiler.trampoline
     val asc: OrderType = ASC
 
-    def transform[T[_[_]]: Recursive: Corecursive](q: T[Sql]): T[Sql] =
-      q.transCata(orOriginal(projectSortKeysƒ))
+    def transform[T]
+      (q: T)
+      (implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+        : T =
+      q.transCata[T](orOriginal(projectSortKeysƒ))
 
     "add single field for order by" in {
       val q = SelectR(SelectAll,

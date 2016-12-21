@@ -26,7 +26,7 @@ import quasar.sql.{Sql, Query}
 import scala.collection.Seq
 
 import argonaut._, Argonaut._
-import matryoshka._
+import matryoshka.data.Fix
 import org.http4s._, dsl._
 import scalaz._, Scalaz._
 

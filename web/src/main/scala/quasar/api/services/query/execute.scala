@@ -30,7 +30,7 @@ import quasar.main.FilesystemQueries
 import quasar.sql.{Query, Sql}
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.Accept

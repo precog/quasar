@@ -16,7 +16,8 @@
 
 package quasar.fp
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object binder {
@@ -24,12 +25,15 @@ package object binder {
     * "bound" nodes. The function is also applied to the bindings themselves
     * to determine their annotation.
     */
-  def boundAttribute[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
-    t: T[F])(f: T[F] => A)(implicit B: Binder[F]): Cofree[F, A] = {
-    def loop(t: F[T[F]], b: B.G[(T[F], Cofree[F, A])]): (T[F], Cofree[F, A]) = {
+  def boundAttribute[T, F[_]: Functor, A]
+    (t: T)
+    (f: T => A)
+    (implicit TR: Recursive.Aux[T, F], TC: Corecursive.Aux[T, F], B: Binder[F])
+      : Cofree[F, A] = {
+    def loop(t: F[T], b: B.G[(T, Cofree[F, A])]): (T, Cofree[F, A]) = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).fold {
-        val m: F[(T[F], Cofree[F, A])] = t.map(x => loop(x.project, newB))
+        val m: F[(T, Cofree[F, A])] = t.map(x => loop(x.project, newB))
         val t1 = m.map(_._1).embed
         (t1, Cofree(f(t1), m.map(_._2)))
       } { case (x, _) => (x, t.embed.cata(attrK(f(x)))) }
@@ -37,8 +41,12 @@ package object binder {
     loop(t.project, B.initial)._2
   }
 
-  def boundCata[T[_[_]]: Recursive, F[_]: Functor, A](t: T[F])(f: F[A] => A)(implicit B: Binder[F]): A = {
-    def loop(t: F[T[F]], b: B.G[A]): A = {
+  def boundCata[T, F[_]: Functor, A]
+    (t: T)
+    (f: F[A] => A)
+    (implicit T: Recursive.Aux[T, F], B: Binder[F])
+      : A = {
+    def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => loop(x.project, newB))))
     }
@@ -46,8 +54,12 @@ package object binder {
     loop(t.project, B.initial)
   }
 
-  def boundParaM[T[_[_]]: Recursive, M[_]: Monad, F[_]: Traverse, A](t: T[F])(f: F[(T[F], A)] => M[A])(implicit B: Binder[F]): M[A] = {
-    def loop(t: F[T[F]], b: B.G[A]): M[A] = {
+  def boundParaM[T, M[_]: Monad, F[_]: Traverse, A]
+    (t: T)
+    (f: F[(T, A)] => M[A])
+    (implicit T: Recursive.Aux[T, F], B: Binder[F])
+      : M[A] = {
+    def loop(t: F[T], b: B.G[A]): M[A] = {
       Applicative[M].sequence(B.bindings[T, M[A]](t, B.G.map(b)(_.point[M]))(s => loop(s, b)))(B.G).flatMap { newB =>
         B.subst(t, newB).cata[M[A]](
           _.point[M],
@@ -58,11 +70,19 @@ package object binder {
     loop(t.project, B.initial)
   }
 
-  def boundParaS[T[_[_]]: Recursive, F[_]: Traverse, S, A](t: T[F])(f: F[(T[F], A)] => State[S, A])(implicit B: Binder[F]): State[S, A] =
+  def boundParaS[T, F[_]: Traverse, S, A]
+    (t: T)
+    (f: F[(T, A)] => State[S, A])
+    (implicit T: Recursive.Aux[T, F], B: Binder[F])
+      : State[S, A] =
     boundParaM[T, State[S, ?], F, A](t)(f)
 
-  def boundPara[T[_[_]]: Recursive, F[_]: Functor, A](t: T[F])(f: F[(T[F], A)] => A)(implicit B: Binder[F]): A = {
-    def loop(t: F[T[F]], b: B.G[A]): A = {
+  def boundPara[T, F[_]: Functor, A]
+    (t: T)
+    (f: F[(T, A)] => A)
+    (implicit T: Recursive.Aux[T, F], B: Binder[F])
+      : A = {
+    def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => (x, loop(x.project, newB)))))
     }

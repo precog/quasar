@@ -26,7 +26,9 @@ import quasar.fp.numeric._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp._
 
-import matryoshka.{Fix, Recursive}, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

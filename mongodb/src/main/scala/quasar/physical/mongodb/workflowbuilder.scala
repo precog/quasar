@@ -30,10 +30,138 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 sealed trait WorkflowBuilderF[F[_], +A] extends Product with Serializable
+
+object WorkflowBuilderF {
+  import WorkflowBuilder._
+
+  // NB: This instance can’t be derived, because of `dummyOp`.
+  implicit def equal[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F): Delay[Equal, WorkflowBuilderF[F, ?]] =
+    new Delay[Equal, WorkflowBuilderF[F, ?]] {
+      def apply[A](eq: Equal[A]) = {
+        implicit val eqA: Equal[A] = eq
+
+        Equal.equal((v1: WorkflowBuilderF[F, A], v2: WorkflowBuilderF[F, A]) => (v1, v2) match {
+          case (CollectionBuilderF(g1, b1, s1), CollectionBuilderF(g2, b2, s2)) =>
+            g1 == g2 && b1 == b2 && s1 ≟ s2
+          case (v1 @ ShapePreservingBuilderF(s1, i1, _), v2 @ ShapePreservingBuilderF(s2, i2, _)) =>
+            eq.equal(s1, s2) && i1 ≟ i2 && v1.dummyOp == v2.dummyOp
+          case (ValueBuilderF(v1), ValueBuilderF(v2)) => v1 == v2
+          case (ExprBuilderF(s1, e1), ExprBuilderF(s2, e2)) =>
+            eq.equal(s1, s2) && e1 == e2
+          case (DocBuilderF(s1, e1), DocBuilderF(s2, e2)) =>
+            eq.equal(s1, s2) && e1 == e2
+          case (ArrayBuilderF(s1, e1), ArrayBuilderF(s2, e2)) =>
+            eq.equal(s1, s2) && e1 == e2
+          case (GroupBuilderF(s1, k1, c1), GroupBuilderF(s2, k2, c2)) =>
+            eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
+          case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
+            eq.equal(s1, s2) && f1 == f2
+          case (SpliceBuilderF(s1, i1), SpliceBuilderF(s2, i2)) =>
+            eq.equal(s1, s2) && i1 == i2
+          case (ArraySpliceBuilderF(s1, i1), ArraySpliceBuilderF(s2, i2)) =>
+            eq.equal(s1, s2) && i1 == i2
+          case _ => false
+        })
+      }
+    }
+
+  implicit def traverse[F[_]]: Traverse[WorkflowBuilderF[F, ?]] =
+    new Traverse[WorkflowBuilderF[F, ?]] {
+      def traverseImpl[G[_], A, B](
+        fa: WorkflowBuilderF[F, A])(
+        f: A => G[B])(
+        implicit G: Applicative[G]):
+          G[WorkflowBuilderF[F, B]] =
+        fa match {
+          case x @ CollectionBuilderF(_, _, _) => G.point(x)
+          case ShapePreservingBuilderF(src, inputs, op) =>
+            (f(src) |@| inputs.traverse(f))(ShapePreservingBuilderF(_, _, op))
+          case x @ ValueBuilderF(_) => G.point(x)
+          case ExprBuilderF(src, expr) => f(src).map(ExprBuilderF(_, expr))
+          case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
+          case ArrayBuilderF(src, shape) => f(src).map(ArrayBuilderF(_, shape))
+          case GroupBuilderF(src, keys, contents) =>
+            (f(src) |@| keys.traverse(f))(GroupBuilderF(_, _, contents))
+          case FlatteningBuilderF(src, fields) =>
+            f(src).map(FlatteningBuilderF(_, fields))
+          case SpliceBuilderF(src, structure) =>
+            f(src).map(SpliceBuilderF(_, structure))
+          case ArraySpliceBuilderF(src, structure) =>
+            f(src).map(ArraySpliceBuilderF(_, structure))
+        }
+    }
+
+  implicit def renderTree[F[_]: Coalesce: Functor](implicit
+      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
+      RC: RenderTree[Contents[Expr]],
+      RF: RenderTree[Fix[F]],
+      ev: WorkflowOpCoreF :<: F
+    ): Delay[RenderTree, WorkflowBuilderF[F, ?]] =
+    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ WorkflowBuilderF[F, ?])#λ](rt => {
+      val nodeType = "WorkflowBuilder" :: Nil
+      import fixExprOp._
+
+      RenderTree.make {
+        case CollectionBuilderF(graph, base, struct) =>
+          NonTerminal("CollectionBuilder" :: nodeType, Some(base.shows),
+            graph.render ::
+              Terminal("Schema" :: "CollectionBuilder" :: nodeType, struct ∘ (_.shows)) ::
+              Nil)
+        case spb @ ShapePreservingBuilderF(src, inputs, op) =>
+          val nt = "ShapePreservingBuilder" :: nodeType
+          NonTerminal(nt, None,
+            rt.render(src) :: (inputs.map(rt.render) :+ spb.dummyOp.render))
+        case ValueBuilderF(value) =>
+          Terminal("ValueBuilder" :: nodeType, Some(value.shows))
+        case ExprBuilderF(src, expr) =>
+          NonTerminal("ExprBuilder" :: nodeType, None,
+            rt.render(src) :: expr.render :: Nil)
+        case DocBuilderF(src, shape) =>
+          val nt = "DocBuilder" :: nodeType
+          NonTerminal(nt, None,
+            rt.render(src) ::
+              NonTerminal("Shape" :: nt, None,
+                shape.toList.map {
+                  case (name, expr) =>
+                    NonTerminal("Name" :: nodeType, Some(name.value), List(expr.render))
+                }) ::
+              Nil)
+        case ArrayBuilderF(src, shape) =>
+          val nt = "ArrayBuilder" :: nodeType
+          NonTerminal(nt, None,
+            rt.render(src) ::
+              NonTerminal("Shape" :: nt, None, shape.map(_.render)) ::
+              Nil)
+        case GroupBuilderF(src, keys, content) =>
+          val nt = "GroupBuilder" :: nodeType
+          NonTerminal(nt, None,
+            rt.render(src) ::
+              NonTerminal("By" :: nt, None, keys.map(rt.render)) ::
+              RG.render(content).copy(nodeType = "Content" :: nt) ::
+              Nil)
+        case FlatteningBuilderF(src, fields) =>
+          val nt = "FlatteningBuilder" :: nodeType
+          NonTerminal(nt, None,
+            rt.render(src) ::
+              fields.toList.map(x => $var(x.field).render.copy(nodeType = (x match {
+                case StructureType.Array(_) => "Array"
+                case StructureType.Object(_) => "Object"
+              }) :: nt)))
+        case SpliceBuilderF(src, structure) =>
+          NonTerminal("SpliceBuilder" :: nodeType, None,
+            rt.render(src) :: structure.map(RC.render))
+        case ArraySpliceBuilderF(src, structure) =>
+          NonTerminal("ArraySpliceBuilder" :: nodeType, None,
+            rt.render(src) :: structure.map(RC.render))
+      }
+    }))
+}
 
 object WorkflowBuilder {
   /** A partial description of a query that can be run on an instance of MongoDB */
@@ -46,9 +174,11 @@ object WorkflowBuilder {
     * gets materialized into a Map/Reduce operation.
     */
   type Expr = JsFn \/ Fix[ExprOp]
+
   private def exprToJs(expr: Expr)(implicit ev: ExprOpOps.Uni[ExprOp])
       : PlannerError \/ JsFn =
     expr.fold(\/-(_), _.para(toJs))
+
   implicit val ExprRenderTree: RenderTree[Expr] = new RenderTree[Expr] {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
@@ -247,60 +377,6 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new ArraySpliceBuilderF(src, structure))
   }
 
-  // NB: This instance can’t be derived, because of `dummyOp`.
-  implicit def WorkflowBuilderEqualF[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F)
-    : EqualF[WorkflowBuilderF[F, ?]] =
-    new EqualF[WorkflowBuilderF[F, ?]] {
-      def equal[A: Equal](v1: WorkflowBuilderF[F, A], v2: WorkflowBuilderF[F, A]) = (v1, v2) match {
-        case (CollectionBuilderF(g1, b1, s1), CollectionBuilderF(g2, b2, s2)) =>
-          g1 == g2 && b1 == b2 && s1 ≟ s2
-        case (v1 @ ShapePreservingBuilderF(s1, i1, _), v2 @ ShapePreservingBuilderF(s2, i2, _)) =>
-          s1 ≟ s2 && i1 ≟ i2 && v1.dummyOp == v2.dummyOp
-        case (ValueBuilderF(v1), ValueBuilderF(v2)) => v1 == v2
-        case (ExprBuilderF(s1, e1), ExprBuilderF(s2, e2)) =>
-          s1 ≟ s2 && e1 == e2
-        case (DocBuilderF(s1, e1), DocBuilderF(s2, e2)) =>
-          s1 ≟ s2 && e1 == e2
-        case (ArrayBuilderF(s1, e1), ArrayBuilderF(s2, e2)) =>
-          s1 ≟ s2 && e1 == e2
-        case (GroupBuilderF(s1, k1, c1), GroupBuilderF(s2, k2, c2)) =>
-          s1 ≟ s2 && k1 ≟ k2 && c1 == c2
-        case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
-          s1 ≟ s2 && f1 == f2
-        case (SpliceBuilderF(s1, i1), SpliceBuilderF(s2, i2)) =>
-          s1 ≟ s2 && i1 == i2
-        case (ArraySpliceBuilderF(s1, i1), ArraySpliceBuilderF(s2, i2)) =>
-          s1 ≟ s2 && i1 == i2
-        case _ => false
-      }
-    }
-
-  implicit def WorkflowBuilderTraverse[F[_]]: Traverse[WorkflowBuilderF[F, ?]] =
-    new Traverse[WorkflowBuilderF[F, ?]] {
-      def traverseImpl[G[_], A, B](
-        fa: WorkflowBuilderF[F, A])(
-        f: A => G[B])(
-        implicit G: Applicative[G]):
-          G[WorkflowBuilderF[F, B]] =
-        fa match {
-          case x @ CollectionBuilderF(_, _, _) => G.point(x)
-          case ShapePreservingBuilderF(src, inputs, op) =>
-            (f(src) |@| inputs.traverse(f))(ShapePreservingBuilderF(_, _, op))
-          case x @ ValueBuilderF(_) => G.point(x)
-          case ExprBuilderF(src, expr) => f(src).map(ExprBuilderF(_, expr))
-          case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
-          case ArrayBuilderF(src, shape) => f(src).map(ArrayBuilderF(_, shape))
-          case GroupBuilderF(src, keys, contents) =>
-            (f(src) |@| keys.traverse(f))(GroupBuilderF(_, _, contents))
-          case FlatteningBuilderF(src, fields) =>
-            f(src).map(FlatteningBuilderF(_, fields))
-          case SpliceBuilderF(src, structure) =>
-            f(src).map(SpliceBuilderF(_, structure))
-          case ArraySpliceBuilderF(src, structure) =>
-            f(src).map(ArraySpliceBuilderF(_, structure))
-        }
-    }
-
   def branchLengthƒ[F[_]]: WorkflowBuilderF[F, Int] => Int = {
     case CollectionBuilderF(_, _, _) => 0
     case ShapePreservingBuilderF(src, inputs, _) => 1 + src
@@ -343,10 +419,10 @@ object WorkflowBuilder {
             xs <- inner.map { case (n, x) =>
                     jscore.Select(jscore.Ident(js.param), n.value) -> exprToJs(x)
                   }.sequence.toOption
-            expr1 <- js.expr.apoM[Fix, Option, jscore.JsCoreF] {
+            expr1 <- js.expr.apoM[JsCore] {
                     case t @ jscore.Access(b, _) if b == jscore.Ident(js.param) =>
-                      xs.get(t).map(_(jscore.Ident(js.param)).unFix.map(_.left))
-                    case t => t.unFix.map(_.right[JsCore]).some
+                      xs.get(t).map(_(jscore.Ident(js.param)).project.map(_.left[JsCore]))
+                    case t => t.project.map(_.right[JsCore]).some
                   }
           } yield -\/(JsFn(js.param, expr1)),
         expr =>
@@ -479,7 +555,7 @@ object WorkflowBuilder {
   }
 
   private def commonShape(shape: ListMap[BsonField.Name, Expr])(implicit ev: ExprOpOps.Uni[ExprOp]) =
-    commonMap(shape)(_.para(toJs[Fix, ExprOp]))
+    commonMap(shape)(_.para(toJs[Fix[ExprOp], ExprOp]))
 
   private val jsBase = jscore.Name("__val")
 
@@ -1144,7 +1220,7 @@ object WorkflowBuilder {
     def read(coll: Collection): WorkflowBuilder[F] =
       CollectionBuilder($read[F](coll), Root(), None)
 
-    def pure(bson: Bson): WorkflowBuilder[F] = ValueBuilder(bson)
+    def pure(bson: Bson): Fix[WorkflowBuilderF[F, ?]] = ValueBuilder(bson)
 
     def limit(wb: WorkflowBuilder[F], count: Long): WorkflowBuilder[F] =
       ShapePreservingBuilder(wb, Nil, { case Nil => $limit[F](count) })
@@ -1766,72 +1842,4 @@ object WorkflowBuilder {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =
       new Ops[F]
   }
-
-  // FIXME: These implicits should not be here, because this is not a companion
-  //        object, and therefore not on the search path.
-
-  implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
-    (implicit
-      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
-      RC: RenderTree[Contents[Expr]],
-      RF: RenderTree[Fix[F]],
-      ev: WorkflowOpCoreF :<: F
-    ): RenderTree[Fix[WorkflowBuilderF[F, ?]]] =
-    new RenderTree[Fix[WorkflowBuilderF[F, ?]]] {
-      val nodeType = "WorkflowBuilder" :: Nil
-
-      def render(v: WorkflowBuilder[F]) = v.unFix match {
-        case CollectionBuilderF(graph, base, struct) =>
-          NonTerminal("CollectionBuilder" :: nodeType, Some(base.shows),
-            graph.render ::
-              Terminal("Schema" :: "CollectionBuilder" :: nodeType, struct ∘ (_.shows)) ::
-              Nil)
-        case spb @ ShapePreservingBuilderF(src, inputs, op) =>
-          val nt = "ShapePreservingBuilder" :: nodeType
-          NonTerminal(nt, None,
-            render(src) :: (inputs.map(render) :+ spb.dummyOp.render))
-        case ValueBuilderF(value) =>
-          Terminal("ValueBuilder" :: nodeType, Some(value.shows))
-        case ExprBuilderF(src, expr) =>
-          NonTerminal("ExprBuilder" :: nodeType, None,
-            render(src) :: expr.render :: Nil)
-        case DocBuilderF(src, shape) =>
-          val nt = "DocBuilder" :: nodeType
-          NonTerminal(nt, None,
-            render(src) ::
-              NonTerminal("Shape" :: nt, None,
-                shape.toList.map {
-                  case (name, expr) =>
-                    NonTerminal("Name" :: nodeType, Some(name.value), List(expr.render))
-                }) ::
-              Nil)
-        case ArrayBuilderF(src, shape) =>
-          val nt = "ArrayBuilder" :: nodeType
-          NonTerminal(nt, None,
-            render(src) ::
-              NonTerminal("Shape" :: nt, None, shape.map(_.render)) ::
-              Nil)
-        case GroupBuilderF(src, keys, content) =>
-          val nt = "GroupBuilder" :: nodeType
-          NonTerminal(nt, None,
-            render(src) ::
-              NonTerminal("By" :: nt, None, keys.map(render)) ::
-              RG.render(content).copy(nodeType = "Content" :: nt) ::
-              Nil)
-        case FlatteningBuilderF(src, fields) =>
-          val nt = "FlatteningBuilder" :: nodeType
-          NonTerminal(nt, None,
-            render(src) ::
-              fields.toList.map(x => $var(x.field).render.copy(nodeType = (x match {
-                case StructureType.Array(_) => "Array"
-                case StructureType.Object(_) => "Object"
-              }) :: nt)))
-        case SpliceBuilderF(src, structure) =>
-          NonTerminal("SpliceBuilder" :: nodeType, None,
-            render(src) :: structure.map(RC.render))
-        case ArraySpliceBuilderF(src, structure) =>
-          NonTerminal("ArraySpliceBuilder" :: nodeType, None,
-            render(src) :: structure.map(RC.render))
-      }
-    }
 }

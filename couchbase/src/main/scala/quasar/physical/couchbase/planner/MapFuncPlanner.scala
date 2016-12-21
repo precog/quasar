@@ -19,16 +19,16 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
-import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, MapFunc[T, ?]] {
 
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
@@ -94,7 +94,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
   def plan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] = {
     // nullary
     case MF.Constant(v) =>
-      Data[T[N1QL]](v.cataM(QData.fromEJson)).embed.η[M]
+      Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
       Data[T[N1QL]](QData.NA).embed.η[M]
 
@@ -356,7 +356,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
     case MF.MakeArray(a1) =>
       Arr(List(a1)).embed.η[M]
     case MF.MakeMap(a1, a2) =>
-      genId[T, M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
         a2,
         Select(
           Value(true),
@@ -394,7 +394,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[M]
     case MF.ProjectField(a1, a2) =>
-      genId[T, M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
         a1,
         Select(
           Value(true),
@@ -406,7 +406,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
           orderBy = Nil).embed,
         SelectField(a1, a2).embed))
     case MF.ProjectIndex(a1, a2) =>
-      genId[T, M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
         a1,
         Select(
           Value(true),
@@ -433,7 +433,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
           Else(na)).embed
 
       def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
-        genId[T, M] ∘ (id =>
+        genId[T[N1QL], M] ∘ (id =>
           Select(
             Value(true),
             ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,

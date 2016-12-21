@@ -20,7 +20,9 @@ import quasar.Predef._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.expression.DocVar
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object accumulator {

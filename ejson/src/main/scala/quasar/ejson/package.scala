@@ -18,11 +18,11 @@ package quasar
 
 import quasar.Predef.Boolean
 
+import java.lang.String
 import scala.Predef.implicitly
 
-import java.lang.String
-
-import matryoshka._, FunctorT.ops._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import monocle.Prism
 import scalaz._
 
@@ -42,16 +42,16 @@ package object ejson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
 
-    def fromJsonT[T[_[_]]: FunctorT: Corecursive]: T[Json] => T[EJson] =
-      _.transAna(fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
+    def fromJsonT[T[_[_]]: BirecursiveT]: T[Json] => T[EJson] =
+      _.transAna[T[EJson]](fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
 
-    def fromCommon[T[_[_]]: Corecursive]: Common[T[EJson]] => T[EJson] =
+    def fromCommon[T](implicit T: Corecursive.Aux[T, EJson]): Common[T] => T =
       CommonEJson.inj(_).embed
 
-    def fromExt[T[_[_]]: Corecursive]: Extension[T[EJson]] => T[EJson] =
+    def fromExt[T](implicit T: Corecursive.Aux[T, EJson]): Extension[T] => T =
       ExtEJson.inj(_).embed
 
-    def isNull[T[_[_]]: Recursive](ej: T[EJson]): Boolean =
+    def isNull[T](ej: T)(implicit T: Recursive.Aux[T, EJson]): Boolean =
       CommonEJson.prj(ej.project).fold(false) {
         case ejson.Null() => true
         case _ => false

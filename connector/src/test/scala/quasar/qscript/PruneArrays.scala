@@ -22,7 +22,8 @@ import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
 
-import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 

@@ -34,7 +34,9 @@ import quasar.physical.mongodb.workflow._
 import quasar.qscript.MapFunc
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path.rootDir
 import scalaz.{Free => _, _}, Scalaz._
 import shapeless.{Data => _, :: => _, _}
@@ -104,7 +106,7 @@ object MongoDbPlanner {
       And => _, Or => _, Not => _,
       _}
 
-    val mjs = quasar.physical.mongodb.javascript[Fix]
+    val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
 
     val HasJs: Output => OutputM[PartialJs] =
@@ -496,12 +498,11 @@ object MongoDbPlanner {
       ev2: ExprOpCoreF :<: EX,
       inj: EX :<: ExprOp,
       WB: WorkflowBuilder.Ops[F])
-    : LP[
-        Cofree[LP, (
-          (OutputM[PartialSelector],
-           OutputM[PartialJs]),
-          OutputM[WorkflowBuilder[F]])]] =>
-      State[NameGen, OutputM[Fix[WorkflowBuilderF[F, ?]]]] = {
+      : LP[
+          Cofree[LP, (
+            (OutputM[PartialSelector], OutputM[PartialJs]),
+            OutputM[WorkflowBuilder[F]])]] =>
+          State[NameGen, OutputM[WorkflowBuilder[F]]] = {
     import WorkflowBuilder._
 
     type Input  = (OutputM[PartialSelector], OutputM[PartialJs])
@@ -512,8 +513,8 @@ object MongoDbPlanner {
 
     // NB: it's only safe to emit "core" expr ops here, but we always use the
     // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-    import fixExprOp.{ I => _, _ }
-    val check = Check[Fix, ExprOp]
+    import fixExprOp._
+    val check = new Check[Fix[ExprOp], ExprOp]
 
     object HasData {
       def unapply(node: LP[Ann]): Option[Data] = constant.getOption(node)
@@ -588,13 +589,13 @@ object MongoDbPlanner {
         (ann.tail, f) match {
           case (Typecheck(_, _, _, _), There(1, _)) => !isSimpleRef
           case (InvokeUnapply(Cond, _), There(x, _))
-              if x == 1 || x == 2                    => !isSimpleRef
-          case _                                     => false
+              if x ≟ 1 || x ≟ 2                     => !isSimpleRef
+          case _                                    => false
         }
       }
 
       def createOp[A](f: scalaz.Free[EX, A]): scalaz.Free[ExprOp, A] =
-        FunctorT[scalaz.Free[?[_], A]].transCata[EX, ExprOp](f)(inj)
+        f.mapSuspension(inj)
 
       ((func, args) match {
         // NB: this one is missing from MapFunc.
@@ -627,7 +628,7 @@ object MongoDbPlanner {
             funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
             val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
-              case List(_1, _2, _3) => exp.eval[Fix](_1, _2, _3)
+              case List(_1, _2, _3) => exp.eval[Fix[ExprOp]](_1, _2, _3)
             }
           }
         case _ => None
@@ -669,7 +670,7 @@ object MongoDbPlanner {
           args match {
             case Sized(left, right, comp) =>
               splitConditions(comp).fold[M[WorkflowBuilder[F]]](
-                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder[F]])]].convertTo[LP, Fix](comp))))(
+                fail(UnsupportedJoinCondition(forgetAnnotation[Cofree[LP, (Input, OutputM[WorkflowBuilder[F]])], Fix[LP], LP, (Input, OutputM[WorkflowBuilder[F]])](comp))))(
                 c => {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
@@ -950,11 +951,11 @@ object MongoDbPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.point[W]).liftM[GenT]
 
-    val wfƒ = workflowƒ[WF, EX](joinHandler, funcHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[WF])))
+    val wfƒ = workflowƒ[WF, EX](joinHandler, funcHandler) ⋙ (_ ∘ (_ ∘ ((_: Fix[WorkflowBuilderF[WF, ?]]).mapR(normalize[WF]))))
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
+      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo[Fix[LP]](elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
       prep <- log("Logical Plan (projections preferred)")(optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpr.lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))

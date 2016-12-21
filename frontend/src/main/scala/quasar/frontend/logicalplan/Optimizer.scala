@@ -18,7 +18,6 @@ package quasar.frontend.logicalplan
 
 import quasar.Predef._
 import quasar._
-import quasar.contrib.matryoshka._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.fp.ski._
@@ -28,44 +27,37 @@ import quasar.sql.JoinDir
 
 import scala.Predef.$conforms
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
-sealed abstract class Component[T[_[_]], A] {
-  def run(l: T[LP], r: T[LP]): A
+sealed abstract class Component[T, A] {
+  def run(l: T, r: T): A = this match {
+    case EquiCond(run0)  => run0(l, r)
+    case LeftCond(run0)  => run0(l)
+    case RightCond(run0) => run0(r)
+    case OtherCond(run0) => run0(l, r)
+    case NeitherCond(a)  => a
+  }
 }
 /** A condition that refers to left and right sources using equality, so may be
   * rewritten into the join condition.
   */
-final case class EquiCond[T[_[_]], A](run0: (T[LP], T[LP]) => A)
-    extends Component[T, A] {
-  def run(l: T[LP], r: T[LP]) = run0(l,r)
-}
+final case class EquiCond[T, A](run0: (T, T) => A) extends Component[T, A]
 /** A condition which refers only to the left source */
-final case class LeftCond[T[_[_]], A](run0: T[LP] => A)
-    extends Component[T, A] {
-  def run(l: T[LP], r: T[LP]) = run0(l)
-}
+final case class LeftCond[T, A](run0: T => A) extends Component[T, A]
 /** A condition which refers only to the right source. */
-final case class RightCond[T[_[_]], A](run0: T[LP] => A)
-    extends Component[T, A] {
-  def run(l: T[LP], r: T[LP]) = run0(r)
-}
+final case class RightCond[T, A](run0: T => A) extends Component[T, A]
 /** A condition which refers to both sources but doesn't have the right shape to
   * become the join condition.
   */
-final case class OtherCond[T[_[_]], A](run0: (T[LP], T[LP]) => A)
-    extends Component[T, A] {
-  def run(l: T[LP], r: T[LP]) = run0(l,r)
-}
+final case class OtherCond[T, A](run0: (T, T) => A) extends Component[T, A]
 /** An expression that doesn't refer to any source. */
-final case class NeitherCond[T[_[_]], A](run0: A) extends Component[T, A] {
-  def run(l: T[LP], r: T[LP]) = run0
-}
+final case class NeitherCond[T, A](run0: A) extends Component[T, A]
 
 object Component {
-  implicit def applicative[T[_[_]]]: Applicative[Component[T, ?]] =
+  implicit def applicative[T]: Applicative[Component[T, ?]] =
     new Applicative[Component[T, ?]] {
       def point[A](a: => A) = NeitherCond(a)
 
@@ -94,7 +86,7 @@ object Component {
     }
 }
 
-class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
+class Optimizer[T[_[_]]: BirecursiveT: EqualT] {
   import quasar.std.StdLib._
   import set._
   import structural._
@@ -120,24 +112,24 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
     case inv @ Invoke(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
       case Constant(_) | Free(_) =>
-        in.transPara(inlineƒ(ident, form.project)).project.some
+        in.transPara[T[LP]](inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
         case 0 => in.project.some
-        case 1 => in.transPara(inlineƒ(ident, form.project)).project.some
+        case 1 => in.transPara[T[LP]](inlineƒ(ident, form.project)).project.some
         case _ => None
       }
     }
     case _ => None
   }
 
-  def simplify(t: T[LP]): T[LP] = t.transCata(repeatedly(simplifyƒ))
+  def simplify(t: T[LP]): T[LP] = t.transCata[T[LP]](repeatedly(simplifyƒ))
 
   /** Like `simplifyƒ`, but eliminates _all_ `Let` (and any bound `Free`) nodes.
     */
   val elideLets:
       LP[T[LP]] => Option[LP[T[LP]]] = {
     case Let(ident, form, in) =>
-      in.transPara(inlineƒ(ident, form.project)).project.some
+      in.transPara[T[LP]](inlineƒ(ident, form.project)).project.some
     case _ => None
   }
 
@@ -217,7 +209,7 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
   }
 
   def preferProjections(t: T[LP]): T[LP] =
-    boundPara(t)(preferProjectionsƒ)._1.transCata(repeatedly(simplifyƒ))
+    boundPara(t)(preferProjectionsƒ)._1.transCata[T[LP]](repeatedly(simplifyƒ))
 
   // FIXME: Make this a transformation instead of an algebra.
   val elideTypeCheckƒ: Algebra[LP, T[LP]] = {
@@ -242,8 +234,8 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
     }
 
     def toComp(left: T[LP], right: T[LP])(c: T[LP]):
-        Component[T, T[LP]] = {
-      c.para[Component[T, T[LP]]] {
+        Component[T[LP], T[LP]] = {
+      c.para[Component[T[LP], T[LP]]] {
         case t if t.map(_._1) ≟ left.project  => LeftCond(ι)
         case t if t.map(_._1) ≟ right.project => RightCond(ι)
 
@@ -268,7 +260,7 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
     def assembleCond(conds: List[T[LP]]): T[LP] =
       conds.foldLeft(lpr.constant(Data.True))(relations.And(_, _).embed)
 
-    def newJoin(lSrc: T[LP], rSrc: T[LP], comps: List[Component[T, T[LP]]])
+    def newJoin(lSrc: T[LP], rSrc: T[LP], comps: List[Component[T[LP], T[LP]]])
         : State[NameGen, T[LP]] = {
       val equis    = comps.collect { case c @ EquiCond(_) => c }
       val lefts    = comps.collect { case c @ LeftCond(_) => c }

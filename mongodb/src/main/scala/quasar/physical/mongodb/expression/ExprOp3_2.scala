@@ -24,6 +24,7 @@ import quasar.physical.mongodb.Bson
 import quasar.jscore, jscore.{JsCore, JsFn}
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators added in MongoDB version 3.2. */
@@ -116,20 +117,21 @@ object ExprOp3_2F {
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
   }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOp3_2F :<: EX) {
-    @inline private implicit def convert(expr: ExprOp3_2F[T[EX]]): T[EX] =
-      I.inj(expr).embed
+  final class fixpoint[T, EX[_]: Functor]
+    (embed: EX[T] => T)
+    (implicit I: ExprOp3_2F :<: EX) {
+    @inline private def convert(expr: ExprOp3_2F[T]): T = embed(I.inj(expr))
 
-    def $sqrt(value: T[EX]): T[EX]             = $sqrtF(value)
-    def $abs(value: T[EX]): T[EX]              = $absF(value)
-    def $log(value: T[EX], base: T[EX]): T[EX] = $logF(value, base)
-    def $log10(value: T[EX]): T[EX]            = $log10F(value)
-    def $ln(value: T[EX]): T[EX]               = $lnF(value)
-    def $pow(value: T[EX], exp: T[EX]): T[EX]  = $powF(value, exp)
-    def $exp(value: T[EX]): T[EX]              = $expF(value)
-    def $trunc(value: T[EX]): T[EX]            = $truncF(value)
-    def $ceil(value: T[EX]): T[EX]             = $ceilF(value)
-    def $floor(value: T[EX]): T[EX]            = $floorF(value)
+    def $sqrt(value: T): T         = convert($sqrtF(value))
+    def $abs(value: T): T          = convert($absF(value))
+    def $log(value: T, base: T): T = convert($logF(value, base))
+    def $log10(value: T): T        = convert($log10F(value))
+    def $ln(value: T): T           = convert($lnF(value))
+    def $pow(value: T, exp: T): T  = convert($powF(value, exp))
+    def $exp(value: T): T          = convert($expF(value))
+    def $trunc(value: T): T        = convert($truncF(value))
+    def $ceil(value: T): T         = convert($ceilF(value))
+    def $floor(value: T): T        = convert($floorF(value))
   }
 }
 
@@ -224,42 +226,42 @@ object $floorF {
 }
 
 object $sqrt {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $sqrtF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $sqrtF.unapply(T.project(expr))
 }
 object $abs {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $absF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $absF.unapply(T.project(expr))
 }
 object $log {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[(T[EX], T[EX])] =
-    $logF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[(T, T)] =
+    $logF.unapply(T.project(expr))
 }
 object $log10 {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $log10F.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $log10F.unapply(T.project(expr))
 }
 object $ln {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $lnF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $lnF.unapply(T.project(expr))
 }
 object $pow {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[(T[EX], T[EX])] =
-    $powF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[(T, T)] =
+    $powF.unapply(T.project(expr))
 }
 object $exp {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $expF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $expF.unapply(T.project(expr))
 }
 object $trunc {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $truncF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $truncF.unapply(T.project(expr))
 }
 object $ceil {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $ceilF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $ceilF.unapply(T.project(expr))
 }
 object $floor {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_2F :<: EX): Option[T[EX]] =
-    $floorF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
+    $floorF.unapply(T.project(expr))
 }

@@ -22,13 +22,14 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
 import matryoshka._
+import matryoshka.implicits._
 
 sealed abstract class JoinDir(val name: String) {
   import structural.ObjectProject
 
   val data: Data = Data.Str(name)
-  def const[T[_[_]]: Corecursive]: T[LP] = constant[T[LP]](data).embed
-  def projectFrom[T[_[_]]: Corecursive](lp: T[LP]): T[LP] =
+  def const[T](implicit T: Corecursive.Aux[T, LP]): T = constant[T](data).embed
+  def projectFrom[T](lp: T)(implicit T: Corecursive.Aux[T, LP]): T =
     ObjectProject(lp, const).embed
 }
 

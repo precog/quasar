@@ -17,10 +17,9 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.ejson.{Common, Str}
-import quasar.fp.{coproductShow, QuasarFreeOps, MonadError_}
+import quasar.ejson.{Common, EJson, Str}
+import quasar.fp.{coproductShow, MonadError_}
 import quasar.fp.ski.κ
-import quasar.contrib.matryoshka.{freeCataM, interpretM}
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.{ejson => ejs, _}
@@ -28,8 +27,10 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import eu.timepit.refined.refineV
-import matryoshka.{Corecursive, Embed, Fix, Recursive}, Recursive.ops._
-import matryoshka.patterns.CoEnv
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 package object qscript {
@@ -46,7 +47,7 @@ package object qscript {
   object MarkLogicPlanner {
     def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP
 
-    implicit def qScriptCore[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
+    implicit def qScriptCore[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: BirecursiveT]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
       new QScriptCorePlanner[F, T]
 
     implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
@@ -61,7 +62,7 @@ package object qscript {
     implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
       new ProjectBucketPlanner[F, T]
 
-    implicit def thetajoin[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
+    implicit def thetajoin[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: BirecursiveT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
       new ThetaJoinPlanner[F, T]
 
     implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
@@ -90,11 +91,11 @@ package object qscript {
     }).fold(invalidQName[F, QName](s))(_.point[F])
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
-    fm.toCoEnv[T].project match {
+  def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
+    fm.project match {
       case MapFunc.StaticArray(elements) =>
         for {
-          xqyElts <- elements.traverse(mapFuncXQueryP(_, src))
+          xqyElts <- elements.traverse(planMapFunc(_)(κ(src)))
           arrElts <- xqyElts.traverse(ejs.mkArrayElt[F])
           arr     <- ejs.mkArray_[F](mkSeq(arrElts))
         } yield arr
@@ -103,42 +104,33 @@ package object qscript {
         for {
           xqyKV <- entries.traverse(_.bitraverse({
                      case Embed(Common(Str(s))) => asQName(s) map (qn => xs.QName(qn.xs))
-                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix].shows)
+                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
-                   mapFuncXQueryP(_, src)))
+                   planMapFunc(_)(κ(src))))
           elts  <- xqyKV.traverse { case (k, v) => ejs.renameOrWrap[F].apply(k, v) }
           map   <- ejs.mkObject[F] apply mkSeq(elts)
         } yield map
 
-      case other                         => mapFuncXQueryP(other.embed, src)
+      case _                             => planMapFunc(fm)(κ(src))
     }
 
-  def mapFuncXQueryP[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: T[CoEnv[Hole, MapFunc[T, ?], ?]], src: XQuery): F[XQuery] =
-    planMapFuncP(fm)(κ(src))
-
-  def mergeXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+  def mergeXQuery[T[_[_]]: RecursiveT, F[_]: QNameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
     planMapFunc[T, F, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr, A](
+  def planMapFunc[T[_[_]]: RecursiveT, F[_]: QNameGenerator: PrologW: MonadPlanErr, A](
     freeMap: FreeMapA[T, A])(
-    recover: A => XQuery
-  ): F[XQuery] =
-    planMapFuncP(freeMap.toCoEnv)(recover)
-
-  def planMapFuncP[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr, A](
-    freeMap: T[CoEnv[A, MapFunc[T, ?], ?]])(
     recover: A => XQuery
   ): F[XQuery] =
     freeMap.cataM(interpretM(recover(_).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](
+  def rebaseXQuery[T[_[_]]: BirecursiveT, F[_]: QNameGenerator: PrologW: MonadPlanErr](
     fqs: FreeQS[T], src: XQuery
   ): F[XQuery] = {
     import MarkLogicPlanner._
-    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
+    fqs.cataM(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
   }
 
   ////

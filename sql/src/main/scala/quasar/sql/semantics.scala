@@ -24,7 +24,9 @@ import quasar.contrib.pathy.prettyPrint
 
 import scala.AnyRef
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless.contrib.scalaz._
 
@@ -51,10 +53,10 @@ object SemanticAnalysis {
     * projection with Synthetic.SortKey. The compiler will generate a step to
     * remove these fields after the sort operation.
     */
-  def projectSortKeysƒ[T[_[_]]: Recursive: Corecursive]:
-      Sql[T[Sql]] => Option[Sql[T[Sql]]] = {
+  def projectSortKeysƒ[T](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+      : Sql[T] => Option[Sql[T]] = {
     case Select(d, projections, r, f, g, Some(OrderBy(keys))) => {
-      def matches(key: T[Sql]): PartialFunction[Proj[T[Sql]], T[Sql]] =
+      def matches(key: T): PartialFunction[Proj[T], T] =
         key.project match {
           case Ident(keyName) => {
             case Proj(_, Some(alias))               if keyName == alias    => key
@@ -62,20 +64,20 @@ object SemanticAnalysis {
             case Proj(Embed(Splice(_)), _)                                 => key
           }
           case _ => {
-            case Proj(expr2, Some(alias)) if key == expr2 => ident[T[Sql]](alias).embed
+            case Proj(expr2, Some(alias)) if key == expr2 => ident[T](alias).embed
           }
         }
 
       // NB: order of the keys has to be preserved, so this complex fold
       //     seems to be the best way.
-      type Target = (List[Proj[T[Sql]]], List[(OrderType, T[Sql])], Int)
+      type Target = (List[Proj[T]], List[(OrderType, T)], Int)
 
       val (projs2, keys2, _) = keys.foldRight[Target]((Nil, Nil, 0)) {
         case ((orderType, expr), (projs, keys, index)) =>
           projections.collectFirst(matches(expr)).fold {
             val name  = syntheticPrefix + index.toString()
             val proj2 = Proj(expr, Some(name))
-            val key2  = (orderType, ident[T[Sql]](name).embed)
+            val key2  = (orderType, ident[T](name).embed)
             (proj2 :: projs, key2 :: keys, index + 1)
           } (
             kExpr => (projs, (orderType, kExpr) :: keys, index))
@@ -119,11 +121,11 @@ object SemanticAnalysis {
     * then because this leads to an ambiguity, an error is produced containing
     * details on the duplicate name.
     */
-  def scopeTablesƒ[T[_[_]]: Recursive]:
-      CoalgebraM[ValidSem, Sql, (Scope, T[Sql])] = {
+  def scopeTablesƒ[T](implicit T: Recursive.Aux[T, Sql]):
+      CoalgebraM[ValidSem, Sql, (Scope, T)] = {
     case (Scope(ts, bs), Embed(expr)) => expr match {
       case Select(_, _, relations, _, _, _) =>
-        def findRelations(r: SqlRelation[T[Sql]]): ValidSem[Map[String, SqlRelation[Unit]]] =
+        def findRelations(r: SqlRelation[T]): ValidSem[Map[String, SqlRelation[Unit]]] =
           r match {
             case IdentRelationAST(name, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(name) ->
@@ -284,7 +286,7 @@ object SemanticAnalysis {
     * if identifiers are used with unknown provenance. The phase requires
     * TableScope and BindingScope annotations on the tree.
     */
-  def inferProvenanceƒ[T[_[_]]: Corecursive]:
+  def inferProvenanceƒ[T](implicit T: Corecursive.Aux[T, Sql]):
       ElgotAlgebraM[(Scope, ?), ValidSem, Sql, Provenance] = {
     case (Scope(ts, bs), expr) => expr match {
       case Select(_, projections, _, _, _, _) =>
@@ -326,11 +328,11 @@ object SemanticAnalysis {
 
   val synthElgotMƒ:
       ElgotAlgebraM[(Scope, ?), ValidSem, Sql, List[Option[Synthetic]]] =
-    identifySyntheticsƒ.generalizeElgot[(Scope, ?)] ⋙ (_.point[ValidSem])
+    (identifySyntheticsƒ: Algebra[Sql, List[Option[Synthetic]]]).generalizeElgot[(Scope, ?)] ⋙ (_.point[ValidSem])
 
-  def addAnnotations[T[_[_]]: Corecursive]:
+  def addAnnotations[T](implicit T: Corecursive.Aux[T, Sql]):
       ElgotAlgebraM[
-        ((Scope, T[Sql]), ?),
+        ((Scope, T), ?),
         NonEmptyList[SemanticError] \/ ?,
         Sql,
         Cofree[Sql, Annotations]] =
@@ -340,7 +342,8 @@ object SemanticAnalysis {
         inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
 
   // NB: projectSortKeys ⋙ (identifySynthetics &&& (scopeTables ⋙ inferProvenance))
-  def AllPhases[T[_[_]]: Recursive: Corecursive](expr: T[Sql]) =
-    (Scope(TableScope(Map()), BindingScope(Map())), expr.transCata(orOriginal(projectSortKeysƒ)))
-      .coelgotM(addAnnotations, scopeTablesƒ.apply(_).disjunction)
+  def AllPhases[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]) =
+    (Scope(TableScope(Map()), BindingScope(Map())), expr.cata(orOriginal(projectSortKeysƒ) >>> (_.embed)))
+      .coelgotM[NonEmptyList[SemanticError] \/ ?](addAnnotations, scopeTablesƒ.apply(_).disjunction)
+
 }

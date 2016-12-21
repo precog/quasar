@@ -21,7 +21,7 @@ import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
 import quasar.frontend.fixpoint.lpf
 import quasar.frontend.logicalplan._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.Arbitrary
 import java.time.{Instant, Duration}
 import scalaz.ValidationNel

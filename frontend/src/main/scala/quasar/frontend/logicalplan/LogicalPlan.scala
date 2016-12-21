@@ -27,7 +27,8 @@ import quasar.fp.binder._
 import scala.Symbol
 import scala.Predef.$conforms
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import shapeless.{Nat, Sized}
 import pathy.Path.posixCodec
@@ -43,12 +44,12 @@ sealed abstract class LogicalPlan[A] extends Product with Serializable {
 
 final case class Read[A](path: FPath) extends LogicalPlan[A]
 final case class Constant[A](data: Data) extends LogicalPlan[A]
-final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N])
+final case class Invoke[N <: Nat, A](func: GenericFunc[N], values: Func.Input[A, N])
     extends LogicalPlan[A]
 // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
 // https://issues.scala-lang.org/browse/SI-5900
 object InvokeUnapply {
-  def unapply[A, N <: Nat](in: Invoke[A, N])
+  def unapply[N <: Nat, A](in: Invoke[N, A])
       : Some[(GenericFunc[N], Func.Input[A, N])] =
     Some((in.func, in.values))
 }
@@ -195,21 +196,28 @@ object LogicalPlan {
   }
 
   implicit val binder: Binder[LogicalPlan] = new Binder[LogicalPlan] {
-      type G[A] = Map[Symbol, A]
-      val G = Traverse[G]
+    type G[A] = Map[Symbol, A]
+    val G = Traverse[G]
 
-      def initial[A] = Map[Symbol, A]()
+    def initial[A] = Map[Symbol, A]()
 
-      def bindings[T[_[_]]: Recursive, A](t: LogicalPlan[T[LogicalPlan]], b: G[A])(f: LogicalPlan[T[LogicalPlan]] => A): G[A] =
-        t match {
-          case Let(ident, form, _) => b + (ident -> f(form.project))
-          case _                    => b
-        }
+    def bindings[T, A]
+      (t: LogicalPlan[T], b: G[A])
+      (f: LogicalPlan[T] => A)
+      (implicit T: Recursive.Aux[T, LogicalPlan])
+        : G[A] =
+      t match {
+        case Let(ident, form, _) => b + (ident -> f(form.project))
+        case _                   => b
+      }
 
-      def subst[T[_[_]]: Recursive, A](t: LogicalPlan[T[LogicalPlan]], b: G[A]): Option[A] =
-        t match {
-          case Free(symbol) => b.get(symbol)
-          case _             => None
-        }
-    }
+    def subst[T, A]
+      (t: LogicalPlan[T], b: G[A])
+      (implicit T: Recursive.Aux[T, LogicalPlan])
+        : Option[A] =
+      t match {
+        case Free(symbol) => b.get(symbol)
+        case _            => None
+      }
+  }
 }

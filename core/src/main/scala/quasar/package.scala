@@ -25,7 +25,9 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql._
 import quasar.std.StdLib.set._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Leibniz._
 import scalaz.std.vector._
 import scalaz.syntax.either._
@@ -88,13 +90,13 @@ package object quasar {
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 
-  def addOffsetLimit[T[_[_]]: Corecursive](
-    lp: T[LP], off: Natural, lim: Option[Positive]):
-      T[LP] = {
-    val skipped =
-      Drop(lp, constant[T[LP]](Data.Int(off.get)).embed).embed
+  def addOffsetLimit[T]
+    (lp: T, off: Natural, lim: Option[Positive])
+    (implicit T: Corecursive.Aux[T, LP])
+      : T = {
+    val skipped = Drop(lp, constant[T](Data.Int(off.get)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, constant[T[LP]](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T](Data.Int(l.get)).embed).embed)
   }
 }

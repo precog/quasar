@@ -19,10 +19,10 @@ package quasar.jscore
 import quasar.Predef._
 import quasar.javascript.Js
 
-sealed trait Operator {
-  val js: String
-}
-abstract sealed class BinaryOperator(val js: String) extends Operator
+import matryoshka.Delay
+import scalaz._, Scalaz._
+
+abstract sealed class BinaryOperator(val js: String)
 final case object Add extends BinaryOperator("+")
 final case object BitAnd extends BinaryOperator("&")
 final case object BitLShift extends BinaryOperator("<<")
@@ -45,13 +45,25 @@ final case object Mult extends BinaryOperator("*")
 final case object Sub extends BinaryOperator("-")
 final case object Instance extends BinaryOperator("instanceof")
 
-abstract sealed class UnaryOperator(val js: String) extends Operator
+object BinaryOperator {
+  implicit val equal: Equal[BinaryOperator] = Equal.equalA
+}
+
+abstract sealed class UnaryOperator(val js: String)
 final case object Neg extends UnaryOperator("-")
 final case object Not extends UnaryOperator("!")
 final case object TypeOf extends UnaryOperator("typeof")
 
+object UnaryOperator {
+  implicit val equal: Equal[UnaryOperator] = Equal.equalA
+}
+
 // TODO: impose JavaScript naming rules? Maybe even at compile time?
 final case class Name(value: String) extends scala.AnyRef
+
+object Name {
+  implicit val equal: Equal[Name] = Equal.equalA
+}
 
 sealed trait JsCoreF[A]
 object JsCoreF {
@@ -76,6 +88,33 @@ object JsCoreF {
 
   final case class SpliceObjectsF[A](srcs: List[A]) extends JsCoreF[A]
   final case class SpliceArraysF[A](srcs: List[A]) extends JsCoreF[A]
+
+  implicit val equal: Delay[Equal, JsCoreF] = new Delay[Equal, JsCoreF] {
+    def apply[A](eq: Equal[A]) = {
+      implicit val EqA: Equal[A] = eq
+      Equal.equal {
+        case (LiteralF(v1), LiteralF(v2)) => v1 == v2
+        case (IdentF(n1), IdentF(n2)) => n1 ≟ n2
+        case (AccessF(e1, k1), AccessF(e2, k2)) =>
+          eq.equal(e1, e2) && eq.equal(k1, k2)
+        case (CallF(c1, a1), CallF(c2, a2)) => eq.equal(c1, c2) && a1 ≟ a2
+        case (NewF(n1, a1), NewF(n2, a2)) => n1 ≟ n2 && a1 ≟ a2
+        case (IfF(t1, c1, a1), IfF(t2, c2, a2)) =>
+          eq.equal(t1, t2) && eq.equal(c1, c2) && eq.equal(a1, a2)
+        case (UnOpF(o1, a1), UnOpF(o2, a2)) => o1 ≟ o2 && eq.equal(a1, a2)
+        case (BinOpF(o1, a1, b1), BinOpF(o2, a2, b2)) =>
+          o1 ≟ o2 && eq.equal(a1, a2) && eq.equal(b1, b2)
+        case (ArrF(v1), ArrF(v2)) => v1 ≟ v2
+        case (FunF(p1, b1), FunF(p2, b2)) => p1 ≟ p2 && eq.equal(b1, b2)
+        case (ObjF(v1), ObjF(v2)) => v1 == v2
+        case (LetF(n1, e1, b1), LetF(n2, e2, b2)) =>
+          n1 ≟ n2 && eq.equal(e1, e2) && eq.equal(b1, b2)
+        case (SpliceObjectsF(s1), SpliceObjectsF(s2)) => s1 ≟ s2
+        case (SpliceArraysF(s1), SpliceArraysF(s2)) => s1 ≟ s2
+        case (_, _) => false
+      }
+    }
+  }
 }
 
 object LiteralF {

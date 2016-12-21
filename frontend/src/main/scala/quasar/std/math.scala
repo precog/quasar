@@ -94,7 +94,9 @@ trait MathLib extends Library {
     MathAbs,
     Func.Input2(MathAbs, MathRel),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
           case Invoke(_, Sized(Embed(ZeroF()), Embed(x))) => x.some
@@ -128,7 +130,9 @@ trait MathLib extends Library {
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case Invoke(_, Sized(Embed(OneF()), Embed(x))) => x.some
@@ -155,7 +159,9 @@ trait MathLib extends Library {
     Type.Numeric,
     Func.Input2(Type.Numeric, Type.Numeric),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None
@@ -180,7 +186,9 @@ trait MathLib extends Library {
     MathAbs,
     Func.Input2(MathAbs, MathAbs),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
           case Invoke(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
@@ -219,7 +227,9 @@ trait MathLib extends Library {
     MathRel,
     Func.Input2(MathAbs, MathRel),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None

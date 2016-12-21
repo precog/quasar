@@ -21,6 +21,7 @@ import quasar.{RenderTree, Terminal}
 import quasar.physical.mongodb.{Bson, BsonField, CollectionName}
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 /** Ops that are provided by MongoDB since 3.2. */

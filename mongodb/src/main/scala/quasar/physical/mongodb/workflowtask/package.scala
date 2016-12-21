@@ -22,6 +22,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 package object workflowtask {

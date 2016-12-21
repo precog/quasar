@@ -16,13 +16,13 @@
 
 package quasar.physical.mongodb.workflow
 
-import quasar.Predef._
 import quasar.physical.mongodb.expression.DocVar
 import quasar.physical.mongodb.workflowtask.WorkflowTask
 
-import matryoshka._, FunctorT.ops._
-import simulacrum.typeclass
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
+import simulacrum.typeclass
 
 /** Operations that are applied to a completed workflow to produce an
   * executable WorkflowTask. NB: when this is applied, information about the
@@ -32,16 +32,14 @@ import scalaz._, Scalaz._
   /** Returns both the final WorkflowTask as well as a DocVar indicating the
     * base of the collection.
     */
-  def crush[T[_[_]]: Recursive: FunctorT](
-    op: F[(T[F], (DocVar, WorkflowTask))]):
-      (DocVar, WorkflowTask)
+  def crush[T[_[_]]: BirecursiveT](op: F[(T[F], (DocVar, WorkflowTask))])
+      : (DocVar, WorkflowTask)
 }
 object Crush {
   implicit def injected[F[_]: Functor, G[_]: Functor](implicit I: F :<: G, CG: Crush[G]):
       Crush[F] =
     new Crush[F] {
-      def crush[T[_[_]]: Recursive: FunctorT](
-        op: F[(T[F], (DocVar, WorkflowTask))]) =
-        CG.crush(I.inj(op.map { case (f, t) => (f.transCata[G](I.inj(_)), t) }))
+      def crush[T[_[_]]: BirecursiveT](op: F[(T[F], (DocVar, WorkflowTask))]) =
+        CG.crush(I.inj(op.map(_.leftMap(_.transCata[T[G]](I.inj(_))))))
     }
 }

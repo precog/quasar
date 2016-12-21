@@ -25,7 +25,9 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflowtask._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.syntax.all._
 import scalaz._, Scalaz._
 
@@ -86,7 +88,7 @@ package object workflow {
   import fixExprOp._
 
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
-    (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna(normalize)
+    (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna[WorkflowTask](normalize)
 
   // NB: no need for a typeclass if implementing this way, but will be needed as
   //     soon as we need to coalesce anything _into_ a type that isn't 2.6.
@@ -321,8 +323,8 @@ package object workflow {
       */
     // TODO: this doesn't seem to actually handle coalescing, so what was the
     // comment referring to?
-    def reparentW[T[_[_]]: Corecursive](newSrc: T[F])(implicit F: Functor[F]):
-        T[F] =
+    def reparentW[T](newSrc: T)(implicit T: Corecursive.Aux[T, F], F: Functor[F])
+        : T =
       reparent(newSrc).wf.embed
 
     def fmap[G[_], B](f: A => B, g: F ~> G): SingleSourceF[G, B] =
@@ -415,7 +417,7 @@ package object workflow {
   implicit def workflowFCrush(implicit I: WorkflowOpCoreF :<: WorkflowF):
       Crush[WorkflowF] =
     new Crush[WorkflowF] {
-      def crush[T[_[_]]: Recursive: FunctorT](
+      def crush[T[_[_]]: BirecursiveT](
         op: WorkflowF[(T[WorkflowF], (DocVar, WorkflowTask))]) = op match {
         case $pure(value) => (DocVar.ROOT(), PureTask(value))
         case $read(coll)  => (DocVar.ROOT(), ReadTask(coll))
@@ -520,7 +522,7 @@ package object workflow {
               })))
       }
 
-      def pipeline[T[_[_]]: Recursive: FunctorT](
+      def pipeline[T[_[_]]: BirecursiveT](
         op: PipelineF[WorkflowF, T[WorkflowF]]):
           Option[(DocVar, WorkflowTask, List[PipelineOp])] =
         op.wf match {
@@ -547,7 +549,7 @@ package object workflow {
           case _ => Some(alwaysPipePipe(op))
         }
 
-      def alwaysPipePipe[T[_[_]]: Recursive: FunctorT](
+      def alwaysPipePipe[T[_[_]]: BirecursiveT](
         op: PipelineF[WorkflowF, T[WorkflowF]]):
           (DocVar, WorkflowTask, List[PipelineOp]) = {
         lazy val (base, crushed) = (finish(_, _)).tupled(op.src.para(crush[T]))
@@ -573,13 +575,6 @@ package object workflow {
               List(toPipelineOp(op, base))))
       }
     }
-
-  // TODO[matryoshka]: Add this there
-  def transHylo[T[_[_]]: FunctorT, F[_]: Functor, G[_]: Functor, H[_]: Functor](
-    t: T[F])(
-    φ: G[T[H]] => H[T[H]], ψ: F[T[F]] => G[T[F]]):
-      T[H] =
-    FunctorT[T].map(t)(ft => φ(ψ(ft).map(transHylo(_)(φ, ψ))))
 
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
@@ -652,18 +647,18 @@ package object workflow {
           case _                     => finished
         }
 
+        // FIXME: This _may_ be causing the failure.
         Crystallized(
-          transHylo(promoteKnownShape(finished))(Coalesce[F].coalesce, crystallizeƒ)
-            // TODO: this can coalesce more cases, but hasn’t been done thus far and
-            //       requires rewriting many tests in a much less readable way.
+          promoteKnownShape(finished).transHylo(Coalesce[F].coalesce, crystallizeƒ)
+            // TODO: this can coalesce more cases, but hasn’t been done thus far
+            //       and requires rewriting many tests in a much less readable
+            //       way.
             // .cata[Workflow](x => coalesce(uncleanƒ(x).project))
         )
       }
     }
 
-  implicit def workflowRenderTree[T[_[_]]: Recursive, F[_]: Traverse: Classify]
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[F[Unit]])
-      : RenderTree[T[F]] =
+  implicit def workflowRenderTree[T[_[_]]: RecursiveT, F[_]: Traverse: Classify](implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[F[Unit]]): RenderTree[T[F]] =
     new RenderTree[T[F]] {
       val wfType = "Workflow" :: Nil
 

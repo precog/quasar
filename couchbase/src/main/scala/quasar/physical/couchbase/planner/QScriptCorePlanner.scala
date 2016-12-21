@@ -19,7 +19,6 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.{Data => QData, NameGenerator}
 import quasar.Planner.InternalError
-import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -27,19 +26,22 @@ import quasar.physical.couchbase._, N1QL.{Id, Union, _}, Case._, Select.{Filter,
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._, NonEmptyList.nels
 
-final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
+final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, QScriptCore[T, ?]] {
 
   def int(i: Int) = Data[T[N1QL]](QData.Int(i)).embed
 
   def processFreeMapDefault(f: FreeMap[T], id: Id[T[N1QL]]): M[T[N1QL]] =
-    freeCataM(f)(interpretM(κ(id.embed.η[M]), mapFuncPlanner[T, F].plan))
+    f.cataM(interpretM(κ(id.embed.η[M]), mapFuncPlanner[T, F].plan))
 
   def processFreeMap(f: FreeMap[T], id: Id[T[N1QL]]): M[T[N1QL]] =
-    f.toCoEnv[T].project match {
+    f.project match {
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
@@ -51,7 +53,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
                 InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
                   .left[T[N1QL]].η[PR])
           },
-          v => processFreeMapDefault(v.fromCoEnv, id)
+          v => processFreeMapDefault(v, id)
         )) ∘ (l => Obj(l.toMap).embed)
       case _ =>
         processFreeMapDefault(f, id)
@@ -60,7 +62,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
   def plan: AlgebraM[M, QScriptCore[T, ?], T[N1QL]] = {
     case qscript.Map(src, f) =>
       for {
-        id1 <- genId[T, M]
+        id1 <- genId[T[N1QL], M]
         ff  <- processFreeMap(f, id1)
       } yield Select(
         Value(true),
@@ -73,10 +75,10 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
     case LeftShift(src, struct, id, repair) =>
       for {
-        id1 <- genId[T, M]
-        id2 <- genId[T, M]
-        id3 <- genId[T, M]
-        s   <- freeCataM(struct)(interpretM(
+        id1 <- genId[T[N1QL], M]
+        id2 <- genId[T[N1QL], M]
+        id3 <- genId[T[N1QL], M]
+        s   <- struct.cataM(interpretM(
                  κ(id1.embed.η[M]),
                  mapFuncPlanner[T, F].plan))
         sr  =  ArrRange(int(0), LengthArr(s).embed, none)
@@ -97,7 +99,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
                  case ExcludeId =>
                    IfNull(ObjValues(s).embed, s)
                }).embed.η[M]
-        r   <- freeCataM(repair)(interpretM(
+        r   <- repair.cataM(interpretM(
                  {
                    case LeftSide  =>
                      id1.embed.η[M]
@@ -116,16 +118,16 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
     case qscript.Reduce(src, bucket, reducers, repair) =>
       for {
-        id1 <- genId[T, M]
-        id2 <- genId[T, M]
-        id3 <- genId[T, M]
+        id1 <- genId[T[N1QL], M]
+        id2 <- genId[T[N1QL], M]
+        id3 <- genId[T[N1QL], M]
         b   <- processFreeMap(bucket, id1)
         red =  reducers.map(
                  _.traverse(
                    red => processFreeMap(red, id1)
                  ).flatMap(reduceFuncPlanner[T, F].plan)
                )
-        rep <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
+        rep <- repair.cataM(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
           Value(false),
@@ -148,9 +150,9 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
     case qscript.Sort(src, bucket, order) =>
       for {
-        id1 <- genId[T, M]
-        id2 <- genId[T, M]
-        id3 <- genId[T, M]
+        id1 <- genId[T[N1QL], M]
+        id2 <- genId[T[N1QL], M]
+        id3 <- genId[T[N1QL], M]
         b   <- processFreeMap(bucket, id1)
         o   <- order.traverse { case (or, d) =>
                  (processFreeMap(or, id3) ∘ (OrderBy(_, d)))
@@ -177,7 +179,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
     case qscript.Filter(src, f) =>
       for {
-        id1  <- genId[T, M]
+        id1  <- genId[T[N1QL], M]
         ff   <- processFreeMap(f, id1)
       } yield Select(
         Value(true),
@@ -190,12 +192,12 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
-        idLB <- genId[T, M]
-        idRB <- genId[T, M]
-        lb   <- freeCataM(lBranch)(interpretM(
+        idLB <- genId[T[N1QL], M]
+        idRB <- genId[T[N1QL], M]
+        lb   <- lBranch.cataM(interpretM(
                   κ(idLB.embed.η[M]),
                   Planner[T, F, QScriptTotal[T, ?]].plan))
-        rb   <- freeCataM(rBranch)(interpretM(
+        rb   <- rBranch.cataM(interpretM(
                   κ(idRB.embed.η[M]),
                   Planner[T, F, QScriptTotal[T, ?]].plan))
       } yield Union(
@@ -214,15 +216,15 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
 
   def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
     for {
-      id1 <- genId[T, M]
-      id2 <- genId[T, M]
-      id3 <- genId[T, M]
-      id4 <- genId[T, M]
-      id5 <- genId[T, M]
-      f   <- freeCataM(from)(interpretM(
+      id1 <- genId[T[N1QL], M]
+      id2 <- genId[T[N1QL], M]
+      id3 <- genId[T[N1QL], M]
+      id4 <- genId[T[N1QL], M]
+      id5 <- genId[T[N1QL], M]
+      f   <- from.cataM(interpretM(
                κ(id1.embed.η[M]),
                Planner[T, F, QScriptTotal[T, ?]].plan))
-      c   <- freeCataM(takeOrDrop.merge)(interpretM(
+      c   <- takeOrDrop.merge.cataM(interpretM(
                κ(id1.embed.η[M]),
                Planner[T, F, QScriptTotal[T, ?]].plan))
     } yield {

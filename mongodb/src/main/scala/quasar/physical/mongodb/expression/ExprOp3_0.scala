@@ -24,6 +24,7 @@ import quasar.physical.mongodb.Bson
 import quasar.jscore, jscore.JsFn
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators added in MongoDB version 3.0. */
@@ -78,9 +79,11 @@ object ExprOp3_0F {
       κ(None)
   }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOp3_0F :<: EX) {
-    def $dateToString(format: FormatString, date: T[EX]): T[EX] =
-      I.inj($dateToStringF(format, date)).embed
+  final class fixpoint[T, EX[_]: Functor]
+    (embed: EX[T] => T)
+    (implicit I: ExprOp3_0F :<: EX) {
+    def $dateToString(format: FormatString, date: T): T =
+      embed(I.inj($dateToStringF(format, date)))
   }
 }
 
@@ -118,6 +121,6 @@ object $dateToStringF {
 }
 
 object $dateToString {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_0F :<: EX): Option[(FormatString, T[EX])] =
-    $dateToStringF.unapply(Recursive[T].project(expr))
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_0F :<: EX): Option[(FormatString, T)] =
+    $dateToStringF.unapply(T.project(expr))
 }

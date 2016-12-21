@@ -23,7 +23,7 @@ import quasar.fs._
 import quasar.regression._
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 

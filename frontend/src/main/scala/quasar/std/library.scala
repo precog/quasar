@@ -30,7 +30,9 @@ trait Library {
   import Func._
 
   protected val noSimplification: Simplifier = new Simplifier {
-    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+    def apply[T]
+      (orig: LogicalPlan[T])
+      (implicit TR: Recursive.Aux[T, LogicalPlan], TC: Corecursive.Aux[T, LogicalPlan]) =
       None
   }
 

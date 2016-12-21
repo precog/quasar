@@ -27,12 +27,15 @@ import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
-import matryoshka._, Recursive.ops._
 import java.time.format.DateTimeFormatter
+import scala.concurrent.duration._
+
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
-import scala.concurrent.duration._
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}

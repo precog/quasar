@@ -19,10 +19,10 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
-import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -275,7 +275,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]

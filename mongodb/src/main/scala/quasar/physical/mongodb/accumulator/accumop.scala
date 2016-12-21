@@ -22,6 +22,7 @@ import quasar.fp.ski._
 import quasar.physical.mongodb.expression.ExprOpOps
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 sealed trait AccumOp[A]

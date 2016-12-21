@@ -22,7 +22,8 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.structural._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
 import org.scalacheck._
 import pathy.Path._
 import scalaz.{Free => _, _}, Scalaz._
@@ -174,23 +175,23 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
   }
 
   "Component" should {
-    implicit def componentArbitrary[A: Arbitrary]: Arbitrary[Component[Fix, A]] =
+    implicit def componentArbitrary[A: Arbitrary]: Arbitrary[Component[Fix[LP], A]] =
       Arbitrary(Arbitrary.arbitrary[A]) ∘ (NeitherCond(_))
 
-    implicit def ArbComponentInt: Arbitrary[Component[Fix, Int]] =
+    implicit def ArbComponentInt: Arbitrary[Component[Fix[LP], Int]] =
       componentArbitrary[Int]
 
-    implicit def ArbComponentInt2Int: Arbitrary[Component[Fix, Int => Int]] =
+    implicit def ArbComponentInt2Int: Arbitrary[Component[Fix[LP], Int => Int]] =
       componentArbitrary[Int => Int]
 
-    // FIXME this test isn't really testing much at this point because
-    // we cannot test the equality of two functions
-    implicit def EqualComponent: Equal[Component[Fix, Int]] = new Equal[Component[Fix, Int]] {
-      def equal(a1: Component[Fix, Int], a2: Component[Fix, Int]): Boolean = true
+    // FIXME: this test isn't really testing much at this point because
+    //        we cannot test the equality of two functions
+    implicit def EqualComponent: Equal[Component[Fix[LP], Int]] = new Equal[Component[Fix[LP], Int]] {
+      def equal(a1: Component[Fix[LP], Int], a2: Component[Fix[LP], Int]): Boolean = true
     }
 
     "obey applicative laws" in {
-      applicative.laws[Component[Fix, ?]]
+      applicative.laws[Component[Fix[LP], ?]]
     }
   }
 }

@@ -32,7 +32,7 @@ import quasar.physical.mongodb.planner.MongoDbPlanner
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
 import com.mongodb.async.client.MongoClient
-import matryoshka.Fix
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

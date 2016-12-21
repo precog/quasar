@@ -24,6 +24,8 @@ import quasar.fs.{PathError, FileSystemType}
 import quasar.sql, sql.Sql
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
 import monocle.std.tuple2._

@@ -28,7 +28,6 @@ import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
 
 import com.mongodb.async.client.MongoClient
-import matryoshka.Recursive.ops._
 import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

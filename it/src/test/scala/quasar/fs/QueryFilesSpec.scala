@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process

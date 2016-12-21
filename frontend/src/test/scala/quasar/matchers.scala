@@ -21,6 +21,7 @@ import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 
 import matryoshka._
+import matryoshka.data.Fix
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 

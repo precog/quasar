@@ -23,7 +23,7 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ThetaJoinPlanner[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]
+private[qscript] final class ThetaJoinPlanner[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: BirecursiveT]
   extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
   import expr.let_
 

@@ -21,7 +21,6 @@ import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
-import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, eitherT._
@@ -39,7 +38,8 @@ import scala.collection.JavaConverters._
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
-import matryoshka._, FunctorT.ops._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import pathy.Path._
 import rx.lang.scala._, JavaConverters._
 import scalaz._, Scalaz._
@@ -84,7 +84,7 @@ object queryfile {
     case FileExists(file)     => fileExists(file)
   }
 
-  def executePlan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+  def executePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan], out: AFile
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -123,7 +123,7 @@ object queryfile {
                 ))).into.liftF
     } yield out).run.run
 
-  def evaluatePlan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+  def evaluatePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -157,7 +157,7 @@ object queryfile {
   ): Free[S, Unit] =
     results.delete(handle)
 
-  def explain[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+  def explain[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -190,7 +190,7 @@ object queryfile {
       exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
     } yield exists).exists(ι)
 
-  def n1qlResults[T[_[_]]: Recursive: Corecursive, S[_]](
+  def n1qlResults[T[_[_]]: BirecursiveT, S[_]](
     n1ql: T[N1QL]
   )(implicit
     S0: Task :<: S,
@@ -211,7 +211,7 @@ object queryfile {
                  )).into.liftM[PhaseResultT])
     } yield r
 
-  def lpToN1ql[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -224,7 +224,7 @@ object queryfile {
     lpLcToN1ql[T, S](lp, lc)
   }
 
-  def lpLcToN1ql[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
@@ -238,20 +238,18 @@ object queryfile {
     val C = Coalesce[T, CBQS, CBQS]
 
     for {
-      _    <- tell(Vector(tree("lp", lp)))
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
       shft =  simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS].apply(qs)
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
-      opz  =  shft
-                .transAna(
-                   repeatedly(C.coalesceQC[CBQS](idPrism))     >>>
-                   repeatedly(C.coalesceEJ[CBQS](idPrism.get)) >>>
-                   repeatedly(C.coalesceSR[CBQS](idPrism))     >>>
-                   repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
-                .transCata(rewrite.optimize(reflNT))
+      opz  =  shft.transHylo(
+                rewrite.optimize(reflNT[CBQS]),
+                repeatedly(C.coalesceQC[CBQS](idPrism))       >>>
+                  repeatedly(C.coalesceEJ[CBQS](idPrism.get)) >>>
+                  repeatedly(C.coalesceSR[CBQS](idPrism))     >>>
+                  repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
-      n1ql <- shft.cataM(
+      n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan
               ).leftMap(FileSystemError.qscriptPlanningFailed(_))
       q    <- RenderQuery.compact(n1ql).liftPE

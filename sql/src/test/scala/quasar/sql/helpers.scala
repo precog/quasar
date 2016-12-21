@@ -24,7 +24,8 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, Optimizer}
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
-import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.matcher.MustThrownMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._

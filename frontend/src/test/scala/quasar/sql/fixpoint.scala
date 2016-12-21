@@ -19,6 +19,8 @@ package quasar.sql
 import quasar.Predef._
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 
 package object fixpoint {
   def SelectR(

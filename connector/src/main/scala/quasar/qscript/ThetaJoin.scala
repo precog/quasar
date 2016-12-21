@@ -18,10 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -91,7 +91,7 @@ object ThetaJoin {
         }
       }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]

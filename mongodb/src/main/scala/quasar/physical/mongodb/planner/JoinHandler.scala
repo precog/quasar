@@ -30,7 +30,9 @@ import quasar.physical.mongodb.workflow._
 import WorkflowBuilder._
 import quasar.sql.JoinDir
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 final case class JoinHandler[WF[_], F[_]](run: (JoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {

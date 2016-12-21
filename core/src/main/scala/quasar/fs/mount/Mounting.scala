@@ -40,7 +40,7 @@ import quasar.fp.ski._
 import quasar.fs._
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import pathy._, Path._

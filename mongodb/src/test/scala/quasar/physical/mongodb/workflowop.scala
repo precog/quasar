@@ -26,7 +26,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._

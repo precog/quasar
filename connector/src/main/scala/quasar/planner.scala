@@ -23,6 +23,7 @@ import quasar.fs.PathError
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._

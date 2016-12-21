@@ -27,7 +27,7 @@ import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 
 import eu.timepit.refined.auto._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Lens
 import pathy.Path._
 import scalaz.{Lens => _, Failure => _, _}, Id.Id

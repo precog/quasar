@@ -18,12 +18,13 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.common.SortDir
-import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
@@ -35,25 +36,25 @@ import simulacrum.typeclass
 trait NormalizableInstances {
   import Normalizable._
 
-  def normalizable[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] =
+  def normalizable[T[_[_]]: BirecursiveT: EqualT: ShowT] =
     new NormalizableT[T]
 
   implicit def const[A]: Normalizable[Const[A, ?]] =
     make(λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None))
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[QScriptCore[T, ?]] =
     normalizable[T].QScriptCore
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ProjectBucket[T, ?]] =
     normalizable[T].ProjectBucket
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ThetaJoin[T, ?]] =
     normalizable[T].ThetaJoin
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
@@ -67,14 +68,13 @@ trait NormalizableInstances {
   }
 }
 
-class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
+class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT]
     extends TTypes[T] {
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 
   def freeTC(free: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
-      liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
+    free.transCata[FreeQS](liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
@@ -87,7 +87,7 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
   }
 
   def freeMF[A: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
-    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
+    fm.transCata[Free[MapFunc, A]](MapFunc.normalize[T, A])
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(

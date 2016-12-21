@@ -36,7 +36,7 @@ object Dependencies {
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.11.1",
+    "com.slamdata"               %% "matryoshka-core"           %     "0.16.1",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,

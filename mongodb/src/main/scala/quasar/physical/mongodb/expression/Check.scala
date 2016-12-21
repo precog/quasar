@@ -21,63 +21,68 @@ import quasar.Type
 import quasar.fp._
 import quasar.physical.mongodb.Bson
 
+import java.time.Instant
+
 import matryoshka._
-import java.time.{Instant}
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Runtime type checks, exploiting MongoDB's total ordering for Bson values,
   * seen in the order of declarations in this class.
   */
-final case class Check[T[_[_]], EX[_]: Functor](implicit
-    T: Corecursive[T],
+final class Check[T, EX[_]]
+  (implicit
+    TR: Recursive.Aux[T, EX],
+    TC: Corecursive.Aux[T, EX],
+    EX: Functor[EX],
     I: ExprOpCoreF :<: EX) {
   import Check._
 
-  private val exprCoreFp = ExprOpCoreF.fixpoint[T, EX]
+  private val exprCoreFp = new ExprOpCoreF.fixpoint[T, EX](_.embed)
   import exprCoreFp._
 
-  def isNull(expr: T[EX]): T[EX] = $eq($literal(Bson.Null), expr)
+  def isNull(expr: T): T = $eq($literal(Bson.Null), expr)
 
-  def isNumber(expr: T[EX])     = betweenExcl(Bson.Null,              expr, Bson.Text(""))
-  def isString(expr: T[EX])     = between    (Bson.Text(""),          expr, Bson.Doc())
-  def isObject(expr: T[EX])     = between    (Bson.Doc(),             expr, Bson.Arr())
-  def isArray(expr: T[EX])      = between    (Bson.Arr(),             expr, Bson.Binary(minBinary))
-  def isBinary(expr: T[EX])     = between    (Bson.Binary(minBinary), expr, Bson.ObjectId(minOid))
-  def isId(expr: T[EX])         = between    (Bson.ObjectId(minOid),  expr, Bson.Bool(false))
-  def isBoolean(expr: T[EX])    = betweenIncl(Bson.Bool(false),       expr, Bson.Bool(true))
+  def isNumber(expr: T)     = betweenExcl(Bson.Null,              expr, Bson.Text(""))
+  def isString(expr: T)     = between    (Bson.Text(""),          expr, Bson.Doc())
+  def isObject(expr: T)     = between    (Bson.Doc(),             expr, Bson.Arr())
+  def isArray(expr: T)      = between    (Bson.Arr(),             expr, Bson.Binary(minBinary))
+  def isBinary(expr: T)     = between    (Bson.Binary(minBinary), expr, Bson.ObjectId(minOid))
+  def isId(expr: T)         = between    (Bson.ObjectId(minOid),  expr, Bson.Bool(false))
+  def isBoolean(expr: T)    = betweenIncl(Bson.Bool(false),       expr, Bson.Bool(true))
   /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
     * ensures that this check is used only when it's safe, although we don't
     * actually use any new op here.
     */
-  def isDate(expr: T[EX])(implicit ev: ExprOp3_0F :<: EX) =
+  def isDate(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
     between(Bson.Date(minInstant), expr, minTimestamp)
   /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
     * ensures that this check is used only when it's safe, although we don't
     * actually use any new op here.
     */
-  def isTimestamp(expr: T[EX])(implicit ev: ExprOp3_0F :<: EX) =
+  def isTimestamp(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
     between(minTimestamp, expr, minRegex)
 
-  def isDateOrTimestamp(expr: T[EX]) = between(Bson.Date(minInstant), expr, minRegex)
+  def isDateOrTimestamp(expr: T) = between(Bson.Date(minInstant), expr, minRegex)
 
   // Some types that happen to be adjacent:
-  def isNumberOrString(expr: T[EX]) = betweenExcl(Bson.Null, expr, Bson.Doc())
-  def isDateTimestampOrBoolean(expr: T[EX]) = between(Bson.Bool(false), expr, minRegex)
-  def isSyntaxed(expr: T[EX]) =
+  def isNumberOrString(expr: T) = betweenExcl(Bson.Null, expr, Bson.Doc())
+  def isDateTimestampOrBoolean(expr: T) = between(Bson.Bool(false), expr, minRegex)
+  def isSyntaxed(expr: T) =
     $or(
       $lt(expr, $literal(Bson.Doc())),
       between(Bson.ObjectId(Check.minOid), expr, minRegex))
 
 
-  private def between(lower: Bson, expr: T[EX], upper: Bson): T[EX] =
+  private def between(lower: Bson, expr: T, upper: Bson): T =
     $and(
       $lte($literal(lower), expr),
       $lt(expr, $literal(upper)))
-  private def betweenExcl(lower: Bson, expr: T[EX], upper: Bson): T[EX] =
+  private def betweenExcl(lower: Bson, expr: T, upper: Bson): T =
     $and(
       $lt($literal(lower), expr),
       $lt(expr, $literal(upper)))
-  private def betweenIncl(lower: Bson, expr: T[EX], upper: Bson): T[EX] =
+  private def betweenIncl(lower: Bson, expr: T, upper: Bson): T =
     $and(
       $lte($literal(lower), expr),
       $lte(expr, $literal(upper)))
@@ -88,8 +93,13 @@ object Check {
     * constructors above.
     */
   // TODO: remove this when we no longer perform after-the-fact translation
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
-      : Option[(T[EX], Type)] = {
+  def unapply[T: Equal, EX[_]]
+    (expr: T)
+    (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)
+      : Option[(T, Type)] = {
+    val exp = new ExprOpCoreF.fixpoint[T, EX](_.embed)
+    import exp._
+
     val nilMap = ListMap.empty[String, Bson]
     expr match {
       case IsBetweenExcl(Bson.Null,            x, Bson.Text(""))            => (x, Type.Numeric).some
@@ -119,21 +129,25 @@ object Check {
   }
 
   object IsBetween {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
-      : Option[(Bson, T[EX], Bson)] =
+    def unapply[T: Equal, EX[_]]
+      (expr: T)
+      (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)
+        : Option[(Bson, T, Bson)] =
       expr match {
         case $and(
               $lte($literal(const1), x1),
               $lt(x2, $literal(const2)))
-              if x1 ≟ x2 =>
+            if x1 ≟ x2 =>
           (const1, x1, const2).some
         case _ => None
       }
   }
 
   object IsBetweenExcl {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
-      : Option[(Bson, T[EX], Bson)] =
+    def unapply[T: Equal, EX[_]]
+      (expr: T)
+      (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)
+        : Option[(Bson, T, Bson)] =
       expr match {
         case $and(
               $lt($literal(const1), x1),
@@ -145,8 +159,10 @@ object Check {
   }
 
   object IsBetweenIncl {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
-      : Option[(Bson, T[EX], Bson)] =
+    def unapply[T: Equal, EX[_]]
+      (expr: T)
+      (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)
+        : Option[(Bson, T, Bson)] =
       expr match {
         case $and(
               $lte($literal(const1), x1),

@@ -18,14 +18,16 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import pathy.Path.{dir1, file1, FileName, rootDir}
 import scalaz._, Scalaz._, \&/._
 
@@ -57,7 +59,7 @@ abstract class DiscoverPathInstances {
   def -\&/[A, B](a: A): These[A, B] = This(a)
   def \&/-[A, B](b: B): These[A, B] = That(b)
 
-  private def union[T[_[_]]: Recursive: Corecursive, OUT[_]: Functor]
+  private def union[T[_[_]]: BirecursiveT, OUT[_]: Functor]
     (elems: NonEmptyList[T[OUT]])
     (implicit
       QC: QScriptCore[T, ?] :<: OUT,
@@ -74,7 +76,7 @@ abstract class DiscoverPathInstances {
       F[T[F]] =
     R.inj(Const[Read, T[F]](Read(dir </> file1(file))))
 
-  private def wrapDir[T[_[_]]: Corecursive, F[_]: Functor]
+  private def wrapDir[T[_[_]]: CorecursiveT, F[_]: Functor]
     (name: String, d: F[T[F]])
     (implicit QC: QScriptCore[T, ?] :<: F)
       : F[T[F]] =
@@ -82,7 +84,7 @@ abstract class DiscoverPathInstances {
 
   // TODO: Some connectors (notably MongoDB) could provide more efficient
   //       implementations of this.
-  private def allDescendents[T[_[_]]: Corecursive, M[_]: MonadFsErr, F[_]: Functor](
+  private def allDescendents[T[_[_]]: CorecursiveT, M[_]: MonadFsErr, F[_]: Functor](
     listContents: ListContents[M])(
     implicit R: Const[Read, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
@@ -93,7 +95,7 @@ abstract class DiscoverPathInstances {
         f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
       .handleError(κ(List.empty[F[T[F]]].point[M]))
 
-  private def unionDirs[T[_[_]]: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
+  private def unionDirs[T[_[_]]: CorecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
     (implicit R: Const[Read, ?] :<: OUT, QC: QScriptCore[T, ?] :<: OUT)
       : List[ADir] => M[Option[NonEmptyList[T[OUT]]]] =
@@ -102,7 +104,7 @@ abstract class DiscoverPathInstances {
       case h :: t => NonEmptyList.nel(h, t.toIList).some
     })
 
-  def unionAll[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
+  def unionAll[T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
     (implicit
       R:     Const[Read, ?] :<: OUT,
@@ -117,7 +119,7 @@ abstract class DiscoverPathInstances {
       (ds, qs) => unionDirs[T, M, OUT](g).apply(ds) ∘ (_.fold(qs)(d => union(qs <:: d))))
 
   private def convertBranch
-    [T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
+    [T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], branch: FreeQS[T])
     (f: ListContents[M])
     (implicit
@@ -125,16 +127,15 @@ abstract class DiscoverPathInstances {
       QC: QScriptCore[T, ?] :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : M[FreeQS[T]] =
-    freeCataM[M, QScriptTotal[T, ?], Hole, List[ADir] \&/ T[QScriptTotal[T, ?]]](
-      branch)(
+    branch.cataM[M, List[ADir] \&/ T[QScriptTotal[T, ?]]](
       interpretM(
-        κ((src ∘ (_.transCata(FI.inject[T[QScriptTotal[T, ?]]]))).point[M]),
+        κ((src ∘ (_.transCata[T[QScriptTotal[T, ?]]](FI.inject))).point[M]),
         DiscoverPath[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].discoverPath(f))) >>=
-      (unionAll[T, M, QScriptTotal[T, ?]](f).apply(_) ∘ (_.convertTo[Free[?[_], Hole]]))
+      (unionAll[T, M, QScriptTotal[T, ?]](f).apply(_) ∘ (_.cata(Free.roll[QScriptTotal[T, ?], Hole])))
 
 
   private def convertBranchingOp
-    [T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
+    [T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[OUT], FreeQS[T], FreeQS[T]) => OUT[T[OUT]])
     (implicit
@@ -162,7 +163,7 @@ abstract class DiscoverPathInstances {
         κ(-\&/[List[ADir], T[OUT]](List(rootDir)).point[M])
     }
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def projectBucket[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:       Const[Read, ?] :<: F,
       QC:   QScriptCore[T, ?] :<: F,
@@ -210,7 +211,7 @@ abstract class DiscoverPathInstances {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
@@ -234,7 +235,7 @@ abstract class DiscoverPathInstances {
 
   // branch handling
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
@@ -253,7 +254,7 @@ abstract class DiscoverPathInstances {
       }
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
@@ -283,7 +284,7 @@ abstract class DiscoverPathInstances {
         _.run.fold(F.discoverPath(g), G.discoverPath(g))
     }
 
-  def default[T[_[_]]: Recursive: Corecursive, IN[_]: Traverse, F[_]: Functor]
+  def default[T[_[_]]: BirecursiveT, IN[_]: Traverse, F[_]: Functor]
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
@@ -298,7 +299,7 @@ abstract class DiscoverPathInstances {
         _.traverse(unionAll(g)) ∘ (in => \&/-(IN.inj(in).embed))
     }
 
-  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def read[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
@@ -306,7 +307,7 @@ abstract class DiscoverPathInstances {
       : DiscoverPath.Aux[T, Const[Read, ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def shiftedRead[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R:         Const[Read, ?] :<: F,
       QC:     QScriptCore[T, ?] :<: F,

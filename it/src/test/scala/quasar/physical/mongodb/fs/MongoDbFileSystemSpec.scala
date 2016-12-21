@@ -33,7 +33,7 @@ import quasar.sql, sql.Sql
 import scala.Predef.$conforms
 
 import com.mongodb.MongoException
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 import monocle.function.Field1
 import monocle.std.{disjunction => D}

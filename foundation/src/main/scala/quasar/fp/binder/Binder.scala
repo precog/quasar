@@ -29,8 +29,8 @@ import simulacrum.typeclass
   def initial[A]: G[A]
 
   // Extracts bindings from a node:
-  def bindings[T[_[_]]: Recursive, A](t: F[T[F]], b: G[A])(f: F[T[F]] => A): G[A]
+  def bindings[T, A](t: F[T], b: G[A])(f: F[T] => A)(implicit T: Recursive.Aux[T, F]): G[A]
 
   // Possibly binds a free term to its definition:
-  def subst[T[_[_]]: Recursive, A](t: F[T[F]], b: G[A]): Option[A]
+  def subst[T, A](t: F[T], b: G[A])(implicit T: Recursive.Aux[T, F]): Option[A]
 }

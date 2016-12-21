@@ -18,7 +18,6 @@ package quasar.qscript
 
 import quasar.Predef.{ Eq => _, _ }
 import quasar._, Planner._
-import quasar.contrib.matryoshka._
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
@@ -27,7 +26,9 @@ import quasar.qscript.MapFuncs._
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz.{ToIdOps => _, _}, Inject._, Leibniz._
 import shapeless.{nat, Sized}
@@ -43,7 +44,7 @@ import shapeless.{nat, Sized}
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
 class Transform
-  [T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT,
+  [T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: Traverse: Normalizable]
   (implicit
     C:  Coalesce.Aux[T, F, F],
@@ -127,14 +128,12 @@ class Transform
         consZipped, zipper)
 
     val leftF =
-      foldIso(CoEnv.freeIso[Hole, F])
-        .get(lTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_)))).mapSuspension(FI.inject)
+      lTail.reverse.ana[Free[F, Hole]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))).mapSuspension(FI.inject)
 
     val rightF =
-      foldIso(CoEnv.freeIso[Hole, F])
-        .get(rTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_)))).mapSuspension(FI.inject)
+      rTail.reverse.ana[Free[F, Hole]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))).mapSuspension(FI.inject)
 
-    MergeResult(common.reverse.ana[T, F](delinearizeInner),
+    MergeResult(common.reverse.ana[T[F]](delinearizeInner),
       rebaseBranch(leftF, lMap),
       rebaseBranch(rightF, rMap))
   }
@@ -384,7 +383,7 @@ class Transform
       : PlannerError \/ Target[F] = {
     val condError: PlannerError \/ JoinFunc = {
       val combiner =
-        QC.inj(reifyResult(values(2).ann, values(2).value)).embed.transCata(rewrite.normalize).project
+        QC.inj(reifyResult(values(2).ann, values(2).value)).embed.transCata[T[F]](rewrite.normalize).project
       // FIXME: This won’t work where we join a collection against itself
       TJ.prj(combiner).fold(
         QC.prj(combiner) match {
@@ -430,7 +429,7 @@ class Transform
         ProjectTarget(pathToProj(p), ejson.CommonEJson(ejson.Str[T[EJson]](n.fold(_.value, _.value))).embed)
     }
 
-  private def fromData[T[_[_]]: Corecursive](data: Data): Data \/ T[EJson] = {
+  private def fromData[T[_[_]]: CorecursiveT](data: Data): Data \/ T[EJson] = {
     data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
       interpretM[Data \/ ?, EJson, Data, T[EJson]](
         _.left,

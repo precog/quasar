@@ -21,7 +21,8 @@ import quasar._, SemanticError._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless.{Data => _, :: => _, _}
 
@@ -190,11 +191,14 @@ trait StructuralLib extends Library {
     Top,
     Func.Input2(AnyObject, Str),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) = orig match {
-        case InvokeUnapply(_, Sized(Embed(MakeObjectN(obj)), Embed(field))) =>
-          obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case InvokeUnapply(_, Sized(Embed(MakeObjectN(obj)), Embed(field))) =>
+            obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
+          case _ => None
+        }
     },
     partialTyperV[nat._2] {
       case Sized(v1, v2) => v1.objectField(v2)
@@ -307,10 +311,13 @@ trait StructuralLib extends Library {
     Top,
     Func.Input1(AnyArray),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) = orig match {
-        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(UnshiftArray, Sized(Embed(set)))))) => set.some
-        case _                                                                                => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(UnshiftArray, Sized(Embed(set)))))) => set.some
+          case _                                                                                => None
+        }
     },
     partialTyperV[nat._1] {
       case Sized(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
@@ -352,10 +359,13 @@ trait StructuralLib extends Library {
     Func.Input2(Top, Top),
     noSimplification,
     // new Func.Simplifier {
-    //   def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) = orig match {
-    //     case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
-    //     case _                                                                            => None
-    //   }
+    //   def apply[T]
+    //     (orig: LP[T])
+    //     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+    //     orig match {
+    //       case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
+    //       case _                                                                            => None
+    //     }
     // },
     partialTyper[nat._2] {
       case Sized(_, value) => Obj(Map(), Some(value))
@@ -373,16 +383,19 @@ trait StructuralLib extends Library {
     AnyArray,
     Func.Input1(Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) = orig match {
-        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArray, Sized(Embed(array)))))) => array.some
-        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArrayIndices, Sized(Embed(Constant(Data.Arr(array)))))))) =>
-          Constant(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
-        case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMap, Sized(Embed(Constant(Data.Obj(map)))))))) =>
-          Constant(Data.Arr(map.values.toList)).some
-        case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMapKeys, Sized(Embed(Constant(Data.Obj(map)))))))) =>
-          Constant(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArray, Sized(Embed(array)))))) => array.some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArrayIndices, Sized(Embed(Constant(Data.Arr(array)))))))) =>
+            Constant(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMap, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+            Constant(Data.Arr(map.values.toList)).some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMapKeys, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+            Constant(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
+          case _ => None
+        }
     },
     partialTyper[nat._1] {
       // case Sized(Const(Data.Set(vs))) => Const(Data.Arr(vs))
@@ -401,7 +414,7 @@ trait StructuralLib extends Library {
   // val MakeObjectN = new VirtualFunc {
   object MakeObjectN {
     // Note: signature does not match VirtualFunc
-    def apply[T[_[_]]: Corecursive](args: (T[LP], T[LP])*): LP[T[LP]] =
+    def apply[T](args: (T, T)*)(implicit T: Corecursive.Aux[T, LP]): LP[T] =
       args.toList match {
         case Nil      => Constant(Data.Obj())
         case x :: xs  =>
@@ -410,8 +423,8 @@ trait StructuralLib extends Library {
       }
 
     // Note: signature does not match VirtualFunc
-    def unapply[T[_[_]]: Recursive](t: LP[T[LP]]):
-        Option[List[(T[LP], T[LP])]] =
+    def unapply[T](t: LP[T])(implicit T: Recursive.Aux[T, LP]):
+        Option[List[(T, T)]] =
       t match {
         case InvokeUnapply(MakeObject, Sized(name, expr)) => Some(List((name, expr)))
         case InvokeUnapply(ObjectConcat, Sized(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
@@ -420,14 +433,14 @@ trait StructuralLib extends Library {
   }
 
   object MakeArrayN {
-    def apply[T[_[_]]: Corecursive](args: T[LP]*): LP[T[LP]] =
+    def apply[T](args: T*)(implicit T: Corecursive.Aux[T, LP]): LP[T] =
       args.map(x => MakeArray(x)) match {
         case Nil      => Constant(Data.Arr(Nil))
         case t :: Nil => t
         case mas      => mas.reduce((t, ma) => ArrayConcat(t.embed, ma.embed))
       }
 
-    def unapply[T[_[_]]: Recursive](t: T[LP]): Option[List[T[LP]]] =
+    def unapply[T](t: T)(implicit T: Recursive.Aux[T, LP]): Option[List[T]] =
       t.project match {
         case InvokeUnapply(MakeArray, Sized(x))      => Some(x :: Nil)
         case InvokeUnapply(ArrayConcat, Sized(a, b)) => (unapply(a) ⊛ unapply(b))(_ ::: _)
@@ -435,9 +448,12 @@ trait StructuralLib extends Library {
       }
 
     object Attr {
-      def unapply[A](t: Cofree[LP, A]):
-          Option[List[Cofree[LP, A]]] =
-        MakeArrayN.unapply[Cofree[?[_], A]](t)
+      def unapply[A](t: Cofree[LP, A]): Option[List[Cofree[LP, A]]] =
+        t.tail match {
+          case InvokeUnapply(MakeArray, Sized(x))      => Some(x :: Nil)
+          case InvokeUnapply(ArrayConcat, Sized(a, b)) => (unapply(a) ⊛ unapply(b))(_ ::: _)
+          case _                                        => None
+        }
     }
   }
 }

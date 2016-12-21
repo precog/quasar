@@ -17,12 +17,12 @@
 package quasar
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
 
-import matryoshka._, FunctorT.ops._, Recursive.ops._
-import matryoshka.patterns._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import monocle.macros.Lenses
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
@@ -106,19 +106,19 @@ package object qscript {
   import MapFunc._
   import MapFuncs._
 
-  def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
+  def concatBuckets[T[_[_]]: BirecursiveT](buckets: List[FreeMap[T]]):
       Option[(FreeMap[T], NEL[FreeMap[T]])] =
     buckets match {
       case Nil => None
       case head :: tail =>
-        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
+        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))).embed,
           NEL(head, tail).zipWithIndex.map(p =>
             Free.roll(ProjectIndex[T, FreeMap[T]](
               HoleF[T],
               IntLit[T, Hole](p._2))))).some
     }
 
-  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal: Show](
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
@@ -132,7 +132,7 @@ package object qscript {
         Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
   }
 
-  def concat3[T[_[_]]: Corecursive, A](
+  def concat3[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
@@ -140,7 +140,7 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
-  def concat4[T[_[_]]: Corecursive, A](
+  def concat4[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
@@ -149,36 +149,31 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
 
-  def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT]
     (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
     val rewrite = new Rewrite[T]
 
-    freeTransCata(
-      br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))(
-      liftCo(rewrite.normalizeCoEnv))
+    (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm)))).transCata[FreeQS[T]](
+      liftCo(rewrite.normalizeCoEnv[QScriptTotal[T, ?]]))
   }
 
-  def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
-    (idStatus: IdStatus, repair0: JoinFunc[T])
+  def rewriteShift[T[_[_]]: BirecursiveT: EqualT]
+    (idStatus: IdStatus, repair: JoinFunc[T])
       : Option[(IdStatus, JoinFunc[T])] =
     (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc[T])]] {
-      val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = repair0.toCoEnv[T]
+      def makeRef(idx: Int): JoinFunc[T] =
+        Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
 
-      val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = RightSideF.toCoEnv[T]
+      val zeroRef: JoinFunc[T] = makeRef(0)
+      val oneRef: JoinFunc[T] = makeRef(1)
+      val rightCount: Int = repair.elgotPara(count(RightSideF))
 
-      def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-        Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(RightSideF, IntLit(idx))).toCoEnv[T]
-
-      val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
-      val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
-      val rightCount: Int = repair.para(count(rightSide))
-
-      if (repair.para(count(oneRef)) ≟ rightCount)
+      if (repair.elgotPara(count(oneRef)) ≟ rightCount)
         // all `RightSide` access is through `oneRef`
-        (ExcludeId, transApoT(repair)(substitute(oneRef, rightSide)).fromCoEnv).some
-      else if (repair.para(count(zeroRef)) ≟ rightCount)
+        (ExcludeId, repair.transApoT(substitute[JoinFunc[T]](oneRef, RightSideF))).some
+      else if (repair.elgotPara(count(zeroRef)) ≟ rightCount)
         // all `RightSide` access is through `zeroRef`
-        (IdOnly, transApoT(repair)(substitute(zeroRef, rightSide)).fromCoEnv).some
+        (IdOnly, repair.transApoT(substitute[JoinFunc[T]](zeroRef, RightSideF))).some
       else
         None
     }.join
@@ -191,7 +186,7 @@ package object qscript {
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
 
   // TODO: make this simply a transform itself, rather than a full traversal.
-  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Functor, G[_]: Traverse]
+  def shiftRead[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor, G[_]: Traverse]
     (implicit QC: QScriptCore[T, ?] :<: G,
               TJ: ThetaJoin[T, ?] :<: G,
               SR: Const[ShiftedRead, ?] :<: G,
@@ -201,13 +196,16 @@ package object qscript {
               N: Normalizable[G])
       : T[F] => T[G] = {
     val rewrite = new Rewrite[T]
-    transFutu(_)(S.shiftRead(idPrism.reverseGet)(_: F[T[F]]))
-      .transCata(
-        rewrite.normalize[G] ⋙
-          liftFG(injectRepeatedly(C.coalesceSR[G](idPrism))))
+    _.codyna(
+      rewrite.normalize[G] >>>
+        liftFG(injectRepeatedly(C.coalesceSR[G](idPrism))) >>>
+        (_.embed),
+      ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
   }
 
-  def simplifyRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Functor, G[_]: Traverse, H[_]: Functor]
+  // FIXME: This needs a better name, as it doesn’t currently reflect what it
+  //        does at all.
+  def simplifyRead[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor, G[_]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore[T, ?] :<: G,
               TJ: ThetaJoin[T, ?] :<: G,
               SR: Const[ShiftedRead, ?] :<: G,
@@ -217,7 +215,7 @@ package object qscript {
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[H] =
-    shiftRead[T, F, G].apply(_).transCata(J.simplifyJoin(idPrism.reverseGet))
+    shiftRead[T, F, G].apply(_).transCata[T[H]](J.simplifyJoin(idPrism.reverseGet))
 
   // Helpers for creating `Injectable` instances
 
@@ -242,7 +240,7 @@ package object qscript {
 
   implicit final class BirecursiveOps[T[_[_]], F[_]](val self: T[F]) extends scala.AnyVal {
     final def pruneArrays
-      (implicit PA: PruneArrays[F], RT: Recursive[T], CT: Corecursive[T], TF: Traverse[F])
+      (implicit PA: PruneArrays[F], T: BirecursiveT[T], TF: Traverse[F])
         : T[F] = {
       val pa = new PAFindRemap[T, F]
       self.hyloM[pa.ArrayState, pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(None)._2

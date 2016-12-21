@@ -20,21 +20,24 @@ import quasar.Predef.{Map => SMap, _}
 
 import jawn.{Facade, SimpleFacade, SupportParser}
 import matryoshka._
+import matryoshka.implicits._
 import scalaz.{:<:, Functor}
 
 object jsonParser {
-  def apply[T[_[_]]: Corecursive, F[_]: Functor](implicit C: Common :<: F, O: Obj :<: F): SupportParser[T[F]] =
-    new SupportParser[T[F]] {
-      implicit val facade: Facade[T[F]] =
-        new SimpleFacade[T[F]] {
-          def jarray(arr: List[T[F]])          = C(Arr(arr)).embed
-          def jobject(obj: SMap[String, T[F]]) = O(Obj(ListMap(obj.toList: _*))).embed
-          def jnull()                          = C(Null[T[F]]()).embed
-          def jfalse()                         = C(Bool[T[F]](false)).embed
-          def jtrue()                          = C(Bool[T[F]](true)).embed
-          def jnum(n: String)                  = C(Dec[T[F]](BigDecimal(n))).embed
-          def jint(n: String)                  = C(Dec[T[F]](BigDecimal(n))).embed
-          def jstring(s: String)               = C(Str[T[F]](s)).embed
+  def apply[T, F[_]: Functor]
+    (implicit T: Corecursive.Aux[T, F], C: Common :<: F, O: Obj :<: F)
+      : SupportParser[T] =
+    new SupportParser[T] {
+      implicit val facade: Facade[T] =
+        new SimpleFacade[T] {
+          def jarray(arr: List[T])          = C(Arr(arr)).embed
+          def jobject(obj: SMap[String, T]) = O(Obj(ListMap(obj.toList: _*))).embed
+          def jnull()                          = C(Null[T]()).embed
+          def jfalse()                         = C(Bool[T](false)).embed
+          def jtrue()                          = C(Bool[T](true)).embed
+          def jnum(n: String)                  = C(Dec[T](BigDecimal(n))).embed
+          def jint(n: String)                  = C(Dec[T](BigDecimal(n))).embed
+          def jstring(s: String)               = C(Str[T](s)).embed
         }
     }
 }

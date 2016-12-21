@@ -157,7 +157,9 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.True)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.True)))) => l.some
@@ -180,7 +182,9 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.False)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.False)))) => l.some
@@ -215,7 +219,9 @@ trait RelationsLib extends Library {
     Type.Bottom,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.True)),  Embed(c), _)) => c.some
           case Invoke(_, Sized(Embed(Constant(Data.False)), _, Embed(a))) => a.some

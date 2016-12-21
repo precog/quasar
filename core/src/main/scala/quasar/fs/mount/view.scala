@@ -28,7 +28,9 @@ import quasar.fs._, FileSystemError._, PathError._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 import quasar.sql.Sql
 
-import matryoshka.{free => _, _}, TraverseT.ops._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
@@ -346,7 +348,7 @@ object view {
     //     to manage.
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
-    (Set[FPath](), cleaned).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LP] {
+    (Set[FPath](), cleaned).anaM[Fix[LP]] {
       case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
         refineTypeAbs(p).swap.map(f =>
           EitherT(compiledView(f) getOrElse i.right).map(_.unFix.map((e + f, _)))

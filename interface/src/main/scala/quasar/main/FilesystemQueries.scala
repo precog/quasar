@@ -25,7 +25,7 @@ import quasar.fs._
 import quasar.sql.Sql
 
 import eu.timepit.refined.auto._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.iteratee._
 import scalaz.stream.Process

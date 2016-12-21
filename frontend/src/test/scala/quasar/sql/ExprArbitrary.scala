@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.sql.fixpoint._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
 import java.time.{Duration, Instant}
 import scalaz._, Scalaz._

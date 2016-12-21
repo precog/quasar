@@ -36,9 +36,10 @@ trait TreeMatchers {
   }
 
   // uses `scalaz.Equal`
-  def beTreeEqual[A: RenderTree: Equal](expected: A): Matcher[A] = new Matcher[A] {
+  def beTreeEqual[A: Equal: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
     def apply[S <: A](s: Expectable[S]) = {
       val v: A = s.value
+      // TODO: these are unintuitively reversed b/c of the `diff` implementation, should be fixed
       val diff = (RenderTree[A].render(v) diff expected.render).shows
       result(v ≟ expected, s"trees match:\n$diff", s"trees do not match:\n$diff", s)
     }

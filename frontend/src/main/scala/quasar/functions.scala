@@ -96,7 +96,7 @@ sealed abstract class GenericFunc[N <: Nat] {
   def untyper0: Func.Untyper[N]
 
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
-    Invoke[A, N](this, args)
+    Invoke[N, A](this, args)
 
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
     untyper0((domain, codomain), tpe)
@@ -232,8 +232,10 @@ object Func {
     * typer.
     */
   trait Simplifier {
-    def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]):
-        Option[LP[T[LP]]]
+    def apply[T]
+      (orig: LP[T])
+      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+        : Option[LP[T]]
   }
 
   type Input[A, N <: Nat] = Sized[List[A], N]

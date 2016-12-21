@@ -22,7 +22,8 @@ import quasar.frontend.logicalplan._
 
 import scala.math.abs
 
-import matryoshka.Fix
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}

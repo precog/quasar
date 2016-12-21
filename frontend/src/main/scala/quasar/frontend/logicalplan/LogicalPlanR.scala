@@ -29,7 +29,9 @@ import quasar.namegen._
 import scala.Predef.$conforms
 import scala.Symbol
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
 import shapeless.{nat, Nat, Sized}
 
@@ -38,7 +40,7 @@ final case class NamedConstraint[T[_[_]]]
 final case class ConstrainedPlan[T[_[_]]]
   (inferred: Type, constraints: List[NamedConstraint[T]], plan: T[LP])
 
-class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
+class LogicalPlanR[T[_[_]]: BirecursiveT] {
   import quasar.std.StdLib._, structural._
 
   def read(path: FPath) = lp.read[T[LP]](path).embed
@@ -75,7 +77,7 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
   }
 
   def rename[M[_]: Monad](f: Symbol => M[Symbol])(t: T[LP]): M[T[LP]] =
-    (Map[Symbol, Symbol](), t).anaM(renameƒ(f))
+    (Map[Symbol, Symbol](), t).anaM[T[LP]](renameƒ(f))
 
   def normalizeTempNames(t: T[LP]) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
@@ -129,7 +131,7 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
     case t => None
   }
 
-  def normalizeLets(t: T[LP]) = t.transAna(repeatedly(normalizeLetsƒ))
+  def normalizeLets(t: T[LP]) = t.transAna[T[LP]](repeatedly(normalizeLetsƒ))
 
   type Typed[F[_]] = Cofree[F, Type]
   type SemValidation[A] = ValidationNel[SemanticError, A]
@@ -314,7 +316,7 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
     import StateT.stateTMonadState
 
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LP, SemNames, Type, ConstrainedPlan[T]](_)(checkTypesƒ).map(appConst(_, constant(Data.NA))).evalZero.validation)
+      _.cataM(liftTM(checkTypesƒ)).map(appConst(_, constant(Data.NA))).evalZero.validation)
   }
 
   // TODO: Generalize this to Binder

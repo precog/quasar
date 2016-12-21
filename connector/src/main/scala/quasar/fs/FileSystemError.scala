@@ -24,6 +24,7 @@ import quasar.frontend.logicalplan.LogicalPlan
 
 import argonaut.JsonObject
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._

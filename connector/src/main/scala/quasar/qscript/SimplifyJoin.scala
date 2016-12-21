@@ -17,10 +17,12 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
@@ -48,11 +50,14 @@ object SimplifyJoin {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
-  def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T])
+  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T])
       : FreeQS[T] =
-    freeTransCata(branch)(liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+    branch
+      .convertTo[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]
+      .transCata[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]](liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)))
+      .convertTo[FreeQS[T]]
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
@@ -103,8 +108,8 @@ object SimplifyJoin {
               tj.src,
               applyToBranch(tj.lBranch),
               applyToBranch(tj.rBranch),
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))),
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))),
+              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))).embed,
+              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))).embed,
               tj.f,
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
@@ -114,7 +119,7 @@ object SimplifyJoin {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]]
     (implicit QC: QScriptCore[T, ?] :<: F)
       : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
@@ -130,7 +135,7 @@ object SimplifyJoin {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]]
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F)
       : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {

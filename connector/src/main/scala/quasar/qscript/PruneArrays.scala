@@ -18,14 +18,13 @@ package quasar.qscript
 
 import quasar.Predef.{ Map => ScalaMap, _ }
 import quasar.common.SortDir
-import quasar.contrib.matryoshka._
-import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 
-import matryoshka._,
-  Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._,
@@ -59,7 +58,7 @@ object PATypes {
   def remap[A](env: StateAcc, state: StateAcc, in: F[A]): Output[F, A]
 }
 
-class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT] extends TTypes[T] {
   import PATypes._
 
   type Mapping = ScalaMap[BigInt, BigInt]
@@ -68,9 +67,7 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
     */
   def findIndicesInFunc(func: FreeMap): StateAcc = {
-    type FreeMapCoEnv[A] = CoEnv[Hole, MapFunc, A]
-
-    def accumulate: MapFunc[(T[FreeMapCoEnv], StateAcc)] => StateAcc = {
+    def accumulate: MapFunc[(FreeMap, StateAcc)] => StateAcc = {
       case ProjectIndex((src, Some(acc1)), (value, Some(acc2))) =>
         (src.project.run, value.project.run) match {
           case (-\/(SrcHole), \/-(IntLitMapFunc(idx))) => ((acc1 ++ acc2) + idx).some  // static integer index
@@ -81,19 +78,19 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
     }
 
     // CoEnv[Hole, MapFunc, (T[CoEnv[Hole, MapFunc, ?]], StateAcc)] => StateAcc
-    val galg: GAlgebra[(T[FreeMapCoEnv], ?), FreeMapCoEnv, StateAcc] =
+    val galg: GAlgebra[(FreeMap, ?), CoEnv[Hole, MapFunc, ?], StateAcc] =
       _.run.fold(κ(Set().some), accumulate)
 
-    func.toCoEnv.para[StateAcc](galg)
+    func.para[StateAcc](galg)
   }
 
-  /** Remap all indices in `func` in structures like `ProjectIndex(SrcHoe, IntLit(_))`
-    * according to the provided `mapping`.
+  /** Remap all indices in `func` in structures like
+    * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
     */
   def remapIndicesInFunc(func: FreeMap, mapping: Mapping): FreeMap =
-    freeTransCata[T, MapFunc, MapFunc, Hole, Hole](func) {
-      case co @ CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLitCoEnv(idx)))) =>
-        CoEnv(\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)).toCoEnv)))
+    func.transCata[FreeMap] {
+      case CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLit(idx)))) =>
+        CoEnv[Hole, MapFunc, FreeMap](\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)))))
       case co => co
     }
 
@@ -176,7 +173,7 @@ object PruneArrays {
   // TODO examine branches
   implicit def equiJoin[T[_[_]]]: PruneArrays[EquiJoin[T, ?]] = default
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive]
+  implicit def projectBucket[T[_[_]]: BirecursiveT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -207,7 +204,7 @@ object PruneArrays {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 
@@ -301,7 +298,7 @@ object PruneArrays {
     }
 }
 
-class PAFindRemap[T[_[_]]: Recursive: Corecursive, F[_]: Functor] {
+class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
   import PATypes._
 
   type ArrayEnv[G[_], A] = EnvT[StateAcc, G, A]

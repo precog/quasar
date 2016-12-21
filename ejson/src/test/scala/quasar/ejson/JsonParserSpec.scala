@@ -21,6 +21,8 @@ import quasar.Qspec
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz.:<:
 
 final class JsonParserSpec extends Qspec {
@@ -41,7 +43,7 @@ final class JsonParserSpec extends Qspec {
         "string" : "lorem ipsum"
       }"""
 
-      jsonParser[Fix, Json].parseUnsafe(js) must_= O(Obj(ListMap(
+      jsonParser[Fix[Json], Json].parseUnsafe(js) must_= O(Obj(ListMap(
         "array"  -> C(Arr(List(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))).embed,
         "null"   -> C(Null[J]()).embed,
         "false"  -> C(Bool[J](false)).embed,

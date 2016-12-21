@@ -16,7 +16,7 @@
 
 package quasar.frontend
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 
 object fixpoint {
   val optimizer = new quasar.frontend.logicalplan.Optimizer[Fix]

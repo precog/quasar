@@ -31,8 +31,8 @@ final case class NSUri(value: String Refined Uri) {
 
 object NSUri {
   implicit val order: Order[NSUri] =
-    Order.orderBy(_.value.get)
+    Order.orderBy(_.value.value)
 
   implicit val show: Show[NSUri] =
-    Show.shows(_.value.get)
+    Show.shows(_.value.value)
 }

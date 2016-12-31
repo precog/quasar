@@ -115,11 +115,11 @@ object syntax {
   }
 
   final implicit class NCNameOps(val ncname: NCName) extends scala.AnyVal {
-    def xs: XQuery = ncname.value.get.xs
+    def xs: XQuery = ncname.value.value.xs
   }
 
   final implicit class NSUriOps(val uri: NSUri) extends scala.AnyVal {
-    def xs: XQuery = uri.value.get.xs
+    def xs: XQuery = uri.value.value.xs
   }
 
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {

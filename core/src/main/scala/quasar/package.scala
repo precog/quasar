@@ -95,9 +95,9 @@ package object quasar {
     (lp: T, off: Natural, lim: Option[Positive])
     (implicit T: Corecursive.Aux[T, LP])
       : T = {
-    val skipped = Drop(lp, constant[T](Data.Int(off.get)).embed).embed
+    val skipped = Drop(lp, constant[T](Data.Int(off.value)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, constant[T](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
   }
 }

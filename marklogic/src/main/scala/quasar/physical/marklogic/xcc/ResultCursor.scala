@@ -32,7 +32,7 @@ final class ResultCursor private[xcc] (val chunkSize: Positive, s: Session, rs: 
 
   def nextChunk: Task[Vector[XdmItem]] =
     Process.unfoldEval(())(_ => next.map(_ strengthR (())))
-      .take(chunkSize.get.toInt)
+      .take(chunkSize.value.toInt)
       .runLog
 
   ////

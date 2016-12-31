@@ -85,7 +85,7 @@ object EncodeXQuery {
     def keyXqy(a: A): Validation[ErrorMessages, XQuery] =
       (f(a) \/> s"'${a.shows}' is not a supported map key in XQuery.")
         .flatMap(s => refineV[IsNCName](s).disjunction leftAs s"'$s' is not a valid XML QName.")
-        .map(ncname => xs.QName(ncname.get.xs))
+        .map(ncname => xs.QName(ncname.value.xs))
         .validationNel
 
     entries.traverse[ValM, XQuery] { case (key, value) =>

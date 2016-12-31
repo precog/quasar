@@ -42,14 +42,14 @@ object readfile {
       val ltd = ops.readFile(file).drop(skip)
 
       limit.fold(ltd)(ltd.take)
-        .chunk(chunkSize.get.toInt)
+        .chunk(chunkSize.value.toInt)
         .map(_.right[FileSystemError])
     }
 
     readFromProcess { (file, readOpts) =>
       lift(ContentSourceIO.runSessionIO(ops.exists(file)) map { doesExist =>
         doesExist.fold(
-          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt)),
+          dataProcess(file, readOpts.offset.value.toInt, readOpts.limit.map(_.value.toInt)),
           (Process.empty: ReadStream[ContentSourceIO])
         ).right[FileSystemError]
       }).into[S]

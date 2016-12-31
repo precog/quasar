@@ -16,7 +16,7 @@ object Dependencies {
   private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
-  private val refinedVersion    = "0.5.0"
+  private val refinedVersion    = "0.6.1"
   private val scalazVersion     = "7.2.4"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"

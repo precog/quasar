@@ -19,6 +19,7 @@ package quasar.physical.sparkcore.fs.local
 import quasar.Predef._
 import quasar.Data
 import quasar.DataCodec
+import quasar.Planner.PlannerError
 import quasar.fs.FileSystemError
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
@@ -35,9 +36,14 @@ import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
-    sc.textFile(posixCodec.unsafePrintPath(file))
-  }
+  def fromFile(file: AFile): StateT[EitherT[Task, PlannerError, ?], SparkContext, RDD[String]] =
+    StateT((sc: SparkContext) => {
+      EitherT(
+        Task.delay {
+          ((sc, sc.textFile(posixCodec.unsafePrintPath(file)))).right[PlannerError]
+        }
+      )}
+    )
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {
     val ioFile = new File(posixCodec.printPath(out))

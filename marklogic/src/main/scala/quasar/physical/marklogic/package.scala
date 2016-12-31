@@ -17,6 +17,7 @@
 package quasar.physical
 
 import quasar.Predef.String
+import quasar.fp.MonadError_
 
 import scalaz.{NonEmptyList, MonadError}
 

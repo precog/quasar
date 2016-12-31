@@ -29,6 +29,10 @@ import quasar.DataCodec
 import quasar.qscript._
 import quasar.sql.JoinDir
 import quasar.fp.ski.κ
+import quasar.Planner._
+import quasar.fp.MonadError_._
+import quasar.fp.stateT._
+import quasar.physical.sparkcore.fs.queryfile.SparkState
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -43,13 +47,11 @@ import org.specs2.scalaz.DisjunctionMatchers
 
 class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
 
-  import Planner.SparkState
-
   sequential
 
-  val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedread
-  val qscore = Planner.qscriptCore[Fix]
+  val equi = Planner.equiJoin[Fix, SparkState]
+  val sr = Planner.shiftedread[SparkState]
+  val qscore = Planner.qscriptCore[Fix, SparkState]
 
   val data = List(
     Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
@@ -90,10 +92,16 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "shiftedread" in {
       withSpark(sc => {
-        val fromFile: (SparkContext, AFile) => Task[RDD[String]] =
-          (sc: SparkContext, file: AFile) => Task.delay {
-            sc.parallelize(List("""{"name" : "tom", "age" : 28}"""))
-          }
+        val fromFile: AFile => SparkState[RDD[String]] =
+          (file: AFile) => StateT((sc: SparkContext) => {
+            EitherT(
+              Task.delay {
+                ((sc,
+                  sc.parallelize(List("""{"name" : "tom", "age" : 28}""")))).right[PlannerError]
+              }
+            )}
+          )
+        
         val alg: AlgebraM[SparkState, Const[ShiftedRead, ?], RDD[Data]] = sr.plan(fromFile )
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
 
@@ -590,8 +598,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
-  private val emptyFF: (SparkContext, AFile) => Task[RDD[String]] =
-    (sc: SparkContext, file: AFile) => Task.delay {
-      sc.parallelize(List())
-    }
+  private val emptyFF: AFile => SparkState[RDD[String]] =
+    (file: AFile) => StateT((sc: SparkContext) => {
+      EitherT(
+        Task.delay {
+          ((sc,
+            sc.parallelize(List.empty[String]))).right[PlannerError]
+        }
+      )}
+    )
 }

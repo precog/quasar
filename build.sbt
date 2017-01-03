@@ -187,6 +187,7 @@ lazy val githubReleaseSettings =
 lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
+lazy val testCore         = project aggregate (foundation, ejson, js, common, frontend, effect, sql, connector, marklogicValidation, core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore, interface, web, repl)
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)

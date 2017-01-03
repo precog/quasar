@@ -29,7 +29,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 
-import argonaut.Json
+import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
@@ -40,10 +40,11 @@ import org.specs2.matcher.MatchResult
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
+import scodec.bits.ByteVector
 
 import quasar.api.MessageFormatGen._
 
@@ -457,6 +458,94 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_== Status.InternalServerError
             response.as[String].unsafePerformSync must contain("anything but 4")
         }
+      }
+    }
+    "PUT" >> {
+      "download and re-upload directory" >> prop { (baseDir: ADir, rFile: RFile, content: Vector[Data]) =>
+        content.nonEmpty ==> {
+          val contentMap = Map((baseDir </> rFile) -> content)
+
+          // NB: only Precise format preserves all possible Data
+          val mt = jsonPreciseLine.mediaType
+
+          val request1 = Request(uri = pathUri(baseDir), headers = Headers(Accept(mt)))
+          val (service1, _) = serviceRef(InMemState.fromFiles(contentMap))
+          val responseBody = service1(request1).flatMap(_.as[ByteVector]).unsafePerformSync
+
+          val request2 = Request(uri = pathUri(baseDir), method = Method.PUT)
+                          .withBody(responseBody).unsafePerformSync
+                          .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+          val (service2, ref2) = serviceRef(InMemState.empty)
+          val response2 = service2(request2).unsafePerformSync
+
+          response2.status must_== Status.Ok
+          response2.as[String].unsafePerformSync must_== ""
+          ref2.unsafePerformSync.contents must_== contentMap
+        }
+      }
+
+      def utf8Bytes(str: String): Process[Task, ByteVector] =
+        Process.eval(ByteVector.encodeUtf8(str).disjunction.fold(
+          err => Task.fail(new RuntimeException(err.toString)),
+          Task.now))
+
+      "upload mixed content" >> prop { (baseDir: ADir, files: Map[AFile, MessageFormat]) =>
+        val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+
+        val metadata = ArchiveMetadata(files.map { case (p, fmt) =>
+          p -> FileMetadata(`Content-Type`(fmt.mediaType))
+        })
+
+        val metaBytes = utf8Bytes(EncodeJson.of[ArchiveMetadata].encode(metadata).pretty(minspace))
+
+        val body = Zip.zipFiles[Task](
+          (ArchiveMetadata.HiddenFile -> metaBytes) ::
+          files.toList.map { case (p, fmt) =>
+            p -> fmt.encode[Task](Process.emitAll(content))
+                  .flatMap(str => utf8Bytes(str))
+          })
+
+        val contentMap = files.map { case (p, _) => p -> content }
+
+        val (service, ref) = serviceRef(InMemState.empty)
+        (for {
+          request <- Request(uri = pathUri(baseDir), method = Method.PUT)
+                        .withBody(body)
+                        .map(_.withContentType(`Content-Type`(MediaType.`application/zip`).some))
+          response <- service(request)
+          body     <- response.as[String]
+          state    <- ref
+        } yield {
+          response.status must_== Status.Ok
+          body must_== ""
+          state.contents must_== contentMap
+        }).unsafePerformSync
+      }
+      "fail upload with no metadata" >> prop { (baseDir: ADir, files: Map[AFile, MessageFormat]) =>
+        val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+
+        val body = Zip.zipFiles[Task](
+          files.toList.map { case (p, fmt) =>
+            p -> fmt.encode[Task](Process.emitAll(content))
+                  .flatMap(str => utf8Bytes(str))
+          })
+
+        val contentMap = files.map { case (p, _) => p -> content }
+
+        val (service, ref) = serviceRef(InMemState.empty)
+        (for {
+          request <- Request(uri = pathUri(baseDir), method = Method.PUT)
+                        .withBody(body)
+                        .map(_.withContentType(`Content-Type`(MediaType.`application/zip`).some))
+          response <- service(request)
+          error    <- response.as[ApiError]
+          state    <- ref
+        } yield {
+          response.status must_== Status.UnsupportedMediaType
+          error must beApiErrorLike[DecodeFailure](
+            MediaTypeMissing(MessageFormat.supportedMediaTypes)) // TODO: Should mention ".quasar-metadata.json"
+          state.contents must_== contentMap
+        }).unsafePerformSync
       }
     }
     "MOVE" >> {

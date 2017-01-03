@@ -189,20 +189,11 @@ object MessageFormat {
     JsonFormat.SingleArray.mediaType,
     Csv.mediaType)
 
-  val decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = {
-    type Result = Process[Task, DecodeError \/ Data]
-    new EntityDecoder[Result] {
-      override def decode(msg: Message, strict: Boolean): DecodeResult[Result] = {
-        msg.headers.get(`Content-Type`).map { contentType =>
-          fromMediaType(contentType.mediaType).map { format =>
-            EitherT[Task, DecodeFailure, Result](format.decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
-          }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMismatch(contentType.mediaType, consumes).point[Task]))
-        }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMissing(consumes).point[Task]))
-      }
-
-      override val consumes: Set[MediaRange] = supportedMediaTypes
-    }
-  }
+  def forMessage(msg: Message): DecodeFailure \/ MessageFormat =
+    for {
+      cType <- msg.headers.get(`Content-Type`) \/> (MediaTypeMissing(supportedMediaTypes): DecodeFailure)
+      fmt   <- fromMediaType(cType.mediaType) \/> MediaTypeMismatch(cType.mediaType, supportedMediaTypes)
+    } yield fmt
 
   // FIXME: I don’t know why this is triggering here.
   @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))

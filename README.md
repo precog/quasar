@@ -495,7 +495,26 @@ A successful upload will replace any previous contents atomically, leaving them 
 
 If an error occurs when reading data from the request body, the response will contain a summary in the common `error` field and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
+
+#### Uploading multpile files
+
+If the supplied path represents a directory (ends with a slash), the request body must contain a `zip` archive containing the contents of the named directory, database, etc., and a special file, `/.quasar-metadata.json`, which specifies the format for each file, as it would be provided in a `Content-Type` header if the file was individually uploaded:
+
+```json
+{
+  "/foo": {
+    "Content-Type": "application/ldjson"
+  },
+  "/foo/bar": {
+    "Content-Type": "application/json; mode=precise"
+  }
+}
+```
+
+Note: if the zip archive was created by downloading a directory from Quasar, then it will already have this hidden file.
+
+Each file in the archive is written as if it was uploaded separately. The write is _not_ atomic; if an error occurs after some files are written, the file system is not restored to its previous state.
 
 ### POST /data/fs/[path]
 
@@ -503,7 +522,7 @@ Append data to the specified path. Uploaded data may be in any of the [supported
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
 
 ### DELETE /data/fs/[path]
 

@@ -20,7 +20,7 @@ import quasar.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
-import quasar.fp._, ski._, numeric._
+import quasar.fp._, numeric._
 import quasar.fs._
 
 import java.nio.charset.StandardCharsets
@@ -58,10 +58,10 @@ object data {
       })
 
     case req @ POST -> AsFilePath(path) =>
-      upload(req, W.appendThese(path, _))
+      upload(req, path, W.appendThese(_, _))
 
-    case req @ PUT -> AsFilePath(path) =>
-      upload(req, W.saveThese(path, _))
+    case req @ PUT -> AsPath(path) =>
+      upload(req, path, W.saveThese(_, _))
 
     case req @ Method.MOVE -> AsPath(path) =>
       respond((for {
@@ -136,40 +136,74 @@ object data {
   // TODO: Streaming
   private def upload[S[_]](
     req: Request,
-    by: Vector[Data] => FileSystemErrT[Free[S,?], Vector[FileSystemError]]
+    path: APath,
+    by: (AFile, Vector[Data]) => FileSystemErrT[Free[S,?], Vector[FileSystemError]]
   )(implicit S0: Task :<: S): Free[S, QResponse[S]] = {
     type FreeS[A] = Free[S, A]
-    type FreeFS[A] = FileSystemErrT[FreeS, A]
-    type QRespT[F[_], A] = EitherT[F, QResponse[S], A]
+
+    val inj = free.injectFT[Task, S]
+    def hoist = Hoist[EitherT[?[_], QResponse[S], ?]].hoist(inj)
+    def decodeUtf8(bytes: ByteVector): EitherT[FreeS, QResponse[S], String] =
+      EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
+        .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
 
     def errorsResponse(
       decodeErrors: IndexedSeq[DecodeError],
-      persistErrors: FreeFS[Vector[FileSystemError]]
-    ): Free[S, QResponse[S]] =
-      decodeErrors.toList.toNel
-        .map(errs => respond_[S, ApiError](ApiError.apiError(
-          BadRequest withReason "Malformed upload data.",
-          "errors" := errs.map(_.shows))))
-        .getOrElse(persistErrors.fold(_.toResponse[S], errs =>
-          errs.toList.toNel.fold(QResponse.ok[S])(errs1 =>
+      persistErrors: FileSystemErrT[FreeS, Vector[FileSystemError]]
+    ): OptionT[FreeS, QResponse[S]] =
+      OptionT(decodeErrors.toList.toNel.map(errs =>
+          respond_[S, ApiError](ApiError.apiError(
+            BadRequest withReason "Malformed upload data.",
+            "errors" := errs.map(_.shows)))).sequence)
+        .orElse(OptionT(persistErrors.fold[Option[QResponse[S]]](
+          _.toResponse[S].some,
+          errs => errs.toList.toNel.map(errs1 =>
             errs1.toApiError.copy(status = InternalServerError.withReason(
               "Error persisting uploaded data."
-            )).toResponse[S])))
+            )).toResponse[S]))))
 
-    def write(xs: IndexedSeq[(DecodeError \/ Data)]): Free[S, QResponse[S]] =
+    def write(fPath: AFile, xs: IndexedSeq[(DecodeError \/ Data)]): FreeS[QResponse[S] \/ Unit] =
       if (xs.isEmpty) {
-        respond_(ApiError.fromStatus(BadRequest withReason "Request has no body."))
+         respond_[S, ApiError](ApiError.fromStatus(BadRequest withReason "Request has no body.")).map(_.left)
       } else {
         val (errors, data) = xs.toVector.separate
-        errorsResponse(errors, by(data))
+        errorsResponse(errors, by(fPath, data)).toLeft(()).run
       }
 
-      free.injectFT[Task,S].apply(
-        MessageFormat.decoder.decode(req,true)
-          .leftMap(_.toResponse[S].point[FreeS])
-          .flatMap(dataStream => EitherT.right(dataStream.runLog.map(write)))
-          .merge
-      ).flatMap(ι)
+    def decodeContent(format: MessageFormat, strs: Process[Task, String])
+        : EitherT[Task, DecodeFailure, Process[Task, DecodeError \/ Data]] =
+      EitherT(format.decode(strs).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg): DecodeFailure)))
+
+    def handleOne(fPath: AFile, fmt: MessageFormat, strs: Process[Task, String])
+        : EitherT[FreeS, QResponse[S], Unit] = {
+      hoist(decodeContent(fmt, strs).leftMap(_.toResponse[S]))
+        .flatMap(dataStream => EitherT(inj(dataStream.runLog).flatMap(write(fPath, _))))
+    }
+
+    refineType(path).fold[EitherT[FreeS, QResponse[S], Unit]](
+      aDir =>
+        for {
+          files <- hoist(Zip.unzipFiles(req.body)
+                   .leftMap(err => InvalidMessageBodyFailure(err).toResponse[S]))
+          t <- files.partition(_._1 ≟ ArchiveMetadata.HiddenFile) match {
+            case ((_, meta) :: Nil, other) =>
+              decodeUtf8(meta).strengthR(other)
+            case _ =>
+              ???
+              // EitherT.left(InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S])
+          }
+          (meta, other) = t
+          _     <- other.traverse { case (aFile, bytes) =>
+                   // EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
+                   //   .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
+                   decodeUtf8(bytes)
+                     .flatMap(str => handleOne(rebaseA(aDir)(aFile), fmt, Process.emit(str)))
+                  }
+        } yield (),
+      aFile => for {
+        fmt <- EitherT(MessageFormat.forMessage(req).point[FreeS]).leftMap(_.toResponse[S])
+        _   <- handleOne(aFile, fmt, req.bodyAsText)
+      } yield ()).as(QResponse.ok[S]).run.map(_.merge)
   }
 
   private def zippedContents[S[_]](
@@ -185,7 +219,7 @@ object data {
       Zip.zipFiles(files.toList map { file =>
         val data = R.scan(dir </> file, offset, limit)
         val bytes = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
-        (file, bytes)
+        (rootDir </> file, bytes)
       })
     }
 }

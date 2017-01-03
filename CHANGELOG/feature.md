@@ -1,0 +1,1 @@
+- [#1300] handle upload of zip archive to directory path

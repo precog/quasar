@@ -35,7 +35,7 @@ object Planner {
   }
 
   final case class NonRepresentableData(data: Data) extends PlannerError {
-    def message = "The back-end has no representation for the constant: " + data
+    def message = "The back-end has no representation for the constant: " + data.shows
   }
   final case class NonRepresentableEJson(data: String)
       extends PlannerError {
@@ -48,7 +48,7 @@ object Planner {
     def message = error.shows
   }
   final case class UnsupportedJoinCondition(cond: Fix[LogicalPlan]) extends PlannerError {
-    def message = "Joining with " + cond + " is not currently supported"
+    def message = s"Joining with ${cond.shows} is not currently supported"
   }
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
     def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan

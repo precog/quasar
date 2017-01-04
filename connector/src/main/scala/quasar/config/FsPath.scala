@@ -77,8 +77,8 @@ object FsPath {
 
   private def winVolAndPath(s: String): (String, String) = {
     val (prefix, s1): (String, String) = if (s.startsWith("\\\\")) ("\\\\", s.drop(2)) else ("", s)
-    val (vol, rest) = s1.splitAt(s1.indexOf("\\"))
-    (prefix + vol, rest)
+    val (vol, rest) = s1.splitAt(s1.indexOf('\\'))
+    (prefix + vol.toString, rest.toString)
   }
 
   def parseWinAbsDir(s: String): Option[Aux[Abs, Dir, Sandboxed]] = {

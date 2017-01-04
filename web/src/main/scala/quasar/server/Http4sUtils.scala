@@ -53,9 +53,9 @@ object Http4sUtils {
   }
 
   def openBrowser(port: Int): Task[Unit] = {
-    val url = "http://localhost:" + port + "/"
+    val url = s"http://localhost:$port/"
     Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
-      .or(stderr("Failed to open browser, please navigate to " + url))
+      .or(stderr(s"Failed to open browser, please navigate to $url"))
   }
 
   /** Returns why the given port is unavailable or None if it is available. */
@@ -67,7 +67,7 @@ object Http4sUtils {
     })
 
   /** An available port number. */
-  def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_.head)
+  def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_(0))
 
   /** Available port numbers. */
   def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Int], N]] = Task.delay {
@@ -79,7 +79,7 @@ object Http4sUtils {
   /** Returns the requested port if available, or the next available port. */
   def choosePort(requested: Int): Task[Int] =
     unavailableReason(requested)
-      .flatMapF(rsn => stderr("Requested port not available: " + requested + "; " + rsn) *>
+      .flatMapF(rsn => stderr(s"Requested port not available: $requested; $rsn") *>
         anyAvailablePort)
       .getOrElse(requested)
 
@@ -108,14 +108,14 @@ object Http4sUtils {
 
     val serversAndPort = configurations.evalMap(conf =>
       startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout("Server started listening on port " + port) })
+        stdout(s"Server started listening on port $port") })
 
     serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
-      oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
+      oldServer.shutdown.flatMap(_ => stdout(s"Stopped server listening on port $oldPort")) *>
         Task.now(newServerAndPort)
     }.cleanUpWithA{ server =>
       server.map { case (lastServer, lastPort) =>
-        lastServer.shutdown.flatMap(_ => stdout("Stopped last server listening on port " + lastPort))
+        lastServer.shutdown.flatMap(_ => stdout(s"Stopped last server listening on port $lastPort"))
       }.getOrElse(Task.now(()))
     }
   }

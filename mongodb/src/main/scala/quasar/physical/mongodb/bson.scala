@@ -199,7 +199,7 @@ object Bson {
     def repr = new BsonTimestamp(epochSecond, ordinal)
     def toJs = Js.Call(Js.Ident("Timestamp"),
       List(Js.num(epochSecond.toLong), Js.num(ordinal.toLong)))
-    override def toString = "Timestamp(" + Instant.ofEpochSecond(epochSecond.toLong) + ", " + ordinal + ")"
+    override def toString = s"Timestamp(${Instant.ofEpochSecond(epochSecond.toLong)}, ${ordinal.shows})"
   }
   object Timestamp {
     def fromInstant(instant: Instant, ordinal: Int): Timestamp =

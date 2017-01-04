@@ -388,7 +388,14 @@ package object fp
     orig.transAnaM[Option, T[F], F](F.prj)
 
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
-    final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
+    final def mapAccumM[B, C, M[_]: Monad](c: C)(f: (C, A) => M[(C, B)]): M[(C, List[B])] =
+      self.foldLeftM((c, List.empty[B])){ case ((c, resultList), a) =>
+        f(c, a).map { case (newC, b) =>
+          (newC, b :: resultList)
+        }
+      }
+    final def mapAccumLeftM[B, C, M[_]: Monad](c: C)(f: (C, A) => M[(C, B)]): M[(C, List[B])] =
+      mapAccumM(c)(f).map { case (c, result) => (c, result.reverse) }
   }
 
   implicit def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]): Delay[Equal, Coproduct[F, G, ?]] =

@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.fp.ski._
 import quasar.SemanticError._
-import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST}
+import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST, pprint}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -57,9 +57,9 @@ object Variables {
             case Fix(Ident(name)) =>
               posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
                 TableRelationAST(_, alias).right,
-                GenericError("bad path: " + name + " (note: absolute file path required)").left)  // FIXME
+                GenericError(s"bad path: $name (note: absolute file path required)").left)  // FIXME
             case x =>
-              GenericError("not a valid table name: " + x).left  // FIXME
+              GenericError(s"not a valid table name: ${pprint(x)}").left  // FIXME
           }
         case r => r.right
       }, _.right[SemanticError]).map(rel =>

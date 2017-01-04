@@ -40,8 +40,8 @@ object control {
             possibleReason map { reason =>
               PreconditionFailed(s"Could not restart on new port because $reason")
             } getOrElse {
-              (restart(portNum) *> Accepted("Restarting on port " + portNum)) handleWith {
-                case e => InternalServerError("Failed to restart on port " + portNum)
+              (restart(portNum) *> Accepted(s"Restarting on port $portNum")) handleWith {
+                case e => InternalServerError(s"Failed to restart on port $portNum")
               }
             }
           }
@@ -49,6 +49,6 @@ object control {
       )
 
     case DELETE -> Root =>
-      restart(defaultPort) *> Accepted("Restarting on default port " + defaultPort)
+      restart(defaultPort) *> Accepted(s"Restarting on default port $defaultPort")
   }
 }

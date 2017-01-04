@@ -31,9 +31,9 @@ import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 
 object BsonCodec {
-  private def pad2(x: Int) = if (x < 10) "0" + x else x.toString
+  private def pad2(x: Int) = if (x < 10) "0" + x.toString else x.toString
   private def pad3(x: Int) =
-    if (x < 10) "00" + x else if (x < 100) "0" + x else x.toString
+    if (x < 10) "00" + x.toString else if (x < 100) "0" + x.toString else x.toString
 
   object EJsonType {
     def apply(typ: String): Bson =

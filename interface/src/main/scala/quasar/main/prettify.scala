@@ -32,7 +32,7 @@ object Prettify {
       (acc :+ (seg match {
         case FieldSeg(name) if first => name
         case FieldSeg(name)          => "." + name
-        case IndexSeg(index)         => "[" + index + "]"
+        case IndexSeg(index)         => s"[$index]"
       })) -> false
     }._1.mkString
 
@@ -134,7 +134,7 @@ object Prettify {
   def render(data: Data): Aligned[String] = data match {
     case Data.Str(str) => Aligned.Left(str)
     case _ => Aligned.Right(DataCodec.Readable.encode(data).fold(
-      _ => "unexpected: " + data,
+      _ => s"unexpected: $data",
       json => json.fold(
         "null",
         _.toString,
@@ -142,8 +142,8 @@ object Prettify {
         ι,
         // NB: the non-atomic types never appear here because the Data has been
         // flattened.
-        _ => "unexpected: " + data,
-        _ => "unexpected: " + data
+        _ => s"unexpected: $data",
+        _ => s"unexpected: $data"
       )))
   }
 

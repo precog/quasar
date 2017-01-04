@@ -518,7 +518,11 @@ package object workflow {
                   MapReduceTask(src, mr, Some(MapReduce.Action.Reduce(Some(true))))
                 // NB: `finalize` should ensure that the final op is always a
                 //     $ReduceF.
-                case src => scala.sys.error("not a mapReduce: " + src)
+                case src =>
+                  // TODO: Find a better way to print this
+                  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+                  val msg = "not a mapReduce: " + src.unFix.toString
+                  scala.sys.error(msg)
               })))
       }
 

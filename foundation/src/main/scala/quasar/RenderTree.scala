@@ -97,13 +97,6 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
       (first #:: Stream.continually(other)).zip(s).map {
         case (a, b) => a + b
       }
-    def mapParts[A, B](as: Stream[A])(f: (A, Boolean, Boolean) => B): Stream[B] = {
-      def loop(as: Stream[A], first: Boolean): Stream[B] =
-        if (as.isEmpty)           Stream.empty
-        else if (as.tail.isEmpty) f(as.head, first, true) #:: Stream.empty
-        else                      f(as.head, first, false) #:: loop(as.tail, false)
-      loop(as, true)
-    }
 
     val (prefix, body, suffix) = (simpleType, label) match {
       case (None,             None)        => ("", "", "")
@@ -112,12 +105,14 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
       case (Some(simpleType), Some(label)) => (simpleType + "(",  label, ")")
     }
     val indent = " " * (prefix.length-2)
-    val lines = body.split("\n").toStream
-    mapParts(lines) { (a, first, last) =>
+    val lines = body.split("\n")
+    lines.zipWithIndex.map { case (a, index) =>
+      def first = index == 0
+      def last = index == lines.length - 1
       val pre = if (first) prefix else indent
       val suf = if (last) suffix else ""
       pre + a + suf
-    } ++ drawSubTrees(children)
+    } ++: drawSubTrees(children)
   }
 
   private def typeAndLabel: String = (simpleType, label) match {

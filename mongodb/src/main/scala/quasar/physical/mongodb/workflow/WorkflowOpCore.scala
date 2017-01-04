@@ -601,7 +601,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           }(ident("value")),
           Js.Return(Js.Ident("rez"))))
 
-    body(exprs.toList.zipWithIndex.map(("each" + _).second))
+    body(exprs.toList.zip(Stream.from(0).map("each" + _.toString)))
   }
 
   def >>>(that: $SimpleMapF[A]) = {
@@ -631,7 +631,10 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           scope <+> $SimpleMapF.implicitScope(funcs)
         )
       case _ =>
-        $FlatMapF(src, fn, $SimpleMapF.implicitScope(funcs + "clone") ++ scope)
+        // WartRemover seems to be confused by the `+` method on `Set`
+        @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+        val newFuncs = funcs + "clone"
+        $FlatMapF(src, fn, $SimpleMapF.implicitScope(newFuncs) ++ scope)
     }
   }
 

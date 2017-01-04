@@ -41,7 +41,7 @@ trait Library {
 
   private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
     f(args).getOrElse {
-      val msg: String = "Unknown arguments: " + args
+      val msg: String = s"Unknown arguments: $args"
       failure(NonEmptyList(SemanticError.GenericError(msg)))
     }
   }

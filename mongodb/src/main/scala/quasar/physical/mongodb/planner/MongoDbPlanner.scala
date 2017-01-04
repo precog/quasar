@@ -261,7 +261,7 @@ object MongoDbPlanner {
   type PartialSelector = Partial[BsonField, Selector]
   implicit def partialSelRenderTree(implicit S: RenderTree[Selector]): RenderTree[PartialSelector] = RenderTree.make {
     case (f, ifs) => NonTerminal(List("PartialSelector"), None,
-      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x))).render ::
+      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x.toString))).render ::
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
@@ -919,7 +919,7 @@ object MongoDbPlanner {
         case _ =>
           -\/(UnsupportedPlan(x,
             Some("collections can only contain objects, but a(n) " +
-              typ +
+              typ.shows +
               " is expected")))
       }
     case x => \/-(x.embed)

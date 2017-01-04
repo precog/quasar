@@ -123,7 +123,7 @@ package object expression {
               isBoolean(x),
               isDate(x),
               isTimestamp(x)))
-        case _ => UnsupportedJS("type check not converted: " + typ).left
+        case _ => UnsupportedJS("type check not converted: " + typ.shows).left
       }
     }
   }

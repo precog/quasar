@@ -213,7 +213,7 @@ object managefile {
       in <- MonadReader[MongoManage, ManageIn].ask
       (prefix, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
-    } yield prefix.run + n
+    } yield prefix.run + n.toString
 
   private def tmpPrefix: Task[TmpPrefix] =
     NameGenerator.salt map (s => TmpPrefix(s"__quasar.tmp_${s}_"))

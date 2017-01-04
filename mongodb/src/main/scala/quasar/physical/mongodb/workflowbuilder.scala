@@ -214,7 +214,7 @@ object WorkflowBuilder {
     def dummyOp(implicit ev0: WorkflowOpCoreF :<: F, ev1: Coalesce[F]): Fix[F] =
       op(
         inputs.zipWithIndex.map {
-          case (_, index) => BsonField.Name("_" + index)
+          case (_, index) => BsonField.Name("_" + index.toString)
         })(
         // Nb. This read is an arbitrary value that allows us to compare the partial function
         $read[F](Collection(DatabaseName(""), CollectionName(""))))
@@ -731,11 +731,11 @@ object WorkflowBuilder {
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
                   fail(InternalError fromMsg "A shape with no fields does not make sense"))(
                   fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
-                    emitSt(ungrouped.size match {
-                      case 0 =>
+                    emitSt(ungrouped.toList match {
+                      case Nil =>
                         state[NameGen, Fix[F]](chain(wf,
                           $group[F](Grouped(grouped).rewriteRefs(prefixBase0(base0 \ base)), key(base0))))
-                      case 1 =>
+                      case (name -> _) :: Nil =>
                         state[NameGen, Fix[F]](chain(wf,
                           $group[F](Grouped(
                             obj.transform {
@@ -745,7 +745,7 @@ object WorkflowBuilder {
                                 $push(v.cata(exprOps.rewriteRefs(prefixBase0(base0 \ base))))
                             }),
                             key(base0)),
-                          $unwind[F](DocField(ungrouped.head._1))))
+                          $unwind[F](DocField(name))))
                       case _ => for {
                         ungroupedName <- freshName
                         groupedName <- freshName
@@ -934,7 +934,7 @@ object WorkflowBuilder {
       swapM((documentize(c1) |@| documentize(c2)) {
         case ((lb, lshape), (rb, rshape)) =>
           Reshape.mergeMaps(lshape, rshape).fold[PlannerError \/ ((Base, Base), DocContents[A])](
-            -\/(InternalError.fromMsg("conflicting fields when merging contents: " + lshape + ", " + rshape)))(
+            -\/(InternalError.fromMsg(s"conflicting fields when merging contents: $lshape, $rshape")))(
             map => {
               val llb = if (Subset(map.keySet) == lb) Root() else lb
               val rrb = if (Subset(map.keySet) == rb) Root() else rb
@@ -1206,13 +1206,18 @@ object WorkflowBuilder {
                         None))))
                 case _ => fail(InternalError fromMsg "couldn’t merge array")
               },
-              fail(InternalError.fromMsg("couldn’t merge unrecognized op: " + wf)))
+              {
+                // TODO: Find a way to print this without using toString
+                @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
+                val msg = "couldn’t merge unrecognized op: " + wf.toString
+                fail(InternalError.fromMsg(msg))
+              })
           }
         }
       case (_, ArrayBuilderF(_, _)) => delegate
 
       case _ =>
-        fail(InternalError.fromMsg("failed to merge:\n" + left.render.show + "\n" + right.render.show))
+        fail(InternalError.fromMsg("failed to merge:\n" + left.render.shows + "\n" + right.render.shows))
     }
   }
 
@@ -1348,14 +1353,14 @@ object WorkflowBuilder {
           else
             -\/(UnsupportedFunction(
               structural.ArrayProject,
-              Some("value does not contain index ‘" + index + "’.")))
+              Some(s"value does not contain index ‘$index’.")))
         case ArrayBuilderF(wb0, elems) =>
           if (index < elems.length) // UGH!
             \/-(ExprBuilder(wb0, elems(index)))
           else
             -\/(UnsupportedFunction(
               structural.ArrayProject,
-              Some("array does not contain index ‘" + index + "’.")))
+              Some(s"array does not contain index ‘$index’.")))
         case ValueBuilderF(_) =>
           -\/(UnsupportedFunction(
             structural.ArrayProject,
@@ -1682,7 +1687,7 @@ object WorkflowBuilder {
 
           case _ => fail(UnsupportedFunction(
             structural.ObjectConcat,
-            Some("unrecognized shapes:\n" + wb1.render.show + "\n" + wb2.render.show)))
+            Some("unrecognized shapes:\n" + wb1.render.shows + "\n" + wb2.render.shows)))
         }
       }
 

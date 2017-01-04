@@ -45,7 +45,10 @@ package object jscore {
 
   val findFunctionsƒ: JsCoreF[(Fix[JsCoreF], Set[String])] => Set[String] = {
     case CallF((Fix(IdentF(Name(name))), _), args) =>
-      Foldable[List].fold(args.map(_._2)) + name
+      // WartRemover seems to be confused by the `+` method on `Set`
+      @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+      val result = Foldable[List].fold(args.map(_._2)) + name
+      result
     case js => js.map(_._2).fold
   }
 

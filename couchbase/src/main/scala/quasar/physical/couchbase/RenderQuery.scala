@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar._
+import quasar.{Data => QData, _}
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
 import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
@@ -41,6 +41,8 @@ object RenderQuery {
   }
 
   val alg: AlgebraM[PlannerError \/ ?, N1QL, String] = {
+    case Data(QData.Str(v)) =>
+      ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
     case Data(v) =>
       DataCodec.render(v).leftAs(NonRepresentableData(v))
     case Id(v) =>

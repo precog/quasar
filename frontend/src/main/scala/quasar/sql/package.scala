@@ -78,20 +78,24 @@ package object sql {
       case _                                             => None
     }
 
-    val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}
+    val aliases = projections.flatMap(_.alias.toList)
 
-    (aliases diff aliases.distinct).headOption.cata(
+    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
       duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeft1(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
+      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
         alias.cata(
-          a => (used, a -> expr),
+          a => (used, a -> expr).right,
           {
             val tentativeName = extractName(expr) getOrElse index.toString
             val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
-            val name = (tentativeName #:: alternatives).dropWhile(used.contains).head
-            (used + name, name -> expr)
+            (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
+              // WartRemover seems to be confused by the `+` method on `Set`
+              @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+              val newUsed = used + name
+              (newUsed, name -> expr)
+            } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
           })
-      }._2.right)
+      }.map(_._2))
   }
 
   def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): Sql ~> (F ∘ Sql)#λ =

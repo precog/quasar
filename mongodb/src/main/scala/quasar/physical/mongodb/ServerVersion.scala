@@ -37,7 +37,7 @@ object ServerVersion {
 
   implicit val show: Show[ServerVersion] = Show.show { v =>
     v.major.toString + "." + v.minor.toString +
-      v.revision.foldMap("." + _) +
+      v.revision.foldMap("." + _.shows) +
       (if (v.extra.isEmpty) "" else "-" + v.extra)
   }
 

@@ -785,7 +785,7 @@ object MongoDbQScriptPlanner {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
       if (typ.contains(subType)) cont.project.right
       else if (!subType.contains(typ))
-        InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected").left
+        InternalError.fromMsg("can only contain " + subType.shows + ", but a(n) " + typ.shows + " is expected").left
       else free.right
     case x => x.right
   }

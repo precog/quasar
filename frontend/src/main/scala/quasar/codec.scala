@@ -30,15 +30,15 @@ trait DataEncodingError {
 }
 object DataEncodingError {
   final case class UnrepresentableDataError(data: Data) extends DataEncodingError {
-    def message = "not representable: " + data
+    def message = s"not representable: ${data.shows}"
   }
 
   final case class UnescapedKeyError(json: Json) extends DataEncodingError {
-    def message = "un-escaped key: " + json
+    def message = s"un-escaped key: ${json.pretty(minspace)}"
   }
 
   final case class UnexpectedValueError(expected: String, json: Json) extends DataEncodingError {
-    def message = "expected " + expected + ", found: " + json.pretty(minspace)
+    def message = s"expected $expected, found: ${json.pretty(minspace)}"
   }
 
   final case class ParseError(cause: String) extends DataEncodingError {

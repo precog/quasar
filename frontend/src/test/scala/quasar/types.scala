@@ -765,7 +765,7 @@ class TypesSpec extends quasar.Qspec {
 
     "encode coproducts as an array of types" >> prop { (t1: Type, t2: Type, ts: List[Type]) =>
       val coprod = ts.foldLeft(Coproduct(t1, t2))(Coproduct(_, _))
-      typJson(coprod) must_= Json("Coproduct" := coprod.flatten)
+      typJson(coprod) must_= Json("Coproduct" := coprod.flatten.toVector)
     }
   }
 }

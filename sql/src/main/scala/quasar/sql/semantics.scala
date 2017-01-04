@@ -214,7 +214,7 @@ object SemanticAnalysis {
 
           def nest(l: RenderedTree, r: RenderedTree, sep: String) = (l, r) match {
             case (RenderedTree(_, ll, Nil), RenderedTree(_, rl, Nil)) =>
-              Terminal(ProvenanceNodeType, Some("(" + ll + " " + sep + " " + rl + ")"))
+              Terminal(ProvenanceNodeType, Some((ll.toList ++ rl.toList).mkString("(", s" $sep ", ")")))
             case _ => NonTerminal(ProvenanceNodeType, Some(sep), l :: r :: Nil)
           }
 

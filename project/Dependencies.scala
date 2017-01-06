@@ -7,9 +7,9 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
-  private val argonautVersion   = "6.2-M3"
+  private val argonautVersion   = "6.2-RC2"
   private val doobieVersion     = "0.3.0"
-  private val http4sVersion     = "0.14.1a"
+  private val http4sVersion     = "0.15.2a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
@@ -124,7 +124,7 @@ object Dependencies {
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,
-    "org.http4s"     %% "http4s-argonaut62"   %   http4sVersion,
+    "org.http4s"     %% "http4s-argonaut"   %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-server" %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-client" %   http4sVersion    % Test,
     "com.propensive" %% "rapture-json"        %   raptureVersion   % Test,

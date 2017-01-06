@@ -148,7 +148,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound
+          case None       => Response.fallthrough
         }
       }
     }

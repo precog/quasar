@@ -1,0 +1,1 @@
+- Reduce quantity of test output on CI.

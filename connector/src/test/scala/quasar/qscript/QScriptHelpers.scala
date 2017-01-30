@@ -177,6 +177,7 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
     ejsonMap((
       ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
       ejsonArr(l, r)))
+
   def ejsonProjectField(field: Fix[EJson]) =
     ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
 }

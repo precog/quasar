@@ -7,7 +7,7 @@
     "data": "zips.data",
     "query": "select foo ?? pop as p, city ?? false as c from zips",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
     "expected": [{ "p": 15338.0, "c": "AGAWAM"       },
                  { "p": 36963.0, "c": "CUSHMAN"      },
                  { "p":  4546.0, "c": "BARRE"        },

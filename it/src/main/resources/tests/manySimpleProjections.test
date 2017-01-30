@@ -11,6 +11,8 @@
 
   "predicate": "containsExactly",
 
+  "ignoreFieldOrder": ["marklogic_json"],
+
   "expected": [
     { "a": "BOULDER", "b": "BOULDER", "c": "BOULDER", "d": "BOULDER", "e": "BOULDER", "f": "BOULDER" }
   ]

@@ -21,6 +21,7 @@ import quasar.fp._
 import quasar.fp.ski._
 
 import java.time.format.DateTimeFormatter
+import java.time.ZoneOffset.UTC
 
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
@@ -65,6 +66,12 @@ object DataCodec {
   def render(data: Data)(implicit C: DataCodec): Option[String] =
     C.encode(data).map(_.pretty(minspace))
 
+  val dateTimeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
+
+  val timeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+
   val Precise = new DataCodec {
     val TimestampKey = "$timestamp"
     val DateKey = "$date"
@@ -87,9 +94,9 @@ object DataCodec {
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
         case Set(_)     => None
 
-        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.toString)).some
+        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
         case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
-        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))).some
+        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(timeFormatter))).some
         case Interval(value)  => Json.obj(IntervalKey  -> jString(value.toString)).some
 
         case bin @ Binary(_)  => Json.obj(BinaryKey    -> jString(bin.base64)).some

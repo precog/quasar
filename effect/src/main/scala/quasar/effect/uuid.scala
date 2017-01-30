@@ -17,6 +17,7 @@
 package quasar.effect
 
 import quasar.Predef._
+import quasar.contrib.scalaz.MonadReader_
 
 import java.util.UUID
 
@@ -27,6 +28,12 @@ import scalaz.syntax.equal._
 import scalaz.concurrent.Task
 
 object uuid {
+  type UuidReader[F[_]] = MonadReader_[F, UUID]
+
+  object UuidReader {
+    def apply[F[_]](implicit F: UuidReader[F]): UuidReader[F] = F
+  }
+
   type GenUUID[A] = Read[UUID, A]
 
   object GenUUID {

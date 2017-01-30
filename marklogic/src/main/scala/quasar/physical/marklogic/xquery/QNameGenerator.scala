@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.fp.ski.κ
-import quasar.effect.MonotonicSeq
+import quasar.effect.MonoSeq
 import quasar.physical.marklogic.xml.{NCName, QName}
 
 import eu.timepit.refined.api.Refined
@@ -44,9 +44,9 @@ sealed abstract class QNameGeneratorInstances extends QNameGeneratorInstances0 {
       def freshQName = F.bind(F.get)(n => F.put(n + 1) as numericQName(n))
     }
 
-  implicit def monotonicSeqQNameGenerator[S[_]](implicit S: MonotonicSeq :<: S): QNameGenerator[Free[S, ?]] =
-    new QNameGenerator[Free[S, ?]] {
-      def freshQName = MonotonicSeq.Ops[S].next map (numericQName)
+  implicit def monotonicSeqQNameGenerator[F[_]: Functor](implicit F: MonoSeq[F]): QNameGenerator[F] =
+    new QNameGenerator[F] {
+      def freshQName = MonoSeq[F].next map (numericQName)
     }
 
   private def numericQName(n: Long): QName = {

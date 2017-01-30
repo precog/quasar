@@ -16,7 +16,11 @@ fi
 
 # only publish on quasar-analytics/quasar#master
 if [[ "$TRAVIS" == "true" && "$TRAVIS_BRANCH" == "master" && "$TRAVIS_REPO_SLUG" == "quasar-analytics/quasar" ]] ; then
-  "$SBT" 'project repl' githubRelease 'project web' githubRelease
+  openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in project/secring.pgp.enc -out project/local.secring.pgp -d
+  openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in project/pubring.pgp.enc -out project/local.pubring.pgp -d
+  openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in credentials.sbt.enc -out local.credentials.sbt -d
+
+  "$SBT" publishSigned sonatypeRelease 'project repl' githubRelease 'project web' githubRelease
 else
   echo "GITHUB_TOKEN defined, but Travis not running in quasar-analytics/quasar#master, so skipping publish"
 fi

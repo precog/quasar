@@ -1,16 +1,29 @@
 {
     "name": "filter with date literals",
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "marklogic":  "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_3_2":       "pending",
+        "postgresql":        "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "spark_local":       "pending",
+        "spark_hdfs":        "pending"
     },
     "data": "../days.data",
     "query": "select day from `../days`
-              where ((ts > date(\"2014-08-17\") and ts <= date(\"2014-08-20\")) and ts != date(\"2014-08-19\"))
-                 or ts = date(\"2014-08-22\")",
+              where
+                (
+                  (
+                    date_trunc(\"day\", ts) > start_of_day(date(\"2014-08-17\")) and
+                    date_trunc(\"day\", ts) <= start_of_day(date(\"2014-08-20\"))
+                  )
+                  and
+                  date_trunc(\"day\", ts) != start_of_day(date(\"2014-08-19\"))
+                )
+                or
+                date_trunc(\"day\", ts) = start_of_day(date(\"2014-08-22\"))",
     "predicate": "containsExactly",
     "expected": ["Monday", "Wednesday", "Friday"]
 }

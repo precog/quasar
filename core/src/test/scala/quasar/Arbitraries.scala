@@ -18,6 +18,7 @@ package quasar
 
 trait Arbitraries extends
   DataArbitrary with
+  DateArbitrary with
   TypeArbitrary with
   VariablesArbitrary
 

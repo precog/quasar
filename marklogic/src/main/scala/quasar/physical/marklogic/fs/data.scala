@@ -19,18 +19,44 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
-import quasar.physical.marklogic.prisms._
+import quasar.physical.marklogic.optics._
+import quasar.physical.marklogic.qscript.{EJsonTypeKey, EJsonValueKey}
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 
 import scala.xml._
 import scala.collection.immutable.Seq
 
+import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
 import monocle.Prism
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
+  val encodeJson: Data => Json = {
+    def typedObj[A: EncodeJson](typ: DataType, value: A): Json =
+      jObjectFields(EJsonTypeKey -> jString(typ.shows), EJsonValueKey -> value.asJson)
+
+    {
+      case Data.Binary(bytes) => typedObj(DT.Binary   , base64Bytes(bytes))
+      case Data.Bool(b)       => jBool(b)
+      case Data.Date(d)       => typedObj(DT.Date     , isoLocalDate(d))
+      case Data.Dec(d)        => typedObj(DT.Decimal  , d)
+      case Data.Id(id)        => typedObj(DT.Id       , id)
+      case Data.Int(i)        => typedObj(DT.Integer  , i)
+      case Data.Interval(d)   => typedObj(DT.Interval , isoDuration(d))
+      case Data.NA            => jSingleObject(EJsonTypeKey, jString((DT.NA: DataType).shows))
+      case Data.Null          => jNull
+      case Data.Str(s)        => jString(s)
+      case Data.Time(t)       => typedObj(DT.Time     , isoLocalTime(t))
+      case Data.Timestamp(ts) => typedObj(DT.Timestamp, isoInstant(ts))
+
+      case Data.Arr(elements) => jArray(elements map encodeJson)
+      case Data.Obj(entries)  => jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
+      case Data.Set(elements) => typedObj(DT.Set      , encodeJson(Data.Arr(elements)))
+    }
+  }
+
   def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: DataType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe.shows, Null)
@@ -62,7 +88,7 @@ object data {
         case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
         case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
         case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
-        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(durationInSeconds(d))   ).success
+        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(isoDuration(d))         ).success
         case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
         case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
         case Data.Str(s)        => elem(elementName, DT.String   , Text(s)                      ).success
@@ -84,6 +110,66 @@ object data {
 
     encodeXml0(rootElem, inner)(ejsonEjson)(data)
       .fold(_.raiseError[F, Elem], _.point[F])
+  }
+
+  def decodeJson[F[_]: MonadErrMsgs](json: Json): F[Data] = {
+    val error: String => F[Data] = _.wrapNel.raiseError[F, Data]
+
+    val decodeNumber: JsonNumber => Data = {
+      case JsonLong(i) => Data.Int(i)
+      case other       => Data.Dec(other.toBigDecimal)
+    }
+
+    val decodeObject: JsonObject => F[Data] = {
+      case EJsonTyped(DT.Binary, b64) =>
+        b64.string.flatMap(base64Bytes.getOption(_)).map(Data._binary(_)).cata(
+          _.point[F], error(s"Expected Base64-encoded binary data, found: $b64"))
+
+      case EJsonTyped(DT.Date, dt) =>
+        dt.string.flatMap(isoLocalDate.getOption(_)).map(Data._date(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted local date, found: $dt"))
+
+      case EJsonTyped(DT.Decimal, d) =>
+        d.as[BigDecimal].toOption.map(Data._dec(_)).cata(
+          _.point[F], error(s"Expected a decimal number, found: $d"))
+
+      case EJsonTyped(DT.Id, id) =>
+        id.string.map(Data._id(_)).cata(
+          _.point[F], error(s"Expected an identifier string, found: $id"))
+
+      case EJsonTyped(DT.Integer, i) =>
+        i.as[BigInt].toOption.map(Data._int(_)).cata(
+          _.point[F], error(s"Expected an integer number, found: $i"))
+
+      case EJsonTyped(DT.Interval, ivl) =>
+        ivl.string.flatMap(isoDuration.getOption(_)).map(Data._interval(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted duration, found: $ivl"))
+
+      case EJsonTyped(DT.Time, t) =>
+        t.string.flatMap(isoLocalTime.getOption(_)).map(Data._time(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted local time, found: $t"))
+
+      case EJsonTyped(DT.Timestamp, ts) =>
+        ts.string.flatMap(isoInstant.getOption(_)).map(Data._timestamp(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted datetime, found: $ts"))
+
+      case EJsType(DT.NA) => (Data.NA: Data).point[F]
+
+      // NB: Because sometimes we need to encode `Null` as an object due to
+      //     MarkLogic losing map entries where the value is a literal `null`.
+      case EJsType(DT.Null) => (Data.Null: Data).point[F]
+
+      case other =>
+        other.toList traverse { case (k, v) => decodeJson[F](v) strengthL k } map (Data.Obj(_: _*))
+    }
+
+    json.fold(
+      (Data.Null: Data).point[F],
+      b => Data._bool(b).point[F],
+      decodeNumber andThen (_.point[F]),
+      s => Data._str(s).point[F],
+      _.traverse(decodeJson[F](_)).map(Data.Arr(_)),
+      decodeObject)
   }
 
   /** Attempts to decode an XML `Elem` as `Data` using the provided `recover`
@@ -135,9 +221,9 @@ object data {
           .point[F]
 
       case DataNode(DT.Interval, LeafText(ivl)) =>
-        durationInSeconds.getOption(ivl)
+        isoDuration.getOption(ivl)
           .map(Data._interval(_))
-          .toSuccessNel(s"Expected a duration in seconds, found: $ivl")
+          .toSuccessNel(s"Expected an ISO-8601 formatted duration, found: $ivl")
           .point[F]
 
       case DataNode(DT.NA, Seq()) => (Data.NA: Data).success.point[F]
@@ -160,7 +246,7 @@ object data {
       case DataNode(DT.Timestamp, LeafText(ts)) =>
         isoInstant.getOption(ts)
           .map(Data._timestamp(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted date-time, found: $ts")
+          .toSuccessNel(s"Expected an ISO-8601 formatted datetime, found: $ts")
           .point[F]
 
       case untyped =>
@@ -199,6 +285,7 @@ object data {
     case object NA        extends DataType
     case object Null      extends DataType
     case object Object    extends DataType
+    case object Set       extends DataType
     case object String    extends DataType
     case object Time      extends DataType
     case object Timestamp extends DataType
@@ -215,6 +302,7 @@ object data {
       case "na"        => NA
       case "null"      => Null
       case "object"    => Object
+      case "set"       => Set
       case "string"    => String
       case "time"      => Time
       case "timestamp" => Timestamp
@@ -230,6 +318,7 @@ object data {
       case NA          => "na"
       case Null        => "null"
       case Object      => "object"
+      case Set         => "set"
       case String      => "string"
       case Time        => "time"
       case Timestamp   => "timestamp"
@@ -249,6 +338,21 @@ object data {
 
       tpe flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
     }
+  }
+
+  private object EJsType {
+    def unapply(jobj: JsonObject): Option[DataType] =
+      jobj(EJsonTypeKey) >>= (_.string) >>= (DataType.stringCodec.getOption(_))
+  }
+
+  private object EJsValue {
+    def unapply(jobj: JsonObject): Option[Json] =
+      jobj(EJsonValueKey)
+  }
+
+  private object EJsonTyped {
+    def unapply(jobj: JsonObject): Option[(DataType, Json)] =
+      (EJsType.unapply(jobj) |@| EJsValue.unapply(jobj)).tupled
   }
 
   private val ejsBinding: NamespaceBinding =

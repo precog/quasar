@@ -13,7 +13,7 @@
 
   "ignoredFields": ["_id"],
 
-  "ignoreFieldOrder": [ "couchbase" ],
+  "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
 
   "expected": [
     { "city": "NEW SALEM", "loc": [-72.306241 , 42.514643], "pop": 456, "state": "MA" }

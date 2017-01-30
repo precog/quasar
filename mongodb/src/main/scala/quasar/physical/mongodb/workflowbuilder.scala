@@ -1003,7 +1003,7 @@ object WorkflowBuilder {
             case $sort(_, _) =>
               foldBuilders(src, sortKeys).flatMap {
                 case (newSrc, dv, ks) =>
-                  distincting(Fix(normalize[F].apply(ExprBuilderF(newSrc, \/-($var(dv.toDocVar)))))).map { dist =>
+                  distincting(newSrc).map { dist =>
                     val spb = ShapePreservingBuilder(
                       Fix(normalize[F].apply(ExprBuilderF(dist, \/-($var(dv.toDocVar))))),
                       ks.map(k => Fix(normalize[F].apply(ExprBuilderF(dist, \/-($var(k.toDocVar)))))), f)

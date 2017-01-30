@@ -16,33 +16,45 @@
 
 package quasar.contrib.scalaz
 
-import scalaz.MonadTell
+import quasar.Predef.Unit
+
+import scalaz._, Scalaz._
 
 /** A version of MonadTell that doesn't extend Monad to avoid ambiguous implicits
   * in the presence of multiple "mtl" constraints.
   */
-trait MonadTell_[F[_], S] { self =>
-  def MT: MonadTell[F, S]
-
-  def writer[A](w: S, v: A): F[A]
+trait MonadTell_[F[_], W] {
+  def writer[A](w: W, a: A): F[A]
+  def tell(w: W): F[Unit] = writer(w, ())
 }
 
-object MonadTell_ {
-  def apply[F[_], E](implicit F: MonadTell_[F, E]): MonadTell_[F, E] = F
+object MonadTell_ extends MonadTell_Instances {
+  def apply[F[_], W](implicit T: MonadTell_[F, W]): MonadTell_[F, W] = T
+}
 
-  implicit def monadTellNoMonad[F[_], E](implicit F: MonadTell[F, E])
-      : MonadTell_[F, E] =
-    new MonadTell_[F, E] {
-      def MT = F
+sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
+  implicit def eitherTMonadTell[F[_]: Functor, W, E](implicit T: MonadTell_[F, W]): MonadTell_[EitherT[F, E, ?], W] =
+    new MonadTell_[EitherT[F, E, ?], W] {
+      def writer[A](w: W, a: A) = EitherT(T.writer(w, a) map (_.right[E]))
+    }
 
-      def writer[A](w: E, v: A): F[A] = F.writer(w, v)
+  implicit def writerTMonadTell[F[_]: Functor, W1, W2: Monoid](implicit T: MonadTell_[F, W1]): MonadTell_[WriterT[F, W2, ?], W1] =
+    new MonadTell_[WriterT[F, W2, ?], W1] {
+      def writer[A](w: W1, a: A) = WriterT(T.writer(w, a) strengthL mzero[W2])
     }
 }
 
-final class MonadTell_Ops[F[_], S, A] private[scalaz](self: F[A])(implicit val F: MonadTell_[F, S]) {
-  final def :++>(w: ⇒ S): F[A] =
-    F.MT.bind(self)(a => F.MT.map(F.MT.tell(w))(_ => a))
+sealed abstract class MonadTell_Instances0 {
+  implicit def monadTellNoMonad[F[_], W](implicit F: MonadTell[F, W]): MonadTell_[F, W] =
+    new MonadTell_[F, W] {
+      def writer[A](w: W, a: A) = F.writer(w, a)
+    }
+}
 
-  final def :++>>(f: (A) ⇒ S): F[A] =
-    F.MT.bind(self)(a => F.MT.map(F.MT.tell(f(a)))(_ => a))
+final class MonadTell_Ops[F[_], W, A] private[scalaz] (self: F[A])(implicit F: MonadTell_[F, W]) {
+  final def :++>(w: ⇒ W)(implicit B: Bind[F]): F[A] =
+    B.bind(self)(a => B.map(F.tell(w))(_ => a))
+
+  final def :++>>(f: A ⇒ W)(implicit B: Bind[F]): F[A] =
+    B.bind(self)(a => B.map(F.tell(f(a)))(_ => a))
 }

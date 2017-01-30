@@ -17,13 +17,15 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef.{Eq => _, _}
-import quasar.Data
+import quasar.qscript.MapFuncs._
+import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
+import quasar.{Data, DataCodec}
 import quasar.Planner._
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
 
-import java.time._
+import java.time._, ZoneOffset.UTC
 import scala.math
 
 import matryoshka._
@@ -61,6 +63,12 @@ object CoreMap extends Serializable {
       case Data.Str(v) => DateLib.parseInterval(v).getOrElse(undefined)
       case _ => undefined
     }).right
+    case StartOfDay(f) => (f >>> {
+      case d @ Data.Timestamp(_) => temporalTrunc(TemporalPart.Day, d).fold(κ(undefined), ι)
+      case Data.Date(v)          => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
+      case _ => undefined
+    }).right
+    case TemporalTrunc(p, f) => (f >>> (d => temporalTrunc(p, d).fold(κ(undefined), ι))).right
     case TimeOfDay(f) => (f >>> {
       case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
       case _ => undefined
@@ -458,16 +466,15 @@ object CoreMap extends Serializable {
     case _ => undefined
   }
 
-  // TODO reuse render from codec
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
     case d: Data.Str => d
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    case Data.Timestamp(v) => Data.Str(v.toString)
+    case Data.Timestamp(v) => Data.Str(v.atZone(UTC).format(DataCodec.dateTimeFormatter))
     case Data.Date(v) => Data.Str(v.toString)
-    case Data.Time(v) => Data.Str(v.toString)
+    case Data.Time(v) => Data.Str(v.format(DataCodec.timeFormatter))
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
@@ -475,6 +482,15 @@ object CoreMap extends Serializable {
   }
 
   private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
+
+  private def temporalTrunc(part: TemporalPart, src: Data): PlannerError \/ Data =
+    (src match {
+      case d @ Data.Date(_)      => DateLib.truncDate(part, d)
+      case t @ Data.Time(_)      => DateLib.truncTime(part, t)
+      case t @ Data.Timestamp(_) => DateLib.truncTimestamp(part, t)
+      case _ =>
+        undefined.right
+    }).leftMap(e => InternalError.fromMsg(e.shows))
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {

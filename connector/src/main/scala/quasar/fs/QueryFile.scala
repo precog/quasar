@@ -140,12 +140,12 @@ object QueryFile {
   }
 
   def convertToQScriptRead
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_], QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults],
+      mtell: MonadTell_[M, PhaseResults],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
@@ -169,16 +169,13 @@ object QueryFile {
           Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
             Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
 
-    val qs =
-      (convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
+    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+      .fold(
         perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
-        _.point[M]) >>=
-        rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)) ∘
-        simplifyAndNormalize[T, InterimQS, QS]
-
-    qs >>= { qs =>
-      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
-    }
+        _.point[M])
+      .flatMap(rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents))
+      .map(simplifyAndNormalize[T, InterimQS, QS])
+      .flatMap(qs => mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs))
   }
 
   /** The result of the query is stored in an output file, overwriting any existing

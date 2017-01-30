@@ -42,6 +42,8 @@ trait N1QLRenderTreeInstance {
           }.toList)
         case Arr(l) =>
           nonTerminal("Arr", l: _*)
+        case Date(a1) =>
+          nonTerminal("Date", a1)
         case Time(a1) =>
           nonTerminal("Time", a1)
         case Timestamp(a1) =>
@@ -138,10 +140,16 @@ trait N1QLRenderTreeInstance {
           nonTerminal("Millis", a1)
         case MillisToUTC(a1, a2) =>
           nonTerminal("MillisToUTC", a1 :: a2.toList: _*)
+        case DateAddStr(a1, a2, a3) =>
+          nonTerminal("DateAddStr", a1, a2, a3)
         case DatePartStr(a1, a2) =>
           nonTerminal("DatePartStr", a1, a2)
         case DateDiffStr(a1, a2, a3) =>
           nonTerminal("DateDiffStr", a1, a2, a3)
+        case DateTruncStr(a1, a2) =>
+          nonTerminal("DateTruncStr", a1, a2)
+        case StrToMillis(a1) =>
+          nonTerminal("StrToMillis", a1)
         case NowStr() =>
           Terminal("NowStr" :: Nil, none)
         case ArrContains(a1, a2) =>

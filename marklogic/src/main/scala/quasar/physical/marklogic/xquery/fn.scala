@@ -22,6 +22,9 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def abs(num: XQuery): XQuery =
+    XQuery(s"fn:abs($num)")
+
   def avg(seq: XQuery): XQuery =
     XQuery(s"fn:avg($seq)")
 
@@ -78,6 +81,12 @@ object fn {
 
   def floor(n: XQuery): XQuery =
     XQuery(s"fn:floor($n)")
+
+  def formatDateTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-dateTime($value, $picture)")
+
+  def formatTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-time($value, $picture)")
 
   def head(seq: XQuery): XQuery =
     XQuery(s"fn:head($seq)")

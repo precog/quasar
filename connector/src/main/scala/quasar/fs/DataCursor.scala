@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef.{Array, Nothing, SuppressWarnings, Unit, Vector}
+import quasar.Predef._
 import quasar.Data
 
 import scalaz._, Scalaz._
@@ -35,7 +35,7 @@ trait DataCursor[F[_], C] {
 
   /** Closes the cursor, freeing any resources it might be using. */
   def close(cursor: C): F[Unit]
-  
+
   def process(cursor: C)(implicit F: Applicative[F]): Process[F, Data] = {
     def closeCursor(c: C): Process[F, Nothing] =
       Process.eval_[F, Unit](close(c))
@@ -66,5 +66,14 @@ object DataCursor {
 
       def close(ab: A \/ B) =
         ab fold (A.close, B.close)
+    }
+
+  implicit def optionDataCursor[F[_]: Applicative, A](implicit C: DataCursor[F, A]): DataCursor[F, Option[A]] =
+    new DataCursor[F, Option[A]] {
+      def nextChunk(oa: Option[A]) =
+        oa.cata(C.nextChunk, Vector[Data]().point[F])
+
+      def close(oa: Option[A]) =
+        oa.traverse_(C.close)
     }
 }

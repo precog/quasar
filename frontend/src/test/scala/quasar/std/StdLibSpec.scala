@@ -17,18 +17,20 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Qspec, Type}
+import quasar.{Data, DataCodec, Qspec, Type}
+import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
 
+import java.time._
+import java.time.ZoneOffset.UTC
 import scala.math.abs
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import org.specs2.execute.Result
+import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
-import java.time.{Instant, LocalDate, ZoneOffset}
-import scalaz.Equal
+import scalaz._, Scalaz._
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
@@ -59,6 +61,7 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+    implicit val arbDate = Arbitrary[LocalDate] { runner.dateDomain }
     implicit val arbData = Arbitrary[Data] {
       Gen.oneOf(
         runner.intDomain.map(Data.Int(_)),
@@ -204,19 +207,33 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        // TODO: need `Arbitrary`s for all of these
-        // "timestamp" >> prop { (x: Instant) =>
-        //   unary(ToString(_).embed, Data.Timestamp(x), Data.Str(x.toString))
-        // }
-        //
-        // "date" >> prop { (x: LocalDate) =>
-        //   unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
-        // }
-        //
-        // "time" >> prop { (x: LocalTime) =>
-        //   unary(ToString(_).embed, Data.Time(x), Data.Str(x.toString))
-        // }
-        //
+        "timestamp" >> {
+          def test(x: Instant) = unary(
+            ToString(_).embed,
+            Data.Timestamp(x),
+            Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
+
+          "zero fractional seconds" >> test(Instant.EPOCH)
+
+          "any" >> prop (test(_: Instant))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
+          unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
+        }
+
+        "time" >> {
+          def test(x: LocalTime) = unary(
+            ToString(_).embed,
+            Data.Time(x),
+            Data.Str(x.format(DataCodec.timeFormatter)))
+
+          "zero fractional seconds" >> test(LocalTime.NOON)
+
+          "any" >> prop (test(_: LocalTime))
+        }
+
+        // TODO: Enable
         // "interval" >> prop { (x: Duration) =>
         //   unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
         // }
@@ -564,6 +581,59 @@ abstract class StdLibSpec extends Qspec {
 
         "midnight 1999-12-31" >> {
           unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+        }
+      }
+
+      "StartOfDay" >> {
+        "timestamp" >> prop { (x: Instant) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(TemporalPart.Day, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              StartOfDay(_).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
+          unary(
+            StartOfDay(_).embed,
+            Data.Date(x),
+            Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+        }
+      }
+
+      "TemporalTrunc" >> {
+        "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate, y: TemporalPart) =>
+          val t = x.atStartOfDay(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Date(x),
+              Data.Date(tt.toLocalDate)))
+        }
+
+        "time" >> prop { (x: LocalTime, y: TemporalPart) =>
+          truncLocalTime(y, x).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Time(x),
+              Data.Time(tt)))
         }
       }
 

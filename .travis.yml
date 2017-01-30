@@ -13,8 +13,11 @@ script:
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; fi
-  - if [ $QUASAR_MARKLOGIC ]; then ./scripts/installMarkLogic; fi
+  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" > $TEST_CONFIG_FILE ; fi
+  - if [[ $QUASAR_MARKLOGIC_JSON || $QUASAR_MARKLOGIC_XML ]]; then ./scripts/installMarkLogic; fi
+  - if [ $QUASAR_MARKLOGIC_XML ]; then echo "marklogic_xml=${QUASAR_MARKLOGIC_XML}" > $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_MARKLOGIC_JSON ]; then echo "marklogic_json=${QUASAR_MARKLOGIC_JSON}" > $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
@@ -43,12 +46,13 @@ before_cache:
 env:
   matrix:
   - MONGO_RELEASE=2_6
-  - QUASAR_COUCHBASE='{"couchbase":{"connectionUri":"couchbase://0.0.0.0?username=Administrator&password=password"}}'
-  - QUASAR_MARKLOGIC='{"marklogic":{"connectionUri":"xcc://marklogic:marklogic@localhost:8000/Documents"}}'
+  - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
+  - QUASAR_MARKLOGIC_JSON='"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"'
+  - QUASAR_MARKLOGIC_XML='"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"'
   - MONGO_RELEASE=3_0
   - MONGO_RELEASE=3_0_RO
   - MONGO_RELEASE=3_2
-  - QUASAR_POSTGRESQL='{"postgresql":{"connectionUri":"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"}}'
+  - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
 
   global:
   - LOCAL_MONGODB=true
@@ -65,3 +69,5 @@ env:
   - MONGO_3_2_LINUX=3.2.9
   - MONGO_3_2_PORT=27020
   - MONGO_3_2_AUTH=""
+  - secure: nxTDurFKCJUnm5caGc7WGN1xJbStxtZECafvll0TClXVmgs907kRwOhL1EX3AwU2cigHI0TV1p3/ZqcSUJGQeqYHNRwxW3+N6yyg7disuDfeaPZ8/Q04SlHbG7/hp5AbZJW7hGpCHgv8cMGl9AJVTEaS+ipV5zr6Ts+JpjtOGhw=
+  - TEST_CONFIG_FILE=it/testing.conf

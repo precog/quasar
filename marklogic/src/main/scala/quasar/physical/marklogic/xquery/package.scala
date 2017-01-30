@@ -18,6 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.common.SortDir
+import quasar.contrib.scalaz.MonadTell_
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -36,8 +37,8 @@ package object xquery {
 
   type XPath = String
 
-  type Prologs = ISet[Prolog]
-  type PrologW[F[_]] = MonadTell[F, Prologs]
+  type Prologs       = ISet[Prolog]
+  type PrologW[F[_]] = MonadTell_[F, Prologs]
 
   sealed abstract class SortDirection {
     def asOrderModifier: String = this match {
@@ -121,7 +122,7 @@ package object xquery {
     QNameGenerator[F].freshQName map (BindingName(_))
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
+    XQuery(s"(${fa.toList.map(_.render).intercalate(", ")})")
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)

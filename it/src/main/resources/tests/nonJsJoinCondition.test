@@ -4,7 +4,8 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "couchbase":         "skip",
         "spark_local": "pending",
         "spark_hdfs": "pending"

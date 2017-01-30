@@ -5,7 +5,6 @@
 
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
@@ -16,7 +15,7 @@
 
     "data": "../days.data",
 
-    "query": "select day, time_of_day(ts) as tod, time_of_day(day) as `not a date`, time_of_day(missing) as missing from `../days`
+    "query": "select day, time_of_day(ts) as tod, time_of_day(day) as notadate, time_of_day(missing) as missing from `../days`
     where time_of_day(ts) >= time(\"08:00\") and time_of_day(ts) < time(\"10:20:30.400\")",
 
     "predicate": "containsExactly",

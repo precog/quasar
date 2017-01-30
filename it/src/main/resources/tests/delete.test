@@ -7,7 +7,7 @@
     "query": "delete from zips where pop < 100000",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
-    "ignoreFieldOrder": [ "couchbase" ],
+    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
     "expected": [
         { "city": "NEW YORK", "loc": [-73.958805, 40.768476], "pop": 106564, "state": "NY" },
         { "city": "NEW YORK", "loc": [-73.968312, 40.797466], "pop": 100027, "state": "NY" },

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data => QData, _}
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
-import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
+import quasar.DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -53,6 +53,8 @@ object RenderQuery {
       }.mkString("{", ", ", "}").right
     case Arr(l) =>
       l.mkString("[", ", ", "]").right
+    case Date(a1) =>
+      s"""{ "$DateKey": $a1 }""".right
     case Time(a1) =>
       s"""{ "$TimeKey": $a1 }""".right
     case Timestamp(a1) =>
@@ -151,10 +153,16 @@ object RenderQuery {
     case MillisToUTC(a1, a2) =>
       val fmt = ~(a2 ∘ (", " ⊹ _))
       s"millis_to_utc($a1$fmt)".right
+    case DateAddStr(a1, a2, a3) =>
+      s"date_add_str($a1, $a2, $a3)".right
     case DatePartStr(a1, a2) =>
       s"date_part_str($a1, $a2)".right
     case DateDiffStr(a1, a2, a3) =>
       s"date_diff_str($a1, $a2, $a3)".right
+    case DateTruncStr(a1, a2) =>
+      s"date_trunc_str($a1, $a2)".right
+    case StrToMillis(a1) =>
+      s"str_to_millis($a1)".right
     case NowStr() =>
       s"now_str()".right
     case ArrContains(a1, a2) =>

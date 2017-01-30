@@ -7,6 +7,7 @@
     "query": "select * from zips where city ~* \"^bOu\"",
     "predicate": "containsAtLeast",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         { "city": "BOUCKVILLE",       "loc": [ -75.567841,  42.894024], "pop":   650, "state": "NY" },
         { "city": "BOUTON",           "loc": [ -93.996286,  41.828432], "pop":   552, "state": "IA" },

@@ -7,6 +7,7 @@
     "query": "select * from zips where state in (\"MA\") and pop < 10",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         { "city": "CAMBRIDGE", "loc": [-71.141879, 42.364005], "pop": 0, "state": "MA" }]
 }

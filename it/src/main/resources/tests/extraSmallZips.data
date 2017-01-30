@@ -1,0 +1,50 @@
+{"_id":"01001","city":"AGAWAM","loc":[-72.622739,42.070206],"pop":15338,"state":"MA"}
+{"_id":"01002","city":"CUSHMAN","loc":[-72.51565,42.377017],"pop":36963,"state":"MA"}
+{"_id":"01005","city":"BARRE","loc":[-72.108354,42.409698],"pop":4546,"state":"MA"}
+{"_id":"01008","city":"BLANDFORD","loc":[-72.936114,42.182949],"pop":1240,"state":"MA"}
+{"_id":"01010","city":"BRIMFIELD","loc":[-72.188455,42.116543],"pop":3706,"state":"MA"}
+{"_id":"01011","city":"CHESTER","loc":[-72.988761,42.279421],"pop":1688,"state":"MA"}
+{"_id":"01022","city":"WESTOVER AFB","loc":[-72.558657,42.196672],"pop":1764,"state":"MA"}
+{"_id":"01026","city":"CUMMINGTON","loc":[-72.905767,42.435296],"pop":1484,"state":"MA"}
+{"_id":"01027","city":"MOUNT TOM","loc":[-72.679921,42.264319],"pop":16864,"state":"MA"}
+{"_id":"01030","city":"FEEDING HILLS","loc":[-72.675077,42.07182],"pop":11985,"state":"MA"}
+{"_id":"01031","city":"GILBERTVILLE","loc":[-72.198585,42.332194],"pop":2385,"state":"MA"}
+{"_id":"01032","city":"GOSHEN","loc":[-72.844092,42.466234],"pop":122,"state":"MA"}
+{"_id":"01035","city":"HADLEY","loc":[-72.571499,42.36062],"pop":4231,"state":"MA"}
+{"_id":"01036","city":"HAMPDEN","loc":[-72.431823,42.064756],"pop":4709,"state":"MA"}
+{"_id":"01039","city":"HAYDENVILLE","loc":[-72.703178,42.381799],"pop":1387,"state":"MA"}
+{"_id":"01040","city":"HOLYOKE","loc":[-72.626193,42.202007],"pop":43704,"state":"MA"}
+{"_id":"01054","city":"LEVERETT","loc":[-72.499334,42.46823],"pop":1748,"state":"MA"}
+{"_id":"01057","city":"MONSON","loc":[-72.319634,42.101017],"pop":8194,"state":"MA"}
+{"_id":"01060","city":"FLORENCE","loc":[-72.654245,42.324662],"pop":27939,"state":"MA"}
+{"_id":"01069","city":"PALMER","loc":[-72.328785,42.176233],"pop":9778,"state":"MA"}
+{"_id":"01070","city":"PLAINFIELD","loc":[-72.918289,42.514393],"pop":571,"state":"MA"}
+{"_id":"01073","city":"SOUTHAMPTON","loc":[-72.719381,42.224697],"pop":4478,"state":"MA"}
+{"_id":"01075","city":"SOUTH HADLEY","loc":[-72.581137,42.237537],"pop":16699,"state":"MA"}
+{"_id":"01081","city":"WALES","loc":[-72.204592,42.062734],"pop":1732,"state":"MA"}
+{"_id":"01082","city":"WARE","loc":[-72.258285,42.261831],"pop":9808,"state":"MA"}
+{"_id":"01085","city":"MONTGOMERY","loc":[-72.754318,42.129484],"pop":40117,"state":"MA"}
+{"_id":"01089","city":"WEST SPRINGFIELD","loc":[-72.641109,42.115066],"pop":27537,"state":"MA"}
+{"_id":"01092","city":"WEST WARREN","loc":[-72.203639,42.20734],"pop":4441,"state":"MA"}
+{"_id":"01098","city":"WORTHINGTON","loc":[-72.931427,42.384293],"pop":877,"state":"MA"}
+{"_id":"01103","city":"SPRINGFIELD","loc":[-72.588735,42.1029],"pop":2323,"state":"MA"}
+{"_id":"01104","city":"SPRINGFIELD","loc":[-72.577769,42.128848],"pop":22115,"state":"MA"}
+{"_id":"01105","city":"SPRINGFIELD","loc":[-72.578312,42.099931],"pop":14970,"state":"MA"}
+{"_id":"01106","city":"LONGMEADOW","loc":[-72.5676,42.050658],"pop":15688,"state":"MA"}
+{"_id":"01107","city":"SPRINGFIELD","loc":[-72.606544,42.117907],"pop":12739,"state":"MA"}
+{"_id":"01220","city":"ADAMS","loc":[-73.117225,42.622319],"pop":9901,"state":"MA"}
+{"_id":"01222","city":"ASHLEY FALLS","loc":[-73.320195,42.059552],"pop":561,"state":"MA"}
+{"_id":"01223","city":"BECKET","loc":[-73.120325,42.359363],"pop":1070,"state":"MA"}
+{"_id":"01225","city":"CHESHIRE","loc":[-73.157964,42.561059],"pop":3094,"state":"MA"}
+{"_id":"01230","city":"GREAT BARRINGTON","loc":[-73.36065,42.195922],"pop":10603,"state":"MA"}
+{"_id":"01235","city":"PERU","loc":[-73.092433,42.434604],"pop":2559,"state":"MA"}
+{"_id":"01236","city":"HOUSATONIC","loc":[-73.374544,42.265296],"pop":802,"state":"MA"}
+{"_id":"01237","city":"HANCOCK","loc":[-73.248737,42.541961],"pop":2328,"state":"MA"}
+{"_id":"01240","city":"LENOX","loc":[-73.271322,42.364241],"pop":5001,"state":"MA"}
+{"_id":"01243","city":"MIDDLEFIELD","loc":[-73.006226,42.34795],"pop":384,"state":"MA"}
+{"_id":"01245","city":"WEST OTIS","loc":[-73.213452,42.187847],"pop":329,"state":"MA"}
+{"_id":"01247","city":"CLARKSBURG","loc":[-73.10999,42.69865],"pop":19054,"state":"MA"}
+{"_id":"01253","city":"OTIS","loc":[-73.082093,42.18988],"pop":1060,"state":"MA"}
+{"_id":"01254","city":"RICHMOND","loc":[-73.364457,42.378398],"pop":1134,"state":"MA"}
+{"_id":"01259","city":"SOUTHFIELD","loc":[-73.260933,42.078014],"pop":622,"state":"MA"}
+{"_id":"01266","city":"WEST STOCKBRIDGE","loc":[-73.38251,42.334752],"pop":1173,"state":"MA"}

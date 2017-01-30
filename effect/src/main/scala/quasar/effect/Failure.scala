@@ -17,6 +17,7 @@
 package quasar.effect
 
 import quasar.Predef._
+import quasar.contrib.scalaz._
 
 import scalaz.{Failure => _, _}
 import scalaz.syntax.monad._
@@ -61,6 +62,14 @@ object Failure {
     val unattemptT: EitherT[F, E, ?] ~> F = new (EitherT[F, E, ?] ~> F) {
       def apply[A](v: EitherT[F, E, A]): F[A] = unattempt(v.run)
     }
+
+    implicit val monadError: MonadError[F, E] =
+      new MonadError[F, E] {
+        def raiseError[A](e: E) = fail(e)
+        def handleError[A](fa: F[A])(f: E => F[A]) = recover(fa, f)
+        def point[A](a: => A) = Free.pure(a)
+        def bind[A, B](fa: F[A])(f: A => F[B]) = fa flatMap f
+      }
 
     ////
 
@@ -114,4 +123,10 @@ object Failure {
   def toRuntimeError[F[_]: Catchable, E: Show]: Failure[E, ?] ~> F =
     toCatchable[F, RuntimeException]
       .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
+
+  def monadError_[E, S[_]](implicit O: Ops[E, S]): MonadError_[Free[S, ?], E] =
+    new MonadError_[Free[S, ?], E] {
+      def raiseError[A](e: E) = O.fail(e)
+      def handleError[A](fa: Free[S, A])(f: E => Free[S, A]) = O.recover(fa, f)
+    }
 }

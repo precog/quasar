@@ -19,11 +19,11 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
+import quasar.effect.Capture
 import quasar.effect.uuid._
-import quasar.fp.free.lift
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.fs.data.encodeXml
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
@@ -33,16 +33,13 @@ import scala.math.{ceil, log}
 
 import eu.timepit.refined.auto._
 import com.marklogic.xcc._
-import com.marklogic.xcc.exceptions.XQueryException
 import com.marklogic.xcc.types.XSBoolean
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 // NB: MarkLogic appears to possibly execute independent expressions in parallel,
 //     which can cause side-effects intended to be sequenced after other operations
-//     to fail, thus it seems to be better to sequence them via `SessionIO` (i.e.
+//     to fail, thus it seems to be better to sequence them monadically (i.e.
 //     make multiple requests) rather than to sequence them as expressions in XQuery.
 object ops {
   import expr.{func, if_, for_, let_}, axes.child
@@ -51,20 +48,13 @@ object ops {
   val propProperties = prop(NCName("properties"))
   val propDirectory  = prop(NCName("directory"))
 
-  def appendToFile[S[_]](
+  def appendToFile[F[_]: Monad: Capture: SessionReader: UuidReader: XccErr, FMT](
     dstFile: AFile,
     data: Vector[Data]
   )(implicit
-    S0: SessionIO :<: S,
-    S1: GenUUID :<: S
-  ): Free[S, Vector[FileSystemError]] = {
+    C: AsContent[FMT, Data]
+  ): F[Vector[FileSystemError]] = {
     val dstDir = asDir(dstFile)
-
-    val createOptions = {
-      val copts = new ContentCreateOptions()
-      copts.setFormatXml()
-      copts
-    }
 
     // NB: Ensures all the filenames are the same length, regardless of
     //     the value of their sequence number, so that they compare properly.
@@ -73,65 +63,58 @@ object ops {
       if (width === 0) "" else s"%0${width}x"
     }
 
-    val xmlData: Vector[FileSystemError \/ String] =
-      data map { d =>
-        encodeXml[ErrorMessages \/ ?](d).bimap(
-          ms => FileSystemError.writeFailed(d, ms.intercalate(", ")),
-          _.toString)
-      }
+    def mkContent(cid: String, seqNum: Int, d: Data): FileSystemError \/ Content = {
+      val fname      = cid + seqFmt.format(seqNum)
+      val uri        = pathUri(dstDir </> file(fname))
+      val contentUri = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
 
-    def mkContent(cid: String, seqNum: Int, str: String): Content = {
-      val fname = cid + seqFmt.format(seqNum)
-      val uri = pathUri(dstDir </> file(fname))
-      ContentFactory.newContent(uri, str, createOptions)
+      (contentUri >>= (C.asContent[ErrorMessages \/ ?](_, d)))
+        .leftMap(msgs => FileSystemError.writeFailed(d, msgs intercalate ", "))
     }
 
-    val (errs, contents) = xmlData.separate
-
     for {
-      cs   <- chunkId ∘ (cid => contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) })
-      exs  <- lift(SessionIO.insertContentCollectErrors(cs)).into[S]
-    } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(errs.length) +: errs)
+      res <- chunkId[F] ∘ (cid => data.zipWithIndex map { case (d, i) => mkContent(cid, i, d) })
+      (errs, contents) = res.separate
+      exs <- session.insertContentCollectErrors[F, Vector](contents)
+    } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(exs.length) +: errs)
   }
 
-  def createFile(file: AFile): SessionIO[PathError \/ Unit] = {
+  def createFile[F[_]: Monad: Capture: SessionReader](file: AFile)(implicit X: XccErr[F]): F[PathError \/ Unit] = {
     val uri = pathUri(asDir(file))
 
     // TODO: If dir exists and is empty, then shouldn't error
-    handleXcc(SessionIO.executeQuery_(xdmp.directoryCreate(uri.xs)) as ().right[PathError]) {
-      case qex: XQueryException if qex.getCode === "XDMP-DIREXISTS" => PathError.pathExists(file).left
+    X.handleError(session.executeQuery_[F](xdmp.directoryCreate(uri.xs)) as ().right[PathError]) {
+      case XccError.XQueryError(_, c) if c.getCode === "XDMP-DIREXISTS" => PathError.pathExists(file).left.point[F]
+      case other                                                        => X.raiseError(other)
     }
   }
 
-  def deleteFile(file: AFile): SessionIO[Unit] = {
+  def deleteFile[F[_]: Monad: Capture: SessionReader: XccErr](file: AFile): F[Unit] = {
     val uri = pathUri(asDir(file))
 
     val deleteChildDocuments =
-      SessionIO.executeQuery_(
+      session.executeQuery_[F](
         fn.map(
           func("$d") { xdmp.documentDelete(fn.baseUri("$d".xqy)) },
           xdmp.directory(uri.xs, "1".xs)))
 
     val deleteMLDirIfEmpty =
-      SessionIO.executeQuery_(deleteIfEmptyXqy(uri.xs))
+      session.executeQuery_[F](deleteIfEmptyXqy(uri.xs))
 
     deleteChildDocuments *> deleteMLDirIfEmpty.void
   }
 
-  def deleteDir(dir: ADir): SessionIO[Unit] =
-    SessionIO.executeQuery_(xdmp.directoryDelete(pathUri(dir).xs)).void
+  def deleteDir[F[_]: Monad: Capture: SessionReader: XccErr](dir: ADir): F[Unit] =
+    session.executeQuery_[F](xdmp.directoryDelete(pathUri(dir).xs)).void
 
-  def exists(path: APath): SessionIO[Boolean] = {
+  def exists[F[_]: Monad: SessionReader: XccErr](path: APath)(implicit C: Capture[F]): F[Boolean] = {
     val uri = pathUri(refineType(path).map(asDir).merge)
-
     val xqy = fn.exists(fn.filter(func("$uri") { fn.startsWith("$uri".xqy, uri.xs) }, cts.uris))
 
-    SessionIO.resultsOf_(xqy) flatMap { items => SessionIO.liftT {
-      Task.delay(items(0).asInstanceOf[XSBoolean].asPrimitiveBoolean)
-    }}
+    session.resultsOf_[F](xqy) >>= (items => C.delay(items(0).asInstanceOf[XSBoolean].asPrimitiveBoolean))
   }
 
-  def ls(dir: ADir): SessionIO[Set[PathSegment]] = {
+  def ls[F[_]: Monad: Capture: SessionReader: XccErr](dir: ADir): F[Set[PathSegment]] = {
     val uri = pathUri(dir)
 
     def isMLDir(u: XQuery) =
@@ -195,20 +178,20 @@ object ops {
     def parseFile(s: String): Option[PathSegment] =
       posixCodec.parseAbsFile(s) map (f => fileName(f).right)
 
-    SessionIO.resultsOf_(xqy) map (_ foldMap { item =>
+    session.resultsOf_[F](xqy) map (_ foldMap { item =>
       val itemStr = item.asString
       parseDir(itemStr).orElse(parseFile(itemStr)).toSet
     })
   }
 
-  def moveFile(src: AFile, dst: AFile): SessionIO[Unit] = {
+  def moveFile[F[_]: Monad: Capture: SessionReader: XccErr](src: AFile, dst: AFile): F[Unit] = {
     val srcUri = pathUri(asDir(src))
     val dstUri = pathUri(asDir(dst))
 
     def doMove = {
       val (d, oldName, newName) = ($("d"), $("oldName"), $("newName"))
 
-      SessionIO.executeQuery_(mkSeq_(
+      session.executeQuery_[F](mkSeq_(
         if_(fn.exists(xdmp.documentProperties(dstUri.xs)("/prop:properties/prop:directory".xqy)))
           .then_ {
             for_(d in xdmp.directory(dstUri.xs, "1".xs))
@@ -228,27 +211,37 @@ object ops {
     }
 
     def deleteSrcIfEmpty =
-      SessionIO.executeQuery_(deleteIfEmptyXqy(srcUri.xs))
+      session.executeQuery_[F](deleteIfEmptyXqy(srcUri.xs))
 
-    if (src === dst) ().point[SessionIO] else doMove *> deleteSrcIfEmpty.void
+    if (src === dst) ().point[F] else doMove *> deleteSrcIfEmpty.void
   }
 
-  def readFile(file: AFile): Process[ContentSourceIO, Data] = {
+  def readFile[F[_]: Monad: Capture: CSourceReader: XccErr](
+    chunkSize: Positive
+  )(
+    file: AFile,
+    offset: Natural,
+    limit: Option[Positive]
+  ): F[ResultCursor] = {
     val uri = pathUri(asDir(file))
 
-    val xqy = cts.search(
+    val contents = cts.search(
       fn.doc(),
       cts.directoryQuery(uri.xs),
       IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
 
-    ContentSourceIO.resultStream(SessionIO.evaluateQuery_(xqy))
-      .map(xdm => xdmitem.toData[ErrorMessages \/ ?](xdm) | Data.NA)
+    val ltd = (offset.get + 1, limit.map(_.get.xqy)) match {
+      case (1, None) => contents
+      case (o, l)    => fn.subsequence(contents, o.xqy, l)
+    }
+
+    contentsource.resultCursor[F](chunkSize)(session.evaluateQuery_[ReaderT[F, Session, ?]](ltd).run)
   }
 
   ////
 
-  private def chunkId[S[_]](implicit S: GenUUID :<: S): Free[S, String] =
-    GenUUID.Ops[S].asks(id => toSequentialString(id) getOrElse toOpaqueString(id))
+  private def chunkId[F[_]: Functor: UuidReader]: F[String] =
+    UuidReader[F].asks(id => toSequentialString(id) getOrElse toOpaqueString(id))
 
   private def deleteIfEmptyXqy(dirUri: XQuery): XQuery =
     if_ (fn.not(fn.exists(xdmp.directory(dirUri, "infinity".xs))))

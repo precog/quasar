@@ -15,7 +15,7 @@
     "query": "select *, '1' as one, '2' as two from largeZips",
 
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic", "spark_local", "spark_hdfs" ],
+    "ignoreFieldOrder": [ "couchbase", "marklogic_json", "marklogic_xml", "spark_local", "spark_hdfs" ],
     "expected": [
         { "_id": "01002", "one": "1", "two": "2", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA" },
         { "_id": "01020", "one": "1", "two": "2", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA" },

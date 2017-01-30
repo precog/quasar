@@ -2,10 +2,9 @@
     "name": "union",
     "backends": {
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "couchbase":         "skip",
-        "marklogic":         "skip"
+        "couchbase":         "skip"
     },
     "data": "zips.data",
     "query": "select _id as zip from zips union select city, state from zips",

@@ -1,0 +1,18 @@
+{
+    "name": "filter with date literals",
+    "backends": {
+        "couchbase":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mongodb_q_3_2":     "skip",
+        "postgresql":        "skip",
+        "spark_local":       "skip",
+        "spark_hdfs":        "skip"
+    },
+    "data": "../../days.data",
+    "query": "select day from `../../days`
+              where ((ts > date(\"2014-08-17\") and ts <= date(\"2014-08-20\")) and ts != date(\"2014-08-19\"))
+                 or ts = date(\"2014-08-22\")",
+    "predicate": "containsExactly",
+    "expected": ["Monday", "Wednesday", "Friday"]
+}

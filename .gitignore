@@ -1,4 +1,5 @@
 target/
+/it/testing.conf
 .idea
 tmp
 **/.DS_Store

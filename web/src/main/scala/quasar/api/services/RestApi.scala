@@ -88,7 +88,12 @@ object RestApi {
     svcs.mapValues(_.toHttpServiceF(f))
 
   def defaultMiddleware: HttpMiddleware =
-    cors compose gzip compose HeaderParam compose passOptions compose errorHandling
+    cors                            compose
+    gzip                            compose
+    RFC5987ContentDispositionRender compose
+    HeaderParam                     compose
+    passOptions                     compose
+    errorHandling
 
   val cors: HttpMiddleware =
     CORS(_, CORSConfig(

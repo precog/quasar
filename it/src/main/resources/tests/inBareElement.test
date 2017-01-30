@@ -7,6 +7,7 @@
     "query": "select * from zips where state in \"ME\" and pop < 10",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         { "city": "BUSTINS ISLAND",  "loc": [-70.042247, 43.79602 ], "pop": 0, "state": "ME" },
         { "city": "SQUIRREL ISLAND", "loc": [-69.630974, 43.809031], "pop": 3, "state": "ME" }]

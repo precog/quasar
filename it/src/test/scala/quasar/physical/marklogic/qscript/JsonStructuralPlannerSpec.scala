@@ -16,22 +16,25 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef.{Map => _, _}
+import quasar.Predef._
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.DocType
+import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ProjectBucketPlanner[F[_]: Applicative, T[_[_]]]
-  extends MarkLogicPlanner[F, ProjectBucket[T, ?]] {
+final class JsonStructuralPlannerSpec
+  extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, DocType.Json] {
 
-  val plan: AlgebraM[F, ProjectBucket[T, ?], XQuery] = {
-    case BucketField(src, value, name) =>
-      s"((: BucketField :)$src)".xqy.point[F]
+  import JsonStructuralPlannerSpec.JsonPlan
 
-    case BucketIndex(src, value, index) =>
-      s"((: BucketIndex :)$src)".xqy.point[F]
-  }
+  val toM = λ[JsonPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
+  def asMapKey(qn: QName) = qn.xs.point[JsonPlan]
+}
+
+object JsonStructuralPlannerSpec {
+  type JsonPlan[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
 }

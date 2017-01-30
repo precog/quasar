@@ -17,22 +17,24 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.Data
+import quasar.{Data, DataArbitrary}, DataArbitrary._
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml, decodeXmlStrict}
+import quasar.physical.marklogic.fs.data._
+import quasar.physical.marklogic.qscript.EJsonTypeKey
 import quasar.physical.marklogic.xml.SecureXML
 
 import scala.xml.Elem
 
+import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 
-final class DataXmlEncodingSpec extends quasar.Qspec {
+final class DataEncodingSpec extends quasar.Qspec {
   type Result[A] = ErrorMessages \/ A
 
   def parseXML(s: String): Result[Elem] =
     SecureXML.loadString(s).leftMap(_.toString.wrapNel)
 
-  "Data <-> XML encoding" should {
+  "Data <-> XML encoding" >> {
     "roundtrip" >> prop { xd: XmlSafeData =>
       (encodeXml[Result](xd.data) >>= decodeXmlStrict[Result] _) must_= xd.data.some.right
     }
@@ -75,6 +77,16 @@ final class DataXmlEncodingSpec extends quasar.Qspec {
 
     "error for Data.Set" >> {
       encodeXml[Result](Data.Set(List(Data.Str("a")))) must be_-\/
+    }
+  }
+
+  "Data <-> JSON Encoding" >> {
+    "roundtrip" >> prop { d: Data =>
+      decodeJson[Result](encodeJson(d)) must_= d.right
+    }
+
+    "decodes typed null as Null" >> {
+      decodeJson[Result](jSingleObject(EJsonTypeKey, jString("null"))) must_= Data.Null.right
     }
   }
 }

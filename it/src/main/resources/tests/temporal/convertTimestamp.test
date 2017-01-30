@@ -2,9 +2,8 @@
   "name": "convert epoch milliseconds value to timestamp",
 
   "backends": {
-    "marklogic":  "pending",
-    "mongodb_q_3_2":  "pending",
-    "postgresql": "pending"
+    "mongodb_q_3_2": "pending",
+    "postgresql":    "pending"
   },
 
   "data": "../days.data",
@@ -20,7 +19,7 @@
     "mongodb_read_only"
   ],
   "expected": [
-    { "day": "Sunday", "ts": { "$timestamp": "2014-08-17T06:00:00Z" }, "converted": { "$timestamp": "2014-08-17T06:00:00Z" } },
-    { "day": "Monday", "ts": { "$timestamp": "2014-08-18T07:00:00Z" }, "converted": { "$timestamp": "2014-08-18T07:00:00Z" } }
+    { "day": "Sunday", "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "converted": { "$timestamp": "2014-08-17T06:00:00.000Z" } },
+    { "day": "Monday", "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "converted": { "$timestamp": "2014-08-18T07:00:00.000Z" } }
   ]
 }

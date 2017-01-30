@@ -10,6 +10,7 @@
     "data": "zips.data",
     "query": "SELECT _id as zip, loc as loc, loc[*] as coord FROM zips",
     "predicate": "containsAtLeast",
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         {"zip": "01001", "loc": [-72.622739, 42.070206], "coord": -72.622739},
         {"zip": "01001", "loc": [-72.622739, 42.070206], "coord": 42.070206},

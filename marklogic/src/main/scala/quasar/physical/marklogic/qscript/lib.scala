@@ -14,31 +14,38 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.fp.ski.ι
+import quasar.fp.ski.{ι, κ}
 import quasar.physical.marklogic.xml.namespaces._
+import quasar.std.DateLib.TemporalPart
+import quasar.physical.marklogic.xquery._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.api.Refined
-import scalaz.IList
+import scalaz.{Bind, Functor, Monad}
 import scalaz.syntax.monad._
 
 /** Functions related to qscript planning. */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-object qscript {
+object lib {
   import syntax._, expr._, axes.{attribute, child}
   import FunctionDecl._
 
   val qs = NamespaceDecl(qscriptNs)
 
-  private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
+  val dateFmt     = "[Y0001]-[M01]-[D01]".xs
+  val dateTimeFmt = "[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z".xs
+  val timeFmt     = "[H01]:[m01]:[s01].[f001]".xs
+
+  private val epoch    = xs.dateTime("1970-01-01T00:00:00Z".xs)
+  private val timeZero = xs.time("00:00:00-00:00".xs)
 
   // qscript:as-date($item as item()?) as xs:date?
-  def asDate[F[_]: PrologW]: F[FunctionDecl1] =
+  def asDate[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("as-date") map (_(
       $("item") as ST("item()?")
     ).as(ST("xs:date?")) { item =>
@@ -52,7 +59,7 @@ object qscript {
     })
 
   // qscript:as-dateTime($item as item()?) as xs:dateTime?
-  def asDateTime[F[_]: PrologW]: F[FunctionDecl1] =
+  def asDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("as-dateTime") map (_(
       $("item") as ST("item()?")
     ).as(ST("xs:dateTime?")) { item =>
@@ -66,27 +73,40 @@ object qscript {
     })
 
   // qscript:as-map-key($item as item()?) as xs:string
-  def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
+  def asMapKey[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>
       declare(fname)(
         $("item") as ST("item()?")
       ).as(ST("xs:string")) { item =>
         typeswitch(item)(
-          ($("a") as ST("attribute()")) return_ (a =>
+          $("a").as(ST("attribute()"))      return_ (a =>
             fn.stringJoin(mkSeq_(fn.string(fn.nodeName(a)), fn.string(a)), "_".xs)),
 
-          ($("e") as ST("element()"))   return_ (e =>
+          $("e").as(ST("element()"))        return_ (e =>
             fn.stringJoin(mkSeq_(
               fn.string(fn.nodeName(e)),
               fn.map(fname :# 1, mkSeq_(e `/` attribute.node(), e `/` child.node()))
-            ), "_".xs))
+            ), "_".xs)),
 
+          $("jarr").as(ST("array-node()"))  return_ (jarr =>
+            fn.stringJoin(mkSeq_(
+              fn.string(fn.nodeName(jarr)),
+              fn.map(fname :# 1, jarr `/` child.node())
+            ), "_".xs)),
+
+          $("jobj").as(ST("object-node()")) return_ (jobj =>
+            fn.stringJoin(mkSeq_(
+              fn.string(fn.nodeName(jobj)),
+              fn.map(fname :# 1, jobj `/` child.node())
+            ), "_".xs)),
+
+          ST("null-node()") return_ "null".xs
         ) default ($("i"), fn.string)
       }
     }
 
   // qscript:combine-apply($fns as (function(item()) as item())*) as function(item()) as item()*
-  def combineApply[F[_]: PrologW]: F[FunctionDecl1] =
+  def combineApply[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("combine-apply") map (_(
       $("fns") as ST("(function(item()) as item())*")
     ).as(ST("function(item()) as item()*")) { fns =>
@@ -95,7 +115,7 @@ object qscript {
     })
 
   // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
-  def combineN[F[_]: PrologW]: F[FunctionDecl1] =
+  def combineN[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("combine-n") map (_(
       $("combiners") as ST("(function(item()*, item()) as item()*)*")
     ).as(ST("function(item()*, item()) as item()*")) { combiners =>
@@ -109,44 +129,44 @@ object qscript {
     })
 
   // qscript:comp-eq($x as item()*, $y as item()*) as xs:boolean?
-  def compEq[F[_]: PrologW]: F[FunctionDecl2] =
+  def compEq[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("eq", _ eq _, fn.False)
 
   // qscript:comp-ne($x as item()*, $y as item()*) as xs:boolean?
-  def compNe[F[_]: PrologW]: F[FunctionDecl2] =
+  def compNe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("ne", _ ne _, fn.True)
 
   // qscript:comp-lt($x as item()*, $y as item()*) as xs:boolean?
-  def compLt[F[_]: PrologW]: F[FunctionDecl2] =
+  def compLt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("lt", _ lt _, emptySeq)
 
   // qscript:comp-le($x as item()*, $y as item()*) as xs:boolean?
-  def compLe[F[_]: PrologW]: F[FunctionDecl2] =
+  def compLe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("le", _ le _, emptySeq)
 
   // qscript:comp-gt($x as item()*, $y as item()*) as xs:boolean?
-  def compGt[F[_]: PrologW]: F[FunctionDecl2] =
+  def compGt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("gt", _ gt _, emptySeq)
 
   // qscript:comp-ge($x as item()*, $y as item()*) as xs:boolean?
-  def compGe[F[_]: PrologW]: F[FunctionDecl2] =
+  def compGe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("ge", _ ge _, emptySeq)
 
   // qscript:concat($x as item()?, $y as item()?) as item()?
-  def concat[F[_]: PrologW]: F[FunctionDecl2] =
+  def concat[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     qs.declare("concat") flatMap (_(
       $("x") as ST("item()?"),
       $("y") as ST("item()?")
     ).as(ST("item()?")) { (x: XQuery, y: XQuery) =>
       val (xArr, yArr) = ($("xArr"), $("yArr"))
       for {
-        xt    <- ejson.isArray[F] apply x
-        yt    <- ejson.isArray[F] apply y
-        xcs   <- toCharArray[F].apply(x) flatMap (ejson.seqToArray_[F])
-        ycs   <- toCharArray[F].apply(y) flatMap (ejson.seqToArray_[F])
-        arrXY <- ejson.arrayConcat[F].apply(x, y)
-        xArrY <- ejson.arrayConcat[F].apply(xcs, y)
-        yArrX <- ejson.arrayConcat[F].apply(x, ycs)
+        xt    <- SP.isArray(x)
+        yt    <- SP.isArray(y)
+        xcs   <- toCharSeq[F].apply(x) >>= (SP.seqToArray)
+        ycs   <- toCharSeq[F].apply(y) >>= (SP.seqToArray)
+        arrXY <- SP.arrayConcat(x, y)
+        xArrY <- SP.arrayConcat(xcs, y)
+        yArrX <- SP.arrayConcat(x, ycs)
       } yield {
         let_(
           xArr := xt,
@@ -163,7 +183,7 @@ object qscript {
     })
 
   // qscript:delete-field($src as element()?, $field as xs:string) as element()?
-  def deleteField[F[_]: PrologW]: F[FunctionDecl2] =
+  def deleteField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
       $("src")   as ST("element()?"),
       $("field") as ST("xs:string")
@@ -181,7 +201,7 @@ object qscript {
     })
 
   // qscript:element-left-shift($elt as element()) as item()*
-  def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
+  def elementLeftShift[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("element-left-shift") map (_(
       $("elt") as ST("element()?")
     ).as(ST("item()*")) { elt =>
@@ -189,7 +209,7 @@ object qscript {
     })
 
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
-  def isoyearFromDateTime[F[_]: PrologW]: F[FunctionDecl1] =
+  def isoyearFromDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
       $("dt") as ST("xs:dateTime?")
     ).as(ST("xs:integer?")) { dt: XQuery =>
@@ -203,13 +223,13 @@ object qscript {
     })
 
   // qscript:identity($x as item()*) as item()*
-  def identity[F[_]: PrologW]: F[FunctionDecl1] =
+  def identity[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("identity") map (_(
       $("x") as ST.Top
     ).as(ST.Top)(ι))
 
   // qscript:inc-avg($st as map:map, $x as item()*) as map:map
-  def incAvg[F[_]: PrologW]: F[FunctionDecl2] =
+  def incAvg[F[_]: Bind: PrologW]: F[FunctionDecl2] =
     qs.declare("inc-avg") flatMap (_(
       $("st") as ST("map:map"),
       $("x")  as ST.Top
@@ -225,18 +245,18 @@ object qscript {
     })
 
   // qscript:inc-avg-state($cnt as xs:integer, $avg as xs:double) as map:map
-  def incAvgState[F[_]: PrologW]: F[FunctionDecl2] =
+  def incAvgState[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("inc-avg-state") map (_(
       $("cnt") as ST("xs:integer"),
       $("avg") as ST("xs:double")
     ).as(ST("map:map")) { (cnt, avg) =>
-      map.new_(IList(
+      map.new_(mkSeq_(
         map.entry("cnt".xs, cnt),
         map.entry("avg".xs, avg)))
     })
 
   // qscript:length($arrOrStr as item()?) as xs:integer?
-  def length[F[_]: PrologW]: F[FunctionDecl1] =
+  def length[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.name("length").qn[F] map { fname =>
       declare(fname)(
         $("arrOrStr") as ST("item()?")
@@ -250,23 +270,28 @@ object qscript {
               .else_ { fname(fn.string(arr)) }
             }
           },
-          $("qn")  as ST("xs:QName")  return_ (qn => fname(fn.string(qn))),
-          $("str") as ST("xs:string") return_ (fn.stringLength(_))
+          $("jarr") as ST("array-node()") return_ { jarr =>
+            fn.count(jarr `/` child.node())
+          },
+          $("txt") as ST("text()")           return_ (t  => fname(fn.string(t))),
+          $("qn")  as ST("xs:QName")         return_ (qn => fname(fn.string(qn))),
+          $("ut")  as ST("xs:untypedAtomic") return_ (ut => fname(fn.string(ut))),
+          $("str") as ST("xs:string")        return_ (fn.stringLength(_))
         ) default emptySeq
       }
     }
 
-  // qscript:meta($item as item()?) as element()?
-  def meta[F[_]: PrologW]: F[FunctionDecl1] =
+  // qscript:meta($item as item()?) as node()?
+  def meta[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
     qs.declare("meta") flatMap (_(
       $("item") as ST("item()?")
-    ).as(ST("element()?")) { item: XQuery =>
-      val eltClause = $("e") as ST("element()") return_ (ejson.attributes[F] apply _)
-      eltClause map (ec => typeswitch(item)(ec) default emptySeq)
+    ).as(ST("node()?")) { item: XQuery =>
+      val nodeClause = $("n") as ST("node()") return_ (SP.nodeMetadata(_))
+      nodeClause map (ec => typeswitch(item)(ec) default emptySeq)
     })
 
   // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
-  def projectField[F[_]: PrologW]: F[FunctionDecl2] =
+  def projectField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("project-field") map (_(
       $("src")   as ST("element()?"),
       $("field") as ST("xs:QName?")
@@ -282,7 +307,7 @@ object qscript {
   //   $bucket   as function(item()*        ) as item(),
   //   $seq      as item()*
   // ) as item()*
-  def reduceWith[F[_]: PrologW]: F[FunctionDecl5] =
+  def reduceWith[F[_]: Bind: PrologW]: F[FunctionDecl5] =
     qs.declare("reduce-with") flatMap (_(
       $("initial")  as ST("function(item()*) as item()*"),
       $("combine")  as ST("function(item()*, item()) as item()*"),
@@ -314,7 +339,7 @@ object qscript {
 
   // NB: Copied from StringLib.safeSubstring
   // qscript:safe-substring($str as xs:string?, $start as xs:integer?, $length as xs:integer?) as xs:string?
-  def safeSubstring[F[_]: PrologW]: F[FunctionDecl3] =
+  def safeSubstring[F[_]: Functor: PrologW]: F[FunctionDecl3] =
     qs.declare("safe-substring") map (_(
       $("str")    as ST("xs:string?"),
       $("start")  as ST("xs:integer?"),
@@ -331,7 +356,7 @@ object qscript {
     })
 
   // qscript:seconds-since-epoch($dt as xs:dateTime?) as xs:double?
-  def secondsSinceEpoch[F[_]: PrologW]: F[FunctionDecl1] =
+  def secondsSinceEpoch[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("seconds-since-epoch") map (_(
       $("dt") as ST("xs:dateTime?")
     ).as(ST("xs:double?")) { dt =>
@@ -339,43 +364,142 @@ object qscript {
     })
 
   // qscript:timestamp-to-dateTime($millis as xs:integer?) as xs:dateTime?
-  def timestampToDateTime[F[_]: PrologW]: F[FunctionDecl1] =
+  def timestampToDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("timestamp-to-dateTime") map (_(
       $("millis") as ST("xs:integer?")
     ).as(ST("xs:dateTime?")) { millis =>
-      epoch + xs.dayTimeDuration(fn.concat("PT".xs, xs.string(millis div 1000.xqy), "S".xs))
+      val prefix = $("prefix")
+      let_(
+        prefix := if_(millis lt 0.xqy) then_ "-PT".xs else_ "PT".xs)
+      .return_(
+        epoch + xs.dayTimeDuration(fn.concat(~prefix, xs.string(fn.abs(millis) div 1000.xqy), "S".xs)))
     })
 
+  // qscript:start-of-day($item as item()?) as xs:$dateTime?
+  def startOfDay[F[_]: Monad: PrologW]: F[FunctionDecl1] =
+    qs.declare("start-of-day") flatMap (_(
+      $("item") as ST("item()?")
+    ).as(ST("item()?")) { item =>
+      temporalTrunc[F](TemporalPart.Day).apply(item) map (tt =>
+        typeswitch(item)(
+          $("dateTime") as ST("xs:dateTime") return_ κ(tt),
+          $("date") as ST("xs:date") return_ κ(xs.dateTime(item, timeZero))
+        ) default emptySeq)
+    })
+
+  // qscript:temporal-trunc($item as item()?) as item()?
+  def temporalTrunc[F[_]: Functor: PrologW](part: TemporalPart): F[FunctionDecl1] =
+    qs.declare("temporal-trunc") map (_(
+      $("item") as ST("item()?")
+    ).as(ST("item()?")) { item =>
+      import TemporalPart._
+
+      def dt(
+        h: XQuery, m: XQuery, d: XQuery, hr: XQuery, min: XQuery, sec: XQuery, ms: XQuery
+      ): XQuery =
+        fn.concat(
+          xdmp.formatNumber(h, "0001".xs), "-".xs,
+          xdmp.formatNumber(m,   "01".xs), "-".xs,
+          xdmp.formatNumber(d,   "01".xs), "T".xs,
+          xdmp.formatNumber(hr,  "01".xs), ":".xs,
+          xdmp.formatNumber(min, "01".xs), ":".xs,
+          xdmp.formatNumber(sec, "01".xs), ".".xs,
+          xdmp.formatNumber(ms, "001".xs), "Z".xs)
+
+      def fmtDateTime(x: XQuery): XQuery = fn.formatDateTime(x, dateTimeFmt)
+
+      val (dateTime, wrap) = ($("dateTime"), $("wrap"))
+      let_(
+        dateTime := typeswitch(item)(
+          $("dateTime") as ST("xs:dateTime") return_ (ι),
+          $("date") as ST("xs:date") return_ (xs.dateTime(_, timeZero)),
+          $("time") as ST("xs:time") return_ (xs.dateTime(xs.date("0001-01-01".xs), _))
+        ) default emptySeq,
+        wrap := typeswitch(item)(
+          $("dateTime") as ST("xs:dateTime") return_ (κ(
+            xdmp.function(xs.QName("xs:dateTime".xs)))),
+          $("date")     as ST("xs:date") return_ (κ(
+            func("$s")(xs.date(xdmp.parseDateTime(dateFmt, "$s".xqy))))),
+          $("time")     as ST("xs:time") return_ (κ(
+            func("$s")(xs.time(xdmp.parseDateTime(dateTimeFmt, "$s".xqy)))))
+        ) default emptySeq
+      ) return_ {
+
+      xdmp.apply(~wrap, part match {
+        case Century =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 100.xqy) * 100.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Day =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            fn.monthFromDateTime(~dateTime),
+            fn.dayFromDateTime(~dateTime),
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Decade =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 10.xqy) * 10.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Hour =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), 0.xqy, 0.xqy, 0.xqy)
+        case Microsecond => fmtDateTime(~dateTime)
+        case Millennium =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 1000.xqy) * 1000.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Millisecond => fmtDateTime(~dateTime)
+        case Minute =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            fn.monthFromDateTime(~dateTime),
+            fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), fn.minutesFromDateTime(~dateTime), 0.xqy, 0.xqy)
+        case Month =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Quarter =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            mkSeq_(mkSeq_(xdmp.quarterFromDate(xs.date(~dateTime)) - 1.xqy) * 3.xqy) + 1.xqy,
+            1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Second =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), fn.minutesFromDateTime(~dateTime),
+            math.floor(fn.secondsFromDateTime(~dateTime)), 0.xqy)
+        case Week =>
+          fmtDateTime(xs.dateTime(
+            xs.date(~dateTime) - xs.dayTimeDuration(
+              fn.concat("P".xs, xs.string(xdmp.weekdayFromDate(xs.date(~dateTime)) - 1.xqy), "D".xs))))
+        case Year =>
+          dt(
+            fn.yearFromDateTime(~dateTime), 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+      })
+    }})
+
   // qscript:timezone-offset-seconds($dt as xs:dateTime?) as xs:integer?
-  def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
+  def timezoneOffsetSeconds[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("timezone-offset-seconds") map (_(
       $("dt") as ST("xs:dateTime?")
     ).as(ST("xs:integer?")) { dt =>
       fn.timezoneFromDateTime(dt) div xs.dayTimeDuration("PT1S".xs)
     })
 
-  // qscript:to-char-array($s as xs:string?) as element()?
-  def toCharArray[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("to-char-array") map (_(
+  // qscript:to-char-seq($s as xs:string?) as xs:string*
+  def toCharSeq[F[_]: Functor: PrologW]: F[FunctionDecl1] =
+    qs.declare("to-char-seq") map (_(
       $("s") as ST("xs:string?")
     ).as(ST("xs:string*")) { s: XQuery =>
       fn.map("fn:codepoints-to-string#1".xqy, fn.stringToCodepoints(s))
     })
 
-  // qscript:to-string($item as item()?) as xs:string
-  def toString[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("to-string") flatMap (_(
-      $("item") as ST("item()?")
-    ).as(ST("xs:string")) { item: XQuery =>
-      ejson.typeOf[F].apply(item) map { tpe =>
-        if_(tpe eq "null".xs)
-        .then_ { "null".xs }
-        .else_ { fn.string(item) }
-      }
-    })
-
   // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
-  def zipApply[F[_]: PrologW]: F[FunctionDecl1] =
+  def zipApply[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("zip-apply") map (_(
       $("fns") as ST("(function(item()*) as item()*)*")
     ).as(ST("function(item()*) as item()*")) { fns =>
@@ -390,7 +514,7 @@ object qscript {
 
   ////
 
-  private def mkComparisonFunction[F[_]: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
+  private def mkComparisonFunction[F[_]: Bind: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
     qs.declare(Refined.unsafeApply(s"comp-$opName")) flatMap (_(
       $("x") as ST.Top,
       $("y") as ST.Top

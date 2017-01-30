@@ -12,6 +12,8 @@
 
   "predicate": "containsExactly",
 
+  "ignoreFieldOrder": ["marklogic_json"],
+
   "expected": [
     { "day": "Sunday" ,   "dow": 0, "isodow" : 7 },
     { "day": "Monday",    "dow": 1, "isodow" : 1 },

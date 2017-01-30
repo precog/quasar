@@ -16,7 +16,7 @@
 
   "predicate": "containsExactly",
 
-  "ignoreFieldOrder": ["couchbase"],
+  "ignoreFieldOrder": ["couchbase", "marklogic_json"],
 
   "expected": [
     { "city": "BOULDER", "a": true,  "b": true  },

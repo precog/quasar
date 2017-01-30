@@ -69,29 +69,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case x                                 => FtoG(QC.inj(x))
   }
 
-  // TODO unify this function with `unifySimpleBranches`
-  // including all the cases
-  def unifySimpleBranches2[F[_], A]
-    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
-    (rebase: FreeQS => A => Option[A])
-    (implicit
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal])
-      : Option[CoEnv[Hole, F, A]] =
-    (l.resumeTwice, r.resumeTwice) match {
-      case (-\/(m1), -\/(m2)) =>
-        (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
-          // both sides only map over the same data
-          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
-            CoEnv(\/-(QC.inj(Map(src, combine >>= {
-              case LeftSide  => mf1
-              case RightSide => mf2
-            })))).some
-          case _ => None
-        }
-      case _ => None
-    }
-
   def unifySimpleBranches[F[_], A]
     (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
     (rebase: FreeQS => A => Option[A])
@@ -208,6 +185,15 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         QC.inj(Map(src, combine.as(SrcHole))).some
       case (_, _) => None
     }
+
+  def unifySimpleBranchesCoEnv[F[_], A]
+    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
+    (rebase: FreeQS => A => Option[A])
+    (implicit
+      QC: QScriptCore :<: F,
+      FI: Injectable.Aux[F, QScriptTotal])
+      : Option[CoEnv[Hole, F, A]] =
+    unifySimpleBranches(src, l, r, combine)(rebase)(QC, FI).map(fa => CoEnv(\/-(fa)))
 
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
@@ -341,7 +327,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: MonadFsErr: Monad, IN[_]: Traverse, OUT[_]: Traverse]
+  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],

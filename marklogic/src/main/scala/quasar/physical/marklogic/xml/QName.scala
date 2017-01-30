@@ -17,10 +17,14 @@
 package quasar.physical.marklogic.xml
 
 import quasar.Predef._
+import quasar.physical.marklogic.validation._
 
+import eu.timepit.refined.refineV
+import monocle.Prism
 import scalaz.{Order, Show}
 import scalaz.std.option._
 import scalaz.std.tuple._
+import scalaz.syntax.apply._
 import scalaz.syntax.show._
 
 final case class QName(prefix: Option[NSPrefix], local: NCName) {
@@ -33,6 +37,17 @@ object QName {
 
   def prefixed(prefix: NSPrefix, local: NCName): QName =
     QName(Some(prefix), local)
+
+  val string: Prism[String, QName] = {
+    def asNCName(s: String): Option[NCName] =
+      refineV[IsNCName](s).right.toOption map (NCName(_))
+
+    Prism((_: String).split(':') match {
+      case Array(pfx, loc) => (asNCName(pfx) |@| asNCName(loc))((p, l) => QName.prefixed(NSPrefix(p), l))
+      case Array(loc)      => asNCName(loc) map (QName.local)
+      case _               => None
+    })(_.shows)
+  }
 
   implicit val order: Order[QName] =
     Order.orderBy(qn => (qn.prefix, qn.local))

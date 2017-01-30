@@ -18,94 +18,89 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy._
-import quasar.fp.free.lift
+import quasar.effect.Capture
 import quasar.fs._
-import quasar.physical.marklogic.xcc.SessionIO
+import quasar.physical.marklogic.xcc._
 
 import scala.util.Random
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object managefile {
   import ManageFile._
   import PathError._, FileSystemError._
 
-  def interpret[S[_]](implicit S: SessionIO :<: S): ManageFile ~> Free[S, ?] =
-    new (ManageFile ~> Free[S, ?]) {
-      def apply[A](fs: ManageFile[A]) = fs match {
-        case Move(scenario, semantics) => move(scenario, semantics)
-        case Delete(path)              => delete(path)
-        case TempFile(path)            => tempFile(path)
-      }
+  def interpret[F[_]: Monad: Capture: SessionReader: XccErr]: ManageFile ~> F = {
+    val tempName: F[String] =
+      Capture[F].delay("temp-" + Random.alphanumeric.take(10).mkString)
 
-      def move(scenario: MoveScenario, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] =
-        lift(scenario match {
-          case MoveScenario.FileToFile(src, dst) => moveFile(src, dst, semantics)
-          case MoveScenario.DirToDir(src, dst)   => moveDir(src, dst, semantics)
-        }).into[S]
+    def ifExists[A](
+      path: APath)(
+      thenDo: => F[FileSystemError \/ A]
+    ): F[FileSystemError \/ A] =
+      ops.exists[F](path).ifM(thenDo, pathErr(pathNotFound(path)).left[A].point[F])
 
-      def checkMoveSemantics(dst: APath, sem: MoveSemantics): FileSystemErrT[SessionIO, Unit] =
-        EitherT(sem match {
-          case MoveSemantics.Overwrite =>
-            ().right[FileSystemError].point[SessionIO]
+    def checkMoveSemantics(dst: APath, sem: MoveSemantics): FileSystemErrT[F, Unit] =
+      EitherT(sem match {
+        case MoveSemantics.Overwrite =>
+          ().right[FileSystemError].point[F]
 
-          case MoveSemantics.FailIfExists =>
-            ops.exists(dst).map(_.fold(
-              pathErr(pathExists(dst)).left[Unit],
-              ().right))
+        case MoveSemantics.FailIfExists =>
+          ops.exists[F](dst).map(_.fold(
+            pathErr(pathExists(dst)).left[Unit],
+            ().right))
 
-          case MoveSemantics.FailIfMissing =>
-            ops.exists(dst).map(_.fold(
-              ().right,
-              pathErr(pathNotFound(dst)).left[Unit]))
-        })
+        case MoveSemantics.FailIfMissing =>
+          ops.exists[F](dst).map(_.fold(
+            ().right,
+            pathErr(pathNotFound(dst)).left[Unit]))
+      })
 
-      def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] =
-        ifExists(src)((
-          checkMoveSemantics(dst, sem) *>
-          ops.moveFile(src, dst).liftM[FileSystemErrT]
-        ).run)
+    def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): F[FileSystemError \/ Unit] =
+      ifExists(src)((
+        checkMoveSemantics(dst, sem) *>
+        ops.moveFile[F](src, dst).liftM[FileSystemErrT]
+      ).run)
 
-      def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] = {
-        def moveContents(src0: ADir, dst0: ADir): SessionIO[Unit] =
-          ops.ls(src0).flatMap(_.traverse_(_.fold(
-            d => moveContents(src0 </> dir1(d), dst0 </> dir1(d)),
-            f => ops.moveFile(src0 </> file1(f), dst0 </> file1(f)))))
+    def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): F[FileSystemError \/ Unit] = {
+      def moveContents(src0: ADir, dst0: ADir): F[Unit] =
+        ops.ls[F](src0).flatMap(_.traverse_(_.fold(
+          d => moveContents(src0 </> dir1(d), dst0 </> dir1(d)),
+          f => ops.moveFile[F](src0 </> file1(f), dst0 </> file1(f)))))
 
-        def doMove =
-          checkMoveSemantics(dst, sem)                 *>
-          moveContents(src, dst).liftM[FileSystemErrT] *>
-          ops.deleteDir(src).liftM[FileSystemErrT]
+      def doMove =
+        checkMoveSemantics(dst, sem)                 *>
+        moveContents(src, dst).liftM[FileSystemErrT] *>
+        ops.deleteDir[F](src).liftM[FileSystemErrT]
 
-        ifExists(src)(doMove.run)
-      }
-
-      def delete(path: APath): Free[S, FileSystemError \/ Unit] =
-        lift(ifExists(path)(
-          refineType(path)
-            .fold(ops.deleteDir, ops.deleteFile)
-            .map(_.right[FileSystemError])
-        )).into[S]
-
-      def tempFile(path: APath): Free[S, FileSystemError \/ AFile] =
-        tempName map { fname =>
-          refineType(path).fold(
-            d => d </> file(fname),
-            f => fileParent(f) </> file(fname)
-          ).right
-        }
-
-      val tempName: Free[S, String] =
-        lift(SessionIO.liftT(
-          Task.delay("temp-" + Random.alphanumeric.take(10).mkString)
-        )).into[S]
-
-      def ifExists[A](
-        path: APath)(
-        thenDo: => SessionIO[FileSystemError \/ A]
-      ): SessionIO[FileSystemError \/ A] =
-        ops.exists(path).ifM(thenDo, pathErr(pathNotFound(path)).left[A].point[SessionIO])
+      ifExists(src)(doMove.run)
     }
+
+    def move(scenario: MoveScenario, semantics: MoveSemantics): F[FileSystemError \/ Unit] =
+      scenario match {
+        case MoveScenario.FileToFile(src, dst) => moveFile(src, dst, semantics)
+        case MoveScenario.DirToDir(src, dst)   => moveDir(src, dst, semantics)
+      }
+
+    def delete(path: APath): F[FileSystemError \/ Unit] =
+      ifExists(path)(
+        refineType(path)
+          .fold(ops.deleteDir[F], ops.deleteFile[F])
+          .map(_.right[FileSystemError]))
+
+    def tempFile(path: APath): F[FileSystemError \/ AFile] =
+      tempName map { fname =>
+        refineType(path).fold(
+          d => d </> file(fname),
+          f => fileParent(f) </> file(fname)
+        ).right
+      }
+
+    λ[ManageFile ~> F] {
+      case Move(scenario, semantics) => move(scenario, semantics)
+      case Delete(path)              => delete(path)
+      case TempFile(path)            => tempFile(path)
+    }
+  }
 }

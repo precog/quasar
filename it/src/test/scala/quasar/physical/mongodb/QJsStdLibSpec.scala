@@ -37,6 +37,10 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
+    case (string.ToString, Data.Date(_) :: Nil) =>
+      Skipped("Date prints timestamp").left
+    case (string.ToString, Data.Interval(_) :: Nil) =>
+      Skipped("Interval prints numeric representation").left
 
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
@@ -45,11 +49,16 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     case (date.ExtractIsoYear, _)      => Skipped("TODO").left
     case (date.ExtractWeek, _)         => Skipped("TODO").left
-    case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
     case (structural.ConcatOp, _)      => Skipped("TODO").left
 
     case _                             => ().right
+  }
+
+  def shortCircuitTC(args: List[Data]): Result \/ Unit = args match {
+    case Data.Date(_) :: Nil => Skipped("TODO").left
+    case Data.Time(_) :: Nil => Skipped("TODO").left
+    case _                   => ().right
   }
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])

@@ -171,9 +171,10 @@ class ServiceSpec extends quasar.Qspec {
   "/data/fs" should {
     val fileSystemConfigs =
       TestConfig.backendRefs
-        .map(_.name)
-        .traverse((TestConfig.backendEnvName _ >>> TestConfig.loadConfig _)(_).run)
-        .map(_
+        .traverse { ref =>
+          val connectionUri = TestConfig.loadConnectionUri(ref.ref)
+          connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
+        }.map(_
           .unite
           .zipWithIndex
           .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }

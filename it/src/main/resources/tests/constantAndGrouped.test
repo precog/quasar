@@ -15,6 +15,6 @@
     "query": "select :state as state, count(*) as `count` from zips where state = :state",
 
     "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase"],
+    "ignoreFieldOrder": ["couchbase", "marklogic_json"],
     "expected": [{ "state": "CO", "count": 414 }]
 }

@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip"
+        "marklogic_xml":     "pending"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",

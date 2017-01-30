@@ -20,11 +20,36 @@ import quasar.Predef._
 import quasar.{Data, Func, NullaryFunc, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
 
-import java.time.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
+import java.time._
+import java.time.temporal.{ChronoUnit => CU}
+import java.time.ZoneOffset.UTC
 import scalaz._, Validation.success
+import scalaz.syntax.bind._
 import shapeless.{Data => _, _}
 
 trait DateLib extends Library {
+  import TemporalPart._
+
+  sealed abstract class TemporalPart
+  object TemporalPart {
+    final case object Century     extends TemporalPart
+    final case object Day         extends TemporalPart
+    final case object Decade      extends TemporalPart
+    final case object Hour        extends TemporalPart
+    final case object Microsecond extends TemporalPart
+    final case object Millennium  extends TemporalPart
+    final case object Millisecond extends TemporalPart
+    final case object Minute      extends TemporalPart
+    final case object Month       extends TemporalPart
+    final case object Quarter     extends TemporalPart
+    final case object Second      extends TemporalPart
+    final case object Week        extends TemporalPart
+    final case object Year        extends TemporalPart
+
+    implicit val equal: Equal[TemporalPart] = Equal.equalRef
+    implicit val show: Show[TemporalPart] = Show.showFromToString
+  }
+
   def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
     \/.fromTryCatchNonFatal(Instant.parse(str)).bimap(
       κ(DateFormatError(Timestamp, str, None)),
@@ -54,6 +79,79 @@ trait DateLib extends Library {
 
   def startOfNextDay(date: Data.Date): Data.Timestamp =
     Data.Timestamp(startOfDayInstant(date.value.plus(Period.ofDays(1))))
+
+  def truncLocalTime(part: TemporalPart, t: LocalTime): SemanticError \/ LocalTime =
+    \/.fromTryCatchNonFatal(
+      part match {
+        case Century | Day | Decade | Millennium |
+             Month | Quarter | Week | Year       => t.truncatedTo(CU.DAYS)
+        case Hour                                => t.truncatedTo(CU.HOURS)
+        case Microsecond                         => t.truncatedTo(CU.MICROS)
+        case Millisecond                         => t.truncatedTo(CU.MILLIS)
+        case Minute                              => t.truncatedTo(CU.MINUTES)
+        case Second                              => t.truncatedTo(CU.SECONDS)
+      }
+    ).leftMap(err => GenericError(s"truncLocalTime: $err"))
+
+  def truncZonedDateTime(part: TemporalPart, zdt: ZonedDateTime):  SemanticError \/ ZonedDateTime =
+    truncLocalTime(part, zdt.toLocalTime) >>= (t => \/.fromTryCatchNonFatal {
+      val truncTime: ZonedDateTime =
+        ZonedDateTime.of(zdt.toLocalDate, t, zdt.getZone)
+
+      part match {
+        case Century =>
+          truncTime
+            .withDayOfMonth(1)
+            .withMonth(1)
+            .withYear((zdt.getYear / 100) * 100)
+        case Day =>
+          truncTime
+        case Decade =>
+          truncTime
+            .withDayOfMonth(1)
+            .withMonth(1)
+            .withYear((zdt.getYear / 10) * 10)
+        case Hour =>
+          truncTime
+        case Microsecond =>
+          truncTime
+        case Millennium =>
+          truncTime
+            .withDayOfMonth(1)
+            .withMonth(1)
+            .withYear((zdt.getYear / 1000) * 1000)
+        case Millisecond =>
+          truncTime
+        case Minute =>
+          truncTime
+        case Month =>
+          truncTime
+            .withDayOfMonth(1)
+        case Quarter =>
+          truncTime
+            .withDayOfMonth(1)
+            .withMonth(zdt.getMonth.firstMonthOfQuarter().getValue)
+        case Second =>
+          truncTime
+        case Week =>
+          truncTime
+            .`with`(java.time.DayOfWeek.MONDAY)
+        case Year =>
+          truncTime
+            .withDayOfMonth(1)
+            .withMonth(1)
+      }
+    }.leftMap(err => GenericError(s"truncZonedDateTime: $err")))
+
+  def truncDate(part: TemporalPart, d: Data.Date): SemanticError \/ Data.Date =
+    truncZonedDateTime(part, d.value.atStartOfDay(UTC)) ∘ (t => Data.Date(t.toLocalDate))
+
+  def truncTime(part: TemporalPart, t: Data.Time): SemanticError \/ Data.Time =
+    truncLocalTime(part, t.value) ∘ (Data.Time(_))
+
+  def truncTimestamp(part: TemporalPart, ts: Data.Timestamp): SemanticError \/ Data.Timestamp =
+    truncZonedDateTime(part, ts.value.atZone(UTC)) ∘ (t => Data.Timestamp(t.toInstant))
+
 
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
@@ -169,6 +267,29 @@ trait DateLib extends Library {
       case Sized(Type.Str) => success(Type.Interval)
     },
     basicUntyper)
+
+  val StartOfDay = UnaryFunc(
+    Mapping,
+    "Converts a Date or Timestamp to a Timestamp at the start of that day.",
+    Type.Timestamp,
+    Func.Input1(Type.Date ⨿ Type.Timestamp),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Date(v))) =>
+        success(Type.Const(Data.Timestamp(startOfDayInstant(v))))
+      case Sized(Type.Date) =>
+        success(Type.Timestamp)
+      case Sized(Type.Const(Data.Timestamp(v))) =>
+        truncZonedDateTime(TemporalPart.Day, v.atZone(UTC))
+          .map(t => Type.Const(Data.Timestamp(t.toInstant))).validation.toValidationNel
+      case Sized(Type.Timestamp) =>
+        success(Type.Timestamp)
+    },
+    untyper[nat._1] {
+      case Type.Const(Data.Timestamp(ts)) => success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))
+      case Type.Timestamp                 => success(Func.Input1(Type.Date))
+      case t                              => success(Func.Input1(t))
+    })
 
   val TimeOfDay = UnaryFunc(
     Mapping,

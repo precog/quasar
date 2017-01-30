@@ -7,5 +7,6 @@
     "data": "nulls.data",
     "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",
     "predicate": "containsExactly",
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [{ "n": null, "s": "null" }]
 }

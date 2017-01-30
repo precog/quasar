@@ -4,25 +4,26 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "couchbase":         "skip",
         "spark_local":       "skip",
         "spark_hdfs":        "skip"
     },
-    "data": "../largeZips.data",
+    "data": ["../extraSmallZips.data", "../smallZips.data", "../zips.data"],
     "query": "select z1.city, z2.state
-              from `../largeZips` as z1
-              join `../largeZips` as z2 on z1._id = z2._id
-              join `../largeZips` as z3 on z2._id = z3._id",
+              from `../extraSmallZips` as z1
+              join `../smallZips` as z2 on z1._id = z2._id
+              join `../zips` as z3 on z2._id = z3._id",
     "predicate": "containsAtLeast",
-    "expected": [{ "city": "CUSHMAN",           "state": "MA" },
-                 { "city": "CHICOPEE",          "state": "MA" },
-                 { "city": "HOLYOKE",           "state": "MA" },
-                 { "city": "FLORENCE",          "state": "MA" },
-                 { "city": "MONTGOMERY",        "state": "MA" },
-                 { "city": "WEST SPRINGFIELD",  "state": "MA" },
-                 { "city": "SPRINGFIELD",       "state": "MA" },
-                 { "city": "SPRINGFIELD",       "state": "MA" },
-                 { "city": "PITTSFIELD",        "state": "MA" },
-                 { "city": "FITCHBURG",         "state": "MA" }]
+    "expected": [{ "city": "AGAWAM",        "state": "MA" },
+                 { "city": "CUSHMAN",       "state": "MA" },
+                 { "city": "BARRE",         "state": "MA" },
+                 { "city": "BLANDFORD",     "state": "MA" },
+                 { "city": "BRIMFIELD",     "state": "MA" },
+                 { "city": "CHESTER",       "state": "MA" },
+                 { "city": "WESTOVER AFB",  "state": "MA" },
+                 { "city": "CUMMINGTON",    "state": "MA" },
+                 { "city": "MOUNT TOM",     "state": "MA" },
+                 { "city": "FEEDING HILLS", "state": "MA" }]
 }

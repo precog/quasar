@@ -49,6 +49,7 @@ class MongoDbQExprStdLibSpec extends MongoDbQStdLibSpec {
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
 
+    case (date.StartOfDay, _) => notHandled.left
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
@@ -57,6 +58,8 @@ class MongoDbQExprStdLibSpec extends MongoDbQStdLibSpec {
 
     case _                  => ().right
   }
+
+  def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {

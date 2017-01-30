@@ -16,16 +16,18 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.physical.marklogic.xquery.syntax._
-
-import eu.timepit.refined.auto._
+import quasar.Predef._
 
 object json {
-  val js = module("json", "http://marklogic.com/xdmp/json", "/MarkLogic/json/json.xqy")
+  def arrayPop(arr: XQuery): XQuery =
+    XQuery(s"json:array-pop($arr)")
 
-  def isObject(node: XQuery): XQuery =
-    xdmp.nodeKind(node) === "object".xs
+  def arrayPush(arr: XQuery, item: XQuery): XQuery =
+    XQuery(s"json:array-push($arr, $item)")
 
-  def transformFromJson[F[_]: PrologW](jsonNode: XQuery): F[XQuery] =
-    js("transform-from-json") apply (jsonNode)
+  def arrayValues(arr: XQuery): XQuery =
+    XQuery(s"json:array-values($arr)")
+
+  def toArray(itemSeq: XQuery): XQuery =
+    XQuery(s"json:to-array($itemSeq)")
 }

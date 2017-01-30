@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -90,11 +89,11 @@ abstract class DiscoverPathInstances {
     implicit R: Const[Read, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
       ADir => M[List[F[T[F]]]] =
-    dir => (listContents(dir) >>=
+    dir => MonadFsErr[M].handleError(listContents(dir) >>=
       (ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
         d => allDescendents[T, M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
-      .handleError(κ(List.empty[F[T[F]]].point[M]))
+        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))(
+      κ(List.empty[F[T[F]]].point[M]))
 
   private def unionDirs[T[_[_]]: CorecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
@@ -114,7 +113,7 @@ abstract class DiscoverPathInstances {
       : List[ADir] \&/ T[OUT] => M[T[OUT]] =
     _.fold(
       ds => unionDirs[T, M, OUT](g).apply(ds) >>= (_.fold[M[T[OUT]]](
-        MonadError_[M, FileSystemError].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
+        MonadFsErr[M].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
         union(_).point[M])),
       _.point[M],
       (ds, qs) => unionDirs[T, M, OUT](g).apply(ds) ∘ (_.fold(qs)(d => union(qs <:: d))))
@@ -149,7 +148,7 @@ abstract class DiscoverPathInstances {
 
   def fileType[M[_]: Monad: MonadFsErr](listContents: ListContents[M]):
       (ADir, String) => OptionT[M, ADir \/ AFile] =
-    (dir, name) => OptionT(listContents(dir).map(_.some).handleError(κ(none.point[M]))) >>=
+    (dir, name) => OptionT(MonadFsErr[M].handleError(listContents(dir).map(_.some))(κ(none.point[M]))) >>=
       (cont => OptionT((cont.find(_.fold(_.value ≟ name, _.value ≟ name)) ∘
         (_.bimap(dir </> dir1(_), dir </> file1(_)))).point[M]))
 

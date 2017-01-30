@@ -293,7 +293,7 @@ abstract class QueryRegressionTest[S[_]](
                     : RegressionTest => Task[RegressionTest] = { rt =>
 
     val unknown = rt.backends.keySet diff knownBackends
-    def errMsg = s"Unrecognized backend(s): ${unknown.mkString(", ")}"
+    def errMsg = s"Unrecognized backend(s) in '${rt.name}': ${unknown.mkString(", ")}"
 
     if (unknown.isEmpty) Task.now(rt)
     else Task.fail(new RuntimeException(errMsg))

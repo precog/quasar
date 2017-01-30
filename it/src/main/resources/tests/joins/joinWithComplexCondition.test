@@ -4,14 +4,15 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "couchbase":         "skip",
         "spark_local": "skip",
-      "spark_hdfs": "skip"
+        "spark_hdfs": "skip"
     },
-    "data": "../slamengine_commits.data",
+    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
-              from `../slamengine_commits` as l join `../slamengine_commits` as r
+              from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
               on r.sha = l.parents[0].sha and l.author.login = r.author.login
               where l.author.login || \",\" || r.author.login = \"selloutsellout\"",
     "predicate": "containsAtLeast",

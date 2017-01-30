@@ -176,6 +176,8 @@ object MongoDbQScriptPlanner {
       case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
       case Timestamp(a1) => unimplemented[M, Fix[ExprOp]]("Timestamp expression")
       case Interval(a1) => unimplemented[M, Fix[ExprOp]]("Interval expression")
+      case StartOfDay(a1) => unimplemented[M, Fix[ExprOp]]("StartOfDay expression")
+      case TemporalTrunc(a1, a2) => unimplemented[M, Fix[ExprOp]]("TemporalTrunc expression")
 
       case IfUndefined(a1, a2) => unimplemented[M, Fix[ExprOp]]("IfUndefined expression")
 

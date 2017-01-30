@@ -14,19 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.fp
 
-import quasar.Predef._
-import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
+import quasar.Predef.Throwable
 
-import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ReadPlanner[F[_]: Applicative] extends MarkLogicPlanner[F, Const[Read, ?]] {
-  val plan: AlgebraM[F, Const[Read, ?], XQuery] = {
-    case Const(Read(absFile)) =>
-      s"((: Read :)())".xqy.point[F]
-  }
+trait WriterTInstances {
+  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
+    new Catchable[WriterT[F, W, ?]] {
+      def attempt[A](fa: WriterT[F, W, A]) =
+        WriterT[F, W, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)      => (mzero[W], t.left)
+            case \/-((w, a)) => (w, a.right)
+          })
+
+      def fail[A](t: Throwable) =
+        WriterT(Catchable[F].fail(t).strengthL(mzero[W]))
+    }
 }
+
+object writerT extends WriterTInstances

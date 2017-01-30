@@ -27,7 +27,6 @@ import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
-import java.time.format.DateTimeFormatter
 import scala.concurrent.duration._
 
 import matryoshka._
@@ -50,6 +49,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
+  def shortCircuitTC(args: List[Data]): Result \/ Unit
+
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
 
@@ -63,13 +64,14 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massage(expected: Data): Data = expected match {
-      case Data.Time(time) => Data.Str(time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))
+      case Data.Time(time) => Data.Str(time.format(DataCodec.timeFormatter))
       case _               => expected
     }
 
     /** Identify constructs that are expected not to be implemented. */
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
-      case lp.Invoke(func, _) => shortCircuit(backend, func, args)
+      case lp.Invoke(func, _)     => shortCircuit(backend, func, args)
+      case lp.TemporalTrunc(_, _) => shortCircuitTC(args)
       case _ => ().right
     }
 

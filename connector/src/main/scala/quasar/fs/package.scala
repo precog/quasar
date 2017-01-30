@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._

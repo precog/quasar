@@ -26,8 +26,9 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner[F[_]: QNameGenerator: PrologW]
-  extends MarkLogicPlanner[F, Const[ShiftedRead, ?]] {
+private[qscript] final class ShiftedReadPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  implicit SP: StructuralPlanner[F, FMT], O: SearchOptions[FMT]
+) extends Planner[F, FMT, Const[ShiftedRead, ?]] {
 
   import expr._, axes.child
 
@@ -53,15 +54,12 @@ private[qscript] final class ShiftedReadPlanner[F[_]: QNameGenerator: PrologW]
     for {
       d     <- freshName[F]
       c     <- freshName[F]
-      b     <- freshName[F]
-      xform <- json.transformFromJson[F](~c)
-      incId <- extractId(~d) traverse (id => ejson.seqToArray_[F](mkSeq_(id, ~b)))
+      incId <- extractId(~d) traverse (id => SP.seqToArray(mkSeq_(id, ~c)))
     } yield {
       for_(
-        d in cts.search(fn.doc(), ctsQuery))
+        d in cts.search(expr = fn.doc(), query = ctsQuery, options = O.searchOptions))
       .let_(
-        c := ~d `/` child.node(),
-        b := (if_ (json.isObject(~c)) then_ xform else_ ~c))
-      .return_(incId getOrElse ~b)
+        c := ~d `/` child.node())
+      .return_(incId getOrElse ~c)
     }
 }

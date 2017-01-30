@@ -18,9 +18,11 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalacheck.gen
 import quasar.sql.fixpoint._
 
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.scalacheck.{Arbitrary, Gen}
 import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
@@ -53,13 +55,13 @@ trait ExprArbitrary {
   private def relationGen(depth: Int): Gen[SqlRelation[Fix[Sql]]] = {
     val simple = for {
       n <- Arbitrary.arbitrary[FPath]
-      a <- Gen.option(Gen.alphaChar.map(_.toString))
+      a <- Gen.option(genIdentString)
     } yield TableRelationAST[Fix[Sql]](pathy.Path.unsandbox(n), a)
     if (depth <= 0) simple
     else Gen.frequency(
       5 -> simple,
-      1 -> (selectGen(2) ⊛ Gen.alphaChar)((s, c) =>
-        ExprRelationAST(s, c.toString)),
+      1 -> (genVari[Fix[Sql]] ⊛ Gen.option(genIdentString))(VariRelationAST(_, _)),
+      1 -> (selectGen(2) ⊛ genIdentString)(ExprRelationAST(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1))(CrossRelation(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1) ⊛
         Gen.oneOf(LeftJoin, RightJoin, InnerJoin, FullJoin) ⊛
@@ -83,9 +85,7 @@ trait ExprArbitrary {
 
   private def simpleExprGen: Gen[Fix[Sql]] =
     Gen.frequency(
-      2 -> (for {
-        n <- Gen.alphaChar.map(_.toString)
-      } yield VariR(n)),
+      2 -> genVariExpr,
       1 -> (for {
         n  <- Gen.chooseNum(2, 5) // Note: at least two, to be valid set syntax
         cs <- Gen.listOfN(n, constExprGen)
@@ -109,9 +109,8 @@ trait ExprArbitrary {
       1 -> exprGen(depth) ∘ (expr => SpliceR(Some(expr))),
       3 -> (exprGen(depth) ⊛ exprGen(depth) ⊛
         Gen.oneOf(
-          Or, And, Eq, Neq, Ge, Gt, Le, Lt,
-          Plus, Minus, Mult, Div, Mod, Pow,
-          In))(
+          IfUndefined, Range, Or, And, Eq, Neq, Ge, Gt, Le, Lt,
+          Concat, Plus, Minus, Mult, Div, Mod, Pow, In, UnshiftMap))(
         BinopR(_, _, _)),
       1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, FieldDeref)),
       1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, IndexDeref)),
@@ -121,7 +120,8 @@ trait ExprArbitrary {
           FlattenMapKeys,   FlattenArrayIndices,
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
-          ShiftMapValues,   ShiftArrayValues))(
+          ShiftMapValues,   ShiftArrayValues,
+          UnshiftArray))(
         UnopR(_, _)),
       2 -> (Gen.oneOf("sum", "count", "avg", "length", "make_array") ⊛ exprGen(depth))(
         (fn, arg) => InvokeFunctionR(fn, List(arg))),
@@ -162,6 +162,16 @@ trait ExprArbitrary {
       l  <- Gen.listOfN(n, gen)
     } yield l
   }
+
+  private def genVariExpr: Gen[Fix[Sql]] =
+    genVari[Fix[Sql]] map (_.embed)
+
+  private def genVari[A]: Gen[Vari[A]] =
+    genIdentString map (Vari(_))
+
+  private def genIdentString: Gen[String] =
+    Gen.listOf(gen.printableAsciiChar) map (_.filter(_ ≠ '`').mkString)
+
 }
 
 object ExprArbitrary extends ExprArbitrary

@@ -7,7 +7,7 @@
     "data": "zips.data",
     "query": "select integer(_id) as intId, decimal(_id) as decId, to_string(pop) as popStr, to_string(loc[0]) as locStr, to_string(length(city) < 9) as boolStr from zips",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "ignoreFieldOrder": ["couchbase", "marklogic_json"],
     "expected": [
         { "intId": 1001, "decId": 1001.0, "popStr": "15338", "locStr": "-72.622739", "boolStr": "true"  },
         { "intId": 1002, "decId": 1002.0, "popStr": "36963", "locStr": "-72.51565",  "boolStr": "true"  },

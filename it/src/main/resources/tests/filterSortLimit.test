@@ -13,6 +13,7 @@
 
     "predicate": "equalsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         { "city": "BOULDER",         "loc": [-109.540105, 42.688146], "pop":  112, "state": "WY"  },
         { "city": "BOULDER",         "loc": [-111.426646, 37.916606], "pop":  131, "state": "UT"  },

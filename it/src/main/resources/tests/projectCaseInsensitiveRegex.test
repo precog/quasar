@@ -8,7 +8,7 @@
     "query": "select city, city ~* \"boU\" as a, city !~* \"Bou\" as b from largeZips",
     "NB": "Should also test `doesNotContain`, see SD-577.",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
     "expected": [
         { "city": "CUSHMAN",          "a": false, "b": true  },
         { "city": "CHICOPEE",         "a": false, "b": true  },

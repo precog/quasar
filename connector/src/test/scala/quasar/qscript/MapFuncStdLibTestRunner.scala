@@ -84,6 +84,9 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
         qsr.fromData(data).fold(
           _ => sys.error("invalid Data"),
           ej => Free.roll(MapFuncs.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej)))
+
+      case lp.TemporalTrunc(part, src) =>
+        Free.roll(MapFuncs.TemporalTrunc(part, src))
     }
 
   def absurd[A, B](a: A): B = sys.error("impossible!")

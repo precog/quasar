@@ -9,12 +9,15 @@
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["couchbase",
-                         "mongodb_2_6",
-                         "mongodb_3_0",
-                         "mongodb_read_only",
-                         "mongodb_3_2",
-                         "mongodb_q_3_2"],
+    "ignoreFieldOrder": [
+      "couchbase",
+      "marklogic_json",
+      "mongodb_2_6",
+      "mongodb_3_0",
+      "mongodb_read_only",
+      "mongodb_3_2",
+      "mongodb_q_3_2"
+    ],
     "expected": [
         { "state": "AK", "city": "ANCHORAGE",   "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116] },
         { "state": "AK", "city": "KETCHIKAN",   "pop": [13886, 422]                                                          },

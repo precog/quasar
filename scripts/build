@@ -38,15 +38,15 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
 
   if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
-    export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
+    echo "mongodb_2_6=\"mongodb://${QUASAR_MONGODB_HOST_2_6}\"" > $TEST_CONFIG_FILE
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
-    export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
+    echo "mongodb_3_0=\"mongodb://${QUASAR_MONGODB_HOST_3_0}\"" > $TEST_CONFIG_FILE
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-    export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
-    export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+    echo "mongodb_read_only=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" > $TEST_CONFIG_FILE
+    echo "mongodb_read_only_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" >> $TEST_CONFIG_FILE
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
-    export QUASAR_MONGODB_3_2="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_2}\"}}"
-    export QUASAR_MONGODB_Q_3_2="{\"mongodbq\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_2}\"}}"
+    echo "mongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" > $TEST_CONFIG_FILE
+    echo "mongodb_q_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" >> $TEST_CONFIG_FILE
   fi
 
   echo "Using local MongoDB config"

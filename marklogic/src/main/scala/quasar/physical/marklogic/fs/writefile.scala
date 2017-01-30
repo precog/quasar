@@ -17,41 +17,36 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.fp.free.lift
+import quasar.Data
+import quasar.effect.{Capture, Kvs, MonoSeq}
+import quasar.effect.uuid.UuidReader
 import quasar.fs._, FileSystemError._
-import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.effect.uuid.GenUUID
-import quasar.physical.marklogic.xcc.SessionIO
+import quasar.physical.marklogic.xcc._
 
 import scalaz._, Scalaz._
 
 object writefile {
-
-  def interpret[S[_]](
+  def interpret[F[_]: Monad: Capture: SessionReader: UuidReader: XccErr, FMT](
     implicit
-    S0:      SessionIO :<: S,
-    S1:      GenUUID :<: S,
-    cursors: KeyValueStore.Ops[WriteFile.WriteHandle, Unit, S],
-    seq:     MonotonicSeq.Ops[S]
-  ): WriteFile ~> Free[S, ?] = new (WriteFile ~> Free[S, ?]) {
-    def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
-      case WriteFile.Open(file) =>
-        for {
-          writeHandle <- seq.next ∘ (WriteFile.WriteHandle(file, _))
-          _  <- cursors.put(writeHandle, ())
-          r  <- lift(ops.exists(file).ifM(
-                  ().right[PathError].point[SessionIO],
-                  ops.createFile(file))
-                ).into[S]
-        } yield r.leftMap(pathErr(_)).as(writeHandle)
+    C:       AsContent[FMT, Data],
+    cursors: Kvs[F, WriteFile.WriteHandle, Unit],
+    idSeq:   MonoSeq[F]
+  ): WriteFile ~> F = λ[WriteFile ~> F] {
+    case WriteFile.Open(file) =>
+      for {
+        wh <- idSeq.next ∘ (WriteFile.WriteHandle(file, _))
+        _  <- cursors.put(wh, ())
+        r  <- ops.exists[F](file).ifM(
+                ().right[PathError].point[F],
+                ops.createFile[F](file))
+      } yield r.leftMap(pathErr(_)).as(wh)
 
-      case WriteFile.Write(h, data) =>
-        cursors.get(h).isDefined.ifM(
-          ops.appendToFile[S](h.file, data),
-          Vector(unknownWriteHandle(h)).pure[Free[S, ?]])
+    case WriteFile.Write(h, data) =>
+      OptionT(cursors.get(h)).isDefined.ifM(
+        ops.appendToFile[F, FMT](h.file, data),
+        Vector(unknownWriteHandle(h)).point[F])
 
-      case WriteFile.Close(h) =>
-        cursors.delete(h)
-    }
+    case WriteFile.Close(h) =>
+      cursors.delete(h)
   }
 }

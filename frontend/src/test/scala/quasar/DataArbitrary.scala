@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import java.time._
 import quasar.pkg.tests._
 
 trait DataArbitrary {
@@ -44,6 +43,8 @@ trait DataArbitrary {
 }
 
 object DataArbitrary extends DataArbitrary {
+  import DateArbitrary._
+
   // Too big for Long
   val LargeInt = BigInt(Long.MaxValue.toString + "0")
 
@@ -91,13 +92,4 @@ object DataArbitrary extends DataArbitrary {
     )
   }
 
-  private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
-  private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)
-  private def genMillis: Gen[Long]      = choose(0L, 999L)
-  private def genNanos: Gen[Long]       = genMillis ^^ (_ * 1000000)
-
-  private def genInstant: Gen[Instant]   = (genSeconds, genNanos) >> Instant.ofEpochSecond
-  private def genDuration: Gen[Duration] = (genSeconds, genNanos) >> Duration.ofSeconds
-  private def genDate: Gen[LocalDate]    = genSeconds ^^ LocalDate.ofEpochDay
-  private def genTime: Gen[LocalTime]    = genSecondOfDay ^^ LocalTime.ofSecondOfDay
 }

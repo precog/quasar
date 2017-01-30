@@ -26,7 +26,7 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib, StdLib._
+import quasar.std.StdLib, StdLib._, date.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
 import matryoshka._
@@ -232,6 +232,7 @@ final class Compiler[M[_], T: Equal]
       "time"                    -> date.Time,
       "timestamp"               -> date.Timestamp,
       "interval"                -> date.Interval,
+      "start_of_day"            -> date.StartOfDay,
       "time_of_day"             -> date.TimeOfDay,
       "to_timestamp"            -> date.ToTimestamp,
       "squash"                  -> identity.Squash,
@@ -397,6 +398,62 @@ final class Compiler[M[_], T: Equal]
               lpr.let(leftName, left0,
                 lpr.let(rightName, right0, join)))
           }).join
+      }
+
+    def extractFunc(part: String): Option[UnaryFunc] =
+      part.some collect {
+        case "century"      => date.ExtractCentury
+        case "day"          => date.ExtractDayOfMonth
+        case "decade"       => date.ExtractDecade
+        case "dow"          => date.ExtractDayOfWeek
+        case "doy"          => date.ExtractDayOfYear
+        case "epoch"        => date.ExtractEpoch
+        case "hour"         => date.ExtractHour
+        case "isodow"       => date.ExtractIsoDayOfWeek
+        case "isoyear"      => date.ExtractIsoYear
+        case "microseconds" => date.ExtractMicroseconds
+        case "millennium"   => date.ExtractMillennium
+        case "milliseconds" => date.ExtractMilliseconds
+        case "minute"       => date.ExtractMinute
+        case "month"        => date.ExtractMonth
+        case "quarter"      => date.ExtractQuarter
+        case "second"       => date.ExtractSecond
+        case "week"         => date.ExtractWeek
+        case "year"         => date.ExtractYear
+      }
+
+    def temporalPart(part: String): Option[TemporalPart] = {
+      import TemporalPart._
+
+      part.some collect {
+        case "century"         => Century
+        case "day"             => Day
+        case "decade"          => Decade
+        case "hour"            => Hour
+        case "microseconds"    => Microsecond
+        case "millennium"      => Millennium
+        case "milliseconds"    => Millisecond
+        case "minute"          => Minute
+        case "month"           => Month
+        case "quarter"         => Quarter
+        case "second"          => Second
+        case "week"            => Week
+        case "year"            => Year
+      }
+    }
+
+    def temporalPartFunc[A](
+      name: String, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
+    ): M[T] =
+      args.traverse(compile0).flatMap {
+        case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
+          f1(part).cata(
+            f2(_, expr),
+            fail(UnexpectedDatePart("\"" + part + "\"")))
+        case _ :: _ :: Nil =>
+          fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](args(0)))))
+        case _ =>
+          fail(WrongArgumentCount(name.toUpperCase, 2, args.length))
       }
 
     node.tail match {
@@ -602,38 +659,13 @@ final class Compiler[M[_], T: Equal]
               if ((rName: String) ≟ name) table
               else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
 
-      case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
-        args.traverse(compile0).flatMap {
-          case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
-            (part.some collect {
-              case "century"      => date.ExtractCentury
-              case "day"          => date.ExtractDayOfMonth
-              case "decade"       => date.ExtractDecade
-              case "dow"          => date.ExtractDayOfWeek
-              case "doy"          => date.ExtractDayOfYear
-              case "epoch"        => date.ExtractEpoch
-              case "hour"         => date.ExtractHour
-              case "isodow"       => date.ExtractIsoDayOfWeek
-              case "isoyear"      => date.ExtractIsoYear
-              case "microseconds" => date.ExtractMicroseconds
-              case "millennium"   => date.ExtractMillennium
-              case "milliseconds" => date.ExtractMilliseconds
-              case "minute"       => date.ExtractMinute
-              case "month"        => date.ExtractMonth
-              case "quarter"      => date.ExtractQuarter
-              case "second"       => date.ExtractSecond
-              case "week"         => date.ExtractWeek
-              case "year"         => date.ExtractYear
-            }).cata(
-              f => emit(f(expr).embed),
-              fail(UnexpectedDatePart("\"" + part + "\"")))
+      case InvokeFunction(name, args) if
+          name.toLowerCase ≟ "date_part"  || name.toLowerCase ≟ "temporal_part" =>
+        temporalPartFunc(name, args, extractFunc, (f: UnaryFunc, expr: T) => emit(f(expr).embed))
 
-          case _ :: _ :: Nil =>
-            fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](args(0)))))
-
-          case _ =>
-            fail(WrongArgumentCount("DATE_PART", 2, args.length))
-        }
+      case InvokeFunction(name, args) if
+          name.toLowerCase ≟ "date_trunc" || name.toLowerCase ≟ "temporal_trunc" =>
+        temporalPartFunc(name, args, temporalPart, (p: TemporalPart, expr: T) => emit(TemporalTrunc(p, expr).embed))
 
       case InvokeFunction(name, Nil) =>
         functionMapping.get(name.toLowerCase).fold[M[T]](

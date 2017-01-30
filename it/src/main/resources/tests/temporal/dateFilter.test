@@ -2,8 +2,8 @@
   "name": "filter on date part",
 
   "backends": {
-    "mongodb_q_3_2": "pending",
-    "postgresql": "pending"
+    "mongodb_q_3_2":  "pending",
+    "postgresql":     "pending"
   },
 
   "data": "../days.data",

@@ -17,42 +17,25 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.contrib.pathy._
-import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.free.lift
+import quasar.effect.{Capture, Kvs, MonoSeq}
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl._
 import quasar.physical.marklogic.xcc._
 
 import scalaz._, Scalaz._
-import scalaz.stream.Process
 
 object readfile {
-
-  def interpret[S[_]](
+  def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr](
     chunkSize: Positive
-  )(
-    implicit
-    S0:    ContentSourceIO :<: S,
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[ContentSourceIO], S],
-    seq:   MonotonicSeq.Ops[S]
-  ): ReadFile ~> Free[S, ?] = {
-    def dataProcess(file: AFile, skip: Int, limit: Option[Int]): ReadStream[ContentSourceIO] = {
-      val ltd = ops.readFile(file).drop(skip)
-
-      limit.fold(ltd)(ltd.take)
-        .chunk(chunkSize.get.toInt)
-        .map(_.right[FileSystemError])
+  )(implicit
+    K: Kvs[F, ReadFile.ReadHandle, Option[ResultCursor]],
+    S: MonoSeq[F]
+  ): ReadFile ~> F =
+    readFromDataCursor[Option[ResultCursor], F] { (file, opts) =>
+      ops.exists[F](file).ifM(
+        ops.readFile[F](chunkSize)(file, opts.offset, opts.limit) map (some(_)),
+        none[ResultCursor].point[F]
+      ) map (_.right[FileSystemError])
     }
-
-    readFromProcess { (file, readOpts) =>
-      lift(ContentSourceIO.runSessionIO(ops.exists(file)) map { doesExist =>
-        doesExist.fold(
-          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt)),
-          (Process.empty: ReadStream[ContentSourceIO])
-        ).right[FileSystemError]
-      }).into[S]
-    }
-  }
 }

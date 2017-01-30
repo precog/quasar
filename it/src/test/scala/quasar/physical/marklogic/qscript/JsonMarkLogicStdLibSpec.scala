@@ -16,17 +16,24 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.Predef._
+import quasar.effect._
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class DeadEndPlanner[F[_]: Applicative]
-  extends MarkLogicPlanner[F, Const[DeadEnd, ?]] {
+import JsonMarkLogicStdLibSpec.SLib
 
-  val plan: AlgebraM[F, Const[DeadEnd, ?], XQuery] = {
-    case Const(Root) => mkSeq_("/".xqy).point[F]
+final class JsonMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, DocType.Json] {
+  def toMain[G[_]: Monad: Capture](xqy: SLib[XQuery]): RunT[G, MainModule] = {
+    val (prologs, q) = xqy.leftMap(e => ko(e.shows).toResult).run.run.eval(1)
+    EitherT.fromDisjunction[G](q map (MainModule(Version.`1.0-ml`, prologs, _)))
   }
+}
+
+object JsonMarkLogicStdLibSpec {
+  type SLib[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
 }

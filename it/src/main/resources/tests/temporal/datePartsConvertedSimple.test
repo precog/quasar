@@ -14,7 +14,7 @@
               from `../slamengine_commits`",
 
   "predicate": "containsAtLeast",
-  "ignoreFieldOrder": [ "couchbase" ],
+  "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
   "expected": [
     { "dayOfMonth": 29.0, "id": "33031" }
   ]

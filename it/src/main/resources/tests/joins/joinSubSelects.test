@@ -3,7 +3,8 @@
 
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
@@ -11,14 +12,14 @@
         "spark_hdfs":        "skip"
     },
 
-    "data": "../zips.data",
+    "data": ["../zips.data", "../largeZips.data"],
 
     "query": "select t1.city, t1.popCA, t2.popMA from
             (select city, sum(pop) as popCA from `../zips`
               where state = \"CA\" group by city
               order by sum(pop) desc limit 200) as t1
             join
-            (select city, sum(pop) as popMA from `../zips`
+            (select city, sum(pop) as popMA from `../largeZips`
               where state = \"MA\" group by city
               order by sum(pop) desc limit 200) as t2
             on t1.city = t2.city",

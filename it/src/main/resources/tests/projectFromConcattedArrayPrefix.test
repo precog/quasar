@@ -3,7 +3,6 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },

@@ -3,7 +3,6 @@
 
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
@@ -11,14 +10,17 @@
         "spark_hdfs": "skip"
     },
 
-    "data": "../largeZips.data",
+    "data": ["../largeZips.data", "../zips.data"],
 
     "query": "select a.city as a, b.city as b, b.pop - a.pop as diff
-            from `../largeZips` as a, `../largeZips` as b
-            where a._id like \"80301\" and b._id like \"90277\"",
+            from `../zips` as a, `../largeZips` as b
+            where a._id like \"80301\" and b._id like \"95928\"",
 
     "predicate": "equalsExactly",
+
+    "ignoreFieldOrder": ["marklogic_json"],
+
     "expected": [
-        { "a": "BOULDER", "b": "REDONDO BEACH", "diff": 14928 }
+        { "a": "BOULDER", "b": "CHICO", "diff": 9278 }
     ]
 }

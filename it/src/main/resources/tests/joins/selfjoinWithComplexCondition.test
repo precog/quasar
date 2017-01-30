@@ -1,0 +1,24 @@
+{
+    "name": "self-join with complex conditions",
+    "backends": {
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2": "pending",
+        "postgresql":        "pending",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "couchbase":         "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
+    },
+    "data": "../slamengine_commits.data",
+    "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
+              from `../slamengine_commits` as l join `../slamengine_commits` as r
+              on r.sha = l.parents[0].sha and l.author.login = r.author.login
+              where l.author.login || \",\" || r.author.login = \"selloutsellout\"",
+    "predicate": "containsAtLeast",
+    "expected": [
+        { "child": "b8a2302e6a0659875d03bfe4988c000f2ed027a0", "c_auth": "sellout",
+          "parent": "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6", "p_auth": "sellout" },
+        { "child": "f1b375cf28abebb32f296119dbb347e5121c3a7a", "c_auth": "sellout",
+          "parent": "696c6ff2556bb1ea6a6de86a03736058e8f6c52a", "p_auth": "sellout" }]
+}

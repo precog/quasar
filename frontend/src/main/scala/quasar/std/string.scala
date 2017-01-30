@@ -17,11 +17,12 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, Type, Mapping, SemanticError},
-  SemanticError._
+import quasar._, SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+
+import java.time.ZoneOffset.UTC
 
 import matryoshka._
 import matryoshka.implicits._
@@ -320,9 +321,9 @@ trait StringLib extends Library {
         case Data.Bool(b)      => success(b.shows)
         case Data.Int(i)       => success(i.shows)
         case Data.Dec(d)       => success(d.shows)
-        case Data.Timestamp(t) => success(t.toString)
+        case Data.Timestamp(t) => success(t.atZone(UTC).format(DataCodec.dateTimeFormatter))
         case Data.Date(d)      => success(d.toString)
-        case Data.Time(t)      => success(t.toString)
+        case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
         case Data.Interval(i)  => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other             =>

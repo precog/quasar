@@ -1,21 +1,21 @@
 {
-  "name": "variable with a non-trivial value",
+    "name": "variable with a non-trivial value",
 
-  "backends": {
-    "postgresql": "pending",
-    "spark_local": "pending",
-    "spark_hdfs": "pending"
-  },
+    "backends": {
+        "postgresql": "pending",
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
+    },
 
-  "data": "days.data",
+    "data": "days.data",
 
-  "variables": {
-    "start": "DATE(\"2014-08-20\")",
-    "end": "TIMESTAMP(\"2014-08-21T00:00:00Z\") + INTERVAL(\"PT24H\")"
-  },
+    "variables": {
+        "start": "DATE(\"2014-08-20\")",
+        "end": "TIMESTAMP(\"2014-08-21T00:00:00Z\") + INTERVAL(\"PT24H\")"
+    },
 
-  "query": "select day from days where ts >= :start and ts <= :end",
+    "query": "select day from days where ts >= start_of_day(:start) and ts <= :end",
 
-  "predicate": "equalsExactly",
-  "expected": ["Wednesday", "Thursday"]
+    "predicate": "equalsExactly",
+    "expected": ["Wednesday", "Thursday"]
 }

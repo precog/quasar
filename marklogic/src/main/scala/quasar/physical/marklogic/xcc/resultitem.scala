@@ -16,13 +16,14 @@
 
 package quasar.physical.marklogic.xcc
 
+import quasar.effect.Capture
+
 import com.marklogic.xcc._
 import com.marklogic.xcc.types.XdmItem
-import scalaz.concurrent.Task
 
 object resultitem {
-  def loadItem(ritem: ResultItem): Task[XdmItem] =
-    Task delay {
+  def loadItem[F[_]: Capture](ritem: ResultItem): F[XdmItem] =
+    Capture[F] delay {
       ritem.cache()
       ritem.getItem
     }

@@ -17,6 +17,7 @@
 package quasar.effect
 
 import quasar.Predef._
+import quasar.contrib.scalaz._
 import quasar.fp.TaskRef
 import quasar.fp._, free._
 
@@ -78,4 +79,10 @@ object Read {
   def constant[F[_]: Applicative, R](r: R)           = λ[Read[R, ?] ~> F]          { case Ask(f) => r.point[F] map f }
   def fromTaskRef[R](tr: TaskRef[R])                 = λ[Read[R, ?] ~> Task]       { case Ask(f) => tr.read map f    }
   def toState[F[_], R](implicit F: MonadState[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
+
+  def monadReader_[R, S[_]](implicit O: Ops[R, S]): MonadReader_[Free[S, ?], R] =
+    new MonadReader_[Free[S, ?], R] {
+      def ask = O.ask
+      def local[A](f: R => R)(fa: Free[S, A]) = O.local(f)(fa)
+    }
 }

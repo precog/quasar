@@ -3,7 +3,8 @@
 
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "skip",

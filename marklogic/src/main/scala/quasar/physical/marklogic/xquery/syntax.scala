@@ -38,10 +38,10 @@ object syntax {
     def qn[F[_]](implicit F: PrologW[F]): F[QName] =
       F.writer(ISet singleton Prolog.nsDecl(decl), decl.ns(local))
 
-    def xqy[F[_]: PrologW]: F[XQuery] =
-      xs map (fn.QName(decl.ns.uri.xs, _))
+    def xqy[F[_]: Functor: PrologW]: F[XQuery] =
+      qn map (_.xqy)
 
-    def xs[F[_]: PrologW]: F[XQuery] =
+    def xs[F[_]: Functor: PrologW]: F[XQuery] =
       qn map (_.xs)
   }
 
@@ -126,7 +126,7 @@ object syntax {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)
 
-    def declare[F[_]: PrologW](local: String Refined IsNCName): F[FunctionDeclDsl] =
+    def declare[F[_]: Functor: PrologW](local: String Refined IsNCName): F[FunctionDeclDsl] =
       name(local).qn[F] map (quasar.physical.marklogic.xquery.declare)
   }
 
@@ -146,8 +146,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl1FOps[F[_]](val funcF: F[FunctionDecl1]) extends scala.AnyVal {
-    def apply(p1: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1))
+    def apply(p1: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1))
   }
 
   final implicit class FunctionDecl2Ops(val func: FunctionDecl2) extends scala.AnyVal {
@@ -156,8 +156,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl2FOps[F[_]](val funcF: F[FunctionDecl2]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2))
+    def apply(p1: XQuery, p2: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2))
   }
 
   final implicit class FunctionDecl3Ops(val func: FunctionDecl3) extends scala.AnyVal {
@@ -166,8 +166,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl3FOps[F[_]](val funcF: F[FunctionDecl3]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3))
   }
 
   final implicit class FunctionDecl4Ops(val func: FunctionDecl4) extends scala.AnyVal {
@@ -176,8 +176,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl4FOps[F[_]](val funcF: F[FunctionDecl4]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3, p4))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3, p4))
   }
 
   final implicit class FunctionDecl5Ops(val func: FunctionDecl5) extends scala.AnyVal {
@@ -186,7 +186,7 @@ object syntax {
   }
 
   final implicit class FunctionDecl5FOps[F[_]](val funcF: F[FunctionDecl5]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery, p5: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3, p4, p5))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery, p5: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3, p4, p5))
   }
 }

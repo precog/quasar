@@ -161,6 +161,7 @@ trait GenericFuncInstances {
       case date.Time                      => "Time"
       case date.Timestamp                 => "Timestamp"
       case date.Interval                  => "Interval"
+      case date.StartOfDay                => "StartOfDay"
       case date.TimeOfDay                 => "TimeOfDay"
       case date.ToTimestamp               => "ToTimestamp"
       case identity.Squash                => "Squash"

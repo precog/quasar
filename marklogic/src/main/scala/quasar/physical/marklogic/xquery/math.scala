@@ -19,6 +19,9 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object math {
+  def floor(x: XQuery): XQuery =
+    XQuery(s"math:floor($x)")
+
   def log(x: XQuery): XQuery =
     XQuery(s"math:log($x)")
 

@@ -24,32 +24,24 @@ import monocle.Prism
 import java.time._
 import java.time.format._
 import java.time.temporal.{TemporalAccessor, TemporalQuery}
-import scalaz._
+import scalaz._, Scalaz._
 
-object prisms {
+object optics {
   val base64Bytes = Prism[String, ImmutableArray[Byte]](
     s => \/.fromTryCatchNonFatal(Base64.getDecoder.decode(s))
            .map(ImmutableArray.fromArray)
            .toOption
   )((Base64.getEncoder.encodeToString(_)) compose (_.toArray))
 
-  val durationInSeconds = Prism[String, Duration] {
-    case DurationEncoding(secs, nanos) =>
-      \/.fromTryCatchNonFatal(Duration.ofSeconds(secs.toLong, nanos.toLong)).toOption
+  val isoDuration = Prism[String, Duration](
+    s => \/.fromTryCatchNonFatal(Duration.parse(s)).toOption)(
+    d => (d.isNegative either d.negated or d).umap(_.toString).map("-" + _).merge)
 
-    case DurationEncoding(secs) =>
-      \/.fromTryCatchNonFatal(Duration.ofSeconds(secs.toLong)).toOption
-
-    case _ => None
-  } (d => s"${d.getSeconds}.${d.getNano}")
-
-  val isoInstant:   Prism[String, Instant]   = temporal(Instant from _, DateTimeFormatter.ISO_INSTANT)
+  val isoInstant:   Prism[String, Instant]   = temporal(Instant   from _, DateTimeFormatter.ISO_INSTANT)
   val isoLocalDate: Prism[String, LocalDate] = temporal(LocalDate from _, DateTimeFormatter.ISO_DATE)
   val isoLocalTime: Prism[String, LocalTime] = temporal(LocalTime from _, DateTimeFormatter.ISO_TIME)
 
   ////
-
-  private val DurationEncoding = "(-?\\d+)(?:\\.(\\d+))?".r
 
   private def temporal[T <: TemporalAccessor](f: TemporalAccessor => T, fmt: DateTimeFormatter): Prism[String, T] = {
     val tq = new TemporalQuery[T] { def queryFrom(q: TemporalAccessor): T = f(q) }

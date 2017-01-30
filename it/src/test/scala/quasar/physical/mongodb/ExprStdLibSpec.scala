@@ -52,6 +52,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
 
+    case (date.StartOfDay, _) => notHandled.left
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
@@ -60,6 +61,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case _                  => ().right
   }
+
+  def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {

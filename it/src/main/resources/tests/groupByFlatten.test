@@ -2,7 +2,8 @@
     "name": "group by flattened field",
     "backends": {
         "couchbase":  "skip",
-        "marklogic":  "skip",
+        "marklogic_json": "skip",
+        "marklogic_xml":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
 	"spark_local": "pending",

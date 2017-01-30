@@ -12,6 +12,7 @@
 { "_id": "01604", "city": "WORCESTER", "loc": [ -71.774626, 42.254084 ], "pop": 29036, "state": "MA" }
 { "_id": "01605", "city": "WORCESTER", "loc": [ -71.788795, 42.289391 ], "pop": 25695, "state": "MA" }
 { "_id": "01701", "city": "FRAMINGHAM", "loc": [ -71.425486, 42.300665 ], "pop": 65046, "state": "MA" }
+{ "_id": "01742", "city": "CONCORD", "loc": [-71.374741, 42.456701], "pop": 17076, "state": "MA" }
 { "_id": "01752", "city": "MARLBOROUGH", "loc": [ -71.543355, 42.350861 ], "pop": 31813, "state": "MA" }
 { "_id": "01757", "city": "MILFORD", "loc": [ -71.527402, 42.151142 ], "pop": 25372, "state": "MA" }
 { "_id": "01760", "city": "NATICK", "loc": [ -71.35741, 42.287476 ], "pop": 30432, "state": "MA" }
@@ -25,6 +26,7 @@
 { "_id": "01852", "city": "LOWELL", "loc": [ -71.298331, 42.634413 ], "pop": 33379, "state": "MA" }
 { "_id": "01854", "city": "LOWELL", "loc": [ -71.335464, 42.649254 ], "pop": 26472, "state": "MA" }
 { "_id": "01876", "city": "TEWKSBURY", "loc": [ -71.223224, 42.60283 ], "pop": 27269, "state": "MA" }
+{ "_id": "01887", "city": "WILMINGTON", "loc": [-71.172306, 42.558143], "pop": 17647, "state": "MA" }
 { "_id": "01902", "city": "LYNN", "loc": [ -70.941989, 42.469814 ], "pop": 41625, "state": "MA" }
 { "_id": "01906", "city": "SAUGUS", "loc": [ -71.011093, 42.463344 ], "pop": 25487, "state": "MA" }
 { "_id": "01915", "city": "BEVERLY", "loc": [ -70.875939, 42.560825 ], "pop": 38259, "state": "MA" }

@@ -4,17 +4,23 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "couchbase":         "skip",
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },
-    "data": "../slamengine_commits.data",
-    "query": "SELECT p.author.login, COUNT(*)
-              FROM `../slamengine_commits` as p INNER JOIN `../slamengine_commits` as c ON p.sha = c.sha
+    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+    "query": "SELECT p.author.login, COUNT(*) as count
+              FROM `../slamengine_commits` as p INNER JOIN `../slamengine_commits_dup` as c ON p.sha = c.sha
               GROUP BY p.author.login",
     "predicate": "containsExactly",
-    "expected": [{ "1": 15, "login": "mossprescott" },
-                 { "1":  9, "login": "sellout"      },
-                 { "1":  6, "login": "jdegoes"      }]
+    "ignoreFieldOrder": ["mongodb_2_6",
+                         "mongodb_3_0",
+                         "mongodb_read_only",
+                         "mongodb_3_2",
+                         "mongodb_q_3_2"],
+    "expected": [{ "login": "mossprescott", "count": 15 },
+                 { "login": "sellout"     , "count":  9 },
+                 { "login": "jdegoes"     , "count":  6 }]
 }

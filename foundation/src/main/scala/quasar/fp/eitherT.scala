@@ -57,7 +57,12 @@ trait EitherTInstances0 extends EitherTInstances1 {
     }
 }
 
-trait EitherTInstances1 {
+trait EitherTInstances1 extends EitherTInstances2 {
+  implicit def eitherTMonadListen[F[_], W, E](implicit F: MonadListen[F, W]): MonadListen[EitherT[F, E, ?], W] =
+    EitherT.monadListen[F, W, E]
+}
+
+trait EitherTInstances2 {
   implicit def eitherTMonadTell[F[_], W, E](implicit F: MonadTell[F, W]): MonadTell[EitherT[F, E, ?], W] =
     EitherT.monadTell[F, W, E]
 }

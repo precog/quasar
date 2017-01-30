@@ -7,7 +7,8 @@
         "mongodb_3_2":       "pending",
         "mongodb_q_3_2":     "skip",
         "postgresql":        "pending",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "couchbase":         "skip",
         "spark_local": "skip",
         "spark_hdfs": "skip"

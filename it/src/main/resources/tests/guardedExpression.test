@@ -1,6 +1,7 @@
 {
   "name": "regex on non-string field",
   "backends": {
+      "marklogic_json":    "pending",
       "mongodb_read_only": "pending",
       "postgresql":        "pending"
   },

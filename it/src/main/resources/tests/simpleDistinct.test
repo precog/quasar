@@ -12,6 +12,8 @@
 
   "predicate": "containsExactly",
 
+  "ignoreFieldOrder": ["marklogic_json"],
+
   "expected": [
     { "discipline": "Speed skating",   "event": "Team pursuit" },
     { "discipline": "Biathlon",        "event": "10km pursuit" },

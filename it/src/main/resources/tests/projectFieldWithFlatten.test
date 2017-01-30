@@ -2,7 +2,7 @@
     "name": "project unrelated field with object flatten",
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
+        "marklogic_xml":  "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",

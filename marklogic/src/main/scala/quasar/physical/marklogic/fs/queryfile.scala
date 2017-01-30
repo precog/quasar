@@ -17,17 +17,17 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.{Data, Planner => QPlanner}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.{Planner => QPlanner, RenderTreeT}
+import quasar.common._
 import quasar.contrib.pathy._
-import quasar.effect.MonotonicSeq
+import quasar.contrib.scalaz._
+import quasar.effect.{Capture, Kvs, MonoSeq}
 import quasar.fp._, eitherT._
-import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
-import quasar.frontend.logicalplan.{constant, LogicalPlan}
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml.NCName
@@ -35,186 +35,185 @@ import quasar.physical.marklogic.xquery._, expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
-import scala.util.control.NonFatal
-
-import com.marklogic.xcc.types.{XdmItem, XSString}
+import com.marklogic.xcc.types.XSString
 import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import scalaz._, Scalaz._, concurrent._
+import scalaz._, Scalaz._
 
 object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
-  import MarkLogicPlanner._, MarkLogicPlannerError._
-  import FunctionDecl.FunctionDecl3
+  import FunctionDecl.{FunctionDecl1, FunctionDecl3}
 
-  def interpret[S[_]](
+  type PrologL[F[_]]         = MonadListen_[F, Prologs]
+  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, A]
+
+  def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr: MonoSeq: PrologW: PrologL, FMT](
     resultsChunkSize: Positive
   )(implicit
-    S0: SessionIO :<: S,
-    S1: ContentSourceIO :<: S,
-    S2: Task :<: S,
-    S3: MLResultHandles :<: S,
-    S4: MonotonicSeq :<: S
-  ): QueryFile ~> Free[S, ?] = {
-    type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
-    type PrologsT[F[_], A] = WriterT[F, Prologs, A]
+    K : Kvs[F, QueryFile.ResultHandle, ResultCursor],
+    P : Planner[F, FMT, MLQScript[Fix, ?]],
+    SP: StructuralPlanner[F, FMT]
+  ): QueryFile ~> F = {
+    type QF[A] = FileSystemErrT[PhaseResultT[F, ?], A]
 
-    def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
-      lift(fa).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
-
-    def prettyPrint(xqy: XQuery): QPlan[Option[XQuery]] = {
-      val pp = SessionIO.resultsOf_(xdmp.prettyPrint(XQuery(s"'$xqy'"))).attempt flatMap {
-        case -\/(ex @ XQueryFailure(_, _)) =>
-          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
-            "Malformed XQuery", Some(ex))).left[ImmutableArray[XdmItem]].point[SessionIO]
-
-        // NB: As this is only for pretty printing, if we fail for some other reason
-        //     just return an empty result.
-        case -\/(NonFatal(_)) => ImmutableArray.fromArray(Array[XdmItem]())
-                                   .right[FileSystemError]
-                                   .point[SessionIO]
-
-        case -\/(fatal)       => SessionIO.fail[FileSystemError \/ ImmutableArray[XdmItem]](fatal)
-        case \/-(r)           => r.right[FileSystemError].point[SessionIO]
-      }
-
-      EitherT(lift(pp).into[S].liftM[PhaseResultT])
-        .map(_.headOption collect { case s: XSString => XQuery(s.asString) })
-    }
-
-    def lpToXQuery(lp: Fix[LogicalPlan]): QPlan[MainModule] = {
-      type MLQScript[A] = QScriptShiftRead[Fix, A]
-      type MLPlan[A]    = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
-      type QSR[A]       = QScriptRead[Fix, A]
-
-      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import WriterT.writerTMonad
-      val rewrite = new Rewrite[Fix]
-      val C = Coalesce[Fix, MLQScript, MLQScript]
-
-      def logPhase(pr: PhaseResult): QPlan[Unit] =
-        MonadTell[QPlan, PhaseResults].tell(Vector(pr))
-
-      def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
-        qs.cataM(MarkLogicPlanner[MLPlan, MLQScript].plan).run map {
-          case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
-        }
-
-      val linearize: Algebra[MLQScript, List[MLQScript[ExternallyManaged]]] =
-        qsr => qsr.as[ExternallyManaged](Extern) :: Foldable[MLQScript].fold(qsr)
-
-      for {
-        qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
-        shifted =  shiftRead[Fix, QSR, MLQScript].apply(qs)
-        _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
-        optmzed =  shifted
-                     .transHylo(
-                       rewrite.optimize(reflNT[MLQScript]),
-                       repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
-                         repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
-                         repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
-                         repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
-        _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
-        main    <- plan(optmzed).leftMap(mlerr => mlerr match {
-                     case InvalidQName(s) =>
-                       FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(
-                         constant(Data.Str(s)), Some(mlerr.shows)))
-
-                     case Unimplemented(f) =>
-                       FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(constant(Data.Str(f)), Some(mlerr.shows)))
-                     case UnrepresentableEJson(ejs, _) =>
-                       FileSystemError.qscriptPlanningFailed(QPlanner.NonRepresentableEJson(ejs.shows))
-                   })
-        pp      <- prettyPrint(main.queryBody)
-        xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
-        _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
-      } yield main
-    }
-
-    val lpadToLength: FunctionDecl3 =
-      declareLocal(NCName("lpad-to-length"))(
-        $("padchar") as SequenceType("xs:string"),
-        $("length")  as SequenceType("xs:integer"),
-        $("str")     as SequenceType("xs:string")
-      ).as(SequenceType("xs:string")) { (padchar, length, str) =>
-        val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
-        let_(
-          slen   := fn.stringLength(str),
-          padct  := fn.max(mkSeq_("0".xqy, length - (~slen))),
-          prefix := fn.stringJoin(for_($("_") in (1.xqy to ~padct)) return_ padchar, "".xs))
-        .return_(
-          fn.concat(~prefix, str))
-      }
-
-    def saveTo[F[_]: QNameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
-      val dstDirUri = pathUri(asDir(dst))
-
-      for {
-        ts     <- freshName[F]
-        i      <- freshName[F]
-        result <- freshName[F]
-        fname  <- freshName[F]
-        now    <- qscript.secondsSinceEpoch[F].apply(fn.currentDateTime)
-        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
-      } yield {
-        let_(
-          ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
-          $("_") := try_(xdmp.directoryCreate(dstDirUri.xs))
-                    .catch_($("e"))(κ(emptySeq)))
-        .return_ {
-          for_(
-            result at i in mkSeq_(results))
-          .let_(
-            fname := fn.concat(dstDirUri.xs, ~ts, dpart))
-          .return_(
-            xdmp.documentInsert(~fname, ~result))
-        }
-      }
-    }
+    def liftQF[A](fa: F[A]): QF[A] =
+      fa.liftM[PhaseResultT].liftM[FileSystemErrT]
 
     def exec(lp: Fix[LogicalPlan], out: AFile) = {
       import MainModule._
 
-      def saveResults(mm: MainModule): QPlan[MainModule] =
-        saveTo[PrologsT[QPlan, ?]](out, mm.queryBody).run map {
-          case (plogs, body) =>
+      def saveResults(mm: MainModule): QF[MainModule] =
+        MonadListen_[QF, Prologs].listen(saveTo[QF, FMT](out, mm.queryBody)) map {
+          case (body, plogs) =>
             (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
 
       val resultFile = for {
-        xqy <- lpToXQuery(lp)
+        xqy <- lpToXQuery[QF, Fix, FMT](lp)
         mm  <- saveResults(xqy)
-        _   <- liftQP(ops.deleteFile(out))
-        _   <- liftQP(SessionIO.executeModule_(mm))
+        _   <- liftQF(ops.deleteFile[F](out))
+        _   <- liftQF(session.executeModule_[F](mm))
       } yield out
 
       resultFile.run.run
     }
 
     def eval(lp: Fix[LogicalPlan]) =
-      lpToXQuery(lp).flatMap(main => liftQP(
-        ContentSourceIO.resultCursor(
-          SessionIO.evaluateModule_(main),
-          resultsChunkSize)
+      lpToXQuery[QF, Fix, FMT](lp).flatMap(main => liftQF(
+        contentsource.resultCursor[F](resultsChunkSize) { s =>
+          SessionReader[F].scope(s)(session.evaluateModule_[F](main))
+        }
       )).run.run
 
     def explain(lp: Fix[LogicalPlan]) =
-      lpToXQuery(lp)
+      lpToXQuery[QF, Fix, FMT](lp)
         .map(main => ExecutionPlan(FsType, main.render))
         .run.run
 
-    def exists(file: AFile): Free[S, Boolean] =
-      lift(ops.exists(file)).into[S]
+    def listContents(dir: ADir): F[FileSystemError \/ Set[PathSegment]] =
+      ops.exists[F](dir).ifM(
+        ops.ls[F](dir).map(_.right[FileSystemError]),
+        pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[F])
 
-    def listContents(dir: ADir): Free[S, FileSystemError \/ Set[PathSegment]] =
-      lift(ops.exists(dir).ifM(
-        ops.ls(dir).map(_.right[FileSystemError]),
-        pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[SessionIO]
-      )).into[S]
+    queryFileFromDataCursor[ResultCursor, F](exec, eval, explain, listContents, ops.exists[F])
+  }
 
-    queryFileFromDataCursor[S, Task, ResultCursor](exec, eval, explain, listContents, exists)
+  def lpToXQuery[
+    F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Capture: SessionReader: XccErr,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    FMT
+  ](
+    lp: T[LogicalPlan]
+  )(implicit
+    planner: Planner[F, FMT, MLQScript[T, ?]]
+  ): F[MainModule] = {
+    type MLQ[A] = MLQScript[T, A]
+    type QSR[A] = QScriptRead[T, A]
+
+    val C = Coalesce[T, MLQ, MLQ]
+    val N = Normalizable[MLQ]
+    val R = new Rewrite[T]
+
+    def logPhase(pr: PhaseResult): F[Unit] =
+      MonadTell_[F, PhaseResults].tell(Vector(pr))
+
+    def plan(qs: T[MLQ]): F[MainModule] =
+      MonadListen_[F, Prologs].listen(qs.cataM(planner.plan)) map {
+        case (xqy, prologs) => MainModule(Version.`1.0-ml`, prologs, xqy)
+      }
+
+    for {
+      qs      <- convertToQScriptRead[T, F, QSR](ops.ls[F])(lp)
+      shifted =  shiftRead[T, QSR, MLQ].apply(qs)
+      _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
+      optmzed =  shifted.transHylo(
+                   R.optimize(reflNT[MLQ]),
+                   repeatedly(C.coalesceQC[MLQ](idPrism))     ⋙
+                   repeatedly(C.coalesceTJ[MLQ](idPrism.get)) ⋙
+                   repeatedly(C.coalesceSR[MLQ](idPrism))     ⋙
+                   repeatedly(N.normalizeF(_: MLQ[T[MLQ]])))
+      _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
+      main    <- plan(optmzed)
+      pp      <- prettyPrint[F](main.queryBody)
+      xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
+      _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
+      // NB: While it would be nice to use the pretty printed body in the module
+      //     returned for nicer error messages, we cannot as xdmp:pretty-print has
+      //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
+      //     causing them to be malformed.
+    } yield main
+  }
+
+  def prettyPrint[F[_]: Monad: MonadFsErr: Capture: SessionReader](xqy: XQuery): F[Option[XQuery]] =
+    session.resultsOf_[EitherT[F, XccError, ?]](xdmp.prettyPrint(XQuery(s"'$xqy'"))).run flatMap {
+      case -\/(err @ XccError.XQueryError(_, cause)) =>
+        MonadFsErr[F].raiseError(
+          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
+            (err: XccError).shows, Some(cause))))
+
+      // NB: As this is only for pretty printing, if we fail for some other reason
+      //     just return an empty result.
+      case -\/(_)  => none[XQuery].point[F]
+      case \/-(xs) => (xs.headOption collect { case s: XSString => XQuery(s.asString) }).point[F]
+    }
+
+  ////
+
+  private val lpadToLength: FunctionDecl3 =
+    declareLocal(NCName("lpad-to-length"))(
+      $("padchar") as SequenceType("xs:string"),
+      $("length")  as SequenceType("xs:integer"),
+      $("str")     as SequenceType("xs:string")
+    ).as(SequenceType("xs:string")) { (padchar, length, str) =>
+      val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
+      let_(
+        slen   := fn.stringLength(str),
+        padct  := fn.max(mkSeq_("0".xqy, length - (~slen))),
+        prefix := fn.stringJoin(for_($("_") in (1.xqy to ~padct)) return_ padchar, "".xs))
+      .return_(
+        fn.concat(~prefix, str))
+    }
+
+  private def wrapUnlessNode[F[_]: Monad, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
+    declareLocal(NCName("wrap-unless-node"))(
+      $("item") as SequenceType("item()")
+    ).as(SequenceType("node()")) { item: XQuery =>
+      SP.singletonObject("value".xs, item) map { obj =>
+        typeswitch(item)(
+          SequenceType("node()") return_ item
+        ) default obj
+      }
+    }
+
+  private def saveTo[F[_]: Monad: QNameGenerator: PrologW, T](
+    dst: AFile, results: XQuery
+  )(implicit SP: StructuralPlanner[F, T]): F[XQuery] = {
+    val dstDirUri = pathUri(asDir(dst))
+
+    for {
+      ts     <- freshName[F]
+      i      <- freshName[F]
+      result <- freshName[F]
+      fname  <- freshName[F]
+      now    <- lib.secondsSinceEpoch[F].apply(fn.currentDateTime)
+      dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
+      node   <- wrapUnlessNode[F, T].apply(~result)
+    } yield {
+      let_(
+        ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
+        $("_") := try_(xdmp.directoryCreate(dstDirUri.xs))
+                  .catch_($("e"))(κ(emptySeq)))
+      .return_ {
+        for_(
+          result at i in mkSeq_(results))
+        .let_(
+          fname := fn.concat(dstDirUri.xs, ~ts, dpart))
+        .return_(
+          xdmp.documentInsert(~fname, node))
+      }
+    }
   }
 }

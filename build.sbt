@@ -181,9 +181,10 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
-lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
+lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
+lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -421,7 +422,8 @@ lazy val sparkcore = project
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
-    libraryDependencies ++= Dependencies.sparkcore,
+    sparkDependencyProvided := false,
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
     wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -434,7 +436,7 @@ lazy val interface = project
   .dependsOn(
     core % BothScopes,
     couchbase,
-    marklogic,
+    marklogic % BothScopes,
     mongodb,
     postgresql,
     sparkcore,
@@ -462,7 +464,7 @@ lazy val repl = project
   */
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(interface, core % BothScopes)
+  .dependsOn(interface % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
@@ -480,7 +482,7 @@ lazy val web = project
   */
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(web, core % BothScopes)
+  .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(libraryDependencies ++= Dependencies.it)

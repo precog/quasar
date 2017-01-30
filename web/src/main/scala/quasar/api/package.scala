@@ -25,6 +25,7 @@ import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
+import org.http4s.headers.`Content-Disposition`
 import org.http4s.server._
 import org.http4s.server.staticcontent._
 import org.http4s.util._
@@ -128,6 +129,33 @@ package object api {
       }
   }
 
+  // [#1861] Workaround to support a small slice of RFC 5987 for this isolated case
+  object RFC5987ContentDispositionRender extends HttpMiddleware {
+    // NonUnitStatements due to http4s's Writer
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    final case class ContentDisposition(dispositionType: String, parameters: Map[String, String])
+      extends Header.Parsed {
+      import org.http4s.util.Writer
+      override def key = `Content-Disposition`
+      override lazy val value = super.value
+      override def renderValue(writer: Writer): writer.type = {
+        writer.append(dispositionType)
+        parameters.foreach(p =>
+          p._1.endsWith("*").fold(
+            writer << "; " << p._1 << "=" << p._2,
+            writer << "; " << p._1 << "=\"" << p._2 << '"'))
+        writer
+      }
+    }
+
+    def apply(service: HttpService): HttpService =
+      service ∘ (resp => resp.headers.get(`Content-Disposition`).cata(
+        i => resp.copy(headers = resp.headers
+          .filter(_.name ≠ `Content-Disposition`.name)
+          .put(ContentDisposition(i.dispositionType, i.parameters))),
+        resp))
+  }
+
   object Prefix {
     def apply(prefix: String)(service: HttpService): HttpService = {
       import monocle.macros.GenLens
@@ -148,7 +176,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => Response.fallthrough
+          case None       => HttpService.notFound // note: This needs to change to `Response.fallthrough` when http4s is upgraded
         }
       }
     }

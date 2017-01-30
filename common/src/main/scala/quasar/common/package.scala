@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.scalaz.MonadTell_
 
 import scalaz._
 
@@ -24,4 +25,5 @@ package object common {
   type PhaseResults = Vector[PhaseResult]
   type PhaseResultW[A] = Writer[PhaseResults, A]
   type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
+  type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
 }

@@ -22,23 +22,111 @@ import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
 import quasar.qscript.MapFunc
 import quasar.qscript.MapFuncs, MapFuncs._
+import quasar.std.DateLib.TemporalPart._
 
 import scalaz.{Free, Scalaz}, Scalaz._
 
 object JsFuncHandler {
   def apply[T[_[_]], A](func: MapFunc[T, A]): Option[Free[JsCoreF, A]] = {
-    implicit def hole(a: A): Free[JsCoreF, A] = Free.pure(a)
+    type JS = Free[JsCoreF, A]
 
-    val mjs = quasar.physical.mongodb.javascript[Free[JsCoreF, A]](Free.roll)
+    implicit def hole(a: A): JS = Free.pure(a)
+
+    val mjs = quasar.physical.mongodb.javascript[JS](Free.roll)
     import mjs._
     import mjs.js._
 
     // NB: Math.trunc is not present in MongoDB.
-    def trunc(expr: Free[JsCoreF, A]): Free[JsCoreF, A] =
+    def trunc(expr: JS): JS =
       Let(Name("x"), expr,
         BinOp(jscore.Sub,
           ident("x"),
-          BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
+          BinOp(jscore.Mod, ident("x"), litNum(1))))
+
+    def dateZ(year: JS, month: JS, day: JS, hr: JS, min: JS, sec: JS, ms: JS): JS =
+      New(Name("Date"), List(
+        Call(select(ident("Date"), "parse"), List(
+          binop(jscore.Add,
+            pad4(year), litStr("-"), pad2(month), litStr("-"), pad2(day), litStr("T"),
+            pad2(hr), litStr(":"), pad2(min), litStr(":"), pad2(sec), litStr("."),
+            pad3(ms), litStr("Z"))))))
+
+    def year(date: JS): JS =
+      Call(select(date, "getUTCFullYear"), Nil)
+
+    def month(date: JS): JS =
+      binop(jscore.Add, Call(select(date, "getUTCMonth"), Nil), litNum(1))
+
+    def day(date: JS): JS =
+      Call(select(date, "getUTCDate"), Nil)
+
+    def hour(date: JS): JS =
+      Call(select(date, "getUTCHours"), Nil)
+
+    def minute(date: JS): JS =
+      Call(select(date, "getUTCMinutes"), Nil)
+
+    def second(date: JS): JS =
+      Call(select(date, "getUTCSeconds"), Nil)
+
+    def millisecond(date: JS): JS =
+      Call(select(date, "getUTCMilliseconds"), Nil)
+
+    def dayOfWeek(date: JS): JS =
+      Call(select(date, "getUTCDay"), Nil)
+
+    def quarter(date: JS): JS =
+      BinOp(jscore.Add,
+        Call(select(ident("Math"), "floor"), List(
+          BinOp(jscore.Div, Call(select(date, "getUTCMonth"), Nil), litNum(3)))),
+        litNum(1))
+
+    def decade(date: JS): JS =
+      trunc(BinOp(jscore.Div, year(date), litNum(10)))
+
+    def century(date: JS): JS =
+      Call(select(ident("Math"), "ceil"), List(
+        BinOp(jscore.Div, year(date), litNum(100))))
+
+    def millennium(date: JS): JS =
+      Call(select(ident("Math"), "ceil"), List(
+        BinOp(jscore.Div, year(date), litNum(1000))))
+
+    def litStr(s: String): JS =
+      Literal(Js.Str(s))
+
+    def litNum(i: Int): JS =
+      Literal(Js.Num(i.toDouble, false))
+
+    def pad2(x: JS) =
+      Let(Name("x"), x,
+        If(
+          BinOp(jscore.Lt, ident("x"), litNum(10)),
+          BinOp(jscore.Add, litStr("0"), ident("x")),
+          ident("x")))
+
+    def pad3(x: JS) =
+      Let(Name("x"), x,
+        If(
+          BinOp(jscore.Lt, ident("x"), litNum(10)),
+          BinOp(jscore.Add, litStr("00"), ident("x")),
+          If(
+            BinOp(jscore.Lt, ident("x"), litNum(100)),
+            BinOp(jscore.Add, litStr("0"), ident("x")),
+            ident("x"))))
+
+    def pad4(x: JS) =
+      Let(Name("x"), x,
+        If(
+          BinOp(jscore.Lt, ident("x"), litNum(10)),
+          BinOp(jscore.Add, litStr("000"), ident("x")),
+          If(
+            BinOp(jscore.Lt, ident("x"), litNum(100)),
+            BinOp(jscore.Add, litStr("00"), ident("x")),
+            If(
+              BinOp(jscore.Lt, ident("x"), litNum(1000)),
+              BinOp(jscore.Add, litStr("0"), ident("x")),
+              ident("x")))))
 
     func.some collect {
       case Add(a1, a2)      => BinOp(jscore.Add, a1, a2)
@@ -68,9 +156,9 @@ object JsFuncHandler {
       case Length(str) =>
         Call(ident("NumberLong"), List(select(hole(str), "length")))
       case Substring(field, start, len) =>
-        If(BinOp(jscore.Lt, start, Literal(Js.Num(0, false))),
-          Literal(Js.Str("")),
-          If(BinOp(jscore.Lt, len, Literal(Js.Num(0, false))),
+        If(BinOp(jscore.Lt, start, litNum(0)),
+          litStr(""),
+          If(BinOp(jscore.Lt, len, litNum(0)),
             Call(select(field, "substr"), List(start, select(field, "length"))),
             Call(select(field, "substr"), List(start, len))))
       case Search(field, pattern, insen) =>
@@ -78,40 +166,40 @@ object JsFuncHandler {
             select(
               New(Name("RegExp"), List(
                 pattern,
-                If(insen, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
+                If(insen, litStr("im"), litStr("m")))),
               "test"),
             List(field))
       case Null(str) =>
         If(
-          BinOp(jscore.Eq, str, Literal(Js.Str("null"))),
+          BinOp(jscore.Eq, str, litStr("null")),
           Literal(Js.Null),
           ident("undefined"))
       case Bool(str) =>
         If(
-          BinOp(jscore.Eq, str, Literal(Js.Str("true"))),
+          BinOp(jscore.Eq, str, litStr("true")),
           Literal(Js.Bool(true)),
           If(
-            BinOp(jscore.Eq, str, Literal(Js.Str("false"))),
+            BinOp(jscore.Eq, str, litStr("false")),
             Literal(Js.Bool(false)),
             ident("undefined")))
       case Integer(str) =>
-        If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.intRegex + "$")))), "test"), List(str)),
+        If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.intRegex + "$"))), "test"), List(str)),
           Call(ident("NumberLong"), List(str)),
           ident("undefined"))
       case Decimal(str) =>
-          If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.floatRegex + "$")))), "test"), List(str)),
+          If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.floatRegex + "$"))), "test"), List(str)),
             Call(ident("parseFloat"), List(str)),
             ident("undefined"))
       case Date(str) =>
-        If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(str)),
+        If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.dateRegex + "$"))), "test"), List(str)),
           Call(ident("ISODate"), List(str)),
           ident("undefined"))
       case Time(str) =>
-        If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(str)),
+        If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timeRegex + "$"))), "test"), List(str)),
           str,
           ident("undefined"))
       case Timestamp(str) =>
-        If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(str)),
+        If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timestampRegex + "$"))), "test"), List(str)),
           Call(ident("ISODate"), List(str)),
           ident("undefined"))
       // TODO: case Interval(str) =>
@@ -122,107 +210,123 @@ object JsFuncHandler {
           //     losing precision.
           Call(select(Call(ident("String"), List(value)), "replace"), List(
             Call(ident("RegExp"), List(
-              Literal(Js.Str("[^-0-9]+")),
-              Literal(Js.Str("g")))),
-            Literal(Js.Str("")))),
+              litStr("[^-0-9]+"),
+              litStr("g"))),
+            litStr(""))),
           If(BinOp(jscore.Or, isTimestamp(value), isDate(value)),
             Call(select(value, "toISOString"), Nil),
             Call(ident("String"), List(value))))
       // TODO: case ToTimestamp(str) =>
 
       case TimeOfDay(date) =>
-        def pad2(x: Free[JsCoreF, A]) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-              ident("x")))
-        def pad3(x: Free[JsCoreF, A]) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x"))))
         Let(Name("t"), date,
           binop(jscore.Add,
-            pad2(Call(select(ident("t"), "getUTCHours"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(select(ident("t"), "getUTCMinutes"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(select(ident("t"), "getUTCSeconds"), Nil)),
-            Literal(Js.Str(".")),
-            pad3(Call(select(ident("t"), "getUTCMilliseconds"), Nil))))
+            pad2(hour(ident("t"))),
+            litStr(":"),
+            pad2(minute(ident("t"))),
+            litStr(":"),
+            pad2(second(ident("t"))),
+            litStr("."),
+            pad3(millisecond(ident("t")))))
 
-      case ExtractCentury(date) =>
-        Call(select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(100, false)))))
-      case ExtractDayOfMonth(date) => Call(select(date, "getUTCDate"), Nil)
-      case ExtractDecade(date) =>
-        trunc(
-          BinOp(jscore.Div,
-            Call(select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(10, false))))
-      case ExtractDayOfWeek(date) =>
-        Call(select(date, "getUTCDay"), Nil)
+      case ExtractCentury(date) => century(date)
+      case ExtractDayOfMonth(date) => day(date)
+      case ExtractDecade(date) => decade(date)
+      case ExtractDayOfWeek(date) => dayOfWeek(date)
       // TODO: case ExtractDayOfYear(date) =>
       case ExtractEpoch(date) =>
         BinOp(jscore.Div,
           Call(select(date, "valueOf"), Nil),
-          Literal(Js.Num(1000, false)))
-      case ExtractHour(date) => Call(select(date, "getUTCHours"), Nil)
+          litNum(1000))
+      case ExtractHour(date) => hour(date)
       case ExtractIsoDayOfWeek(date) =>
-        Let(Name("x"), Call(select(date, "getUTCDay"), Nil),
+        Let(Name("x"), dayOfWeek(date),
           If(
-            BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
-            Literal(Js.Num(7, false)),
+            BinOp(jscore.Eq, ident("x"), litNum(0)),
+            litNum(7),
             ident("x")))
       // TODO: case ExtractIsoYear(date) =>
       case ExtractMicroseconds(date) =>
         BinOp(jscore.Mult,
           BinOp(jscore.Add,
-            Call(select(date, "getUTCMilliseconds"), Nil),
+            millisecond(date),
             BinOp(jscore.Mult,
-              Call(select(date, "getUTCSeconds"), Nil),
-              Literal(Js.Num(1000, false)))),
-          Literal(Js.Num(1000, false)))
-      case ExtractMillennium(date) =>
-        Call(select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(1000, false)))))
+              second(date),
+              litNum(1000))),
+          litNum(1000))
+      case ExtractMillennium(date) => millennium(date)
       case ExtractMilliseconds(date) =>
         BinOp(jscore.Add,
-          Call(select(date, "getUTCMilliseconds"), Nil),
+          millisecond(date),
           BinOp(jscore.Mult,
-            Call(select(date, "getUTCSeconds"), Nil),
-            Literal(Js.Num(1000, false))))
-      case ExtractMinute(date) =>
-        Call(select(date, "getUTCMinutes"), Nil)
-      case ExtractMonth(date) =>
-        BinOp(jscore.Add,
-          Call(select(date, "getUTCMonth"), Nil),
-          Literal(Js.Num(1, false)))
-      case ExtractQuarter(date) =>
-        BinOp(jscore.Add,
-          BinOp(jscore.BitOr,
-            BinOp(jscore.Div,
-              Call(select(date, "getUTCMonth"), Nil),
-              Literal(Js.Num(3, false))),
-            Literal(Js.Num(0, false))),
-          Literal(Js.Num(1, false)))
+            second(date),
+            litNum(1000)))
+      case ExtractMinute(date) => minute(date)
+      case ExtractMonth(date) => month(date)
+      case ExtractQuarter(date) => quarter(date)
       case ExtractSecond(date) =>
         BinOp(jscore.Add,
-          Call(select(date, "getUTCSeconds"), Nil),
-          BinOp(jscore.Div,
-            Call(select(date, "getUTCMilliseconds"), Nil),
-            Literal(Js.Num(1000, false))))
+          second(date),
+          BinOp(jscore.Div, millisecond(date), litNum(1000)))
       // TODO: case ExtractWeek(date) =>
-      case ExtractYear(date) => Call(select(date, "getUTCFullYear"), Nil)
+      case ExtractYear(date) => year(date)
+
+      case StartOfDay(date) =>
+        dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
+
+      case TemporalTrunc(Century, date) =>
+        dateZ(
+          BinOp(jscore.Mult, BinOp(jscore.Sub, century(date), litNum(1)), litNum(100)),
+          litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Day, date) =>
+        dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Decade, date) =>
+        dateZ(
+          BinOp(jscore.Mult, decade(date), litNum(10)),
+          litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Hour, date) =>
+        dateZ(year(date), month(date), day(date), hour(date), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Millennium, date) =>
+        dateZ(
+          BinOp(jscore.Mult,
+            Call(select(ident("Math"), "floor"), List(
+              BinOp(jscore.Div, year(date), litNum(1000)))),
+            litNum(1000)),
+          litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Microsecond | Millisecond, date) =>
+        dateZ(
+          year(date), month(date), day(date),
+          hour(date), minute(date), second(date), millisecond(date))
+      case TemporalTrunc(Minute, date) =>
+        dateZ(year(date), month(date), day(date), hour(date), minute(date), litNum(0), litNum(0))
+      case TemporalTrunc(Month, date) =>
+        dateZ(year(date), month(date), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Quarter, date) =>
+        dateZ(
+          year(date),
+          BinOp(jscore.Add,
+            BinOp(jscore.Mult,
+              BinOp(jscore.Sub, quarter(date), litNum(1)),
+              litNum(3)),
+            litNum(1)),
+          litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+      case TemporalTrunc(Second, date) =>
+        dateZ(year(date), month(date), day(date), hour(date), minute(date), second(date), litNum(0))
+      case TemporalTrunc(Week, date) =>
+        val d =
+          New(Name("Date"), List(
+            BinOp(jscore.Sub,
+              Call(select(date, "getTime"), Nil),
+              BinOp(jscore.Mult,
+                litNum(24*60*60*1000),
+                BinOp(jscore.Mod,
+                  BinOp(jscore.Add, dayOfWeek(date), litNum(6)),
+                  litNum(7))
+            ))))
+        Let(Name("d"), d,
+          dateZ(year(d), month(d), day(d), litNum(0), litNum(0), litNum(0), litNum(0)))
+      case TemporalTrunc(Year, date) =>
+        dateZ(year(date), litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
 
       case Now() => Call(ident("ISODate"), Nil)
 

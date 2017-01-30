@@ -3,7 +3,8 @@
 
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
+        "marklogic_json":  "skip",
+        "marklogic_xml":   "skip",
         "mongodb_q_3_2": "pending",
         "couchbase":  "skip",
         "spark_local": "skip",

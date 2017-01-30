@@ -214,6 +214,7 @@ object MongoDbPlanner {
       case Invoke(f, a)    => invoke(f, a)
       case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
       case lp.Let(_, _, body) => body
+
       case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
@@ -783,6 +784,8 @@ object MongoDbPlanner {
           val (keys, dirs) = os.toList.unzip
           WB.sortBy(src, keys, dirs)
         })
+      case TemporalTrunc(part, src) =>
+        state(-\/(UnsupportedPlan(node, "TemporalTrunc not supported".some)))
       case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.

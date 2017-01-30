@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.physical.marklogic.xml.QName
+import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz.syntax.show._
 
@@ -45,11 +46,20 @@ object axes {
     def attribute(): XQuery =
       xqy("attribute()")
 
+    def attributeNamed(name: String): XQuery =
+      xqy(s"attribute(${name.xs})")
+
     def element(): XQuery =
       xqy("element()")
 
+    def elementNamed(name: String): XQuery =
+      xqy(s"element(${name.xs})")
+
     def node(): XQuery =
       xqy("node()")
+
+    def nodeNamed(name: String): XQuery =
+      xqy(s"node(${name.xs})")
 
     def text(): XQuery =
       xqy("text()")

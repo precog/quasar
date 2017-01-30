@@ -564,5 +564,10 @@ class SQLParserSpec extends quasar.Qspec {
 
       parsed must beRightDisjOrDiff(node)
     }
+
+    "round-trip quoted variable names through the pretty-printer" >> {
+      val q = "select * from :`A.results`"
+      (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
+    }
   }
 }

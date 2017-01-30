@@ -34,6 +34,9 @@ object xs {
   def dateTime(xqy: XQuery): XQuery =
     XQuery(s"xs:dateTime($xqy)")
 
+  def dateTime(date: XQuery, time: XQuery): XQuery =
+    XQuery(s"xs:dateTime($date, $time)")
+
   def dayTimeDuration(xqy: XQuery): XQuery =
     XQuery(s"xs:dayTimeDuration($xqy)")
 

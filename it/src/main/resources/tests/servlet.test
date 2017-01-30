@@ -2,14 +2,15 @@
     "name": "servlets with and without init-param (pending #465, #467)",
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-	"spark_local":       "pending",
+        "spark_local":       "pending",
         "spark_hdfs":        "pending"
     },
     "data": "webapp.data",

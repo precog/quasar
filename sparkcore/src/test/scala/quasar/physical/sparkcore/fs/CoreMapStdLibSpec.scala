@@ -94,6 +94,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
     def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
     def stringDomain = arbitrary[String]
+
+    def dateDomain = DateArbitrary.genDate
   }
 
   tests(runner)

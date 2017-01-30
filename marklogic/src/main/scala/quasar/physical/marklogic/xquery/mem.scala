@@ -19,13 +19,14 @@ package quasar.physical.marklogic.xquery
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
+import scalaz.Functor
 
 object mem {
   val m = module("mem", "http://xqdev.com/in-mem-update", "/MarkLogic/appservices/utils/in-mem-update.xqy")
 
-  def nodeDelete[F[_]: PrologW](node: XQuery): F[XQuery] =
+  def nodeDelete[F[_]: Functor: PrologW](node: XQuery): F[XQuery] =
     m("node-delete") apply node
 
-  def nodeInsertChild[F[_]: PrologW](node: XQuery, child: XQuery): F[XQuery] =
+  def nodeInsertChild[F[_]: Functor: PrologW](node: XQuery, child: XQuery): F[XQuery] =
     m("node-insert-child") apply (node, child)
 }

@@ -40,7 +40,7 @@ object readfile {
     S2: Read[Context, ?] :<:  S,
     S3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
-    impl.read[S, Cursor](open, read, close)
+    impl.read[Cursor, Free[S, ?]](open, read, close)
 
   // TODO: Streaming
   def open[S[_]](

@@ -33,6 +33,8 @@ import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
 
+import java.time.LocalDate
+
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import matryoshka.patterns._
@@ -133,6 +135,13 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     val intDomain: Gen[BigInt] = arbitrary[Int] map (BigInt(_))
     val decDomain: Gen[BigDecimal] = arbitrary[Double] map (BigDecimal(_))
     val stringDomain: Gen[String] = genPrintableAsciiSansBackslash
+
+    val dateDomain: Gen[LocalDate] =
+      Gen.choose(
+        LocalDate.of(1, 1, 1).toEpochDay,
+        LocalDate.of(9999, 12, 31).toEpochDay
+      ) ∘ (LocalDate.ofEpochDay(_))
+
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

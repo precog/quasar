@@ -16,10 +16,11 @@
 
 package quasar.physical.marklogic.xcc
 
+import quasar.effect.Capture
+
 import com.marklogic.xcc.ResultSequence
 import com.marklogic.xcc.types.XdmItem
-import scalaz._
-import scalaz.concurrent.Task
+import scalaz.ImmutableArray
 
 final class QueryResults private[xcc] (private[xcc] val resultSequence: ResultSequence) {
   /** Collect all of the result items in an `ImmutableArray`.
@@ -27,8 +28,8 @@ final class QueryResults private[xcc] (private[xcc] val resultSequence: ResultSe
     * NB: This method should only be called once as it consumes the underlying
     *     `ResultSequence`.
     */
-  def toImmutableArray: Task[ImmutableArray[XdmItem]] =
-    Task delay {
+  def toImmutableArray[F[_]](implicit F: Capture[F]): F[ImmutableArray[XdmItem]] =
+    F.delay {
       val items = resultSequence.toCached.toArray
       resultSequence.close()
       ImmutableArray.fromArray(items)

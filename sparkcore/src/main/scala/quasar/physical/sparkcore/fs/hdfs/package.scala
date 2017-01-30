@@ -52,16 +52,18 @@ package object hdfs {
 
   final case class SparkFSConf(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-  def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
+  val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (uri: ConnectionUri) => {
 
-    def error(msg: String): DefinitionError \/ SparkFSConf =
-      NonEmptyList(msg).left[EnvironmentError].left[SparkFSConf]
+    def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
+      NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
 
-    def forge(master: String, hdfsUriStr: String, rootPath: String): DefinitionError \/ SparkFSConf =
+    def forge(master: String, hdfsUriStr: String, rootPath: String): DefinitionError \/ (SparkConf, SparkFSConf) =
       posixCodec.parseAbsDir(rootPath)
-        .map { prefix =>
-        SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar"), hdfsUriStr, sandboxAbs(prefix))
-      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+        .map { prefix => {
+          val conf = SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar"), hdfsUriStr, sandboxAbs(prefix))
+          (conf.sparkConf, conf)
+        }
+      }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
     uri.value.split('|').toList match {
       case master :: hdfsUriStr :: prefixPath :: Nil => forge(master, hdfsUriStr, prefixPath)
@@ -71,16 +73,14 @@ package object hdfs {
     }
   }
 
-  final case class SparkHdfsFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
-
   private def fetchSparkCoreJar: Task[String] = Task.delay {
     sys.env("QUASAR_HOME") + "/sparkcore.jar"
   }
 
-  private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
+  def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): Free[S, SparkHdfsFSDef[S]] = {
+  ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
     val genSc = fetchSparkCoreJar.map { jar => 
       val sc = new SparkContext(sparkConf)
@@ -103,11 +103,11 @@ package object hdfs {
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-      SparkHdfsFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
   }
 
-  private def fsInterpret(sparkFsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = {
+  val fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) = (sparkFsConf: SparkFSConf) => {
 
     def hdfsPathStr: AFile => Task[String] = (afile: AFile) => Task.delay {
       sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
@@ -126,20 +126,8 @@ package object hdfs {
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))
   }
 
-  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
-      FileSystemDef[Free[S, ?]] =
-    FileSystemDef.fromPF {
-      case (FsType, uri) =>
-        for {
-          sparkFsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
-          res <- {
-            sparkFsDef(sparkFsConf.sparkConf).map {
-              case SparkHdfsFSDef(run, close) =>
-                FileSystemDef.DefinitionResult[Free[S, ?]](
-                  fsInterpret(sparkFsConf) andThen run,
-                  close)
-            }.liftM[DefErrT]
-          }
-        }  yield res
-    }
+  def definition[S[_]](implicit
+    S0: Task :<: S, S1: PhysErr :<: S
+  ) =
+    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
 }

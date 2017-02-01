@@ -45,7 +45,7 @@ package object qscript {
   /** Matches "iterative" FLWOR expressions, those involving at least one `for` clause. */
   object IterativeFlwor {
     def unapply(xqy: XQuery): Option[(NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] = xqy match {
-      case XQuery.Flwor(clauses, filter, order, isStable, result) if clauses.any(BindingClause.forClause.isMatching) =>
+      case XQuery.Flwor(clauses, filter, order, isStable, result) if clauses.any(BindingClause.forClause.nonEmpty) =>
         Some((clauses, filter, order, isStable, result))
 
       case _ => None

@@ -23,7 +23,6 @@ import quasar.fp.ski.κ
 import quasar.fs._
 
 import monocle.std.{disjunction => D}
-import monocle.std.nel._
 import monocle.function.Cons1
 import scalaz._, Scalaz._
 

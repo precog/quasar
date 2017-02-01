@@ -83,7 +83,7 @@ object WriteFile {
           .map(PartialWrite)
 
       val dropPartialWrites =
-        process1.filter[FileSystemError](e => !partialWrite.isMatching(e))
+        process1.filter[FileSystemError](partialWrite.isEmpty)
 
       // NB: We don't use `through` as we want to ensure the `Open` from
       //     `appendChannel` happens even if the src process never emits.

@@ -25,7 +25,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._
-import monocle.std.tuple2._
 import scalaz.{Optional => _, _}
 import scalaz.NaturalTransformation.natToFunction
 import pathy.Path._

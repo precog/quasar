@@ -20,10 +20,12 @@ import quasar.Predef._
 import quasar.fp._
 
 import org.scalacheck._
+import org.scalacheck.Arbitrary._
+import org.scalacheck.rng.Seed
 import org.specs2.scalaz._
-import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
-import shapeless.contrib.scalaz.instances.{deriveShow => _, _}
+import scalaz._//, Scalaz._
+import scalaz.scalacheck.ScalazProperties.{comonad, traverse1}
+//import shapeless.contrib.scalaz.instances.{deriveShow => _, _}
 
 class AccumulatorSpec extends Spec {
   implicit val arbAccumOp: Arbitrary ~> λ[α => Arbitrary[AccumOp[α]]] =
@@ -42,6 +44,23 @@ class AccumulatorSpec extends Spec {
     }
 
   implicit val arbIntAccumOp = arbAccumOp(Arbitrary.arbInt)
+
+  implicit def cogenAccumOp[A](implicit A: Cogen[A]): Cogen[AccumOp[A]] =
+    Cogen((seed: Seed, acc: AccumOp[A]) => {
+      val newSeed = acc match {
+        case AccumOp.$addToSet(value) => seed.reseed(0)
+        case AccumOp.$avg(value)      => seed.reseed(1)
+        case AccumOp.$first(value)    => seed.reseed(2)
+        case AccumOp.$last(value)     => seed.reseed(3)
+        case AccumOp.$max(value)      => seed.reseed(4)
+        case AccumOp.$min(value)      => seed.reseed(5)
+        case AccumOp.$push(value)     => seed.reseed(6)
+        case AccumOp.$sum(value)      => seed.reseed(7)
+      }
+      A.perturb(newSeed, acc.value)
+    })
+
+  implicit val equalIntAccumOp: Equal[AccumOp[Int]] = AccumOp.equal(Equal[Int])
 
   checkAll(comonad.laws[AccumOp])
   checkAll(traverse1.laws[AccumOp])

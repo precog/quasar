@@ -28,7 +28,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
-import monocle.std.tuple2._
 import org.specs2.execute._
 import pathy.Path._
 import scalaz._, Scalaz._

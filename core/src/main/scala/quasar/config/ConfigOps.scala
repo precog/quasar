@@ -27,7 +27,6 @@ import scala.util.Properties._
 
 import argonaut._
 import monocle.syntax.fields._
-import monocle.std.tuple2._
 import pathy._, Path._
 import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task

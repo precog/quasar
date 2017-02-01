@@ -25,7 +25,9 @@ import matryoshka._
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
-sealed trait AccumOp[A]
+sealed trait AccumOp[A] {
+  def value: A
+}
 object AccumOp {
   final case class $addToSet[A](value: A) extends AccumOp[A]
   final case class $push[A](value: A)     extends AccumOp[A]
@@ -78,6 +80,22 @@ object AccumOp {
       case $min(v) => Cord("$min(") ++ s.show(v) ++ Cord(")")
       case $push(v) => Cord("$push(") ++ s.show(v) ++ Cord(")")
       case $sum(v) => Cord("$sum(") ++ s.show(v) ++ Cord(")")
+    }
+  }
+
+  implicit def equal: Delay[Equal, AccumOp] = new Delay[Equal, AccumOp] {
+    def apply[A](e: Equal[A]) = new Equal[AccumOp[A]] {
+      def equal(a: AccumOp[A], b: AccumOp[A]) = (a,b) match {
+        case ($addToSet(v1), $addToSet(v2)) => e.equal(v1, v2)
+        case ($avg(v1),      $avg(v2)     ) => e.equal(v1, v2)
+        case ($first(v1),    $first(v2)   ) => e.equal(v1, v2)
+        case ($last(v1),     $last(v2)    ) => e.equal(v1, v2)
+        case ($max(v1),      $max(v2)     ) => e.equal(v1, v2)
+        case ($min(v1),      $min(v2)     ) => e.equal(v1, v2)
+        case ($push(v1),     $push(v2)    ) => e.equal(v1, v2)
+        case ($sum(v1),      $sum(v2)     ) => e.equal(v1, v2)
+        case _                              => false
+      }
     }
   }
 

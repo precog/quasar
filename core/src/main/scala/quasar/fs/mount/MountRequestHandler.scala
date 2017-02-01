@@ -24,7 +24,6 @@ import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
 import monocle.function.Field1
-import monocle.std.tuple3._
 import pathy.Path.fileParent
 import scalaz._, Scalaz._
 

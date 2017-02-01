@@ -24,7 +24,6 @@ import quasar.fp.free, free._
 import quasar.fs.{FileSystem, FileSystemType, PathError}
 
 import monocle.function.Field1
-import monocle.std.tuple2._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 

@@ -104,7 +104,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
       case XQuery.StringLit(s) =>
         (asQName[F](s) |@| freshName[F])((qn, m) =>
-          if (XQuery.flwor.isMatching(obj))
+          if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
           else
             obj `/` child(qn))

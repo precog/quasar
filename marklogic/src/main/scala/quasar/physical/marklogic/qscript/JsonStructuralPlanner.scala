@@ -94,7 +94,7 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
         (obj `/` key).point[F]
 
       case XQuery.StringLit(s) =>
-        if (XQuery.flwor.isMatching(obj))
+        if (XQuery.flwor.nonEmpty(obj))
           freshName[F] map (m => let_(m := obj) return_ (~m `/` child.nodeNamed(s)))
         else
           (obj `/` child.nodeNamed(s)).point[F]

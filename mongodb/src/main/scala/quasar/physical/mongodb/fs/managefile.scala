@@ -164,7 +164,7 @@ object managefile {
     if (src === dst)
       collFromFileM(src) flatMap (srcColl =>
         collectionExists(srcColl).liftM[FileSystemErrT].ifM(
-          if (MoveSemantics.failIfExists isMatching sem)
+          if (MoveSemantics.failIfExists nonEmpty sem)
             MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathExists(src)))
           else
             ().point[MongoFsM]
@@ -175,7 +175,7 @@ object managefile {
         srcColl <- collFromFileM(src)
         dstColl <- collFromFileM(dst)
         rSem    =  moveToRename(sem)
-        _       <- if (MoveSemantics.failIfMissing isMatching sem)
+        _       <- if (MoveSemantics.failIfMissing nonEmpty sem)
                      ensureDstExists(dstColl)
                    else
                      ().point[MongoFsM]

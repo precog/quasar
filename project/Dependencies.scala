@@ -17,7 +17,7 @@ object Dependencies {
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
-  private val monocleVersion    = "1.3.2"
+  private val monocleVersion    = "1.4.0"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
@@ -25,8 +25,8 @@ object Dependencies {
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slcVersion        = "0.4"
-  private val scalacheckVersion = "1.12.5"
-  private val specsVersion      = "3.8.4-scalacheck-1.12.5"
+  private val scalacheckVersion = "1.14.0-861f58e-SNAPSHOT"
+  private val specsVersion      = "3.8.7"
 
   def foundation = Seq(
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
@@ -37,7 +37,7 @@ object Dependencies {
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
+    "com.slamdata"               %% "matryoshka-core"           %     "0.16.5",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,

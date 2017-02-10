@@ -44,10 +44,7 @@ object compile {
     M: ManageFile.Ops[S]
   ): QHttpService[S] = {
     def phaseResultsResponse(prs: PhaseResults): Option[Json] =
-      prs.lastOption map {
-        case PhaseResult.Tree(name, value)   => value.asJson
-        case PhaseResult.Detail(name, value) => value.asJson
-      }
+      prs.lastOption.map(PhaseResult.asJson)
 
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(

@@ -25,30 +25,37 @@ import scalaz.syntax.show._
 
 sealed trait PhaseResult {
   def name: String
+  def time: Long
 }
 
 object PhaseResult {
-  final case class Tree(name: String, value: RenderedTree) extends PhaseResult
-  final case class Detail(name: String, value: String)     extends PhaseResult
+  private final case class Tree(name: String, time: Long, value: RenderedTree) extends PhaseResult
+  private final case class Detail(name: String, time: Long, value: String)     extends PhaseResult
 
   def tree[A: RenderTree](name: String, value: A): PhaseResult =
-    Tree(name, value.render)
-  def detail(name: String, value: String): PhaseResult = Detail(name, value)
+    Tree(name, java.lang.System.nanoTime, value.render)
+  def detail(name: String, value: String): PhaseResult =
+    Detail(name, java.lang.System.nanoTime, value)
+
+  def asJson(pr: PhaseResult): Json = pr match {
+    case Tree(_, _, value)   => value.asJson
+    case Detail(_, _, value) => value.asJson
+  }
 
   implicit def show: Show[PhaseResult] = Show.shows {
-    case Tree(name, value)   => name + ":\n" + value.shows
-    case Detail(name, value) => name + ":\n" + value
+    case Tree(name, _, value)   => name + ":\n" + value.shows
+    case Detail(name, _, value) => name + ":\n" + value
   }
 
   implicit def renderTree: RenderTree[PhaseResult] = new RenderTree[PhaseResult] {
     def render(v: PhaseResult) = v match {
-      case Tree(name, value)   => NonTerminal(List("PhaseResult"), Some(name), List(value))
-      case Detail(name, value) => NonTerminal(List("PhaseResult"), Some(name), List(Terminal(List("Detail"), Some(value))))
+      case Tree(name, _, value)   => NonTerminal(List("PhaseResult"), Some(name), List(value))
+      case Detail(name, _, value) => NonTerminal(List("PhaseResult"), Some(name), List(Terminal(List("Detail"), Some(value))))
     }
   }
 
   implicit def phaseResultEncodeJson: EncodeJson[PhaseResult] = EncodeJson {
-    case Tree(name, value)   => Json.obj("name" := name, "tree" := value)
-    case Detail(name, value) => Json.obj("name" := name, "detail" := value)
+    case Tree(name, _, value)   => Json.obj("name" := name, "tree" := value)
+    case Detail(name, _, value) => Json.obj("name" := name, "detail" := value)
   }
 }

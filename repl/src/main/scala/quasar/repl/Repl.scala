@@ -30,6 +30,7 @@ import quasar.main.{FilesystemQueries, Prettify}
 import quasar.sql
 
 import eu.timepit.refined.auto._
+import java.time.Duration
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -248,7 +249,12 @@ object Repl {
   ): Free[S, Option[String]] =
     M.lookupType(path).map(_.fold(_.value, "view")).run
 
-  def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
+  def showPhaseResults: PhaseResults => String = _.foldLeft((None: Option[Long], "")) {
+    case ((prev, acc), res) =>
+      val elapsed: Option[Duration] = prev.map(t => Duration.ofNanos(res.time - t))
+      val timing: String = elapsed.fold("Unavailable")(t => (t.toMillis/1000.0).toString + "s")
+      (res.time.some, s"$acc\n\n${res.shows}\nTiming: ${timing}")
+  }._2
 
   def printLog[S[_]](debugLevel: DebugLevel, log: PhaseResults)(implicit
     P: ConsoleIO.Ops[S]

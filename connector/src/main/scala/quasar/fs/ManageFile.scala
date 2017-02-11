@@ -114,7 +114,7 @@ object ManageFile {
   final class Ops[S[_]](implicit S: ManageFile :<: S)
     extends LiftedOps[ManageFile, S] {
 
-    type M[A] = FileSystemErrT[F, A]
+    type M[A] = FileSystemErrT[FreeS, A]
 
     /** Request the given move scenario be applied to the file system, using the
       * given semantics.

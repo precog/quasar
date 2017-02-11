@@ -30,7 +30,7 @@ object ConsoleIO {
   final class Ops[S[_]](implicit S: ConsoleIO :<: S)
     extends LiftedOps[ConsoleIO, S] {
 
-    def println(message: String): F[Unit] =
+    def println(message: String): FreeS[Unit] =
       lift(PrintLn(message))
   }
 

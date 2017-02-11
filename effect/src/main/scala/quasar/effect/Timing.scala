@@ -35,11 +35,11 @@ object Timing {
     /** Clock time, convertible to time and date, but with relatively little
       * precision.
       */
-    def timestamp: F[Instant] =
+    def timestamp: FreeS[Instant] =
       lift(Timestamp)
 
     /** Elapsed time to evaluate some term, with greater precision. */
-    def time[A](fa: F[A]): F[(A, Duration)] = {
+    def time[A](fa: FreeS[A]): FreeS[(A, Duration)] = {
       for {
         start <- lowLevel.nanos
         a     <- fa
@@ -59,7 +59,7 @@ object Timing {
     /** Raw nanoseconds value; note that these values are only meaningful when
       * compared to each other.
       */
-    val nanos: F[Long] =
+    val nanos: FreeS[Long] =
       lift(Nanos)
   }
 

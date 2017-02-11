@@ -218,7 +218,7 @@ class MongoDbFileSystemSpec
         def shouldFailWithPathNotFound(f: String => String) = {
           val dne = testPrefix map (_ </> file("__DNE__"))
           val q = dne map (p => f(posixCodec.printPath(p)))
-          val xform = QueryFile.Transforms[query.F]
+          val xform = QueryFile.Transforms[query.FreeS]
 
           import xform._
 
@@ -343,7 +343,7 @@ class MongoDbFileSystemSpec
 
             runT(run)(for {
               tfile  <- manage.tempFile(pdir)
-              dbName <- EitherT.fromDisjunction[manage.F](
+              dbName <- EitherT.fromDisjunction[manage.FreeS](
                           Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
             } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
           })

@@ -50,10 +50,10 @@ abstract class MountingSpec[S[_]](
   val mntErr = MountingFailure.Ops[S]
   val mmErr = PathMismatchFailure.Ops[S]
   // NB: Without the explicit imports, scalac complains of an import cycle
-  import mnt.{F, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
+  import mnt.{FreeS, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
 
   implicit class StrOps(s: String) {
-    def >>*[A: AsResult](a: => F[A]) =
+    def >>*[A: AsResult](a: => FreeS[A]) =
       s >> a.foldMap(interpret).unsafePerformSync
   }
 
@@ -85,7 +85,7 @@ abstract class MountingSpec[S[_]](
   def maybeExists[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism pathExists getOption dj
 
-  def mountViewNoVars(loc: AFile, query: Fix[Sql]): F[Unit] =
+  def mountViewNoVars(loc: AFile, query: Fix[Sql]): FreeS[Unit] =
     mountView(loc, query, noVars)
 
   s"$interpName mounting interpreter" should {
@@ -250,10 +250,10 @@ abstract class MountingSpec[S[_]](
     }
 
     "mountFileSystem" >> {
-      def mountFF(d1: ADir, d2: ADir): F[Unit] =
+      def mountFF(d1: ADir, d2: ADir): FreeS[Unit] =
         mountFileSystem(d1, dbType, uriA) *> mountFileSystem(d2, dbType, uriB)
 
-      def mountVF(f: AFile, d: ADir): F[Option[MountConfig]] =
+      def mountVF(f: AFile, d: ADir): FreeS[Option[MountConfig]] =
         mountViewNoVars(f, exprA)        *>
         mountFileSystem(d, dbType, uriA) *>
         lookupConfig(d).run

@@ -50,16 +50,16 @@ object mount {
 
       case req @ MOVE -> AsPath(src) =>
         respondT(requiredHeader(Destination, req).map(_.value).fold(
-          _.raiseError[ApiErrT[M.F, ?], String],
+          _.raiseError[ApiErrT[M.FreeS, ?], String],
           dst => refineType(src).fold(
             srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
             srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))))
 
       case req @ POST -> AsDirPath(parent) =>
         respondT(for {
-          hdr <- EitherT.fromDisjunction[M.F](requiredHeader(XFileName, req))
+          hdr <- EitherT.fromDisjunction[M.FreeS](requiredHeader(XFileName, req))
           fn  =  hdr.value
-          dst <- EitherT.fromDisjunction[M.F](
+          dst <- EitherT.fromDisjunction[M.FreeS](
                   (UriPathCodec.parseRelDir(fn) orElse UriPathCodec.parseRelFile(fn))
                     .flatMap(sandbox(currentDir, _))
                     .map(parent </> _)

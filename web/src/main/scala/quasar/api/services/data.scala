@@ -66,10 +66,10 @@ object data {
 
     case req @ Method.MOVE -> AsPath(path) =>
       respond((for {
-        dstStr <- EitherT.fromDisjunction[M.F](
+        dstStr <- EitherT.fromDisjunction[M.FreeS](
                     requiredHeader(Destination, req) map (_.value))
-        dst    <- EitherT.fromDisjunction[M.F](parseDestination(dstStr))
-        scn    <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
+        dst    <- EitherT.fromDisjunction[M.FreeS](parseDestination(dstStr))
+        scn    <- EitherT.fromDisjunction[M.FreeS](moveScenario(path, dst))
         _      <- M.move(scn, MoveSemantics.FailIfExists)
                     .leftMap(_.toApiError)
       } yield Created).run)

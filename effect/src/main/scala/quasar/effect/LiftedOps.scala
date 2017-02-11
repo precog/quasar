@@ -24,9 +24,8 @@ import scalaz._
   * monads over effect algebras.
   */
 abstract class LiftedOps[G[_], S[_]](implicit S: G :<: S) {
-  // FIXME: Rename this to something that wont be confused with a type parameter
-  type F[A] = Free[S, A]
+  type FreeS[A] = Free[S, A]
 
-  def lift[A](ga: G[A]): F[A] =
+  def lift[A](ga: G[A]): FreeS[A] =
     free.lift(ga).into[S]
 }

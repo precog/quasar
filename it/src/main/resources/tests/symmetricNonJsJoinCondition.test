@@ -10,7 +10,7 @@
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },
-    "data": "zips.data",
+    "data": ["zips.data", "largeZips.data"],
     "query": "select z1.city as city1, z1.loc as loc1, z2.city as city2, z2.loc as loc2 from zips as z1 join largeZips as z2 on z1.loc[*] = z2.loc[*] where z1.city < z2.city",
     "predicate": "containsExactly",
     "expected": [

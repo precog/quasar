@@ -1241,10 +1241,11 @@ object MongoDbQScriptPlanner {
           .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
-            repeatedly(C.coalesceQC[MongoQScript](idPrism))          ⋙
-              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get))    ⋙
-              repeatedly(C.coalesceSR[MongoQScript, AFile](idPrism)) ⋙
-              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]]))))
+            repeatedly(rewrite.applyTransforms(
+              C.coalesceQC[MongoQScript](idPrism),
+              C.coalesceEJ[MongoQScript](idPrism.get),
+              C.coalesceSR[MongoQScript, AFile](idPrism),
+              Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))))
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",

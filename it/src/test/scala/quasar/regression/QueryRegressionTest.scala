@@ -52,7 +52,8 @@ import scalaz.stream._
 abstract class QueryRegressionTest[S[_]](
   fileSystems: Task[IList[SupportedFs[S]]])(
   implicit S0: QueryFile :<: S, S1: ManageFile :<: S,
-           S2: WriteFile :<: S, S3: Task :<: S
+           S2: ReadFile  :<: S, S3: WriteFile  :<: S,
+           S4: Task :<: S
 ) extends FileSystemTest[S](fileSystems) {
 
   import QueryRegressionTest._
@@ -102,12 +103,13 @@ abstract class QueryRegressionTest[S[_]](
   //     Ideally, we'd have specs2 log each example in the suite as it finishes, but
   //     all attempts at doing this have been unsuccessful, if we succeed eventually
   //     this printing can be removed.
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, fsNonChrooted) =>
     suiteName should {
       step(print(s"Running $suiteName ["))
 
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, fs.ref.name, fs.setupInterpM, fs.testInterpM)
+        val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
+        regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
         step(print("."))
       }
 
@@ -127,9 +129,13 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Fragment = {
     def runTest: Result = {
-      val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
+      val data = testQuery(
+        test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
+        test.query,
+        test.variables)
 
-      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run, backendName))
+      (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
+       verifyResults(test.expected, data, run, backendName))
         .timed(5.minutes)
         .unsafePerformSync
     }
@@ -336,9 +342,16 @@ object QueryRegressionTest {
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
-      hfsUts <- uts.traverse(sb => sb.impl.map(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f: FileSystemIO ~> Task =>
-                  SupportedFs(sb.ref, ut.copy(testInterp = f).contramapF(chroot.fileSystem[FileSystemIO](ut.testDir)).some)
-                }).getOrElse(sb.point[Task]))
+      hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
+                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: FileSystemIO ~> Task =>
+                    SupportedFs(
+                      sb.ref,
+                      ut.copy(testInterp = f)
+                        .contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
+                        .some,
+                      ut.some)
+                  }
+                ).getOrElse(sb.point[Task]))
     } yield hfsUts
 
   private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =

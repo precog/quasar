@@ -59,12 +59,12 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Fragments =
+  def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
       Fragments.foreach(fss.toList)(fs =>
-        fs.impl.map { f =>
+        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f, fʹ) =>
           s"${fs.ref.name.shows} FileSystem" >>
-            Fragments(examples(f), step(f.close.unsafePerformSync))
+            Fragments(examples(f, fʹ), step(f.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
           Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))

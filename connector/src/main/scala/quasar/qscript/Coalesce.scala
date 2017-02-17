@@ -491,10 +491,29 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) =
-        ej => makeBranched(
-          ej.lBranch, ej.rBranch)(
-          ifNeq(freeQC))(
-          EquiJoin(ej.src, _, _, ej.lKey, ej.rKey, ej.f, ej.combine))
+        (ej: EquiJoin[IT[F]]) => {
+          val branched: Option[EquiJoin[T[F]]] = makeBranched(
+            ej.lBranch, ej.rBranch)(
+            ifNeq(freeQC))(
+            EquiJoin(ej.src, _, _, ej.lKey, ej.rKey, ej.f, ej.combine))
+
+          val qct = Inject[QScriptCore, QScriptTotal]
+
+          def coalesceBranchMaps(ej: EquiJoin[T[F]]): Option[EquiJoin[T[F]]] =
+            (ej.lBranch.project.run.map(qct.prj), ej.rBranch.project.run.map(qct.prj)) match {
+              case (\/-(Some(Map(innerLSrc, lmf))), \/-(Some(Map(innerRSrc, rmf)))) =>
+                val newLKey = ej.lKey >> lmf
+                val newRKey = ej.rKey >> rmf
+                val newCombine = ej.combine >>= {
+                  case LeftSide  => lmf.as[JoinSide](LeftSide)
+                  case RightSide => rmf.as[JoinSide](RightSide)
+                }
+                EquiJoin(ej.src, innerLSrc, innerRSrc, newLKey, newRKey, ej.f, newCombine).some
+              case _ => none
+            }
+
+          coalesceBranchMaps(branched.getOrElse(ej)) orElse branched
+        }
 
       def coalesceSR[F[_]: Functor, A]
         (FToOut: PrismNT[F, OUT])

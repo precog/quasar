@@ -84,9 +84,11 @@ object queryfile {
                    .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
         optQS =  qs.transHylo(
                    rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(C.coalesceQC[SparkQScript](idPrism))       ⋙
-                     repeatedly(C.coalesceEJ[SparkQScript](idPrism.get)) ⋙
-                     repeatedly(C.coalesceSR[SparkQScript, AFile](idPrism)))
+                   repeatedly(rewrite.applyTransforms(
+                     C.coalesceQC[SparkQScript](idPrism),
+                     C.coalesceEJ[SparkQScript](idPrism.get),
+                     C.coalesceSR[SparkQScript, AFile](idPrism),
+                     Normalizable[SparkQScript].normalizeF(_: SparkQScript[Fix[SparkQScript]]))))
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }

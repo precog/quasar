@@ -92,7 +92,7 @@ class MongoDbFileSystemSpec
   val tmpDir: Task[ADir] =
     NameGenerator.salt map (s => rootDir </> dir(s))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     val run = fs.testInterpM
 
     "MongoDB" should {

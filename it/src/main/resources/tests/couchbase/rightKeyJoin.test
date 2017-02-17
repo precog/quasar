@@ -1,0 +1,50 @@
+{
+    "name": "right key join (Couchbase)",
+    "backends": {
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mongodb_2_6":       "skip",
+        "mongodb_3_0":       "skip",
+        "mongodb_read_only": "skip",
+        "mongodb_3_2":       "skip",
+        "mongodb_q_3_2":     "skip",
+        "postgresql":        "skip",
+        "spark_local":       "skip",
+        "spark_hdfs":        "skip"
+    },
+    "data": [],
+    "query": "select meta(brewery).id as brewery_meta_id, brewery.name as brewery_name,
+                     beer.name as beer_name, beer.brewery_id as beer_brewery_id
+              from `/beer-sample/beer` as beer
+              join `/beer-sample/brewery` as brewery on beer.brewery_id = meta(brewery).id
+              where beer.name = \"Pale\"",
+    "ignoreFieldOrder": [ "couchbase" ],
+    "predicate": "containsExactly",
+    "expected": [
+        {
+            "beer_brewery_id": "coastal_fog_brewing", "beer_name": "Pale",
+            "brewery_meta_id": "coastal_fog_brewing", "brewery_name": "Coastal Fog Brewing"
+        },
+        {
+            "beer_brewery_id": "glacial_lakes_brewing", "beer_name": "Pale",
+            "brewery_meta_id": "glacial_lakes_brewing", "brewery_name": "Glacial Lakes Brewing"
+        },
+        {
+            "beer_brewery_id": "left_coast_brewing", "beer_name": "Pale",
+            "brewery_meta_id": "left_coast_brewing", "brewery_name": "Left Coast Brewing"
+        },
+        {
+            "beer_brewery_id": "pyramid_alehouse_brewery_and_restaurant_berkeley", "beer_name": "Pale",
+            "brewery_meta_id": "pyramid_alehouse_brewery_and_restaurant_berkeley",
+            "brewery_name": "Pyramid Alehouse, Brewery and Restaurant - Berkeley"
+        },
+        {
+            "beer_brewery_id": "red_kettle_brewing", "beer_name": "Pale",
+            "brewery_meta_id": "red_kettle_brewing", "brewery_name": "Red Kettle Brewing"
+        },
+        {
+            "beer_brewery_id": "triple_rock_brewery", "beer_name": "Pale",
+            "brewery_meta_id": "triple_rock_brewery", "brewery_name": "Triple Rock Brewery"
+        }
+    ]
+}

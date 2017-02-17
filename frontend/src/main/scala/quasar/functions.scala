@@ -217,6 +217,7 @@ trait GenericFuncInstances {
       case string.ToString                => "ToString"
       case structural.MakeObject          => "MakeObject"
       case structural.MakeArray           => "MakeArray"
+      case structural.Meta                => "Meta"
       case structural.ObjectConcat        => "ObjectConcat"
       case structural.ArrayConcat         => "ArrayConcat"
       case structural.ConcatOp            => "ConcatOp"

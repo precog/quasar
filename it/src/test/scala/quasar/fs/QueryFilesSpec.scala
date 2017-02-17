@@ -54,7 +54,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
           lpr.read(src),
           lpr.constant(Data._str(from)))))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     "Querying Files" should {
       step(deleteForQuery(fs.setupInterpM).runVoid)
 

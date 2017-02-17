@@ -42,7 +42,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
   def deleteForWriting(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(writesPrefix))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
     "Writing Files" should {

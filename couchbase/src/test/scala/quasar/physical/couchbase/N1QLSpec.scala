@@ -18,9 +18,10 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.{Data => QData}
+import quasar.common.SortDir, SortDir._
 import quasar.DataArbitrary._
 import quasar.physical.couchbase.N1QL.{Eq, Id, Split, _}, Case._, Select.{Value, _}
-import quasar.common.SortDir, SortDir._
+import quasar.qscript.{LeftOuter, Inner}
 
 import scala.Predef.$conforms
 
@@ -54,6 +55,16 @@ trait N1QLArbitrary {
 
   implicit def arbKeyspace[A: Arbitrary]: Arbitrary[Keyspace[A]] =
     Arbitrary((arb[A] ⊛ arb[Option[Id[A]]])(Keyspace(_, _)))
+
+  implicit def arbLookupJoin[A: Arbitrary]: Arbitrary[LookupJoin[A]] =
+    Arbitrary((
+      arb[Id[A]]         ⊛
+      arb[Option[Id[A]]] ⊛
+      arb[A]             ⊛
+      Gen.oneOf(LeftOuter.left, Inner.right)
+     )(
+      LookupJoin(_, _, _, _))
+    )
 
   implicit def arbUnnest[A: Arbitrary]: Arbitrary[Unnest[A]] =
     Arbitrary((arb[A] ⊛ arb[Option[Id[A]]])(Unnest(_, _)))
@@ -157,13 +168,14 @@ trait N1QLArbitrary {
     (arb[Value]                       ⊛
      arb[NonEmptyList[ResultExpr[A]]] ⊛
      arb[Option[Keyspace[A]]]         ⊛
+     arb[Option[LookupJoin[A]]]       ⊛
      arb[Option[Unnest[A]]]           ⊛
      arb[List[Binding[A]]]            ⊛
      arb[Option[Filter[A]]]           ⊛
      arb[Option[GroupBy[A]]]          ⊛
      arb[List[OrderBy[A]]]
     )(
-      Select(_, _, _, _, _, _, _, _)
+      Select(_, _, _, _, _, _, _, _, _)
     ),
     (arb[NonEmptyList[WhenThen[A]]]  ⊛
      arb[Else[A]]

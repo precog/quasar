@@ -22,7 +22,10 @@ import quasar.Planner.InternalError
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.physical.couchbase._, N1QL.{Id, Union, _}, Case._, Select.{Filter, Value, _}
+import quasar.physical.couchbase._,
+  N1QL.{Id, Union, Unreferenced, _},
+  Case._,
+  Select.{Filter, Value, _}
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript._
 
@@ -68,6 +71,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(ff, none).wrapNel,
         Keyspace(wrapSelect(src), id1.some).some,
+        join    = none,
         unnest  = none,
         let     = nil,
         filter  = none,
@@ -109,6 +113,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
                        Value(true),
                        ResultExpr(id2.embed, none).wrapNel,
                        Keyspace(wrapSelect(src), id1.some).some,
+                       join    = none,
                        Unnest(u, id2.some).some,
                        let     = nil,
                        filter  = none,
@@ -135,6 +140,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
           Value(false),
           ResultExpr(rep, id2.some).wrapNel,
           Keyspace(src, id1.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           filter  = none,
@@ -145,6 +151,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
           Value(true),
           ResultExpr(id2.embed, none).wrapNel,
           Keyspace(s, id3.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           Filter(IsNotNull(id2.embed).embed).some,
@@ -166,6 +173,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
            Value(true),
            ResultExpr(ArrAgg(id1.embed).embed, none).wrapNel,
            Keyspace(src, id1.some).some,
+           join    = none,
            unnest  = none,
            let     = nil,
            filter  = none,
@@ -176,6 +184,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
           Value(true),
           ResultExpr(id3.embed, none).wrapNel,
           Keyspace(s, id2.some).some,
+          join    = none,
           Unnest(id2.embed, id3.some).some,
           let     = nil,
           filter  = none,
@@ -191,6 +200,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(id1.embed, none).wrapNel,
         Keyspace(src, id1.some).some,
+        join    = none,
         unnest  = none,
         let     = nil,
         Filter(ff).some,
@@ -218,7 +228,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
     }
 
     case qscript.Unreferenced() =>
-      wrapSelect(Arr[T[N1QL]](nil).embed).η[M]
+      Unreferenced[T[N1QL]]().embed.η[M]
   }
 
   def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
@@ -242,6 +252,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
             ResultExpr(f, id2.some),
             ResultExpr(c, id3.some)),
           Keyspace(src, id1.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           filter  = none,
@@ -262,6 +273,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(id5.embed, none).wrapNel,
         Keyspace(s, id4.some).some,
+        join    = none,
         Unnest(SelectElem(id2.embed, slc).embed, id5.some).some,
         let     = nil,
         filter  = none,

@@ -39,16 +39,16 @@ package object planner {
     (implicit T: Recursive.Aux[T, N1QL])
       : T =
     a.project match {
-      case Select(_, _, _, _, _, _, _, _) => whenSelect
-      case _                              => otherwise
+      case Select(_, _, _, _, _, _, _, _, _) => whenSelect
+      case _                                 => otherwise
     }
 
   def wrapSelect[T[_[_]]: BirecursiveT](a: T[N1QL]): T[N1QL] =
     selectOrElse[T[N1QL]](
       a, a,
       Select(
-        Value(true), ResultExpr(a, none).wrapNel, keyspace = none, unnest = none,
-        let = nil, filter = none, groupBy = none, orderBy = nil).embed)
+        Value(true), ResultExpr(a, none).wrapNel, keyspace = none, join = none,
+        unnest = none, let = nil,  filter = none, groupBy = none, orderBy = Nil).embed)
 
   def unimplemented[A](name: String): PlannerError \/ A =
     InternalError.fromMsg(s"unimplemented $name").left

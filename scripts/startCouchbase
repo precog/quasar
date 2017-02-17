@@ -37,3 +37,15 @@ curl -v -X POST $CB:8093/query -d 'statement=create primary index on `quasar-tes
 sleep 5
 
 curl -v -X POST $CB:8093/query -d 'statement=create index quasar_test_type_idx on `quasar-test`(type)'
+
+sleep 5
+
+curl -v -X POST $CB:8091/sampleBuckets/install -d '["beer-sample"]'
+
+sleep 5
+
+curl -v -X POST $CB:8093/query -d 'statement=create primary index on `beer-sample`'
+
+sleep 10
+
+curl -v -X POST $CB:8093/query -d 'statement=create index beer_sample_type_idx on `beer-sample`(type)'

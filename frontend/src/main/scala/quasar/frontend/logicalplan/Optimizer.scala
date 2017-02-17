@@ -19,6 +19,7 @@ package quasar.frontend.logicalplan
 import quasar.Predef._
 import quasar._
 import quasar.contrib.shapeless._
+import quasar.fp._
 import quasar.fp.binder._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
@@ -29,7 +30,7 @@ import scala.Predef.$conforms
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 import shapeless.{Data => _, :: => _, _}
 
 sealed abstract class Component[T, A] {
@@ -41,6 +42,7 @@ sealed abstract class Component[T, A] {
     case NeitherCond(a)  => a
   }
 }
+
 /** A condition that refers to left and right sources using equality, so may be
   * rewritten into the join condition.
   */
@@ -223,6 +225,8 @@ final class Optimizer[T: Equal]
     * 2) Filtering that refers to only side of the join is hoisted prior to the join.
     * The input plan must have been simplified already so that the structure
     * is in a canonical form for inspection.
+    *
+    * TODO: Separate the combining of filter and join from ...
     */
   val rewriteCrossJoinsƒ: LP[(T, T)] => State[NameGen, T] = { node =>
     def preserveFree(x: (T, T)) = preserveFree0(x)(ι)

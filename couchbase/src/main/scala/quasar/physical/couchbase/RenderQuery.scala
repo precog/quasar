@@ -18,6 +18,7 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.{Data => QData, _}
+import quasar.fp.ski.κ
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
 import quasar.DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
@@ -61,6 +62,8 @@ object RenderQuery {
       s"""{ "$TimestampKey": $a1 }""".right
     case Null() =>
       s"null".right
+    case Unreferenced() =>
+      s"(select value [])".right
     case SelectField(a1, a2) =>
       s"$a1.[$a2]".right
     case SelectElem(a1, a2) =>
@@ -196,11 +199,14 @@ object RenderQuery {
       s"($a1 union $a2)".right
     case ArrFor(a1, a2, a3) =>
       s"(array $a1 for $a2 in $a3 end)".right
-    case Select(v, re, ks, un, lt, ft, gb, ob) =>
+    case Select(v, re, ks, jn, un, lt, ft, gb, ob) =>
       def alias(a: Option[Id[String]]) = ~(a ∘ (i => s" as `${i.v}`"))
       val value       = v.v.fold("value ", "")
       val resultExprs = (re ∘ (r => r.expr ⊹ alias(r.alias))).intercalate(", ")
       val kSpace      = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
+      val join        = ~(jn ∘ (j =>
+                          j.joinType.fold(κ(""), κ(" left outer")) ⊹ s" join `${j.id.v}`" ⊹ alias(j.alias) ⊹
+                          " on keys " ⊹ j.pred))
       val unnest      = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
       val let         = lt.toNel.foldMap(
                           " let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
@@ -211,7 +217,7 @@ object RenderQuery {
           case OrderBy(a, Ascending)  => s"$a ASC"
           case OrderBy(a, Descending) => s"$a DESC"
         }).toNel ∘ (" order by " ⊹ _.intercalate(", ")))
-      s"(select $value$resultExprs$kSpace$unnest$let$filter$groupBy$orderBy)".right
+      s"(select $value$resultExprs$kSpace$join$unnest$let$filter$groupBy$orderBy)".right
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right

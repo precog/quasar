@@ -1,7 +1,6 @@
 {
     "name": "double flatten with intervening field",
     "backends": {
-        "couchbase":         "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "spark_hdfs":        "skip",

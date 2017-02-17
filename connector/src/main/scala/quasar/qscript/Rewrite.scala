@@ -307,16 +307,16 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case _ => None
   }
 
-  // /** Chains multiple transformations together, each of which can fail to change
-  //   * anything.
-  //   */
-  // def applyTransforms
-  //   (transform: F[T[F]] => Option[F[T[F]]],
-  //     transforms: (F[T[F]] => Option[F[T[F]]])*)
-  //     : F[T[F]] => Option[F[T[F]]] =
-  //   transforms.foldLeft(
-  //     transform)(
-  //     (prev, next) => x => prev.fold(next(x))(y => next(y).orElse(y.some)))
+  /** Chains multiple transformations together, each of which can fail to change
+    * anything.
+    */
+  def applyTransforms[F[_]]
+    (transform: F[T[F]] => Option[F[T[F]]],
+      transforms: (F[T[F]] => Option[F[T[F]]])*)
+      : F[T[F]] => Option[F[T[F]]] =
+    transforms.foldLeft(
+      transform)(
+      (prev, next) => x => prev(x).fold(next(x))(y => next(y).orElse(y.some)))
 
   // TODO: add reordering
   // - Filter can be moved ahead of Sort

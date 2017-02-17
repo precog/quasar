@@ -99,7 +99,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5`) as `_1`, (select value 1 from (select value []) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
+      """select value v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5`) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",

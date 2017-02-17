@@ -74,6 +74,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
                 Value(false),
                 ResultExpr(qq, Id("v").some).wrapNel,
                 keyspace = None,
+                join     = None,
                 unnest   = None,
                 let      = Nil,
                 filter   = None,

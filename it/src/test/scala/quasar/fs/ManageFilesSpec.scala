@@ -41,7 +41,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
   def deleteForManage(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(managePrefix))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
     "Managing Files" should {

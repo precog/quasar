@@ -418,7 +418,9 @@ lazy val skeleton = project
   */
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes
+    )
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(

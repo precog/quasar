@@ -47,7 +47,7 @@ class PlannerSpec
   sequential
 
   val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedReadFile
+  val sr = Planner.shiftedread
   val qscore = Planner.qscriptCore[Fix]
 
   val data = List(
@@ -89,9 +89,13 @@ class PlannerSpec
 
     "shiftedReadFile" in {
       withSpark { sc =>
-        val fromFile: (SparkContext, AFile) => Task[RDD[String]] =
+        val input: ListMap[String, Data] = ListMap(
+              "name" -> Data.Str("tom"),
+              "age" -> Data.Int(28)
+            )
+        val fromFile: (SparkContext, AFile) => Task[RDD[Data]] =
           (sc: SparkContext, file: AFile) => Task.delay {
-            sc.parallelize(List("""{"name" : "tom", "age" : 28}"""))
+            sc.parallelize(List(Data.Obj(input)))
           }
         val compile: AlgebraM[SparkState, Const[ShiftedRead[AFile], ?], RDD[Data]] = sr.plan(fromFile)
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
@@ -101,10 +105,7 @@ class PlannerSpec
           case rdd =>
             val results = rdd.collect
             results.size must_= 1
-            results(0) must_= Data.Obj(ListMap(
-              "name" -> Data.Str("tom"),
-              "age" -> Data.Int(28)
-            ))
+            results(0) must_= Data.Obj(input)
         })
       }
     }
@@ -565,7 +566,7 @@ class PlannerSpec
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
-  private val emptyFF: (SparkContext, AFile) => Task[RDD[String]] =
+  private val emptyFF: (SparkContext, AFile) => Task[RDD[Data]] =
     (sc: SparkContext, file: AFile) => Task.delay {
       sc.parallelize(List())
     }

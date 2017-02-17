@@ -104,7 +104,9 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
       .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      .exclude("org.scalatest", "scalatest_2.11")
+      .exclude("org.scalatest", "scalatest_2.11"),
+    "org.apache.parquet" % "parquet-format" % "2.3.1",
+    "org.apache.parquet" % "parquet-hadoop" % "1.9.0"
   )
 
   def marklogicValidation = Seq(

@@ -3,11 +3,8 @@
 
   "backends": {
       "mongodb_read_only": "pending",
-      "mongodb_q_3_2": "skip",
       "postgresql":        "pending",
-      "marklogic_json":    "pending",
       "marklogic_xml":     "pending",
-      "couchbase":         "skip",
       "spark_local": "skip",
       "spark_hdfs": "skip"
   },
@@ -15,6 +12,7 @@
   "data": "../slamengine_commits.data",
 
   "nb": "`doy` and `week` are missing because we currently have no JS implementation.",
+  "ignoreFieldOrder": [ "marklogic_json", "couchbase" ],
   "query": "select
               date_part(\"millennium\", timestamp(commit.committer.date)) as millennium,
               date_part(\"century\", timestamp(commit.committer.date)) as century,

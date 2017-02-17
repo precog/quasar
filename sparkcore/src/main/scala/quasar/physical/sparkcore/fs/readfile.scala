@@ -17,10 +17,9 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.{Data, DataCodec}
+import quasar.Data
 import quasar.contrib.pathy._
 import quasar.effect._
-import quasar.fp.ski._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._, FileSystemError._
@@ -38,7 +37,7 @@ object readfile {
   type Limit = Option[Positive]
 
   final case class Input[S[_]](
-    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[String]],
+    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]],
     fileExists: AFile => Free[S, Boolean],
     readChunkSize: () => Int
   )
@@ -78,9 +77,7 @@ object readfile {
 
     def _open: Free[S, ReadHandle] = for {
       rdd <- input.rddFrom(f, offset, limit)
-      cur = SparkCursor(rdd.map{ raw =>
-        DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }.zipWithIndex.some, 0)
+      cur = SparkCursor(rdd.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h

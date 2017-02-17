@@ -35,7 +35,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait Planner[F[_]] extends Serializable {
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
+  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
 }
 
 // TODO divide planner instances into separate files
@@ -77,7 +77,7 @@ object Planner {
 
   private def unreachable[F[_]](what: String): Planner[F] =
     new Planner[F] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, F, RDD[Data]] =
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
         EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
@@ -89,18 +89,16 @@ object Planner {
   implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
   implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
 
-  implicit def shiftedReadFile: Planner[Const[ShiftedRead[AFile], ?]] =
+  implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] =
     new Planner[Const[ShiftedRead[AFile], ?]] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]) =
+      
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]) =
         (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
           StateT((sc: SparkContext) => {
             val filePath = qs.getConst.path
             val idStatus = qs.getConst.idStatus
 
-            EitherT(fromFile(sc, filePath).map { initRDD =>
-              val rdd = initRDD.map { raw =>
-                DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-              }
+            EitherT(fromFile(sc, filePath).map { rdd =>
               (sc,
                 idStatus match {
                   case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
@@ -122,7 +120,7 @@ object Planner {
       type Count = Long
 
       private def filterOut(
-        fromFile: (SparkContext, AFile) => Task[RDD[String]],
+        fromFile: (SparkContext, AFile) => Task[RDD[Data]],
         src: RDD[Data],
         from: FreeQS[T],
         count: FreeQS[T],
@@ -184,7 +182,7 @@ object Planner {
 
       }
 
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, QScriptCore[T, ?], RDD[Data]] = {
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {
@@ -351,8 +349,8 @@ object Planner {
   implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]:
       Planner[EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
-
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
+      
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
         case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
@@ -403,7 +401,6 @@ object Planner {
     implicit F: Planner[F], G: Planner[G]):
       Planner[Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
-
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 }

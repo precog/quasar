@@ -17,13 +17,13 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
-import quasar.Data
-import quasar.DataCodec
+import quasar.{Data, DataCodec}
 import quasar.fs.FileSystemError
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
+import quasar.fp.ski._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -35,8 +35,9 @@ import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
     sc.textFile(posixCodec.unsafePrintPath(file))
+      .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {

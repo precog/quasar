@@ -79,7 +79,10 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
           case (-\/(SrcHole), _)                       => None  // non-static index
           case (_, _)                                  => (acc1 ++ acc2).some
         }
-      case f => f.foldMapM[Option, Acc](_._2)
+      // check if entire array is referenced
+      case f => f.foldMapM[Option, Acc] {
+        case (src, value) => if (src ≟ HoleF) None else value
+      }
     }
 
     // CoEnv[Hole, MapFunc, (T[CoEnv[Hole, MapFunc, ?]], StateAcc)] => StateAcc

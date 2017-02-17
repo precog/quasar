@@ -116,11 +116,13 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
   def arrayRewrite(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc = {
+    val rewrite = new Rewrite[T]
+
     def removeUnusedIndices[A](array: List[A], indicesToKeep: Set[Int]): List[A] =
       indicesToKeep.toList.sorted map array
 
-    rebuildArray[T, JoinSide](
-      removeUnusedIndices[JoinFunc](flattenArray[T, JoinSide](array), indicesToKeep))
+    rewrite.rebuildArray[JoinSide](
+      removeUnusedIndices[JoinFunc](rewrite.flattenArray[JoinSide](array), indicesToKeep))
   }
 
   // TODO can we be more efficient?

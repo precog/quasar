@@ -33,26 +33,71 @@ import scalaz.{:+: => _, Divide => _, _},
   Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
-  private val UnrefedSrc: QScriptTotal[FreeQS] =
-    Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
+  def flattenArray[A: Show](array: ConcatArrays[T, FreeMapA[A]]): List[FreeMapA[A]] = {
+    def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
+      jf.resume match {
+        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
+        case _                           => List(jf)
+      }
+    inner(Free.roll(array))
+  }
 
-  def rebaseT[F[_]: Traverse](
-    target: FreeQS)(
-    src: T[F])(
-    implicit FI: Injectable.Aux[F, QScriptTotal]):
-      Option[T[F]] =
-    target.as(src.transAna[T[QScriptTotal]](FI.inject)).cata(recover(_.embed)).transAnaM(FI project _)
+  def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = {
+    def inner(funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
+      case Nil          => Free.roll(EmptyArray[T, FreeMapA[A]])
+      case func :: Nil  => func
+      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
+    }
+    inner(funcs.reverse)
+  }
 
-  def rebaseTCo[F[_]: Traverse]
-    (target: FreeQS)
-    (srcCo: T[CoEnv[Hole, F, ?]])
-    (implicit FI: Injectable.Aux[F, QScriptTotal])
-      : Option[T[CoEnv[Hole, F, ?]]] =
-    // TODO: with the right instances & types everywhere, this should look like
-    //       target.transAnaM(_.htraverse(FI project _)) ∘ (_ >> srcCo)
-    target.cataM[Option, T[CoEnv[Hole, F, ?]]](
-      CoEnv.htraverse(λ[QScriptTotal ~> (Option ∘ F)#λ](FI.project(_))).apply(_) ∘ (_.embed)) ∘
-      (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
+  def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
+      : Option[(IdStatus, JoinFunc)] =
+    (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
+      def makeRef(idx: Int): JoinFunc =
+        Free.roll[MapFunc, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+
+      val zeroRef: JoinFunc = makeRef(0)
+      val oneRef: JoinFunc = makeRef(1)
+      val rightCount: Int = repair.elgotPara(count(RightSideF))
+
+      if (repair.elgotPara(count(oneRef)) ≟ rightCount)
+        // all `RightSide` access is through `oneRef`
+        (ExcludeId, repair.transApoT(substitute[JoinFunc](oneRef, RightSideF))).some
+      else if (repair.elgotPara(count(zeroRef)) ≟ rightCount)
+        // all `RightSide` access is through `zeroRef`
+        (IdOnly, repair.transApoT(substitute[JoinFunc](zeroRef, RightSideF))).some
+      else
+        None
+    }.join
+
+  // TODO: make this simply a transform itself, rather than a full traversal.
+  def shiftRead[F[_]: Functor, G[_]: Traverse]
+    (implicit QC: QScriptCore :<: G,
+              TJ: ThetaJoin :<: G,
+              SR: Const[ShiftedRead[APath], ?] :<: G,
+              GI: Injectable.Aux[G, QScriptTotal],
+              S: ShiftRead.Aux[T, F, G],
+              C: Coalesce.Aux[T, G, G],
+              N: Normalizable[G])
+      : T[F] => T[G] = {
+    _.codyna(
+      normalize[G] >>> liftFG(injectRepeatedly(C.coalesceSR[G, APath](idPrism))) >>> (_.embed),
+      ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
+  }
+
+  def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
+    (implicit QC: QScriptCore :<: G,
+              TJ: ThetaJoin :<: G,
+              SR: Const[ShiftedRead[APath], ?] :<: G,
+              GI: Injectable.Aux[G, QScriptTotal],
+              S: ShiftRead.Aux[T, F, G],
+              J: SimplifyJoin.Aux[T, G, H],
+              C: Coalesce.Aux[T, G, G],
+              N: Normalizable[G])
+      : T[F] => T[H] =
+    shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin(idPrism.reverseGet))
+
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
@@ -76,7 +121,10 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     (implicit
       QC: QScriptCore :<: F,
       FI: Injectable.Aux[F, QScriptTotal])
-      : Option[F[A]] =
+      : Option[F[A]] = {
+    val UnrefedSrc: QScriptTotal[FreeQS] =
+      Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
+
     (l.resumeTwice, r.resumeTwice) match {
       case (-\/(m1), -\/(m2)) =>
         (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
@@ -186,6 +234,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         QC.inj(Map(src, combine.as(SrcHole))).some
       case (_, _) => None
     }
+  }
 
   def unifySimpleBranchesCoEnv[F[_], A]
     (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)

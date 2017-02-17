@@ -188,7 +188,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       case (l,    r)    => f(l.getOrElse(lOrig), r.getOrElse(rOrig)).some
     }
 
-  def rewrite(elem: FreeMap): Option[FreeMap] = {
+  private def eliminateRightSideProj(elem: FreeMap): Option[FreeMap] = {
     val oneRef = Free.roll[MapFunc, Hole](ProjectIndex(HoleF, IntLit(1)))
     val rightCount: Int = elem.elgotPara(count(HoleF))
 
@@ -226,6 +226,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         }
 
       val nm = new NormalizableT[T]
+
+      val rewrite = new Rewrite[T]
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
@@ -309,9 +311,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                   sr,
                   redRepair))
             case LeftShift(innerSrc, struct, id, shiftRepair) =>
-              (rewriteShift(id, nm.freeMF(bucket >> shiftRepair)) ⊛
+              (rewrite.rewriteShift(id, nm.freeMF(bucket >> shiftRepair)) ⊛
                 reducers.traverse(_.traverse(mf =>
-                  rewriteShift(id, nm.freeMF(mf >> shiftRepair)))))((b, r) =>
+                  rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))))((b, r) =>
                 r.foldRightM[Option, (IdStatus, (JoinFunc, List[ReduceFunc[JoinFunc]]))]((b._1, (b._2, Nil)))((elem, acc) => {
                   sequenceReduce(elem) >>= (e =>
                     (e._1 ≟ acc._1).option(
@@ -350,23 +352,23 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT, SR: Const[ShiftedRead[A], ?] :<: OUT) = {
         case Map(Embed(src), mf) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ rewrite(mf))((const, newMF) =>
+          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProj(mf))((const, newMF) =>
             Map(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
               newMF)) <+>
           (((FToOut.get(src) >>= QC.prj) match {
             case Some(Filter(Embed(innerSrc), cond)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ rewrite(cond))((const, newCond) =>
+              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProj(cond))((const, newCond) =>
                 Filter(
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
                   newCond))
             case _ => None
-          }) ⊛ rewrite(mf))((newFilter, newMF) =>
+          }) ⊛ eliminateRightSideProj(mf))((newFilter, newMF) =>
             Map(
               FToOut.reverseGet(QC.inj(newFilter)).embed,
               newMF))
         case Reduce(Embed(src), bucket, reducers, repair) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ rewrite(bucket) ⊛ reducers.traverse(_.traverse(rewrite)))(
+          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProj(bucket) ⊛ reducers.traverse(_.traverse(eliminateRightSideProj)))(
             (const, newBuck, newRed) =>
             Reduce(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,

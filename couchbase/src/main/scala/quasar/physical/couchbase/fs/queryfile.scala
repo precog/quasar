@@ -241,7 +241,7 @@ object queryfile {
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, APath, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
-      shft <- simplifyRead[T, QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], CBQS0]
+      shft <- rewrite.simplifyJoinOnShiftRead[QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], CBQS0]
                 .apply(qs)
                 .transCataM(ExpandDirs[T, CBQS0, CBQS].expandDirs(idPrism.reverseGet, lc))
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))

@@ -11,7 +11,7 @@
 
     "predicate": "containsExactly",
 
-    "expected": [{ "result": { "_id": "1", "name": "RangeRover-Evoque" } },
-                 { "result": { "_id": "2", "name": "Honda-civic" } },
-                 { "result": { "_id": "3", "name": "BMW-X5" } }]
+    "expected": [{ "result": { "_id": "1", "year": [2012], "name": "RangeRover-Evoque" } },
+                 { "result": { "_id": "2", "year": [2010], "name": "Honda-civic" } },
+                 { "result": { "_id": "3", "year": [2003], "name": "BMW-X5" } }]
 }

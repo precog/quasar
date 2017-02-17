@@ -132,7 +132,7 @@ object queryfile {
 
     for {
       qs      <- convertToQScriptRead[T, F, QSR](ops.ls[F])(lp)
-      shifted <- shiftRead[T, QSR, QSSR].apply(qs)
+      shifted <- R.shiftRead[QSR, QSSR].apply(qs)
                    // TODO: Eliminate this once the filesystem implementation is updated
                    .transCataM(ExpandDirs[T, QSSR, MLQ].expandDirs(idPrism.reverseGet, ops.ls[F]))
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))

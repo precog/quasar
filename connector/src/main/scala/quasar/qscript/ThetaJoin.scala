@@ -96,22 +96,47 @@ object ThetaJoin {
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
+      val merge = new Merge[IT]
+      val rewrite = new Rewrite[IT]
+
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: ThetaJoin[IT, ExternallyManaged],
         p2: ThetaJoin[IT, ExternallyManaged]) =
         (p1, p2) match {
-          case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2)) =>
+          case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2)) if f1 ≟ f2 => {
             val left1 = rebaseBranch(l1, left)
             val right1 = rebaseBranch(r1, left)
             val left2 = rebaseBranch(l2, right)
             val right2 = rebaseBranch(r2, right)
 
-            (left1 ≟ left2 && right1 ≟ right2 && o1 ≟ o2 && f1 ≟ f2).option {
-              val (merged, left, right) = concat(c1, c2)
-              SrcMerge(ThetaJoin(s1, left1, right1, o1, f1, merged), left, right)
+            def updateJoin(func: JoinFunc[IT], left: FreeMap[IT], right: FreeMap[IT]): JoinFunc[IT] =
+              func.flatMap {
+                case LeftSide => left.as(LeftSide)
+                case RightSide => right.as(RightSide)
+              }
+
+            merge.tryMergeBranches(rewrite)(left1, right1, left2, right2).toOption.map {
+              case (resL, resR) => {
+                val onL: JoinFunc[IT] = updateJoin(o1, resL.lval, resR.lval)
+                val onR: JoinFunc[IT] = updateJoin(o2, resL.rval, resR.rval)
+                // The implication here is that
+                // `(l join r on X) as lj inner join (l join r on Y) as rj on lj = rj`
+                // is equivalent to
+                // `l join r on X and Y`
+                val on: JoinFunc[IT] = (onL ≟ onR).fold(onL, Free.roll(MapFuncs.And(onL, onR)))
+
+                val cL: JoinFunc[IT] = updateJoin(c1, resL.lval, resR.lval)
+                val cR: JoinFunc[IT] = updateJoin(c2, resL.rval, resR.rval)
+                val (cond, left, right) = concat(cL, cR)
+
+                SrcMerge(ThetaJoin(s1, resL.src, resR.src, on, f1, cond), left, right)
+              }
             }
-        }
+          }
+
+          case (_, _) => None
     }
+  }
 }

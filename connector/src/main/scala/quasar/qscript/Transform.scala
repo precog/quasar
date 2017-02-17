@@ -18,8 +18,8 @@ package quasar.qscript
 
 import quasar.Predef.{ Eq => _, _ }
 import quasar._, Planner._
-import quasar.ejson.{Int => _, _}
-import quasar.fp.{ ExternallyManaged => EM, _ }
+import quasar.ejson._
+import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
@@ -30,7 +30,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{:+: => _, Divide => _, _}, Scalaz.{ToIdOps => _, _}, Inject._, Leibniz._
+import scalaz._, Scalaz._
 import shapeless.{nat, Sized}
 
 // Need to keep track of our non-type-ensured guarantees:
@@ -56,120 +56,12 @@ class Transform
     FI: Injectable.Aux[F, QScriptTotal[T, ?]],
     render: Delay[RenderTree, F],
     mergeable: Mergeable.Aux[T, F],
-    mergeableCoEnv: Mergeable.Aux[T, CoEnv[Hole, QScriptTotal[T, ?], ?]],
     eq: Delay[Equal, F],
     show: Delay[Show, F]) extends TTypes[T] {
 
   private val prov = new provenance.ProvenanceT[T]
   private val rewrite = new Rewrite[T]
-
-  case class ZipperSides(
-    lSide: FreeMap,
-    rSide: FreeMap)
-
-  case class ZipperTails[G[_]](
-    lTail: List[G[EM]],
-    rTail: List[G[EM]])
-
-  case class ZipperAcc[G[_]](
-    acc: List[G[EM]],
-    sides: ZipperSides,
-    tails: ZipperTails[G])
-
-  // TODO: Convert to NEL
-  def linearize[G[_]: Functor: Foldable]: Algebra[G, List[G[EM]]] =
-    fl => fl.as[EM](Extern) :: fl.fold
-
-  private def delinearizeInner[A]:
-      Coalgebra[F, List[F[A]]] = {
-    case Nil    => DE.inj(Const[DeadEnd, List[F[A]]](Root))
-    case h :: t => h.as(t)
-  }
-
-  private def delinearizeInnerCoEnv[A](
-    implicit DE: Const[DeadEnd, ?] :<: QScriptTotal):
-      Coalgebra[CoEnv[Hole, QScriptTotal, ?], List[CoEnv[Hole, QScriptTotal, A]]] = {
-    case Nil    => CoEnv(\/-(DE.inj(Const[DeadEnd, List[CoEnv[Hole, QScriptTotal, A]]](Root))))
-    case h :: t => h.as(t)
-  }
-
-  private def delinearizeTargets[G[_]: Functor, A]:
-      ElgotCoalgebra[Hole \/ ?, G, List[G[A]]] = {
-    case Nil    => SrcHole.left[G[List[G[A]]]]
-    case h :: t => h.as(t).right
-  }
-
-  private def delinearizeTargetsCoEnv[A]:
-      Coalgebra[CoEnv[Hole, QScriptTotal, ?], List[CoEnv[Hole, QScriptTotal, A]]] = {
-    case Nil    => CoEnv(-\/(SrcHole))
-    case h :: t => h.as(t)
-  }
-
-  private def consZipped[G[_]]: Algebra[ListF[G[EM], ?], ZipperAcc[G]] = {
-    case ConsF(head, ZipperAcc(acc, sides, tails)) =>
-      ZipperAcc(head :: acc, sides, tails)
-    case NilF() =>
-      ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
-  }
-
-  private def zipper[G[_]](
-    implicit mergeable: Mergeable.Aux[T, G]):
-      ElgotCoalgebra[
-        ZipperAcc[G] \/ ?,
-        ListF[G[EM], ?],
-        (ZipperSides, ZipperTails[G])] = {
-    case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc[G] \/ ListF[G[EM], (ZipperSides, ZipperTails[G])]](
-        ZipperAcc(Nil, zs, zt).left) {
-          case SrcMerge(inn, lmf, rmf) =>
-            ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc[G]]
-      }
-    case (sides, tails) =>
-      ZipperAcc(Nil, sides, tails).left
-  }
-
-  private def mergeFreeQS(left: FreeQS, right: FreeQS): SrcMerge[FreeQS, FreeQS] = {
-    val lLin: List[CoEnv[Hole, QScriptTotal, EM]] = left.cata(linearize).reverse
-    val rLin: List[CoEnv[Hole, QScriptTotal, EM]] = right.cata(linearize).reverse
-
-    val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
-      elgot(
-        (ZipperSides(HoleF[T], HoleF[T]), ZipperTails(lLin, rLin)))(
-        consZipped[CoEnv[Hole, QScriptTotal, ?]], zipper[CoEnv[Hole, QScriptTotal, ?]])
-
-    val leftF: FreeQS =
-      lTail.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
-    val rightF: FreeQS =
-      rTail.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
-
-    val mergeSrc: FreeQS =
-      common.reverse.ana[FreeQS](delinearizeInnerCoEnv[EM])
-
-    SrcMerge[FreeQS, FreeQS](
-      mergeSrc,
-      rebaseBranch(leftF, lMap),
-      rebaseBranch(rightF, rMap))
-  }
-
-  private def merge(left: T[F], right: T[F]): SrcMerge[T[F], FreeQS] = {
-    val lLin: List[F[EM]] = left.cata(linearize).reverse
-    val rLin: List[F[EM]] = right.cata(linearize).reverse
-
-    val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
-      elgot(
-        (ZipperSides(HoleF[T], HoleF[T]), ZipperTails(lLin, rLin)))(
-        consZipped[F], zipper[F])
-
-    val leftF: FreeQS =
-      lTail.reverse.ana[Free[F, Hole]](delinearizeTargets[F, EM] >>> (CoEnv(_))).mapSuspension(FI.inject)
-
-    val rightF: FreeQS =
-      rTail.reverse.ana[Free[F, Hole]](delinearizeTargets[F, EM] >>> (CoEnv(_))).mapSuspension(FI.inject)
-
-    SrcMerge[T[F], FreeQS](common.reverse.ana[T[F]](delinearizeInner),
-      rebaseBranch(leftF, lMap),
-      rebaseBranch(rightF, rMap))
-  }
+  private val merge = new Merge[T]
 
   private case class AutoJoinBase(src: T[F], buckets: List[prov.Provenance]) {
     def asTarget(vals: FreeMap): Target[F] = Target(Ann(buckets, vals), src)
@@ -178,22 +70,6 @@ class Transform
   private case class AutoJoinResult(base: AutoJoinBase, lval: FreeMap, rval: FreeMap)
   private case class AutoJoin3Result(base: AutoJoinBase, lval: FreeMap, cval: FreeMap, rval: FreeMap)
   private case class AutoJoinNResult(base: AutoJoinBase, vals: NonEmptyList[FreeMap])
-
-  private def joinBranches(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] = {
-    val SrcMerge(src, lBranch, rBranch) = mergeFreeQS(left, right)
-
-    val (combine, lacc, racc) = concat(LeftSideF[T], RightSideF[T])
-
-    def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] =
-      rebase(l, r).some
-
-    val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
-      rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
-
-    baseSrc.cata(src =>
-      SrcMerge(src.embed, lacc, racc).right[PlannerError],
-      InternalError.fromMsg(s"failed autojoin").left[SrcMerge[FreeQS, FreeMap]])
-  }
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -204,7 +80,7 @@ class Transform
     val rann = right.ann
     val lval: JoinFunc = lann.values.as[JoinSide](LeftSide)
     val rval: JoinFunc = rann.values.as[JoinSide](RightSide)
-    val SrcMerge(src, lBranch, rBranch) = merge(left.value, right.value)
+    val SrcMerge(src, lBranch, rBranch) = merge.mergeT(left.value, right.value)
 
     val lprovs = prov.genBuckets(lann.provenance) ∘ (_ ∘ (_.as[JoinSide](LeftSide)))
     val rprovs = prov.genBuckets(rann.provenance) ∘ (_ ∘ (_.as[JoinSide](RightSide)))
@@ -228,7 +104,7 @@ class Transform
 
     AutoJoinResult(
       AutoJoinBase(
-        rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rewrite.rebaseT).getOrElse(
+        rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
           TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), Inner, combine))).embed,
         prov.joinProvenances(newLprov, newRprov)),
       lacc,
@@ -453,10 +329,10 @@ class Transform
       case -\/(ThetaJoin(condSrc, _condL, _condR, BoolLit(true), Inner, cond)) =>
 
         val SrcMerge(inSrc, _inL, _inR): SrcMerge[T[F], FreeQS] =
-          merge(values(0).value, values(1).value)
+          merge.mergeT(values(0).value, values(1).value)
 
         val SrcMerge(resultSrc, inAccess, condAccess): SrcMerge[T[F], FreeQS] =
-          merge(inSrc, condSrc)
+          merge.mergeT(inSrc, condSrc)
 
         val inL: FreeQS = rebase(_inL, inAccess)
         val inR: FreeQS = rebase(_inR, inAccess)
@@ -472,23 +348,7 @@ class Transform
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
 
-        // FIXME: We shouldn't have to guess which side is which.
-        // Fixing #1556 should address this issue.
-        val pair: PlannerError \/ (SrcMerge[FreeQS, FreeMap], SrcMerge[FreeQS, FreeMap]) =
-          joinBranches(inL, condL).fold(
-            {
-              _ => for {
-                resL <- joinBranches(inL, condR)
-                resR <- joinBranches(inR, condL)
-              } yield (resL, resR)
-            },
-            {
-              resL => for {
-                resR <- joinBranches(inR, condR)
-              } yield (resL, resR)
-            })
-
-        pair.map {
+        merge.tryMergeBranches(rewrite)(inL, inR, condL, condR).map {
           case (resL, resR) =>
             // FIXME: The provenances are not correct here - need to use `resL` and `resR` provs
             Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
@@ -508,10 +368,10 @@ class Transform
         }
 
       case -\/(tj) =>
-        InternalError.fromMsg(s"incompatible theta join found with condition ${tj.on} and join type ${tj.f}").left[Target[F]]
+        InternalError.fromMsg(s"incompatible theta join found with condition ${tj.on.shows} and join type ${tj.f}").left[Target[F]]
 
       case \/-(cond) =>
-        val merged: SrcMerge[T[F], FreeQS] = merge(values(0).value, values(1).value)
+        val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(values(0).value, values(1).value)
 
         val Ann(leftBuckets, leftValue) = values(0).ann
         val Ann(rightBuckets, rightValue) = values(1).ann
@@ -668,17 +528,17 @@ class Transform
             base.src))).right
 
     case lp.InvokeUnapply(set.Sample, Sized(a1, a2)) =>
-      val merged: SrcMerge[T[F], FreeQS] = merge(a1.value, a2.value)
+      val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Sample, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case lp.InvokeUnapply(set.Take, Sized(a1, a2)) =>
-      val merged: SrcMerge[T[F], FreeQS] = merge(a1.value, a2.value)
+      val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Take, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case lp.InvokeUnapply(set.Drop, Sized(a1, a2)) =>
-      val merged: SrcMerge[T[F], FreeQS] = merge(a1.value, a2.value)
+      val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
@@ -722,7 +582,7 @@ class Transform
       Target(Ann(prov.swapProvenances(provenance.Value(join.rval) :: join.base.buckets), join.lval), join.base.src).right
 
     case lp.InvokeUnapply(set.Union, Sized(a1, a2)) =>
-      val SrcMerge(src, lfree, rfree) = merge(a1.value, a2.value)
+      val SrcMerge(src, lfree, rfree) = merge.mergeT(a1.value, a2.value)
       val lbranch = Free.roll(FI.inject(QC.inj(reifyResult(a1.ann, lfree))))
       val rbranch = Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, rfree))))
 
@@ -760,7 +620,7 @@ class Transform
       }
 
     case lp.InvokeUnapply(set.Intersect, Sized(a1, a2)) =>
-      val merged: SrcMerge[T[F], FreeQS] = merge(a1.value, a2.value)
+      val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
       Target(Ann(prov.joinProvenances(a1.ann.provenance, a2.ann.provenance), HoleF),
         TJ.inj(ThetaJoin(
@@ -772,7 +632,7 @@ class Transform
           LeftSideF)).embed).right
 
     case lp.InvokeUnapply(set.Except, Sized(a1, a2)) =>
-      val merged: SrcMerge[T[F], FreeQS] = merge(a1.value, a2.value)
+      val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
       Target(Ann(a1.ann.provenance, HoleF),
         TJ.inj(ThetaJoin(

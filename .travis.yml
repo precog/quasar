@@ -22,7 +22,7 @@ script:
   - if [ $QUASAR_MARKLOGIC_JSON ]; then echo "marklogic_json=${QUASAR_MARKLOGIC_JSON}" > $TEST_CONFIG_FILE; fi
   - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
-  - ./scripts/build $MONGO_RELEASE
+  - travis_wait 240 ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
 notifications:
   irc:

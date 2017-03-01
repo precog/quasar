@@ -21,10 +21,8 @@ import quasar.{BackendName, Data, TestConfig}
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.testing
-import quasar.physical.marklogic.xcc.XccError
 
 import com.marklogic.xcc.ContentSource
-import com.marklogic.xcc.exceptions.XQueryException
 import org.specs2.specification.core.Fragment
 import scalaz._, Scalaz._, concurrent.Task
 
@@ -55,12 +53,6 @@ abstract class XQuerySpec extends quasar.Qspec {
       testing.moduleResults[ReaderT[Task, ContentSource, ?]](mm)
         .run(cs)
         .map(_ >>= (_ \/> noResults))
-        .handleWith {
-          // TODO: Why isn't this caught earlier? Is it being thrown by the ResultSequence?
-          case ex: XQueryException =>
-            Task.fail(new RuntimeException(
-              XccError.xqueryError(mm.render, ex).shows, ex))
-        }
         .unsafePerformSync)
   }
 }

@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy._
 
 import org.http4s.Uri
 

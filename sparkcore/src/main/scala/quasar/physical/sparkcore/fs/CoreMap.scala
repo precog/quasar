@@ -29,17 +29,38 @@ import java.time._, ZoneOffset.UTC
 import scala.math
 
 import matryoshka._
+import matryoshka.data.free._
 import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 
-  // TODO: replace Data.NA with something safer
-  def change[T[_[_]]: RecursiveT]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
-    case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
-    case Undefined() => κ[Data, Data](Data.NA).right // TODO compback to this one, needs reviewv
+  def changeFreeMap[T[_[_]]: RecursiveT](f: FreeMap[T])
+      : PlannerError \/ (Data => Data) =
+    f.cataM(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
+
+  def changeJoinFunc[T[_[_]]: RecursiveT](f: JoinFunc[T])
+      : PlannerError \/ ((Data, Data) => Data) =
+    f.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
+      (js: JoinSide) => (js match {
+        case LeftSide  => (_: (Data, Data))._1
+        case RightSide => (_: (Data, Data))._2
+      }).right,
+      change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
+
+  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
+      : PlannerError \/ ((Data, List[Data]) => Data) =
+    f.cataM(interpretM(
+      _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
+      change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
+
+  def change[T[_[_]]: RecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
+    case Constant(f) => κ(f.cata(Data.fromEJson)).right
+    case Undefined() => κ(undefined).right
 
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)
@@ -197,7 +218,7 @@ object CoreMap extends Serializable {
       case Data.Date(v) => Data.Int(v.getYear())
       case _ => undefined
     }).right
-    case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
+    case Now() => κ(Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
       case Data.Int(v) => Data.Int(-v)
@@ -205,43 +226,43 @@ object CoreMap extends Serializable {
       case Data.Interval(v) => Data.Interval(v.negated())
       case _ => undefined
     }).right
-    case Add(f1, f2) => ((x: Data) => add(f1(x), f2(x))).right
-    case Multiply(f1, f2) => ((x: Data) => multiply(f1(x), f2(x))).right
-    case Subtract(f1, f2) => ((x: Data) => subtract(f1(x), f2(x))).right
-    case Divide(f1, f2) => ((x: Data) => divide(f1(x), f2(x))).right
-    case Modulo(f1, f2) => ((x: Data) => modulo(f1(x), f2(x))).right
-    case Power(f1, f2) => ((x: Data) => power(f1(x), f2(x))).right
+    case Add(f1, f2) => ((x: A) => add(f1(x), f2(x))).right
+    case Multiply(f1, f2) => ((x: A) => multiply(f1(x), f2(x))).right
+    case Subtract(f1, f2) => ((x: A) => subtract(f1(x), f2(x))).right
+    case Divide(f1, f2) => ((x: A) => divide(f1(x), f2(x))).right
+    case Modulo(f1, f2) => ((x: A) => modulo(f1(x), f2(x))).right
+    case Power(f1, f2) => ((x: A) => power(f1(x), f2(x))).right
 
     case Not(f) => (f >>> {
       case Data.Bool(b) => Data.Bool(!b)
       case _ => undefined
     }).right
-    case Eq(f1, f2) => ((x: Data) => Data.Bool(f1(x) === f2(x))).right
-    case Neq(f1, f2) => ((x: Data) => Data.Bool(f1(x) =/= f2(x))).right
-    case Lt(f1, f2) => ((x: Data) => lt(f1(x), f2(x))).right
-    case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
-    case Gt(f1, f2) => ((x: Data) => gt(f1(x), f2(x))).right
-    case Gte(f1, f2) => ((x: Data) => gte(f1(x), f2(x))).right
-    case IfUndefined(f1, f2) => ((x: Data) => f1(x) match {
+    case Eq(f1, f2) => ((x: A) => Data.Bool(f1(x) === f2(x))).right
+    case Neq(f1, f2) => ((x: A) => Data.Bool(f1(x) =/= f2(x))).right
+    case Lt(f1, f2) => ((x: A) => lt(f1(x), f2(x))).right
+    case Lte(f1, f2) => ((x: A) => lte(f1(x), f2(x))).right
+    case Gt(f1, f2) => ((x: A) => gt(f1(x), f2(x))).right
+    case Gte(f1, f2) => ((x: A) => gte(f1(x), f2(x))).right
+    case IfUndefined(f1, f2) => ((x: A) => f1(x) match {
       case Data.NA => f2(x)
       case d => d
     }).right
-    case And(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case And(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a && b)
       case _ => undefined
     }).right
-    case Or(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case Or(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => undefined
     }).right
-    case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
-    case Cond(fCond, fThen, fElse) => ((x: Data) => fCond(x) match {
+    case Between(f1, f2, f3) => ((x: A) => between(f1(x), f2(x), f3(x))).right
+    case Cond(fCond, fThen, fElse) => ((x: A) => fCond(x) match {
       case Data.Bool(true) => fThen(x)
       case Data.Bool(false) => fElse(x)
       case _ => undefined
     }).right
 
-    case Within(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case Within(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (d, Data.Arr(list)) => Data.Bool(list.contains(d))
       case _ => undefined
     }).right
@@ -273,40 +294,40 @@ object CoreMap extends Serializable {
     }).right
     case ToString(f) => (f >>> toStringFunc).right
     case Search(fStr, fPattern, fInsen) =>
-      ((x: Data) => search(fStr(x), fPattern(x), fInsen(x))).right
+      ((x: A) => search(fStr(x), fPattern(x), fInsen(x))).right
     case Substring(fStr, fFrom, fCount) =>
-      ((x: Data) => substring(fStr(x), fFrom(x), fCount(x))).right
+      ((x: A) => substring(fStr(x), fFrom(x), fCount(x))).right
     case MakeArray(f) => (f >>> ((x: Data) => Data.Arr(List(x)))).right
-    case MakeMap(fK, fV) => ((x: Data) => (fK(x), fV(x)) match {
+    case MakeMap(fK, fV) => ((x: A) => (fK(x), fV(x)) match {
       case (Data.Str(k), v) => Data.Obj(ListMap(k -> v))
       case _ => undefined
     }).right
-    case ConcatArrays(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case ConcatArrays(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
       case (Data.Str(s1), Data.Str(s2)) => Data.Str(s1 ++ s2)
       case _ => undefined
     }).right
-    case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case ConcatMaps(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 ++ m2)
       case _ => undefined
     }).right
-    case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+    case ProjectIndex(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Arr(list), Data.Int(index)) =>
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
       case _ => undefined
     }).right
-    case ProjectField(fSrc, fField) => ((x: Data) => (fSrc(x), fField(x)) match {
+    case ProjectField(fSrc, fField) => ((x: A) => (fSrc(x), fField(x)) match {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => m(field)
       case _ => undefined
     }).right
-    case DeleteField(fSrc, fField) =>  ((x: Data) => (fSrc(x), fField(x)) match {
+    case DeleteField(fSrc, fField) =>  ((x: A) => (fSrc(x), fField(x)) match {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
+    case Range(fFrom, fTo) => ((x: A) => (fFrom(x), fTo(x)) match {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
-    case Guard(f1, fPattern, f2,ff3) => ((x:Data) => f2(x)).right
+    case Guard(f1, fPattern, f2, ff3) => f2.right
     case _ => InternalError.fromMsg("not implemented").left
   }
 

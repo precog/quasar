@@ -16,26 +16,35 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
-import quasar.effect.{Capture, Kvs, MonoSeq}
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl._
+import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.xquery._
 
 import scalaz._, Scalaz._
+import scalaz.stream.Process
 
 object readfile {
-  def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr](
-    chunkSize: Positive
+  type RKvs[F[_], G[_]] = Kvs[G, ReadFile.ReadHandle, DataStream[F]]
+
+  def interpret[
+    F[_]: Monad: Catchable: Xcc: PrologL,
+    G[_]: Monad: MonoSeq: RKvs[F, ?[_]],
+    FMT: SearchOptions
+  ](
+    chunkSize: Positive, fToG: F ~> G
   )(implicit
-    K: Kvs[F, ReadFile.ReadHandle, Option[ResultCursor]],
-    S: MonoSeq[F]
-  ): ReadFile ~> F =
-    readFromDataCursor[Option[ResultCursor], F] { (file, opts) =>
-      ops.exists[F](file).ifM(
-        ops.readFile[F](chunkSize)(file, opts.offset, opts.limit) map (some(_)),
-        none[ResultCursor].point[F]
-      ) map (_.right[FileSystemError])
+    SP: StructuralPlanner[F, FMT]
+  ): ReadFile ~> G =
+    readFromProcess(fToG) { (file, opts) =>
+      fToG(ops.pathHavingFormatExists[F, FMT](file) map (_.fold(
+        ops.readFile[F, FMT](file, opts.offset, opts.limit)
+          .chunk(chunkSize.get.toInt)
+          .map(_ traverse xdmitem.decodeForFileSystem),
+        (Process.empty: DataStream[F])
+      ))) map (_.right[FileSystemError])
     }
 }

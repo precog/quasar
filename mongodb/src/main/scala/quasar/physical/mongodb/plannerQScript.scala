@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.ski._
@@ -787,7 +787,7 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+    implicit def shiftedReadFile[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
@@ -844,21 +844,26 @@ object MongoDbQScriptPlanner {
               (expr, jm) => WB.jsArrayExpr(List(src, WB.flattenMap(expr)), jm)).map(liftM[M, WorkflowBuilder[WF]]).join
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
-              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) =>
-              getReduceBuilder[T, M, WF, EX](
-                funcHandler)(
-                red.map(_.sequence).sequence.fold(
-                  κ(GroupBuilder(ArrayBuilder(src, red.unite), // FIXME: Doesn’t work with UnshiftMap
-                    List(b),
-                    Contents.Doc(red.zipWithIndex.map(ai =>
-                      (BsonField.Name(ai._2.toString),
-                        accumulator(ai._1.as($field(ai._2.toString))).left[Fix[ExprOp]])).toListMap))),
-                  exprs => GroupBuilder(src,
-                    List(b),
-                    Contents.Doc(exprs.zipWithIndex.map(ai =>
-                      (BsonField.Name(ai._2.toString),
-                        accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
-                repair)).join
+              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
+                val newB = b.unFix match {
+                  case ArrayBuilderF(src, elems) => DocBuilder(src, elems.zipWithIndex.map(_.map(i => BsonField.Name(i.toString)).swap).toListMap)
+                  case _ => b
+                }
+                getReduceBuilder[T, M, WF, EX](
+                  funcHandler)(
+                  red.map(_.sequence).sequence.fold(
+                    κ(GroupBuilder(ArrayBuilder(src, red.unite), // FIXME: Doesn’t work with UnshiftMap
+                      List(newB),
+                      Contents.Doc(red.zipWithIndex.map(ai =>
+                        (BsonField.Name(ai._2.toString),
+                          accumulator(ai._1.as($field(ai._2.toString))).left[Fix[ExprOp]])).toListMap))),
+                    exprs => GroupBuilder(src,
+                      List(newB),
+                      Contents.Doc(exprs.zipWithIndex.map(ai =>
+                        (BsonField.Name(ai._2.toString),
+                          accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
+                    repair)
+              }).join
           case Sort(src, bucket, order) =>
             val (keys, dirs) = (bucket match {
               case MapFuncs.NullLit() => order
@@ -979,8 +984,8 @@ object MongoDbQScriptPlanner {
     implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
       default("Read")
 
-    implicit def shiftedReadPath[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[APath], ?]] =
-      default("ShiftedRead[APath]")
+    implicit def shiftedReadDir[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[ADir], ?]] =
+      default("ShiftedRead[ADir]")
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
       default("ThetaJoin")
@@ -1075,13 +1080,13 @@ object MongoDbQScriptPlanner {
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.toString))
+    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(_.toString)))
 
   def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.toString))) ∘
+    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.fold("_id")(_.toString)))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
@@ -1226,18 +1231,18 @@ object MongoDbQScriptPlanner {
       ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
     // NB: Intermediate form of QScript between the standard form and Mongo’s.
-    type MongoQScript0[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
+    type MongoQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: MongoQScript)#M[A]
 
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, APath, ?]](listContents)(lp).liftM[GenT]
+      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], MongoQScript0].apply(qs)
+        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript0].apply(qs)
           .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),

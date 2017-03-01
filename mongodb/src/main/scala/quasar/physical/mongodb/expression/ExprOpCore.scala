@@ -102,7 +102,7 @@ object ExprOpCoreF {
       Delay[Equal, ExprOpCoreF] =
     new Delay[Equal, ExprOpCoreF] {
       def apply[A](eq: Equal[A]) = {
-        implicit val EQ = eq
+        implicit val EQ: Equal[A] = eq
         Equal.equal {
           case ($includeF(), $includeF())           => true
           case ($varF(dv1), $varF(dv2))             => dv1 ≟ dv2

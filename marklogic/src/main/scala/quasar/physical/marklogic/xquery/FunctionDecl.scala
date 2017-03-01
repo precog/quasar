@@ -33,7 +33,6 @@ sealed abstract class FunctionDecl {
   def arity: Int =
     parameters.length
 
-  // TODO: Naming?
   def render: String = {
     val paramsList = parameters.map(_.render).toList
     s"declare function ${name}${paramsList.mkString("(", ", ", ")")} as $returnType {\n  $body\n}"
@@ -41,7 +40,6 @@ sealed abstract class FunctionDecl {
 }
 
 object FunctionDecl {
-  // TODO: Maybe just name? Until we have namespaces?
   implicit val order: Order[FunctionDecl] =
     Order.orderBy(fd => (fd.name, fd.parameters, fd.returnType))
 

@@ -39,8 +39,8 @@ object SemanticError {
     def message = s"The data '${data.shows}' did not fall within its expected domain" + hint.map(": " + _).getOrElse("")
   }
 
-  final case class FunctionNotFound(name: String) extends SemanticError {
-    def message = s"The function '$name' could not be found in the standard library"
+  final case class FunctionNotFound(name: CIName) extends SemanticError {
+    def message = s"The function '${name.shows}' could not be found in the standard library"
   }
   final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
     def message = s"Expected type ${expected.shows} but found ${actual.shows}" + hint.map(": " + _).getOrElse("")
@@ -66,8 +66,8 @@ object SemanticError {
   final case class MissingIndex(index: Int) extends SemanticError {
     def message = s"No element exists at array index '$index"
   }
-  final case class WrongArgumentCount(func: String, expected: Int, actual: Int) extends SemanticError {
-    def message = s"Wrong number of arguments for function '$func': expected $expected but found $actual"
+  final case class WrongArgumentCount(funcName: CIName, expected: Int, actual: Int) extends SemanticError {
+    def message = s"Wrong number of arguments for function '${funcName.shows}': expected $expected but found $actual"
   }
   final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
     def message = {

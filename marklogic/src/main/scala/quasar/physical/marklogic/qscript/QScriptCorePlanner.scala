@@ -103,9 +103,10 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
         cmbs  <- reducers traverse (reduceFuncCombine)
         cmb   <- lib.combineN[F] apply (mkSeq(cmbs))
         fnls  <- reducers traverse (reduceFuncFinalize)
-        fnl   <- lib.zipApply[F] apply (mkSeq(fnls))
+        idfn  <- lib.identity[F] flatMap (_.ref[F])
+        fnl   <- lib.zipApply[F] apply (mkSeq(idfn :: fnls))
         y     <- freshName[F]
-        rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(r => (~y)((r.idx + 1).xqy))
+        rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(r => (~y)((r.idx.fold(1)(_ + 2)).xqy))
         rfnl  <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
         bckt  <- fx(mapFuncXQuery[T, F, FMT](bucket, _))
         red   <- lib.reduceWith[F] apply (init, cmb, rfnl, bckt, src)

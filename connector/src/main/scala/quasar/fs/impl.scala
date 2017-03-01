@@ -20,20 +20,30 @@ import quasar.Predef._
 import quasar.Data
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.effect.{Kvs, KeyValueStore, MonoSeq, MonotonicSeq}
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.fs.PathError._
 import quasar.fs.ManageFile._
 import quasar.fs.ManageFile.MoveSemantics._
-import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
-import scalaz.stream.Process
+import scalaz.stream.{Writer => PWriter, Process}
 
 object impl {
   import FileSystemError._
+
+  type DataStream[F[_]] = PWriter[F, FileSystemError, Vector[Data]]
+
+  def dataStreamRead[F[_]: Monad: Catchable](s: DataStream[F]): F[FileSystemError \/ (DataStream[F], Vector[Data])] =
+    s.unconsOption map {
+      case Some((chunk, next)) => chunk strengthL next
+      case None                => (Process.empty: DataStream[F], Vector.empty[Data]).right[FileSystemError]
+    }
+
+  def dataStreamClose[F[_]: Monad: Catchable](s: DataStream[F]): F[Unit] =
+    s.kill.run
 
   def ensureMoveSemantics[F[_]: Monad] (
     src: APath,
@@ -100,41 +110,14 @@ object impl {
   ): ReadFile ~> F =
     read[C, F](open, c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c), C.close)
 
-  type ReadStream[F[_]] = Process[F, FileSystemError \/ Vector[Data]]
-
-  def readFromProcess[S[_], F[_]: Monad: Catchable](
-    f: (AFile, ReadOpts) => Free[S, FileSystemError \/ ReadStream[F]]
-  )(implicit
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[F], S],
-    idGen: MonotonicSeq.Ops[S],
-    S0: F :<: S
-  ) = λ[ReadFile ~> Free[S, ?]] {
-    case ReadFile.Open(file, offset, limit) =>
-      (for {
-        readStream <- EitherT(f(file, ReadOpts(offset, limit)))
-        id         <- idGen.next.liftM[FileSystemErrT]
-        handle     =  ReadFile.ReadHandle(file, id)
-        _          <- state.put(handle, readStream).liftM[FileSystemErrT]
-      } yield handle).run
-
-    case ReadFile.Read(handle) =>
-      (for {
-        stream <- state.get(handle).toRight(unknownReadHandle(handle))
-        data   <- EitherT(lift(stream.unconsOption).into[S].flatMap {
-                    case Some((value, streamTail)) =>
-                      state.put(handle, streamTail).as(value)
-                    case None                      =>
-                      state.delete(handle).as(Vector.empty[Data].right[FileSystemError])
-                  })
-      } yield data).run
-
-    case ReadFile.Close(handle) =>
-      (for {
-        stream <- state.get(handle)
-        _      <- lift(stream.kill.run).into[S].liftM[OptionT]
-        _      <- state.delete(handle).liftM[OptionT]
-      } yield ()).run.void
-  }
+  def readFromProcess[
+    F[_]: Monad: Catchable,
+    G[_]: Monad: Kvs[?[_], ReadFile.ReadHandle, DataStream[F]]: MonoSeq
+  ](
+    fToG: F ~> G)(
+    f: (AFile, ReadOpts) => G[FileSystemError \/ DataStream[F]]
+  ): ReadFile ~> G =
+    read[DataStream[F], G](f, s => fToG(dataStreamRead(s)), s => fToG(dataStreamClose(s)))
 
   def queryFile[C, F[_]: Monad](
     execute: (Fix[LogicalPlan], AFile) => F[(PhaseResults, FileSystemError \/ AFile)],
@@ -193,6 +176,26 @@ object impl {
       evaluate,
       c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c),
       C.close,
+      explain,
+      listContents,
+      fileExists)
+
+  def queryFileFromProcess[
+    F[_]: Monad: Catchable,
+    G[_]: Monad: Kvs[?[_], QueryFile.ResultHandle, DataStream[F]]: MonoSeq
+  ](
+    fToG: F ~> G,
+    execute: (Fix[LogicalPlan], AFile) => G[(PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ DataStream[F])],
+    explain: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => G[FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => G[Boolean]
+  ): QueryFile ~> G =
+    queryFile[DataStream[F], G](
+      execute,
+      evaluate,
+      s => fToG(dataStreamRead(s)),
+      s => fToG(dataStreamClose(s)),
       explain,
       listContents,
       fileExists)

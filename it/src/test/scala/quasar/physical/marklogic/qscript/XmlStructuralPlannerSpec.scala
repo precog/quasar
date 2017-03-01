@@ -96,5 +96,5 @@ final class XmlStructuralPlannerSpec
 }
 
 object XmlStructuralPlannerSpec {
-  type XmlPlan[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
+  type XmlPlan[A] = MarkLogicPlanErrT[PrologT[State[Long, ?], ?], A]
 }

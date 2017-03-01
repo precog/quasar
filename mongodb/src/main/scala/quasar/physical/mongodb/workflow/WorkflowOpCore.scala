@@ -959,7 +959,7 @@ object WorkflowOpCoreF {
         case $SortF(_, value)   =>
           val nt = "$SortF" :: wfType
           NonTerminal(nt, None,
-            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
+            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st.shows)) }.toList)
         case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
           val nt = "$GeoNearF" :: wfType
           NonTerminal(nt, None,

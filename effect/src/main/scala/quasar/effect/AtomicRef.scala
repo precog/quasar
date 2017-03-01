@@ -22,10 +22,8 @@ import quasar.fp.TaskRef
 import quasar.fp.free
 
 import monocle.Lens
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.syntax.applicative._
-import scalaz.syntax.id._
 
 /** A reference to a value that may be updated atomically.
   *
@@ -96,6 +94,8 @@ object AtomicRef {
       }
     }
 
+  // FIXME
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def toState[F[_], S](implicit F: MonadState[F, S])
                          : AtomicRef[S, ?] ~> F =
     new (AtomicRef[S, ?] ~> F) {
@@ -160,6 +160,8 @@ object AtomicRef {
   object zoom {
     def apply[A, B](lens: Lens[A, B]) = new Aux(lens)
 
+    // FIXME
+    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     final class Aux[A, B](lens: Lens[A, B]) {
       def into[S[_]](implicit S: AtomicRef[A, ?] :<: S)
           : AtomicRef[B, ?] ~> Free[S, ?] = {

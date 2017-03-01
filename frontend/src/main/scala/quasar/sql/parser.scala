@@ -71,7 +71,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     def numLitParser: Parser[Token] = rep1(digit) ~ opt('.' ~> rep(digit)) ~ opt((elem('e') | 'E') ~> opt(elem('-') | '+') ~ rep(digit)) ^^ {
       case i ~ None ~ None     => NumericLit(i mkString "")
       case i ~ Some(d) ~ None  => FloatLit(i.mkString("") + "." + d.mkString(""))
-      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.getOrElse("") + e.mkString(""))
+      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.map(_.toString).getOrElse("") + e.mkString(""))
     }
 
     val hexDigit: Parser[String] = """[0-9a-fA-F]""".r
@@ -146,7 +146,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def let_expr: Parser[T[Sql]] =
     ident ~ (op(":=") ~> expr) ~ (op(";") ~> expr) ^^ {
-      case i ~ e ~ b => let(i, e, b).embed
+      case i ~ e ~ b => let(CIName(i), e, b).embed
     } | query_expr
 
   def select_expr: Parser[T[Sql]] =
@@ -227,14 +227,14 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def between_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("between") ~ default_expr ~ keyword("and") ~ default_expr ^^ {
       case kw ~ lower ~ _ ~ upper =>
-        lhs => invokeFunction(kw, List(lhs, lower, upper)).embed
+        lhs => invokeFunction(CIName(kw), List(lhs, lower, upper)).embed
     }
 
   def in_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("in") ~ default_expr ^^ { case _ ~ a => In(_, a).embed }
 
   private def LIKE(l: T[Sql], r: T[Sql], esc: Option[T[Sql]]) =
-    invokeFunction("like",
+    invokeFunction(CIName("like"),
       List(l, r, esc.getOrElse(stringLiteral[T[Sql]]("\\").embed))).embed
 
   def like_suffix: Parser[T[Sql] => T[Sql]] =
@@ -268,16 +268,16 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def default_expr: Parser[T[Sql]] =
     concat_expr * (
       op("~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-        invokeFunction("search",
+        invokeFunction(CIName("search"),
           List(l, r, boolLiteral[T[Sql]](false).embed)).embed) |
         op("~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          invokeFunction("search",
+          invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed) |
         op("!~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](false).embed)).embed).embed) |
         op("!~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed).embed) |
         op("~~") ^^^ ((l: T[Sql], r: T[Sql]) => LIKE(l, r, None)) |
         op("!~~") ^^^ ((l: T[Sql], r: T[Sql]) => Not(LIKE(l, r, None)).embed))
@@ -340,7 +340,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def paren_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
 
   def function_expr: Parser[T[Sql]] =
-    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(a, xs).embed }
+    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(CIName(a), xs).embed }
 
   def primary_expr: Parser[T[Sql]] =
     case_expr |
@@ -452,11 +452,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
     phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
-      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first))
+      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first.toString))
     }
 
   private def parse0(sql: Query): ParsingError \/ T[Sql] = parseExpr(sql.value)

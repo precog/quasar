@@ -132,7 +132,7 @@ object LogicalPlan {
   implicit val show: Delay[Show, LogicalPlan] =
     new Delay[Show, LogicalPlan] {
       def apply[A](sa: Show[A]): Show[LogicalPlan[A]] = {
-        implicit val showA = sa
+        implicit val showA: Show[A] = sa
         Show.show {
           case Read(v) =>
             Cord("Read(") ++ v.show ++ Cord(")")
@@ -196,7 +196,7 @@ object LogicalPlan {
   implicit val equal: Delay[Equal, LogicalPlan] =
     new Delay[Equal, LogicalPlan] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (Read(n1), Read(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (Constant(d1), Constant(d2)) => d1 ≟ d2

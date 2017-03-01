@@ -2,13 +2,13 @@
     "name": "timestamp and interval syntax",
 
     "backends": {
-        "couchbase":  "skip",
+        "couchbase":      "skip",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_hdfs": "skip",
-        "spark_local": "skip"
+        "mongodb_q_3_2":  "pending",
+        "postgresql":     "pending",
+        "spark_hdfs":     "skip",
+        "spark_local":    "skip"
     },
 
     "data": "../days.data",

@@ -18,7 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar._
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{AFile, ADir}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fs._
@@ -47,7 +47,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
-      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, APath](idPrism))))
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))) >>>
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))))
 
   type QSI[A] =
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
@@ -261,8 +262,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val exp: QS[Fix[QS]] =
         TJ.inj(ThetaJoin(
           QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(RTP.inj(Const(Read(rootDir </> file("foo"))))),
-          Free.roll(RTP.inj(Const(Read(rootDir </> file("bar"))))),
+          Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+          Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
           Free.roll(And(Free.roll(And(
             // reversed equality
             Free.roll(MapFuncs.Eq(
@@ -288,8 +289,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           QCT.inj(Filter(
             EJT.inj(EquiJoin(
               QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
-              Free.roll(RTP.inj(Const(Read(rootDir </> file("foo"))))),
-              Free.roll(RTP.inj(Const(Read(rootDir </> file("bar"))))),
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
                   Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
@@ -325,14 +326,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val originalQScript =
         QCT.inj(Map(
-          SRT.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
+          SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
           Free.roll(Add(
             Free.roll(ProjectIndex(HoleF, IntLit(1))),
             Free.roll(ProjectIndex(HoleF, IntLit(1))))))).embed
 
       val expectedQScript =
         QCT.inj(Map(
-          SRT.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
+          SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
           Free.roll(Add(HoleF, HoleF)))).embed
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript

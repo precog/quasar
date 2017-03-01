@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.{Data => QData, _}
+import quasar.{Data => QData, DataCodec}
 import quasar.fp.ski.κ
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
 object RenderQuery {
   import N1QL._, Case._, Select._
 
-  implicit val codec = common.CBDataCodec
+  implicit val codec: DataCodec = common.CBDataCodec
 
   def compact[T[_[_]]: BirecursiveT](a: T[N1QL]): PlannerError \/ String = {
     val q = a.cataM(alg)

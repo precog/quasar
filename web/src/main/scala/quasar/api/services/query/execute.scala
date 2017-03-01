@@ -70,7 +70,7 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          queryPlan(xpr, requestVars(req), basePath, off, lim)
+          queryPlan(xpr, requestVars(req), basePath, Nil, off, lim)
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
               lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))

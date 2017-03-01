@@ -19,6 +19,7 @@ package quasar.physical.postgresql.fs
 import quasar.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free._
 import quasar.fs._
@@ -32,18 +33,18 @@ import scalaz.stream.Process
 
 object readfile {
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec: DataCodec = DataCodec.Precise
 
   def interpret[S[_]](
     implicit
-    S0: KeyValueStore[ReadFile.ReadHandle, impl.ReadStream[ConnectionIO], ?] :<: S,
+    S0: KeyValueStore[ReadFile.ReadHandle, impl.DataStream[ConnectionIO], ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S3: ConnectionIO :<: S
+    S2: ConnectionIO :<: S
   ): ReadFile ~> Free[S, ?] =
-    impl.readFromProcess[S, ConnectionIO] { (file: AFile, readOpts: impl.ReadOpts) =>
+    impl.readFromProcess(injectFT[ConnectionIO, S]) { (file: AFile, readOpts: impl.ReadOpts) =>
       (for {
         dt <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
-        te <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
+        te <- lift(tableExists(dt.table)).into[S].liftM[FileSystemErrT]
       } yield {
         val lim = readOpts.limit.map(lim => s"limit ${lim.unwrap}").orZero
 
@@ -56,8 +57,7 @@ object readfile {
             .chunk(1024) // arbitrary size for the moment
             .map(_.traverse(s => DataCodec.parse(s).leftMap(
               err => FileSystemError.readFailed(s, err.shows))))
-        }
-        else {
+        } else {
           Process.empty[ConnectionIO, FileSystemError \/ Vector[Data]]
         }
       }).run

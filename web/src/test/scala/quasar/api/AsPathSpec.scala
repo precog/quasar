@@ -17,7 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.pathy._
 
 import org.http4s.dsl.{Path => HPath}
 import pathy.Path._

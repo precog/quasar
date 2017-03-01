@@ -35,5 +35,5 @@ final class XmlMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, DocType.Xml
 }
 
 object XmlMarkLogicStdLibSpec {
-  type SLib[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
+  type SLib[A] = MarkLogicPlanErrT[PrologT[State[Long, ?], ?], A]
 }

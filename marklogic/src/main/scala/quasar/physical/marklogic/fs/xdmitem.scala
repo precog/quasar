@@ -18,7 +18,8 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
-import quasar.physical.marklogic.MonadErrMsgs
+import quasar.fs.FileSystemError
+import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
@@ -98,6 +99,10 @@ object xdmitem {
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
     case other                          => noReprError[F, Data](other.toString)
   }
+
+  def decodeForFileSystem(item: XdmItem): FileSystemError \/ Data =
+    toData[ErrorMessages \/ ?](item) leftMap (msgs =>
+      FileSystemError.readFailed(item.asString, msgs intercalate ", "))
 
   ////
 

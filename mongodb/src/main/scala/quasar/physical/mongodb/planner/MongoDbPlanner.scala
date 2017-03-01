@@ -567,6 +567,25 @@ object MongoDbPlanner {
         case Sized(a1, a2, a3) => (f1(a1) |@| f2(a2) |@| f3(a3))((_, _, _))
       }
 
+      def groupExpr0(f: AccumOp[Fix[ExprOp]]): Output = {
+        def reduce0(wb: WorkflowBuilder[F])(fʹ: AccumOp[Fix[ExprOp]])
+            : WorkflowBuilder[F] =
+          wb.unFix match {
+            case GroupBuilderF(Fix(ExprBuilderF(wb0, _)), keys, WorkflowBuilder.Contents.Expr(\/-(_))) =>
+              GroupBuilder(wb0, keys, WorkflowBuilder.Contents.Expr(-\/(fʹ)))
+            case GroupBuilderF(wb0, keys, WorkflowBuilder.Contents.Expr(\/-(expr))) =>
+              GroupBuilder(wb0, keys, WorkflowBuilder.Contents.Expr(-\/(fʹ)))
+            case ShapePreservingBuilderF(src @ Fix(GroupBuilderF(_, _, WorkflowBuilder.Contents.Expr(\/-(_)))), inputs, op) =>
+              ShapePreservingBuilder(reduce0(src)(fʹ), inputs, op)
+            case ExprBuilderF(src0, _) =>
+              GroupBuilder(src0, Nil, WorkflowBuilder.Contents.Expr(-\/(fʹ)))
+            case _ =>
+              GroupBuilder(wb, Nil, WorkflowBuilder.Contents.Expr(-\/(fʹ)))
+          }
+
+        lift(Arity1(HasWorkflow).map(reduce0(_)(f)))
+      }
+
       def groupExpr1(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]]): Output =
         lift(Arity1(HasWorkflow).map(WB.reduce(_)(f)))
 
@@ -693,7 +712,7 @@ object MongoDbPlanner {
           lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
-        case Count      => groupExpr1(κ($sum($literal(Bson.Int32(1)))))
+        case Count      => groupExpr0($sum($literal(Bson.Int32(1))))
         case Sum        => groupExpr1($sum(_))
         case Avg        => groupExpr1($avg(_))
         case Min        => groupExpr1($min(_))

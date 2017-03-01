@@ -17,15 +17,22 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
+import eu.timepit.refined.auto._
 import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
+  val ns = Namespace(NSPrefix(NCName("xdmp")), NSUri("http://marklogic.com/xdmp"))
+
   def apply(function: XQuery, params: XQuery*): XQuery =
     XQuery(s"xdmp:apply($function, ${mkSeq(params)})")
+
+  def database(): XQuery =
+    XQuery(s"xdmp:database()")
 
   def directory(uri: XQuery, depth: XQuery): XQuery =
     XQuery(s"xdmp:directory($uri, $depth)")
@@ -35,6 +42,9 @@ object xdmp {
 
   def directoryDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:directory-delete($uri)")
+
+  def directoryProperties(uris: XQuery, depth: XQuery): XQuery =
+    XQuery(s"xdmp:directory-properties($uris, $depth)")
 
   def documentDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:document-delete($uri)")
@@ -60,6 +70,11 @@ object xdmp {
   def integerToHex(int: XQuery): XQuery =
     XQuery(s"xdmp:integer-to-hex($int)")
 
+  // NB: This mutates state on disk, see the `mem` lib if looking for in-memory
+  //     node modification.
+  def nodeInsertChild(parent: XQuery, child: XQuery): XQuery =
+    XQuery(s"xdmp:node-insert-child($parent, $child)")
+
   def nodeKind(node: XQuery): XQuery =
     XQuery(s"xdmp:node-kind($node)")
 
@@ -76,6 +91,9 @@ object xdmp {
 
   def quarterFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:quarter-from-date($date)")
+
+  def random(max: XQuery): XQuery =
+    XQuery(s"xdmp:random($max)")
 
   def toJson(serialized: XQuery): XQuery =
     XQuery(s"xdmp:to-json($serialized)")

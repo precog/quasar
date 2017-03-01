@@ -95,9 +95,7 @@ object JoinHandler {
     }
 
     def sourceDb: Algebra[WorkflowBuilderF[WF, ?], Option[DatabaseName]] = {
-      case CollectionBuilderF(Fix($read(Collection(db, _))), _, _) => db.some
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
-
       case ArrayBuilderF(src, _)              => src
       case ArraySpliceBuilderF(src, _)        => src
       case DocBuilderF(src, _)                => src

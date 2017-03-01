@@ -85,6 +85,12 @@ final class LogicalPlanR[T]
   def normalizeTempNames(t: T) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
+  def bindFree(vars: Map[Symbol, T])(t: T): String \/ T =
+    t.cataM[String \/ ?, T] {
+      case Free(sym) => vars.get(sym).toRightDisjunction(s"Could not find variable $sym")
+      case other     => other.embed.right
+    }
+
   /** Per the following:
     * 1. Successive Lets are re-associated to the right:
     *    (let a = (let b = x1 in x2) in x3) becomes
@@ -297,13 +303,13 @@ final class LogicalPlanR[T]
           plan  <- unifyOrCheck(inf, types, invoke(structural.FlattenMap, consts))
         } yield plan
         case InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized()) =>
-          handleGenericInvoke(inf, func, Sized[List]())
+          checkGenericInvoke(inf, func, Sized[List]())
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
-          handleGenericInvoke(inf, func, Func.Input1(a1))
+          checkGenericInvoke(inf, func, Func.Input1(a1))
         case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) =>
-          handleGenericInvoke(inf, func, Func.Input2(a1, a2))
+          checkGenericInvoke(inf, func, Func.Input2(a1, a2))
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
-          handleGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
+          checkGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
         case Typecheck(expr, typ, cont, fallback) =>
 	  val typer: Func.Typer[Nat._3] = {
             case Sized(_, t2, _) => Type.glb(t2, typ).success
@@ -319,7 +325,7 @@ final class LogicalPlanR[T]
 	        (List(constr), expr.plan)
 	  }
           val expr0 = ConstrainedPlan(expr.inferred, constrs, plan)
-          handleInvoke(inf, typer, construct, Func.Input3(expr0, cont, fallback))
+          checkInvoke(inf, typer, construct, Func.Input3(expr0, cont, fallback))
         case Let(name, value, in) =>
           unifyOrCheck(inf, in.inferred, let(name, appConst(value, constant(Data.NA)), appConst(in, constant(Data.NA))))
         // TODO: Get the possible type from the LetF
@@ -336,11 +342,11 @@ final class LogicalPlanR[T]
 
           val constructLPNode: Func.Input[T, Nat._1] => T = { case Sized(i) => temporalTrunc(part, i) }
 
-          handleInvoke(inf, typer, constructLPNode, Func.Input1(src))
+          checkInvoke(inf, typer, constructLPNode, Func.Input1(src))
       }
   }
 
-  private def handleInvoke[N <: Nat](
+  private def checkInvoke[N <: Nat](
     inf: Type,
     typer: Func.Typer[N],
     constructLPNode: Func.Input[T, N] => T,
@@ -357,13 +363,13 @@ final class LogicalPlanR[T]
       cp.copy(constraints = cp.constraints ++ constraints))
   }
 
-  private def handleGenericInvoke[N <: Nat](
+  private def checkGenericInvoke[N <: Nat](
     inf: Type, func: GenericFunc[N], args: Func.Input[ConstrainedPlan[T], N]
   ): NameT[SemDisj, ConstrainedPlan[T]] = {
     val constructLPNode = invoke(func, _: Func.Input[T, N])
     func.effect match {
       case Mapping =>
-        handleInvoke(inf, func.typer0, constructLPNode, args)
+        checkInvoke(inf, func.typer0, constructLPNode, args)
       case _ =>
         lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
           unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))

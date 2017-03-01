@@ -35,5 +35,5 @@ final class JsonMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, DocType.Js
 }
 
 object JsonMarkLogicStdLibSpec {
-  type SLib[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
+  type SLib[A] = MarkLogicPlanErrT[PrologT[State[Long, ?], ?], A]
 }

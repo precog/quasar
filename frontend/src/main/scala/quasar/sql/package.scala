@@ -41,10 +41,10 @@ package object sql {
   def binop[A] = Prism.partial[Sql[A], (A, A, BinaryOperator)] { case Binop(l, r, op) => (l, r, op) } ((Binop[A] _).tupled)
   def unop[A] = Prism.partial[Sql[A], (A, UnaryOperator)] { case Unop(a, op) => (a, op) } ((Unop[A] _).tupled)
   def ident[A] = Prism.partial[Sql[A], String] { case Ident(name) => name } (Ident(_))
-  def invokeFunction[A] = Prism.partial[Sql[A], (String, List[A])] { case InvokeFunction(name, args) => (name, args) } ((InvokeFunction[A] _).tupled)
+  def invokeFunction[A] = Prism.partial[Sql[A], (CIName, List[A])] { case InvokeFunction(name, args) => (name, args) } ((InvokeFunction[A] _).tupled)
   def matc[A] = Prism.partial[Sql[A], (A, List[Case[A]], Option[A])] { case Match(expr, cases, default) => (expr, cases, default) } ((Match[A] _).tupled)
   def switch[A] = Prism.partial[Sql[A], (List[Case[A]], Option[A])] { case Switch(cases, default) => (cases, default) } ((Switch[A] _).tupled)
-  def let[A] = Prism.partial[Sql[A], (String, A, A)] { case Let(n, f, b) => (n, f, b) } ((Let[A](_, _, _)).tupled)
+  def let[A] = Prism.partial[Sql[A], (CIName, A, A)] { case Let(n, f, b) => (n, f, b) } ((Let[A](_, _, _)).tupled)
   def intLiteral[A] = Prism.partial[Sql[A], Long] { case IntLiteral(v) => v } (IntLiteral(_))
   def floatLiteral[A] = Prism.partial[Sql[A], Double] { case FloatLiteral(v) => v } (FloatLiteral(_))
   def stringLiteral[A] = Prism.partial[Sql[A], String] { case StringLiteral(v) => v } (StringLiteral(_))
@@ -132,10 +132,10 @@ package object sql {
         sel2.copy(relations = sel2.relations.map(mkRel(_))).embed
       }
 
-      case Let(name, form, body) => {
-        val form2 = form.makeTables(bindings)
-        val body2 = body.makeTables(name :: bindings)
-        let(name, form2, body2).embed
+      case Let(ident, bindTo, in) => {
+        val form2 = bindTo.makeTables(bindings)
+        val body2 = in.makeTables(ident.value :: bindings)
+        let(ident, form2, body2).embed
       }
 
       case other => other.map(_.makeTables(bindings)).embed
@@ -242,11 +242,11 @@ package object sql {
       case Ident(name) => _qq("`", name)
       case InvokeFunction(name, args) =>
         (name, args) match {
-          case ("like", (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
+          case (CIName("like"), (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
             "(" + value + ") like (" + pattern + ")"
-          case ("like", (_, value) :: (_, pattern) :: (_, esc) :: Nil) =>
+          case (CIName("like"), (_, value) :: (_, pattern) :: (_, esc) :: Nil) =>
             "(" + value + ") like (" + pattern + ") escape (" + esc + ")"
-          case _ => name + "(" + args.map(_._2).mkString(", ") + ")"
+          case _ => name.value + "(" + args.map(_._2).mkString(", ") + ")"
         }
       case Match(expr, cases, default) =>
         ("case" ::
@@ -257,8 +257,8 @@ package object sql {
         ("case" ::
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
-      case Let(name, form, body) =>
-        name ++ " :: " ++ form._2 ++ "; " ++ body._2
+      case Let(ident, bindTo, in) =>
+        ident.shows ++ " :: " ++ bindTo._2 ++ "; " ++ in._2
       case IntLiteral(v) => v.toString
       case FloatLiteral(v) => v.toString
       case StringLiteral(v) => _q(v)

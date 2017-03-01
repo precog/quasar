@@ -26,10 +26,11 @@ import scalaz._, Scalaz._
 
 sealed trait Sql[A]
 object Sql {
+
   implicit val equal: Delay[Equal, Sql] =
     new Delay[Equal, Sql] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (Select(d1, p1, r1, f1, g1, o1), Select(d2, p2, r2, f2, g2, o2)) =>
             d1 ≟ d2 && p1 ≟ p2 && r1 ≟ r2 && f1 ≟ f2 && g1 ≟ g2 && o1 ≟ o2
@@ -96,7 +97,7 @@ object Sql {
           case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
           case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(_.render))
 
-          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
+          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name.value), args.map(ra.render))
 
           case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
           case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
@@ -115,7 +116,7 @@ object Sql {
           case Vari(name) => Terminal("Variable" :: astType, Some(":" + name))
 
           case Let(name, form, body) =>
-            NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
+            NonTerminal("Let" :: astType, Some(name.value), ra.render(form) :: ra.render(body) :: Nil)
 
           case IntLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
           case FloatLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
@@ -195,13 +196,13 @@ object Sql {
     extends Sql[A]
 @Lenses final case class Unop[A] private[sql] (expr: A, op: UnaryOperator) extends Sql[A]
 @Lenses final case class Ident[A] private[sql] (name: String) extends Sql[A]
-@Lenses final case class InvokeFunction[A] private[sql] (name: String, args: List[A])
+@Lenses final case class InvokeFunction[A] private[sql] (name: CIName, args: List[A])
     extends Sql[A]
 @Lenses final case class Match[A] private[sql] (expr: A, cases: List[Case[A]], default: Option[A])
     extends Sql[A]
 @Lenses final case class Switch[A] private[sql] (cases: List[Case[A]], default: Option[A])
     extends Sql[A]
-@Lenses final case class Let[A](name: String, form: A, body: A) extends Sql[A]
+@Lenses final case class Let[A](ident: CIName, bindTo: A, in: A) extends Sql[A]
 @Lenses final case class IntLiteral[A] private[sql] (v: Long) extends Sql[A]
 @Lenses final case class FloatLiteral[A] private[sql] (v: Double) extends Sql[A]
 @Lenses final case class StringLiteral[A] private[sql] (v: String) extends Sql[A]
@@ -213,7 +214,7 @@ object Case {
   implicit val equal: Delay[Equal, Case] =
     new Delay[Equal, Case] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (Case(c1, e1), Case(c2, e2)) => c1 ≟ c2 && e1 ≟ e2
           case (_, _)                       => false
@@ -227,7 +228,7 @@ object GroupBy {
   implicit val equal: Delay[Equal, GroupBy] =
     new Delay[Equal, GroupBy] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (GroupBy(k1, h1), GroupBy(k2, h2)) => k1 ≟ k2 && h1 ≟ h2
           case (_, _)                             => false
@@ -241,7 +242,7 @@ object OrderBy {
   implicit val equal: Delay[Equal, OrderBy] =
     new Delay[Equal, OrderBy] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (OrderBy(k1), OrderBy(k2)) => k1 ≟ k2
           case (_, _)                     => false
@@ -255,7 +256,7 @@ object Proj {
   implicit val equal: Delay[Equal, Proj] =
     new Delay[Equal, Proj] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (Proj(e1, a1), Proj(e2, a2)) => e1 ≟ e2 && a1 ≟ a2
           case (_, _)                       => false

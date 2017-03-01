@@ -244,12 +244,12 @@ object MapFunc {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
             case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Constant(src)))), Embed(value))))) if field ≟ src =>
-              value
+              value.some
             case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
-              m.find {
-                case (k, v) => k ≟ field
-              }.map(p => rollMF[T, A](Constant(p._2))).get
-          }
+              m.collectFirst {
+                case (k, v) if k ≟ field => rollMF[T, A](Constant(v))
+              }
+          }.flatten
 
         // elide Nil array on the left
         case ConcatArrays(

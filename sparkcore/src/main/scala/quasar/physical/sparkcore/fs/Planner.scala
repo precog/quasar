@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar._, quasar.Planner._
 import quasar.common.SortDir
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
 
@@ -85,7 +85,7 @@ object Planner {
 
   implicit def deadEnd: Planner[Const[DeadEnd, ?]] = unreachable("deadEnd")
   implicit def read[A]: Planner[Const[Read[A], ?]] = unreachable("read")
-  implicit def shiftedReadPath: Planner[Const[ShiftedRead[APath], ?]] = unreachable("shifted read of a path")
+  implicit def shiftedReadPath: Planner[Const[ShiftedRead[ADir], ?]] = unreachable("shifted read of a dir")
   implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
   implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
 
@@ -185,16 +185,10 @@ object Planner {
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
-            EitherT {
-              val maybeFunc =
-                // TODO extract to a single method for compile-time efficiency
-                f.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
-              maybeFunc.map(df => (sc, src.map(df))).point[Task]
-            }
-          )
+            EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[Task]))
         case Reduce(src, bucket, reducers, repair) =>
           val maybePartitioner: PlannerError \/ (Data => Data) =
-            bucket.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+            CoreMap.changeFreeMap(bucket)
 
           val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
             case Count(a) => a >>> {
@@ -220,39 +214,31 @@ object Planner {
           }
 
           val maybeTransformers: PlannerError \/ List[Data => Data] =
-            reducers.traverse(red => (red.traverse(_.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)))).map(extractFunc))
+            reducers.traverse(_.traverse(CoreMap.changeFreeMap[T]).map(extractFunc))
 
           val reducersFuncs: List[(Data,Data) => Data] =
             reducers.map(reduceData)
 
-          val maybeRepair: PlannerError \/ (Data => Data) =
-            repair.cataM(interpretM({
-              case ReduceIndex(i) => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(i)
-                case _ => Data.NA
-              }).right
-            }, CoreMap.change))
+          val maybeRepair: PlannerError \/ ((Data, List[Data]) => Data) =
+            CoreMap.changeReduceFunc(repair)
 
-          def merge(a: Data, b: Data, f: List[(Data, Data) => Data]): Data = (a, b) match {
-            case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(Zip[List].zipWith(f,(l1.zip(l2))) {
-              case (f, (l1, l2)) => f(l1,l2)
-            })
-            case _ => Data.NA
-          }
+          def merge
+            (a: List[Data], b: List[Data], f: List[(Data, Data) => Data])
+              : List[Data] =
+            Zip[List].zipWith(f,(a.zip(b)))(_.tupled(_))
 
           StateT((sc: SparkContext) =>
             EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
               case (partitioner, trans, repair) =>
-                src.map(d => (partitioner(d), Data.Arr(trans.map(_(d))) : Data))
+                src.map(d => (partitioner(d), trans.map(_(d))))
                   .reduceByKey(merge(_,_, reducersFuncs))
                   .map {
-                  case (k, Data.Arr(vs)) =>
+                  case (k, vs) =>
                     val v = Zip[List].zipWith(vs, reducers) {
                       case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
-                    repair(Data.Arr(v))
-                  case (_, _) => Data.NA
+                    repair(k, v)
                 }
             }).map((sc, _)).point[Task])
           )
@@ -260,12 +246,10 @@ object Planner {
 
           val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
             orders.traverse {
-              case (freemap, sdir) =>
-                freemap.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
+              case (freemap, sdir) => CoreMap.changeFreeMap(freemap).map((_, sdir))
             }
 
-          val maybeBucket =
-            bucket.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+          val maybeBucket = CoreMap.changeFreeMap(bucket)
 
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
@@ -277,16 +261,12 @@ object Planner {
         case Filter(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {
-              val maybeFunc =
-                f.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
-              maybeFunc.map(df => (sc, src.filter{
+              CoreMap.changeFreeMap(f).map(df => (sc, src.filter(
                 df >>> {
                   case Data.Bool(b) => b
-                  case _ => false
-                }
-              })).point[Task]
-            }
-          )
+                  case _            => false
+                }))).point[Task]
+            })
         case Subset(src, from, sel, count) =>
           filterOut(fromFile, src, from, count,
             sel match {
@@ -299,38 +279,25 @@ object Planner {
         case LeftShift(src, struct, id, repair) =>
 
           val structFunc: PlannerError \/ (Data => Data) =
-            struct.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+            CoreMap.changeFreeMap(struct)
 
-          def repairFunc: PlannerError \/ ((Data, Data) => Data) = {
-            val dd: PlannerError \/ (Data => Data) =
-              repair.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
-                case LeftSide => ((x: Data) => x match {
-                  case Data.Arr(elems) => elems(0)
-                  case _ => Data.NA
-                }).right
-                case RightSide => ((x: Data) => x match {
-                  case Data.Arr(elems) => elems(1)
-                  case _ => Data.NA
-                }).right
-              }, CoreMap.change))
-
-            dd.map(df => (l, r) => df(Data.Arr(List(l, r))))
-          }
+          def repairFunc: PlannerError \/ ((Data, Data) => Data) =
+            CoreMap.changeJoinFunc(repair)
 
           StateT((sc: SparkContext) =>
             EitherT((structFunc ⊛ repairFunc)((df, rf) =>
-              src.flatMap((input: Data) => (df(input), id) match {
-                case (Data.Arr(list), ExcludeId) => list.map(rf(input, _))
-                case (Data.Arr(list), IncludeId) =>
-                  list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
-                case (Data.Arr(list), IdOnly) =>
-                  list.indices.map(i => rf(input, Data.Int(i)))
-                case (Data.Obj(m), ExcludeId) => m.values.map(rf(input, _))
-                case (Data.Obj(m), IncludeId) =>
-                  m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
-                case (Data.Obj(m), IdOnly) =>
-                  m.keys.map(k => rf(input, Data.Str(k)))
-                case (_, _) => List.empty[Data]
+              src.flatMap((input: Data) => df(input) match {
+                case Data.Arr(list) => id match {
+                  case ExcludeId => list.map(rf(input, _))
+                  case IncludeId => list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
+                  case IdOnly => list.indices.map(i => rf(input, Data.Int(i)))
+                }
+                case Data.Obj(m) => id match {
+                  case ExcludeId => m.values.map(rf(input, _))
+                  case IncludeId => m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
+                  case IdOnly => m.keys.map(k => rf(input, Data.Str(k)))
+                }
+                case _ => List.empty[Data]
               })).map((sc, _)).point[Task]))
 
         case Union(src, lBranch, rBranch) =>
@@ -355,19 +322,11 @@ object Planner {
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
 
-          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = EitherT(kf.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).liftM[SparkStateT]
+          def genKey(kf: FreeMap[T]): SparkState[Data => Data] =
+            EitherT(CoreMap.changeFreeMap(kf).point[Task]).liftM[SparkStateT]
 
-          val merger: SparkState[Data => Data] =
-            EitherT((combine.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
-              case LeftSide => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(0)
-                case _ => Data.NA
-              }).right
-              case RightSide => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(1)
-                case _ => Data.NA
-              }).right
-            }, CoreMap.change))).point[Task]).liftM[SparkStateT]
+          val merger: SparkState[(Data, Data) => Data] =
+            EitherT(CoreMap.changeJoinFunc(combine).point[Task]).liftM[SparkStateT]
 
           for {
             lk <- genKey(lKey)
@@ -381,16 +340,16 @@ object Planner {
 
             jt match {
               case Inner => klRdd.join(krRdd).map {
-                case (_, (l, r)) => merge(Data.Arr(List(l, r)))
+                case (_, (l, r)) => merge(l, r)
               }
               case LeftOuter => klRdd.leftOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(Data.Arr(List(l, r.getOrElse(Data.Null))))
+                case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
               }
               case RightOuter => klRdd.rightOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(Data.Arr(List(l.getOrElse(Data.Null), r)))
+                case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
               }
               case FullOuter => klRdd.fullOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(Data.Arr(List(l.getOrElse(Data.Null), r.getOrElse(Data.Null))))
+                case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
               }
             }
           }

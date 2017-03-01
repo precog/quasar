@@ -29,7 +29,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.CoEnv
-import pathy.Path.{dir1, file1, refineType}
+import pathy.Path.{dir1, file1}
 import scalaz._, Scalaz._
 
 /** Converts any {Shifted}Read containing a directory to a union of all the
@@ -67,21 +67,21 @@ abstract class ExpandDirsInstances {
 
   // real instances
 
-  implicit def read[T[_[_]]: BirecursiveT, F[_]: Functor]
+  implicit def readDir[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       R: Const[Read[AFile], ?] :<: F,
       QC:    QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
-      : ExpandDirs.Aux[T, Const[Read[APath], ?], F] =
-    expandDirsPath[T, F].readPath
+      : ExpandDirs.Aux[T, Const[Read[ADir], ?], F] =
+    expandDirsPath[T, F].readDir
 
-  implicit def shiftedReadPath[T[_[_]]: BirecursiveT, F[_]: Functor]
+  implicit def shiftedReadDir[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
       SR: Const[ShiftedRead[AFile], ?] :<: F,
       QC:            QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
-      : ExpandDirs.Aux[T, Const[ShiftedRead[APath], ?], F] =
-    expandDirsPath[T, F].shiftedReadPath
+      : ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], F] =
+    expandDirsPath[T, F].shiftedReadDir
 
   // branch handling
 
@@ -176,8 +176,8 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
       nel => OutToF(union(nel) ∘ (_.transAna[T[F]](OutToF))).point[M]))
 
 
-  def readPath(implicit R: Const[Read[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[Read[APath], ?], O] =
-    new ExpandDirs[Const[Read[APath], ?]] {
+  def readDir(implicit R: Const[Read[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[Read[ADir], ?], O] =
+    new ExpandDirs[Const[Read[ADir], ?]] {
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
@@ -186,13 +186,11 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
 
       def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
         (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        r => refineType(r.getConst.path).fold(
-          unionAll(OutToF, g, wrapRead[OUT]),
-          file => OutToF(wrapRead[F](file)).point[M])
+        r => unionAll(OutToF, g, wrapRead[OUT]) apply r.getConst.path
     }
 
-  def shiftedReadPath(implicit SR: Const[ShiftedRead[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[ShiftedRead[APath], ?], O] =
-    new ExpandDirs[Const[ShiftedRead[APath], ?]] {
+  def shiftedReadDir(implicit SR: Const[ShiftedRead[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], O] =
+    new ExpandDirs[Const[ShiftedRead[ADir], ?]] {
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
@@ -201,9 +199,7 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
 
       def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
         (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        r => refineType(r.getConst.path).fold(
-          unionAll(OutToF, g, wrapRead[OUT](_, r.getConst.idStatus)),
-          file => (OutToF(wrapRead[F](file, r.getConst.idStatus)).point[M]))
+        r => unionAll(OutToF, g, wrapRead[OUT](_, r.getConst.idStatus)) apply r.getConst.path
     }
 }
 

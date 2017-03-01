@@ -26,6 +26,8 @@ import scalaz._, Scalaz._
 
 class ParquetRDDSpec extends Qspec {
 
+  sequential
+
   val config =
     new SparkConf().setMaster("local[*]").setAppName("ParquetRDDSpec")
 

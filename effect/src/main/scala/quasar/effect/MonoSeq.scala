@@ -41,22 +41,17 @@ trait MonoSeq[F[_]] {
 object MonoSeq extends MonoSeqInstances {
   def forTrans[F[_]: Monad, T[_[_], _]: MonadTrans](implicit S: MonoSeq[F]): MonoSeq[T[F, ?]] =
     new MonoSeq[T[F, ?]] { def next = S.next.liftM[T] }
-
-  def forInjectable[F[_], S[_]](implicit F: MonoSeq[F], I: F :<: S): MonoSeq[Free[S, ?]] =
-    new MonoSeq[Free[S, ?]] {
-      def next = Free.liftF(I(F.next))
-    }
 }
 
-sealed abstract class MonoSeqInstances {
+sealed abstract class MonoSeqInstances extends MonoSeqInstances0 {
   implicit val monotonicSeq: MonoSeq[MonotonicSeq] =
-    new MonoSeq[MonotonicSeq] {
-      val next = MonotonicSeq.Next
-    }
+    new MonoSeq[MonotonicSeq] { val next = MonotonicSeq.Next }
 
-  implicit def injectableMonotonicSeq[S[_]](implicit I: MonotonicSeq :<: S): MonoSeq[Free[S, ?]] =
-    MonoSeq.forInjectable[MonotonicSeq, S]
+  implicit def freeMonoSeq[F[_], S[_]](implicit F: MonoSeq[F], I: F :<: S): MonoSeq[Free[S, ?]] =
+    new MonoSeq[Free[S, ?]] { def next = Free.liftF(I(F.next)) }
+}
 
+sealed abstract class MonoSeqInstances0 {
   implicit def eitherTMonoSeq[F[_]: Monad: MonoSeq, E]: MonoSeq[EitherT[F, E, ?]] =
     MonoSeq.forTrans[F, EitherT[?[_], E, ?]]
 

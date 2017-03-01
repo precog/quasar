@@ -21,6 +21,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{Common, EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
+import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
@@ -59,6 +60,28 @@ package object qscript {
   def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
     (QName.string.getOption(s) orElse QName.string.getOption(encodeForQName(s)))
       .fold(invalidQName[F, QName](s))(_.point[F])
+
+  /** XQuery evaluating to the documents having the specified format in the directory. */
+  def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =
+    cts.search(
+      expr    = fn.doc(),
+      query   = cts.directoryQuery(uri, (includeDescendants ? "infinity" | "1").xs),
+      options = SearchOptions[FMT].searchOptions)
+
+  /** XQuery evaluating to the document node at the given URI. */
+  def documentNode[FMT: SearchOptions](uri: XQuery): XQuery =
+    cts.search(
+      expr    = fn.doc(),
+      query   = cts.documentQuery(uri),
+      options = SearchOptions[FMT].searchOptions)
+
+  /** XQuery evaluating to the document node at the given path. */
+  def fileNode[FMT: SearchOptions](file: AFile): XQuery =
+    documentNode[FMT](UriPathCodec.printPath(file).xs)
+
+  /** XQuery evaluating to the root node of the document at the given path. */
+  def fileRoot[FMT: SearchOptions](file: AFile): XQuery =
+    fileNode[FMT](file) `/` axes.child.node()
 
   def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: MonadPlanErr, FMT](
     fm: FreeMap[T],

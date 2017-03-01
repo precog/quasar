@@ -18,9 +18,11 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.catchable._
+import quasar.effect.Capture
+import quasar.fp.ski.κ
 
 import com.marklogic.xcc.{ContentSource, Session}
-import com.marklogic.xcc.exceptions.XccException
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
@@ -38,39 +40,21 @@ package object xcc {
 
   object SessionReader {
     def apply[F[_]](implicit F: SessionReader[F]): SessionReader[F] = F
-  }
 
-  type XccErr[F[_]] = MonadError_[F, XccError]
-
-  object XccErr {
-    def apply[F[_]](implicit F: MonadError_[F, XccError]): XccErr[F] = F
+    def withSession[F[_]: Bind: Capture: SessionReader, A](f: Session => A): F[A] =
+      apply[F].ask >>= (s => Capture[F].capture(f(s)))
   }
 
   type ContentUri = String Refined Uri
   val  ContentUri = Prism((s: String) => refineV[Uri](s).right.toOption)(_.get)
 
-  def attemptXcc[F[_], A](fa: F[A])(implicit FM: Monad[F], FC: Catchable[F]): F[XccException \/ A] =
-    FM.bind(FC.attempt(fa)) {
-      case -\/(xe: XccException) => FM.point(xe.left)
-      case -\/(t)                => FC.fail(t)
-      case \/-(a)                => FM.point(a.right)
-    }
-
-  def handleXcc[F[_]: Monad: Catchable, A, B >: A](
-    fa: F[A])(
-    pf: PartialFunction[XccException, B]
-  ): F[B] =
-    handleXccWith[F, A, B](fa)(pf andThen (_.point[F]))
-
-  def handleXccWith[F[_], A, B >: A](
-    fa: F[A])(
-    pf: PartialFunction[XccException, F[B]]
-  )(implicit
-    FM: Monad[F],
-    FC: Catchable[F]
-  ): F[B] =
-    FM.bind(attemptXcc(fa)) {
-      case -\/(e) => pf.lift(e) getOrElse FC.fail(e)
-      case \/-(a) => FM.point[B](a)
+  /** Returns a natural transformation that safely runs a `Session` reader,
+    * ensuring the provided sessions are properly closed after use.
+    */
+  def provideSession[F[_]: Monad: Capture: Catchable](cs: ContentSource): Kleisli[F, Session, ?] ~> F =
+    λ[Kleisli[F, Session, ?] ~> F] { sr =>
+      contentsource.defaultSession[Kleisli[F, ContentSource, ?]]
+        .run(cs)
+        .flatMap(s => sr.run(s).ensuring(κ(Capture[F].capture(s.close()))))
     }
 }

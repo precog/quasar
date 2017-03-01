@@ -202,10 +202,10 @@ package object optimize {
         case (Nil, r :: rs) => inlineProject0(r, rs).map(_.left)
 
         case (l :: ls, r :: rs) => r.get(l).flatMap {
-          case  -\/ (r)          => get0(ls, r :: rs)
-          case   \/-($include()) => get0(leaves, rs)
-          case   \/-($var(d))    => get0(d.path ++ ls, rs)
-          case   \/-(e) => if (ls.isEmpty) fixExpr(e, rs).map(_.right) else none
+          case -\/ (r)          => get0(ls, r :: rs)
+          case  \/-($include()) => get0(leaves, rs)
+          case  \/-($var(d))    => get0(d.path ++ ls, rs)
+          case  \/-(e) => if (ls.isEmpty) fixExpr(e, rs).map(_.right) else none
         }
       }
     }

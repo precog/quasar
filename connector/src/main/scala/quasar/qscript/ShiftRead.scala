@@ -73,7 +73,7 @@ object ShiftRead {
           List(ReduceFuncs.UnshiftMap(
             Free.roll(ProjectIndex(HoleF, IntLit(0))),
             Free.roll(ProjectIndex(HoleF, IntLit(1))))),
-          Free.point(ReduceIndex(0)))))
+          Free.point(ReduceIndex(0.some)))))
        )
     }
 

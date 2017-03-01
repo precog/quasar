@@ -17,33 +17,66 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
+import quasar.fp.ski.ι
+import quasar.physical.marklogic.xquery.MainModule
 
 import com.marklogic.xcc.exceptions._
 import monocle.{Getter, Prism}
-import scalaz._
-import scalaz.std.string._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
 
 sealed abstract class XccError
 
 object XccError {
   /** Indicates a problem with an XCC request. */
-  final case class RequestError(cause: RequestException) extends XccError
+  final case class RequestError(cause: RequestException)
+    extends XccError
 
-  /** Indicates a problem (syntactic or semantic) with some XQuery submitted for evaluation. */
-  final case class XQueryError(xqy: String, cause: XQueryException) extends XccError
+  /** Indicates a problem (syntactic or semantic) with some XQuery submitted for
+    * evaluation.
+    */
+  final case class XQueryError(
+    module: MainModule,
+    cause: RetryableXQueryException \/ XQueryException
+  ) extends XccError
+
+  object QueryError {
+    def unapply(xerr: XccError): Option[(MainModule, QueryException)] =
+      Functor[Option].compose[(MainModule, ?)]
+        .map(xqueryError.getOption(xerr))(widenXQueryCause)
+  }
+
+  sealed abstract class Code
+
+  object Code {
+    case object DirExists extends Code
+
+    val string = Prism.partial[String, Code] {
+      case "XDMP-DIREXISTS" => DirExists
+    } {
+      case DirExists        => "XDMP-DIREXISTS"
+    }
+
+    implicit val equal: Equal[Code] =
+      Equal.equalA
+
+    implicit val show: Show[Code] =
+      Show.shows(string(_))
+  }
+
+  val widenXQueryCause: RetryableXQueryException \/ XQueryException => QueryException =
+    _.fold[QueryException](ι, ι)
 
   val cause: Getter[XccError, RequestException] =
     Getter {
-      case RequestError(ex)   => ex
-      case XQueryError(_, ex) => ex
+      case RequestError(ex)  => ex
+      case XQueryError(_, c) => widenXQueryCause(c)
     }
 
   val requestError = Prism.partial[XccError, RequestException] {
     case RequestError(ex) => ex
   } (RequestError)
 
-  val xqueryError = Prism.partial[XccError, (String, XQueryException)] {
+  val xqueryError = Prism.partial[XccError, (MainModule, RetryableXQueryException \/ XQueryException)] {
     case XQueryError(xqy, cause) => (xqy, cause)
   } (XQueryError.tupled)
 
@@ -51,8 +84,9 @@ object XccError {
     case RequestError(cause) =>
       cause.toString
 
-    case XQueryError(xqy, cause) =>
-      val lineNum = cause.getStack.headOption map (sf => s" on line ${sf.getLineNumber}")
-      s"${cause.getFormatString}${~lineNum}\n---BEGIN QUERY---\n$xqy\n--- END QUERY ---"
+    case XQueryError(main, c) =>
+      val error   = widenXQueryCause(c)
+      val lineNum = error.getStack.headOption map (sf => s" on line ${sf.getLineNumber}")
+      s"${error.getFormatString}${~lineNum}\n---BEGIN QUERY---\n${main.render}\n--- END QUERY ---"
   }
 }

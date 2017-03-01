@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
 import quasar.qscript.MapFunc._
@@ -67,9 +67,9 @@ package object qscript {
   type QScriptTotal0[T[_[_]], A] = Coproduct[ProjectBucket[T, ?]         , QScriptTotal1[T, ?], A]
   type QScriptTotal1[T[_[_]], A] = Coproduct[ThetaJoin[T, ?]             , QScriptTotal2[T, ?], A]
   type QScriptTotal2[T[_[_]], A] = Coproduct[EquiJoin[T, ?]              , QScriptTotal3[T, ?], A]
-  type QScriptTotal3[T[_[_]], A] = Coproduct[Const[ShiftedRead[APath], ?], QScriptTotal4[T, ?], A]
+  type QScriptTotal3[T[_[_]], A] = Coproduct[Const[ShiftedRead[ADir], ?] , QScriptTotal4[T, ?], A]
   type QScriptTotal4[T[_[_]], A] = Coproduct[Const[ShiftedRead[AFile], ?], QScriptTotal5[T, ?], A]
-  type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[APath], ?]       , QScriptTotal6[T, ?], A]
+  type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[ADir], ?]        , QScriptTotal6[T, ?], A]
   type QScriptTotal6[T[_[_]], A] = Coproduct[Const[Read[AFile], ?]       , Const[DeadEnd, ?]  , A]
 
   /** QScript that has not gone through Read conversion. */
@@ -80,20 +80,25 @@ package object qscript {
       : Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[DeadEnd, ?]])
 
-  /** QScript that has gone through Read conversion. */
-  type QScriptRead[T[_[_]], P, A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[P], ?])#M[A]
+  /** QScript that has gone through Read conversion.
+    *
+    * NB: Once QScriptTotal goes away, this could become parametric in the path type.
+    */
+  type QScriptRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :\: Const[Read[ADir], ?] :/: Const[Read[AFile], ?])#M[A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, APath, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read[APath], ?]])
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[Read[ADir], ?], Const[Read[AFile], ?]]))
 
-  /** QScript that has gone through Read conversion and shifted conversion */
-  type QScriptShiftRead[T[_[_]], P, A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead[P], ?])#M[A]
+  /** QScript that has gone through Read conversion and shifted conversion.
+    *
+    * NB: Once QScriptTotal goes away, this could become parametric in the path type.
+    */
+  type QScriptShiftRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :\: Const[ShiftedRead[ADir], ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
 
-  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptShiftRead[T, APath, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead[APath], ?]])
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
   type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
@@ -106,7 +111,7 @@ package object qscript {
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](RightSide)
-  def ReduceIndexF[T[_[_]]](i: Int): FreeMapA[T, ReduceIndex] =
+  def ReduceIndexF[T[_[_]]](i: Option[Int]): FreeMapA[T, ReduceIndex] =
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])

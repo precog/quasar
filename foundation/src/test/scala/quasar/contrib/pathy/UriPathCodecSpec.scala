@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.contrib.pathy
 
 import quasar.Predef._
-import quasar.contrib.pathy._
 
-import org.http4s.dsl.{Path => HPath}
 import org.specs2.specification.core._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -77,31 +75,6 @@ class UriPathCodecSpec extends quasar.Qspec {
       }
       "relative dir" >> prop { path: RDir =>
         codec.parseRelDir(codec.printPath(path)) must_= Some(unsandbox(path))
-      }
-    }
-
-    "print and parse through http4s should produce same Path" >> {
-      "absolute file with plus" >> {
-        import pathy.Path._
-        val path = rootDir </> file("a+b/c")
-        val hpath = HPath(codec.printPath(path))
-        AsFilePath.unapply(hpath) must_= Some(path)
-      }
-
-      "absolute dir with plus" >> {
-        import pathy.Path._
-        val path = rootDir </> dir("a+b/c")
-        val hpath = HPath(codec.printPath(path))
-        AsDirPath.unapply(hpath) must_= Some(path)
-      }
-
-      "absolute file" >> prop { path: AFile =>
-        val hpath = HPath(codec.printPath(path))
-        AsFilePath.unapply(hpath) must_= Some(path)
-      }
-      "absolute dir" >> prop { path: ADir =>
-        val hpath = HPath(codec.printPath(path))
-        AsDirPath.unapply(hpath) must_= Some(path)
       }
     }
   }

@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xcc
+package quasar
 
-import quasar.effect.Capture
+import quasar.Predef._
 
-import com.marklogic.xcc._
-import com.marklogic.xcc.types.XdmItem
-
-object resultitem {
-  def loadItem[F[_]: Capture](ritem: ResultItem): F[XdmItem] =
-    Capture[F] delay {
-      ritem.cache()
-      ritem.getItem
-    }
+trait HomomorphicFunction[-A, +B] { self =>
+  def arity: Int
+  def apply(args: List[A]): Option[B]
+  def andThen[C](f: B => C) = new HomomorphicFunction[A, C] {
+    def arity = self.arity
+    def apply(args: List[A]) = self.apply(args).map(f)
+  }
 }

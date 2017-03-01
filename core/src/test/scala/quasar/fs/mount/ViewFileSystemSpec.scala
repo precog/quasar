@@ -154,7 +154,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
-      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 
@@ -611,7 +611,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p), Nil).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
@@ -674,7 +674,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
+        quasar.queryPlan(q, Variables.empty, rootDir, Nil, 0L, None)
           .run.value.toOption.get
           .valueOr(_ => scala.sys.error("impossible constant plan"))
 

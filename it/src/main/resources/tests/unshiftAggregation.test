@@ -3,7 +3,6 @@
     "NB": "Couchbase skipped due to different ordering of pop array. Enable once group contents ordering is possible.",
     "backends": {
         "couchbase":  "skip",
-        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

@@ -18,7 +18,6 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.effect.Capture
-import quasar.fp.numeric.Positive
 
 import com.marklogic.xcc._
 import scalaz._, Scalaz._
@@ -27,27 +26,12 @@ object contentsource {
   def defaultSession[F[_]: Bind: Capture: CSourceReader]: F[Session] =
     newSession[F](None)
 
-  def newSession[F[_]: Bind](
+  def newSession[F[_]: Bind: Capture: CSourceReader](
     defaultRequestOptions: Option[RequestOptions]
-  )(implicit
-    C: Capture[F],
-    R: CSourceReader[F]
   ): F[Session] =
-    R.ask >>= (cs => C.delay {
+    CSourceReader[F].ask >>= (cs => Capture[F].capture {
       val session = cs.newSession
       defaultRequestOptions foreach session.setDefaultRequestOptions
       session
     })
-
-  def resultCursor[F[_]: Bind: Capture: CSourceReader](chunkSize: Positive)(f: Session => F[QueryResults]): F[ResultCursor] =
-    newSession[F](some(streamingOptions)) >>= (s =>
-      Capture[F].delay(f(s)).join map (qr => new ResultCursor(chunkSize, s, qr.resultSequence)))
-
-  ////
-
-  private def streamingOptions: RequestOptions = {
-    val opts = new RequestOptions
-    opts.setCacheResult(false)
-    opts
-  }
 }

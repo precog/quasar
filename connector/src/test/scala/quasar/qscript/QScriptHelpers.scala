@@ -39,36 +39,42 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   type QS[A] = (
     QScriptCore           :\:
     ThetaJoin             :\:
-    Const[Read[APath], ?] :/:
+    Const[Read[ADir], ?]  :\:
+    Const[Read[AFile], ?] :/:
     Const[DeadEnd, ?]
   )#M[A]
 
   val DE = implicitly[Const[DeadEnd, ?]     :<: QS]
-  val R  = implicitly[Const[Read[APath], ?] :<: QS]
+  val RD = implicitly[Const[Read[ADir], ?]  :<: QS]
+  val RF = implicitly[Const[Read[AFile], ?] :<: QS]
   val QC = implicitly[QScriptCore           :<: QS]
   val TJ = implicitly[ThetaJoin             :<: QS]
 
   implicit val QS: Injectable.Aux[QS, QST] =
     ::\::[QScriptCore](
       ::\::[ThetaJoin](
-        ::/::[Fix, Const[Read[APath], ?], Const[DeadEnd, ?]]))
+        ::\::[Const[Read[ADir], ?]](
+          ::/::[Fix, Const[Read[AFile], ?], Const[DeadEnd, ?]])))
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
-  def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
+  def ReadR(path: APath): QS[Fix[QS]] =
+    refineType(path).fold(
+      d => RD.inj(Const(Read(d))),
+      f => RF.inj(Const(Read(f))))
 
   type QST[A] = QScriptTotal[A]
 
   def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
 
   val DET  =            implicitly[Const[DeadEnd, ?] :<: QST]
-  val RTP  =        implicitly[Const[Read[APath], ?] :<: QST]
+  val RTD  =        implicitly[Const[Read[ADir], ?]  :<: QST]
   val RTF  =        implicitly[Const[Read[AFile], ?] :<: QST]
   val QCT  =                  implicitly[QScriptCore :<: QST]
   val TJT  =                    implicitly[ThetaJoin :<: QST]
   val EJT  =                     implicitly[EquiJoin :<: QST]
   val PBT  =                implicitly[ProjectBucket :<: QST]
-  val SRT  = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
+  val SRTD = implicitly[Const[ShiftedRead[ADir], ?]  :<: QST]
   val SRTF = implicitly[Const[ShiftedRead[AFile], ?] :<: QST]
 
   val RootRT: QST[Fix[QST]] = DET.inj(Const[DeadEnd, Fix[QST]](Root))

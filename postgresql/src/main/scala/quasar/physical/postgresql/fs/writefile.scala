@@ -31,7 +31,7 @@ import shapeless.HNil
 object writefile {
   import WriteFile._
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec: DataCodec = DataCodec.Precise
 
   final case class TableName(v: String)
 

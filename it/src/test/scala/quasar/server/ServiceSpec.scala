@@ -19,9 +19,8 @@ package quasar.server
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{TestConfig, Variables}
-import quasar.api.UriPathCodec
 import quasar.config.{ConfigOps, FsPath, WebConfig}
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.{APath, UriPathCodec}
 import quasar.internal.MountServiceConfig
 import quasar.main.MainErrT
 import quasar.fs.mount._

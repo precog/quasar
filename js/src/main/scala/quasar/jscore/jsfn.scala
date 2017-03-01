@@ -48,7 +48,7 @@ object JsFn {
   val const: JsCore => JsFn = JsFn(Name("__unused"), _)
 
   implicit val equal: Equal[JsFn] =
-    Equal.equal(_(ident("_")).simplify == _(ident("_")).simplify)
+    Equal.equal(_(ident("_")).simplify ≟ _(ident("_")).simplify)
 
   implicit val renderTree: RenderTree[JsFn] = new RenderTree[JsFn] {
     def render(v: JsFn) = v(ident("_")).render

@@ -19,6 +19,8 @@ package quasar.contrib
 import quasar.Predef._
 import quasar.fp.ski._
 
+import java.net.{URLDecoder, URLEncoder}
+
 import argonaut._
 import _root_.pathy.Path, Path._
 import _root_.scalaz._, Scalaz._
@@ -54,6 +56,23 @@ package object pathy {
           .map(sandboxAbs)
           .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
 
+  }
+
+  /** PathCodec with URI-encoded segments. */
+  val UriPathCodec: PathCodec = {
+    /** This encoder translates spaces into pluses, but we want the
+      *  more rigorous %20 encoding.
+      */
+    val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
+    val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")
+
+    val escapeRel: String => String = {
+      case ".." => "%2E%2E"
+      case "."  => "%2E"
+      case s    => uriEncodeUtf8(s)
+    }
+
+    PathCodec('/', escapeRel, uriDecodeUtf8)
   }
 
   /** Rebases absolute paths onto the provided absolute directory, so

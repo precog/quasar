@@ -19,8 +19,10 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 import monocle.macros.Lenses
+import scalaz.Functor
 import scalaz.std.string._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 import scalaz.syntax.std.option._
 
 // TODO: Possibly introduce `Module` and just have this be a constructor.
@@ -39,4 +41,9 @@ final case class MainModule(version: Version, prologs: Prologs, queryBody: XQuer
 
     s"${version.render}${Prolog.Separator}${~declBlock}${~funcBlock}\n\n${queryBody}"
   }
+}
+
+object MainModule {
+  def fromWritten[F[_]: Functor: PrologL](vq: F[(Version, XQuery)]): F[MainModule] =
+    PrologL[F].listen(vq) map { case ((ver, body), plog) => apply(ver, plog, body) }
 }

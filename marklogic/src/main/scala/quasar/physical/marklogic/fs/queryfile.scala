@@ -20,18 +20,16 @@ import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._
-import quasar.effect.{Capture, Kvs, MonoSeq}
+import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp._, eitherT._
 import quasar.fp.numeric.Positive
-import quasar.fp.ski.κ
 import quasar.fs._
-import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fs.impl.queryFileFromProcess
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.xml.NCName
-import quasar.physical.marklogic.xquery._, expr._
+import quasar.physical.marklogic.{qscript => mlqscript}, mlqscript._
+import quasar.physical.marklogic.xcc._, Xcc.ops._
+import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
@@ -45,78 +43,89 @@ import scalaz._, Scalaz._
 object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
-  import FunctionDecl.{FunctionDecl1, FunctionDecl3}
 
-  type PrologL[F[_]]         = MonadListen_[F, Prologs]
-  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, AFile, A]
+  type QKvs[F[_], G[_]] = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
 
-  implicit def mlQScriptToQScriptTotal[T[_[_]]]
-      : Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+  type MLQScript[T[_[_]], A] = (
+    QScriptCore[T, ?]           :\:
+    ThetaJoin[T, ?]             :\:
+    Const[ShiftedRead[ADir], ?] :/:
+    Const[Read[AFile], ?]
+  )#M[A]
 
-  def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr: MonoSeq: PrologW: PrologL, FMT](
-    resultsChunkSize: Positive
+  implicit def mlQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+
+  def interpret[
+    F[_]: Monad: Catchable: Xcc,
+    G[_]: Monad: Xcc: PrologW: PrologL: MonoSeq: QKvs[F, ?[_]],
+    FMT: SearchOptions
+  ](
+    chunkSize: Positive, fToG: F ~> G
   )(implicit
-    K : Kvs[F, QueryFile.ResultHandle, ResultCursor],
-    P : Planner[F, FMT, MLQScript[Fix, ?]],
-    SP: StructuralPlanner[F, FMT]
-  ): QueryFile ~> F = {
-    type QF[A] = FileSystemErrT[PhaseResultT[F, ?], A]
+    P : Planner[G, FMT, MLQScript[Fix, ?]],
+    SP: StructuralPlanner[G, FMT]
+  ): QueryFile ~> G = {
+    type QG[A] = FileSystemErrT[PhaseResultT[G, ?], A]
 
-    def liftQF[A](fa: F[A]): QF[A] =
-      fa.liftM[PhaseResultT].liftM[FileSystemErrT]
+    def liftQG[A](ga: G[A]): QG[A] =
+      ga.liftM[PhaseResultT].liftM[FileSystemErrT]
 
     def exec(lp: Fix[LogicalPlan], out: AFile) = {
       import MainModule._
 
-      def saveResults(mm: MainModule): QF[MainModule] =
-        MonadListen_[QF, Prologs].listen(saveTo[QF, FMT](out, mm.queryBody)) map {
+      def saveResults(mm: MainModule): QG[MainModule] =
+        MonadListen_[QG, Prologs].listen(saveTo[QG, FMT](out, mm.queryBody)) map {
           case (body, plogs) =>
             (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
 
+      val deleteOutIfExists =
+        ops.pathHavingFormatExists[G, FMT](out)
+          .flatMap(_.whenM(ops.deleteFile[G](out)))
+          .transact
+
       val resultFile = for {
-        xqy <- lpToXQuery[QF, Fix, FMT](lp)
+        xqy <- lpToXQuery[QG, Fix, FMT](lp)
         mm  <- saveResults(xqy)
-        _   <- liftQF(ops.deleteFile[F](out))
-        _   <- liftQF(session.executeModule_[F](mm))
+        _   <- liftQG(deleteOutIfExists)
+        _   <- liftQG(Xcc[G].execute(mm))
       } yield out
 
       resultFile.run.run
     }
 
     def eval(lp: Fix[LogicalPlan]) =
-      lpToXQuery[QF, Fix, FMT](lp).flatMap(main => liftQF(
-        contentsource.resultCursor[F](resultsChunkSize) { s =>
-          SessionReader[F].scope(s)(session.evaluateModule_[F](main))
-        }
-      )).run.run
+      lpToXQuery[QG, Fix, FMT](lp).map(main =>
+        Xcc[F].evaluate(main)
+          .chunk(chunkSize.get.toInt)
+          .map(_ traverse xdmitem.decodeForFileSystem)
+      ).run.run
 
     def explain(lp: Fix[LogicalPlan]) =
-      lpToXQuery[QF, Fix, FMT](lp)
+      lpToXQuery[QG, Fix, FMT](lp)
         .map(main => ExecutionPlan(FsType, main.render))
         .run.run
 
-    def listContents(dir: ADir): F[FileSystemError \/ Set[PathSegment]] =
-      ops.exists[F](dir).ifM(
-        ops.ls[F](dir).map(_.right[FileSystemError]),
-        pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[F])
+    def listContents(dir: ADir) =
+      ops.pathHavingFormatExists[G, FMT](dir).ifM(
+        ops.directoryContents[G, FMT](dir).map(_.right[FileSystemError]),
+        pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[G])
 
-    queryFileFromDataCursor[ResultCursor, F](exec, eval, explain, listContents, ops.exists[F])
+    queryFileFromProcess[F, G](fToG, exec, eval, explain, listContents, ops.pathHavingFormatExists[G, FMT])
   }
 
   def lpToXQuery[
-    F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Capture: SessionReader: XccErr,
+    F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    FMT
+    FMT: SearchOptions
   ](
     lp: T[LogicalPlan]
   )(implicit
     planner: Planner[F, FMT, MLQScript[T, ?]]
   ): F[MainModule] = {
     type MLQ[A]  = MLQScript[T, A]
-    type QSR[A]  = QScriptRead[T, APath, A]
-    type QSSR[A] = QScriptShiftRead[T, APath, A]
+    type QSR[A]  = QScriptRead[T, A]
 
     val C = Coalesce[T, MLQ, MLQ]
     val N = Normalizable[MLQ]
@@ -126,22 +135,18 @@ object queryfile {
       MonadTell_[F, PhaseResults].tell(Vector(pr))
 
     def plan(qs: T[MLQ]): F[MainModule] =
-      MonadListen_[F, Prologs].listen(qs.cataM(planner.plan)) map {
-        case (xqy, prologs) => MainModule(Version.`1.0-ml`, prologs, xqy)
-      }
+      MainModule.fromWritten(qs.cataM(planner.plan) strengthL Version.`1.0-ml`)
 
     for {
-      qs      <- convertToQScriptRead[T, F, QSR](ops.ls[F])(lp)
-      shifted <- R.shiftRead[QSR, QSSR].apply(qs)
-                   // TODO: Eliminate this once the filesystem implementation is updated
-                   .transCataM(ExpandDirs[T, QSSR, MLQ].expandDirs(idPrism.reverseGet, ops.ls[F]))
+      qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
+      shifted =  R.shiftReadDir[QSR, MLQ].apply(qs)
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(
                    R.optimize(reflNT[MLQ]),
                    repeatedly(R.applyTransforms(
                      C.coalesceQC[MLQ](idPrism),
                      C.coalesceTJ[MLQ](idPrism.get),
-                     C.coalesceSR[MLQ, AFile](idPrism),
+                     C.coalesceSR[MLQ, ADir](idPrism),
                      N.normalizeF(_: MLQ[T[MLQ]]))))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)
@@ -155,73 +160,27 @@ object queryfile {
     } yield main
   }
 
-  def prettyPrint[F[_]: Monad: MonadFsErr: Capture: SessionReader](xqy: XQuery): F[Option[XQuery]] =
-    session.resultsOf_[EitherT[F, XccError, ?]](xdmp.prettyPrint(XQuery(s"'$xqy'"))).run flatMap {
-      case -\/(err @ XccError.XQueryError(_, cause)) =>
+  def prettyPrint[F[_]: Monad: MonadFsErr: Xcc](xqy: XQuery): F[Option[XQuery]] = {
+    val prettyPrinted =
+      Xcc[F].queryResults(xdmp.prettyPrint(XQuery(s"'$xqy'")))
+        .map(_.headOption collect { case s: XSString => XQuery(s.asString) })
+
+    Xcc[F].handleWith(prettyPrinted) {
+      case err @ XccError.QueryError(_, cause) =>
         MonadFsErr[F].raiseError(
           FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
-            (err: XccError).shows, Some(cause))))
+            err.shows, Some(cause))))
 
       // NB: As this is only for pretty printing, if we fail for some other reason
       //     just return an empty result.
-      case -\/(_)  => none[XQuery].point[F]
-      case \/-(xs) => (xs.headOption collect { case s: XSString => XQuery(s.asString) }).point[F]
+      case _ => none[XQuery].point[F]
     }
+  }
 
   ////
 
-  private val lpadToLength: FunctionDecl3 =
-    declareLocal(NCName("lpad-to-length"))(
-      $("padchar") as SequenceType("xs:string"),
-      $("length")  as SequenceType("xs:integer"),
-      $("str")     as SequenceType("xs:string")
-    ).as(SequenceType("xs:string")) { (padchar, length, str) =>
-      val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
-      let_(
-        slen   := fn.stringLength(str),
-        padct  := fn.max(mkSeq_("0".xqy, length - (~slen))),
-        prefix := fn.stringJoin(for_($("_") in (1.xqy to ~padct)) return_ padchar, "".xs))
-      .return_(
-        fn.concat(~prefix, str))
-    }
-
-  private def wrapUnlessNode[F[_]: Monad, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
-    declareLocal(NCName("wrap-unless-node"))(
-      $("item") as SequenceType("item()")
-    ).as(SequenceType("node()")) { item: XQuery =>
-      SP.singletonObject("value".xs, item) map { obj =>
-        typeswitch(item)(
-          SequenceType("node()") return_ item
-        ) default obj
-      }
-    }
-
-  private def saveTo[F[_]: Monad: QNameGenerator: PrologW, T](
+  private def saveTo[F[_]: Bind: PrologW, T](
     dst: AFile, results: XQuery
-  )(implicit SP: StructuralPlanner[F, T]): F[XQuery] = {
-    val dstDirUri = pathUri(asDir(dst))
-
-    for {
-      ts     <- freshName[F]
-      i      <- freshName[F]
-      result <- freshName[F]
-      fname  <- freshName[F]
-      now    <- lib.secondsSinceEpoch[F].apply(fn.currentDateTime)
-      dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
-      node   <- wrapUnlessNode[F, T].apply(~result)
-    } yield {
-      let_(
-        ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
-        $("_") := try_(xdmp.directoryCreate(dstDirUri.xs))
-                  .catch_($("e"))(κ(emptySeq)))
-      .return_ {
-        for_(
-          result at i in mkSeq_(results))
-        .let_(
-          fname := fn.concat(dstDirUri.xs, ~ts, dpart))
-        .return_(
-          xdmp.documentInsert(~fname, node))
-      }
-    }
-  }
+  )(implicit SP: StructuralPlanner[F, T]): F[XQuery] =
+    SP.seqToArray(results) map (xdmp.documentInsert(pathUri(dst).xs, _))
 }

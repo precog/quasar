@@ -35,7 +35,7 @@ final case class NamedDaemonThreadFactory(name: String) extends ThreadFactory {
 
   def newThread(r: java.lang.Runnable) = {
     val thread = backingThreadFactory.newThread(r)
-    thread.setName(name + "-" + threadNo.incrementAndGet())
+    thread.setName(name + "-" + threadNo.incrementAndGet().toString)
     thread.setDaemon(true)
     thread
   }

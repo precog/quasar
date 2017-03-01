@@ -148,6 +148,8 @@ object KeyValueStore {
 
         val R = AtomicRef.Ops[Map[K, V], Ref]
 
+        // FIXME
+        @SuppressWarnings(Array("org.wartremover.warts.Equals"))
         def apply(): KeyValueStore[K, V, ?] ~> Free[Ref, ?] =
           new (KeyValueStore[K, V, ?] ~> Free[Ref, ?]) {
             def apply[A](m: KeyValueStore[K, V, A]) = m match {
@@ -186,6 +188,8 @@ object KeyValueStore {
         def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
                           : KeyValueStore[K, V, ?] ~> F =
           new(KeyValueStore[K, V, ?] ~> F) {
+            // FIXME
+            @SuppressWarnings(Array("org.wartremover.warts.Equals"))
             def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {
               case CompareAndPut(k, expect, update) =>
                 lookup(k) flatMap { cur =>

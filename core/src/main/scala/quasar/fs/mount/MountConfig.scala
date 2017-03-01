@@ -91,6 +91,8 @@ object MountConfig {
 
   private val VarPrefix = "var."
 
+  // FIXME
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def viewCfgFromUri(uri: String): String \/ (Fix[Sql], Variables) = {
     import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
 

@@ -84,9 +84,9 @@ object Selector {
         case Doc(pairs)   => {
           val children = pairs.map {
             case (field, Expr(expr)) =>
-              Terminal("Expr" :: SelectorNodeType, Some(field.asField + " -> " + expr))
+              Terminal("Expr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
             case (field, NotExpr(expr)) =>
-              Terminal("NotExpr" :: SelectorNodeType, Some(field.asField + " -> " + expr))
+              Terminal("NotExpr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
           }
           NonTerminal("Doc" :: SelectorNodeType, None, children.toList)
         }
@@ -96,6 +96,8 @@ object Selector {
   sealed trait Condition {
     def bson: Bson
   }
+
+  implicit val showCondition: Show[Condition] = Show.showFromToString
 
   private[Selector] abstract sealed class SimpleCondition(val op: String) extends Condition {
     protected def rhs: Bson
@@ -187,6 +189,8 @@ object Selector {
     def bson: Bson
   }
 
+  implicit val showSelectorExpr: Show[SelectorExpr] = Show.showFromToString
+
   final case class Expr(value: Condition) extends SelectorExpr {
     def bson = value.bson
   }
@@ -205,8 +209,7 @@ object Selector {
 
     override def toString = {
       val children = pairs.map {
-        case (field, Expr(expr)) => field.shows + " -> " + expr
-        case (field, notExpr @ NotExpr(_)) => field.shows + " -> " + notExpr
+        case (field, expr) => field.shows + " -> " + expr.shows
       }
       "Selector.Doc(" + children.mkString(", ") + ")"
     }
@@ -283,5 +286,5 @@ object Selector {
     }
   }
 
-  implicit val show: Show[Selector] = Show.showFromToString
+  implicit val showSelector: Show[Selector] = Show.showFromToString
 }

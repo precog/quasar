@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 package object query {
   import ToApiError.ops._
 
-  implicit val QueryDecoder = new QueryParamDecoder[Query] {
+  implicit val QueryDecoder: QueryParamDecoder[Query] = new QueryParamDecoder[Query] {
     def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Query] =
       Query(value.value).successNel[ParseFailure]
   }

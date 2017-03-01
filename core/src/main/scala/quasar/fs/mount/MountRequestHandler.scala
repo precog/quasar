@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{None, Unit}
+import quasar.Predef._
 import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.FileSystem
@@ -61,7 +61,7 @@ final class MountRequestHandler[F[_], S[_]](
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
         case MountView(f, qry, vars) =>
-          queryPlan(qry, vars, fileParent(f), 0L, None).run.value
+          queryPlan(qry, vars, fileParent(f), Nil, 0L, None).run.value
             .leftMap(e => invalidConfig(viewConfig(qry, vars), e.map(_.shows)))
             .void.point[Free[T, ?]]
 

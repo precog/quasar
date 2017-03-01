@@ -42,14 +42,14 @@ package object fixpoint {
     binop(lhs, rhs, op).embed
   def UnopR(expr: Fix[Sql], op: UnaryOperator): Fix[Sql] = unop(expr, op).embed
   def IdentR(name: String): Fix[Sql] = ident[Fix[Sql]](name).embed
-  def InvokeFunctionR(name: String, args: List[Fix[Sql]]): Fix[Sql] =
+  def InvokeFunctionR(name: CIName, args: List[Fix[Sql]]): Fix[Sql] =
     invokeFunction(name, args).embed
   def MatchR(expr: Fix[Sql], cases: List[Case[Fix[Sql]]], default: Option[Fix[Sql]]):
       Fix[Sql] =
     matc(expr, cases, default).embed
   def SwitchR(cases: List[Case[Fix[Sql]]], default: Option[Fix[Sql]]): Fix[Sql] =
     switch(cases, default).embed
-  def LetR(name: String, form: Fix[Sql], body: Fix[Sql]): Fix[Sql] =
+  def LetR(name: CIName, form: Fix[Sql], body: Fix[Sql]): Fix[Sql] =
     let(name, form, body).embed
   def IntLiteralR(v: Long): Fix[Sql] = intLiteral[Fix[Sql]](v).embed
   def FloatLiteralR(v: Double): Fix[Sql] = floatLiteral[Fix[Sql]](v).embed

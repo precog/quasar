@@ -74,8 +74,6 @@ object MongoDbIO {
   /** Returns the stream of results of aggregating documents according to the
     * given aggregation pipeline.
     */
-  // FIXME: I don’t know why this triggers here.
-  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def aggregated(
     src: Collection,
     pipeline: List[Bson.Doc],

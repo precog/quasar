@@ -128,7 +128,7 @@ package object fs {
        TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
        TaskRef(Map.empty[ResultHandle, Cursor])          |@|
        TaskRef(0L)                                       |@|
-       GenUUID.type1
+       GenUUID.type1[Task]
      )((kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (

@@ -48,7 +48,10 @@ package object main {
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
     couchbase.fs.definition[PhysFsEff],
-    marklogic.fs.definition[PhysFsEff](readChunkSize = 10000L),
+    marklogic.fs.definition(
+      readChunkSize  = 10000L,
+      writeChunkSize =  1000L
+    ) translate injectFT[Task, PhysFsEff],
     mongodb.fs.definition[PhysFsEff],
     mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],

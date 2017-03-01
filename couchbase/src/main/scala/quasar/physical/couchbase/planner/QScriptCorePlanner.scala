@@ -129,12 +129,11 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         id2 <- genId[T[N1QL], M]
         id3 <- genId[T[N1QL], M]
         b   <- processFreeMap(bucket, id1)
-        red =  reducers.map(
-                 _.traverse(
-                   red => processFreeMap(red, id1)
-                 ).flatMap(reduceFuncPlanner[T, F].plan)
-               )
-        rep <- repair.cataM(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
+        red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
+                 reduceFuncPlanner[T, F].plan)
+        rep <- repair.cataM(interpretM(
+                 _.idx.fold(SelectElem(ArrAgg(b).embed, int(0)).embed)(red(_)).point[M],
+                 mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
           Value(false),

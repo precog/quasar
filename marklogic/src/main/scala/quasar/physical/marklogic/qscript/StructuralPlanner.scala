@@ -257,7 +257,7 @@ object StructuralPlanner extends StructuralPlannerInstances {
 }
 
 sealed abstract class StructuralPlannerInstances extends StructuralPlannerInstances0 {
-  implicit def jsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Json] =
+  implicit def jsonStructuralPlanner[F[_]: Monad: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Json] =
     new JsonStructuralPlanner[F]
 
   implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Xml] =

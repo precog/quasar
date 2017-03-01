@@ -40,13 +40,13 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript0[A] =
-     (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
   type SparkQScript[A] =
      (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
 
   implicit val sparkQScriptToQSTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
     ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
+
+  type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
@@ -79,8 +79,8 @@ object queryfile {
       val C = quasar.qscript.Coalesce[Fix, SparkQScript, SparkQScript]
       val rewrite = new Rewrite[Fix]
       for {
-        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, APath, ?]](lc)(lp)
-                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, APath, ?], QScriptShiftRead[Fix, APath, ?], SparkQScript0].apply(_))
+        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
+                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript0].apply(_))
                    .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
         optQS =  qs.transHylo(
                    rewrite.optimize(reflNT[SparkQScript]),

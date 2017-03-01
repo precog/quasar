@@ -89,6 +89,7 @@ object JsCoreF {
   final case class SpliceObjectsF[A](srcs: List[A]) extends JsCoreF[A]
   final case class SpliceArraysF[A](srcs: List[A]) extends JsCoreF[A]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit val equal: Delay[Equal, JsCoreF] = new Delay[Equal, JsCoreF] {
     def apply[A](eq: Equal[A]) = {
       implicit val EqA: Equal[A] = eq

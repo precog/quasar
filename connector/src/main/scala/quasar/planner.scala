@@ -50,8 +50,9 @@ object Planner {
   final case class UnsupportedJoinCondition(cond: Fix[LogicalPlan]) extends PlannerError {
     def message = s"Joining with ${cond.shows} is not currently supported"
   }
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
-    def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan
+    def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan.toString
   }
   final case class FuncApply[N <: Nat](func: GenericFunc[N], expected: String, actual: String) extends PlannerError {
     def message = "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual

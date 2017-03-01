@@ -161,9 +161,6 @@ object Server {
       _       <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
     } yield ())
 
-  def main(args: Array[String]): Unit = {
-    implicit val configOps = ConfigOps[WebConfig]
-
+  def main(args: Array[String]): Unit =
     launchServer(args, durableService(_, _)).unsafePerformSync
-  }
 }

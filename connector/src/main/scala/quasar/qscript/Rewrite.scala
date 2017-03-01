@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
@@ -75,21 +75,42 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   def shiftRead[F[_]: Functor, G[_]: Traverse]
     (implicit QC: QScriptCore :<: G,
               TJ: ThetaJoin :<: G,
-              SR: Const[ShiftedRead[APath], ?] :<: G,
+              SD: Const[ShiftedRead[ADir], ?] :<: G,
+              SF: Const[ShiftedRead[AFile], ?] :<: G,
               GI: Injectable.Aux[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[G] = {
     _.codyna(
-      normalize[G] >>> liftFG(injectRepeatedly(C.coalesceSR[G, APath](idPrism))) >>> (_.embed),
+      normalize[G]                                              >>>
+      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism)))  >>>
+      liftFG(injectRepeatedly(C.coalesceSR[G, AFile](idPrism))) >>>
+      (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
   }
+
+  def shiftReadDir[F[_]: Functor, G[_]: Traverse](
+    implicit
+    QC: QScriptCore :<: G,
+    TJ: ThetaJoin :<: G,
+    SD: Const[ShiftedRead[ADir], ?] :<: G,
+    GI: Injectable.Aux[G, QScriptTotal],
+    S: ShiftReadDir.Aux[T, F, G],
+    C: Coalesce.Aux[T, G, G],
+    N: Normalizable[G]
+  ): T[F] => T[G] =
+    _.codyna(
+      normalize[G]                                             >>>
+      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism))) >>>
+      (_.embed),
+      ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
 
   def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<: G,
               TJ: ThetaJoin :<: G,
-              SR: Const[ShiftedRead[APath], ?] :<: G,
+              SD: Const[ShiftedRead[ADir], ?] :<: G,
+              SF: Const[ShiftedRead[AFile], ?] :<: G,
               GI: Injectable.Aux[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               J: SimplifyJoin.Aux[T, G, H],
@@ -281,10 +302,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     case Reduce(src, bucket, reducers, repair0) =>
       // `indices`: the indices into `reducers` that are used
-      val used    = repair0.map(_.idx).toSet
+      val Empty   = ReduceIndex(-1.some)
+      val used    = repair0.map(_.idx).toList.unite.toSet
       val indices = reducers.indices filter used
-      val repair  = repair0 map (r => r.copy(indices indexOf r.idx))
-      val done    = repair ≟ repair0 || (repair element ReduceIndex.Empty)
+      val repair  = repair0 map (r => r.copy(r.idx ∘ indices.indexOf))
+      val done    = repair ≟ repair0 || (repair element Empty)
 
       !done option Reduce(src, bucket, (indices map reducers).toList, repair)
 
@@ -381,7 +403,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],
-      R:  Const[Read[APath], ?] :<: OUT,
+      RD:  Const[Read[ADir], ?] :<: OUT,
+      RF: Const[Read[AFile], ?] :<: OUT,
       QC:           QScriptCore :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal])
       : T[IN] => M[T[OUT]] =

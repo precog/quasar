@@ -36,7 +36,7 @@ import scalaz.concurrent.Task
 object writefile {
   import WriteFile._
 
-  implicit val codec = CBDataCodec
+  implicit val codec: DataCodec = CBDataCodec
 
   final case class State(bucket: Bucket, collection: String)
 

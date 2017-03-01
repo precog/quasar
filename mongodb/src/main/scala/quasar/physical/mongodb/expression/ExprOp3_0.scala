@@ -40,7 +40,7 @@ object ExprOp3_0F {
       Delay[Equal, ExprOp3_0F] =
     new Delay[Equal, ExprOp3_0F] {
       def apply[A](eq: Equal[A]) = {
-        implicit val A = eq
+        implicit val A: Equal[A] = eq
         Equal.equal {
           case ($dateToStringF(fmt1, x1), $dateToStringF(fmt2, x2)) =>
             fmt1 ≟ fmt2 && x1 ≟ x2

@@ -44,7 +44,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     off: Natural,
     lim: Option[Positive]
   ): CompExecM[EnumeratorT[Data, ExecM]] =
-    compToCompExec(queryPlan(query, vars, basePath, off, lim))
+    compToCompExec(queryPlan(query, vars, basePath, Nil, off, lim))
       .map(_.fold(EnumeratorT.enumList(_), Q.enumerate(_)))
 
   /** Returns the source of values from the result of executing the given
@@ -57,7 +57,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     off: Natural,
     lim: Option[Positive]):
       Process[CompExecM, Data] =
-    queryPlan(query, vars, basePath, off, lim).sequenceU.fold(
+    queryPlan(query, vars, basePath, Nil, off, lim).sequenceU.fold(
       Process(_: _*),
       compToCompExec(_)
         .liftM[Process]
@@ -73,7 +73,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     out: AFile)(
     implicit W: WriteFile.Ops[S], MF: ManageFile.Ops[S]):
       CompExecM[AFile] =
-    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
+    compToCompExec(queryPlan(query, vars, basePath, Nil, 0L, None))
       .flatMap(lp => execToCompExec(lp.fold(
         d => fsErrToExec(W.saveThese(out, d.toVector).flatMap(fse => EitherT.fromDisjunction(fse.headOption <\/ out))),
         Q.execute(_, out))))
@@ -84,7 +84,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     vars: Variables,
     basePath: ADir
   ): CompExecM[ExecutionPlan] =
-    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
+    compToCompExec(queryPlan(query, vars, basePath, Nil, 0L, None))
       .flatMap(lp => execToCompExec(lp.fold(
         κ(ExecutionPlan(FileSystemType("none"), "Constant").point[ExecM]),
         Q.explain(_))))

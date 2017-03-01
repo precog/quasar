@@ -254,12 +254,10 @@ class Transform
             QC.inj(Reduce[T, T[F]](
               values(0).value,
               buckets,
-              List(
-                ReduceFuncs.Arbitrary(buckets),
-                ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
+              List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
               Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(1)))))))).embed)
+                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
+                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
         case None =>
           Target(
             Ann(provs, HoleF),
@@ -267,7 +265,7 @@ class Transform
               values(0).value,
               NullLit(),
               List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
-              Free.point(ReduceIndex(0)))).embed)
+              Free.point(ReduceIndex(0.some)))).embed)
       }
     }
   }
@@ -288,11 +286,10 @@ class Transform
               values(0).value,
               buckets,
               List(
-                ReduceFuncs.Arbitrary(buckets),
                 ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
               Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(1)))))))).embed)
+                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
+                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
         case None =>
           Target(
             Ann(join.base.buckets, HoleF),
@@ -300,7 +297,7 @@ class Transform
               values(0).value,
               NullLit(),
               List(ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
-              Free.point(ReduceIndex(0)))).embed)
+              Free.point(ReduceIndex(0.some)))).embed)
       }
     }
   }
@@ -504,17 +501,24 @@ class Transform
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case lp.InvokeUnapply(set.Distinct, Sized(a1)) =>
-      // TODO: This currently duplicates a _portion_ of the bucket in the
-      //       reducer list, we could perhaps avoid doing that, or normalize it
-      //       away later.
-      invokeReduction1(
-        agg.Arbitrary,
-        Func.Input1(
-          Target(
-            Ann(
-              prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance),
-              a1.ann.values),
-            a1.value))).right
+      // NB: If there’s no provenance, then there’s nothing to reduce. We’re
+      //     already holding a single value.
+      prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance).tailOption.fold(a1) { tail =>
+        prov.genBuckets(tail) match {
+          case Some((newProvs, buckets)) =>
+            Target(Ann(
+              prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
+              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+              QC.inj(Reduce[T, T[F]](
+                a1.value,
+                buckets,
+                Nil,
+                Free.roll(ConcatArrays(
+                  Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
+                  Free.roll(MakeArray(Free.roll(ProjectIndex(Free.point(ReduceIndex(none)), IntLit(0))))))))).embed)
+          case None => a1
+        }
+      }.right
 
     case lp.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)

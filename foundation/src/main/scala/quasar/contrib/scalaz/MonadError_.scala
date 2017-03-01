@@ -16,6 +16,8 @@
 
 package quasar.contrib.scalaz
 
+import quasar.Predef._
+
 import scalaz._, Scalaz._
 
 /** A version of MonadError that doesn't extend Monad to avoid ambiguous implicits
@@ -24,6 +26,29 @@ import scalaz._, Scalaz._
 trait MonadError_[F[_], E] {
   def raiseError[A](e: E): F[A]
   def handleError[A](fa: F[A])(f: E => F[A]): F[A]
+
+  def attempt[A](fa: F[A])(implicit F: Applicative[F]): F[E \/ A] =
+    handleError(fa map (_.right[E]))(_.left[A].point[F])
+
+  /** Ensures `f` is sequenced after `fa`, whether the latter succeeded or not.
+    *
+    * Useful for releasing resources that may have been acquired in order to
+    * produce `fa`.
+    */
+  def ensuring[A](fa: F[A])(f: Option[E] => F[Unit])(implicit F: Monad[F]): F[A] =
+    attempt(fa) flatMap {
+      case -\/(e) => f(some(e)) *> raiseError(e)
+      case \/-(a) => f(none)    as a
+    }
+
+  def handle[A](fa: F[A])(pf: PartialFunction[E, A])(implicit F: Applicative[F]): F[A] =
+    handleWith(fa)(pf andThen (_.point[F]))
+
+  def handleWith[A](fa: F[A])(pf: PartialFunction[E, F[A]]): F[A] =
+    handleError(fa)(e => pf.lift(e) getOrElse raiseError(e))
+
+  def unattempt[A](fa: F[E \/ A])(implicit F: Monad[F]): F[A] =
+    fa >>= (_.fold(raiseError[A] _, _.point[F]))
 }
 
 object MonadError_ extends MonadError_Instances {
@@ -76,7 +101,19 @@ sealed abstract class MonadError_Instances0 {
     }
 }
 
-final class MonadError_Ops[F[_], E, A] private[scalaz] (self: F[A])(implicit F: MonadError_[F, E]) {
+final class MonadError_Ops[F[_], E, A] private[scalaz] (self: F[A])(implicit F0: MonadError_[F, E]) {
   final def handleError(f: E => F[A]): F[A] =
-    F.handleError(self)(f)
+    F0.handleError(self)(f)
+
+  def attempt(implicit F: Applicative[F]): F[E \/ A] =
+    F0.attempt(self)
+
+  def ensuring(f: Option[E] => F[Unit])(implicit F: Monad[F]): F[A] =
+    F0.ensuring(self)(f)
+
+  def handle(pf: PartialFunction[E, A])(implicit F: Applicative[F]): F[A] =
+    F0.handle(self)(pf)
+
+  def handleWith(pf: PartialFunction[E, F[A]]): F[A] =
+    F0.handleWith(self)(pf)
 }

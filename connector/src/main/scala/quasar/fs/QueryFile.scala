@@ -145,9 +145,10 @@ object QueryFile {
     (implicit
       merr: MonadError_[M, FileSystemError],
       mtell: MonadTell_[M, PhaseResults],
-      R: Const[Read[APath], ?] :<: QS,
-      QC:    QScriptCore[T, ?] :<: QS,
-      TJ:      ThetaJoin[T, ?] :<: QS,
+      RD: Const[Read[ADir], ?]  :<: QS,
+      RF: Const[Read[AFile], ?] :<: QS,
+      QC:    QScriptCore[T, ?]  :<: QS,
+      TJ:      ThetaJoin[T, ?]  :<: QS,
       CQ: Coalesce.Aux[T, QS, QS],
       PA: PruneArrays[QS],
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
@@ -159,14 +160,15 @@ object QueryFile {
     val rewrite = new Rewrite[T]
 
     type InterimQS[A] =
-      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
+      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :\: Const[Read[ADir], ?] :/: Const[Read[AFile], ?])#M[A]
 
     implicit val interimQsToQscriptTotal
         : Injectable.Aux[InterimQS, QScriptTotal[T, ?]] =
       Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
         Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
           Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-            Injectable.inject[Const[Read[APath], ?], QScriptTotal[T, ?]])))
+            Injectable.coproduct(Injectable.inject[Const[Read[ADir], ?], QScriptTotal[T, ?]],
+              Injectable.inject[Const[Read[AFile], ?], QScriptTotal[T, ?]]))))
 
     convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
       .fold(

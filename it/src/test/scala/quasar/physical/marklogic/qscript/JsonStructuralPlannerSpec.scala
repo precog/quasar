@@ -17,24 +17,28 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.contrib.scalaz.eitherT._
-import quasar.physical.marklogic.DocType
+import quasar.physical.marklogic.{DocType, ErrorMessages}
 import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
-import matryoshka._
 import scalaz._, Scalaz._
+
+// TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+import WriterT.writerTMonadListen
 
 final class JsonStructuralPlannerSpec
   extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, DocType.Json] {
 
   import JsonStructuralPlannerSpec.JsonPlan
 
-  val toM = λ[JsonPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
+  val toM = λ[JsonPlan ~> M] { xp =>
+    WriterT.writer(xp.run.eval(1)).liftM[EitherT[?[_], ErrorMessages, ?]]
+  }
+
   def asMapKey(qn: QName) = qn.xs.point[JsonPlan]
 }
 
 object JsonStructuralPlannerSpec {
-  type JsonPlan[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
+  type JsonPlan[A] = PrologT[State[Long, ?], A]
 }

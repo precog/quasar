@@ -19,13 +19,15 @@ package quasar.physical.marklogic.xml
 import eu.timepit.refined.auto._
 
 object namespaces {
-  val qscriptNs     = Namespace(NSPrefix(NCName("qscript")), NSUri("http://quasar-analytics.org/qscript"))
-  val qscriptError  = qscriptNs(NCName("error"))
-
   // NB: We've choosen to only support EJSON maps with string keys for the
   //     time-being as that maps reasonably to XML elements.
-  val ejsonNs       = Namespace(NSPrefix(NCName("ejson")), NSUri("http://quasar-analytics.org/ejson"))
-  val ejsonEjson    = ejsonNs(NCName("ejson"))
-  val ejsonArrayElt = ejsonNs(NCName("array-element"))
-  val ejsonType     = ejsonNs(NCName("type"))
+  val ejsonNs         = Namespace(NSPrefix(NCName("ejson")), NSUri("http://quasar-analytics.org/ejson"))
+  val ejsonEjson      = ejsonNs(NCName("ejson"))
+  val ejsonArrayElt   = ejsonNs(NCName("array-element"))
+  val ejsonType       = ejsonNs(NCName("type"))
+
+  val filesystemNs    = Namespace(NSPrefix(NCName("filesystem")), NSUri("http://quasar-analytics.org/filesystem"))
+  val filesystemError = filesystemNs(NCName("error"))
+
+  val qscriptNs       = Namespace(NSPrefix(NCName("qscript")), NSUri("http://quasar-analytics.org/qscript"))
 }

@@ -81,7 +81,7 @@ trait JsonOps {
 
   def decodeJson[A](text: String)(implicit DA: DecodeJson[A]): String \/ A = \/.fromEither(for {
     json <- Parse.parse(text)
-    a <- DA.decode(json.hcursor).result.leftMap { case (exp, hist) => "expected: " + exp + "; " + hist }
+    a <- DA.decode(json.hcursor).result.leftMap { case (exp, hist) => "expected: " + exp + "; " + hist.toString }
   } yield a)
 
 

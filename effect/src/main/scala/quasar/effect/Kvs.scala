@@ -45,18 +45,9 @@ object Kvs extends KvsInstances {
       def compareAndPut(k: K, e: Option[V], u: V) = K.compareAndPut(k, e, u).liftM[T]
       def delete(k: K)                            = K.delete(k).liftM[T]
     }
-
-  def forInjectable[F[_], K, V, S[_]](implicit F: Kvs[F, K, V], I: F :<: S): Kvs[Free[S, ?], K, V] =
-    new Kvs[Free[S, ?], K, V] {
-      def keys                                    = Free.liftF(I(F.keys))
-      def get(k: K)                               = Free.liftF(I(F.get(k)))
-      def put(k: K, v: V)                         = Free.liftF(I(F.put(k, v)))
-      def compareAndPut(k: K, e: Option[V], u: V) = Free.liftF(I(F.compareAndPut(k, e, u)))
-      def delete(k: K)                            = Free.liftF(I(F.delete(k)))
-    }
 }
 
-sealed abstract class KvsInstances {
+sealed abstract class KvsInstances extends KvsInstances0 {
   implicit def keyValueStoreKvs[K, V]: Kvs[KeyValueStore[K, V, ?], K, V] =
     new Kvs[KeyValueStore[K, V, ?], K, V] {
       def keys                                    = KeyValueStore.Keys()
@@ -66,9 +57,17 @@ sealed abstract class KvsInstances {
       def delete(k: K)                            = KeyValueStore.Delete(k)
     }
 
-  implicit def injectableKeyValueStoreKvs[K, V, S[_]](implicit I: KeyValueStore[K, V, ?] :<: S): Kvs[Free[S, ?], K, V] =
-    Kvs.forInjectable[KeyValueStore[K, V, ?], K, V, S]
+  implicit def freeKvs[K, V, F[_], S[_]](implicit F: Kvs[F, K, V], I: F :<: S): Kvs[Free[S, ?], K, V] =
+    new Kvs[Free[S, ?], K, V] {
+      def keys                                    = Free.liftF(I(F.keys))
+      def get(k: K)                               = Free.liftF(I(F.get(k)))
+      def put(k: K, v: V)                         = Free.liftF(I(F.put(k, v)))
+      def compareAndPut(k: K, e: Option[V], u: V) = Free.liftF(I(F.compareAndPut(k, e, u)))
+      def delete(k: K)                            = Free.liftF(I(F.delete(k)))
+    }
+}
 
+sealed abstract class KvsInstances0 {
   implicit def eitherTKvs[K, V, E, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[EitherT[F, E, ?], K, V] =
     Kvs.forTrans[F, K, V, EitherT[?[_], E, ?]]
 

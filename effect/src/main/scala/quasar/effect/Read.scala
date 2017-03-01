@@ -75,10 +75,11 @@ object Read {
       new Ops[R, S]
   }
 
-  def contramapR[Q, R](f: Q => R)                    = λ[Read[R, ?] ~> Read[Q, ?]] { case Ask(g) => Ask(g compose f) }
-  def constant[F[_]: Applicative, R](r: R)           = λ[Read[R, ?] ~> F]          { case Ask(f) => r.point[F] map f }
-  def fromTaskRef[R](tr: TaskRef[R])                 = λ[Read[R, ?] ~> Task]       { case Ask(f) => tr.read map f    }
-  def toState[F[_], R](implicit F: MonadState[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
+  def contramapR[Q, R](f: Q => R)                      = λ[Read[R, ?] ~> Read[Q, ?]] { case Ask(g) => Ask(g compose f) }
+  def constant[F[_]: Applicative, R](r: R)             = λ[Read[R, ?] ~> F]          { case Ask(f) => r.point[F] map f }
+  def fromTaskRef[R](tr: TaskRef[R])                   = λ[Read[R, ?] ~> Task]       { case Ask(f) => tr.read map f    }
+  def toState[F[_], R](implicit F: MonadState[F, R])   = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
+  def toReader[F[_], R](implicit F: MonadReader[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F asks f         }
 
   def monadReader_[R, S[_]](implicit O: Ops[R, S]): MonadReader_[Free[S, ?], R] =
     new MonadReader_[Free[S, ?], R] {

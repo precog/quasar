@@ -18,7 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.common.SortDir
-import quasar.contrib.scalaz.MonadTell_
+import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -37,8 +37,13 @@ package object xquery {
 
   type XPath = String
 
-  type Prologs       = ISet[Prolog]
-  type PrologW[F[_]] = MonadTell_[F, Prologs]
+  type Prologs          = ISet[Prolog]
+  type PrologT[F[_], A] = WriterT[F, Prologs, A]
+  type PrologW[F[_]]    = MonadTell_[F, Prologs]
+  type PrologL[F[_]]    = MonadListen_[F, Prologs]
+
+  def PrologW[F[_]](implicit F: PrologW[F]): PrologW[F] = F
+  def PrologL[F[_]](implicit F: PrologL[F]): PrologL[F] = F
 
   sealed abstract class SortDirection {
     def asOrderModifier: String = this match {

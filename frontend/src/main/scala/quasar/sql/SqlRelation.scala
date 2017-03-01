@@ -60,7 +60,7 @@ sealed trait NamedRelation[A] extends SqlRelation[A] {
 }
 
 /**
- * IdentRelationAST allows us to reference a let binding in relation (i.e. table)
+ * IdentRelationAST allows us to reference a let binding in a relation (i.e. table)
  * context. ExprF.IdentF allows us to reference a let binding in expression context.
  * Ideally we can unify these two contexts, providing a single way to reference a
  * let binding.
@@ -89,7 +89,7 @@ object SqlRelation {
   implicit val equal: Delay[Equal, SqlRelation] =
     new Delay[Equal, SqlRelation] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (IdentRelationAST(n1, a1), IdentRelationAST(n2, a2)) =>
             n1 ≟ n2 && a1 ≟ a2

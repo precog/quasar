@@ -136,6 +136,8 @@ object Extension {
       }
   }
 
+  // TODO need Equal[Char]
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit val equal: Delay[Equal, Extension] =
     new Delay[Equal, Extension] {
       def apply[α](eq: Equal[α]) = Equal.equal((a, b) => (a, b) match {

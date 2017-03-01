@@ -19,7 +19,7 @@ package quasar.qscript
 import quasar.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
 import quasar.common.SortDir
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncs._
@@ -149,7 +149,7 @@ class QScriptSpec
                 ProjectFieldR(HoleF, StrLit("pop")),
                 Free.roll(Undefined()))),
               Free.roll(Undefined()))))),
-          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0))))))(
+          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0.some))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -158,7 +158,7 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(
         QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+          Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
           Take,
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
@@ -168,7 +168,7 @@ class QScriptSpec
         beSome(beTreeEqual(
           QC.inj(Subset(
             QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-            Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+            Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
             Take,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
@@ -270,7 +270,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap](HoleF)),
-          ReduceIndexF(0))))(
+          ReduceIndexF(0.some))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -290,7 +290,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap](ProjectFieldR(HoleF, StrLit("height")))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))))(
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some)))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -443,7 +443,7 @@ class QScriptSpec
                 ProjectIndexR(HoleF, IntLit(2)))))),
           Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
-            ReduceIndexF(0))))))(
+            ReduceIndexF(0.some))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -491,14 +491,14 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(LeftSideF)),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("car"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
@@ -612,7 +612,7 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(Union((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("city"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("city"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
@@ -621,7 +621,7 @@ class QScriptSpec
                   ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
@@ -632,8 +632,8 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             ProjectIndexR(HoleF, IntLit(1)))),
-          List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
-          ReduceIndexF(0))))(
+          Nil,
+          ProjectIndexR(ReduceIndexF(None), IntLit(0)))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -681,7 +681,7 @@ class QScriptSpec
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
           List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))(
+          Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -731,8 +731,8 @@ class QScriptSpec
                   StrLit("city")),
                 Free.roll(Undefined()))))),
           Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))),
-            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1))))))))(
+            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0.some))),
+            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1.some))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -777,7 +777,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(),
           List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
-          ReduceIndexF(0))))(
+          ReduceIndexF(0.some))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -866,8 +866,8 @@ class QScriptSpec
               HoleF,
               Free.roll(Undefined()))))),
           Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0))),
-            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1))))))))(
+            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0.some))),
+            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1.some))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
 
     }

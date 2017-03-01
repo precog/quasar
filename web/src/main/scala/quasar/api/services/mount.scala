@@ -18,7 +18,7 @@ package quasar.api.services
 
 import quasar.Predef.{ -> => _, _ }
 import quasar.api._
-import quasar.contrib.pathy.{AbsPath, APath, sandboxAbs}
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fs.mount._
 

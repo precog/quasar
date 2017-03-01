@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.couchbase._
 import quasar.qscript._
 
@@ -51,9 +51,9 @@ object Planner {
     : Planner[T, F, Const[Read[A], ?]] =
     new UnreachablePlanner[T, F, Const[Read[A], ?]]
 
-  implicit def constShiftedReadPathPlanner[T[_[_]], F[_]: Monad]
-    : Planner[T, F, Const[ShiftedRead[APath], ?]] =
-    new UnreachablePlanner[T, F, Const[ShiftedRead[APath], ?]]
+  implicit def constShiftedReadDirPlanner[T[_[_]], F[_]: Monad]
+    : Planner[T, F, Const[ShiftedRead[ADir], ?]] =
+    new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
   implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
     : Planner[T, F, Const[ShiftedRead[AFile], ?]] =

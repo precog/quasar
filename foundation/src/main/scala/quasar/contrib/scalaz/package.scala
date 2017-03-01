@@ -22,9 +22,9 @@ package object scalaz {
   def -\&/[A, B](a: A): These[A, B] = This(a)
   def \&/-[A, B](b: B): These[A, B] = That(b)
 
-  implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]) =
+  implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 
-  implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(implicit F: MonadError_[F, E]) =
+  implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(implicit F: MonadError_[F, E]): MonadError_Ops[F, E, A] =
     new MonadError_Ops[F, E, A](fa)
 }

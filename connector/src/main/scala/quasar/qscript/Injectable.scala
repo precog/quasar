@@ -54,5 +54,6 @@ object Injectable {
     )
   )
 
-  implicit def inject[F[_], G[_]](implicit IN: F :<: G) = make[F, G](IN, λ[G ~> λ[A => Option[F[A]]]](IN prj _))
+  implicit def inject[F[_], G[_]](implicit IN: F :<: G): Aux[F, G] =
+    make[F, G](IN, λ[G ~> λ[A => Option[F[A]]]](IN prj _))
 }

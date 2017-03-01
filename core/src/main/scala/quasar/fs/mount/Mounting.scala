@@ -172,8 +172,6 @@ object Mounting {
     private val notFound: Prism[MountingError, APath] =
       MountingError.pathError composePrism PathError.pathNotFound
 
-    // TODO: look at this for comprehension more closely
-    @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
     private def modify[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],

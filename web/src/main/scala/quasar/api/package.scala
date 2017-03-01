@@ -182,28 +182,9 @@ package object api {
     }
   }
 
-  /** This encoder translates spaces into pluses, but we want the
-   *  more rigorous encoding %20.
-   */
-  def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
-  def uriDecodeUtf8(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
-
-  private val dotdot = "%2E%2E"
-  private val dot    = "%2E"
-
-  private val escapeRel: String => String = {
-    case ".." => dotdot
-    case "."  => dot
-    case s    => uriEncodeUtf8(s)
-  }
-
-  private val unescapeRel: String => String = uriDecodeUtf8
-
-  val UriPathCodec = PathCodec('/', escapeRel, unescapeRel)
-
   // NB: HPath's own toString doesn't encode properly
   private def pathString(p: HPath) =
-    "/" + p.toList.map(escapeRel).mkString("/")
+    "/" + p.toList.map(UriPathCodec.escape).mkString("/")
 
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
@@ -235,7 +216,7 @@ package object api {
   def decodedPath(encodedPath: String): ApiError \/ APath =
     AsPath.unapply(HPath(encodedPath)) \/> ApiError.fromMsg(
       BadRequest withReason "Malformed path.",
-      s"Failed to parse '${uriDecodeUtf8(encodedPath)}' as an absolute path.",
+      s"Failed to parse '${UriPathCodec.unescape(encodedPath)}' as an absolute path.",
       "encodedPath" := encodedPath)
 
   def transcode(from: PathCodec, to: PathCodec): String => String =

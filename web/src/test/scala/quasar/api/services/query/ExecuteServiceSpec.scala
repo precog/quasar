@@ -28,7 +28,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.Sql
+import quasar.sql.{Sql, CIName}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -120,7 +120,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
       sql.fixParser.parse(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        ast => quasar.queryPlan(ast, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        ast => quasar.queryPlan(ast, vars, rootDir, Nil, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -252,13 +252,13 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val q = "select sum(1, 2, 3, 4)"
 
         val err: SemanticError =
-          SemanticError.WrongArgumentCount("sum", 1, 4)
+          SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
         val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -279,7 +279,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,

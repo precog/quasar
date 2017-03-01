@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
@@ -163,8 +163,12 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   private def freeQC(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
 
-  private def freeSR(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceSR[CoEnv[Hole, QScriptTotal, ?], APath](coenvPrism[QScriptTotal, Hole]))
+  private def freeSR(branch: FreeQS): FreeQS = {
+    def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<: QScriptTotal): FreeQS =
+      freeTotal(b)(CoalesceTotal.coalesceSR[CoEnv[Hole, QScriptTotal, ?], A](coenvPrism[QScriptTotal, Hole]))
+
+    freeSR0[AFile](freeSR0[ADir](branch))
+  }
 
   private def freeEJ(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
@@ -273,7 +277,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, innerStruct, innerId, innerRepair)
-                if !shiftRepair.element(LeftSide) && struct != HoleF =>
+                if !shiftRepair.element(LeftSide) && struct ≠ HoleF =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
                   innerSrc,
@@ -286,10 +290,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, nm.freeMF(struct >> mf), id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(id match {
                 case IncludeId =>
                   Free.roll(ConcatArrays[T, FreeMap](

@@ -97,7 +97,7 @@ object writefile {
     s2: Task :<: S
   ): Free[S, Vector[FileSystemError]] = {
 
-    implicit val codec = DataCodec.Precise
+    implicit val codec: DataCodec = DataCodec.Precise
 
     def _write(pw: PrintWriter): Task[Vector[FileSystemError]] = {
 

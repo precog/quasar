@@ -1768,6 +1768,36 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
   }
 
+  "compile expression and functions" >> {
+    val expr = parseAndAnnotateUnsafe("select FLOOR(10.4)")
+    val funcs = List(FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")))
+    val expected =
+      lpf.invoke2(Subtract,
+        lpf.constant(Data.Dec(10.4)),
+        lpf.invoke2(Modulo,
+          lpf.constant(Data.Dec(10.4)),
+          lpf.constant(Data.Int(1))))
+    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+  }
+
+  "compile expression and functions that depend on themselves" >> {
+    val expr = parseAndAnnotateUnsafe("select ROUND(10.4)")
+    val funcs = List(
+      FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
+      FunctionDecl(CIName("round"), List(CIName("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
+    val floorArgumentLP =
+      lpf.invoke2(Add,
+        lpf.constant(Data.Dec(10.4)),
+        lpf.constant(Data.Dec(0.5)))
+    val expected =
+      lpf.invoke2(Subtract,
+        floorArgumentLP,
+        lpf.invoke2(Modulo,
+          floorArgumentLP,
+          lpf.constant(Data.Int(1))))
+    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+  }
+
   "constant folding" >> {
     def testFolding(name: String, query: String, expected: String) = {
       s"${name}" >> {

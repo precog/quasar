@@ -403,17 +403,17 @@ class SQLParserSpec extends quasar.Qspec {
     "parse basic let" in {
       parse("""foo := 5; foo""") must
         beRightDisjunction(
-          LetR("foo", IntLiteralR(5), IdentR("foo")))
+          LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
     }
 
     "parse nested lets" in {
       parse("""foo := 5; bar := "hello"; bar + foo""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             IntLiteralR(5),
             LetR(
-              "bar",
+              CIName("bar"),
               StringLiteralR("hello"),
               BinopR(IdentR("bar"), IdentR("foo"), Plus))))
     }
@@ -426,7 +426,7 @@ class SQLParserSpec extends quasar.Qspec {
             List(Proj(IdentR("foo"), None)),
             Some(ExprRelationAST(
               LetR(
-                "bar",
+                CIName("bar"),
                 IntLiteralR(12),
                 IdentR("baz")),
               "quag")),
@@ -439,7 +439,7 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := (1,2,3); select * from foo""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             SetLiteralR(
               List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
@@ -455,7 +455,7 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := (1,2,3); select foo from bar""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             SetLiteralR(
               List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
@@ -471,7 +471,7 @@ class SQLParserSpec extends quasar.Qspec {
     "parse select inside body of let inside select" in {
       val innerLet =
         LetR(
-          "foo",
+          CIName("foo"),
           SetLiteralR(
             List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
           SelectR(
@@ -539,7 +539,7 @@ class SQLParserSpec extends quasar.Qspec {
 
     "parse deeply nested parens" in {
       // NB: Just a stress-test that the parser can handle a deeply
-      // left-recursive expression with many unneeded parenes, which
+      // left-recursive expression with many unneeded parens, which
       // happens to be exactly what pprint produces.
       val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
       parse(q).map(pprint[Fix[Sql]]) must beRightDisjunction(q)

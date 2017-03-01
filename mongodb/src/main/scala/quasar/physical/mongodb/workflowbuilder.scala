@@ -185,16 +185,18 @@ object WorkflowBuilder {
 
   import fixExprOp._
 
-  /**
-   * Like ValueBuilder, this is a Leaf node which can be used to construct a more complicated WorkflowBuilder.
-   * Takes a value resulting from a Workflow and wraps it in a WorkflowBuilder.
-   * For example: If you want to read from MongoDB and then project on a field, the read would be the
-   * CollectionBuilder.
-   * @param base Name, or names under which the values produced by the src will be found.
-   *             It's most often `Root`, or else it's probably a temporary `Field`
-   * @param struct In the case of read, it's None. In the case where we are converting a WorkflowBuilder into
-   *               a Workflow, we have access to the shape of this Workflow and encode it in `struct`.
-   */
+  /** Like ValueBuilder, this is a Leaf node which can be used to construct a
+    * more complicated WorkflowBuilder. Takes a value resulting from a Workflow
+    * and wraps it in a WorkflowBuilder. For example: If you want to read from
+    * MongoDB and then project on a field, the read would be the
+    * CollectionBuilder.
+    * @param base Name, or names under which the values produced by the src will
+    *             be found. It's most often `Root`, or else it's probably a
+    *             temporary `Field`.
+    * @param struct In the case of read, it's None. In the case where we are
+    *               converting a WorkflowBuilder into a Workflow, we have access
+    *               to the shape of this Workflow and encode it in `struct`.
+    */
   final case class CollectionBuilderF[F[_]](
     src: Fix[F],
     base: Base,
@@ -228,23 +230,20 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new ShapePreservingBuilderF(src, inputs, op))
   }
 
-  /**
-   * A query that produces a constant value.
-   */
+  /** A query that produces a constant value. */
   final case class ValueBuilderF[F[_]](value: Bson) extends WorkflowBuilderF[F, Nothing]
   object ValueBuilder {
     def apply[F[_]](value: Bson) = Fix[WorkflowBuilderF[F, ?]](new ValueBuilderF(value))
   }
 
-  /**
-    * A query that applies an `Expr` operator to a source (which could be
+  /** A query that applies an `Expr` operator to a source (which could be
     * multiple values). You can think of `Expr` as a function application in
     * MongoDB that accepts values and produces new values. It's kind of like a
     * map. The shape coming out of an `ExprBuilder` is unknown because of the
     * fact that the expression can be arbitrary.
     * @param src The values on which to apply the `Expr`
     * @param expr The expression that produces a new set of values given a set
-    *   of values.
+    *             of values.
     */
   final case class ExprBuilderF[F[_], A](src: A, expr: Expr) extends WorkflowBuilderF[F, A]
   object ExprBuilder {
@@ -252,14 +251,14 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new ExprBuilderF(src, expr))
   }
 
-  /**
-   * Same as an `ExprBuilder` but contains the shape of the resulting query.
-   * The result is a document that maps the field Name to the resulting values
-   * from applying the `Expr` associated with that name.
-   * NB: The shape is more restrictive than \$project because we may need to
-   * convert it to a `GroupBuilder`, and a nested `Reshape` can be realized with
-   * a chain of DocBuilders, leaving the collapsing to Workflow.coalesce.
-   */
+  /** Same as an `ExprBuilder` but contains the shape of the resulting query.
+    * The result is a document that maps the field Name to the resulting values
+    * from applying the `Expr` associated with that name.
+    * NB: The shape is more restrictive than \$project because we may need to
+    *     convert it to a `GroupBuilder`, and a nested `Reshape` can be realized
+    *     with a chain of DocBuilders, leaving the collapsing to
+    *     Workflow.coalesce.
+    */
   final case class DocBuilderF[F[_], A](src: A, shape: ListMap[BsonField.Name, Expr])
       extends WorkflowBuilderF[F, A]
   object DocBuilder {
@@ -341,10 +340,9 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields))
   }
 
-  /**
-    Holds a partially-unknown structure. `Expr` entries are unknown and `Doc`
-    entries are known. There should be at least one Expr in the list, otherwise
-    it should be a DocBuilder.
+  /** Holds a partially-unknown structure. `Expr` entries are unknown and `Doc`
+    * entries are known. There should be at least one Expr in the list,
+    * otherwise it should be a DocBuilder.
     */
   final case class SpliceBuilderF[F[_], A](src: A, structure: List[DocContents[Expr]])
       extends WorkflowBuilderF[F, A] {
@@ -375,19 +373,6 @@ object WorkflowBuilder {
   object ArraySpliceBuilder {
     def apply[F[_]](src: WorkflowBuilder[F], structure: List[ArrayContents[Expr]]) =
       Fix[WorkflowBuilderF[F, ?]](new ArraySpliceBuilderF(src, structure))
-  }
-
-  def branchLengthƒ[F[_]]: WorkflowBuilderF[F, Int] => Int = {
-    case CollectionBuilderF(_, _, _) => 0
-    case ShapePreservingBuilderF(src, inputs, _) => 1 + src
-    case ValueBuilderF(_) => 0
-    case ExprBuilderF(src, _) => 1 + src
-    case DocBuilderF(src, _) => 1 + src
-    case ArrayBuilderF(src, _) => 1 + src
-    case GroupBuilderF(src, keys, _) => 1 + src
-    case FlatteningBuilderF(src, _) => 1 + src
-    case SpliceBuilderF(src, _) => 1 + src
-    case ArraySpliceBuilderF(src, _) => 1 + src
   }
 
   /** Simplify/coalesce certain shapes, eliminating extra layers that make it
@@ -725,11 +710,16 @@ object WorkflowBuilder {
                     case (k, \/-(v)) =>
                       ((x: ListMap[BsonField.Name, Fix[ExprOp]]) => x + (k -> v)).second(acc)
                   })
-              if (grouped.isEmpty)
+              if (grouped.isEmpty && !ungrouped.isEmpty)
                 toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
               else
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-                  fail(InternalError fromMsg "A shape with no fields does not make sense"))(
+                  generateWorkflow(wb) ∘ { case (wf, base0) =>
+                    CollectionBuilderF(
+                      chain(wf, $group(Grouped(ListMap()), key(base0))),
+                      Field(BsonField.Name("_id")),
+                      none)
+                  })(
                   fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
                     emitSt(ungrouped.toList match {
                       case Nil =>
@@ -1148,7 +1138,7 @@ object WorkflowBuilder {
       case (
         FlatteningBuilderF(src0, fields0),
         FlatteningBuilderF(src1, fields1)) =>
-        left.cata(branchLengthƒ[F]) cmp right.cata(branchLengthƒ[F]) match {
+        left.cata(height) cmp right.cata(height) match {
           case Ordering.LT =>
             merge(left, src1).map { case (lbase, rbase, wb) =>
               (lbase, rbase, FlatteningBuilder(wb, fields1.map(_.map(rbase.toDocVar \\ _))))

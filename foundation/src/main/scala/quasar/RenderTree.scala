@@ -75,8 +75,6 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
     Delay.fromNT(λ[RenderTree ~> DelayedA[A]#RenderTree](_ =>
       make(_.getConst.render)))
 
-  // FIXME: needs puffnfresh/wartremover#226 fixed
-  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
   implicit def delay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
     F(RenderTree[A])
 

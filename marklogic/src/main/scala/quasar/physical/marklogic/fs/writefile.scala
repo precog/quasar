@@ -18,35 +18,52 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
-import quasar.effect.{Capture, Kvs, MonoSeq}
+import quasar.contrib.pathy._
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.effect.uuid.UuidReader
+import quasar.fp.numeric.Positive
 import quasar.fs._, FileSystemError._
+import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.xquery._
 
+import pathy.Path._
 import scalaz._, Scalaz._
 
 object writefile {
-  def interpret[F[_]: Monad: Capture: SessionReader: UuidReader: XccErr, FMT](
+  def interpret[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions](
+    chunkSize: Positive
+  )(
     implicit
     C:       AsContent[FMT, Data],
+    SP:      StructuralPlanner[F, FMT],
     cursors: Kvs[F, WriteFile.WriteHandle, Unit],
     idSeq:   MonoSeq[F]
-  ): WriteFile ~> F = λ[WriteFile ~> F] {
-    case WriteFile.Open(file) =>
-      for {
-        wh <- idSeq.next ∘ (WriteFile.WriteHandle(file, _))
-        _  <- cursors.put(wh, ())
-        r  <- ops.exists[F](file).ifM(
-                ().right[PathError].point[F],
-                ops.createFile[F](file))
-      } yield r.leftMap(pathErr(_)).as(wh)
+  ): WriteFile ~> F = {
+    def write(dst: AFile, lines: Vector[Data]) = {
+      val chunk = Data._arr(lines.toList)
+      ops.upsertFile[F, FMT, Data](dst, chunk) map (_.fold(
+        msgs => Vector(FileSystemError.writeFailed(chunk, msgs intercalate ", ")),
+        _ map (xe => FileSystemError.writeFailed(chunk, xe.shows))))
+    }
 
-    case WriteFile.Write(h, data) =>
-      OptionT(cursors.get(h)).isDefined.ifM(
-        ops.appendToFile[F, FMT](h.file, data),
-        Vector(unknownWriteHandle(h)).point[F])
+    λ[WriteFile ~> F] {
+      case WriteFile.Open(file) =>
+        for {
+          wh <- idSeq.next ∘ (WriteFile.WriteHandle(file, _))
+          _  <- cursors.put(wh, ())
+          _  <- ops.ensureLineage[F](fileParent(file))
+        } yield wh.right[FileSystemError]
 
-    case WriteFile.Close(h) =>
-      cursors.delete(h)
+      case WriteFile.Write(h, data) =>
+        OptionT(cursors.get(h)).isDefined.ifM(
+          data.grouped(chunkSize.get.toInt)
+            .toStream
+            .foldMapM(write(h.file, _)),
+          Vector(unknownWriteHandle(h)).point[F])
+
+      case WriteFile.Close(h) =>
+        cursors.delete(h)
+    }
   }
 }

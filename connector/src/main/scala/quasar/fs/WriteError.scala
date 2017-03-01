@@ -18,13 +18,14 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataCodec}
+import quasar.Data._
 
 import argonaut._, Argonaut._
 
 import scalaz.Show
 
 final case class WriteError(value: Data, hint: Option[String]) {
-  def message = hint.getOrElse("error writing data") + "; value: " + value
+  def message = hint.getOrElse("error writing data") + "; value: " + Show[Data].shows(value)
 }
 
 object WriteError {

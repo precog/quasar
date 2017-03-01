@@ -58,7 +58,7 @@ object compile {
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, QResponse[S]] =
-      respond(queryPlan(expr, vars, basePath, offset, limit)
+      respond(queryPlan(expr, vars, basePath, Nil, offset, limit)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
           κ(Json(
             "physicalPlan" -> jNull,

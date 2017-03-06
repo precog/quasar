@@ -57,7 +57,7 @@ object writefile {
 
       case WriteFile.Write(h, data) =>
         OptionT(cursors.get(h)).isDefined.ifM(
-          data.grouped(chunkSize.get.toInt)
+          data.grouped(chunkSize.value.toInt)
             .toStream
             .foldMapM(write(h.file, _)),
           Vector(unknownWriteHandle(h)).point[F])

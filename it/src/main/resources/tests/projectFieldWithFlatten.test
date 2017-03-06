@@ -5,9 +5,7 @@
         "marklogic_xml":  "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-	"spark_local": "pending",
-        "spark_hdfs": "pending"
+        "postgresql":        "pending"
     },
     "data": "usa_factbook.data",
     "query": "select intro from usa_factbook where geo{*}.text = \"19,924 km\"",

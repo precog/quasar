@@ -42,7 +42,7 @@ object queryfile {
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {
     val ioFile = new File(posixCodec.printPath(out))
-    val pw = new PrintWriter(new FileOutputStream(ioFile, true))
+    val pw = new PrintWriter(new FileOutputStream(ioFile, false))
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
     pw.close()
   }

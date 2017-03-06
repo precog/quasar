@@ -18,25 +18,103 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.TreeMatchers
-import quasar.sql.SemanticAnalysis._
 import quasar.sql.fixpoint._
 
 import matryoshka._
-import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
-  "TransformSelect" should {
-    val asc: OrderType = ASC
+  val asc: OrderType = ASC
 
-    def transform[T]
-      (q: T)
-      (implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
-        : T =
-      q.transCata[T](orOriginal(projectSortKeysƒ))
+  "normalize projections" should {
+    "remove projection from filter when table exists" in  {
+      val query = SelectR(SelectAll,
+        Proj(IdentR("name"), None) :: Nil,
+        Some(TableRelationAST(file("person"), None)),
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
+        None,
+        None)
 
+      SemanticAnalysis.normalizeProjections(query) must beTree(
+        SelectR(SelectAll,
+          Proj(IdentR("name"), None) :: Nil,
+          Some(TableRelationAST(file("person"), None)),
+          Some(IdentR("age")),
+          None,
+          None))
+    }
+
+    "remove projection from group by that already exists" in  {
+      val query = SelectR(SelectAll,
+        Proj(IdentR("name"), None) :: Nil,
+        Some(TableRelationAST(file("person"), None)),
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
+        Some(GroupBy(
+          BinopR(IdentR("person"), StringLiteralR("height"), FieldDeref) :: Nil,
+          Some(BinopR(IdentR("person"), StringLiteralR("initials"), FieldDeref)))),
+        None)
+
+      SemanticAnalysis.normalizeProjections(query) must beTree(
+        SelectR(SelectAll,
+          Proj(IdentR("name"), None) :: Nil,
+          Some(TableRelationAST(file("person"), None)),
+          Some(IdentR("age")),
+          Some(GroupBy(
+            IdentR("height") :: Nil,
+            Some(IdentR("initials")))),
+          None))
+    }
+
+    "remove projection from order by that already exists" in  {
+      val query = SelectR(SelectDistinct,
+        Proj(IdentR("name"), None) :: Nil,
+        Some(TableRelationAST(file("person"), None)),
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
+        Some(GroupBy(BinopR(IdentR("person"), StringLiteralR("height"), FieldDeref) :: Nil, None)),
+        Some(OrderBy((asc, BinopR(IdentR("person"), StringLiteralR("shoe size"), FieldDeref)).wrapNel)))
+
+      SemanticAnalysis.normalizeProjections(query) must beTree(
+        SelectR(SelectDistinct,
+          Proj(IdentR("name"), None) :: Nil,
+          Some(TableRelationAST(file("person"), None)),
+          Some(IdentR("age")),
+          Some(GroupBy(IdentR("height") :: Nil, None)),
+          Some(OrderBy((asc, IdentR("shoe size")).wrapNel))))
+    }
+
+    "not remove projection that doesn't exist" in  {
+      val query = SelectR(SelectAll,
+        Proj(IdentR("name"), None) :: Nil,
+        Some(TableRelationAST(file("person"), None)),
+        Some(BinopR(IdentR("animal"), StringLiteralR("name"), FieldDeref)),
+        None,
+        None)
+
+      SemanticAnalysis.normalizeProjections(query) must beTree(query)
+    }
+
+    "remove projection using table alias" in  {
+      val query = SelectR(SelectAll,
+        Proj(IdentR("name"), None) :: Nil,
+        Some(TableRelationAST(file("person"), Some("Full Name"))),
+        Some(BinopR(IdentR("Full Name"), StringLiteralR("first"), FieldDeref)),
+        None,
+        None)
+
+      SemanticAnalysis.normalizeProjections(query) must beTree(
+        SelectR(SelectAll,
+          Proj(IdentR("name"), None) :: Nil,
+          Some(TableRelationAST(file("person"), Some("Full Name"))),
+          Some(IdentR("first")),
+          None,
+          None))
+
+    }
+  }
+
+  "sort key projection" should {
     "add single field for order by" in {
       val q = SelectR(SelectAll,
                      Proj(IdentR("name"), None) :: Nil,
@@ -44,7 +122,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      None,
                      None,
                      Some(OrderBy((asc, IdentR("height")).wrapNel)))
-      transform(q) must beTree(
+      SemanticAnalysis.projectSortKeys(q) must beTree(
                SelectR(SelectAll,
                       Proj(IdentR("name"), None) :: Proj(IdentR("height"), Some("__sd__0")) :: Nil,
                       Some(TableRelationAST(file("person"), None)),
@@ -61,7 +139,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      None,
                      None,
                      Some(OrderBy((asc, IdentR("name")).wrapNel)))
-      transform(q) must beTree(q)
+      SemanticAnalysis.projectSortKeys(q) must beTree(q)
     }
 
     "not add a field that appears as an alias in the projections" in {
@@ -71,7 +149,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      None,
                      None,
                      Some(OrderBy((asc, IdentR("name")).wrapNel)))
-      transform(q) must beTree(q)
+      SemanticAnalysis.projectSortKeys(q) must beTree(q)
     }
 
     "not add a field with wildcard present" in {
@@ -81,7 +159,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      None,
                      None,
                      Some(OrderBy((asc, IdentR("height")).wrapNel)))
-      transform(q) must beTree(q)
+      SemanticAnalysis.projectSortKeys(q) must beTree(q)
     }
 
     "add single field for order by" in {
@@ -93,7 +171,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(OrderBy(NonEmptyList(
                        (asc, IdentR("height")),
                        (asc, IdentR("name"))))))
-      transform(q) must beTree(
+      SemanticAnalysis.projectSortKeys(q) must beTree(
                SelectR(SelectAll,
                       Proj(IdentR("name"), None) ::
                         Proj(IdentR("height"), Some("__sd__0")) ::
@@ -106,7 +184,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                         (asc, IdentR("name")))))))
     }
 
-    "transform sub-select" in {
+    "SemanticAnalysis.projectSortKeys sub-select" in {
       val q = SelectR(SelectAll,
                      Proj(SpliceR(None), None) :: Nil,
                      Some(TableRelationAST(file("foo"), None)),
@@ -122,7 +200,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                          In)),
                      None,
                      None)
-      transform(q) must beTree(
+      SemanticAnalysis.projectSortKeys(q) must beTree(
               SelectR(SelectAll,
                      Proj(SpliceR(None), None) :: Nil,
                      Some(TableRelationAST(file("foo"), None)),
@@ -141,6 +219,5 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      None,
                      None))
     }
-
   }
 }

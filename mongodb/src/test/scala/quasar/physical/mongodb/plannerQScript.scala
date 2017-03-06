@@ -4008,7 +4008,8 @@ class PlannerQScriptSpec extends
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (Mongo-specific)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)"))
@@ -4023,7 +4024,8 @@ class PlannerQScriptSpec extends
     "include correct phases with planner error" in {
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (Mongo-specific)"))
     }

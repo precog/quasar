@@ -80,7 +80,7 @@ lazy val buildSettings = Seq(
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
 
-  console <<= console in Test, // console alias test:console
+  console := { (console in Test).value }, // console alias test:console
 
   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
 
@@ -146,6 +146,17 @@ lazy val assemblySettings = Seq(
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
 
     case other => (assemblyMergeStrategy in assembly).value apply other
+  },
+
+  assemblyExcludedJars in assembly := {
+    val cp = (fullClasspath in assembly).value
+
+    cp filter { af =>
+      val file = af.data
+
+      (file.getName == "scala-library-" + scalaVersion.value + ".jar") &&
+        (file.getPath contains "org/scala-lang")
+    }
   }
 )
 

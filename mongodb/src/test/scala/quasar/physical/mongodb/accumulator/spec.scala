@@ -16,14 +16,14 @@
 
 package quasar.physical.mongodb.accumulator
 
-import quasar.Predef._
 import quasar.fp._
 
 import org.scalacheck._
+import org.scalacheck.rng.Seed
+
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
-import shapeless.contrib.scalaz.instances.{deriveShow => _, _}
 
 class AccumulatorSpec extends Spec {
   implicit val arbAccumOp: Arbitrary ~> λ[α => Arbitrary[AccumOp[α]]] =
@@ -42,6 +42,16 @@ class AccumulatorSpec extends Spec {
     }
 
   implicit val arbIntAccumOp = arbAccumOp(Arbitrary.arbInt)
+
+  implicit val cogenAccumOp: Cogen ~> λ[α => Cogen[AccumOp[α]]] =
+    new (Cogen ~> λ[α => Cogen[AccumOp[α]]]) {
+      def apply[α](cg: Cogen[α]): Cogen[AccumOp[α]] =
+        Cogen { (seed: Seed, ao: AccumOp[α]) =>
+          cg.perturb(seed, ao.copoint)
+        }
+    }
+
+  implicit val cogenIntAccumOp = cogenAccumOp(Cogen.cogenInt)
 
   checkAll(comonad.laws[AccumOp])
   checkAll(traverse1.laws[AccumOp])

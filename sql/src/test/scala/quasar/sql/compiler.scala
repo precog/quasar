@@ -1133,6 +1133,17 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
+    "compile order by reusing selected field" in {
+      testLogicalPlanCompile(
+        "select name from person order by name",
+        lpf.let('__tmp0,
+          lpf.invoke1(Squash,
+            lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("name")))),
+          lpf.sort(
+            lpf.free('__tmp0),
+            (lpf.free('__tmp0), SortDir.asc).wrapNel)))
+    }
+
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
         "select name from person where gender = \"male\" order by name, height",

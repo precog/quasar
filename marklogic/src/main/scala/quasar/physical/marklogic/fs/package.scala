@@ -240,7 +240,7 @@ package object fs {
         data.encodeXml[F](d) map { elem =>
           val opts = new ContentCreateOptions
           opts.setFormatXml()
-          ContentFactory.newContent(uri.get, elem.toString, opts)
+          ContentFactory.newContent(uri.value, elem.toString, opts)
         }
     }
 
@@ -249,7 +249,7 @@ package object fs {
       def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] = {
         val opts = new ContentCreateOptions
         opts.setFormatJson()
-        ContentFactory.newContent(uri.get, data.encodeJson(d).nospaces, opts).point[F]
+        ContentFactory.newContent(uri.value, data.encodeJson(d).nospaces, opts).point[F]
       }
     }
 

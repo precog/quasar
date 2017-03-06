@@ -128,12 +128,12 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
       }.set(minTestsOk = 10)
 
       "scan with offset zero and limit j stops after j data" >> prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
-        val limit = Positive(j.get.toLong).get // Not ideal, but simplest solution for now
+        val limit = Positive(j.value.toLong).get // Not ideal, but simplest solution for now
 
         val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
         val r     = runLogT(run, read.scan(smallFile.file, 0L, Some(limit))).run_\/
 
-        val d = rFull.map(_.take(j.get))
+        val d = rFull.map(_.take(j.value))
 
         (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
         (r must_= d)
@@ -146,21 +146,21 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
         val r     = runLogT(run, read.scan(smallFile.file, k, Some(j))).run_\/
 
-        val d = rFull.map(_.drop(k).take(j.get))
+        val d = rFull.map(_.drop(k).take(j.value))
 
         (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
         (r must_= d)
       }.set(minTestsOk = 5)
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" >> prop { j: Int Refined Greater[SmallFileSize] =>
-          val limit = Some(Positive(j.get.toLong).get) // Not ideal, but simplest solution for now
+          val limit = Some(Positive(j.value.toLong).get) // Not ideal, but simplest solution for now
 
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
           val r     = runLogT(run, read.scan(smallFile.file, 0L, limit)).run_\/
 
-          val d = rFull.map(_.take(j.get))
+          val d = rFull.map(_.take(j.value))
 
-          (j.get must beGreaterThan(smallFile.data.length))      and
+          (j.value must beGreaterThan(smallFile.data.length))    and
           (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
           (r must_= d)
       }.set(minTestsOk = 10)

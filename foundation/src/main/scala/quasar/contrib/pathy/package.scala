@@ -119,8 +119,8 @@ package object pathy {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(
-      abs => (abs relativeTo rootDir).map(p => (rootDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]),
-      rel => (rel relativeTo currentDir).map(p => (currentDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]))
+      abs => (abs relativeTo rootDir).map((p: Path[Rel,T,Sandboxed]) => (rootDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]),
+      rel => (rel relativeTo currentDir).map((p: Path[Rel,T,Sandboxed]) => (currentDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]))
 
   // TODO[pathy]: Offer clean API in pathy to do this
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

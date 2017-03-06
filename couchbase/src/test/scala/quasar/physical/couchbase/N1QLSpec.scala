@@ -94,7 +94,7 @@ trait N1QLArbitrary {
   implicit def arbN1QL[A: Arbitrary]: Arbitrary[N1QL[A]] = Arbitrary(Gen.oneOf(
     arb[QData]                         ∘ (Data[A](_)),
     arb[String]                        ∘ (Id[A](_)),
-    arb[Map[A, A]]                     ∘ (Obj(_)),
+    arb[List[(A, A)]]                  ∘ (Obj(_)),
     arb[List[A]]                       ∘ (Arr(_)),
     arb[A]                             ∘ (Time(_)),
     arb[A]                             ∘ (Timestamp(_)),

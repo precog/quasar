@@ -42,7 +42,7 @@ object readfile {
     readFromProcess(fToG) { (file, opts) =>
       fToG(ops.pathHavingFormatExists[F, FMT](file) map (_.fold(
         ops.readFile[F, FMT](file, opts.offset, opts.limit)
-          .chunk(chunkSize.get.toInt)
+          .chunk(chunkSize.value.toInt)
           .map(_ traverse xdmitem.decodeForFileSystem),
         (Process.empty: DataStream[F])
       ))) map (_.right[FileSystemError])

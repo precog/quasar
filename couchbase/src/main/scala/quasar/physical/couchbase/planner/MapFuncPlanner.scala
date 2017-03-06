@@ -183,7 +183,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         a1),
       WhenThen(
         RegexContains(a1, str(regex.regex)).embed,
-        Obj(Map(str(key) -> a1)).embed)
+        Obj(List(str(key) -> a1)).embed)
     )(
       Else(Null[T[N1QL]].embed)
     ).embed
@@ -476,7 +476,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         Select(
           Value(true),
           ResultExpr(
-            Obj(Map(
+            Obj(List(
               ToString(a1).embed -> IfNull(id1.embed, undefined).embed
             )).embed,
             none
@@ -488,7 +488,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           filter  = none,
           groupBy = none,
           orderBy = nil).embed,
-      Obj(Map(a1 -> a2)).embed))
+      Obj(List(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
       def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
         case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none

@@ -35,4 +35,6 @@ object IdHandling {
   }
 
   implicit val show: Show[IdHandling] = Show.showFromToString
+
+  implicit val equal: Equal[IdHandling] = Equal.equalA
 }

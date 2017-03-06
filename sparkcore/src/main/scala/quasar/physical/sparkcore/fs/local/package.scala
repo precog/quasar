@@ -37,7 +37,7 @@ package object local {
 
   import corequeryfile.RddState
 
-  val FsType = FileSystemType("sparklocal")
+  val FsType = FileSystemType("spark-local")
 
   type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]

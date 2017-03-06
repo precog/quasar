@@ -158,6 +158,7 @@ trait ExprArbitrary {
     def log2(x: Int): Int = (java.lang.Math.log(x.toDouble)/java.lang.Math.log(2)).toInt
     for {
       sz <- Gen.size
+      if sz > 1
       n  <- Gen.choose(1, log2(sz))
       l  <- Gen.listOfN(n, gen)
     } yield l

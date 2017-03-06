@@ -19,6 +19,7 @@ package quasar.physical.mongodb.workflow
 import scalaz._, Scalaz._
 
 sealed trait CardinalExpr[A]
+
 final case class MapExpr[A](fn: A)  extends CardinalExpr[A]
 final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
 
@@ -53,4 +54,15 @@ object CardinalExpr {
         case FlatExpr(e) => e
       }
     }
+
+  implicit def equal[A: Equal]: Equal[CardinalExpr[A]] = new Equal[CardinalExpr[A]] {
+
+    def equal(left: CardinalExpr[A], right: CardinalExpr[A]) = (left, right) match {
+      case (MapExpr(lfn), MapExpr(rfn)) => lfn === rfn
+      case (FlatExpr(lfn), FlatExpr(rfn)) => lfn === rfn
+      case _ => false
+    }
+
+    override def equalIsNatural = Equal[A].equalIsNatural
+  }
 }

@@ -1,6 +1,8 @@
 resolvers += "Jenkins-CI" at "http://repo.jenkins-ci.org/repo"
 libraryDependencies += "org.kohsuke" % "github-api" % "1.59"
 
+addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-M15")
+
 addSbtPlugin("com.eed3si9n"      % "sbt-assembly"    % "0.14.3")
 addSbtPlugin("com.eed3si9n"      % "sbt-buildinfo"   % "0.6.1")
 addSbtPlugin("de.heikoseeberger" % "sbt-header"      % "1.5.0")

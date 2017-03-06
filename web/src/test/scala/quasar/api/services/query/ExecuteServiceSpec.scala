@@ -161,7 +161,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         var_ : Int,
         offset: Int Refined NonNegative,
         limit: Int Refined RPositive) =>
-          (filesystem.file != rootDir </> file("sk(..)a/nZaxo/\"`oq_Jy.g.r.V{\\l") && varName.value != "im" && limit.get != 1 && offset.get != 0 && var_ != 0) ==> {
+          (filesystem.file != rootDir </> file("sk(..)a/nZaxo/\"`oq_Jy.g.r.V{\\l") && varName.value != "im" && limit.value != 1 && offset.value != 0 && var_ != 0) ==> {
             import quasar.std.StdLib.set._
 
             val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
@@ -169,25 +169,25 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
               Fix(Take(
                 Fix(Drop(
                   lp,
-                  lpf.constant(Data.Int(offset.get)))),
-                lpf.constant(Data.Int(limit.get))))
+                  lpf.constant(Data.Int(offset.value)))),
+                lpf.constant(Data.Int(limit.value))))
             val limitedContents =
               filesystem.contents
-                .drop(offset.get)
-                .take(limit.get)
+                .drop(offset.value)
+                .take(limit.value)
 
             get(executeService)(
               path = filesystem.parent,
               query = Some(Query(
                 query,
                 offset = Some(offset),
-                limit = Some(Positive(limit.get.toLong).get),
+                limit = Some(Positive(limit.value.toLong).get),
                 varNameAndValue = Some((varName.value, var_.toString)))),
               state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
               status = Status.Ok,
               response = (a: String) => a must_==
                 jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync
-                  .drop(offset.get).take(limit.get).mkString(""))
+                  .drop(offset.value).take(limit.value).mkString(""))
         }
       }.flakyTest("See precondition for example of offending arguments")
       "POST" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>

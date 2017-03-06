@@ -227,6 +227,11 @@ object Planner {
               : List[Data] =
             Zip[List].zipWith(f,(a.zip(b)))(_.tupled(_))
 
+          val avgReducers = reducers.map {
+            case Avg(_) => true
+            case _  => false
+          }
+
           StateT((sc: SparkContext) =>
             EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
               case (partitioner, trans, repair) =>
@@ -234,8 +239,8 @@ object Planner {
                   .reduceByKey(merge(_,_, reducersFuncs))
                   .map {
                   case (k, vs) =>
-                    val v = Zip[List].zipWith(vs, reducers) {
-                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
+                    val v = Zip[List].zipWith(vs, avgReducers) {
+                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), true) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
                     repair(k, v)

@@ -103,13 +103,13 @@ class ZipSpecs extends quasar.Qspec {
     "zip files of constant bytes" >> prop { (filesAndSize: Map[RelFile[Sandboxed], Positive], byte: Byte) =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
       val z = zipFiles(filesAndBytes)
-      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.get.toInt)
+      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.value.toInt)
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip files of random bytes" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
       val z = zipFiles(filesAndBytes)
-      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.get.toInt)
+      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.value.toInt)
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip many large files of random bytes (100 MB)" in {

@@ -35,8 +35,8 @@ object NCName {
     refineV[IsNCName](s).disjunction map (NCName(_))
 
   implicit val order: Order[NCName] =
-    Order.orderBy(_.value.get)
+    Order.orderBy(_.value.value)
 
   implicit val show: Show[NCName] =
-    Show.shows(_.value.get)
+    Show.shows(_.value.value)
 }

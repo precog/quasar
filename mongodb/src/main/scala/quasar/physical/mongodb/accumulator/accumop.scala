@@ -26,6 +26,7 @@ import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
 sealed trait AccumOp[A]
+
 object AccumOp {
   final case class $addToSet[A](value: A) extends AccumOp[A]
   final case class $push[A](value: A)     extends AccumOp[A]
@@ -67,6 +68,23 @@ object AccumOp {
           case $sum(value)      => G.map(f(value))($sum(_))
         }
     }
+
+  implicit def equal[A: Equal]: Equal[AccumOp[A]] = new Equal[AccumOp[A]] {
+
+    def equal(left: AccumOp[A], right: AccumOp[A]) = (left, right) match {
+      case ($addToSet(lv), $addToSet(rv)) => lv === rv
+      case ($push(lv), $push(rv)) => lv === rv
+      case ($first(lv), $first(rv)) => lv === rv
+      case ($last(lv), $last(rv)) => lv === rv
+      case ($max(lv), $max(rv)) => lv === rv
+      case ($min(lv), $min(rv)) => lv === rv
+      case ($avg(lv), $avg(rv)) => lv === rv
+      case ($sum(lv), $sum(rv)) => lv === rv
+      case _ => false
+    }
+
+    override def equalIsNatural = Equal[A].equalIsNatural
+  }
 
   implicit val show: Delay[Show, AccumOp] = new Delay[Show, AccumOp] {
     def apply[A](s: Show[A]) = Show.show {

@@ -4048,7 +4048,8 @@ class PlannerSpec extends
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)",
@@ -4065,7 +4066,8 @@ class PlannerSpec extends
     "include correct phases with planner error" in {
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)", "Logical Plan (projections preferred)"))

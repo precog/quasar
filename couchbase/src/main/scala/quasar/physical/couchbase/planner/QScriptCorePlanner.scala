@@ -57,7 +57,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
                   .left[T[N1QL]].η[PR])
           },
           v => processFreeMapDefault(v, id)
-        )) ∘ (l => Obj(l.toMap).embed)
+        )) ∘ (Obj(_).embed)
       case _ =>
         processFreeMapDefault(f, id)
     }

@@ -68,6 +68,10 @@ final class Mounts[A] private (val toMap: Map[ADir, A]) {
   def map[B](f: A => B): Mounts[B] =
     mapWithDir((_, a) => f(a))
 
+  def foldRight[B, C](z: B)(append: (A, => B) => B): B = toMap.foldRight(z) {
+    case ((_, b), acc) => append(b, acc)
+  }
+
   /** Right-biased union of two `Mounts`. */
   def union(other: Mounts[A]): String \/ Mounts[A] =
     other.toMap.toList.foldLeftM[String \/ ?, Mounts[A]](this)(_ + _)
@@ -82,10 +86,10 @@ object Mounts {
   def fromFoldable[F[_]: Foldable, A](entries: F[(ADir, A)]): String \/ Mounts[A] =
     entries.foldLeftM[String \/ ?, Mounts[A]](empty[A])(_ + _)
 
-  implicit val mountsFunctor: Functor[Mounts] =
-    new Functor[Mounts] {
-      def map[A, B](fa: Mounts[A])(f: A => B) = fa map f
-    }
+  implicit val MountsTraverse: Traverse[Mounts] = new Traverse[Mounts] {
+    def traverseImpl[G[_]:Applicative, A, B](fa: Mounts[A])(f: A => G[B]): G[Mounts[B]] = 
+      fa.toMap.traverse(f).map(new Mounts(_))
+  }
 
   ////
 

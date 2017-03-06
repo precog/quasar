@@ -1,13 +1,16 @@
 language: scala
-scala: 2.11.8 # but this setting isn't used when there's an explicit script
+scala: 2.11.8
 jdk: oraclejdk8
 dist: trusty
 sudo: false
+
 addons:
   postgresql: 9.4
+
 services:
   - docker
   - postgresql
+
 script:
   # Export color variables needed by travis_wait and travis_jigger
   - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
@@ -23,12 +26,14 @@ script:
   - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
+
 after_success: ./scripts/afterSuccess
+
 notifications:
   irc:
     template:
-    - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
-      %{build_url}"
+      - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
+        %{build_url}"
   slack:
     secure: KPCXtCAjtlpRQcH7TQtprrf67yIqPVpht9L6/+wbbNd14Tj3x53fiZ3OTabHVx3SL2ZWxbWq+FJGxdIFMyxC/fC0bV9flB7PlRtqHJV1Q7g49odAMAZL7syWr7vFP5bJt+TXuxHvMBihDHFk1Cehy4a1cnrOMReDgqGIFCwQtbI=
 
@@ -38,39 +43,42 @@ branches:
 
 cache:
   directories:
-  - $HOME/.ivy2/cache
-  - $HOME/.sbt
-  - scripts/marklogic/docker
+    - $HOME/.coursier/cache
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+    - scripts/marklogic/docker
 
 before_cache:
-- find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
-- find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
+  - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
+  - find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
 
 env:
   matrix:
-  - MONGO_RELEASE=2_6
-  - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
-  - QUASAR_MARKLOGIC_JSON='"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"'
-  - QUASAR_MARKLOGIC_XML='"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"'
-  - MONGO_RELEASE=3_0
-  - MONGO_RELEASE=3_0_RO
-  - MONGO_RELEASE=3_2
-  - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
+    - MONGO_RELEASE=2_6
+    - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
+    - QUASAR_MARKLOGIC_JSON='"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"'
+    - QUASAR_MARKLOGIC_XML='"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"'
+    - MONGO_RELEASE=3_0
+    - MONGO_RELEASE=3_0_RO
+    - MONGO_RELEASE=3_2
+    - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
 
   global:
-  - LOCAL_MONGODB=true
-  - ISOLATED_ENV=true
-  - MONGO_2_6_LINUX=2.6.11
-  - MONGO_2_6_PORT=27018
-  - MONGO_2_6_AUTH=""
-  - MONGO_3_0_LINUX=3.0.12
-  - MONGO_3_0_PORT=27019
-  - MONGO_3_0_AUTH=""
-  - MONGO_3_0_RO_LINUX=3.0.12
-  - MONGO_3_0_RO_PORT=27019
-  - MONGO_3_0_RO_AUTH="--auth"
-  - MONGO_3_2_LINUX=3.2.9
-  - MONGO_3_2_PORT=27020
-  - MONGO_3_2_AUTH=""
-  - secure: nxTDurFKCJUnm5caGc7WGN1xJbStxtZECafvll0TClXVmgs907kRwOhL1EX3AwU2cigHI0TV1p3/ZqcSUJGQeqYHNRwxW3+N6yyg7disuDfeaPZ8/Q04SlHbG7/hp5AbZJW7hGpCHgv8cMGl9AJVTEaS+ipV5zr6Ts+JpjtOGhw=
-  - TEST_CONFIG_FILE=it/testing.conf
+    - secure: nxTDurFKCJUnm5caGc7WGN1xJbStxtZECafvll0TClXVmgs907kRwOhL1EX3AwU2cigHI0TV1p3/ZqcSUJGQeqYHNRwxW3+N6yyg7disuDfeaPZ8/Q04SlHbG7/hp5AbZJW7hGpCHgv8cMGl9AJVTEaS+ipV5zr6Ts+JpjtOGhw=
+
+    - COURSIER_PROGRESS=0
+    - LOCAL_MONGODB=true
+    - ISOLATED_ENV=true
+    - MONGO_2_6_LINUX=2.6.11
+    - MONGO_2_6_PORT=27018
+    - MONGO_2_6_AUTH=""
+    - MONGO_3_0_LINUX=3.0.12
+    - MONGO_3_0_PORT=27019
+    - MONGO_3_0_AUTH=""
+    - MONGO_3_0_RO_LINUX=3.0.12
+    - MONGO_3_0_RO_PORT=27019
+    - MONGO_3_0_RO_AUTH="--auth"
+    - MONGO_3_2_LINUX=3.2.9
+    - MONGO_3_2_PORT=27020
+    - MONGO_3_2_AUTH=""
+    - TEST_CONFIG_FILE=it/testing.conf

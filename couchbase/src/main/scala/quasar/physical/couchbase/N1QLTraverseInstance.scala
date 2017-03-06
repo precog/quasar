@@ -31,7 +31,7 @@ trait N1QLTraverseInstance {
     ): G[N1QL[B]] = fa match {
       case Data(v)                 => G.point(Data(v))
       case Id(v)                   => G.point(Id(v))
-      case Obj(m)                  => m.toList.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l.toMap))
+      case Obj(m)                  => m.toList.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Arr(l)                  => l.traverse(f) ∘ (Arr(_))
       case Date(a1)                => f(a1) ∘ (Date(_))
       case Time(a1)                => f(a1) ∘ (Time(_))

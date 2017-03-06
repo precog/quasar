@@ -60,9 +60,9 @@ object readfile {
         .filter {
         case (value, index) =>
           maybeLimit.fold(
-            index >= offset.get
+            index >= offset.value
           ) (
-            limit => index >= offset.get && index < limit.get + offset.get
+            limit => index >= offset.value && index < limit.value + offset.value
           )
       }
     }

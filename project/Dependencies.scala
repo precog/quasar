@@ -1,14 +1,14 @@
 package quasar.project
 
 import scala.{Option, Boolean}
-import java.lang.System
+import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
 
 object Dependencies {
-  // Switch to `6.2-RC2` once http4s can be upgraded (see below)
-  private val argonautVersion   = "6.2-M3"
+  // RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
+  private val argonautVersion   = "6.2-RC2"
   private val doobieVersion     = "0.3.0"
   // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
   // https://github.com/quasar-analytics/quasar/issues/1852
@@ -18,41 +18,41 @@ object Dependencies {
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.3.2"
-  private val pathyVersion      = "0.2.2"
+  private val pathyVersion      = "0.2.8"
   private val raptureVersion    = "2.0.0-M6"
-  private val refinedVersion    = "0.5.0"
-  private val scalazVersion     = "7.2.8"
+  private val refinedVersion    = "0.6.2"   // waiting for a stable release with fix for fthomas/refined#256
+  private val scalazVersion     = "7.2.9"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
-  private val slcVersion        = "0.4"
-  private val scalacheckVersion = "1.12.6"
-  private val specsVersion      = "3.8.4-scalacheck-1.12.5"
+  private val slscVersion       = "0.6"
+  private val scalacheckVersion = "1.13.4"
+  private val specsVersion      = "3.8.4"
 
   def foundation = Seq(
-    "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
-    "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
-    "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
-    "org.scalaz.stream"          %% "scalaz-stream"             %     "0.8.6a",
-    "com.github.julien-truffaut" %% "monocle-core"              %  monocleVersion,
-    "io.argonaut"                %% "argonaut"                  %  argonautVersion,
-    "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
-    "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
-    "com.slamdata"               %% "pathy-core"                %   pathyVersion,
-    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
-    "eu.timepit"                 %% "refined"                   %  refinedVersion,
+    "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
+    "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
+    "org.scalaz"                 %% "scalaz-iteratee"           % scalazVersion,
+    "org.scalaz.stream"          %% "scalaz-stream"             % "0.8.6a",
+    "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
+    "io.argonaut"                %% "argonaut"                  % argonautVersion,
+    "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
+    "com.slamdata"               %% "matryoshka-core"           % "0.16.4",
+    "com.slamdata"               %% "pathy-core"                % pathyVersion,
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion                         %     Test,
+    "eu.timepit"                 %% "refined"                   % refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
-    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
-    "com.github.mpilquist"       %% "simulacrum"                %      "0.8.0"      %     Test,
-    "org.typelevel"              %% "discipline"                %       "0.5"       %     Test,
-    "org.specs2"                 %% "specs2-core"               %    specsVersion   %     Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" %   scalazVersion   %     Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
-    "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
+    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    %     Test,
+    "com.github.mpilquist"       %% "simulacrum"                % "0.8.0"                              %     Test,
+    "org.typelevel"              %% "discipline"                % "0.5"                                %     Test,
+    "org.specs2"                 %% "specs2-core"               % specsVersion                         %     Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") %     Test,
+    "org.typelevel"              %% "shapeless-scalacheck"      % slscVersion                          %     Test,
+    "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              %     Test
   )
 
   def frontend = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion
+    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+    "org.scala-lang.modules"     %% "scala-parser-combinators"  % "1.0.5"
   )
 
   def ejson = Seq(
@@ -110,8 +110,8 @@ object Dependencies {
   )
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined"     % refinedVersion,
-    "org.scalaz" %% "scalaz-core" % scalazVersion force()
+    "eu.timepit"     %% "refined"       % refinedVersion,
+    "org.scalaz"     %% "scalaz-core"   % scalazVersion
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,

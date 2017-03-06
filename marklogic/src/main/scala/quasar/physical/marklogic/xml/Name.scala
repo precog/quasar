@@ -30,8 +30,8 @@ final case class Name(value: String Refined IsName) {
 
 object Name {
   implicit val order: Order[Name] =
-    Order.orderBy(_.value.get)
+    Order.orderBy(_.value.value)
 
   implicit val show: Show[Name] =
-    Show.shows(_.value.get)
+    Show.shows(_.value.value)
 }

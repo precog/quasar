@@ -1,0 +1,19 @@
+{
+    "name": "handle variable referenced in filter",
+
+    "backends": {
+        "postgresql": "pending"
+    },
+
+    "data": "zips.data",
+
+    "query": "mystate := \"CO\"; select * from zips where state = mystate",
+
+    "ignoredFields": ["_id"],
+
+    "ignoreFieldOrder": ["marklogic_json"],
+
+    "predicate": "containsAtLeast",
+
+    "expected": [{ "city": "ARVADA", "loc": [-105.098402, 39.794533], "pop": 12065, "state": "CO" }]
+}

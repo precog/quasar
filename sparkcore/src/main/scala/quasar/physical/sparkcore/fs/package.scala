@@ -39,7 +39,7 @@ package object fs {
     S0: Task :<: S, S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case (fsType, uri) =>
+      case (`fsType`, uri) =>
         for {
           config <- EitherT(parseUri(uri).point[Free[S, ?]])
           (sparkConf, t) = config

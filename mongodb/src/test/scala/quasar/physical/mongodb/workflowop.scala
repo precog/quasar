@@ -27,11 +27,12 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 
 import matryoshka.data.Fix
+
 import org.scalacheck._
+import org.scalacheck.rng.Seed
+import org.specs2.matcher.MustMatchers._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
-import shapeless.contrib.scalaz.instances._
-import org.specs2.matcher.MustMatchers._
 
 class WorkflowFSpec extends org.specs2.scalaz.Spec {
   implicit val arbIdHandling: Arbitrary[IdHandling] =
@@ -48,6 +49,16 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
     }
 
   implicit val arbIntCardinalExpr = arbCardinalExpr(Arbitrary.arbInt)
+
+  implicit val cogenCardinalExpr: Cogen ~> λ[α => Cogen[CardinalExpr[α]]] =
+    new (Cogen ~> λ[α => Cogen[CardinalExpr[α]]]) {
+      def apply[α](cg: Cogen[α]): Cogen[CardinalExpr[α]] =
+        Cogen { (seed: Seed, ce: CardinalExpr[α]) =>
+          cg.perturb(seed, ce.copoint)
+        }
+    }
+
+  implicit val cogenIntCardinalExpr = cogenCardinalExpr(Cogen.cogenInt)
 
   checkAll("CardinalExpr", traverse.laws[CardinalExpr])
   checkAll("CardinalExpr", comonad.laws[CardinalExpr])

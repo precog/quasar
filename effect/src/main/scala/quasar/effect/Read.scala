@@ -37,17 +37,17 @@ object Read {
     extends LiftedOps[Read[R, ?], S] { self =>
 
     /** Request a value from the environment. */
-    def ask: F[R] = lift(Ask(r => r))
+    def ask: FreeS[R] = lift(Ask(r => r))
 
     /** Request and modify a value from the environment. */
-    def asks[A](f: R => A): F[A] = ask map f
+    def asks[A](f: R => A): FreeS[A] = ask map f
 
     /** Evaluate a computation in a modified environment. */
-    def local(f: R => R): F ~> F = {
-      val g: Read[R, ?] ~> F = injectFT compose contramapR(f)
+    def local(f: R => R): FreeS ~> FreeS = {
+      val g: Read[R, ?] ~> FreeS = injectFT compose contramapR(f)
 
-      val s: S ~> F =
-        new (S ~> F) {
+      val s: S ~> FreeS =
+        new (S ~> FreeS) {
           def apply[A](sa: S[A]) =
             S.prj(sa) match {
               case Some(read) => g.apply(read)
@@ -59,14 +59,14 @@ object Read {
     }
 
     /** Evaluate a computation using the given environment. */
-    def scope(r: R): F ~> F = local(_ => r)
+    def scope(r: R): FreeS ~> FreeS = local(_ => r)
 
-    implicit val monadReader: MonadReader[F, R] =
-      new MonadReader[F, R] {
+    implicit val monadReader: MonadReader[FreeS, R] =
+      new MonadReader[FreeS, R] {
         def ask = self.ask
-        def local[A](f: R => R)(fa: F[A]) = self.local(f)(fa)
+        def local[A](f: R => R)(fa: FreeS[A]) = self.local(f)(fa)
         def point[A](a: => A) = Free.pure(a)
-        def bind[A, B](fa: F[A])(f: A => F[B]) = fa flatMap f
+        def bind[A, B](fa: FreeS[A])(f: A => FreeS[B]) = fa flatMap f
       }
   }
 

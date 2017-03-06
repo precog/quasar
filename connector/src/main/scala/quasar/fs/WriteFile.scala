@@ -54,7 +54,7 @@ object WriteFile {
     import FileSystemError._, PathError._
     import ManageFile.MoveSemantics
 
-    type F[A]    = unsafe.F[A]
+    type F[A]    = unsafe.FreeS[A]
     type M[A]    = unsafe.M[A]
     type G[E, A] = EitherT[F, E, A]
 
@@ -251,7 +251,7 @@ object WriteFile {
   final class Unsafe[S[_]](implicit S: WriteFile :<: S)
     extends LiftedOps[WriteFile, S] {
 
-    type M[A] = FileSystemErrT[F, A]
+    type M[A] = FileSystemErrT[FreeS, A]
 
     /** Returns a write handle for the specified file which may be used to
       * append data to the file it represents, creating it if necessary.
@@ -268,11 +268,11 @@ object WriteFile {
       * it fail, any such failures will be returned in the output `Vector`
       * An empty `Vector` means the entire chunk was written successfully.
       */
-    def write(h: WriteHandle, chunk: Vector[Data]): F[Vector[FileSystemError]] =
+    def write(h: WriteHandle, chunk: Vector[Data]): FreeS[Vector[FileSystemError]] =
       lift(Write(h, chunk))
 
     /** Close the write handle, freeing any resources it was using. */
-    def close(h: WriteHandle): F[Unit] =
+    def close(h: WriteHandle): FreeS[Unit] =
       lift(Close(h))
   }
 

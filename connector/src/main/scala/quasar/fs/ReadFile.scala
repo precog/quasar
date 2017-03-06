@@ -59,7 +59,7 @@ object ReadFile {
     extends ReadFile[Unit]
 
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
-    type F[A] = unsafe.F[A]
+    type F[A] = unsafe.FreeS[A]
     type M[A] = unsafe.M[A]
 
     /** Returns a process which produces data from the given file, beginning
@@ -100,7 +100,7 @@ object ReadFile {
   final class Unsafe[S[_]](implicit S: ReadFile :<: S)
     extends LiftedOps[ReadFile, S] {
 
-    type M[A] = FileSystemErrT[F, A]
+    type M[A] = FileSystemErrT[FreeS, A]
 
     /** Returns a read handle for the given file, positioned at the given
       * zero-indexed offset, that may be used to read chunks of data from the
@@ -121,7 +121,7 @@ object ReadFile {
       EitherT(lift(Read(rh)))
 
     /** Closes the given read handle, freeing any resources it was using. */
-    def close(rh: ReadHandle): F[Unit] =
+    def close(rh: ReadHandle): FreeS[Unit] =
       lift(Close(rh))
   }
 

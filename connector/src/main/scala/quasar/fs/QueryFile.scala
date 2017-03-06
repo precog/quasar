@@ -242,10 +242,10 @@ object QueryFile {
   final class Ops[S[_]](implicit S: QueryFile :<: S)
     extends LiftedOps[QueryFile, S] {
 
-    type M[A] = FileSystemErrT[F, A]
+    type M[A] = FileSystemErrT[FreeS, A]
 
     val unsafe = Unsafe[S]
-    val transforms = Transforms[F]
+    val transforms = Transforms[FreeS]
     import transforms._
 
     /** Returns the path to the result of executing the given `LogicalPlan`,
@@ -334,7 +334,7 @@ object QueryFile {
     }
 
     /** Returns whether the given file exists. */
-    def fileExists(file: AFile): F[Boolean] =
+    def fileExists(file: AFile): FreeS[Boolean] =
       lift(FileExists(file))
 
     /** Returns whether the given file exists, lifted into the same monad as
@@ -346,7 +346,7 @@ object QueryFile {
     ////
 
     private val hoistToExec: M ~> ExecM =
-      Hoist[FileSystemErrT].hoist[F, G](liftMT[F, PhaseResultT])
+      Hoist[FileSystemErrT].hoist[FreeS, G](liftMT[FreeS, PhaseResultT])
   }
 
   object Ops {
@@ -360,7 +360,7 @@ object QueryFile {
   final class Unsafe[S[_]](implicit S: QueryFile :<: S)
     extends LiftedOps[QueryFile, S] {
 
-    val transforms = Transforms[F]
+    val transforms = Transforms[FreeS]
     import transforms._
 
     /** Returns a handle to the results of evaluating the given `LogicalPlan`
@@ -377,11 +377,11 @@ object QueryFile {
       *
       * An empty `Vector` signals that all data has been read.
       */
-    def more(rh: ResultHandle): FileSystemErrT[F, Vector[Data]] =
+    def more(rh: ResultHandle): FileSystemErrT[FreeS, Vector[Data]] =
       EitherT(lift(More(rh)))
 
     /** Closes the given result handle, freeing any resources it was using. */
-    def close(rh: ResultHandle): F[Unit] =
+    def close(rh: ResultHandle): FreeS[Unit] =
       lift(Close(rh))
   }
 

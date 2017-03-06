@@ -46,32 +46,32 @@ object AtomicRef {
     /** Set the value of the ref to `update` if the current value is `expect`,
       * returns whether the value was updated.
       */
-    def compareAndSet(expect: V, update: V): F[Boolean] =
+    def compareAndSet(expect: V, update: V): FreeS[Boolean] =
       lift(CompareAndSet(expect, update))
 
     /** Returns the current value of the ref. */
-    def get: F[V] =
+    def get: FreeS[V] =
       lift(Get(ι))
 
     /** Atomically updates the ref with the result of applying the given
       * function to the current value, returning the updated value.
       */
-    def modify(f: V => V): F[V] =
+    def modify(f: V => V): FreeS[V] =
       modifyS(v => f(v).squared)
 
     /** Atomically updates the ref with the first part of the result of applying
       * the given function to the current value, returning the second part.
       */
-    def modifyS[A](f: V => (V, A)): F[A] =
+    def modifyS[A](f: V => (V, A)): FreeS[A] =
       for {
         cur       <- get
         (nxt, a0) =  f(cur)
         updated   <- compareAndSet(cur, nxt)
-        a         <- if (updated) a0.point[F] else modifyS(f)
+        a         <- if (updated) a0.point[FreeS] else modifyS(f)
       } yield a
 
     /** Sets the value of the ref to the given value. */
-    def set(value: V): F[Unit] =
+    def set(value: V): FreeS[Unit] =
       lift(Set(value))
   }
 

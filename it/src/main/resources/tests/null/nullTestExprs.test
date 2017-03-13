@@ -3,9 +3,7 @@
     "backends": {
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",
-        "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "postgresql": "pending"
     },
     "data": "nulls.data",
     "query": "select name,

@@ -7,8 +7,8 @@
         "marklogic_xml":  "skip",
         "mongodb_q_3_2": "skip",
         "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
 
     "data": "zips.data",

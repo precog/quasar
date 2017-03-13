@@ -6,9 +6,7 @@
         "marklogic_json": "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "postgresql":        "pending"
     },
 
     "data": ["../smallZips.data", "../extraSmallZips.data"],

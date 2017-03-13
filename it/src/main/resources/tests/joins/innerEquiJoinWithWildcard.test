@@ -6,9 +6,7 @@
         "postgresql":        "pending",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "couchbase":         "skip"
     },
     "data": ["../smallZips.data", "../zips.data"],
     "query": "select * from `../smallZips` join `../zips` on smallZips._id = zips._id",

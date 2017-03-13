@@ -3,9 +3,7 @@
     "backends": {
         "couchbase":  "skip",
         "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "SELECT _id as zip, loc as loc, loc[*] as coord FROM zips",

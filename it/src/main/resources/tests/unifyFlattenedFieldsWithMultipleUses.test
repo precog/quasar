@@ -6,8 +6,8 @@
         "marklogic_xml":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "zips.data",
     "query": "select _id as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",

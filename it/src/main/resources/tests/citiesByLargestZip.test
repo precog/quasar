@@ -6,8 +6,8 @@
         "marklogic_xml":  "pending",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "NB": "This is tricky because the sort key does not appear in the result.
            The result can be verified by running a similar query with

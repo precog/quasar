@@ -7,8 +7,8 @@
         "marklogic_xml":  "pending",
         "mongodb_q_3_2":  "pending",
         "postgresql":     "pending",
-        "spark_hdfs":     "skip",
-        "spark_local":    "skip"
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
 
     "data": "../days.data",

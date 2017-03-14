@@ -6,9 +6,7 @@
         "postgresql":        "pending",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "couchbase":         "skip"
     },
     "data": ["../smallZips.data", "../zips.data"],
     "query": "select z1._id as zip, z2.pop / 1000 as popK from `../smallZips` as z1 inner join `../zips` as z2 on z1._id = z2._id order by popK desc",

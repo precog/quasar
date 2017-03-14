@@ -2,9 +2,7 @@
     "name": "double flatten with intervening field",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "spark_hdfs":        "skip",
-        "spark_local":       "skip"
+        "postgresql":        "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",

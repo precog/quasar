@@ -7,8 +7,8 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "couchbase":         "skip",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
     "query": "SELECT p.author.login, COUNT(*) as count

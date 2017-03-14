@@ -6,9 +6,7 @@
         "postgresql":        "pending",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "couchbase":         "skip"
     },
     "data": ["../extraSmallZips.data", "../smallZips.data", "../zips.data"],
     "query": "select z1.city, z2.state

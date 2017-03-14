@@ -3,9 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "skip",
-        "postgresql":        "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "postgresql":        "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0].sha, count(*) as count from slamengine_commits where parents[0].sha like \"5%\" group by parents[0].sha",

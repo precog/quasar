@@ -43,7 +43,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
 
   val parseAndAnnotate: String => String \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
     for {
-      parsed <- fixParser.parse(Query(query)).leftMap(_.toString)
+      parsed <- fixParser.parseExpr(Query(query)).leftMap(_.toString)
       normed <- normalizeProjections(parsed).right
       sort   <- projectSortKeys(normed).right
       attr   <- annotate(sort).leftMap(_.toString)

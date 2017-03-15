@@ -54,7 +54,7 @@ package object sql {
   // NB: we need to support relative paths, including `../foo`
   type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
-  private def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
+  def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
 
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]

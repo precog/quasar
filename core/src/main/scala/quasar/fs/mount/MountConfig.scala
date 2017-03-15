@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fs.FileSystemType
-import quasar.sql, sql.Sql
+import quasar.sql, sql.Sql, sql.Statement
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -30,11 +30,18 @@ import scalaz._, Scalaz._
 sealed abstract class MountConfig
 
 object MountConfig {
+  final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])
+    extends MountConfig
+
   final case class ViewConfig private[mount] (query: Fix[Sql], vars: Variables)
     extends MountConfig
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
     extends MountConfig
+
+  val moduleConfig = Prism.partial[MountConfig, List[Statement[Fix[Sql]]]] {
+    case ModuleConfig(statements) => statements
+  } (ModuleConfig)
 
   val viewConfig = Prism.partial[MountConfig, (Fix[Sql], Variables)] {
     case ViewConfig(query, vars) => (query, vars)
@@ -50,6 +57,8 @@ object MountConfig {
 
   implicit val show: Show[MountConfig] =
     Show.shows {
+      case ModuleConfig(statements) =>
+        "Module Config"  // TODO: Perhaps make this more descriptive
       case ViewConfig(expr, vars) =>
         viewConfigUri.reverseGet((expr, vars))
       case FileSystemConfig(typ, uri) =>
@@ -57,14 +66,7 @@ object MountConfig {
     }
 
   implicit def equal: Equal[MountConfig] =
-    Equal.equalBy(MountConfig.toConfigPair)
-
-  val toConfigPair: MountConfig => (String, ConnectionUri) = {
-    case ViewConfig(query, vars) =>
-      "view" -> ConnectionUri(viewCfgAsUri(query, vars))
-    case FileSystemConfig(typ, uri) =>
-      typ.value -> uri
-  }
+    Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
   val fromConfigPair: (String, ConnectionUri) => String \/ MountConfig = {
     case ("view", uri) =>
@@ -74,17 +76,26 @@ object MountConfig {
   }
 
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
-    CodecJson({ cfg =>
-      val (key, uri) = toConfigPair(cfg)
-      Json(key := Json("connectionUri" := uri.value))
+    CodecJson({
+      case ModuleConfig(statements)   =>
+        Json("module" := statements.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n"))
+      case ViewConfig(query, vars)    =>
+        Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
+      case FileSystemConfig(typ, uri) =>
+        Json(typ.value := Json("connectionUri" := uri.value))
     },
     json => json.fields match {
       case Some(key :: Nil) =>
-        val uriCur = json --\ key --\ "connectionUri"
-        uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
-          fromConfigPair(key, uri).leftMap((_, uriCur.history)).toEither))
+        if (key === "module") (json --\ key).as[String].flatMap { statementsString =>
+          DecodeResult(sql.fixParser.parseWithParser(statementsString, sql.fixParser.statements).map(moduleConfig(_))
+            .leftMap(parseError => (parseError.message, (json --\ key).history)).toEither)
+        } else {
+          val uriCur = json --\ key --\ "connectionUri"
+          uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
+            fromConfigPair(key, uri).leftMap((_, uriCur.history)).toEither))
+        }
       case _ =>
-        DecodeResult.fail(s"invalid config: ${json.focus}", json.history)
+        DecodeResult.fail(s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}", json.history)
     })
 
   ////
@@ -101,7 +112,7 @@ object MountConfig {
       scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
       _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
-      query    <- sql.fixParser.parse(sql.Query(queryStr)).leftMap(_.message)
+      query    <- sql.fixParser.parseExpr(sql.Query(queryStr)).leftMap(_.message)
       vars     =  Variables(parsed.multiParams collect {
                     case (n, vs) if n.startsWith(VarPrefix) => (
                       VarName(n.substring(VarPrefix.length)),

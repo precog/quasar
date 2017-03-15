@@ -4,6 +4,15 @@
             "mongodb": {
                 "connectionUri": "mongodb://localhost:27018"
             }
+        },
+        "/myview": {
+            "view": {
+                "connectionUri": "sql2://q=\"select bar from biz\""
+            }
+        },
+        "/mymodule": {
+            "module":
+                "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END"
         }
     },
     "server": { "port": 8080 }

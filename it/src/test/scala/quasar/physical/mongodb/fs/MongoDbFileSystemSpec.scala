@@ -29,7 +29,7 @@ import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
-import quasar.sql, sql.Sql
+import quasar.sql, sql.Sql, sql.Blob
 
 import scala.Predef.$conforms
 
@@ -242,7 +242,7 @@ class MongoDbFileSystemSpec
 
             val out = renameFile(file, κ(FileName("out")))
 
-            def check0(expr: Fix[Sql]) =
+            def check0(expr: Blob[Fix[Sql]]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
                 runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))

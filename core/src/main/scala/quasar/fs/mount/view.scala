@@ -26,7 +26,7 @@ import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
-import quasar.sql.Sql
+import quasar.sql.{Sql, Blob}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -341,7 +341,7 @@ object view {
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], SemanticErrors \/ Fix[LP]] =
       lookup(loc).map { case (expr, vars) =>
-         precompile[Fix[LP]](expr, vars, fileParent(loc), Nil).run.value
+         precompile[Fix[LP]](Blob(expr, Nil), vars, fileParent(loc)).run.value
       }
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler

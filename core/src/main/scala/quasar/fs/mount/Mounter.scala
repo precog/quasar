@@ -61,6 +61,7 @@ object Mounter {
       store.get(p).map {
         case ViewConfig(_, _)         => MountType.viewMount()
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
+        case ModuleConfig(_)          => MountType.moduleMount()
       }
 
     def handleMount(req: MountRequest): MntE[Unit] = {

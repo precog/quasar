@@ -119,7 +119,7 @@ class ServiceSpec extends quasar.Qspec {
       val sel2 = "sql2:///?q=%28select%202%29"
 
       val finalCfg =
-        fixParser.parse(Query("select 2"))
+        fixParser.parseExpr(Query("select 2"))
           .bimap(_.shows, MountConfig.viewConfig(_, Variables.empty))
 
       val r = withServer(port, configOps.default) { baseUri: Uri =>

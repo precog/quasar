@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar.api._
+import quasar.api.PathUtils._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
@@ -31,7 +32,6 @@ import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import quasar.api.PathUtils._
 
 object queryFixture {
   type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]

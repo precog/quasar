@@ -144,7 +144,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   }
 
   def parseExpr(query: String) =
-    fixParser.parse(Query(query)).toOption.get
+    fixParser.parseExpr(Query(query)).toOption.get
 
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
     def render(t: RenderedTree) = t
@@ -154,7 +154,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
-      val lp = queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 
@@ -564,7 +564,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "resolveViewRefs" >> {
     def unsafeParse(sqlQry: String): Fix[Sql] =
-      sql.fixParser.parse(sql.Query(sqlQry)).toOption.get
+      sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
     def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): SemanticErrors \/ Fix[LogicalPlan] =
       view.resolveViewRefs[Mounting](lp).run
@@ -611,7 +611,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p), Nil).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](Blob(inner, Nil), Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
@@ -674,7 +674,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(q, Variables.empty, rootDir, Nil, 0L, None)
+        quasar.queryPlan(Blob(q, Nil), Variables.empty, rootDir, 0L, None)
           .run.value.toOption.get
           .valueOr(_ => scala.sys.error("impossible constant plan"))
 

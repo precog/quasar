@@ -27,7 +27,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.main.FilesystemQueries
-import quasar.sql.{Query, Sql}
+import quasar.sql.{Blob, Query, Sql}
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -70,7 +70,7 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          queryPlan(xpr, requestVars(req), basePath, Nil, off, lim)
+          queryPlan(xpr, requestVars(req), basePath, off, lim)
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
               lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
@@ -82,7 +82,7 @@ object execute {
             respond_(bodyMustContainQuery)
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
-              val parseRes: ApiError \/ Fix[Sql] =
+              val parseRes: ApiError \/ Blob[Fix[Sql]] =
                 sql.fixParser.parse(Query(query)).leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =

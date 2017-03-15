@@ -45,13 +45,13 @@ object compile {
         "value" := data.map(DataCodec.Precise.encode).unite)
 
     def explainQuery(
-      expr: Fix[sql.Sql],
+      blob: sql.Blob[Fix[sql.Sql]],
       vars: Variables,
       basePath: ADir,
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      queryPlan(expr, vars, basePath, Nil, offset, limit)
+      queryPlan(blob, vars, basePath, offset, limit)
         .run.value
         .traverse(_.fold(
           data => constantResponse(data).right[ApiError].point[Free[S, ?]],

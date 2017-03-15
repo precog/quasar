@@ -24,7 +24,7 @@ import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 import quasar.regression._
-import quasar.sql.Sql
+import quasar.sql.{Blob, Sql}
 
 import matryoshka.data.Fix
 import pathy.Path._
@@ -56,10 +56,10 @@ class ViewReadQueryRegressionSpec
 
   val RF = ReadFile.Ops[ReadFile]
 
-  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) = {
+  def queryResults(blob: Blob[Fix[Sql]], vars: Variables, basePath: ADir) = {
     val path = basePath </> file("view")
     val prg: Process[RF.unsafe.M, Data] = RF.scanAll(path)
-    val interp = mounts(path, expr, vars).flatMap(interpViews).unsafePerformSync
+    val interp = mounts(path, blob.expr, vars).flatMap(interpViews).unsafePerformSync
 
     def t: RF.unsafe.M ~> qfTransforms.CompExecM =
       new (RF.unsafe.M ~> qfTransforms.CompExecM) {

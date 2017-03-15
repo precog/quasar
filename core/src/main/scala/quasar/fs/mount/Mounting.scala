@@ -139,6 +139,11 @@ object Mounting {
           D.left.getOption(refineType(loc)) cata (
             dir => mountFileSystem(dir, typ, uri),
             mmErr.fail(PathTypeMismatch(loc)))
+
+        case ModuleConfig(statements) =>
+          D.right.getOption(refineType(loc)) cata (
+            file => mmErr.fail(PathTypeMismatch(loc)), // TODO: Mount module instead of erroring out
+            mmErr.fail(PathTypeMismatch(loc)))
       }
     }
 

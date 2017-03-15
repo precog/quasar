@@ -149,6 +149,25 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case i ~ e ~ b => let(CIName(i), e, b).embed
     } | query_expr
 
+  def func_def: Parser[FunctionDecl[T[Sql]]] =
+    keyword("create") ~> keyword("function") ~> ident ~ (op("(") ~> repsep(variable, op(",")) <~ op(")")) ~
+      (keyword("begin") ~> expr <~ keyword("end")) ^^ {
+      case i ~ vars ~ expr => FunctionDecl[T[Sql]](CIName(i), vars.map(v => CIName(v.symbol)), expr)
+    }
+
+  def import_ : Parser[Import[T[Sql]]] =
+    keyword("import") ~> ident ^^ {
+      case i => Import(i)
+    }
+
+  def statements: Parser[List[Statement[T[Sql]]]] =
+    repsep(func_def |[Statement[T[Sql]]] import_, op(";"))
+
+  def blob: Parser[Blob[T[Sql]]] =
+    opt(statements <~ op(";")) ~ expr ^^ {
+      case stats ~ expr => Blob(expr, stats.getOrElse(Nil))
+    }
+
   def select_expr: Parser[T[Sql]] =
     keyword("select") ~> opt(keyword("distinct")) ~ projections ~
       opt(from) ~ opt(filter) ~
@@ -452,16 +471,21 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
-    phrase(expr)(new lexical.Scanner(exprSql)) match {
+  def parseWithParser[A](input: String, parser: Parser[A]): ParsingError \/ A =
+    phrase(parser)(new lexical.Scanner(input)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
-      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first.toString))
+      case Failure(msg, input)  => \/.left(GenericParsingError(s"$msg; but found `${input.first.chars}'"))
     }
 
-  private def parse0(sql: Query): ParsingError \/ T[Sql] = parseExpr(sql.value)
+  val parse: Query => ParsingError \/ Blob[T[Sql]] = query =>
+    parseBlob(query.value)
 
-  val parse: Query => ParsingError \/ T[Sql] =
-    parse0(_).map(_.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil))
+  def parseBlob(blobString: String): ParsingError \/ Blob[T[Sql]] =
+    parseWithParser(blobString, blob).map(_.map(normalize))
+
+  val parseExpr: Query => ParsingError \/ T[Sql] = query =>
+    parseWithParser(query.value, expr).map(normalize)
+
+  private def normalize: T[Sql] => T[Sql] = _.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil)
 }

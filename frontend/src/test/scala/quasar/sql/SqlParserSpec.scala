@@ -34,7 +34,7 @@ class SQLParserSpec extends quasar.Qspec {
   implicit def stringToQuery(s: String): Query = Query(s)
 
   def parse(query: Query): ParsingError \/ Fix[Sql] =
-    fixParser.parse(query).map(_.makeTables(Nil))
+    fixParser.parseExpr(query).map(_.makeTables(Nil))
 
   "SQLParser" should {
     "parse query1" in {
@@ -396,7 +396,7 @@ class SQLParserSpec extends quasar.Qspec {
     "should refuse a semicolon not at the end" in {
       val q = "select foo from (select 5 as foo;) where foo = 7"
       parse(q) must beLeftDisjunction(
-        GenericParsingError("operator ')' expected; `;'")
+        GenericParsingError("operator ')' expected; but found `;'")
       )
     }
 
@@ -515,6 +515,45 @@ class SQLParserSpec extends quasar.Qspec {
     "should not parse multiple expressions seperated incorrectly" in {
       val q = "select foo from bar limit 6 select biz from baz"
       parse(q) must beLeftDisjunction
+    }
+
+    "parse function declaration" in {
+      val funcDeclString = "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END"
+      fixParser.parseWithParser(funcDeclString, fixParser.func_def) must beRightDisjunction(
+        FunctionDecl(CIName("ARRAY_LENGTH"),List(CIName("foo")),Fix(invokeFunction(CIName("count"),List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")),ShiftArrayValues)))))))
+    }
+
+    "parse import statement" in {
+      val importString = "import `/foo/bar/baz/`"
+      fixParser.parseWithParser(importString, fixParser.import_) must beRightDisjunction(
+        Import("/foo/bar/baz/"))
+    }
+
+    "parse module" in {
+      val moduleString =
+        """
+          |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
+          |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
+          |import `/other/stuff/in/filesystem/`
+        """.stripMargin
+      fixParser.parseWithParser(moduleString, fixParser.statements) must beLike {
+        case \/-(List(FunctionDecl(_,_,_),FunctionDecl(_,_,_),Import(_))) => ok
+      }
+    }
+
+    "parse blob" in {
+      val blobString =
+        """
+          |CREATE FUNCTION USER_DATA(:user_id)
+          |  BEGIN
+          |    SELECT * FROM `/foo` WHERE user_id = :user_id
+          |  END;
+          |USER_DATA("bob")
+        """.stripMargin
+      val invokeAST: Fix[Sql] = Fix(invokeFunction[Fix[Sql]](CIName("USER_DATA"),List(Fix(stringLiteral[Fix[Sql]]("bob")))))
+      fixParser.parse(blobString) must beLike {
+        case \/-(Blob(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
+      }
     }
 
     "parse array literal at top level" in {

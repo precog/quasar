@@ -35,7 +35,7 @@ import quasar.sql.{nullLiteral, Sql}
 object MountServiceConfig {
   def unsafeViewCfg(q: String, vars: (String, String)*): (Fix[Sql], Variables) =
     (
-      sql.fixParser.parse(sql.Query(q)).toOption.fold[Fix[sql.Sql]](nullLiteral[Fix[Sql]]().embed)(x => x),
+      sql.fixParser.parseExpr(sql.Query(q)).toOption.fold[Fix[sql.Sql]](nullLiteral[Fix[Sql]]().embed)(x => x),
       Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
     )
 }

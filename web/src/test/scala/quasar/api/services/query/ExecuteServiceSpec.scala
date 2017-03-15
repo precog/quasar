@@ -28,7 +28,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.{Sql, CIName}
+import quasar.sql.{Blob, Sql, CIName}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -120,7 +120,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
       sql.fixParser.parse(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        ast => quasar.queryPlan(ast, vars, rootDir, Nil, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        ast => quasar.queryPlan(ast, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -205,6 +205,24 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }
     }
+    "execute a query with function definitions" >> {
+      val sampleFile = rootDir </> file("foo")
+      val query =
+        """
+          |CREATE FUNCTION TRIVIAL(:user_id)
+          |  BEGIN
+          |    SELECT * FROM `/foo`
+          |  END;
+          |TRIVIAL("bob")
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "5"
+      )
+    }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
         post[String](fileSystem)(
@@ -254,11 +272,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val err: SemanticError =
           SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
+          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -275,11 +293,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
+          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,

@@ -67,7 +67,7 @@ object metadata {
       M.havingPrefix(parent).map { mounts =>
         names map { name =>
           val path = name.fold(parent </> dir1(_), parent </> file1(_))
-          FsNode(name, mounts.get(path).map(_.fold(_.value, "view")))
+          FsNode(name, mounts.get(path).map(_.fold(_.value, "view", "module")))
         }
       }.liftM[FileSystemErrT]
 

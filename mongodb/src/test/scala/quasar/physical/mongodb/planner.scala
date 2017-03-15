@@ -88,10 +88,10 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
+  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, Nil, 0L, None)
+    queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -3649,7 +3649,7 @@ class PlannerSpec extends
     * @throws AssertionError If the `Query` is not a selection
     */
   def columnNames(q: Query): List[String] =
-    fixParser.parse(q).toOption.get.project match {
+    fixParser.parseExpr(q).toOption.get.project match {
       case Select(_, projections, _, _, _, _) =>
         projectionNames(projections, None).toOption.get.map(_._1)
       case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
@@ -3728,7 +3728,7 @@ class PlannerSpec extends
     genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
-    fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    fixParser.parseExpr(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**

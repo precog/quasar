@@ -31,14 +31,14 @@ class SQLSpec extends quasar.Qspec {
     "create unique names" >> {
       "when two fields have the same name" in {
         val query = "SELECT owner.name, car.name from owners as owner join cars as car on car._id = owner.carId"
-        val projections = fixParser.parse(query).toOption.get.project.asInstanceOf[Select[Fix[Sql]]].projections
+        val projections = fixParser.parseExpr(query).toOption.get.project.asInstanceOf[Select[Fix[Sql]]].projections
         projectionNames(projections, None) must beLike { case \/-(list) =>
           list.map(_._1) must contain(allOf("name", "name0"))
         }
       }
       "when a field and an alias have the same name" in {
         val query = "SELECT owner.name, car.model as name from owners as owner join cars as car on car._id = owner.carId"
-        val projections = fixParser.parse(query).toOption.get.project.asInstanceOf[Select[Fix[Sql]]].projections
+        val projections = fixParser.parseExpr(query).toOption.get.project.asInstanceOf[Select[Fix[Sql]]].projections
         projectionNames(projections, None) must beLike { case \/-(list) =>
           list.map(_._1) must contain(allOf("name0", "name"))
         }

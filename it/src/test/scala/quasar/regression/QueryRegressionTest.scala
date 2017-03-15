@@ -31,7 +31,7 @@ import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.FilesystemQueries
 import quasar.fs.mount.{Mounts, hierarchical}
-import quasar.sql, sql.{Query, Sql}
+import quasar.sql, sql.{Blob, Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
 import java.math.{MathContext, RoundingMode}
@@ -91,7 +91,7 @@ abstract class QueryRegressionTest[S[_]](
   def suiteName: String
 
   /** Return the results of evaluating the given query as a stream. */
-  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir): Process[CompExecM, Data]
+  def queryResults(expr: Blob[Fix[Sql]], vars: Variables, basePath: ADir): Process[CompExecM, Data]
 
   ////
 
@@ -238,10 +238,10 @@ abstract class QueryRegressionTest[S[_]](
     val f: Task ~> CompExecM =
       toCompExec compose injectTask
 
-    val parseTask: Task[Fix[Sql]] =
+    val parseTask: Task[Blob[Fix[Sql]]] =
       sql.fixParser.parse(Query(qry))
         .fold(e => Task.fail(new RuntimeException(e.message)),
-        _.mkPathsAbsolute(loc).point[Task])
+        _.map(_.mkPathsAbsolute(loc)).point[Task])
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars), loc))
   }

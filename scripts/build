@@ -23,7 +23,11 @@ QUASAR_MONGODB_HOST_2_6="localhost:27018"
 QUASAR_MONGODB_HOST_3_0="localhost:27019"
 QUASAR_MONGODB_HOST_3_2="localhost:27020"
 
+# FIXME: Remove travis_wait usages when associated phases produce output
+#        more frequently than Travis's 10 minute imposed window
 TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
+TRAVIS_MAX_DOC_MINS=20
+
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
 
 # Enables running tests for a single mongo release by specifying an argument of
@@ -79,8 +83,16 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
-  # that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly' doc
+  # that does not contain instrumentation.
+  "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly'
+
+  # Running `doc` can take awhile, so allow it some extra time when
+  # running on travis to avoid having the build killed due to lack of output.
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  fi
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"

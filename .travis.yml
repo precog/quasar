@@ -61,7 +61,7 @@ before_cache:
 env:
   matrix:
     - MONGO_RELEASE=2_6
-    - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
+    - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password&socketConnectTimeoutSeconds=15"'
     - QUASAR_MARKLOGIC_JSON='"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"'
     - QUASAR_MARKLOGIC_XML='"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"'
     - QUASAR_SPARK_LOCAL='spark_local_test'

@@ -44,4 +44,4 @@ curl -v -X POST $CB:8091/sampleBuckets/install -d '["beer-sample"]'
 
 # FIXME: Ideally we'd poll for CB readiness rather than sleeping. Running into
 #        initialization startup slowness due to resource constraints under Travis.
-sleep 30
+# sleep 30

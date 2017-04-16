@@ -1,0 +1,114 @@
+{
+ "_id" : ObjectId("523e667f8449340df8172b6a")
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Denver",
+      "LocationState" : "unknown",
+      "LocationZip" : "unknown",
+      "LocationCountry" : "unknown"
+    }
+  }
+}
+,
+{
+  "_id" : ObjectId("526d6ed384493416dc2d4980"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Boston",
+      "LocationState" : "MA",
+      "LocationZip" : "z02121",
+      "LocationCountry" : "US"
+    }
+  }
+}
+,
+{
+  "_id" : ObjectId("527283e08449340f08b7a69c"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Boston",
+      "LocationState" : "MA",
+      "LocationZip" : "z",
+      "LocationCountry" : "US"
+    }
+  }
+}
+,
+{
+  "_id" : ObjectId("523e66708449340df8172a8c"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Denver",
+      "LocationState" : "unknown",
+      "LocationZip" : "zunknown",
+      "LocationCountry" : "unknown"
+    }
+  }
+}
+,
+{
+"_id" : ObjectId("523e66728449340df8172aa9"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Boston",
+      "LocationState" : "unknown",
+      "LocationZip" : "zunknown",
+      "LocationCountry" : "unknown"
+    }
+  }  
+}
+,
+{
+"_id" : ObjectId("523e66728449340df8172aa1"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Boulder",
+      "LocationState" : "unknown",
+      "LocationZip" : "zunknown",
+      "LocationCountry" : "unknown"
+    }
+  }  
+}
+,
+{
+"_id" : ObjectId("523e66728449340df8172aa2"),
+  "PositionHeader" : {
+    "PositionLocation" : {
+      "LocationCity" : "Boston",
+      "LocationState" : "unknown",
+      "LocationZip" : "zunknown",
+      "LocationCountry" : "unknown"
+    }
+  }  
+}
+
+
+select count(PositionHeader.PositionLocation.LocationCity) as counter,
+PositionHeader.PositionLocation.LocationCity as location 
+from jobs_jobinfo group by location order by counter desc limit 10 
+
+here are the results:
+
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd529"} , "location" : "Boston" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Boston" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Boston" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Boulder" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Boulder" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Denver" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "Denver" , "counter" : 7}
+
+
+John mentioned to try using 'select distinct' but that eliminated the location altogether
+
+select distinct count(PositionHeader.PositionLocation.LocationCity) as counter,
+PositionHeader.PositionLocation.LocationCity as location 
+from jobs_jobinfo group by location order by counter desc limit 10 
+
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd529"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+{ "_id" : { "$oid" : "542c2ceff9766d018d6fd52a"} , "location" : "" , "counter" : 7}
+

@@ -1,0 +1,1 @@
+Add `.sbtopts` to repository in order to prevent `Metaspace` out of memory errors

@@ -1,0 +1,1 @@
+Add convenience function to define `ReadFile` interpreter

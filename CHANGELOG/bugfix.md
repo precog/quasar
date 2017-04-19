@@ -1,0 +1,4 @@
+- Free the response
+- Lower toMainTask and toResponseOr to work on effects instead of free
+- Add implicit to Failure.Ops
+- Add translate to QHttpService and QResponse

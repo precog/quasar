@@ -1,0 +1,2 @@
+- Add reference to SQL² tutorial in README
+- Remove reference to mount in SQL² section

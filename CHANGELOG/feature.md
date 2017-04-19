@@ -1,0 +1,1 @@
+- [SD-1804] Update documentation regarding usage of `internal` sbt script

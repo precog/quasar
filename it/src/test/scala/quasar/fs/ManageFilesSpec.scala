@@ -189,7 +189,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
         runT(run)(manage.delete(f)).runEither must beLeft(pathErr(pathNotFound(f)))
       }
 
-      "deleting a file makes it no longer accessible" >> {
+      "deleting a file empties contents" >> {
         val f1 = managePrefix </> dir("deleteone") </> file("f1")
         val p  = write.save(f1, oneDoc.toProcess).drain ++ manage.delete(f1).liftM[Process]
 

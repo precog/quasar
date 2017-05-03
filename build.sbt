@@ -291,7 +291,7 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageMinimum := 70,
     ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 

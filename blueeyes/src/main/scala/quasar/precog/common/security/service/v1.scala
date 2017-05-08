@@ -18,9 +18,11 @@ package quasar.precog.common
 package security
 package service
 
+import quasar.blueeyes._, json._, serialization._
 import quasar.precog.common.accounts._
 
-import quasar.blueeyes._, json._, serialization._
+import java.time.LocalDateTime
+
 import IsoSerialization._, Iso8601Serialization._
 
 object v1 {
@@ -29,7 +31,7 @@ object v1 {
                           description: Option[String],
                           permissions: Set[Permission],
                           createdAt: Instant,
-                          expirationDate: Option[DateTime]) {
+                          expirationDate: Option[LocalDateTime]) {
     def isValidAt(timestamp: Instant) = {
       createdAt.isBefore(timestamp) && expirationDate.forall(_ isAfter (dateTime fromMillis timestamp.getMillis))
     }
@@ -51,8 +53,8 @@ object v1 {
                              description: Option[String],
                              parentIds: Set[GrantId],
                              permissions: Set[Permission],
-                             expirationDate: Option[DateTime]) {
-    def isExpired(at: Option[DateTime]) = (expirationDate, at) match {
+                             expirationDate: Option[LocalDateTime]) {
+    def isExpired(at: Option[LocalDateTime]) = (expirationDate, at) match {
       case (None, _)                 => false
       case (_, None)                 => true
       case (Some(expiry), Some(ref)) => expiry.isBefore(ref)

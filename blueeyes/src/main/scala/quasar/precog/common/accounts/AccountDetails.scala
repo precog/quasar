@@ -22,13 +22,15 @@ import quasar.precog.common.security.APIKey
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 
+import java.time.LocalDateTime
+
 case class AccountDetails(accountId: AccountId,
                           email: String,
-                          accountCreationDate: DateTime,
+                          accountCreationDate: LocalDateTime,
                           apiKey: APIKey,
                           rootPath: Path,
                           plan: AccountPlan,
-                          lastPasswordChangeTime: Option[DateTime] = None,
+                          lastPasswordChangeTime: Option[LocalDateTime] = None,
                           profile: Option[JValue] = None)
 
 object AccountDetails {

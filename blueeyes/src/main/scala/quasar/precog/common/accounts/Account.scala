@@ -30,6 +30,8 @@ import scalaz.Validation
 import scalaz.syntax.apply._
 import scalaz.syntax.plus._
 
+import java.time.LocalDateTime
+
 case class AccountPlan(planType: String)
 object AccountPlan {
   val Root = AccountPlan("Root")
@@ -43,12 +45,12 @@ case class Account(accountId: AccountId,
                    email: String,
                    passwordHash: String,
                    passwordSalt: String,
-                   accountCreationDate: DateTime,
+                   accountCreationDate: LocalDateTime,
                    apiKey: APIKey,
                    rootPath: Path,
                    plan: AccountPlan,
                    parentId: Option[String] = None,
-                   lastPasswordChangeTime: Option[DateTime] = None,
+                   lastPasswordChangeTime: Option[LocalDateTime] = None,
                    profile: Option[JValue] = None)
 
 object Account {

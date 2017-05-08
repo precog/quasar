@@ -25,6 +25,8 @@ import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import scalaz._, Scalaz._
 
+import java.time.LocalDateTime
+
 case class Grant(grantId: GrantId,
                  name: Option[String],
                  description: Option[String],
@@ -32,19 +34,19 @@ case class Grant(grantId: GrantId,
                  parentIds: Set[GrantId],
                  permissions: Set[Permission],
                  createdAt: Instant,
-                 expirationDate: Option[DateTime]) {
+                 expirationDate: Option[LocalDateTime]) {
 
-  def isExpired(at: Option[DateTime]) = (expirationDate, at) match {
+  def isExpired(at: Option[LocalDateTime]) = (expirationDate, at) match {
     case (None, _)                 => false
     case (_, None)                 => true
     case (Some(expiry), Some(ref)) => expiry.isBefore(ref)
   }
 
-  def implies(perm: Permission, at: Option[DateTime]): Boolean = {
+  def implies(perm: Permission, at: Option[LocalDateTime]): Boolean = {
     !isExpired(at) && permissions.exists(_.implies(perm))
   }
 
-  def implies(perms: Set[Permission], at: Option[DateTime]): Boolean = {
+  def implies(perms: Set[Permission], at: Option[LocalDateTime]): Boolean = {
     !isExpired(at) && perms.forall { perm =>
       permissions.exists(_.implies(perm))
     }
@@ -71,7 +73,7 @@ object Grant extends Logging {
             obj.validated[Option[APIKey]]("cid").map(_.getOrElse("(undefined)")) |@|
             obj.validated[Option[GrantId]]("issuer") |@|
             obj.validated[Permission]("permission")(Permission.extractorV0) |@|
-            obj.validated[Option[DateTime]]("permission.expirationDate")).apply { (gid, cid, issuer, permission, expiration) =>
+            obj.validated[Option[LocalDateTime]]("permission.expirationDate")).apply { (gid, cid, issuer, permission, expiration) =>
         Grant(gid, None, None, cid, issuer.toSet, Set(permission), instant.zero, expiration)
       }
     }
@@ -80,7 +82,7 @@ object Grant extends Logging {
   implicit val decomposer: Decomposer[Grant] = decomposerV1
   implicit val extractor: Extractor[Grant]   = extractorV2 <+> extractorV1 <+> extractorV0
 
-  def implies(grants: Set[Grant], perms: Set[Permission], at: Option[DateTime] = None) = {
+  def implies(grants: Set[Grant], perms: Set[Permission], at: Option[LocalDateTime] = None) = {
     log.trace("Checking implication of %s to %s".format(grants, perms))
     perms.nonEmpty && perms.forall(perm => grants.exists(_.implies(perm, at)))
   }
@@ -96,7 +98,7 @@ object Grant extends Logging {
    * If the supplied set of grants is insufficient to support the supplied set of permissions the result is the empty
    * set.
    */
-  def coveringGrants(grants: Set[Grant], perms: Set[Permission], at: Option[DateTime] = None): Set[Grant] = {
+  def coveringGrants(grants: Set[Grant], perms: Set[Permission], at: Option[LocalDateTime] = None): Set[Grant] = {
     if (!implies(grants, perms, at)) Set.empty[Grant]
     else {
       def tsort(grants: List[Grant]): List[Grant] = grants.find(g1 => !grants.exists(g2 => g2 != g1 && g2.implies(g1))) match {

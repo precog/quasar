@@ -17,7 +17,7 @@
 package quasar.blueeyes.json
 
 import quasar.blueeyes._
-
+import java.nio.ByteBuffer
 
 /**
   * Basic ByteBuffer parser.

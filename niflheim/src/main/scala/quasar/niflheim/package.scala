@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar
 
-import quasar.blueeyes._
-import org.slf4s.Logging
+import quasar.precog.PackageAliases
 
 import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monad._
 
-import java.time.LocalDateTime
+package object niflheim extends PackageAliases {
 
-trait AccessControl[M[+ _]] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean]
-}
+  /**
+   * Dear god don't use this!  It's a shim to make old things work.  This is NOT
+   * a lawful monad!
+   */
+  @deprecated
+  private[niflheim] implicit def validationMonad[E]: Monad[Validation[E, ?]] =
+    new Monad[Validation[E, ?]] {
+      def point[A](a: => A) = Success(a)
 
-class UnrestrictedAccessControl[M[+ _]: Applicative] extends AccessControl[M] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = true.point[M]
+      def bind[A, B](fa: Validation[E, A])(f: A => Validation[E, B]): Validation[E, B] =
+        fa.fold(Failure(_), f)
+    }
 }

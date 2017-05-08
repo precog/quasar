@@ -14,22 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar.niflheim
 
-import quasar.blueeyes._
-import org.slf4s.Logging
-
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monad._
-
-import java.time.LocalDateTime
-
-trait AccessControl[M[+ _]] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean]
+final class CookedBlock(segments: Map[SegmentId, File]) {
 }
 
-class UnrestrictedAccessControl[M[+ _]: Applicative] extends AccessControl[M] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = true.point[M]
+object CookedBlock {
+  def fromFiles(files: Seq[File]): CookedBlock = {
+    sys.error("...")
+  }
 }

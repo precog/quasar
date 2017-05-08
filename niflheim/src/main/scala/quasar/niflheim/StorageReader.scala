@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar.niflheim
 
-import quasar.blueeyes._
-import org.slf4s.Logging
+import quasar.precog.common._
+import quasar.precog.util._
 
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monad._
+trait StorageReader {
+  def snapshot(pathConstraints: Option[Set[CPath]]): Block
+  def snapshotRef(refConstraints: Option[Set[ColumnRef]]): Block
+  def structure: Iterable[ColumnRef]
 
-import java.time.LocalDateTime
+  def isStable: Boolean
 
-trait AccessControl[M[+ _]] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean]
-}
+  def id: Long
 
-class UnrestrictedAccessControl[M[+ _]: Applicative] extends AccessControl[M] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = true.point[M]
+  /**
+   * Returns the total length of the block.
+   */
+  def length: Int
+
+  override def toString = "StorageReader: id = %d, length = %d, structure = %s".format(id, length, structure)
 }

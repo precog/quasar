@@ -69,6 +69,10 @@ object BitSetUtil {
     }
   }
 
+  object Implicits {
+    implicit def toOperations(bs: BitSet) = new BitSetOperations(bs)
+  }
+
   def fromArray(arr: Array[Long]) = {
     val bs = new BitSet()
     bs.setBits(arr)

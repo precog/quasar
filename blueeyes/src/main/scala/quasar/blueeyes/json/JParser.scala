@@ -22,6 +22,9 @@ import serialization.Extractor
 import serialization.Extractor.Error._
 import serialization.SerializationImplicits._
 import scalaz._, Scalaz._
+
+import java.nio.ByteBuffer
+
 import Validation.fromTryCatchNonFatal
 
 object JParser {

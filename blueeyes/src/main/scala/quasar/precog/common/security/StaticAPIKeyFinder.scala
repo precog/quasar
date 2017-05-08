@@ -26,6 +26,9 @@ import org.slf4s.Logging
 import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.monad._
+
+import java.time.LocalDateTime
+
 import Permission._
 
 class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging { self =>
@@ -54,5 +57,5 @@ class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) exten
     throw new UnsupportedOperationException("Grant management unavailable for standalone system.")
   }
 
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[DateTime]): M[Boolean] = M.point(true)
+  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = M.point(true)
 }

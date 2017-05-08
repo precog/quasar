@@ -16,6 +16,7 @@
 
 package quasar.precog
 
+import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 
@@ -23,7 +24,6 @@ trait PackageTime {
   type Instant  = java.time.Instant
   type Period   = java.time.Period
   type Duration = java.time.Duration
-  type DateTime = java.time.LocalDateTime
 
   implicit class QuasarDurationOps(private val x: Duration) {
     def getMillis: Long = x.toMillis
@@ -36,8 +36,8 @@ trait PackageTime {
     def getMillis: Long       = toDuration.getMillis
     def toDuration: Duration = java.time.Duration from x
   }
-  implicit class QuasarDateTimeOps(private val x: DateTime) {
-    def until(end: DateTime): Period = java.time.Period.between(x.toLocalDate, end.toLocalDate)
+  implicit class QuasarDateTimeOps(private val x: LocalDateTime) {
+    def until(end: LocalDateTime): Period = java.time.Period.between(x.toLocalDate, end.toLocalDate)
     def toUtcInstant: Instant        = x toInstant UTC
     def getMillis: Long              = toUtcInstant.toEpochMilli
   }
@@ -56,13 +56,13 @@ trait PackageTime {
     def apply(s: String): Instant                 = java.time.Instant parse s
   }
   object dateTime {
-    def minimum: DateTime              = java.time.LocalDateTime.MIN
-    def maximum: DateTime              = java.time.LocalDateTime.MAX
-    def fromIso(s: String): DateTime   = java.time.LocalDateTime.parse(s, ISO_DATE_TIME)
-    def showIso(d: DateTime): String   = d format ISO_DATE_TIME
-    def zero: DateTime                 = fromMillis(0)
-    def now(): DateTime                = java.time.LocalDateTime.now
-    def fromMillis(ms: Long): DateTime = java.time.LocalDateTime.ofInstant(instant fromMillis ms, UTC)
-    def apply(s: String): DateTime     = java.time.LocalDateTime.parse(s)
+    def minimum: LocalDateTime              = java.time.LocalDateTime.MIN
+    def maximum: LocalDateTime              = java.time.LocalDateTime.MAX
+    def fromIso(s: String): LocalDateTime   = java.time.LocalDateTime.parse(s, ISO_DATE_TIME)
+    def showIso(d: LocalDateTime): String   = d format ISO_DATE_TIME
+    def zero: LocalDateTime                 = fromMillis(0)
+    def now(): LocalDateTime                = java.time.LocalDateTime.now
+    def fromMillis(ms: Long): LocalDateTime = java.time.LocalDateTime.ofInstant(instant fromMillis ms, UTC)
+    def apply(s: String): LocalDateTime     = java.time.LocalDateTime.parse(s)
   }
 }

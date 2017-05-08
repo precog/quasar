@@ -20,6 +20,8 @@ import quasar.blueeyes._
 
 import scala.math.max
 
+import java.nio.ByteBuffer
+
 case class AsyncParse(errors: Seq[ParseException], values: Seq[JValue])
 
 /**

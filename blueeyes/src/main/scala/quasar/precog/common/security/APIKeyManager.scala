@@ -26,6 +26,8 @@ import org.slf4s.Logging
 
 import scalaz._, Scalaz._
 
+import java.time.LocalDateTime
+
 object APIKeyManager {
   def newUUID() = java.util.UUID.randomUUID.toString
 
@@ -47,7 +49,7 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
                   issuerKey: APIKey,
                   parentIds: Set[GrantId],
                   perms: Set[Permission],
-                  expiration: Option[DateTime]): M[Grant]
+                  expiration: Option[LocalDateTime]): M[Grant]
 
   def createAPIKey(name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId]): M[APIKeyRecord]
 
@@ -102,7 +104,7 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
   def deleteAPIKey(apiKey: APIKey): M[Option[APIKeyRecord]]
   def deleteGrant(apiKey: GrantId): M[Set[Grant]]
 
-  def findValidGrant(grantId: GrantId, at: Option[DateTime] = None): M[Option[Grant]] =
+  def findValidGrant(grantId: GrantId, at: Option[LocalDateTime] = None): M[Option[Grant]] =
     findGrant(grantId) flatMap { grantOpt =>
       grantOpt map { (grant: Grant) =>
         if (grant.isExpired(at)) None.point[M]
@@ -120,7 +122,7 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
       }
     }
 
-  def validGrants(apiKey: APIKey, at: Option[DateTime] = None): M[Set[Grant]] = {
+  def validGrants(apiKey: APIKey, at: Option[LocalDateTime] = None): M[Set[Grant]] = {
     log.trace("Checking grant validity for apiKey " + apiKey)
     findAPIKey(apiKey) flatMap {
       _ map {
@@ -137,7 +139,7 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
                   description: Option[String],
                   issuerKey: APIKey,
                   perms: Set[Permission],
-                  expiration: Option[DateTime] = None): M[Option[Grant]] = {
+                  expiration: Option[LocalDateTime] = None): M[Option[Grant]] = {
     validGrants(issuerKey, expiration).flatMap { grants =>
       if (!Grant.implies(grants, perms, expiration)) none[Grant].point[M]
       else {
@@ -156,7 +158,7 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
                         issuerKey: APIKey,
                         perms: Set[Permission],
                         recipientKey: APIKey,
-                        expiration: Option[DateTime] = None): M[Option[Grant]] = {
+                        expiration: Option[LocalDateTime] = None): M[Option[Grant]] = {
     deriveGrant(name, description, issuerKey, perms, expiration) flatMap {
       case Some(grant) =>
         addGrants(recipientKey, Set(grant.grantId)) map {
@@ -184,6 +186,6 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
     }
   }
 
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[DateTime] = None): M[Boolean] =
+  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime] = None): M[Boolean] =
     validGrants(apiKey, at).map(Grant.implies(_, perms, at))
 }

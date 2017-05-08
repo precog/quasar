@@ -17,12 +17,14 @@
 package quasar.blueeyes.util
 
 import quasar.blueeyes._
+import scala.concurrent.Future
+import java.time.LocalDateTime
 
 trait Clock {
 
   /** Returns the current time.
     */
-  def now(): DateTime
+  def now(): LocalDateTime
 
   def instant(): Instant
 
@@ -59,7 +61,7 @@ object Clock {
 
 trait ClockSystem {
   implicit val realtimeClock = new Clock {
-    def now(): DateTime    = dateTime.now()
+    def now(): LocalDateTime    = dateTime.now()
     def instant(): Instant = quasar.blueeyes.instant.now()
     def nanoTime(): Long   = System.nanoTime()
   }
@@ -68,7 +70,7 @@ object ClockSystem extends ClockSystem
 
 trait ClockMock {
   protected class MockClock extends Clock {
-    private var _now: DateTime  = dateTime.zero
+    private var _now: LocalDateTime  = dateTime.zero
     private var _nanoTime: Long = 0
 
     def now() = _now
@@ -77,9 +79,9 @@ trait ClockMock {
 
     def nanoTime() = _nanoTime
 
-    def setNow(dateTime: DateTime): DateTime = { _now = dateTime; _now }
+    def setNow(dateTime: LocalDateTime): LocalDateTime = { _now = dateTime; _now }
 
-    def setNow(millis: Long): DateTime = dateTime fromMillis millis
+    def setNow(millis: Long): LocalDateTime = dateTime fromMillis millis
 
     def setNanoTime(time: Long): Long = { _nanoTime = time; _nanoTime }
   }

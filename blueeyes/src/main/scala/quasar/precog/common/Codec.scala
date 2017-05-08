@@ -19,9 +19,12 @@ package quasar.precog.common
 import quasar.precog._
 import quasar.blueeyes._
 import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
-import java.nio.CharBuffer
+
+import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
+import java.time.LocalDateTime
+
 import scalaz._
 
 /**
@@ -358,7 +361,7 @@ object Codec {
     }
   }
 
-  implicit val DateCodec   = Codec[Long].as[DateTime](_.getMillis, dateTime.fromMillis)
+  implicit val DateCodec   = Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
   implicit val PeriodCodec = Codec[Long].as[Period](_.getMillis, period.fromMillis)
 
   implicit case object DoubleCodec extends FixedWidthCodec[Double] {

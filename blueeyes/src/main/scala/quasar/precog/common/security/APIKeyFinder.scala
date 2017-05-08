@@ -25,6 +25,8 @@ import org.slf4s.Logging
 
 import scalaz._, Scalaz._
 
+import java.time.LocalDateTime
+
 trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
   def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]): M[Option[v1.APIKeyDetails]]
 
@@ -47,7 +49,7 @@ trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
     def addGrant(accountKey: APIKey, grantId: GrantId) =
       t(self.addGrant(accountKey, grantId))
 
-    def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[DateTime]) =
+    def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]) =
       t(self.hasCapability(apiKey, perms, at))
   }
 }
@@ -73,7 +75,7 @@ class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: M
 
   val recordDetails: PartialFunction[APIKeyRecord, M[v1.APIKeyDetails]] = recordDetails(None)
 
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[DateTime]): M[Boolean] = {
+  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = {
     underlying.hasCapability(apiKey, perms, at)
   }
 

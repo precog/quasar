@@ -28,6 +28,8 @@ import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.monad._
 
+import java.time.LocalDateTime
+
 class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) extends APIKeyManager[M] {
   import Permission._
 
@@ -72,7 +74,7 @@ class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) exte
                   issuerKey: APIKey,
                   parentIds: Set[GrantId],
                   perms: Set[Permission],
-                  expiration: Option[DateTime]): M[Grant] = {
+                  expiration: Option[LocalDateTime]): M[Grant] = {
     val grant = Grant(APIKeyManager.newGrantId(), name, description, issuerKey, parentIds, perms, clock.instant(), expiration)
     grants.put(grant.grantId, grant)
     grant.point[M]

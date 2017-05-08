@@ -39,10 +39,8 @@ trait PackageAliases {
   type AtomicLong           = java.util.concurrent.atomic.AtomicLong
   type BufferedOutputStream = java.io.BufferedOutputStream
   type BufferedReader       = java.io.BufferedReader
-  type ByteBuffer           = java.nio.ByteBuffer
   type CharBuffer           = java.nio.CharBuffer
   type Charset              = java.nio.charset.Charset
-  type ExecutionContext     = java.util.concurrent.ExecutorService
   type File                 = java.io.File
   type FileInputStream      = java.io.FileInputStream
   type FileOutputStream     = java.io.FileOutputStream
@@ -57,7 +55,6 @@ trait PackageAliases {
 
   // other outside libs: scalaz, spire, shapeless, scodec
   type ByteVector     = scodec.bits.ByteVector
-  type Future[+A]     = scalaz.concurrent.Future[A]
   type IO[A]          = scalaz.effect.IO[A]
   type Iso[T, L]      = shapeless.Generic.Aux[T, L]
   type Logging        = org.slf4s.Logging
@@ -68,7 +65,6 @@ trait PackageAliases {
 
   // It looks like scalaz.Id.Id is (now?) invariant.
   type Id[+X]        = X
-  val Future         = scalaz.concurrent.Future
   val ScalazOrder    = scalaz.Order
   val ScalazOrdering = scalaz.Ordering
   val IO             = scalaz.effect.IO

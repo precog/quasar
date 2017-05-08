@@ -30,6 +30,7 @@ import java.nio.file.Files
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 import java.util.Arrays.fill
+import java.time.LocalDateTime
 
 trait FileLock {
   def release: Unit
@@ -325,7 +326,7 @@ object NumericComparisons {
 
   @inline def compare(a: BigDecimal, b: BigDecimal): Int = a compare b
 
-  @inline def compare(a: DateTime, b: DateTime): Int = {
+  @inline def compare(a: LocalDateTime, b: LocalDateTime): Int = {
     val res: Int = a compareTo b
     if (res < 0) -1
     else if (res > 0) 1
@@ -369,7 +370,7 @@ object NumericComparisons {
   @inline def order(a: BigDecimal, b: BigDecimal): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 
-  @inline def order(a: DateTime, b: DateTime): scalaz.Ordering =
+  @inline def order(a: LocalDateTime, b: LocalDateTime): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 }
 

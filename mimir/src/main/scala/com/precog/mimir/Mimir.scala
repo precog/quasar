@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.precog.mimir
+package quasar.precog.mimir
 
 import slamdata.Predef._
 import quasar._

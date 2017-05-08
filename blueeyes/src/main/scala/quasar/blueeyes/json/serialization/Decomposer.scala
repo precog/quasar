@@ -21,6 +21,8 @@ import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 import ExtractorDecomposer.by
 
+import java.time.LocalDateTime
+
 /** Decomposes the value into a JSON object.
   */
 trait Decomposer[A] { self =>
@@ -114,14 +116,14 @@ object SerializationImplicits extends SerializationImplicits
   */
 object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
   implicit val DateTimeExtractorDecomposer =
-    by[DateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map (dateTime fromMillis _))
+    by[LocalDateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map (dateTime fromMillis _))
 }
 
 // when we want to serialize dates as ISO8601 not as numbers
 object Iso8601Serialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
   import Extractor._
   implicit val TZDateTimeExtractorDecomposer =
-    by[DateTime].opt(d => JString(dateTime showIso d): JValue) {
+    by[LocalDateTime].opt(d => JString(dateTime showIso d): JValue) {
       case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(dateTime fromIso dt)
       case _           => Failure(Invalid("Date time must be represented as JSON string"))
     }

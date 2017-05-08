@@ -17,12 +17,16 @@
 package quasar.blueeyes
 package json
 
-import java.net.URLDecoder
-import scala.util.control.Exception._
+import quasar.precog._, JsonTestSupport._
+
 import scalaz._
+
+import scala.util.control.Exception._
 import scala.math.min
 import scala.util.Random.nextInt
-import quasar.precog._, JsonTestSupport._
+
+import java.net.URLDecoder
+import java.nio.ByteBuffer
 
 class JsonParserSpec extends Specification with ScalaCheck {
   import JParser._

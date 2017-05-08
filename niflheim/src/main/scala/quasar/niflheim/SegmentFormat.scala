@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar.niflheim
 
-import quasar.blueeyes._
-import org.slf4s.Logging
+import quasar.precog.util.PrecogUnit
 
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monad._
+import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
-import java.time.LocalDateTime
+import scalaz.Validation
 
-trait AccessControl[M[+ _]] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean]
+trait SegmentWriter {
+  def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, PrecogUnit]
 }
 
-class UnrestrictedAccessControl[M[+ _]: Applicative] extends AccessControl[M] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = true.point[M]
+trait SegmentReader {
+  def readSegmentId(channel: ReadableByteChannel): Validation[IOException, SegmentId]
+  def readSegment(channel: ReadableByteChannel): Validation[IOException, Segment]
+}
+
+trait SegmentFormat {
+  def reader: SegmentReader
+  def writer: SegmentWriter
 }

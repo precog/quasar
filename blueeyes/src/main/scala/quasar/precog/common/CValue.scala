@@ -22,6 +22,7 @@ import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz._, Scalaz._, Ordering._
 import java.math.MathContext.UNLIMITED
+import java.time.LocalDateTime
 
 sealed trait RValue { self =>
   def toJValue: JValue
@@ -343,7 +344,7 @@ object CValueType {
   implicit def long: CValueType[Long]                     = CLong
   implicit def double: CValueType[Double]                 = CDouble
   implicit def bigDecimal: CValueType[BigDecimal]         = CNum
-  implicit def dateTime: CValueType[DateTime]             = CDate
+  implicit def dateTime: CValueType[LocalDateTime]             = CDate
   implicit def period: CValueType[Period]                 = CPeriod
   implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
@@ -497,15 +498,15 @@ case object CNum extends CNumericType[BigDecimal] {
 //
 // Dates and Periods
 //
-case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
+case class CDate(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
   val cType = CDate
 }
 
-case object CDate extends CValueType[DateTime] {
-  val classTag: CTag[DateTime]      = implicitly[CTag[DateTime]]
+case object CDate extends CValueType[LocalDateTime] {
+  val classTag: CTag[LocalDateTime]      = implicitly[CTag[LocalDateTime]]
   def readResolve()                     = CDate
-  def order(v1: DateTime, v2: DateTime) = sys.error("todo")
-  def jValueFor(v: DateTime)            = JString(v.toString)
+  def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
+  def jValueFor(v: LocalDateTime)            = JString(v.toString)
 }
 
 case class CPeriod(value: Period) extends CWrappedValue[Period] {

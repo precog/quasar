@@ -172,7 +172,7 @@ lazy val root = project.in(file("."))
 //        /   \
        repl,  web,
 //             |
-              it, precog, blueeyes, yggdrasil, mimir)
+              it, precog, blueeyes, yggdrasil, mimir, niflheim)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -476,5 +476,16 @@ lazy val yggdrasil = project.setup
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val niflheim = project.setup.noArtifacts
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
+      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)

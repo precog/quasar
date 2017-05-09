@@ -143,6 +143,14 @@ object Dependencies {
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     CommonDependencies.refined.scalacheck                          % Test
   )
+  def precog = Seq(
+    "org.slf4s"            %% "slf4s-api"       % "1.7.13",
+    "org.spire-math"       %% "spire"           % "0.13.0",
+    "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
+    "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
+    "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
+    "org.quartz-scheduler" %  "quartz"          % "2.3.0"
+  )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,
     CommonDependencies.http4s.blazeClient                       % Test,

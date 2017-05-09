@@ -172,7 +172,7 @@ lazy val root = project.in(file("."))
 //        /   \
        repl,  web,
 //             |
-              it)
+              it, precog, blueeyes, yggdrasil, mimir, niflheim)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -428,8 +428,6 @@ lazy val web = project
     libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
-// integration tests
-
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
@@ -443,4 +441,51 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+
+/***** PRECOG *****/
+
+val headerSettings = Seq(
+  headers := Map(
+     ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
+     ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
+   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
+   checkHeaders := {
+     if ((createHeaders in Compile).value.nonEmpty) sys.error("headers not all present")
+  })
+
+import precogbuild.Build._
+
+lazy val precog = project.setup
+  .dependsOn(common % BothScopes)
+  .deps(Dependencies.precog: _*)
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val blueeyes = project.setup
+  .dependsOn(precog % BothScopes)
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val yggdrasil = project.setup
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val mimir = project.setup.noArtifacts
+  .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
+  .scalacArgs ("-Ypartial-unification")
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val niflheim = project.setup.noArtifacts
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
+      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
+  .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)

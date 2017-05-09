@@ -50,6 +50,7 @@ notifications:
 branches:
   except:
     - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
+    - mimir
 
 cache:
   directories:

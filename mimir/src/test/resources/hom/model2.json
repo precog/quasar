@@ -1,0 +1,3 @@
+{ "model1": {"coefficients": [{"foo":{"estimate":3.0}, "bar":{"estimate":2.0}}, {"estimate":5}]}, "model1": {"coefficients": [{"foo":{"estimate":3.0}}, {"estimate":5}]}, "model3": {"coefficients": [{"baz": {"estimate":4.0}}, {"estimate":6}]} }
+{ "model2": {"coefficients": [{"foo":{"estimate":3.0}, "baz":{"estimate":2.0}}, {"estimate":5}]}, "model1": {"coefficients": [{"foo":{"estimate":3.0}}, {"estimate":6}]} }
+{ "model2": {"coefficients": [[{"estimate":2}, {"estimate":7}], {"estimate":2}]}, "model3": {"coefficients": [{"bar": {"estimate":-1}}, {"estimate":2}]} }

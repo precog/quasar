@@ -121,6 +121,7 @@ object Dependencies {
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "com.slamdata"               %% "xml-names-core"      % "0.0.1",
+    "eu.timepit"                 %% "refined-scalaz"      % CommonDependencies.refinedVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
     CommonDependencies.refined.scalacheck                                   % Test,
     "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test

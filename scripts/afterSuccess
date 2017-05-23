@@ -7,5 +7,5 @@ source "$(dirname $0)/constants"
 
 # Only run for the first travis job
 if [[ $CONNECTOR == "mongodb_2_6" ]]; then
-  "$SCRIPT_DIR/publishJarIfMaster"
+  "$SCRIPT_DIR/publishJar"
 fi

@@ -48,9 +48,10 @@ import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec
-  extends FileSystemTest[AnalyticalFileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
-  with quasar.ExclusiveQuasarSpecification {
+  extends FileSystemTest[AnalyticalFileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write()))) {
 
+  sequential
+  
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 

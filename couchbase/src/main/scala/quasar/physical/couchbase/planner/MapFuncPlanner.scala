@@ -498,24 +498,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       }.isEmpty
 
       (containsAgg(a1) || containsAgg(a2)).fold(
-        IfNull(
-          ConcatStr(a1, a2).embed,
-          ConcatArr(
-            Case(
-              WhenThen(
-                IsString(a1).embed,
-                Split(a1, emptyStr).embed)
-            )(
-              Else(a1)
-            ).embed,
-            Case(
-              WhenThen(
-                IsString(a2).embed,
-                Split(a2, emptyStr).embed)
-            )(
-              Else(a2)
-            ).embed).embed
-        ).embed.η[M],
+        ConcatArr(a1, a2).embed.η[M],
         (genId[T[N1QL], M] ⊛ genId[T[N1QL], M]) { (id1, id2) =>
           SelectElem(
             Select(

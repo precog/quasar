@@ -19,7 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.queryPlan
 import quasar.effect._
-import quasar.fs.FileSystem
+import quasar.fs.AnalyticalFileSystem
 import quasar.sql.Blob
 import hierarchical.MountedResultH
 
@@ -43,11 +43,11 @@ final class MountRequestHandler[F[_], S[_]](
 ) {
   import MountRequest._, MountingError._, MountConfig._
 
-  type HierarchicalFsRef[A] = AtomicRef[FileSystem ~> Free[S, ?], A]
+  type HierarchicalFsRef[A] = AtomicRef[AnalyticalFileSystem ~> Free[S, ?], A]
 
   object HierarchicalFsRef {
     def Ops[G[_]](implicit G: HierarchicalFsRef :<: G) =
-      AtomicRef.Ops[FileSystem ~> Free[S, ?], G]
+      AtomicRef.Ops[AnalyticalFileSystem ~> Free[S, ?], G]
   }
 
   def mount[T[_]](
@@ -111,7 +111,7 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-                 (mnts => hierarchical.fileSystem[F, S](mnts.map(_.run)))
+                 (mnts => hierarchical.analyticalFileSystem[F, S](mnts.map(_.run)))
       _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }

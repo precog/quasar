@@ -19,14 +19,12 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
-import quasar.effect.Read
-import quasar.fp.free._
-import quasar.fs.{PathError, FileSystemError}
+import quasar.contrib.scalaz.MonadReader_
+import quasar.fs.FileSystemError
 
 import scala.collection.JavaConverters._
 
-import com.couchbase.client.java.{Bucket, Cluster}
-import com.couchbase.client.java.cluster.ClusterManager
+import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
@@ -35,50 +33,54 @@ import scalaz.concurrent.Task
 
 object common {
 
-  final case class Context(cluster: Cluster, manager: ClusterManager)
+  type ContextReader[F[_]] = MonadReader_[F, Context]
 
-  final case class BucketCollection(bucket: String, collection: String)
-
-  object BucketCollection {
-    def fromPath(p: APath): PathError \/ BucketCollection =
-      Path.flatten(None, None, None, Some(_), Some(_), p)
-        .toIList.unite.uncons(
-          PathError.invalidPath(p, "no bucket specified").left,
-          (h, t) => BucketCollection(h, t.intercalate("/")).right)
+  object ContextReader {
+    def apply[F[_]](implicit R: MonadReader_[F, Context]) = R
   }
 
+  final case class ClientContext(bucket: Bucket, docTypeKey: DocTypeKey)
+
+  final case class Context(bucket: BucketName, docTypeKey: DocTypeKey)
+
+  final case class BucketName(v: String)
+
   // type field in Couchbase documents
-  final case class DocType(v: String)
+  final case class DocTypeKey(v: String)
+  final case class DocTypeValue(v: String)
 
   final case class Cursor(result: Vector[Data])
 
   val CBDataCodec = DataCodec.Precise
 
+  def docTypeValueFromPath(p: APath): DocTypeValue =
+    DocTypeValue(Path.flatten(None, None, None, Some(_), Some(_), p).toIList.unite.intercalate("/"))
+
   def deleteHavingPrefix(
-    bucket: Bucket,
+    ctx: ClientContext,
     prefix: String
   ): Task[FileSystemError \/ Unit] = {
-    val qStr = s"""DELETE FROM `${bucket.name}` WHERE type LIKE "${prefix}%""""
+    val qStr = s"""DELETE FROM `${ctx.bucket.name}` WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
 
-    query(bucket, qStr).map(_.void)
+    query(ctx.bucket, qStr).map(_.void)
   }
 
-  def docTypesFromPrefix(
-    bucket: Bucket,
+  def docTypeValuesFromPrefix(
+    ctx: ClientContext,
     prefix: String
-  ): Task[FileSystemError \/ List[DocType]] = {
-    val qStr = s"""SELECT distinct type FROM `${bucket.name}`
-                   WHERE type LIKE "${prefix}%""""
-    query(bucket, qStr).map(_.map(_.toList.map(r => DocType(r.value.getString("type")))))
+  ): Task[FileSystemError \/ List[DocTypeValue]] = {
+    val qStr = s"""SELECT distinct type FROM `${ctx.bucket.name}`
+                   WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
+    query(ctx.bucket, qStr).map(_.map(_.toList.map(r => DocTypeValue(r.value.getString(ctx.docTypeKey.v)))))
   }
 
   def existsWithPrefix(
-    bucket: Bucket,
+    ctx: ClientContext,
     prefix: String
   ): Task[FileSystemError \/ Boolean] = {
-    val qStr = s"""SELECT count(*) > 0 v FROM `${bucket.name}`
-                   WHERE type = "${prefix}" OR type like "${prefix}/%""""
-    query(bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
+    val qStr = s"""SELECT count(*) > 0 v FROM `${ctx.bucket.name}`
+                   WHERE `${ctx.docTypeKey.v}` = "${prefix}" OR `${ctx.docTypeKey.v}` like "${prefix}/%""""
+    query(ctx.bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
   }
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
@@ -87,10 +89,7 @@ object common {
       case h :: _   => DirName(h).left
     }.toSet
 
-  def pathSegmentsFromBucketCollections(bktCols: List[BucketCollection]): Set[PathSegment] =
-    pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
-
-  def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
+  def pathSegmentsFromPrefixDocTypeValues(prefix: String, types: List[DocTypeValue]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
   def query(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[N1qlQueryRow]] =
@@ -105,18 +104,6 @@ object common {
 
   def queryData(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[Data]] =
     this.query(bucket, query) ∘ (_ >>= (_.traverse(rowToData)))
-
-  def getBucket[S[_]](
-    name: String
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Bucket] =
-    context.ask.flatMap(ctx => lift(
-      Task.delay(ctx.manager.hasBucket(name).booleanValue).ifM(
-        Task.delay(ctx.cluster.openBucket(name).right),
-        Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
-    ).into)
 
   def resultsFromCursor(cursor: Cursor): (Cursor, Vector[Data]) =
     (Cursor(Vector.empty), cursor.result)

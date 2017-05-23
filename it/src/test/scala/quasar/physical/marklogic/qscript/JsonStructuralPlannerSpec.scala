@@ -18,11 +18,11 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.physical.marklogic.{DocType, ErrorMessages}
-import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz._, Scalaz._
+import xml.name._
 
 // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
 import WriterT.writerTMonadListen

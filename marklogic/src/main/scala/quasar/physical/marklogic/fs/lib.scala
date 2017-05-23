@@ -18,13 +18,13 @@ package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xml.{NCName, NSPrefix}
 import quasar.physical.marklogic.xml.namespaces._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
+import xml.name._
 
 object lib {
   import expr.{emptySeq, for_, func, if_, let_}, axes.child

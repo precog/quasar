@@ -31,6 +31,7 @@ import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
 import monocle.Prism
 import scalaz.{Node => _, _}, Scalaz._
+import xml.name._
 
 object data {
   val encodeJson: Data => Json = {
@@ -59,10 +60,10 @@ object data {
 
   def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: DataType): Attribute =
-      Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe.shows, Null)
+      Attribute(ejsBinding.prefix, ejsonType.localPart.shows, tpe.shows, Null)
 
     def ejsElem(name: QName, tpe: DataType, ns: NamespaceBinding, children: Seq[Node]): Elem =
-      Elem(name.prefix.map(_.shows).orNull, name.local.shows, typeAttr(tpe), ns, true, children: _*)
+      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, typeAttr(tpe), ns, true, children: _*)
 
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, tpe, TopScope, children)
@@ -77,7 +78,7 @@ object data {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => for {
           nc <- NCName.fromString(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
-          el <- loop(QName.local(nc))(v).disjunction
+          el <- loop(QName.unprefixed(nc))(v).disjunction
         } yield el
       }
 

@@ -35,7 +35,7 @@ object readfile {
     implicit
     S0: KeyValueStore[ReadFile.ReadHandle, Cursor, ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S2: Read[Context, ?] :<:  S,
+    S2: Read[ClientContext, ?] :<:  S,
     S3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
     impl.read[Cursor, Free[S, ?]](open, read, close)
@@ -45,17 +45,16 @@ object readfile {
     file: AFile, readOpts: ReadOpts
   )(implicit
     S1: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Cursor] =
     (for {
       ctx     <- context.ask.liftM[FileSystemErrT]
-      bktCol  <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      bkt     <- EitherT(getBucket(bktCol.bucket))
+      col     <- docTypeValueFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
       limit   =  readOpts.limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
-      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
-                     WHERE type="${bktCol.collection}"
+      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
+                     WHERE `${ctx.docTypeKey.v}`="${col.v}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- EitherT(lift(queryData(bkt, qStr)).into)
+      qResult <- EitherT(lift(queryData(ctx.bucket, qStr)).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](

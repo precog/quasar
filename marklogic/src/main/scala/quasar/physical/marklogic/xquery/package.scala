@@ -19,8 +19,6 @@ package quasar.physical.marklogic
 import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
-import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xml._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
@@ -32,6 +30,8 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
+import _root_.xml.name._
+import _root_.xml.name.validate._
 
 package object xquery {
 
@@ -119,9 +119,6 @@ package object xquery {
 
   def declare(fname: QName): FunctionDecl.FunctionDeclDsl =
     FunctionDecl.FunctionDeclDsl(fname)
-
-  def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
-    declare(NSPrefix.local(fname))
 
   def freshName[F[_]: QNameGenerator: Functor]: F[BindingName] =
     QNameGenerator[F].freshQName map (BindingName(_))

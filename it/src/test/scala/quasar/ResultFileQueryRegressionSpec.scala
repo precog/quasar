@@ -28,7 +28,7 @@ import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 class ResultFileQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](
+  extends QueryRegressionTest[AnalyticalFileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(fs =>
       fs.ref.supports(BackendCapability.query()) &&
       fs.ref.supports(BackendCapability.write()) &&
@@ -36,7 +36,7 @@ class ResultFileQueryRegressionSpec
       !TestConfig.isCouchbase(fs.ref)))
   ) {
 
-  val read = ReadFile.Ops[FileSystemIO]
+  val read = ReadFile.Ops[AnalyticalFileSystemIO]
 
   val suiteName = "ResultFile Queries"
 

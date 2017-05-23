@@ -18,15 +18,15 @@ package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
 import quasar.{Data => QData, NameGenerator}
-import quasar.Planner.InternalError
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._,
+  common.ContextReader,
   N1QL.{Id, Union, Unreferenced, _},
-  Case._,
-  Select.{Filter, Value, _}
-import quasar.physical.couchbase.planner.Planner._
+  planner.Planner._,
+  Select.{Filter, Value, _}, Case._
+import quasar.Planner.InternalError
 import quasar.qscript, qscript._
 
 import matryoshka._
@@ -35,7 +35,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._, NonEmptyList.nels
 
-final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextReader: NameGenerator]
   extends Planner[T, F, QScriptCore[T, ?]] {
 
   def int(i: Int) = Data[T[N1QL]](QData.Int(i)).embed

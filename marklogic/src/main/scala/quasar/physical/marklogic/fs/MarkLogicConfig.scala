@@ -36,6 +36,16 @@ object MarkLogicConfig {
       Option(u.getScheme).exists(_ === "xcc")
         .unlessM("Missing or unrecognized scheme, expected 'xcc'.".failureNel)
 
+    def ensureHost(u: URI): ValidationNel[String, Unit] =
+      Option(u.getHost).isDefined.unlessM("Missing host".failureNel)
+
+    def ensurePort(u: URI): ValidationNel[String, Unit] =
+      Option(u.getPort).filter(_ > 0).isDefined
+        .unlessM("Missing port".failureNel)
+
+    def validations(u: URI): ValidationNel[String, Unit] =
+      ensureScheme(u) *> ensureHost(u) *> ensurePort(u)
+
     def dbAndRest(u: URI): ValidationNel[String, (String, ADir)] =
       Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(sandboxAbs).flatMap { d =>
         firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
@@ -44,7 +54,7 @@ object MarkLogicConfig {
       } toSuccessNel "No database specified."
 
     def xccUriAndRoot(u: URI): ValidationNel[String, (URI, ADir)] =
-      ensureScheme(u) *> dbAndRest(u) map { case (db, dir) =>
+      validations(u) *> dbAndRest(u) map { case (db, dir) =>
         (new URI(u.getScheme, u.getUserInfo, u.getHost, u.getPort, "/" + db, null, null), dir)
       }
 

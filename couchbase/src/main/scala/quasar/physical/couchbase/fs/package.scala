@@ -17,29 +17,27 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
-import quasar.contrib.pathy.APath
+import quasar.connector.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._, ski.κ
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
-import quasar.fs.mount._, FileSystemDef.DefErrT
-import quasar.physical.couchbase.common.{BucketCollection, Context, Cursor}
+import quasar.fs.mount._, FileSystemDef.{DefErrT, DefinitionError}
 
-import java.net.ConnectException
+import quasar.physical.couchbase.common.{ClientContext, Cursor, DocTypeKey}
+
 import java.time.Duration
 import scala.math
 
-import com.couchbase.client.java.CouchbaseCluster
+import com.couchbase.client.core.CouchbaseException
+import com.couchbase.client.java.{CouchbaseCluster, Cluster}
 import com.couchbase.client.java.env.{CouchbaseEnvironment, DefaultCouchbaseEnvironment}
-import com.couchbase.client.java.error.InvalidPasswordException
 import com.couchbase.client.java.util.features.Version
-import org.http4s.Uri
+import org.http4s.{Uri, Query}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 // TODO: Injection? Parameterized queries could help but don't appear to handle bucket names within ``
-// TODO: Handle query returned errors field
 
 package object fs {
   val FsType = FileSystemType("couchbase")
@@ -51,7 +49,7 @@ package object fs {
 
   type Eff[A] = (
     Task                                             :\:
-    Read[Context, ?]                                 :\:
+    Read[ClientContext, ?]                           :\:
     MonotonicSeq                                     :\:
     GenUUID                                          :\:
     KeyValueStore[ReadHandle,   Cursor,  ?]          :\:
@@ -59,16 +57,8 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  object CBConnectException {
-    def unapply(ex: Throwable): Option[ConnectException] =
-      ex.getCause match {
-        case ex: ConnectException => ex.some
-        case _                    => none
-      }
-  }
-
-  def context(connectionUri: ConnectionUri): DefErrT[Task, Context] = {
-    final case class ConnUriParams(user: String, pass: String, socketConnectTimeout: Duration, queryTimeout: Duration)
+  def context(connectionUri: ConnectionUri): DefErrT[Task, (ClientContext, Cluster)] = {
+    final case class ConnUriParams(bucket: String, pass: String, docTypeKey: String, socketConnectTimeout: Duration, queryTimeout: Duration)
 
     def liftDT[A](v: => NonEmptyList[String] \/ A): DefErrT[Task, A] =
       EitherT(Task.delay(
@@ -93,33 +83,33 @@ package object fs {
                    Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
                  )
       params  <- liftDT((
-                   uri.params.get("username").toSuccessNel("No username in ConnectionUri")   |@|
                    uri.params.get("password").toSuccessNel("No password in ConnectionUri")   |@|
+                   uri.params.get("docTypeKey").toSuccessNel("No doctype in ConnectionUri")  |@|
                    duration(uri, "socketConnectTimeoutSeconds", defaultSocketConnectTimeout) |@|
                    duration(uri, "queryTimeoutSeconds", defaultQueryTimeout)
-                 )(ConnUriParams).disjunction)
+                 )(ConnUriParams(uri.path.stripPrefix("/"), _, _, _, _)).disjunction)
       ev      <- env(params).liftM[DefErrT]
       cluster <- EitherT(Task.delay(
-                   CouchbaseCluster.fromConnectionString(ev, uri.renderString).right
+                   CouchbaseCluster.fromConnectionString(ev, uri.copy(path = "", query = Query.empty).renderString).right
                  ).handle {
                    case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
                  })
-      cm      =  cluster.clusterManager(params.user, params.pass)
+      cm      =  cluster.clusterManager(params.bucket, params.pass)
       _       <- EitherT(Task.delay(
                    (cm.info.getMinVersion.compareTo(minimumRequiredVersion) >= 0).unlessM(
                      s"Couchbase Server must be ${minimumRequiredVersion}+"
                        .wrapNel.left[EnvironmentError].left)
                  ).handle {
-                   case _: InvalidPasswordException =>
+                   // NB: CB client issues an opque error when credentials or bucket are incorrect 
+                   case _: CouchbaseException => 
                      invalidCredentials(
-                       "Unable to obtain a ClusterManager with provided credentials."
-                     ).right[NonEmptyList[String]].left
-                   case CBConnectException(ex) =>
-                     connectionFailed(
-                       ex
+                       "Unable to obtain a ClusterManager with provided bucket name or password."
                      ).right[NonEmptyList[String]].left
                  })
-    } yield Context(cluster, cm)
+      bkt     <- EitherT(Task.delay(cm.hasBucket(params.bucket).booleanValue).ifM(
+                   Task.delay(cluster.openBucket(params.bucket, params.pass).right[DefinitionError]),
+                   Task.now(s"Bucket ${params.bucket} not found".wrapNel.left.left)))
+    } yield (ClientContext(bkt, DocTypeKey(params.docTypeKey)), cluster)
   }
 
   def interp[S[_]](
@@ -129,7 +119,8 @@ package object fs {
   ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
     def taskInterp(
-      ctx: Context
+      ctx: ClientContext,
+      cluster: Cluster
     ): Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
       (TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
        TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
@@ -139,17 +130,17 @@ package object fs {
      )((kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
-          reflNT[Task]                          :+:
-          Read.constant[Task, Context](ctx)     :+:
-          MonotonicSeq.fromTaskRef(i)           :+:
-          genUUID                               :+:
-          KeyValueStore.impl.fromTaskRef(kvR)   :+:
-          KeyValueStore.impl.fromTaskRef(kvW)   :+:
+          reflNT[Task]                            :+:
+          Read.constant[Task, ClientContext](ctx) :+:
+          MonotonicSeq.fromTaskRef(i)             :+:
+          genUUID                                 :+:
+          KeyValueStore.impl.fromTaskRef(kvR)     :+:
+          KeyValueStore.impl.fromTaskRef(kvW)     :+:
           KeyValueStore.impl.fromTaskRef(kvQ))),
-        lift(Task.delay(ctx.cluster.disconnect()).void).into
+        lift(Task.delay(cluster.disconnect()).void).into
       ))
 
-    EitherT(lift(context(connectionUri).run >>= (_.traverse(taskInterp))).into)
+    EitherT(lift(context(connectionUri).run >>= (_.traverse((taskInterp _).tupled))).into)
   }
 
   def definition[S[_]](implicit
@@ -160,7 +151,9 @@ package object fs {
       case (FsType, uri) =>
         interp(uri).map { case (run, close) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
-            run compose interpretFileSystem(
+            run compose interpretAnalyticalFileSystem(
+              // FIX-ME
+              Empty.analyze[Free[Eff, ?]],
               queryfile.interpret,
               readfile.interpret,
               writefile.interpret,
@@ -168,7 +161,4 @@ package object fs {
             close)
         }
     }
-
-  def bucketCollectionFromPath(p: APath): FileSystemError \/ BucketCollection =
-    BucketCollection.fromPath(p) leftMap (FileSystemError.pathErr(_))
 }

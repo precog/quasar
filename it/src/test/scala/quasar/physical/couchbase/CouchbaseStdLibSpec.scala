@@ -25,7 +25,7 @@ import quasar.fp.reflNT
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.fs.FileSystemError
-import quasar.physical.couchbase.common.{CBDataCodec, Context}
+import quasar.physical.couchbase.common.{CBDataCodec, ClientContext}
 import quasar.physical.couchbase.fs.{context, FsType}
 import quasar.physical.couchbase.fs.queryfile.n1qlResults
 import quasar.physical.couchbase.planner.CBPhaseLog
@@ -49,7 +49,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
 
   implicit val codec = CBDataCodec
 
-  type Eff0[A] = Coproduct[MonotonicSeq, Read[Context, ?], A]
+  type Eff0[A] = Coproduct[MonotonicSeq, Read[ClientContext, ?], A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
 
   type F[A] = Free[Eff, A]
@@ -59,7 +59,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     fm: Free[MapFunc[Fix, ?], A],
     args: A => QData,
     expected: QData,
-    ctx: Context
+    ctx: ClientContext
   ): Result = {
 
     def argN1ql(d: QData): M[Fix[N1QL]] = Data[Fix[N1QL]](d).embed.η[M]
@@ -90,7 +90,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       } yield (q, r)).run.run.foldMap(
         reflNT[Task]                            :+:
         MonotonicSeq.fromZero.unsafePerformSync :+:
-        Read.constant[Task, Context](ctx)
+        Read.constant[Task, ClientContext](ctx)
       ).unsafePerformSync._2
 
       (r must beRightDisjunction.like { case (q, Vector(d)) =>
@@ -98,7 +98,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       }).toResult
   }
 
-  def runner(ctx: Context) = new MapFuncStdLibTestRunner {
+  def runner(ctx: ClientContext) = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(
       prg: FreeMapA[Fix, Nothing],
       expected: QData
@@ -148,8 +148,8 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
     context(uri).fold(
       err => Task.fail(new RuntimeException(err.shows)),
-      ctx => Task.now(backend.name.shows should tests(runner(ctx)))
-    ).void
+      ctx => Task.now(backend.name.shows should tests(runner(ctx._1)))
+    ).join.void
   }).unsafePerformSync
 
 }

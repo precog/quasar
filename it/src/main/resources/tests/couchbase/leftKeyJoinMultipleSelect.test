@@ -18,7 +18,7 @@
                      beer.name AS beer_name,
                      beer.brewery_id AS beer_brewery_id,
                      beer.category AS beer_category
-              FROM `/beer-sample/brewery` AS brewery JOIN `/beer-sample/beer` AS beer
+              FROM `brewery` AS brewery JOIN `beer` AS beer
               ON META(brewery).id = beer.brewery_id
               WHERE beer.category = \"North American Ale\"",
     "ignoreFieldOrder": [ "couchbase" ],

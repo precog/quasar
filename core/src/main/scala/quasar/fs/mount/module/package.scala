@@ -21,6 +21,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
 import quasar.sql.FunctionDecl
 
@@ -137,5 +138,21 @@ package object module {
     val mount = Mounting.Ops[S]
     val manageFile = nonFsMounts.manageFile(dir => mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
+  }
+  // FIX-ME
+  def analyticalFileSystem[S[_]](
+                        implicit
+                        S0: ReadFile :<: S,
+                        S1: WriteFile :<: S,
+                        S2: ManageFile :<: S,
+                        S3: QueryFile :<: S,
+                        S4: MonotonicSeq :<: S,
+                        S5: ViewState :<: S,
+                        S6: Mounting :<: S,
+                        S7: MountingFailure :<: S,
+                        S8: PathMismatchFailure :<: S,
+                        S9: Analyze :<: S
+                      ): AnalyticalFileSystem ~> Free[S, ?] = {
+    (injectFT[Analyze, S]) :+: fileSystem[S]
   }
 }

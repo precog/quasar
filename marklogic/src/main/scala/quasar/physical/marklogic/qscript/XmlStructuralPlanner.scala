@@ -33,9 +33,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   import axes.child, StructuralPlanner.ejs
   import FunctionDecl._
 
-  val ejsonN    = ejs name ejsonEjson.local
-  val arrayEltN = ejs name ejsonArrayElt.local
-  val typeAttrN = ejs name ejsonType.local
+  val ejsonN    = ejs name ejsonEjson.localPart
+  val arrayEltN = ejs name ejsonArrayElt.localPart
+  val typeAttrN = ejs name ejsonType.localPart
 
   // <ejson:ejson ejson:type="null" />
   val null_ : F[XQuery] =

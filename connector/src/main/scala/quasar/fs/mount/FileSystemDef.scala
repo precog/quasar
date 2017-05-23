@@ -19,7 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.connector.EnvironmentError
 import quasar.fp.ski.κ
-import quasar.fs.{FileSystem, FileSystemType}
+import quasar.fs.{AnalyticalFileSystem, FileSystemType}
 
 import scala.StringContext
 
@@ -48,7 +48,7 @@ object FileSystemDef {
   type DefinitionError  = NonEmptyList[String] \/ EnvironmentError
   type DefErrT[F[_], A] = EitherT[F, DefinitionError, A]
 
-  final case class DefinitionResult[F[_]](run: FileSystem ~> F, close: F[Unit]) {
+  final case class DefinitionResult[F[_]](run: AnalyticalFileSystem ~> F, close: F[Unit]) {
     def translate[G[_]](f: F ~> G): DefinitionResult[G] =
       DefinitionResult(f compose run, f(close))
   }

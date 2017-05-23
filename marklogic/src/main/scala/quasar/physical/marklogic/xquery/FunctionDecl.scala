@@ -17,12 +17,12 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml.QName
 
 import scalaz._, Id.Id
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
+import xml.name._
 
 sealed abstract class FunctionDecl {
   def name: QName

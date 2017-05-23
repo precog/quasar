@@ -47,6 +47,10 @@ object mounted {
   def queryFile[S[_]](mountPoint: ADir)(implicit S: QueryFile :<: S): S ~> Free[S, ?] =
     transformPaths.queryFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
 
+  def analyze[S[_]](mountPoint: ADir)(implicit S: Analyze :<: S): S ~> Free[S, ?] =
+    transformPaths.analyze[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
+
+
   def fileSystem[S[_]](
     mountPoint: ADir
   )(implicit

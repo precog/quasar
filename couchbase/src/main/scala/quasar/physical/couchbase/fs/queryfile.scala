@@ -34,8 +34,6 @@ import quasar.Planner.PlannerError
 import quasar.qscript.{Read => _, _}
 import quasar.RenderTree.ops._
 
-import scala.collection.JavaConverters._
-
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
@@ -70,7 +68,7 @@ object queryfile {
   // TODO: Streaming
   def interpret[S[_]](
     implicit
-    S0: Read[Context, ?] :<: S,
+    S0: Read[ClientContext, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: KeyValueStore[ResultHandle, Cursor, ?] :<: S,
     S3: GenUUID :<: S,
@@ -88,7 +86,7 @@ object queryfile {
   def executePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan], out: AFile
   )(implicit
-    S0: Read[Context, ?] :<: S,
+    S0: Read[ClientContext, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: GenUUID :<: S,
     S3: Task :<: S
@@ -96,25 +94,22 @@ object queryfile {
     (for {
       n1ql   <- lpToN1ql[T, S](lp) map (_._1)
       r      <- n1qlResults(n1ql)
-      bktCol <- bucketCollectionFromPath(out).liftFE
+      col    <- docTypeValueFromPath(out).η[Plan[S, ?]]
+      ctx    <- Read.Ops[ClientContext, S].ask.liftF
       docs   <- r.map(DataCodec.render).unite.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
                     JsonObject
                       .create()
-                      .put("type", bktCol.collection)
+                      .put(ctx.docTypeKey.v, col.v)
                       .put("value", jsonTranscoder.stringToJsonObject(d)))
                 )).liftF
-      ctx    <- Read.Ops[Context, S].ask.liftF
-      bkt    <- lift(Task.delay(
-                  ctx.cluster.openBucket(bktCol.bucket)
-                )).into.liftF
-      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[PhaseResultT])
-      _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[PhaseResultT]))
+      exists <- EitherT(lift(existsWithPrefix(ctx, col.v)).into.liftM[PhaseResultT])
+      _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(ctx, col.v)).into[S].liftM[PhaseResultT]))
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable
                     .from(docs)
-                    .flatMap(bkt.async.insert(_).asScala)
+                    .flatMap(ctx.bucket.async.insert(_).asScala)
                     .toBlocking
                     .last
                 ))).into.liftF
@@ -123,7 +118,7 @@ object queryfile {
   def evaluatePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
-    S0: Read[Context, ?] :<: S,
+    S0: Read[ClientContext, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S,
     results: KeyValueStore.Ops[ResultHandle, Cursor, S]
@@ -157,7 +152,7 @@ object queryfile {
   def explain[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
-    S0: Read[Context, ?] :<: S,
+    S0: Read[ClientContext, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
@@ -170,36 +165,40 @@ object queryfile {
     dir: APath
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    if (dir === rootDir)
-      listRootContents
-    else
-      listNonRootContents(dir)
+    (for {
+      ctx    <- context.ask.liftM[FileSystemErrT]
+      col    <- docTypeValueFromPath(dir).η[FileSystemErrT[Free[S, ?], ?]]
+      types  <- EitherT(lift(docTypeValuesFromPrefix(ctx, col.v)).into)
+      _      <- EitherT((
+                  if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
+                  else ().right
+                ).η[Free[S, ?]])
+    } yield pathSegmentsFromPrefixDocTypeValues(col.v, types)).run
 
   def fileExists[S[_]](
     file: AFile
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, Boolean] =
     (for {
       ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into)
+      col    <- docTypeValueFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
+      exists <- EitherT(lift(existsWithPrefix(ctx, col.v)).into)
     } yield exists).exists(ι)
 
   def n1qlResults[T[_[_]]: BirecursiveT, S[_]](
     n1ql: T[N1QL]
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Plan[S, Vector[Data]] =
     for {
       ctx     <- context.ask.liftF
       bkt     <- lift(Task.delay(
-                   ctx.cluster.openBucket()
+                   ctx.bucket
                  )).into.liftF
       q       <- RenderQuery.compact(n1ql).liftPE
       r       <- EitherT(lift(queryData(bkt, q)).into.liftM[PhaseResultT])
@@ -209,22 +208,23 @@ object queryfile {
   def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
-    S0: Read[Context, ?] :<: S,
-    S1: MonotonicSeq :<: S,
-    S2: Task :<: S
+    S0: MonotonicSeq :<: S,
+    S1: Task :<: S,
+    ctx: Read.Ops[ClientContext, S]
   ): Plan[S, (T[N1QL], ISet[APath])] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
-    lpLcToN1ql[T, S](lp, lc)
+    ctx.ask.liftF >>= (c => lpLcToN1ql[T, S](lp, lc, Context(BucketName(c.bucket.name), c.docTypeKey)))
   }
 
   def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
-    lc: DiscoverPath.ListContents[Plan[S, ?]]
+    lc: DiscoverPath.ListContents[Plan[S, ?]],
+    ctx: Context
   )(implicit
-    S1: MonotonicSeq :<: S,
-    S2: Task :<: S
+    S0: MonotonicSeq :<: S,
+    S1: Task :<: S
   ): Plan[S, (T[N1QL], ISet[APath])] = {
     type CBQSCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
     type CBQS[A]  = CBQSCP#M[A]
@@ -246,43 +246,13 @@ object queryfile {
                 optimize.optimize(reflNT[CBQS]),
                 Unicoalesce[T, CBQSCP])
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
-      n1ql <- opz.cataM(
-                Planner[T, Free[S, ?], CBQS].plan
-              ).leftMap(FileSystemError.qscriptPlanningFailed(_))
+      n1ql <- EitherT(WriterT(
+                opz.cataM(Planner[T, Kleisli[Free[S, ?], Context, ?], CBQS].plan)
+                  .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.run.run(ctx)))
       ipt  =  opz.cata(ExtractPath[CBQS, APath].extractPath[DList])
       q    <- RenderQuery.compact(n1ql).liftPE
       _    <- tell(Vector(detail("N1QL AST", n1ql.render.shows)))
       _    <- tell(Vector(detail("N1QL", q)))
     } yield (n1ql, ISet fromFoldable ipt)
   }
-
-  def listRootContents[S[_]]
-  (implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    (for {
-      ctx      <- context.ask.liftM[FileSystemErrT]
-      bktNames <- lift(Task.delay(
-                    ctx.manager.getBuckets.asScala.toList.map(_.name)
-                  )).into.liftM[FileSystemErrT]
-    } yield bktNames.map(DirName(_).left[FileName]).toSet).run
-
-  def listNonRootContents[S[_]](
-    dir: APath
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    (for {
-      ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(dir).η[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      types  <- EitherT(lift(docTypesFromPrefix(bkt, bktCol.collection)).into)
-      _      <- EitherT((
-                  if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
-                  else ().right
-                ).η[Free[S, ?]])
-    } yield pathSegmentsFromPrefixTypes(bktCol.collection, types)).run
-
 }

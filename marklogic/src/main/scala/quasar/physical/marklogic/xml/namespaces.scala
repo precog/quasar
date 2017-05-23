@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.xml
 
 import eu.timepit.refined.auto._
+import xml.name._
 
 object namespaces {
   // NB: We've choosen to only support EJSON maps with string keys for the

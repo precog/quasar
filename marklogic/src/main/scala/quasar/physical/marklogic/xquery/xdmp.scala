@@ -17,12 +17,12 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
 import scalaz.std.iterable._
+import xml.name._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {

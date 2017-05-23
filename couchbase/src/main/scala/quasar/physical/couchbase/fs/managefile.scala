@@ -32,7 +32,7 @@ object managefile {
 
   def interpret[S[_]](implicit
     S0: MonotonicSeq :<: S,
-    S1: Read[Context, ?] :<:  S,
+    S1: Read[ClientContext, ?] :<:  S,
     S2: Task :<: S
   ): ManageFile ~> Free[S, ?] = λ[ManageFile ~> Free[S, ?]] {
     case Move(scenario, semantics) => move(scenario, semantics)
@@ -44,27 +44,20 @@ object managefile {
     scenario: MoveScenario, semantics: MoveSemantics
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Unit] =
     (for {
       ctx       <- context.ask.liftM[FileSystemErrT]
-      src       <- EitherT(bucketCollectionFromPath(scenario.src).η[Free[S, ?]])
-      dst       <- EitherT(bucketCollectionFromPath(scenario.dst).η[Free[S, ?]])
-      _         <- EitherT((
-                     if (src.bucket =/= dst.bucket) FileSystemError.pathErr(
-                       PathError.invalidPath(scenario.dst, "different bucket from src path")).left
-                     else
-                       ().right
-                   ).η[Free[S, ?]])
-      bkt       <- EitherT(getBucket(src.bucket))
-      srcExists <- EitherT(lift(existsWithPrefix(bkt, src.collection)).into)
+      src       <- docTypeValueFromPath(scenario.src).η[FileSystemErrT[Free[S, ?], ?]]
+      dst       <- docTypeValueFromPath(scenario.dst).η[FileSystemErrT[Free[S, ?], ?]]
+      srcExists <- EitherT(lift(existsWithPrefix(ctx, src.v)).into)
       _         <- EitherT((
                      if (!srcExists)
                        FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
                      else
                        ().right
                    ).η[Free[S, ?]])
-      dstExists <- EitherT(lift(existsWithPrefix(bkt, dst.collection)).into)
+      dstExists <- EitherT(lift(existsWithPrefix(ctx, dst.v)).into)
       _         <- EitherT((semantics match {
                     case MoveSemantics.FailIfExists if dstExists =>
                       FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
@@ -74,28 +67,27 @@ object managefile {
                       ().right[FileSystemError]
                   }).η[Free[S, ?]])
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
-      qStr      =  s"""update `${bkt.name}`
-                       set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where type like "${src.collection}%""""
-      _         <- EitherT(lift(query(bkt, qStr)).into)
+      qStr      =  s"""update `${ctx.bucket.name}`
+                       set `${ctx.docTypeKey.v}`=("${dst.v}" || REGEXP_REPLACE(`${ctx.docTypeKey.v}`, "^${src.v}", ""))
+                       where `${ctx.docTypeKey.v}` like "${src.v}%""""
+      _         <- EitherT(lift(query(ctx.bucket, qStr)).into)
     } yield ()).run
 
   def delete[S[_]](
     path: APath
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Unit] =
     (for {
       ctx       <- context.ask.liftM[FileSystemErrT]
-      bktCol    <- EitherT(bucketCollectionFromPath(path).η[Free[S, ?]])
-      bkt       <- EitherT(getBucket(bktCol.bucket))
-      docsExist <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into)
+      col       <- docTypeValueFromPath(path).η[FileSystemErrT[Free[S, ?], ?]]
+      docsExist <- EitherT(lift(existsWithPrefix(ctx, col.v)).into)
       _         <- EitherT((
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).η[Free[S, ?]])
-      _         <- EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into)
+      _         <- EitherT(lift(deleteHavingPrefix(ctx, col.v)).into)
     } yield ()).run
 
   def tempFile[S[_]](

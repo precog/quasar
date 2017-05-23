@@ -92,7 +92,7 @@ object metastore {
   }
 
   def jdbcMounter[S[_]](
-    hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+    hfsRef: TaskRef[AnalyticalFileSystem~> HierarchicalFsEffM],
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,
@@ -168,7 +168,7 @@ object metastore {
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephmralMnt   =  KvsMounter.interpreter[Task, QErrsTCnxIO](

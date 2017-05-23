@@ -19,12 +19,12 @@ package quasar.physical.marklogic.xquery
 import slamdata.Predef._
 import quasar.fp.ski.κ
 import quasar.effect.MonoSeq
-import quasar.physical.marklogic.xml.{NCName, QName}
 
 import eu.timepit.refined.api.Refined
 import simulacrum.typeclass
 import scalaz._
 import scalaz.syntax.functor._
+import xml.name._
 
 /** A source of QNames unique within `F[_]`, an implementation must have the
   * property that, if Applicative[F], then (freshQName |@| freshQName)(_ != _).
@@ -51,7 +51,7 @@ sealed abstract class QNameGeneratorInstances extends QNameGeneratorInstances0 {
 
   private def numericQName(n: Long): QName = {
     val name = if (n < 0) s"n_${scala.math.abs(n)}" else s"n$n"
-    QName.local(NCName(Refined.unsafeApply(name)))
+    QName.unprefixed(NCName(Refined.unsafeApply(name)))
   }
 }
 

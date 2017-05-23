@@ -1,0 +1,8 @@
+{"userId":1,"height":89,"weight":129}
+{"userId":2,"height":47,"weight":100}
+{"userId":3,"height":30,"weight":88}
+{"userId":4,"height":62,"weight":110}
+{"userId":5,"height":93,"weight":131}
+{"userId":6,"height":null,"weight":"129"}
+{"userId":7,"height":[15],"weight":true}
+{"userId":8,"height":34.3,"weight":{"foo":12}}

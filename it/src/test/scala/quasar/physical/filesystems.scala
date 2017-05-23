@@ -37,7 +37,7 @@ object filesystems {
     uri: ConnectionUri,
     prefix: ADir,
     f: Free[Eff, FileSystemDef.DefinitionError \/ FileSystemDef.DefinitionResult[Free[Eff, ?]]]
-  ): Task[(FileSystem ~> Task, Task[Unit])] = {
+  ): Task[(AnalyticalFileSystem ~> Task, Task[Unit])] = {
     val fsDef = f.flatMap[FileSystemDef.DefinitionResult[EffM]] {
         case -\/(-\/(strs)) => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
         case -\/(\/-(err))  => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(err.shows)))

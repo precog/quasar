@@ -49,16 +49,7 @@ package object mount {
       KeyValueStore.Ops[APath, MountConfig, S]
   }
 
-  type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
-
-  object MountingFileSystem {
-    def interpret[F[_]](
-      mounting: Mounting ~> F,
-      fileSystem: FileSystem ~> F
-    ): MountingFileSystem ~> F =
-      mounting :+: fileSystem
-  }
-
+  
   //-- Views --
 
   sealed abstract class ResultSet

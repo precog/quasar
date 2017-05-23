@@ -27,14 +27,14 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+class ManageFilesSpec extends FileSystemTest[AnalyticalFileSystem](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
   import FileSystemTest._, FileSystemError._, PathError._
   import ManageFile._
 
-  val query  = QueryFile.Ops[FileSystem]
-  val read   = ReadFile.Ops[FileSystem]
-  val write  = WriteFile.Ops[FileSystem]
-  val manage = ManageFile.Ops[FileSystem]
+  val query  = QueryFile.Ops[AnalyticalFileSystem]
+  val read   = ReadFile.Ops[AnalyticalFileSystem]
+  val write  = WriteFile.Ops[AnalyticalFileSystem]
+  val manage = ManageFile.Ops[AnalyticalFileSystem]
 
   val managePrefix: ADir = rootDir </> dir("formanage")
 

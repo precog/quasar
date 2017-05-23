@@ -48,9 +48,6 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
   def MonadM = Monad[M]
-  def MonadFsErrM = MonadFsErr[M]
-  def PhaseResultTellM = PhaseResultTell[M]
-  def PhaseResultListenM = PhaseResultListen[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
@@ -58,47 +55,46 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
 
   def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] = ???
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
-    ???
+  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
 
   val Type = FileSystemType("marklogic")
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): M[Repr] = ???
+      cp: T[QSM[T, ?]]): Backend[Repr] = ???
 
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): Kleisli[M, Config, AFile] = ???
-    def evaluatePlan(repr: Repr): Kleisli[M, Config, ResultHandle] = ???
-    def more(h: ResultHandle): Kleisli[M, Config, Vector[Data]] = ???
-    def close(h: ResultHandle): Kleisli[M, Config, Unit] = ???
-    def explain(repr: Repr): Kleisli[M, Config, String] = ???
-    def listContents(dir: ADir): Kleisli[M, Config, Set[PathSegment]] = ???
-    def fileExists(file: AFile): Kleisli[M, Config, Boolean] = ???
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
+    def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
+    def more(h: ResultHandle): Backend[Vector[Data]] = ???
+    def close(h: ResultHandle): Configured[Unit] = ???
+    def explain(repr: Repr): Backend[String] = ???
+    def listContents(dir: ADir): Backend[Set[PathSegment]] = ???
+    def fileExists(file: AFile): Configured[Boolean] = ???
   }
 
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): Kleisli[M, Config, ReadHandle] = ???
-    def read(h: ReadHandle): Kleisli[M, Config, Vector[Data]] = ???
-    def close(h: ReadHandle): Kleisli[M, Config, Unit] = ???
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = ???
+    def read(h: ReadHandle): Backend[Vector[Data]] = ???
+    def close(h: ReadHandle): Configured[Unit] = ???
   }
 
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
-    def open(file: AFile): Kleisli[M, Config, WriteHandle] = ???
-    def write(h: WriteHandle, chunk: Vector[Data]): Kleisli[M, Config, Vector[FileSystemError]] = ???
-    def close(h: WriteHandle): Kleisli[M, Config, Unit] = ???
+    def open(file: AFile): Backend[WriteHandle] = ???
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = ???
+    def close(h: WriteHandle): Configured[Unit] = ???
   }
 
   object ManageFileModule extends ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Kleisli[M, Config, Unit] = ???
-    def delete(path: APath): Kleisli[M, Config, Unit] = ???
-    def tempFile(near: APath): Kleisli[M, Config, AFile] = ???
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ???
+    def delete(path: APath): Backend[Unit] = ???
+    def tempFile(near: APath): Backend[AFile] = ???
   }
 }

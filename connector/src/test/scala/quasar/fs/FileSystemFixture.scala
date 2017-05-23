@@ -158,8 +158,8 @@ object FileSystemFixture {
           nw <- nextWriteL.st.lift[F]
           ws <- restWritesL.st.lift[F]
           _  <- (writesL := ws.orZero).lift[F]
-          es <- f(Write(h, d)).liftM[ReadWriteT]
-        } yield es ++ nw.orZero
+          es <- nw.cata(_.point[ReadWriteT[F, ?]], f(Write(h, d)).liftM[ReadWriteT])
+        } yield es
 
         case _ => f(wf).liftM[ReadWriteT]
       }

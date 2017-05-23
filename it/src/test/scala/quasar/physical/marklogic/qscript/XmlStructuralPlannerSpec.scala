@@ -20,12 +20,12 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalaz.eitherT._
 import quasar.physical.marklogic.DocType
-import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
 import matryoshka._
 import scalaz._, Scalaz._
+import xml.name._
 
 final class XmlStructuralPlannerSpec
   extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, DocType.Xml] {

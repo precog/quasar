@@ -17,24 +17,25 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.contrib.pathy.APath
+
+import quasar.contrib.pathy.{AFile, APath, FPath}
+import quasar.Data
+import quasar.Data._int
+import quasar.fs.{FileSystemError, FileSystemErrT, QueryFile}
+import quasar.fs.PathError.invalidPath
 import quasar.fp._, ski._
+import quasar.frontend.logicalplan.{Read => LPRead, LogicalPlan}
+import quasar.std.StdLib.agg
 
 import matryoshka.{Hole => _, _}
 import matryoshka.patterns._
 import matryoshka.implicits._
 import matryoshka.data._
+import pathy.Path.{file, peel, file1}
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 package object analysis {
-
-  sealed trait AnalysisResult
-  case object Instant extends AnalysisResult
-  case object Interactive extends AnalysisResult
-  case object SemiInteractive extends AnalysisResult
-  case object Batch extends AnalysisResult
-  case object Unknown extends AnalysisResult
 
   @typeclass
   trait Cardinality[F[_]] {
@@ -43,14 +44,27 @@ package object analysis {
 
   @typeclass
   trait Cost[F[_]] {
-    def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, F, Int]
+    def evaluate[M[_] : Monad](pathCard : APath => M[Int]): GAlgebraM[(Int, ?), M, F, Int]
   }
 
-  def analyze[F[_] : Traverse, M[_] : Monad,  T](t: T)(pathCard: APath => M[Int])(implicit
-    rec: Recursive.Aux[T, F],
-    cardinalty: Cardinality[F],
-    cost: Cost[F]
-  ): M[Int] = rec.zygoM(t)(cardinalty.calculate(pathCard), cost.evaluate(pathCard))
+  def pathCard[S[_]](
+    implicit queryOps: QueryFile.Ops[S]
+  ): APath => FileSystemErrT[Free[S, ?], Int] = (apath: APath) => {
+    val afile: Option[AFile] = peel(apath).map {
+      case (dirPath, \/-(fileName)) => dirPath </> file1(fileName)
+      case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
+    }
+
+    def lpFromPath[LP](p: FPath)(implicit LP: Corecursive.Aux[LP, LogicalPlan]): LP =
+      LP.embed(agg.Count(LP.embed(LPRead(p))))
+
+    val lp: FileSystemErrT[Free[S, ?], Fix[LogicalPlan]] =
+      EitherT.fromDisjunction(afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
+    val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
+      (lp: Fix[LogicalPlan]) => queryOps.first(lp).mapT(_.value)
+    
+    (lp >>= (dataFromLp)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0) 
+  }
 
   object Cardinality {
 

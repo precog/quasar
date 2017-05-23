@@ -23,7 +23,6 @@ import quasar.effect.uuid._
 import quasar.fp.numeric._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xml.NCName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
@@ -33,6 +32,7 @@ import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
+import xml.name._
 
 object ops {
   import expr.{func, let_}

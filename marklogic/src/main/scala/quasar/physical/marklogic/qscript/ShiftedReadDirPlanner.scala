@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.contrib.pathy.{ADir, UriPathCodec}
-import quasar.physical.marklogic.xml.NCName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -25,6 +24,7 @@ import quasar.qscript._
 import eu.timepit.refined.auto._
 import matryoshka._
 import scalaz._, Scalaz._
+import xml.name._
 
 private[qscript] final class ShiftedReadDirPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
   implicit

@@ -21,7 +21,7 @@ import quasar.contrib.pathy.ADir
 import quasar.effect._
 import quasar.fp.{TaskRef}
 import quasar.fp.free, free._
-import quasar.fs.{QueryFile, FileSystem}
+import quasar.fs.{QueryFile, AnalyticalFileSystem}
 
 import scalaz.{Failure => _, _}
 import scalaz.concurrent._
@@ -30,7 +30,7 @@ import scalaz.syntax.apply._
 package object regression {
   import quasar.fs.mount.hierarchical.MountedResultH
 
-  type FileSystemIO[A] = Coproduct[Task, FileSystem, A]
+  type AnalyticalFileSystemIO[A] = Coproduct[Task, AnalyticalFileSystem, A]
 
   type HfsIO0[A] = Coproduct[MountedResultH, Task, A]
   type HfsIO[A]  = Coproduct[MonotonicSeq, HfsIO0, A]

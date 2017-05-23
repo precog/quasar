@@ -338,29 +338,29 @@ abstract class QueryRegressionTest[S[_]](
 object QueryRegressionTest {
   lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
-  val externalFS: Task[IList[SupportedFs[FileSystemIO]]] =
+  val externalFS: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
       hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
-                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: FileSystemIO ~> Task =>
+                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: AnalyticalFileSystemIO ~> Task =>
                     SupportedFs(
                       sb.ref,
                       ut.copy(testInterp = f)
-                        .contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
+                        .contramapF(chroot.fileSystem[AnalyticalFileSystemIO](ut.testDir))
                         .some,
                       ut.some)
                   }
                 ).getOrElse(sb.point[Task]))
     } yield hfsUts
 
-  private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
+  private def hierarchicalFSIO(mnt: ADir, f: AnalyticalFileSystemIO ~> Task): Task[AnalyticalFileSystemIO ~> Task] =
     interpretHfsIO map { hfs =>
-      val interpFS = f compose injectNT[FileSystem, FileSystemIO]
+      val interpFS = f compose injectNT[AnalyticalFileSystem, AnalyticalFileSystemIO]
 
-      val g: FileSystem ~> Free[HfsIO, ?] =
-        flatMapSNT(hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
-          .compose(chroot.fileSystem[FileSystem](mnt))
+      val g: AnalyticalFileSystem ~> Free[HfsIO, ?] =
+        flatMapSNT(hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
+          .compose(chroot.analyticalFileSystem[AnalyticalFileSystem](mnt))
 
       NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)
     }

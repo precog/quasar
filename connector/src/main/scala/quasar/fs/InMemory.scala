@@ -121,7 +121,6 @@ object InMemory {
         for {
           h <- nextSeq ∘ (WriteHandle(f, _))
           _ <- wFileL(h) := Some(f)
-          _ <- fileL(f) %= (_ orElse Some(Vector()))
         } yield h.right
 
       case WriteFile.Write(h, xs) =>

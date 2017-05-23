@@ -114,16 +114,14 @@ object Dependencies {
     "org.http4s"         %% "http4s-core" % http4sVersion
   )
 
-  def marklogicValidation = Seq(
-    CommonDependencies.refined.refined,
-    CommonDependencies.scalaz.core
-  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
+    "com.slamdata"               %% "xml-names-core"      % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
     CommonDependencies.refined.scalacheck                                   % Test,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+    "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
@@ -142,6 +140,15 @@ object Dependencies {
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     CommonDependencies.refined.scalacheck                          % Test
+  )
+  def precog = Seq(
+    "org.slf4s"            %% "slf4s-api"       % "1.7.13",
+    "org.spire-math"       %% "spire"           % "0.13.0",
+    "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
+    "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
+    "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
+    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,

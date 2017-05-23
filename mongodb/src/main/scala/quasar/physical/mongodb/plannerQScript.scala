@@ -1212,6 +1212,36 @@ object MongoDbQScriptPlanner {
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
+  type MongoQScriptCP[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+  type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
+
+  def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_] : Monad](
+    lp: T[LogicalPlan],
+    listContents: DiscoverPath.ListContents[M])(implicit
+    merr: MonadError_[M, FileSystemError],
+    mtell: MonadTell_[M, PhaseResults]
+  ): M[T[MongoQScript[T, ?]]] = {
+    val rewrite = new Rewrite[T]
+    val optimize = new Optimize[T]
+
+    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript[T, ?], QScriptTotal[T, ?]] =
+      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+
+    for {
+      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp)
+      // TODO: also need to prefer projections over deletions
+      // NB: right now this only outputs one phase, but it’d be cool if we could
+      //     interleave phase building in the composed recursion scheme
+      opt <- log(
+        "QScript (Mongo-specific)",
+        Unirewrite[T, MongoQScriptCP[T], M](rewrite, listContents).apply(qs)
+          .map(_.transHylo(
+            optimize.optimize(reflNT[MongoQScript[T, ?]]),
+            Unicoalesce[T, MongoQScriptCP[T]]))
+          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))))
+    } yield opt
+  }
+
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad,
@@ -1229,33 +1259,12 @@ object MongoDbQScriptPlanner {
       ev2: EX :<: ExprOp,
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
-    val rewrite = new Rewrite[T]
-    val optimize = new Optimize[T]
-
-    type MongoQScriptCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-    type MongoQScript[A] = MongoQScriptCP#M[A]
-
-    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript, QScriptTotal[T, ?]] =
-      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
-    // NB: Intermediate form of QScript between the standard form and Mongo’s.
-    type MongoQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: MongoQScript)#M[A]
 
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
-      // TODO: also need to prefer projections over deletions
-      // NB: right now this only outputs one phase, but it’d be cool if we could
-      //     interleave phase building in the composed recursion scheme
-      opt <- log(
-        "QScript (Mongo-specific)",
-        Unirewrite[T, MongoQScriptCP, M](rewrite, listContents).apply(qs)
-          .map(_.transHylo(
-            optimize.optimize(reflNT[MongoQScript]),
-            Unicoalesce[T, MongoQScriptCP]))
-          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
+      opt <- toMongoQScript(lp, listContents).liftM[GenT]
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
+        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript[T, ?]].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
       wf1 <- log("Workflow (raw)", liftM[GenT[M, ?], Fix[WF]](WorkflowBuilder.build(wb)))
       wf2 <- log(
         "Workflow (crystallized)",

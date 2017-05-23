@@ -33,15 +33,15 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 class ViewReadQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS.map(_.take(1))) {
+  extends QueryRegressionTest[AnalyticalFileSystemIO](QueryRegressionTest.externalFS.map(_.take(1))) {
 
   val suiteName = "View Reads"
-  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: FileSystemIO)#M[A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: AnalyticalFileSystemIO)#M[A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(expr, vars))) |@|
-      TaskRef(Empty.fileSystem[HierarchicalFsEffM]) |@|
+      TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) { (cfgsRef, hfsRef, mntdRef) =>
       val mnt =
@@ -64,7 +64,7 @@ class ViewReadQueryRegressionSpec
     def t: RF.unsafe.M ~> qfTransforms.CompExecM =
       new (RF.unsafe.M ~> qfTransforms.CompExecM) {
         def apply[A](fa: RF.unsafe.M[A]): qfTransforms.CompExecM[A] = {
-          val u: ReadFile ~> Free[FileSystemIO, ?] =
+          val u: ReadFile ~> Free[AnalyticalFileSystemIO, ?] =
             mapSNT(interp) compose view.readFile[ViewFS]
 
           EitherT(EitherT.right(WriterT.put(fa.run.flatMapSuspension(u))(Vector.empty)))
@@ -74,10 +74,10 @@ class ViewReadQueryRegressionSpec
     prg.translate(t)
   }
 
-  def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> FileSystemIO] =
+  def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> AnalyticalFileSystemIO] =
     (ViewState.toTask(Map()) |@| seq)((v, s) =>
-      (injectNT[Task, FileSystemIO] compose mnts) :+:
-      (injectNT[Task, FileSystemIO] compose v) :+:
-      (injectNT[Task, FileSystemIO] compose s) :+:
-      reflNT[FileSystemIO])
+      (injectNT[Task, AnalyticalFileSystemIO] compose mnts) :+:
+      (injectNT[Task, AnalyticalFileSystemIO] compose v) :+:
+      (injectNT[Task, AnalyticalFileSystemIO] compose s) :+:
+      reflNT[AnalyticalFileSystemIO])
 }

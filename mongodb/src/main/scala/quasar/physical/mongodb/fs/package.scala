@@ -53,7 +53,7 @@ package object fs {
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -63,12 +63,14 @@ package object fs {
       readfile.run[S](client).liftM[EnvErrT]        |@|
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) =>
-      interpretFileSystem[Free[S, ?]](
+    )((execMongo, qfile, rfile, wfile, mfile) => {
+      interpretAnalyticalFileSystem[Free[S, ?]](
+        Empty.analyze[Free[S, ?]], // old mongo, will be removed
         qfile compose queryfile.interpret(execMongo),
         rfile compose readfile.interpret,
         wfile compose writefile.interpret,
-        mfile compose managefile.interpret))
+        mfile compose managefile.interpret)
+    })
   }
 
   def definition[S[_]](implicit
@@ -80,7 +82,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, FileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
                     fileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run
@@ -97,7 +99,7 @@ package object fs {
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -107,12 +109,17 @@ package object fs {
       readfile.run[S](client).liftM[EnvErrT]        |@|
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) =>
-      interpretFileSystem[Free[S, ?]](
+    )((execMongo, qfile, rfile, wfile, mfile) => {
+      val fileSystemInterpreter = interpretFileSystem[Free[S, ?]](
         qfile compose queryfile.interpretQ(execMongo),
         rfile compose readfile.interpret,
         wfile compose writefile.interpret,
-        mfile compose managefile.interpret))
+        mfile compose managefile.interpret)
+
+      val analyzeInterpreter = Empty.analyze[Free[S, ?]]
+
+      analyzeInterpreter :+: fileSystemInterpreter
+    })
   }
 
   def qscriptDefinition[S[_]](implicit
@@ -124,7 +131,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, FileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
                     qscriptFileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run

@@ -1,0 +1,18 @@
+"this,is,delimited"
+"this is a string"
+null
+12324.123215
+999
+[]
+{}
+["this", "is", "an", "array"]
+{"objects": "are great"}
+""
+"also,delmited"
+",starts,with,comma"
+"ends,with,comma,"
+"lots,,,,of,,,,commas"
+",,,,,,,"
+","
+",,crazy,,"
+"something,basically,reasonable"

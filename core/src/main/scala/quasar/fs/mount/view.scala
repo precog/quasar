@@ -21,6 +21,7 @@ import quasar._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
+import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
@@ -182,6 +183,18 @@ object view {
     }
   }
 
+  def analyze[S[_]](implicit
+    M: Mounting.Ops[S],
+    A: Analyze.Ops[S]
+  ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
+    def apply[A](from: Analyze[A]) = from match {
+      case Analyze.QueryCost(lp) => resolveViewRefs[S](lp).run.flatMap(_.fold(
+        e => planningFailed(lp, Planner.InternalError fromMsg e.shows).raiseError[FileSystemErrT[Free[S, ?], ?], Int],
+        p => A.queryCost(p)).run)
+
+    }
+  }
+
   /** Translates requests which refer to any view path into operations
     * on an underlying filesystem, where references to views have been
     * rewritten as queries against actual files.
@@ -202,6 +215,20 @@ object view {
     val manageFile = nonFsMounts.manageFile(dir => mount.viewsHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
+
+  def analyticalFileSystem[S[_]](
+    implicit
+    S0: ReadFile :<: S,
+    S1: WriteFile :<: S,
+    S2: ManageFile :<: S,
+    S3: QueryFile :<: S,
+    S4: MonotonicSeq :<: S,
+    S5: ViewState :<: S,
+    S6: Mounting :<: S,
+    S7: MountingFailure :<: S,
+    S8: PathMismatchFailure :<: S,
+    S9: Analyze :<: S
+  ): AnalyticalFileSystem ~> Free[S, ?] = analyze :+: fileSystem[S]
 
   /** Resolve view references in the given `LP`. */
   def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])

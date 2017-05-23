@@ -83,7 +83,7 @@ object WriteFile {
           .map(PartialWrite)
 
       val dropPartialWrites =
-        process1.filter[FileSystemError](e => !partialWrite.nonEmpty(e))
+        process1.filter[FileSystemError](partialWrite.isEmpty)
 
       // NB: We don't use `through` as we want to ensure the `Open` from
       //     `appendChannel` happens even if the src process never emits.
@@ -215,14 +215,14 @@ object WriteFile {
                             : Process[M, FileSystemError] = {
 
       def cleanupTmp(tmp: AFile)(t: Throwable): Process[M, Nothing] =
-        Process.eval_(MF.delete(tmp)).causedBy(Cause.Error(t))
+        Process.eval_(ensureAbsent(tmp)).causedBy(Cause.Error(t))
 
       MF.tempFile(dst).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src)
           .map(some).append(Process.emit(none))
           .take(1)
           .flatMap(_.cata(
-            werr => MF.delete(tmp).as(werr).liftM[Process],
+            werr => ensureAbsent(tmp).as(werr).liftM[Process],
             Process.eval_(MF.moveFile(tmp, dst, sem))))
           .onFailure(cleanupTmp(tmp))
       }
@@ -234,10 +234,12 @@ object WriteFile {
       for {
         tmp  <- MF.tempFile(dst)
         errs <- appendThese(tmp, data)
-        _    <- if (errs.isEmpty) MF.moveFile(tmp, dst, sem)
-                else MF.delete(tmp)
+        _    <- if (errs.isEmpty) MF.moveFile(tmp, dst, sem) else ensureAbsent(tmp)
       } yield errs
     }
+
+    private def ensureAbsent(f: AFile)(implicit MF: ManageFile.Ops[S]): M[Unit] =
+      MF.delete(f).run.void.liftM[FileSystemErrT]
   }
 
   object Ops {

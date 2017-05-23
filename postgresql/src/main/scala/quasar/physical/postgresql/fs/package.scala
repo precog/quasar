@@ -71,7 +71,8 @@ package object fs {
       case (FsType, uri) =>
         interp(uri).map { run =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
-            run compose interpretFileSystem(
+            run compose interpretAnalyticalFileSystem(
+              Empty.analyze[Free[Eff, ?]],
               queryfile.interpret,
               readfile.interpret,
               writefile.interpret,

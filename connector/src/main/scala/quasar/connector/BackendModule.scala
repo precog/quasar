@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz._
+import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
@@ -32,8 +32,7 @@ import quasar.qscript._
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz._
-import scalaz.syntax.all._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait BackendModule {
@@ -41,109 +40,106 @@ trait BackendModule {
 
   type ErrorMessages = NonEmptyList[String]
 
+  type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
+  type Configured[A]        = ConfiguredT[M, A]
+  type Backend[A]           = FileSystemErrT[PhaseResultT[Configured, ?], A]
+
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
   private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
   private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
   private final implicit def _MonadM = MonadM
-  private final implicit def _MonadFsErrM = MonadFsErrM
-  private final implicit def _PhaseResultTellM = PhaseResultTellM
-  private final implicit def _PhaseResultListenM = PhaseResultListenM
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  final def definition = FileSystemDef fromPF {
-    case (Type, uri) =>
-      parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
-        compile(cfg) map {
-          case (int, close) =>
-            val runK = λ[Kleisli[M, Config, ?] ~> M](_.run(cfg))
-            FileSystemDef.DefinitionResult(int compose runK compose fsInterpreter, close)
+  final val definition: FileSystemDef[Task] =
+    FileSystemDef fromPF {
+      case (Type, uri) =>
+        parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
+          compile(cfg) map {
+            case (int, close) =>
+              val runK = λ[Configured ~> M](_.run(cfg))
+              val interpreter: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
+              FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
+          }
         }
-      }
-  }
+    }
 
-  private final def fsInterpreter: FileSystem ~> Kleisli[M, Config, ?] = {
-    type Back[A] = Kleisli[M, Config, A]
+  private final def analyzeInterpreter: Analyze ~> Configured =
+    Empty.analyze[Configured]
 
-    def attemptListen[A](back: Back[A]) =
-      MonadListen_[Back, PhaseResults].listen(back.attempt).map(_.swap)
-
-    val qfInter: QueryFile ~> Back = λ[QueryFile ~> Back] {
+  private final def fsInterpreter: FileSystem ~> Configured = {
+    val qfInter: QueryFile ~> Configured = λ[QueryFile ~> Configured] {
       case QueryFile.ExecutePlan(lp, out) =>
-        val back = lpToRepr(lp).map(_.repr).flatMap(r => QueryFileModule.executePlan(r, out))
-        attemptListen(back)
+        lpToRepr(lp).flatMap(p => QueryFileModule.executePlan(p.repr, out)).run.run
 
       case QueryFile.EvaluatePlan(lp) =>
-        val back = lpToRepr(lp).map(_.repr).flatMap(r => QueryFileModule.evaluatePlan(r))
-        attemptListen(back)
+        lpToRepr(lp).flatMap(p => QueryFileModule.evaluatePlan(p.repr)).run.run
 
-      case QueryFile.More(h) => QueryFileModule.more(h).attempt
+      case QueryFile.More(h) => QueryFileModule.more(h).run.value
       case QueryFile.Close(h) => QueryFileModule.close(h)
 
       case QueryFile.Explain(lp) =>
-        val back = for {
+        (for {
           pp <- lpToRepr(lp)
           explanation <- QueryFileModule.explain(pp.repr)
-        } yield ExecutionPlan(Type, explanation, pp.paths)
+        } yield ExecutionPlan(Type, explanation, pp.paths)).run.run
 
-        attemptListen(back)
-
-      case QueryFile.ListContents(dir) => QueryFileModule.listContents(dir).attempt
+      case QueryFile.ListContents(dir) => QueryFileModule.listContents(dir).run.value
       case QueryFile.FileExists(file) => QueryFileModule.fileExists(file)
     }
 
-    val rfInter: ReadFile ~> Back = λ[ReadFile ~> Back] {
+    val rfInter: ReadFile ~> Configured = λ[ReadFile ~> Configured] {
       case ReadFile.Open(file, offset, limit) =>
-        ReadFileModule.open(file, offset, limit).attempt
+        ReadFileModule.open(file, offset, limit).run.value
 
-      case ReadFile.Read(h) => ReadFileModule.read(h).attempt
+      case ReadFile.Read(h) => ReadFileModule.read(h).run.value
       case ReadFile.Close(h) => ReadFileModule.close(h)
     }
 
-    val wfInter: WriteFile ~> Back = λ[WriteFile ~> Back] {
-      case WriteFile.Open(file) => WriteFileModule.open(file).attempt
+    val wfInter: WriteFile ~> Configured = λ[WriteFile ~> Configured] {
+      case WriteFile.Open(file) => WriteFileModule.open(file).run.value
       case WriteFile.Write(h, chunk) => WriteFileModule.write(h, chunk)
       case WriteFile.Close(h) => WriteFileModule.close(h)
     }
 
-    val mfInter: ManageFile ~> Back = λ[ManageFile ~> Back] {
+    val mfInter: ManageFile ~> Configured = λ[ManageFile ~> Configured] {
       case ManageFile.Move(scenario, semantics) =>
-        ManageFileModule.move(scenario, semantics).attempt
+        ManageFileModule.move(scenario, semantics).run.value
 
-      case ManageFile.Delete(path) => ManageFileModule.delete(path).attempt
-      case ManageFile.TempFile(near) => ManageFileModule.tempFile(near).attempt
+      case ManageFile.Delete(path) => ManageFileModule.delete(path).run.value
+      case ManageFile.TempFile(near) => ManageFileModule.tempFile(near).run.value
     }
 
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
   final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      lp: T[LogicalPlan]): Kleisli[M, Config, PhysicalPlan[Repr]] = {
+      lp: T[LogicalPlan]): Backend[PhysicalPlan[Repr]] = {
 
     type QSR[A] = QScriptRead[T, A]
 
-    def logPhase(pr: PhaseResult): M[Unit] =
-      MonadTell_[M, PhaseResults].tell(Vector(pr))
+    def logPhase(pr: PhaseResult): Backend[Unit] =
+      MonadTell_[Backend, PhaseResults].tell(Vector(pr))
 
-    val lc: DiscoverPath.ListContents[Kleisli[M, Config, ?]] =
+    val lc: DiscoverPath.ListContents[Backend] =
       QueryFileModule.listContents(_)
 
     val R = new Rewrite[T]
     val O = new Optimize[T]
 
     for {
-      qs <- QueryFile.convertToQScriptRead[T, Kleisli[M, Config, ?], QSR](lc)(lp)
-      shifted <- Unirewrite[T, QS[T], Kleisli[M, Config, ?]](R, lc).apply(qs)
+      qs <- QueryFile.convertToQScriptRead[T, Backend, QSR](lc)(lp)
+      shifted <- Unirewrite[T, QS[T], Backend](R, lc).apply(qs)
 
-      _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted)).liftM[Kleisli[?[_], Config, ?]]
+      _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
 
       optimized =
         shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
 
-      _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized)).liftM[Kleisli[?[_], Config, ?]]
+      _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
 
-      main <- plan(optimized).liftM[Kleisli[?[_], Config, ?]]
+      main <- plan(optimized)
       inputs = optimized.cata(ExtractPath[QSM[T, ?], APath].extractPath[DList])
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
   }
@@ -162,9 +158,6 @@ trait BackendModule {
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
   def MonadM: Monad[M]
-  def MonadFsErrM: MonadFsErr[M]
-  def PhaseResultTellM: PhaseResultTell[M]
-  def PhaseResultListenM: PhaseResultListen[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
@@ -175,19 +168,18 @@ trait BackendModule {
 
   val Type: FileSystemType
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): M[Repr]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr]
 
   trait QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): Kleisli[M, Config, AFile]
-    def evaluatePlan(repr: Repr): Kleisli[M, Config, ResultHandle]
-    def more(h: ResultHandle): Kleisli[M, Config, Vector[Data]]
-    def close(h: ResultHandle): Kleisli[M, Config, Unit]
-    def explain(repr: Repr): Kleisli[M, Config, String]
-    def listContents(dir: ADir): Kleisli[M, Config, Set[PathSegment]]
-    def fileExists(file: AFile): Kleisli[M, Config, Boolean]
+    def executePlan(repr: Repr, out: AFile): Backend[AFile]
+    def evaluatePlan(repr: Repr): Backend[ResultHandle]
+    def more(h: ResultHandle): Backend[Vector[Data]]
+    def close(h: ResultHandle): Configured[Unit]
+    def explain(repr: Repr): Backend[String]
+    def listContents(dir: ADir): Backend[Set[PathSegment]]
+    def fileExists(file: AFile): Configured[Boolean]
   }
 
   def QueryFileModule: QueryFileModule
@@ -195,9 +187,9 @@ trait BackendModule {
   trait ReadFileModule {
     import ReadFile._
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): Kleisli[M, Config, ReadHandle]
-    def read(h: ReadHandle): Kleisli[M, Config, Vector[Data]]
-    def close(h: ReadHandle): Kleisli[M, Config, Unit]
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle]
+    def read(h: ReadHandle): Backend[Vector[Data]]
+    def close(h: ReadHandle): Configured[Unit]
   }
 
   def ReadFileModule: ReadFileModule
@@ -205,9 +197,9 @@ trait BackendModule {
   trait WriteFileModule {
     import WriteFile._
 
-    def open(file: AFile): Kleisli[M, Config, WriteHandle]
-    def write(h: WriteHandle, chunk: Vector[Data]): Kleisli[M, Config, Vector[FileSystemError]]
-    def close(h: WriteHandle): Kleisli[M, Config, Unit]
+    def open(file: AFile): Backend[WriteHandle]
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]]
+    def close(h: WriteHandle): Configured[Unit]
   }
 
   def WriteFileModule: WriteFileModule
@@ -215,9 +207,9 @@ trait BackendModule {
   trait ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Kleisli[M, Config, Unit]
-    def delete(path: APath): Kleisli[M, Config, Unit]
-    def tempFile(near: APath): Kleisli[M, Config, AFile]
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit]
+    def delete(path: APath): Backend[Unit]
+    def tempFile(near: APath): Backend[AFile]
   }
 
   def ManageFileModule: ManageFileModule

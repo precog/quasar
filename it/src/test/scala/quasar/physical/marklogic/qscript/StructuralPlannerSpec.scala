@@ -19,7 +19,6 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.{Data, DataArbitrary}, DataArbitrary.dataShrink
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
@@ -32,6 +31,7 @@ import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import org.specs2.scalacheck.Parameters
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
+import xml.name._
 
 abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   implicit SP: StructuralPlanner[F, FMT], DP: Planner[F, FMT, Const[Data, ?]]
@@ -173,12 +173,12 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     "leftShift" >> todo
 
     "objectDelete" >> {
-      val somekey = asMapKey(QName.local(NCName("somekey")))
+      val somekey = asMapKey(QName.unprefixed(NCName("somekey")))
 
       "removes existing key from an object" >> prop { values: NonEmptyList[Data] =>
         val entries = keyed(values).toList
         val obj = Data._obj(ListMap(entries: _*))
-        val k0  = QName.local(NCName("k0"))
+        val k0  = QName.unprefixed(NCName("k0"))
         evalF((lit(obj) |@| asMapKey(k0))(SP.objectDelete).join) must resultIn(
           Data._obj(ListMap(entries.tail: _*)))
       }
@@ -194,7 +194,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     }
 
     "objectInsert" >> {
-      val newKey  = QName.local(NCName("NEW_KEY"))
+      val newKey  = QName.unprefixed(NCName("NEW_KEY"))
 
       "adds new assoc to non-empty object" >> prop { (y: Data, ys: NonEmptyList[Data]) =>
         val entries = keyed(ys)
@@ -212,10 +212,10 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     }
 
     "objectLookup" >> {
-      val notKey = asMapKey(QName.local(NCName("NOT_EXIST")))
+      val notKey = asMapKey(QName.unprefixed(NCName("NOT_EXIST")))
 
       "returns value for existing key" >> prop { values: NonEmptyList[Data] =>
-        val k0  = asMapKey(QName.local(NCName("k0")))
+        val k0  = asMapKey(QName.unprefixed(NCName("k0")))
         val obj = Data._obj(ListMap(keyed(values).toList: _*))
 
         evalF((lit(obj) |@| k0)(SP.objectLookup).join) must resultIn(values.head)

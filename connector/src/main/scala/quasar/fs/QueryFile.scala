@@ -283,6 +283,12 @@ object QueryFile {
       }
     }
 
+    def first(plan: Fix[LogicalPlan]): ExecM[Option[Data]] = for {
+      h  <- unsafe.eval(plan)
+      vs <- hoistToExec(unsafe.more(h))
+      _  <- toExec(unsafe.close(h))
+    } yield vs.headOption
+
     /** Returns a stream of data resulting from evaluating the given
       * `LogicalPlan`.
       *

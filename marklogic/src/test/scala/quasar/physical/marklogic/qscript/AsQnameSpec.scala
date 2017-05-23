@@ -18,8 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.fp.numeric.Natural
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xml.Arbitraries._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -27,6 +25,8 @@ import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.scalacheck.numeric._
 import org.scalacheck.Arbitrary
 import scalaz._
+import xml.name._
+import xml.name.scalacheck.arbitrary._
 
 final class AsQNameSpec extends quasar.Qspec {
   type Result[A] = MarkLogicPlannerError \/ A
@@ -40,7 +40,7 @@ final class AsQNameSpec extends quasar.Qspec {
     }
 
     "prefix numerals" >> prop { n: Natural =>
-      asQName[Result](n.value.toString) must_= \/.right(QName.local(NCName(Refined.unsafeApply(s"_$n"))))
+      asQName[Result](n.value.toString) must_= \/.right(QName.unprefixed(NCName(Refined.unsafeApply(s"_$n"))))
     }
 
     "error when string is not a QName" >> {

@@ -1,6 +1,7 @@
 {
     "name": "wildcard with projection and synthetic field",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

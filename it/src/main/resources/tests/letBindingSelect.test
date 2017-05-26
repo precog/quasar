@@ -2,6 +2,7 @@
     "name": "handle select in form of let",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

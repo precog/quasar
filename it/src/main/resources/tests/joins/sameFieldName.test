@@ -2,6 +2,7 @@
     "name": "select over fields with same name",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",

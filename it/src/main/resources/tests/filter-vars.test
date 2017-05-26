@@ -2,6 +2,7 @@
     "name": "filter with pipeline using variables in query",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

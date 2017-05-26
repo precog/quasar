@@ -71,6 +71,7 @@ env:
     - CONNECTOR=mongodb_2_6
     - CONNECTOR=marklogic_xml
     - CONNECTOR=marklogic_json
+    - CONNECTOR=mimir
     - CONNECTOR=couchbase
     - CONNECTOR=mongodb_3_0
     - CONNECTOR=mongodb_read_only

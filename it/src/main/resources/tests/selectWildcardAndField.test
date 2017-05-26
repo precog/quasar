@@ -1,6 +1,7 @@
 {
     "name": "select wildcard and field",
     "backends": {
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

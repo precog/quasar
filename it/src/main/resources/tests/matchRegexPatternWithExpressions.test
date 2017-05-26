@@ -2,6 +2,7 @@
   "name": "regexes in expressions and filter, with fields and constants providing the pattern",
 
   "backends": {
+        "mimir": "skip",
     "mongodb_read_only": "pending",
     "mongodb_q_3_2":  "pending",
     "postgresql":        "pending"

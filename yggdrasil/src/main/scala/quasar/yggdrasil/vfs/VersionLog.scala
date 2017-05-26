@@ -144,7 +144,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   def addVersion(entry: VersionEntry): IO[Unit] = allVersions.find(_ == entry) map { _ =>
     IO(())
   } getOrElse {
-    log.debug("Adding version entry: " + entry)
+    log.debug(s"Adding version entry $entry for base directory $baseDir.")
     IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) flatMap { _ =>
       IO(allVersions = allVersions :+ entry)
     }

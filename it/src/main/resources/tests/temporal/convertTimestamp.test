@@ -2,6 +2,7 @@
   "name": "convert epoch milliseconds value to timestamp",
 
   "backends": {
+        "mimir": "skip",
     "mongodb_q_3_2": "pending",
     "postgresql":    "pending"
   },

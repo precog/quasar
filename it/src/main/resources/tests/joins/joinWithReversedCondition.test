@@ -2,6 +2,7 @@
     "name": "join with reversed condition and complex condition expression",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",

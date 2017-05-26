@@ -1,6 +1,7 @@
 {
     "name": "unify flattened fields",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "postgresql": "pending"
     },

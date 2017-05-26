@@ -2,6 +2,7 @@
     "name": "perform inner equi-join",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

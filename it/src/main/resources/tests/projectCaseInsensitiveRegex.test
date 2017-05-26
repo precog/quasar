@@ -1,6 +1,7 @@
 {
     "name": "case-insensitive regex in projections",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

@@ -4,6 +4,7 @@
     "NB": "Couchbase is skipped due to largish generated N1QL that leads to a timeout.",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "postgresql": "pending"
     },

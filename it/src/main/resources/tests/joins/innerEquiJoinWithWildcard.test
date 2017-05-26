@@ -2,6 +2,7 @@
     "name": "perform inner equi-join with wildcard",
 
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",

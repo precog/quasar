@@ -2,6 +2,7 @@
     "name": "unshift aggregation",
     "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "pending",
         "postgresql": "pending"
     },

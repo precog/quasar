@@ -1,6 +1,7 @@
 {
     "name": "long city names in Colorado",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending"

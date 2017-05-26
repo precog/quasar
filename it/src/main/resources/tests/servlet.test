@@ -1,6 +1,7 @@
 {
     "name": "servlets with and without init-param (pending #465, #467)",
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

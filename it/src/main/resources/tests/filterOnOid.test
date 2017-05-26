@@ -2,6 +2,7 @@
     "name": "match on ObjectId",
     "NB": "This test isn’t really valid. This is neither the correct way to represent an OID (there is no generic way to do so), nor should the `_id` field even be in the data. But this is a reasonable placeholder until we actually expose the correct way to do more or less what this intends.",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "days.data",

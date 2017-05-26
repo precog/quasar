@@ -1,6 +1,7 @@
 {
     "name": "concat BETWEEN with other fields",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "smallZips.data",

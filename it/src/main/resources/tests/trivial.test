@@ -2,6 +2,7 @@
   "name": "simple read",
 
   "backends": {
+    "mimir": "skip",
     "postgresql": "pending"
   },
 
@@ -13,7 +14,7 @@
 
   "ignoredFields": ["_id"],
 
-  "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+  "ignoreFieldOrder": [ "couchbase", "marklogic_json", "mimir" ],
 
   "expected": [
     { "city": "NEW SALEM", "loc": [-72.306241 , 42.514643], "pop": 456, "state": "MA" }

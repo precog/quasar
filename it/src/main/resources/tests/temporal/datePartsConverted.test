@@ -2,6 +2,7 @@
   "name": "date_part with (virtually) all selectors, after conversion to JS (see #1238)",
 
   "backends": {
+        "mimir": "skip",
       "mongodb_read_only": "pending",
       "postgresql":        "pending",
       "marklogic_xml":     "pending"

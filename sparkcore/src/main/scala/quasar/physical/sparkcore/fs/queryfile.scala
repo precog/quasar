@@ -142,7 +142,7 @@ object queryfile {
   }
 
   // TODO for Q4.2016  - unify it with ReadFile
-  final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
+  final case class RddState(rdd: RDD[(Data, Long)], pointer: Int)
 
   private def evaluatePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
       s0: Task :<: S,
@@ -158,7 +158,7 @@ object queryfile {
       rdd <- EitherT(read.asks { sc =>
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
       }.join)
-      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
+      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
 
     open
@@ -176,21 +176,14 @@ object queryfile {
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
     kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
-      case RddState(None, _) =>
-        Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-      case RddState(Some(rdd), p) =>
+     case RddState(rdd, p) =>
         for {
           collected <- lift(Task.delay {
             rdd
               .filter(d => d._2 >= p && d._2 < (p + step))
               .map(_._1).collect.toVector
           }).into[S].liftM[FileSystemErrT]
-          rddState <- lift(Task.delay {
-            if(collected.isEmpty) {
-              ignore(rdd.unpersist())
-              RddState(None, 0)
-            } else RddState(Some(rdd), p + step)
-          }).into[S].liftM[FileSystemErrT]
+          rddState <- lift(Task.delay { RddState(rdd, p + step)}).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
         } yield collected
     }.run
@@ -198,7 +191,15 @@ object queryfile {
 
   private def close[S[_]](h: ResultHandle)(implicit
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
-  ): Free[S, Unit] = kvs.delete(h)
+  ): Free[S, Unit] = for {
+    maybeRddState <- kvs.get(h).run
+    _ <- kvs.delete(h)
+  } yield {
+    maybeRddState.foreach {
+      case RddState(rdd, _) =>
+        ignore(rdd.unpersist())
+    }
+  }
 
   private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
     s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)

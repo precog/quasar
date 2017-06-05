@@ -78,17 +78,3 @@ trait QuasarSpecification extends AnyRef
     def skippedOnUserEnv(m: String): Result = if (isIsolatedEnv) AsResult(t) else Skipped(m)
   }
 }
-
-/** Trait that tags all examples in a spec for exclusive execution. Examples
-  * will be executed sequentially and parallel execution will be disabled.
-  *
-  * Use this when you have tests that muck with global state.
-  */
-trait ExclusiveQuasarSpecification extends QuasarSpecification {
-  import org.specs2.specification.core.Fragments
-  import org.specs2.specification.dsl.FragmentsDsl._
-
-  sequential
-  override def map(fs: => Fragments) =
-    section(exclusiveTestTag) ^ super.map(fs) ^ section(exclusiveTestTag)
-}

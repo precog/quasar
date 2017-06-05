@@ -18,14 +18,6 @@ import slamdata.SbtSlamData.transferPublishAndTagResources
 
 val BothScopes = "test->test;compile->compile"
 
-// Exclusive execution settings
-lazy val ExclusiveTests = config("exclusive") extend Test
-
-val ExclusiveTest = Tags.Tag("exclusive-test")
-
-def exclusiveTasks(tasks: Scoped*) =
-  tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
-
 lazy val buildSettings = commonBuildSettings ++ Seq(
   organization := "org.quasar-analytics",
   initialize := {
@@ -54,10 +46,6 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
     Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see wartremover/wartremover#263
-  // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
-  // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
 
   console := { (console in Test).value }) // console alias test:console
 
@@ -82,9 +70,6 @@ concurrentRestrictions in Global := {
   else
     (concurrentRestrictions in Global).value
 }
-
-// Tasks tagged with `ExclusiveTest` should be run exclusively.
-concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = commonPublishSettings ++ Seq(
   organizationName := "SlamData Inc.",
@@ -149,7 +134,6 @@ lazy val githubReleaseSettings =
 
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
 lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
 lazy val root = project.in(file("."))
@@ -202,9 +186,8 @@ lazy val foundation = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv),
     buildInfoPackage := "quasar.build",
-    exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
@@ -438,15 +421,11 @@ lazy val web = project
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
-  .configs(ExclusiveTests)
   .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
   .enablePlugins(AutomateHeaderPlugin)
 

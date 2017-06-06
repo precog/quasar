@@ -408,6 +408,8 @@ object CoreMap extends Serializable {
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Timestamp(a), Data.Date(b)) =>
+      fromDateTime(a)(zdt => Data.Bool(zdt.toLocalDate().compareTo(b) < 0))
     case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
@@ -425,6 +427,8 @@ object CoreMap extends Serializable {
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Timestamp(a), Data.Date(b)) =>
+      fromDateTime(a)(zdt => Data.Bool(zdt.toLocalDate().compareTo(b) <= 0))
     case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
@@ -442,6 +446,8 @@ object CoreMap extends Serializable {
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Timestamp(a), Data.Date(b)) =>
+      fromDateTime(a)(zdt => Data.Bool(zdt.toLocalDate().compareTo(b) > 0))
     case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
@@ -459,6 +465,8 @@ object CoreMap extends Serializable {
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Timestamp(a), Data.Date(b)) =>
+      fromDateTime(a)(zdt => Data.Bool(zdt.toLocalDate().compareTo(b) >= 0))
     case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {

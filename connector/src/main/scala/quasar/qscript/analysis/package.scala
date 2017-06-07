@@ -66,6 +66,23 @@ package object analysis {
     (lp >>= (dataFromLp)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0) 
   }
 
+  def pathCard[S[_]](
+    implicit queryOps: QueryFile.Ops[S]
+  ): APath => FileSystemErrT[Free[S, ?], Int] = (apath: APath) => {
+    val afile: Option[AFile] = peel(apath).map {
+      case (dirPath, \/-(fileName)) => dirPath </> file1(fileName)
+      case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
+    }
+
+    val lpFromPath: FPath => Fix[LogicalPlan] = (p: FPath) => Fix(agg.Count(Fix(LPRead(p))))
+    val lp: FileSystemErrT[Free[S, ?], Fix[LogicalPlan]] =
+      EitherT.fromDisjunction(afile.map(lpFromPath) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
+    val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
+      (lp: Fix[LogicalPlan]) => queryOps.first(lp).mapT(_.value)
+    
+    (lp >>= (dataFromLp)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0) 
+  }
+
   object Cardinality {
 
     implicit def read[A]: Cardinality[Const[Read[A], ?]] =

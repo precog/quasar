@@ -20,7 +20,9 @@ import slamdata.Predef._
 import quasar.{BackendCapability, Data}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, Free => _,  _}
+import InMemory.InMemState
+import quasar.fp.free._
 import quasar.std.StdLib
 
 import matryoshka.data.Fix
@@ -130,6 +132,27 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
 
         runT(fs.testInterpM)(p)
           .runEither must beRight(containTheSameElementsAs(preDelete.tail))
+      }
+
+      "reading first should close file even if throws exception" >> {
+        val ops = QueryFile.Ops[QueryFile]
+        val src = queryPrefix </> file("foo.txt")
+        val inmemS = InMemory.InMemState.fromFiles(Map(src -> Vector(Data.Str("data"))))
+
+        val lp: Fix[LP] = lpr.read(src)
+        val first: Free[QueryFile, FileSystemError \/ Option[Data]] = ops.first(lp).run.value
+
+        val failingInterpreter: QueryFile ~> Free[QueryFile, ?] = new (QueryFile ~> Free[QueryFile, ?]) {
+          def apply[A](from: QueryFile[A]) = from match {
+            case QueryFile.More(h) => Free.point(\/.left(readFailed("data", "reason")))
+            case other => Free.liftF(other)
+          }
+        }
+        val interpreter: QueryFile ~> State[InMemState, ?] =
+          failingInterpreter andThen foldMapNT(InMemory.queryFile)
+        val (state, result) = first.foldMap(interpreter).run(inmemS)
+        state.resultMap.size must_== 0
+        result must_== readFailed("data", "reason").left[Option[Data]]
       }
 
       step(deleteForQuery(fs.setupInterpM).runVoid)

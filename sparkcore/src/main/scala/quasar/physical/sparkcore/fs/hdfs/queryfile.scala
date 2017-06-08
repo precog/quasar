@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
+import quasar.fs._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
@@ -105,10 +106,16 @@ class queryfile(fileSystem: Task[FileSystem]) {
 
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit s0: Task :<: S): Input[S] =
-    Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+  def input[S[_]](implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Input[S] =
+    Input[S](readfile.createSparkContext _, fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 }
 
 object queryfile {
-  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = new queryfile(fileSystem).input
+  def input[S[_]](fileSystem: Task[FileSystem])(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Input[S] = new queryfile(fileSystem).input
 }

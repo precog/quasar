@@ -24,7 +24,7 @@ import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
 
 import java.io.PrintWriter
 
@@ -39,7 +39,7 @@ package object local {
 
   val FsType = FileSystemType("spark-local")
 
-  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkConf, ?], A]
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
   type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
@@ -70,11 +70,11 @@ package object local {
     FailOps: Failure.Ops[PhysicalError, S]
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
-    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift((TaskRef(0L) |@|
+    lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, PrintWriter])
-      ) {
+    ) {
       (genState, rddStates, sparkCursors, printWriters) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
@@ -82,15 +82,10 @@ package object local {
       (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
-      (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+      (Read.constant[Task, SparkConf](sparkConf) andThen injectNT[Task, S])
 
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), ().point[Free[S, ?]])
     }).into[S]
-
-    lift(coreGenSc(sparkConf).run).into[S] >>= (_.fold(
-      msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
-      definition(_)
-    ))
   }
 
   def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =

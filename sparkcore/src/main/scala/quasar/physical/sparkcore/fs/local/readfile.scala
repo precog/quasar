@@ -19,37 +19,51 @@ package quasar.physical.sparkcore.fs.local
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
-import quasar.effect.Read
+import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.ski._
+import quasar.fs._
 import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
+import quasar.physical.sparkcore.fs.{genSc => coreGenSc}
 
 import java.io.File
 
-import org.apache.spark.SparkContext
+import org.apache.spark._
 import org.apache.spark.rdd._
 import pathy.Path.posixCodec
-import scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)
-    (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
-    read.asks { sc =>
+  def createSparkContext[S[_]](sparkConf: SparkConf)(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S,
+    FailOps: Failure.Ops[PhysicalError, S]
+  ): Free[S, SparkContext] =
+    lift(coreGenSc(sparkConf).run).into[S] >>= (_.fold(
+      msg => FailOps.fail[SparkContext](UnhandledFSError(new RuntimeException(msg))),
+      _.point[Free[S, ?]]
+    ))
+  
+  def rddFrom[S[_]](sc: SparkContext, f: AFile, offset: Offset, maybeLimit: Limit)
+    (implicit
+      s0: Task :<: S
+    ): Free[S, RDD[(Data, Long)]] =
+    lift(Task.delay {
       sc.textFile(posixCodec.unsafePrintPath(f))
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
         .zipWithIndex()
         .filter {
-        case (value, index) =>
-          maybeLimit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
-      }
-    }
+          case (value, index) =>
+            maybeLimit.fold(
+              index >= offset.value
+            ) (
+              limit => index >= offset.value && index < limit.value + offset.value
+            )
+        }
+    }).into[S]
 
   def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] =
     injectFT[Task, S].apply(Task.delay(new File(posixCodec.unsafePrintPath(f)).exists()))
@@ -58,7 +72,15 @@ object readfile {
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f,off, lim) => rddFrom(f, off, lim), f => fileExists(f), readChunkSize _)
+  def input[S[_]](implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Input[S] =
+    Input[S](
+      conf => createSparkContext(conf),
+      (sc: SparkContext, f: AFile, off: Offset, lim: Limit) => rddFrom(sc, f, off, lim),
+      f => fileExists(f),
+      readChunkSize _
+    )
 
 }

@@ -169,15 +169,13 @@ object IOUtils extends Logging {
     props
   }
 
-  def overwriteFile(s: String, f: File): IO[PrecogUnit] = writeToFile(s, f, append = false)
-  def writeToFile(s: String, f: File, append: Boolean): IO[PrecogUnit] = IO {
-    Files.write(f.toPath, s.getBytes);
-    PrecogUnit
+  def overwriteFile(s: String, f: File): IO[Unit] = writeToFile(s, f, append = false)
+  def writeToFile(s: String, f: File, append: Boolean): IO[Unit] = IO {
+    Files.write(f.toPath, s.getBytes)
   }
 
-  def writeSeqToFile[A](s0: Seq[A], f: File): IO[PrecogUnit] = IO {
+  def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
     Files.write(f.toPath, s0.map("" + _: CharSequence).asJava, Utf8Charset)
-    PrecogUnit
   }
 
   /** Performs a safe write to the file. Returns true
@@ -191,15 +189,17 @@ object IOUtils extends Logging {
     }
   }
 
-  def makeDirectory(dir: File): IO[PrecogUnit] = IO {
-    if (dir.isDirectory || dir.mkdirs) PrecogUnit
-    else throw new IOException("Failed to create directory " + dir)
+  def makeDirectory(dir: File): IO[Unit] = IO {
+    if (dir.isDirectory || dir.mkdirs)
+      ()
+    else
+      throw new IOException("Failed to create directory " + dir)
   }
 
-  def recursiveDelete(files: Seq[File]): IO[PrecogUnit] = {
+  def recursiveDelete(files: Seq[File]): IO[Unit] = {
     files.toList match {
-      case Nil      => IO(PrecogUnit)
-      case hd :: tl => recursiveDelete(hd) flatMap (_ => recursiveDelete(tl))
+      case Nil      => IO(())
+      case hd :: tl => recursiveDelete(hd).flatMap(_ => recursiveDelete(tl))
     }
   }
 
@@ -211,22 +211,22 @@ object IOUtils extends Logging {
   }
 
   /** Deletes `file`, recursively if it is a directory. */
-  def recursiveDelete(file: File): IO[PrecogUnit] = {
-    def del(): PrecogUnit = { file.delete() ; PrecogUnit }
+  def recursiveDelete(file: File): IO[Unit] = {
+    def del(): Unit = { file.delete(); () }
 
     if (!file.isDirectory) IO(del())
     else listFiles(file) flatMap {
       case Array() => IO(del())
-      case xs      => recursiveDelete(xs) map (_ => del())
+      case xs      => recursiveDelete(xs).map(_ => del())
     }
   }
 
   /** Recursively deletes empty directories, stopping at the first
     * non-empty dir.
     */
-  def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[PrecogUnit] = {
+  def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[Unit] = {
     if (startDir == upTo) {
-      IO { log.debug("Stopping recursive clean at root: " + upTo); PrecogUnit }
+      IO { log.debug("Stopping recursive clean at root: " + upTo) }
     } else if (startDir.isDirectory) {
       if (Option(startDir.list).exists(_.length == 0)) {
         IO {
@@ -235,10 +235,10 @@ object IOUtils extends Logging {
           recursiveDeleteEmptyDirs(startDir.getParentFile, upTo)
         }
       } else {
-        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir); PrecogUnit }
+        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir) }
       }
     } else {
-      IO { log.warn("Asked to clean a non-directory: " + startDir); PrecogUnit }
+      IO { log.warn("Asked to clean a non-directory: " + startDir) }
     }
   }
 
@@ -246,9 +246,8 @@ object IOUtils extends Logging {
     Files.createTempDirectory(prefix).toFile
   }
 
-  def copyFile(src: File, dest: File): IO[PrecogUnit] = IO {
+  def copyFile(src: File, dest: File): IO[Unit] = IO {
     Files.copy(src.toPath, dest.toPath)
-    PrecogUnit
   }
 }
 
@@ -373,22 +372,6 @@ object NumericComparisons {
   @inline def order(a: LocalDateTime, b: LocalDateTime): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 }
-
-
-/**
-  * This class exists as a replacement for Unit in Unit-returning functions.
-  * The main issue with unit is that the coercion of any return value to
-  * unit means that we were sometimes masking mis-returns of functions. In
-  * particular, functions returning IO[Unit] would happily coerce IO => Unit,
-  * which essentially discarded the inner IO work.
-  */
-sealed trait PrecogUnit
-
-object PrecogUnit extends PrecogUnit {
-  implicit def liftUnit(unit: Unit): PrecogUnit = this
-}
-
-
 
 object RawBitSet {
   final def create(size: Int): RawBitSet = new Array[Int]((size >>> 5) + 1)

@@ -27,7 +27,7 @@ import quasar.blueeyes.json.serialization.Versioned._
 //import quasar.blueeyes.json.serialization.JodaSerializationImplicits._
 
 //import quasar.precog.common.serialization._
-import quasar.precog.util.{FileLock, IOUtils, PrecogUnit}
+import quasar.precog.util.{FileLock, IOUtils}
 
 import org.slf4s.Logging
 
@@ -65,10 +65,10 @@ object VersionLog {
           for {
             jv <- JParser.parseFromFile(currentFile).leftMap(ioError).disjunction
             version <- jv match {
-              case JString(`unsetSentinel`) => 
+              case JString(`unsetSentinel`) =>
                 \/.left(NotFound("No current data for the path %s exists; it has been archived.".format(dir)))
-              case other => 
-                other.validated[VersionEntry].disjunction leftMap { err => Corrupt(err.message) } 
+              case other =>
+                other.validated[VersionEntry].disjunction leftMap { err => Corrupt(err.message) }
             }
           } yield version
         } else {
@@ -87,7 +87,7 @@ object VersionLog {
   def open(baseDir: File): IO[Validation[Error, VersionLog]] = IO {
     if (!baseDir.isDirectory) {
       if (!baseDir.mkdirs) throw new IllegalStateException(baseDir + " cannot be created as a directory.")
-    } 
+    }
 
     val logFiles = new LogFiles(baseDir)
     import logFiles._
@@ -148,28 +148,27 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
     workLock.release
   }
 
-  def addVersion(entry: VersionEntry): IO[PrecogUnit] = allVersions.find(_ == entry) map { _ =>
-    IO(PrecogUnit): IO[PrecogUnit]
+  def addVersion(entry: VersionEntry): IO[Unit] = allVersions.find(_ == entry) map { _ =>
+    IO(())
   } getOrElse {
     log.debug("Adding version entry: " + entry)
-    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) map { _ =>
-      allVersions = allVersions :+ entry
-      PrecogUnit
-    }: IO[PrecogUnit]
+    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) flatMap { _ =>
+      IO(allVersions = allVersions :+ entry)
+    }
   }
 
-  def completeVersion(version: UUID): IO[PrecogUnit] = {
+  def completeVersion(version: UUID): IO[Unit] = {
     if (allVersions.exists(_.id == version)) {
       !isCompleted(version) whenM {
         log.debug("Completing version " + version)
         IOUtils.writeToFile(version.serialize.renderCompact + "\n", completedFile, false)
-      } map { _ => PrecogUnit }
+      } map { _ => () }
     } else {
       IO.throwIO(new IllegalStateException("Cannot make nonexistent version %s current" format version))
     }
   }
 
-  def setHead(newHead: UUID): IO[PrecogUnit] = {
+  def setHead(newHead: UUID): IO[Unit] = {
     currentVersion.exists(_.id == newHead) unlessM {
       allVersions.find(_.id == newHead) traverse { entry =>
         log.debug("Setting HEAD to " + newHead)
@@ -179,7 +178,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
       } flatMap {
         _.isEmpty.whenM(IO.throwIO(new IllegalStateException("Attempt to set head to nonexistent version %s" format newHead)))
       }
-    } map { _ => PrecogUnit }
+    } map { _ => () }
   }
 
   def clearHead = IOUtils.writeToFile(unsetSentinelJV, headFile, false).map { _ =>

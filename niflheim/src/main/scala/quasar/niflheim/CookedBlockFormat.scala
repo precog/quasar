@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.util.PrecogUnit
 
 import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
@@ -42,7 +41,7 @@ case class CookedBlockMetadata(blockid: Long, length: Int, segments: Array[(Segm
 
 trait CookedBlockFormat {
   def readCookedBlock(channel: ReadableByteChannel): Validation[IOException, CookedBlockMetadata]
-  def writeCookedBlock(channel: WritableByteChannel, metadata: CookedBlockMetadata): Validation[IOException, PrecogUnit]
+  def writeCookedBlock(channel: WritableByteChannel, metadata: CookedBlockMetadata): Validation[IOException, Unit]
 }
 
 object V1CookedBlockFormat extends CookedBlockFormat with Chunker {
@@ -70,7 +69,6 @@ object V1CookedBlockFormat extends CookedBlockFormat with Chunker {
       buffer.putLong(metadata.blockid)
       buffer.putInt(metadata.length)
       SegmentsCodec.writeUnsafe(metadata.segments, buffer)
-      PrecogUnit
     }
   }
 
@@ -95,7 +93,7 @@ case class VersionedCookedBlockFormat(formats: Map[Int, CookedBlockFormat]) exte
     for {
       _ <- writeVersion(channel)
       _ <- format.writeCookedBlock(channel, segments)
-    } yield PrecogUnit
+    } yield ()
   }
 
   def readCookedBlock(channel: ReadableByteChannel): Validation[IOException, CookedBlockMetadata] = {

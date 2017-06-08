@@ -16,14 +16,12 @@
 
 package quasar.niflheim
 
-import quasar.precog.util.PrecogUnit
-
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 import scalaz.Validation
 
 trait SegmentWriter {
-  def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, PrecogUnit]
+  def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit]
 }
 
 trait SegmentReader {

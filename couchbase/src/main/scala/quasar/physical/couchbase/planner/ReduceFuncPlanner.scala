@@ -29,6 +29,7 @@ final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad] extends Planne
 
   def plan: AlgebraM[M, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[M])
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val planʹ: Transform[T[N1QL], ReduceFunc, N1QL] = {
     case RF.Arbitrary(a1)      => Min(a1)
     case RF.Avg(a1)            => Avg(a1)

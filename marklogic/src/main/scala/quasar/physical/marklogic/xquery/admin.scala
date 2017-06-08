@@ -29,4 +29,7 @@ object admin {
 
   def databaseGetDirectoryCreation[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery): F[XQuery] =
     m("database-get-directory-creation") apply (config, databaseId)
+
+  def databaseGetUriLexicon[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery): F[XQuery] =
+    m("database-get-uri-lexicon") apply (config, databaseId)
 }

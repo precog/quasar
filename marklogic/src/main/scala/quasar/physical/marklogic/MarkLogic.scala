@@ -18,7 +18,7 @@ package quasar
 package physical.marklogic
 
 import slamdata.Predef._
-import quasar.common.PhaseResultT
+import quasar.common._
 import quasar.connector._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -56,7 +56,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     with ManagedWriteFile[AFile]
     with ManagedReadFile[XccDataStream] {
 
-  type QS[T[_[_]]] = queryfile.MLQScriptCP[T]
+  type QS[T[_[_]]] = MLQScriptCP[T]
   type Repr        = MainModule
   type Config      = MLBackendConfig
   type M[A]        = MLFS[A]
@@ -119,11 +119,19 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   }
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] =
-    config[Backend] >>= { cfg =>
-      MainModule.fromWritten(
-        qs.cataM(cfg.planner[T].plan) strengthL Version.`1.0-ml`
-      ).liftQB
-    }
+    for {
+      cfg    <- config[Backend]
+      main   <- MainModule.fromWritten(
+                  qs.cataM(cfg.planner[T].plan) strengthL Version.`1.0-ml`
+                ).liftQB
+      pp     <- fs.ops.prettyPrint[Backend](main.queryBody)
+      xqyLog =  MainModule.queryBody.modify(pp getOrElse _)(main).render
+      _      <- PhaseResultTell[Backend].tell(Vector(PhaseResult.detail("XQuery", xqyLog)))
+      // NB: While it would be nice to use the pretty printed body in the module
+      //     returned for nicer error messages, we cannot as xdmp:pretty-print has
+      //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
+      //     causing them to be malformed.
+    } yield main
 
   object ManagedQueryFileModule extends ManagedQueryFileModule {
     def executePlan(repr: Repr, out: AFile): Backend[AFile] = {
@@ -216,7 +224,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
 
   object ManagedWriteFileModule extends ManagedWriteFileModule {
     def writeCursor(file: AFile): Backend[AFile] =
-      ops.ensureLineage[Backend](fileParent(file)) as file
+      file.point[Backend]
 
     def writeChunk(f: AFile, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
       config[Configured] >>= { cfg =>

@@ -33,6 +33,7 @@ object queryfile {
     implicit
     S0: ConnectionIO :<: S
   ): QueryFile ~> Free[S, ?] = new (QueryFile ~> Free[S, ?]) {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def apply[A](qf: QueryFile[A]) = qf match {
       case ExecutePlan(lp, out) => ???
       case EvaluatePlan(lp) => ???

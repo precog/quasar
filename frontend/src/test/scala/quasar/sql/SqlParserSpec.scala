@@ -17,16 +17,16 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.RenderTree.ops._
+import quasar.specs2.QuasarMatchers._
 import quasar.sql.fixpoint._
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._
 import pathy.Path._
-import quasar.specs2.QuasarMatchers._
+import scalaz._, Scalaz._
 
 class SQLParserSpec extends quasar.Qspec {
   import SqlQueries._, ExprArbitrary._
@@ -670,9 +670,17 @@ class SQLParserSpec extends quasar.Qspec {
       parsed must beRightDisjOrDiff(node)
     }.set(minTestsOk = 1000) // one cannot test a parser too much
 
-    "round-trip quoted variable names through the pretty-printer" >> {
-      val q = "select * from :`A.results`"
-      (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
+    "round-trip through the pretty-printer" >> {
+      def roundTrip(q: String) = {
+        val ast = parse(q)
+        ((ast ∘ ((pprint[Fix[Sql]] _) >>> (Query(_)))) >>= (parse(_))) must_=== ast
+      }
+
+      "quoted variable names" in
+        roundTrip("select * from :`A.results`")
+
+      "field deref with string literal" in
+        roundTrip("select a.`_id` from z as a")
     }
   }
 }

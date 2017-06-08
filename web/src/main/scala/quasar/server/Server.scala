@@ -122,10 +122,11 @@ object Server {
   ): Task[Unit] = {
     def start(tx: StatefulTransactor, port: Int, qCfg: QuasarConfig) =
       for {
-        _         <- verifySchema(Schema.schema, tx.transactor)
-        msCtx     <- metastoreCtx(tx)
-        (srvc, _) =  builder(qCfg, port, msCtx)
-        _         <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
+        _     <- verifySchema(Schema.schema, tx.transactor)
+        msCtx <- metastoreCtx(tx)
+        (srvc, sdown) = builder(qCfg, port, msCtx)
+        _     <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
+        _     <- sdown.liftM[MainErrT]
       } yield ()
 
     logErrors(for {

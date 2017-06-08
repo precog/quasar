@@ -90,7 +90,7 @@ object NIHDB {
 trait NIHDB {
   def authorities: Authorities
 
-  def insert(batch: Seq[NIHDB.Batch]): IO[PrecogUnit]
+  def insert(batch: Seq[NIHDB.Batch]): IO[Unit]
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult]
 
@@ -116,9 +116,9 @@ trait NIHDB {
    */
   def count(paths0: Option[Set[CPath]]): Future[Long]
 
-  def quiesce: IO[PrecogUnit]
+  def quiesce: IO[Unit]
 
-  def close(implicit actorSystem: ActorSystem): Future[PrecogUnit]
+  def close(implicit actorSystem: ActorSystem): Future[Unit]
 }
 
 private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: Timeout, val authorities: Authorities)(implicit executor: ExecutionContext) extends NIHDB with GracefulStopSupport with AskSupport {
@@ -126,7 +126,7 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
 
   val projectionId = NIHDB.projectionIdGen.getAndIncrement
 
-  def insert(batch: Seq[NIHDB.Batch]): IO[PrecogUnit] =
+  def insert(batch: Seq[NIHDB.Batch]): IO[Unit] =
     IO(actor ! Insert(batch, false))
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult] =
@@ -153,11 +153,11 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   def count(paths0: Option[Set[CPath]]): Future[Long] =
     getSnapshot().map(_.count(paths0))
 
-  def quiesce: IO[PrecogUnit] =
+  def quiesce: IO[Unit] =
     IO(actor ! Quiesce)
 
-  def close(implicit actorSystem: ActorSystem): Future[PrecogUnit] =
-    gracefulStop(actor, timeout.duration) map { _ => PrecogUnit }
+  def close(implicit actorSystem: ActorSystem): Future[Unit] =
+    gracefulStop(actor, timeout.duration).map(_ => ())
 }
 
 private[niflheim] object NIHDBActor extends Logging {

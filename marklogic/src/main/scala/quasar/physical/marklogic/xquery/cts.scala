@@ -26,14 +26,23 @@ import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object cts {
+  def andQuery(queries: XQuery): XQuery =
+    XQuery(s"cts:and-query($queries)")
+
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
     XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")
 
   def documentQuery(uri: XQuery, uris: XQuery*): XQuery =
     XQuery(s"cts:document-query${mkSeq(uri +: uris)}")
 
-  def indexOrder(index: XQuery, options: XQuery*) =
+  def indexOrder(index: XQuery, options: XQuery*): XQuery =
     XQuery(s"cts:index-order($index, ${mkSeq(options)})")
+
+  def notQuery(query: XQuery): XQuery =
+    XQuery(s"cts:not-query($query)")
+
+  def orQuery(queries: XQuery): XQuery =
+    XQuery(s"cts:or-query($queries)")
 
   def search(
     expr: XQuery,
@@ -44,8 +53,12 @@ object cts {
   ): XQuery =
     XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
-  def uriMatch(pattern: XQuery, options: IList[XQuery]): XQuery =
-    XQuery(s"cts:uri-match($pattern, ${mkSeq(options)})")
+  def uriMatch(
+    pattern: XQuery,
+    options: IList[XQuery] = IList.empty,
+    query: Option[XQuery] = None
+  ): XQuery =
+    XQuery(s"cts:uri-match($pattern, ${mkSeq(options)}${asArg(query)})")
 
   val uriReference: XQuery =
     XQuery("cts:uri-reference()")

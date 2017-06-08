@@ -115,6 +115,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
         _.fold(ι, κ(Reshape.emptyDoc[EX])),
         Reshape.emptyDoc[EX])
 
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def set0(cur: Reshape[EX], els: List[BsonField.Name]): Reshape[EX] = els match {
       case Nil => ??? // TODO: Refactor els to be NonEmptyList
       case (x @ BsonField.Name(_)) :: Nil => Reshape(cur.value + (x -> newv))

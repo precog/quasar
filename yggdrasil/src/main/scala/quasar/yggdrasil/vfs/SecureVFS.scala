@@ -192,10 +192,10 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
         result   <- cacheAt match {
           case Some(cachePath) =>
             for {
-              _ <- EitherT[M, EvaluationError, PrecogUnit] {
+              _ <- EitherT[M, EvaluationError, Unit] {
                 permissionsFinder.writePermissions(ctx.apiKey, cachePath, clock.instant()) map { pset =>
                   /// here, we just terminate the computation early if no write permissions are available.
-                  if (pset.nonEmpty) \/.right(PrecogUnit)
+                  if (pset.nonEmpty) \/.right(())
                   else \/.left(
                     storageError(PermissionsError("API key %s has no permission to write to the caching path %s.".format(ctx.apiKey, cachePath)))
                   )

@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil.scheduling
+package quasar.mimir
 
-import quasar.precog.common.Path
-import quasar.precog.common.security._
-
-import java.util.UUID
-
-import scalaz.EitherT
-
-trait ScheduleStorage[M[+_]] {
-  def addTask(task: ScheduledTask): EitherT[M, String, ScheduledTask]
-
-  def deleteTask(id: UUID): EitherT[M, String, Option[ScheduledTask]]
-
-  def reportRun(report: ScheduledRunReport): M[Unit]
-
-  def statusFor(id: UUID, lastLimit: Option[Int]): M[Option[(ScheduledTask, Seq[ScheduledRunReport])]]
-
-  def listTasks: M[Seq[ScheduledTask]]
+// TODO move to quasar.contrib.fp
+// TODO if this turns out to be useful, macro-ize a DepFn1.apply implementation
+trait DepFn1[In <: AnyRef with Singleton, Out[_ <: In]] {
+  def apply(In: In): Out[In.type]
 }

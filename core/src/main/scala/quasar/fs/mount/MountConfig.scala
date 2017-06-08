@@ -85,7 +85,7 @@ object MountConfig {
     case ("view", uri) =>
       viewCfgFromUri(uri).map(i => viewConfig(i))
     case ("module", stmts) =>
-      sql.fixParser.parseWithParser(stmts, sql.fixParser.statements).bimap(
+      sql.fixParser.parseModule(stmts).bimap(
         _.message,
         moduleConfig(_))
     case (typ, uri) =>

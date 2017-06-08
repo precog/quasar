@@ -32,7 +32,7 @@ import matryoshka._
   */
 private[marklogic] sealed abstract class MLBackendConfig {
   type M[A] = MLFSQ[A]
-  type QSM[T[_[_]], A] = queryfile.MLQScriptCP[T]#M[A]
+  type QSM[T[_[_]], A] = MLQScriptCP[T]#M[A]
 
   type FMT
 

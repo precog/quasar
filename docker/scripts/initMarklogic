@@ -1,10 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 MLHOSTNAME=$1
-PORT=$2
-ML_ADMIN_PREFIX="http://${MLHOSTNAME}:${PORT}/admin/v1"
+ADMIN_PORT=$2
+MANAGE_PORT=$3
+URILEX_DISABLED=$4
+ML_ADMIN_PREFIX="http://${MLHOSTNAME}:${ADMIN_PORT}/admin/v1"
+ML_MANAGE_PREFIX="http://${MLHOSTNAME}:${MANAGE_PORT}/manage/v2"
 ML_USERNAME="marklogic"
 ML_PASSWORD="marklogic"
 
@@ -16,3 +19,12 @@ sleep 20
 
 # Add the admin user
 curl -d "admin-username=${ML_USERNAME}&admin-password=${ML_PASSWORD}" ${ML_ADMIN_PREFIX}/instance-admin
+
+# Disable the URI lexicon, if requested.
+if [[ "${URILEX_DISABLED:-enabled}" == "disabled" ]]; then
+  sleep 20
+
+  curl -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: application/json" \
+    -d '{"uri-lexicon" : false}' \
+    ${ML_MANAGE_PREFIX}/databases/Documents/properties
+fi

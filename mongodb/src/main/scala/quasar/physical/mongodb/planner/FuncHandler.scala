@@ -49,7 +49,19 @@ object FuncHandler {
           case Add(a1, a2)           => $add(a1, a2)
           case Multiply(a1, a2)      => $multiply(a1, a2)
           case Subtract(a1, a2)      => $subtract(a1, a2)
-          case Divide(a1, a2)        => $divide(a1, a2)
+          case Divide(a1, a2)        =>
+            // TODO
+            // 1) remove workaround for appropriate Mongo version driver
+            // once this Mongo issue is fixed: https://jira.mongodb.org/browse/SERVER-29410
+            // 2) it would be nice if we would be able to generate simply $divide(a1, a2) for
+            // $literal's != 0 (but the type of a2 is generic so we can't check it here)
+            $cond($eq(a2, $literal(Bson.Int32(0))),
+              $cond($eq(a1, $literal(Bson.Int32(0))),
+                $literal(Bson.Dec(Double.NaN)),
+                $cond($gt(a1, $literal(Bson.Int32(0))),
+                  $literal(Bson.Dec(Double.PositiveInfinity)),
+                  $literal(Bson.Dec(Double.NegativeInfinity)))),
+              $divide(a1, a2))
           case Modulo(a1, a2)        => $mod(a1, a2)
           case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
 

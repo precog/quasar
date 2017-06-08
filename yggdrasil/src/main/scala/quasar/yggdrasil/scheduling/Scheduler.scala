@@ -24,7 +24,6 @@ import akka.util.Timeout
 
 import quasar.precog.common.Path
 import quasar.precog.common.security._
-import quasar.precog.util.PrecogUnit
 import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
@@ -39,7 +38,7 @@ trait Scheduler[M[+_]] {
 
   def addTask(repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]): EitherT[M, String, UUID]
 
-  def deleteTask(id: UUID): EitherT[M, String, PrecogUnit]
+  def deleteTask(id: UUID): EitherT[M, String, Unit]
 
   def statusForTask(id: UUID, limit: Option[Int]): EitherT[M, String, Option[(ScheduledTask, Seq[ScheduledRunReport])]]
 }
@@ -53,7 +52,7 @@ class ActorScheduler(scheduler: ActorRef, timeout: Timeout) extends Scheduler[Fu
   }
 
   def deleteTask(id: UUID) = EitherT {
-    (scheduler ? DeleteTask(id)).mapTo[String \/ PrecogUnit]
+    (scheduler ? DeleteTask(id)).mapTo[String \/ Unit]
   }
 
   def statusForTask(id: UUID, limit: Option[Int]) = EitherT {

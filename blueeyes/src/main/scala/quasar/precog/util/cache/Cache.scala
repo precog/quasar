@@ -66,7 +66,7 @@ object Cache {
     def apply(builder: CacheBuilder[K, V]) = builder.expireAfterWrite(timeout.length, timeout.unit)
   }
 
-  case class OnRemoval[K, V](onRemove: (K, V, RemovalCause) => PrecogUnit) extends CacheOption[K, V] {
+  case class OnRemoval[K, V](onRemove: (K, V, RemovalCause) => Unit) extends CacheOption[K, V] {
     def apply(builder: CacheBuilder[K, V]) = builder.removalListener(new RemovalListener[K, V] {
       def onRemoval(notification: RemovalNotification[K, V]) = onRemove(notification.getKey, notification.getValue, notification.getCause)
     })

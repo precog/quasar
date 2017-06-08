@@ -267,7 +267,7 @@ If a root directory path is specified, all operations and queries within the mou
 
 Prerequisites
 - MarkLogic 8.0+
-- Documents must to be organized under directories to be found by Quasar.
+- The URI lexicon must be enabled.
 - Namespaces used in queries must be defined on the server.
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
@@ -283,8 +283,8 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
 - XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
   - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
   - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
-  - Element attributes are serialized to an object at the `_attributes` key.
-  - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
+  - Element attributes are serialized to an object at the `_xml.attributes` key.
+  - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
 
 ### View mounts
 
@@ -494,6 +494,7 @@ Returns a Json object with the following shape:
   "inputs": [<filePath>, ...],
   "physicalPlan": "Description of physical plan"
 }
+```
 
 where `inputs` is a field containing a list of files that are referenced by the query.
 where `physicalPlan` is a string description of the physical plan that would be executed by this query. `null` if no physical plan is required in order to execute this query. A query may not need a physical plan in order to be executed if the query is "constant", that is that no data needs to be read from a backend.

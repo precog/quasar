@@ -17,7 +17,8 @@
 package quasar.fs.mount.module
 
 import slamdata.Predef._
-import quasar.{Data, SemanticError, Variables}
+import quasar.{Data, SemanticError, Variables, addOffsetLimit}
+import quasar.fp.numeric._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.frontend.logicalplan.LogicalPlan
@@ -83,7 +84,7 @@ object Module {
   }
 
 
-  final case class InvokeModuleFunction(path: AFile, args: Map[String, String])
+  final case class InvokeModuleFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive])
     extends Module[Error \/ ResultHandle]
 
   final case class More(handle: ResultHandle)
@@ -100,8 +101,8 @@ object Module {
 
     type M[A] = ErrorT[FreeS, A]
 
-    def invokeFunction(path: AFile, args: Map[String, String]): M[ResultHandle] =
-      EitherT(lift(InvokeModuleFunction(path, args)))
+    def invokeFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): M[ResultHandle] =
+      EitherT(lift(InvokeModuleFunction(path, args, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.
       *
@@ -124,7 +125,7 @@ object Module {
     type M[A] = unsafe.M[A]
 
     /** Returns mounts located at a path having the given prefix. */
-    def invokeFunction(path: AFile, args: Map[String, String]): Process[M, Data] = {
+    def invokeFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
       def closeHandle(h: ResultHandle): Process[M, Nothing] =
         Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT])
@@ -137,7 +138,7 @@ object Module {
             Process.emitAll(data) ++ readUntilEmpty(h)
         }
 
-      Process.bracket(unsafe.invokeFunction(path, args))(closeHandle)(readUntilEmpty)
+      Process.bracket(unsafe.invokeFunction(path, args, offset, limit))(closeHandle)(readUntilEmpty)
     }
   }
 
@@ -154,7 +155,7 @@ object Module {
 
     def default[S[_]](implicit query: QueryFile.Unsafe[S], mount: Mounting.Ops[S]): Module ~> Free[S, ?] =
       λ[Module ~> Free[S, ?]] {
-        case InvokeModuleFunction(file, args) =>
+        case InvokeModuleFunction(file, args, offset, limit) =>
           val notFoundError = fsError(pathErr(pathNotFound(file)))
           // case insensitive args
           val iArgs = args.map{ case (key, value) => (CIName(key), value)}
@@ -171,7 +172,8 @@ object Module {
             sqlBlob      =  Blob(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, List(funcDec))
             logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sqlBlob, Variables.empty, basePath = fileParent(file))
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
-            handle       <- EitherT(query.eval(logicalPlan).run.value).leftMap(fsError(_))
+            withOffLim   =  addOffsetLimit(logicalPlan, offset, limit)
+            handle       <- EitherT(query.eval(withOffLim).run.value).leftMap(fsError(_))
           } yield ResultHandle(handle.run)).run
         case More(handle)  => query.more(QueryFile.ResultHandle(handle.run)).run
         case Close(handle) => query.close(QueryFile.ResultHandle(handle.run))

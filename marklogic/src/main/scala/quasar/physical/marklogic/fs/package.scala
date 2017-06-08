@@ -31,6 +31,7 @@ import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefErrT}
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc.{AsContent, provideSession}
 import quasar.physical.marklogic.xquery.PrologT
+import quasar.{qscript => qs}
 
 import java.net.URI
 
@@ -71,6 +72,13 @@ package object fs {
 
   type MLFS[A]  = PrologT[Free[MarkLogicFs, ?], A]
   type MLFSQ[A] = MarkLogicPlanErrT[MLFS, A]
+
+  type MLQScriptCP[T[_[_]]] = (
+    qs.QScriptCore[T, ?]           :\:
+    qs.ThetaJoin[T, ?]             :\:
+    Const[qs.ShiftedRead[ADir], ?] :/:
+    Const[qs.Read[AFile], ?]
+  )
 
   val FsType = FileSystemType("marklogic")
 

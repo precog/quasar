@@ -16,8 +16,6 @@
 
 package quasar.niflheim
 
-import quasar.precog.util.PrecogUnit
-
 import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
@@ -27,7 +25,7 @@ trait Versioning {
   def magic: Short
   def version: Short
 
-  def writeVersion(channel: WritableByteChannel): Validation[IOException, PrecogUnit] = {
+  def writeVersion(channel: WritableByteChannel): Validation[IOException, Unit] = {
     val buffer = ByteBuffer.allocate(4)
     buffer.putShort(magic)
     buffer.putShort(version)
@@ -37,7 +35,7 @@ trait Versioning {
       while (buffer.remaining() > 0) {
         channel.write(buffer)
       }
-      Success(PrecogUnit)
+      Success(())
     } catch { case ioe: IOException =>
       Failure(ioe)
     }

@@ -63,7 +63,7 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
       val mdFile = File.createTempFile("block-%08x".format(reader.id), ".cookedmeta", root)
       val channel = new FileOutputStream(mdFile).getChannel()
       try {
-        blockFormat.writeCookedBlock(channel, metadata).toValidationNel.map { _ : PrecogUnit =>
+        blockFormat.writeCookedBlock(channel, metadata).toValidationNel.map { _ : Unit =>
           new File(mdFile.getName)
         }
       } finally {

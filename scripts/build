@@ -49,7 +49,7 @@ if [[ $CONNECTOR == "mongodb_2_6" ]]; then
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders test exclusive:test
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders "testOnly -- xonly" "exclusive:testOnly -- xonly"
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation.
@@ -87,7 +87,7 @@ elif [[ $CONNECTOR == "mongodb_3_0" ]]; then
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE "testOnly -- xonly" "exclusive:testOnly -- xonly" $COVERAGE_REPORT
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
@@ -103,5 +103,5 @@ else
 
   # Not the first job in Travis; run only integration tests (no sense
   # re-doing work that isn't affected by the available backends)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION it/test it/exclusive:test
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION "it/testOnly -- xonly" "it/exclusive:testOnly -- xonly"
 fi

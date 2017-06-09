@@ -100,6 +100,7 @@ package object fs {
 
     mlerr match {
       case InvalidQName(s)  => unsupportedPlan(s)
+      case InvalidUri(s)    => unsupportedPlan(s)
       case Unimplemented(f) => unsupportedPlan(f)
 
       case Unreachable(d)   =>

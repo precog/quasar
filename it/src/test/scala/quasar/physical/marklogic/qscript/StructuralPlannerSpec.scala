@@ -34,7 +34,7 @@ import scalaz.scalacheck.ScalazArbitrary._
 import xml.name._
 
 abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
-  implicit SP: StructuralPlanner[F, FMT], DP: Planner[F, FMT, Const[Data, ?]]
+  implicit SP: StructuralPlanner[F, FMT]
 ) extends XQuerySpec {
 
   def toM: F ~> M
@@ -80,7 +80,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
 
   val emptyArr: Data              = Data._arr(List())
   val emptyObj: Data              = Data._obj(ListMap())
-  val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
+  val lit     : Data => F[XQuery] = DataPlanner[F, FMT](_)
 
   def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
     xs.zipWithIndex map { case (v, i) => s"k$i" -> v }

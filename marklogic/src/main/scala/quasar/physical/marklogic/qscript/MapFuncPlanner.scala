@@ -22,22 +22,22 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs.{Search => QSearch, _}
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
-import scalaz.{Const, Monad, Show}
+import scalaz.{Monad, Show}
 import scalaz.syntax.monad._
 
-private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
-  implicit
-  DP: Planner[F, FMT, Const[Data, ?]],
-  SP: StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, MapFunc[T, ?]] {
+private[qscript] final class MapFuncPlanner[
+  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+  FMT,
+  T[_[_]]: RecursiveT
+](implicit SP: StructuralPlanner[F, FMT]) {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
   val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
-    case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
+    case Constant(ejson)              => DataPlanner[F, FMT](ejson.cata(Data.fromEJson))
     case Undefined()                  => emptySeq.point[F]
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
@@ -115,7 +115,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => SP.null_ map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
     case ToString(x)                  => SP.asString(x)
-    case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
+    case QSearch(in, ptn, ci)         => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
 
     // structural

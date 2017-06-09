@@ -19,6 +19,8 @@ package quasar.physical.marklogic.cts
 import slamdata.Predef._
 
 import quasar.{NonTerminal, Terminal, RenderTree}, RenderTree.ops._
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.scalaz._
 import matryoshka._
@@ -142,12 +144,63 @@ object Query extends QueryInstances {
 
   // TODO: Options
   final case class Word[V, A](words: IList[String]) extends Query[V, A]
+
+  def toXQuery[V]: Algebra[Query[V, ?], XQuery] = {
+    case AndNot(positive, negative) =>
+      ???
+    case And(queries) =>
+      cts.andQuery(mkSeq(queries))
+    case Collection(uris) =>
+      ???
+    case Directory(uris, depth) =>
+      cts.directoryQuery(mkSeq(uris map (_.value.xs)), MatchDepth toXQuery depth)
+    case DocumentFragment(query) =>
+      ???
+    case Document(uris) =>
+      cts.documentQuery(mkSeq(uris map (_.value.xs)))
+    case ElementAttributeRange(elements, attributes, op, values) =>
+      ???
+    case ElementAttributeValue(elements, attributes, values) =>
+      ???
+    case ElementAttributeWord(elements, attributes, words) =>
+      ???
+    case Element(elements, query) =>
+      ???
+    case ElementRange(elements, op, values) =>
+      ???
+    case ElementValue(elements, values) =>
+      ???
+    case ElementWord(elements, words) =>
+      ???
+    case False() =>
+      ???
+    case JsonPropertyRange(properties, op, values) =>
+      ???
+    case JsonPropertyScope(properties, query) =>
+      ???
+    case JsonPropertyValue(properties, values) =>
+      ???
+    case JsonPropertyWord(properties, words) =>
+      ???
+    case Near(queries, weight) =>
+      ???
+    case Not(query) =>
+      cts.notQuery(query)
+    case Or(queries) =>
+      cts.orQuery(mkSeq(queries))
+    case PathRange(paths, op, values) =>
+      ???
+    case True() =>
+      ???
+    case Word(words) =>
+      ???
+  }
 }
 
 sealed abstract class QueryInstances {
   import Query._
 
-  def traverse[V]: Traverse[Query[V, ?]] =
+  implicit def traverse[V]: Traverse[Query[V, ?]] =
     new Traverse[Query[V, ?]] {
       def traverseImpl[F[_]: Applicative, A, B](qa: Query[V, A])(f: A => F[B]): F[Query[V, B]] = {
         def F(qb: Query[V, B]): F[Query[V, B]] = qb.point[F]
@@ -242,7 +295,7 @@ sealed abstract class QueryInstances {
       }
     }
 
-    def renderTree[V: RenderTree]: Delay[RenderTree, Query[V, ?]] =
+    implicit def renderTree[V: RenderTree]: Delay[RenderTree, Query[V, ?]] =
       new Delay[RenderTree, Query[V, ?]] {
         def apply[A](rt: RenderTree[A]) = {
           implicit val rta = rt

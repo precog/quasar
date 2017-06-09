@@ -29,11 +29,11 @@ object cts {
   def andQuery(queries: XQuery): XQuery =
     XQuery(s"cts:and-query($queries)")
 
-  def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
-    XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")
+  def directoryQuery(uris: XQuery, depth: XQuery): XQuery =
+    XQuery(s"cts:directory-query($uris, $depth)")
 
-  def documentQuery(uri: XQuery, uris: XQuery*): XQuery =
-    XQuery(s"cts:document-query${mkSeq(uri +: uris)}")
+  def documentQuery(uris: XQuery): XQuery =
+    XQuery(s"cts:document-query($uris)")
 
   def indexOrder(index: XQuery, options: XQuery*): XQuery =
     XQuery(s"cts:index-order($index, ${mkSeq(options)})")

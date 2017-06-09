@@ -19,14 +19,19 @@ package quasar.physical.marklogic
 import slamdata.Predef._
 import quasar.RenderTree
 
+import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.scalaz._
 import eu.timepit.refined.string.{Uri => RUri}
+import monocle.Prism
 import scalaz.std.string._
 import _root_.xml.name.QName
 
 package object cts {
   type Uri = String Refined RUri
+
+  val Uri: Prism[String, Uri] =
+    Prism[String, Uri](refineV[RUri](_).right.toOption)(_.value)
 
   implicit def uriRenderTree: RenderTree[Uri] =
     RenderTree.fromShow[Uri]("Uri")

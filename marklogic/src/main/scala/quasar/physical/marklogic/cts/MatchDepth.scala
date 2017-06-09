@@ -18,6 +18,8 @@ package quasar.physical.marklogic.cts
 
 import slamdata.Predef._
 import quasar.RenderTree
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz.{Enum, Show}
 import scalaz.syntax.order._
@@ -28,6 +30,11 @@ sealed abstract class MatchDepth
 object MatchDepth {
   final case object Children extends MatchDepth
   final case object Descendants extends MatchDepth
+
+  val toXQuery: MatchDepth => XQuery = {
+    case Children    => "1".xs
+    case Descendants => "infinity".xs
+  }
 
   implicit val enum: Enum[MatchDepth] =
     new Enum[MatchDepth] {

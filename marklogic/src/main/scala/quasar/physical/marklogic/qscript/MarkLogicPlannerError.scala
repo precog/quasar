@@ -28,12 +28,17 @@ sealed abstract class MarkLogicPlannerError
 
 object MarkLogicPlannerError {
   final case class InvalidQName(strLit: String) extends MarkLogicPlannerError
+  final case class InvalidUri(uri: String) extends MarkLogicPlannerError
   final case class Unimplemented(function: String) extends MarkLogicPlannerError
   final case class Unreachable(desc: String) extends MarkLogicPlannerError
 
   val invalidQName = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidQName(s) => s
   } (InvalidQName)
+
+  val invalidUri = Prism.partial[MarkLogicPlannerError, String] {
+    case InvalidUri(s) => s
+  } (InvalidUri)
 
   val unimplemented = Prism.partial[MarkLogicPlannerError, String] {
     case Unimplemented(f) => f
@@ -44,12 +49,19 @@ object MarkLogicPlannerError {
   } (Unreachable)
 
   implicit val equal: Equal[MarkLogicPlannerError] =
-    Equal.equalBy(e => (invalidQName.getOption(e), unimplemented.getOption(e), unreachable.getOption(e)))
+    Equal.equalBy(e => (
+      invalidQName.getOption(e),
+      invalidUri.getOption(e),
+      unimplemented.getOption(e),
+      unreachable.getOption(e)))
 
   implicit val show: Show[MarkLogicPlannerError] =
     Show.shows {
       case InvalidQName(s) =>
         s"'$s' is not a valid XML QName."
+
+      case InvalidUri(s) =>
+        s"'$s' is not a valid URI."
 
       case Unimplemented(f) =>
         s"The function $f is not implemented."

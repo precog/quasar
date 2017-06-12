@@ -50,6 +50,7 @@ package object main {
   type MainTask[A]       = MainErrT[Task, A]
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
+  // TODO this requires passing TaskRef to connectors, not Task of TaskRef
   val refSc: Task[TaskRef[Option[(Int, SparkContext)]]] = TaskRef[Option[(Int, SparkContext)]](none)
 
   /** The physical filesystems currently supported. */

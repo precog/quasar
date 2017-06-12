@@ -31,6 +31,7 @@ import quasar.physical._, couchbase.Couchbase
 
 import scala.util.control.NonFatal
 
+import org.apache.spark._
 import doobie.imports.Transactor
 import eu.timepit.refined.auto._
 import monocle.Lens
@@ -49,6 +50,9 @@ package object main {
   type MainTask[A]       = MainErrT[Task, A]
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
+  // TODO this requires passing TaskRef to connectors, not Task of TaskRef
+  val refSc: Task[TaskRef[Option[(Int, SparkContext)]]] = TaskRef[Option[(Int, SparkContext)]](none)
+
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
     Couchbase.definition translate injectFT[Task, PhysFsEff],
@@ -61,8 +65,8 @@ package object main {
     postgresql.fs.definition[PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.hdfs.definition[PhysFsEff],
-    sparkcore.fs.local.definition[PhysFsEff]
+    sparkcore.fs.hdfs.definition[PhysFsEff](refSc),
+    sparkcore.fs.local.definition[PhysFsEff](refSc)
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

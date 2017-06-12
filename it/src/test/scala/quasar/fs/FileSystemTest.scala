@@ -32,6 +32,7 @@ import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
 
+import org.apache.spark._
 import eu.timepit.refined.auto._
 import monocle.Optional
 import monocle.function.Index
@@ -142,6 +143,8 @@ object FileSystemTest {
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
   }
 
+  val refSc: Task[TaskRef[Option[(Int, SparkContext)]]] = TaskRef[Option[(Int, SparkContext)]](none)
+
   def externalFsUT = {
     val marklogicDef =
       MarkLogic(10000L, 10000L).definition translate injectFT[Task, filesystems.Eff]
@@ -152,8 +155,8 @@ object FileSystemTest {
       fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
       fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)  orElse
       fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
-      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
-      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
+      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition(refSc))  orElse
+      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition(refSc))
     }
   }
 

@@ -24,7 +24,7 @@ import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, FileSystemDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc, stopSc => coreStopSc}
 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
 
 
@@ -129,14 +129,14 @@ package object hdfs {
     OptionT(jar).toRight("Could not fetch sparkcore.jar")
   }
 
-  def sparkFsDef[S[_]](implicit
+  def sparkFsDef[S[_]](refSc: Task[TaskRef[SparkContextHolder]])(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S,
     FailOps: Failure.Ops[PhysicalError, S]
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
     val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
-      sc <- coreGenSc(sparkConf)
+      sc <- coreGenSc(refSc).apply(sparkConf)
       jar <- sparkCoreJar
     } yield {
       sc.addJar(posixCodec.printPath(jar))
@@ -158,7 +158,7 @@ package object hdfs {
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), lift(coreStopSc(refSc)).into[S])
     }).into[S]
 
     genScWithJar >>= (_.fold(
@@ -192,8 +192,8 @@ package object hdfs {
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))
   }
 
-  def definition[S[_]](implicit
+  def definition[S[_]](refSc: Task[TaskRef[SparkContextHolder]])(implicit
     S0: Task :<: S, S1: PhysErr :<: S
   ) =
-    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
+    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef(refSc), fsInterpret)
 }

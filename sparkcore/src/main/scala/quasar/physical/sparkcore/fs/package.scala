@@ -45,17 +45,60 @@ package object fs {
 
   type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
 
-
   final case class SparkFSDef[HS[_], S[_]](run: Free[HS, ?] ~> Free[S, ?], close: Free[S, Unit])
 
-  val genSc: SparkConf => EitherT[Task, String, SparkContext] = (sparkConf: SparkConf) =>
-  EitherT(Task.delay {
-    val sc = new SparkContext(sparkConf)
-    sc.right[String]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      "You can not mount second Spark based connector... Please unmount existing one first.".left[SparkContext].point[Task]
-  })
+  implicit val SparkConfEq: Eq[SparkConf] = new Eq[SparkConf] {
+    def equal(conf1: SparkConf, conf2: SparkConf): Boolean =
+      conf1.get("master") === conf2.get("master")
+  }
+
+  type SparkContextHolder = Option[(Int, SparkContext)]
+  
+  def genSc(
+    fetchRefSc: Task[TaskRef[SparkContextHolder]]
+  ): SparkConf => EitherT[Task, String, SparkContext] = {
+    def handleScExists(
+      refSc: TaskRef[SparkContextHolder],
+      conf: SparkConf
+    ): ((Int, SparkContext)) => Task[String \/ SparkContext] = {
+      case (counter, sc) =>
+        if(sc.getConf === conf) {
+          refSc.write((counter + 1, sc).some).as(sc.right[String])
+        } else
+            ("You can not mount second Spark based connector to a different Spark cluster." +
+              "Please unmount existing one first.").left[SparkContext].point[Task]
+    }
+     
+    def handleScDoesNotExist(
+      refSc: TaskRef[SparkContextHolder],
+      conf: SparkConf
+    ): Task[String \/ SparkContext] = for {
+      sc <- Task.delay(new SparkContext(conf))
+      _ <- refSc.write((1, sc).some)
+    } yield sc.right[String]
+
+    (conf: SparkConf) => EitherT(for {
+      refSc <- fetchRefSc
+      maybeSc <- refSc.read
+      scErr <- maybeSc.cata(handleScExists(refSc, conf), handleScDoesNotExist(refSc, conf))
+    } yield scErr)
+  }
+
+  def stopSc(fetchRefSc: Task[TaskRef[SparkContextHolder]]): Task[Unit] = for {
+    refSc <- fetchRefSc
+    holder <- refSc.read
+    newHolder <- Task.delay {
+      val newHolder = holder.map {
+        case (1, sc) => None
+        case (counter, sc) => (counter - 1, sc).some
+      }.join
+      if(!newHolder.isDefined) holder.foreach {
+        case (_, sc) => sc.stop()
+      }
+      newHolder
+    }
+    _ <- refSc.write(newHolder)
+  } yield ()
 
   def toQScript[M[_] : Monad](
     listContents: ADir => M[FileSystemError \/ Set[PathSegment]]

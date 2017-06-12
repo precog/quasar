@@ -24,7 +24,7 @@ import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc, stopSc => coreStopSc}
 
 import java.io.PrintWriter
 
@@ -64,7 +64,7 @@ package object local {
       forge("local[*]", uri.value)
     }
 
-  def sparkFsDef[S[_]](implicit
+  def sparkFsDef[S[_]](refSc: Task[TaskRef[SparkContextHolder]])(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S,
     FailOps: Failure.Ops[PhysicalError, S]
@@ -84,10 +84,10 @@ package object local {
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), lift(coreStopSc(refSc)).into[S])
     }).into[S]
 
-    lift(coreGenSc(sparkConf).run).into[S] >>= (_.fold(
+    lift(coreGenSc(refSc).apply(sparkConf).run).into[S] >>= (_.fold(
       msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
       definition(_)
     ))
@@ -100,8 +100,8 @@ package object local {
       writefile.chrooted[Eff](fsConf.prefix),
       managefile.chrooted[Eff](fsConf.prefix))
 
-  def definition[S[_]](implicit
+  def definition[S[_]](refSc: Task[TaskRef[SparkContextHolder]])(implicit
     S0: Task :<: S, S1: PhysErr :<: S
   ) =
-    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
+    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef(refSc), fsInterpret)
 }

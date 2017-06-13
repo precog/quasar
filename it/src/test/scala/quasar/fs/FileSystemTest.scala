@@ -64,12 +64,13 @@ abstract class FileSystemTest[S[_]](
   def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
       Fragments.foreach(fss.toList)(fs =>
-        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f, fʹ) =>
+        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f0, f1) =>
           s"${fs.ref.name.shows} FileSystem" >>
-            Fragments(examples(f, fʹ), step(f.close.unsafePerformSync))
+            Fragments(examples(f0, f1), step(f0.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
-          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
+          Fragments(s"${fs.ref.name.shows} FileSystem" >> 
+            skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
         })
     }.unsafePerformSync
 
@@ -79,6 +80,11 @@ abstract class FileSystemTest[S[_]](
       .traverse_(c => fs.supports(c).fold(().successNel[BackendCapability], c.failureNel))
       .as(AsResult(a))
       .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
+
+  def pendingFor[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(a: => A): Result = {
+    val name: String = fs.ref.name.name
+    toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
+  }
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)

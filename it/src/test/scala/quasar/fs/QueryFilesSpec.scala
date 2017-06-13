@@ -78,11 +78,10 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
         val p = e.liftM[Process].drain ++ read.scanAll(c)
 
         runLogT(fs.testInterpM, p).runEither must beRight(containTheSameElementsAs(Vector[Data](
-          Data.Obj("c" -> Data._int(2))
-        )))
+          Data.Obj("c" -> Data._int(2)))))
       }
 
-      "listing directory returns immediate child nodes" >> {
+      "listing directory returns immediate child nodes" >> pendingFor(fs)(Set("mimir")) {
         val d = queryPrefix </> dir("lschildren")
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
@@ -91,6 +90,7 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
                     write.save(f2, anotherDoc.toProcess).drain
+
         execT(fs.setupInterpM, setup).runVoid
 
         val p = query.ls(d1)
@@ -105,12 +105,12 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
         runT(fs.testInterpM)(query.ls(rootDir)).runEither must beRight
       }
 
-      "listing nonexistent directory returns dir NotFound" >> {
+      "listing nonexistent directory returns dir NotFound" >> pendingFor(fs)(Set("mimir")) {
         val d = queryPrefix </> dir("lsdne")
         runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))
       }
 
-      "listing results should not contain deleted files" >> {
+      "listing results should not contain deleted files" >> pendingFor(fs)(Set("mimir")) {
         val d = queryPrefix </> dir("lsdeleted")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")

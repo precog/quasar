@@ -2,6 +2,7 @@
     "name": "variable with a non-trivial value",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

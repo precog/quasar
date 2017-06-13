@@ -2,6 +2,7 @@
     "name": "constant and a grouped value",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

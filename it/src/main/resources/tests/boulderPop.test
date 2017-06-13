@@ -1,6 +1,7 @@
 {
     "name": "population of Boulder",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

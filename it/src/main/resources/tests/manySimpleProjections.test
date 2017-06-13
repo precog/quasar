@@ -2,6 +2,7 @@
   "name": "many simple projections (order matters)",
 
   "backends": {
+        "mimir": "skip",
     "postgresql": "pending"
   },
 

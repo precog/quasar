@@ -1,6 +1,7 @@
 {
     "name": "trivial group by",
     "backends": {
+        "mimir": "skip",
         "postgresql":    "pending"
     },
     "data": "largeZips.data",

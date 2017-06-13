@@ -30,7 +30,7 @@ import quasar.precog.util._
 import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.table.ColumnarTableModule
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, ReceiveTimeout}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, ReceiveTimeout}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 
@@ -371,10 +371,15 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
     private[this] val pathLRU = Cache.simple[Path, Unit](
       MaxSize(maxOpenPaths),
-      OnRemoval({(p: Path, _: Unit, _: RemovalCause) => pathActors.get(p).foreach(_ ! ReceiveTimeout) })
-    )
+      OnRemoval({(p: Path, _: Unit, _: RemovalCause) => pathActors.get(p).foreach(_ ! ReceiveTimeout) }))
 
     private[this] var pathActors = Map.empty[Path, ActorRef]
+
+    // not atomic
+    def stopPath(path: Path): Unit = {
+      pathActors.get(path).map(_ ! PoisonPill)
+      pathActors -= path
+    }
 
     override def postStop = {
       log.info("Shutdown of path actors complete")

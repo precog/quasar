@@ -1,6 +1,7 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
+        "mimir": "skip",
         "couchbase":      "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",

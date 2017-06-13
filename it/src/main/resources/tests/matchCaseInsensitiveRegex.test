@@ -1,6 +1,7 @@
 {
     "name": "match on case-insensitive string",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

@@ -2,6 +2,7 @@
   "name": "select wildcard with group by",
 
   "backends": {
+        "mimir": "skip",
     "postgresql": "pending"
   },
 

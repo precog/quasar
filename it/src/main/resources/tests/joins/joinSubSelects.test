@@ -2,6 +2,7 @@
     "name": "join the results of a pair of sub-queries",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

@@ -1,6 +1,7 @@
 {
     "name": "states sorted by the length of name of their first city, alphabetically",
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"

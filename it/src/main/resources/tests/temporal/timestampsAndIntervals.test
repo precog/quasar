@@ -2,6 +2,7 @@
     "name": "timestamp and interval syntax",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":      "skip",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",

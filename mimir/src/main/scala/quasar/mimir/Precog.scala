@@ -49,6 +49,7 @@ import akka.routing.{
 
 import scalaz.{EitherT, Monad, StreamT}
 import scalaz.std.scalaFuture.futureInstance
+import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
 import java.io.File
@@ -121,13 +122,18 @@ class Precog(dataDir0: File)
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
+  private lazy val pathRoutingActor =
+    new PathRoutingActor(Config.dataDir, Config.storageTimeout, Config.quiescenceTimeout, Config.maxOpenPaths, clock)
+
   // Members declared in quasar.yggdrasil.table.VFSColumnarTableModule
   private val projectionsActor: ActorRef =
-    actorSystem.actorOf(Props(
-      new PathRoutingActor(Config.dataDir, Config.storageTimeout, Config.quiescenceTimeout, Config.maxOpenPaths, clock)))
+    actorSystem.actorOf(Props(pathRoutingActor))
 
   private val actorVFS: ActorVFS =
     new ActorVFS(projectionsActor, Config.storageTimeout, Config.storageTimeout)
+
+  def stopPath(path: Path): Unit =
+    pathRoutingActor.stopPath(path)
 
   def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] =
     actorVFS.findDirectChildren(path)
@@ -138,7 +144,7 @@ class Precog(dataDir0: File)
   def ingest(path: Path, chunks: StreamT[Future, Vector[JValue]]): Future[Unit] = {
     val streamId = java.util.UUID.randomUUID()
 
-    val stream = StreamT.unfoldM((0, chunks)) {
+    def stream = StreamT.unfoldM((0, chunks)) {
       case (pseudoOffset, chunks) =>
         chunks.uncons flatMap {
           case Some((chunk, tail)) =>
@@ -150,11 +156,9 @@ class Precog(dataDir0: File)
 
             for {
               terminal <- tail.isEmpty
-
+              _ = log.debug(s"Replacing with new version $streamId.")
               streamRef = StreamRef.Replace(streamId, terminal)
-
               apiKey <- RootAPIKey
-
               msg =
                 IngestMessage(
                   apiKey,
@@ -183,7 +187,9 @@ class Precog(dataDir0: File)
         }
     }
 
-    stream.foldLeft(())((_, _) => ())
+    ().point[Future]
+    // TODO reenable ingest when it doesn't throw exceptions
+    //stream.foldLeft(())((_, _) => ())
   }
 
   def shutdown: Future[Unit] = actorSystem.terminate.map(_ => ())

@@ -1,6 +1,7 @@
 {
     "name": "left key join with multiple fields selected (Couchbase)",
     "backends": {
+        "mimir": "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_2_6":       "skip",

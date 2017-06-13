@@ -25,6 +25,7 @@ import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
+import quasar.mimir
 import quasar.physical._
 import quasar.physical.couchbase.Couchbase
 import quasar.physical.marklogic.MarkLogic
@@ -63,12 +64,13 @@ abstract class FileSystemTest[S[_]](
   def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
       Fragments.foreach(fss.toList)(fs =>
-        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f, fʹ) =>
+        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f0, f1) =>
           s"${fs.ref.name.shows} FileSystem" >>
-            Fragments(examples(f, fʹ), step(f.close.unsafePerformSync))
+            Fragments(examples(f0, f1), step(f0.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
-          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
+          Fragments(s"${fs.ref.name.shows} FileSystem" >> 
+            skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
         })
     }.unsafePerformSync
 
@@ -78,6 +80,14 @@ abstract class FileSystemTest[S[_]](
       .traverse_(c => fs.supports(c).fold(().successNel[BackendCapability], c.failureNel))
       .as(AsResult(a))
       .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
+
+  def pendingFor[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(a: => A): Result = {
+    val name: String = fs.ref.name.name
+    toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
+  }
+
+  def pendingForF[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(fa: => F[A])(implicit run: Run): Result =
+    pendingFor(fs)(toPend)(run(fa).unsafePerformSync)
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
@@ -94,7 +104,7 @@ abstract class FileSystemTest[S[_]](
   ////
 
   implicit class FSExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A])(implicit run: Run) =
+    def >>*[A: AsResult](fa: => F[A])(implicit run: Run): Fragment =
       s >> run(fa).unsafePerformSync
   }
 
@@ -148,11 +158,12 @@ object FileSystemTest {
 
     TestConfig.externalFileSystems {
       fsTestConfig(couchbase.fs.FsType,       Couchbase.definition translate injectFT[Task, filesystems.Eff]) orElse
-      fsTestConfig(marklogic.fs.FsType,       marklogicDef)                  orElse
-      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
-      fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)  orElse
-      fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
-      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
+      fsTestConfig(marklogic.fs.FsType,       marklogicDef) orElse
+      fsTestConfig(mimir.Mimir.Type,          mimir.Mimir.definition translate injectFT[Task, filesystems.Eff]) orElse
+      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition) orElse
+      fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition) orElse
+      fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition) orElse
+      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition) orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
     }
   }

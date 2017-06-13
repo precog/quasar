@@ -1,6 +1,7 @@
 {
     "name": "shortest city names",
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

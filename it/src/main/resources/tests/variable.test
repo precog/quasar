@@ -2,6 +2,7 @@
     "name": "handle variable referenced in filter",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

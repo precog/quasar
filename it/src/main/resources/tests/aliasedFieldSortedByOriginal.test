@@ -1,6 +1,7 @@
 {
     "name": "select aliased field sorted by original name",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

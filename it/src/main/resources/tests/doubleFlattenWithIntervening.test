@@ -1,6 +1,7 @@
 {
     "name": "double flatten with intervening field",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

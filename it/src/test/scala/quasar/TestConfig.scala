@@ -42,7 +42,7 @@ object TestConfig {
 
   /** External Backends. */
   val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
-  val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , ISet.empty), mimir.Mimir.Type)
+  val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , ISet singleton BackendCapability.query()), mimir.Mimir.Type)
   val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
   val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
   val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.fs.FsType)

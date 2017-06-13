@@ -86,6 +86,9 @@ abstract class FileSystemTest[S[_]](
     toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
   }
 
+  def pendingForF[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(fa: => F[A])(implicit run: Run): Result =
+    pendingFor(fs)(toPend)(run(fa).unsafePerformSync)
+
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
 
@@ -101,7 +104,7 @@ abstract class FileSystemTest[S[_]](
   ////
 
   implicit class FSExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A])(implicit run: Run) =
+    def >>*[A: AsResult](fa: => F[A])(implicit run: Run): Fragment =
       s >> run(fa).unsafePerformSync
   }
 

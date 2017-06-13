@@ -188,6 +188,7 @@ class Precog(dataDir0: File)
     }
 
     ().point[Future]
+    // TODO reenable ingest when it doesn't throw exceptions
     //stream.foldLeft(())((_, _) => ())
   }
 

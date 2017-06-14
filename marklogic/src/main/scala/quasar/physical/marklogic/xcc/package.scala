@@ -23,6 +23,7 @@ import quasar.effect.Capture
 import quasar.fp.ski.κ
 
 import com.marklogic.xcc.{ContentSource, Session}
+import com.marklogic.xcc.types.{XdmItem, XSBoolean}
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
@@ -47,6 +48,12 @@ package object xcc {
 
   type ContentUri = String Refined Uri
   val  ContentUri = Prism((s: String) => refineV[Uri](s).right.toOption)(_.value)
+
+  /** Returns the expected single boolean result or "false" otherwise. */
+  val booleanResult: Vector[XdmItem] => Boolean = {
+    case Vector(b: XSBoolean) => b.asPrimitiveBoolean
+    case _                    => false
+  }
 
   /** Returns a natural transformation that safely runs a `Session` reader,
     * ensuring the provided sessions are properly closed after use.

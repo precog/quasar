@@ -1,6 +1,7 @@
 {
     "name": "concat field with constant array",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

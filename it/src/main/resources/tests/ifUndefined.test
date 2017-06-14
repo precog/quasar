@@ -1,6 +1,7 @@
 {
     "name": "handle undefined values",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

@@ -2,6 +2,7 @@
     "name": "handle nested let binding and selects",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

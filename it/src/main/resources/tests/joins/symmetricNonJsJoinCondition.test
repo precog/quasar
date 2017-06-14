@@ -2,6 +2,7 @@
     "name": "flattening both sides of a join condition",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

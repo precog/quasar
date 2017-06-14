@@ -1,6 +1,7 @@
 {
     "name": "flatten array with unflattened field",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "postgresql": "pending"
     },

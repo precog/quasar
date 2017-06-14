@@ -1,6 +1,7 @@
 {
     "name": "distinct *",
     "backends": {
+        "mimir": "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",

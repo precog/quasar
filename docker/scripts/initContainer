@@ -7,6 +7,9 @@ CONTAINER=$1
 if [[ $CONTAINER == "quasar_spark_local_test" ]]
 then
     echo "$CONTAINER: not starting a container for spark_local_test..."
+elif [[ $CONTAINER == "quasar_mimir" ]]
+then
+    echo "$CONTAINER: not starting a container for mimir..."
 else
   cd $TRAVIS_BUILD_DIR
   docker-compose -f ./docker/docker-compose.yml up -d $CONTAINER

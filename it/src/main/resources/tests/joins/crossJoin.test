@@ -2,6 +2,7 @@
     "name": "simple join written in 'cross join' form (must be optimized to an inner join or else the join explodes, taking several minutes to complete)",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

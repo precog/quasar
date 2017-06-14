@@ -2,6 +2,7 @@
     "name": "filter, sort, and limit",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

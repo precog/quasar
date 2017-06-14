@@ -47,8 +47,8 @@ trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with Block
       "empty input"                   in emptySort
       "with uniqueness for keys"      in uniqueSort
 
-      "arbitrary datasets"            in checkSortDense(SortAscending)
-      "arbitrary datasets descending" in checkSortDense(SortDescending)
+      "arbitrary datasets" in skipped { checkSortDense(SortAscending) } // FIXME skipped per #2309
+      "arbitrary datasets descending" in skipped { checkSortDense(SortDescending) } // FIXME skipped per #2309
     }
   }
 }

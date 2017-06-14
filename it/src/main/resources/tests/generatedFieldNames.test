@@ -2,6 +2,7 @@
   "name": "generated field names",
 
   "backends": {
+        "mimir": "skip",
     "marklogic_xml":     "pending",
     "mongodb_read_only": "pending",
     "postgresql":        "pending"

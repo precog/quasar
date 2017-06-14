@@ -1,6 +1,7 @@
 {
     "name": "flatten an object resulting from an array projection",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

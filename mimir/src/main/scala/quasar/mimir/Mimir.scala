@@ -37,7 +37,7 @@ import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.async.mutable.Queue
+import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -61,7 +61,7 @@ import scala.util.Random
 
 object Mimir extends BackendModule with Logging {
 
-  // pessimisticaly equal to couchbase's
+  // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
     QScriptCore[T, ?] :\:
     EquiJoin[T, ?] :/:
@@ -132,7 +132,7 @@ object Mimir extends BackendModule with Logging {
   final case class Config(dataDir: java.io.File)
 
   def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] =
-    Config(new java.io.File("/tmp")).point[FileSystemDef.DefErrT[Task, ?]]
+    Config(new java.io.File("/tmp/precog")).point[FileSystemDef.DefErrT[Task, ?]]
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
@@ -288,14 +288,16 @@ object Mimir extends BackendModule with Logging {
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
 
   private def toSegment: PathMetadata => PathSegment = {
+    // ShiftedRead[ADir]
     case PathMetadata(path, PathMetadata.DataDir(_)) =>
       DirName(path.components.mkString("/")).left[FileName]
 
+    // ShiftedRead[AFile]
     case PathMetadata(path, PathMetadata.DataOnly(_)) =>
       FileName(path.components.mkString("/")).right[DirName]
 
     case PathMetadata(path, PathMetadata.PathOnly) =>
-      sys.error(s"found path $path")
+      DirName(path.components.mkString("/")).left[FileName]
   }
 
   private def children(dir: ADir): EitherT[M, ResourceError, Set[PathSegment]] = {
@@ -349,11 +351,7 @@ object Mimir extends BackendModule with Logging {
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       val segments: FileSystemErrT[M, Set[PathSegment]] =
-        for {
-          precog <- cake[FileSystemErrT[M, ?]]
-          key <- precog.RootAPIKey.toTask.liftM[MT].liftM[FileSystemErrT]
-          stuff <- children(dir).leftMap(toFSError)
-        } yield stuff
+        children(dir).leftMap(toFSError)
 
       val result: FileSystemErrT[M, ?] ~> Backend =
         Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
@@ -367,8 +365,6 @@ object Mimir extends BackendModule with Logging {
       val dir: ADir = pathy.Path.fileParent(file)
 
       val res: M[Boolean] = for {
-        precog <- cake[M]
-        key <- precog.RootAPIKey.toTask.liftM[MT]
         back <- children(dir).fold(_ => false, _.contains(pathy.Path.fileName(file).right))
       } yield back
 
@@ -389,7 +385,7 @@ object Mimir extends BackendModule with Logging {
 
     private val QueueLimit = 100
 
-    private val map: ConcurrentHashMap[WriteHandle, Queue[Task, Vector[Data]]] =
+    private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
       new ConcurrentHashMap
 
     private val cur = new AtomicLong(0L)
@@ -403,20 +399,23 @@ object Mimir extends BackendModule with Logging {
 
         for {
           queue <- Queue.bounded[Task, Vector[Data]](QueueLimit).liftM[MT]
-          _ <- Task.delay(log.debug(s"got a queue $queue")).liftM[MT]
+          signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
 
           path = fileToPath(file)
           jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
 
           precog <- cake[M]
 
-          ingestion = precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+          ingestion = for {
+            _ <- precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+            _ <- signal.set(true)
+          } yield ()
 
           // run asynchronously forever
           _ <- Task.delay(ingestion.unsafePerformAsync(_ => ())).liftM[MT]
-          _ <- Task.delay(log.debug(s"started the ingest stuff")).liftM[MT]
+          _ <- Task.delay(log.debug(s"Started ingest.")).liftM[MT]
 
-          _ <- Task.delay(map.put(handle, queue)).liftM[MT]
+          _ <- Task.delay(map.put(handle, (queue, signal))).liftM[MT]
         } yield handle
       }
 
@@ -430,8 +429,9 @@ object Mimir extends BackendModule with Logging {
         Vector.empty[FileSystemError].point[Configured]
       } else {
         val t = for {
-          optQueue <- Task.delay(Option(map.get(h)))
-          _ <- optQueue.map(_.enqueue1(chunk)).getOrElse(Task.now(()))
+          pair <- Task.delay(Option(map.get(h)).get)
+          (queue, _) = pair
+          _ <- queue.enqueue1(chunk)
         } yield Vector.empty[FileSystemError]
 
         t.liftM[MT].liftM[ConfiguredT]
@@ -440,14 +440,19 @@ object Mimir extends BackendModule with Logging {
 
     def close(h: WriteHandle): Configured[Unit] = {
       val t = for {
-        optQueue <- Task.delay(Option(map.get(h)))
-
-        _ <- Task.delay(log.debug(s"close $h"))
-
-        _ <- optQueue.map(_.enqueue1(Vector.empty)).getOrElse(Task.now(()))
+        // yolo we crash because quasar
+        pair <- Task.delay(Option(map.get(h)).get).liftM[MT]
+        (queue, signal) = pair
+        _ <- Task.delay(log.debug(s"close $h")).liftM[MT]
+        // ask queue to stop
+        _ <- queue.enqueue1(Vector.empty).liftM[MT]
+        // wait until queue actually stops; task async completes when signal completes
+        _ <- signal.discrete.takeWhile(!_).run.liftM[MT]
+        precog <- cake[M]
+        _ <- Task.delay(precog.stopPath(fileToPath(h.file))).liftM[MT]
       } yield ()
 
-      t.liftM[MT].liftM[ConfiguredT]
+      t.liftM[ConfiguredT]
     }
   }
 
@@ -479,11 +484,16 @@ object Mimir extends BackendModule with Logging {
       } yield ()
 
       t.liftB
+      //().point[Backend]
     }
 
     def tempFile(near: APath): Backend[AFile] = {
       for {
         seed <- Task.delay(Random.nextLong.toString).liftM[MT].liftB
+
+        precog <- cake[M].liftB
+        newDir <- Task.delay(new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(parentDir(near).get))).liftM[MT].liftB
+        _ <- Task.delay(newDir.mkdirs()).liftM[MT].liftB
 
         // yolo
         target = parentDir(near).get </> file(seed)

@@ -2,6 +2,7 @@
     "name": "group by a computed value",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "ignoreFieldOrder": [

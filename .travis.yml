@@ -69,6 +69,7 @@ before_cache:
 env:
   matrix:
     - CONNECTOR=mongodb_2_6
+    - CONNECTOR=mimir
     - CONNECTOR=marklogic_xml
     - CONNECTOR=marklogic_json
     - CONNECTOR=couchbase

@@ -1,6 +1,7 @@
 {
     "name": "multi-flatten with fields at various depths",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",

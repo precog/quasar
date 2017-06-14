@@ -2,6 +2,7 @@
     "name": "join with multiple fields selected",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",

@@ -158,7 +158,7 @@ object JsonASTSpec extends quasar.Qspec {
     prop(inverse)
   }.flakyTest
 
-  "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
+  "Set and retrieve an arbitrary jvalue at an arbitrary path" in skipped { // FIXME skipped per #2185
     runArbitraryPathSpec
   }
 

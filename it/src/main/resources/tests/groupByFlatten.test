@@ -1,6 +1,7 @@
 {
     "name": "group by flattened field",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",

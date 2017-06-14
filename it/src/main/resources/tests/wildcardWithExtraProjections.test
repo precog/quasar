@@ -2,6 +2,7 @@
   "name": "wildcard with additional projections and filtering",
 
   "backends": {
+        "mimir": "skip",
     "mongodb_read_only": "pending",
     "postgresql":        "pending"
   },

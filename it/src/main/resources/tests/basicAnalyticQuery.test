@@ -1,6 +1,7 @@
 {
     "name": "basic analytic query",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending"

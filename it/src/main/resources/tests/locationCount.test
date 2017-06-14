@@ -1,6 +1,7 @@
 {
     "name": "job postings by city ",
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "pending",
         "marklogic_xml":     "skip",

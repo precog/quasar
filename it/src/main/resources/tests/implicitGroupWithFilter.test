@@ -2,6 +2,7 @@
     "name": "implicitly grouped, with filtering",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 

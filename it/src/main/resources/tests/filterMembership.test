@@ -1,6 +1,7 @@
 {
     "name": "filter on list membership",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

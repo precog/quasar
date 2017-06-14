@@ -13,6 +13,13 @@ configure_spark() {
   echo "spark_local=\"${HOME}/spark_local_test/\"" >> $CONFIGFILE
 }
 
+##########################################
+# injects mimir path into
+# it/testing.conf
+#
+configure_mimir() {
+  echo "mimir=\"/tmp/precog/\"" >> $CONFIGFILE
+}
 
 ##########################################
 # injects marklogic xml and json url
@@ -70,13 +77,14 @@ configure_mongo() {
 
 container_lookup() {
   CONTAINER=$(echo "$1" | cut -d_ -f2-)
-  if [[ $CONTAINER =~ "mongodb"              ]]; then configure_mongo          $CONTAINER;      fi
-  if [[ $CONTAINER == "postgresql"           ]]; then configure_postgresql     $CONTAINER;      fi
-  if [[ $CONTAINER == "marklogic_xml"        ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
-  if [[ $CONTAINER == "marklogic_json"       ]]; then configure_marklogic_json $CONTAINER 9001; fi
-  if [[ $CONTAINER == "couchbase"            ]]; then configure_couchbase      $CONTAINER;      fi
-  if [[ $CONTAINER == "spark_local_test"     ]]; then configure_spark;                          fi
-  if [[ $CONTAINER == "metastore"            ]]; then configure_metastore;                      fi
+  if [[ $CONTAINER =~ "mongodb"          ]]; then configure_mongo          $CONTAINER;      fi
+  if [[ $CONTAINER == "postgresql"       ]]; then configure_postgresql     $CONTAINER;      fi
+  if [[ $CONTAINER == "marklogic_xml"    ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
+  if [[ $CONTAINER == "marklogic_json"   ]]; then configure_marklogic_json $CONTAINER 9001; fi
+  if [[ $CONTAINER == "couchbase"        ]]; then configure_couchbase      $CONTAINER;      fi
+  if [[ $CONTAINER == "spark_local_test" ]]; then configure_spark;                          fi
+  if [[ $CONTAINER == "metastore"        ]]; then configure_metastore;                      fi
+  if [[ $CONTAINER == "mimir"            ]]; then configure_mimir;                          fi
 }
 
 

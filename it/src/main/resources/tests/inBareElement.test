@@ -1,6 +1,7 @@
 {
     "name": "filter field “in” a bare value",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

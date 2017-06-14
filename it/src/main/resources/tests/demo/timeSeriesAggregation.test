@@ -1,6 +1,7 @@
 {
     "name": "time series aggregation",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "smalltimeseries.data",

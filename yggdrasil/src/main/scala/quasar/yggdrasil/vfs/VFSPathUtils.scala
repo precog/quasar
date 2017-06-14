@@ -77,22 +77,23 @@ object VFSPathUtils extends Logging {
   def findChildren(baseDir: File, path: Path): IO[Set[PathMetadata]] = {
     val pathRoot = pathDir(baseDir, path)
 
-    log.debug("Checking for children of path %s in dir %s".format(path, pathRoot))
+    log.debug(s"Checking for children of path $path in dir $pathRoot")
+
     Option(pathRoot.listFiles(pathFileFilter)) map { files =>
       log.debug("Filtering children %s in path %s".format(files.mkString("[", ", ", "]"), path))
-      val childMetadata = files.toList traverse { f =>
+
+      val childMetadata: IO[List[Option[PathMetadata]]] = files.toList traverse { f =>
         val childPath = unescapePath(path / Path(f.getName))
         currentPathMetadata(baseDir, childPath).fold[Option[PathMetadata]](
           {
             case NotFound(message) =>
-              log.trace("No child data found for %s".format(childPath.path))
+              log.trace(s"No child data found for ${childPath.path}: $message")
               None
             case error =>
               log.error("Encountered corruption or error searching child paths: %s".format(error.messages.list.toList.mkString("; ")))
               None
           },
-          pathMetadata => Some(pathMetadata)
-        )
+          pathMetadata => Some(pathMetadata))
       }
 
       childMetadata.map(_.flatten.toSet): IO[Set[PathMetadata]]
@@ -103,17 +104,13 @@ object VFSPathUtils extends Logging {
   }
 
   def currentPathMetadata(baseDir: File, path: Path): EitherT[IO, ResourceError, PathMetadata] = {
-    def containsNonemptyChild(dirs: List[File]): IO[Boolean] = dirs match {
-      case f :: xs =>
-        val childPath = unescapePath(path / Path(f.getName))
-        findChildren(baseDir, childPath) flatMap { children =>
-          if (children.nonEmpty) IO(true) else containsNonemptyChild(xs)
-        }
-
-      case Nil => IO(false)
-    }
+    def containsNonemptyChild: IO[Boolean] =
+      findChildren(baseDir, path) flatMap { children =>
+        IO(children.nonEmpty)
+      }
 
     val pathDir0 = pathDir(baseDir, path)
+
     EitherT {
       IO(pathDir0.isDirectory) flatMap {
         case true =>
@@ -121,8 +118,7 @@ object VFSPathUtils extends Logging {
             currentVersionV.fold[IO[ResourceError \/ PathMetadata]](
               {
                 case NotFound(message) =>
-                  // Recurse on children to find one that is nonempty
-                  containsNonemptyChild(Option(pathDir0.listFiles(pathFileFilter)).toList.flatten) map {
+                  containsNonemptyChild map {
                     case true =>
                       \/.right(PathMetadata(path, PathMetadata.PathOnly))
                     case false =>
@@ -134,12 +130,12 @@ object VFSPathUtils extends Logging {
               },
               {
                 case VersionEntry(uuid, dataType, timestamp) =>
-                  containsNonemptyChild(Option(pathDir0.listFiles(pathFileFilter)).toList.flatten) map {
+                  log.debug(s"Got a version entry for $pathDir0.")
+                  containsNonemptyChild map {
                     case true => \/.right(PathMetadata(path, PathMetadata.DataDir(dataType.contentType)))
                     case false => \/.right(PathMetadata(path, PathMetadata.DataOnly(dataType.contentType)))
                   }
-              }
-            )
+              })
           }
 
         case false =>
@@ -147,5 +143,4 @@ object VFSPathUtils extends Logging {
       }
     }
   }
-
 }

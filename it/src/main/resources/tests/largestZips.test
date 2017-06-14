@@ -1,6 +1,7 @@
 {
     "name": "largest zips",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending",
         "spark_local": "pending",
         "spark_hdfs": "pending"

@@ -1,6 +1,7 @@
 {
     "name": "negate matches in filter and projection",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

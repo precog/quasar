@@ -2,6 +2,7 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",

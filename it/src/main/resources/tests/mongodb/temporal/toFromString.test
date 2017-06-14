@@ -1,6 +1,7 @@
 {
     "name": "convert dates to/from strings (MongoDB)",
     "backends": {
+        "mimir": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "skip",
         "marklogic_json":    "skip",

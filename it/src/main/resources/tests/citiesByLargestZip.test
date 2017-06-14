@@ -1,6 +1,7 @@
 {
     "name": "cities with largest individual zip codes",
     "backends": {
+        "mimir": "skip",
         "couchbase":  "skip",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",

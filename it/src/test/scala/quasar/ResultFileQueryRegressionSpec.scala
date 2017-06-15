@@ -31,9 +31,7 @@ class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[AnalyticalFileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(fs =>
       fs.ref.supports(BackendCapability.query()) &&
-      fs.ref.supports(BackendCapability.write()) &&
-      // NB: These are prohibitively slow on Couchbase
-      !TestConfig.isCouchbase(fs.ref)))
+      fs.ref.supports(BackendCapability.write())))
   ) {
 
   val read = ReadFile.Ops[AnalyticalFileSystemIO]

@@ -63,6 +63,8 @@ class BasicQueryEnablementSpec
 
   val cbEnv = DefaultCouchbaseEnvironment.builder.build
 
+  val docTypeKey = DocTypeKey("type")
+
   val cfg =
     Config(
       ClientContext(
@@ -72,7 +74,8 @@ class BasicQueryEnablementSpec
           "beer-sample",
           "",
           List[transcoder.Transcoder[_, _]]().asJava),
-        DocTypeKey("type")),
+        docTypeKey,
+        ListContentsView(docTypeKey)),
       CouchbaseCluster.create(cbEnv))
 
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =

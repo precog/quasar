@@ -25,8 +25,10 @@ import quasar.fs.FileSystemError
 import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.{Bucket, Cluster}
+import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
+import com.couchbase.client.java.view.{DefaultView, DesignDocument, View, ViewQuery, Stale}
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -43,7 +45,7 @@ object common {
 
   final case class Config(ctx: ClientContext, cluster: Cluster)
 
-  final case class ClientContext(bucket: Bucket, docTypeKey: DocTypeKey)
+  final case class ClientContext(bucket: Bucket, docTypeKey: DocTypeKey, lcView: ListContentsView)
 
   final case class Context(bucket: BucketName, docTypeKey: DocTypeKey)
 
@@ -53,6 +55,40 @@ object common {
   final case class DocTypeValue(v: String)
 
   final case class Cursor(result: Vector[Data])
+
+  final case class ListContentsView(docTypeKey: DocTypeKey) {
+    val designDocName: String = s"quasar_${docTypeKey.v}"
+    val viewName: String = s"lc_${docTypeKey.v}"
+
+    val view: View =
+      DefaultView.create(
+        viewName,
+        s"""function (doc, meta) { emit(null, doc["${docTypeKey.v}"]); }""",
+        """function(key, values, rereduce) {
+          |  var o = {};
+          |
+          |  values.forEach(function(v) {
+          |    if (rereduce) {
+          |      Object.keys(v).forEach(function(i) {
+          |        o[i] = 0;
+          |      });
+          |    }
+          |    else {
+          |      o[v] = 0;
+          |    }
+          |  });
+          |
+          |  return o;
+          |}""".stripMargin)
+
+    val designDoc: DesignDocument =
+      DesignDocument.create(designDocName, List(view).asJava)
+
+    val query: ViewQuery =
+      ViewQuery
+        .from(designDocName, viewName)
+        .stale(Stale.FALSE)
+  }
 
   val CBDataCodec = DataCodec.Precise
 
@@ -71,10 +107,17 @@ object common {
   def docTypeValuesFromPrefix(
     ctx: ClientContext,
     prefix: String
-  ): Task[FileSystemError \/ List[DocTypeValue]] = {
-    val qStr = s"""SELECT distinct type FROM `${ctx.bucket.name}`
-                   WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
-    query(ctx.bucket, qStr).map(_.map(_.toList.map(r => DocTypeValue(r.value.getString(ctx.docTypeKey.v)))))
+  ): Task[FileSystemError \/ List[DocTypeValue]] = Task.delay {
+    ctx.bucket.query(ctx.lcView.query).allRows.asScala.toList.traverseM {
+      _.value match {
+        case o: JsonObject =>
+          o.getNames.asScala.toList.collect {
+            case v if v.startsWith(prefix) => DocTypeValue(v)
+          }.right
+        case _ =>
+          FileSystemError.readFailed(ctx.lcView.viewName, "not a JsonObject").left
+      }
+    }
   }
 
   def existsWithPrefix(

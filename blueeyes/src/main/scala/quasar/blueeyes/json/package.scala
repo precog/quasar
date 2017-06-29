@@ -22,7 +22,7 @@ import quasar.blueeyes.json.serialization.Decomposer
 package object json {
   import JValue._
 
-  type JFieldTuple = String -> JValue
+  type JFieldTuple = (String, JValue)
 
   def jarray(elements: JValue*): JValue                                    = JArray(elements.toList)
   def jobject(fields: JField*): JValue                                     = JObject(fields.toList)

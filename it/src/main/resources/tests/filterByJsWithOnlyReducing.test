@@ -3,7 +3,6 @@
 
     "backends": {
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
 
@@ -11,6 +10,7 @@
 
     "query": "select max(pop) as max_pop, min(city) as min_city from largeZips where length(city) < 6",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "max_pop": 85710, "min_city": "ABAC" }]
 }

@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner, FreeMapA}, MapFuncs._
+import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
 import quasar.std._
 
 import matryoshka._
@@ -36,7 +36,7 @@ class CoreMapStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Skipped("TODO").left
 
   /** Identify constructs that are expected not to be implemented. */
-  val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
+  val shortCircuit: AlgebraM[Result \/ ?, MapFuncCore[Fix, ?], Unit] = {
     case ExtractIsoYear(_)  => TODO
     case ExtractWeek(_)     => TODO
     case Power(_, _)        => Skipped("TODO: handle large value").left
@@ -45,13 +45,13 @@ class CoreMapStdLibSpec extends StdLibSpec {
   }
 
   // TODO: figure out how to pass the args to shortCircuit so they can be inspected
-  def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
-    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
+  def check[A](fm: Free[MapFuncCore[Fix, ?], A], args: List[Data]): Option[Result] =
+    fm.cataM(interpretM[Result \/ ?, MapFuncCore[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
 
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
-  def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
-    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
+  def run[A](fm: Free[MapFuncCore[Fix, ?], A], args: A => Data, expected: Data): Result = {
+    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFuncCore[Fix, ?], A, Data => Data](
       a => κ(args(a)).right, CoreMap.change))
     (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }

@@ -2,14 +2,13 @@
     "name": "states sorted by the length of name of their first city, alphabetically",
     "backends": {
         "mimir": "skip",
-        "couchbase":         "skip",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "couchbase": "pending",
+        "postgresql": "pending"
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",
     "data": "zips.data",
     "query": "select state, min(city) as first, length(min(city)) as len from zips group by state order by len, first, state limit 5",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "state": "MI" , "first": "ADA",  "len": 3 },
                  { "state": "OK" , "first": "ADA",  "len": 3 },
                  { "state": "GA" , "first": "ABAC", "len": 4 },

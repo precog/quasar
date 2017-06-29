@@ -17,15 +17,22 @@
 package quasar.api.services
 
 import slamdata.Predef._
+import quasar.contrib.pathy.APath
+import quasar.effect._
+import quasar.fp._
+import quasar.fp.free._
+import quasar.fs.mount._
+import quasar.api.JsonFormat.{SingleArray, LineDelimited}
+import quasar.api.JsonPrecision.{Precise, Readable}
+import quasar.api.MessageFormat.JsonContentType
+
 import argonaut.{Json, Argonaut}
 import Argonaut._
 import org.http4s.{MediaType, Charset, EntityEncoder}
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Arbitrary
-
-import quasar.api.JsonFormat.{SingleArray, LineDelimited}
-import quasar.api.JsonPrecision.{Precise, Readable}
-import quasar.api.MessageFormat.JsonContentType
+import scalaz._
+import scalaz.concurrent.Task
 
 object Fixture {
 
@@ -72,5 +79,18 @@ object Fixture {
       EntityEncoder.encodeBy(`Content-Type`(MediaType.`text/csv`, Charset.`UTF-8`)) { csv =>
         EntityEncoder.stringEncoder(Charset.`UTF-8`).toEntity(csv.value)
       }
+  }
+
+  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
+    type MEff[A] = Coproduct[Task, MountConfigs, A]
+    TaskRef(mounts).map { configsRef =>
+
+      val mounter: Mounting ~> Free[MEff, ?] = Mounter.trivial[MEff]
+
+      val meff: MEff ~> Task =
+        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
+
+      foldMapNT(meff) compose mounter
+    }
   }
 }

@@ -2,16 +2,30 @@
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
+function downloadMLRPM() {
+  if [[ $1 =~ "marklogic" ]]
+  then
+    docker/Dockerfiles/Marklogic/getMLRpm
+  fi
+}
+
+function upContainer() {
+  docker-compose -f docker/docker-compose.yml up -d $1
+}
 
 CONTAINER=$1
 if [[ $CONTAINER == "quasar_spark_local_test" ]]
 then
-    echo "$CONTAINER: not starting a container for spark_local_test..."
+  echo "$CONTAINER: not starting a container for spark_local_test..."
 elif [[ $CONTAINER == "quasar_mimir" ]]
 then
-    echo "$CONTAINER: not starting a container for mimir..."
+  echo "$CONTAINER: not starting a container for mimir..."
+elif [[ $CONTAINER =~ "marklogic" ]]
+then
+  downloadMLRPM $CONTAINER
+  upContainer $CONTAINER
+  sleep 5
 else
-  cd $TRAVIS_BUILD_DIR
-  docker-compose -f ./docker/docker-compose.yml up -d $CONTAINER
+  upContainer $CONTAINER
   sleep 5
 fi

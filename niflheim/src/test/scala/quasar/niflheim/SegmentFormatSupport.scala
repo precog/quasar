@@ -30,6 +30,7 @@ import scalaz._
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels._
 import java.time.{LocalDateTime, ZoneOffset}

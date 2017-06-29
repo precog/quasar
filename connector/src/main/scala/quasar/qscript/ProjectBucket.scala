@@ -29,7 +29,7 @@ import scalaz._, Scalaz._
 /** Projections are technically dimensional (i.e., QScript) operations. However,
   * to a filesystem, they are merely Map operations. So, we use these components
   * while building the QScript plan and they are then used in static path
-  * processing, but they are replaced with equivalent MapFuncs before being
+  * processing, but they are replaced with equivalent MapFuncsCore before being
   * processed by the filesystem.
   */
 sealed abstract class ProjectBucket[T[_[_]], A] {

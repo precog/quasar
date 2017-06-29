@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._

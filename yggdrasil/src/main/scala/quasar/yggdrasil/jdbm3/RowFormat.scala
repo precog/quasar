@@ -26,6 +26,8 @@ import quasar.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons 
 import java.nio.ByteBuffer
 import java.time.LocalDateTime
 
+import scala.collection.mutable
+
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]
 }
@@ -267,8 +269,8 @@ trait RowFormatSupport { self: StdCodecs =>
 
   protected def encodeRow(row: Int, undefined: RawBitSet, encoders: Array[ColumnValueEncoder], init: ByteBuffer, pool: ByteBufferPool): Array[Byte] = {
 
-    var buffer                         = init
-    var filled: ListBuffer[ByteBuffer] = null
+    var buffer = init
+    var filled: mutable.ListBuffer[ByteBuffer] = null
 
     @inline
     @tailrec
@@ -277,7 +279,7 @@ trait RowFormatSupport { self: StdCodecs =>
         encoders(i).encode(row, buffer, pool) match {
           case Some(buffers) =>
             if (filled == null)
-              filled = new ListBuffer[ByteBuffer]()
+              filled = new mutable.ListBuffer[ByteBuffer]()
             filled ++= buffers
             buffer = pool.acquire
           case None =>

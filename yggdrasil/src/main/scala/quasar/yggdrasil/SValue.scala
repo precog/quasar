@@ -168,7 +168,7 @@ trait SValueInstances {
     case SUndefined     => 2
   }
 
-  implicit def order: ScalazOrder[SValue] = new ScalazOrder[SValue] {
+  implicit def order: scalaz.Order[SValue] = new scalaz.Order[SValue] {
     private val objectOrder = (o1: Map[String, SValue]) =>
       (o2: Map[String, SValue]) => {
         (o1.size ?|? o2.size) |+|
@@ -185,11 +185,11 @@ trait SValueInstances {
           }
     }
 
-    private val stringOrder = ScalazOrder[String].order _ curried
-    private val boolOrder   = ScalazOrder[Boolean].order _ curried
-    private val longOrder   = ScalazOrder[Long].order _ curried
-    private val doubleOrder = ScalazOrder[Double].order _ curried
-    private val numOrder    = ScalazOrder[BigDecimal].order _ curried
+    private val stringOrder = scalaz.Order[String].order _ curried
+    private val boolOrder   = scalaz.Order[Boolean].order _ curried
+    private val longOrder   = scalaz.Order[Long].order _ curried
+    private val doubleOrder = scalaz.Order[Double].order _ curried
+    private val numOrder    = scalaz.Order[BigDecimal].order _ curried
 
     def order(sv1: SValue, sv2: SValue) = paired(sv1, sv2).fold(typeIndex(sv1) ?|? typeIndex(sv2))(
       obj = objectOrder,
@@ -232,9 +232,11 @@ trait SValueInstances {
     )
   }
 
-  implicit def scalaOrder: scala.math.Ordering[SValue] = order.toScalaOrdering
+  implicit def scalaOrder: scala.math.Ordering[SValue] =
+    order.toScalaOrdering
 
-  implicit val StructureOrdering: scala.math.Ordering[(JPath, CType)] = implicitly[ScalazOrder[(JPath, CType)]].toScalaOrdering
+  implicit val StructureOrdering: scala.math.Ordering[(JPath, CType)] =
+    implicitly[scalaz.Order[(JPath, CType)]].toScalaOrdering
 }
 
 object SValue extends SValueInstances {

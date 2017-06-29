@@ -25,6 +25,8 @@ import scalaz._
 class AccessControlSpec extends Specification {
   import Permission._
 
+  type Id[+X] = X
+
   val apiKeyManager = new InMemoryAPIKeyManager[Id](quasar.blueeyes.util.Clock.System)
   import apiKeyManager._
 

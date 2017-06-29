@@ -21,7 +21,7 @@ import quasar.{Data, TreeMatchers}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 import quasar.std.StdLib._
 
 import matryoshka._

@@ -249,7 +249,24 @@ final class Optimizer[T: Equal]
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def toComp(left: T, right: T)(c: T):
-        (List[Component[T, T]], Component[T, T]) =
+        (List[Component[T, T]], Component[T, T]) = {
+
+      def typecheckCond(cond: T => T, tpe: Type, cont: Component[T, T], f: (T => T) => Component[T, T])
+          : (List[Component[T, T]], Component[T, T]) = {
+        val check: T => T = { t =>
+          Typecheck(cond(t), tpe, Constant[T](Data.Bool(true)).embed, Constant[T](Data.Bool(false)).embed).embed
+        }
+        (List(f(check)), cont)
+      }
+
+      def typecheckLeft(cond: T => T, tpe: Type, cont: Component[T, T])
+          : (List[Component[T, T]], Component[T, T]) =
+        typecheckCond(cond, tpe, cont, LeftCond(_))
+
+      def typecheckRight(cond: T => T, tpe: Type, cont: Component[T, T])
+          : (List[Component[T, T]], Component[T, T]) =
+        typecheckCond(cond, tpe, cont, RightCond(_))
+
       boundParaM[T, (List[Component[T, T]], ?), LP, Component[T, T]](c) {
         case t if t.map(_._1) ≟ left.project  => (Nil, LeftCond(ι))
         case t if t.map(_._1) ≟ right.project => (Nil, RightCond(ι))
@@ -260,13 +277,21 @@ final class Optimizer[T: Equal]
         case InvokeUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
           (Nil, EquiCond((l, r) => relations.Eq(rc(r), lc(l)).embed))
 
+        // FIXME: in new mongo, we should only have to match on `Data.NA`
         case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.NA)), _)) =>
-          (List(LeftCond(l =>
-            Typecheck(lc(l), tpe, Constant[T](Data.Bool(true)).embed, Constant[T](Data.Bool(false)).embed).embed)), cont)
+          typecheckLeft(lc, tpe, cont)
+        case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.Arr(List(Data.NA)))), _)) =>
+          typecheckLeft(lc, tpe, cont)
+        case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.Obj(obj))), _)) if obj === ListMap("" -> Data.NA) =>
+          typecheckLeft(lc, tpe, cont)
 
+        // FIXME: in new mongo, we should only have to match on `Data.NA`
         case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.NA)), _)) =>
-          (List(RightCond(r =>
-            Typecheck(rc(r), tpe, Constant[T](Data.Bool(true)).embed, Constant[T](Data.Bool(false)).embed).embed)), cont)
+          typecheckRight(rc, tpe, cont)
+        case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.Arr(List(Data.NA)))), _)) =>
+          typecheckRight(rc, tpe, cont)
+        case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.Obj(obj))), _)) if obj === ListMap("" -> Data.NA) =>
+          typecheckRight(rc, tpe, cont)
 
         case Typecheck((_, cond), tpe, (_, cont), (_, fallback)) =>
           (Nil, (cond |@| cont |@| fallback)(lpr.typecheck(_, tpe, _, _)))
@@ -291,6 +316,7 @@ final class Optimizer[T: Equal]
         case t =>
           (Nil, NeitherCond(t.map(_._1).embed))
     }
+  }
 
     def assembleCond(conds: List[T]): T =
       conds.foldLeft(lpr.constant(Data.True))(relations.And(_, _).embed)

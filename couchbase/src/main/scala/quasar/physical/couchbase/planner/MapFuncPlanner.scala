@@ -19,10 +19,10 @@ package quasar.physical.couchbase.planner
 import slamdata.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
-import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
-import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
+import quasar.Planner.PlannerErrorME
+import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import quasar.std.TemporalPart, TemporalPart._
 
@@ -30,8 +30,8 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
-  extends Planner[T, F, MapFunc[T, ?]] {
+final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
+  extends Planner[T, F, MapFuncCore[T, ?]] {
 
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
   def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
@@ -188,14 +188,14 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       Else(Null[T[N1QL]].embed)
     ).embed
 
-  def plan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] = {
+  def plan: AlgebraM[F, MapFuncCore[T, ?], T[N1QL]] = {
     // nullary
     case MF.Constant(v) =>
-      Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
+      Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[F]
     case MF.Undefined() =>
-      undefined.η[M]
+      undefined.η[F]
     case MF.JoinSideName(n) =>
-      unexpectedP(s"JoinSideName(${n.shows})")
+      unexpected(s"JoinSideName(${n.shows})")
 
     // array
     case MF.Length(a1) =>
@@ -204,21 +204,21 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         LengthArr(a1).embed,
         LengthObj(a1).embed,
         undefined
-      ).embed.η[M]
+      ).embed.η[F]
 
     // date
     case MF.Date(a1) =>
-      datetime(a1, DateKey, dateRegex.r).η[M]
+      datetime(a1, DateKey, dateRegex.r).η[F]
     case MF.Time(a1) =>
-      datetime(a1, TimeKey, timeRegex.r).η[M]
+      datetime(a1, TimeKey, timeRegex.r).η[F]
     case MF.Timestamp(a1) =>
-      datetime(a1, TimestampKey, timestampRegex.r).η[M]
+      datetime(a1, TimestampKey, timestampRegex.r).η[F]
     case MF.Interval(a1) =>
       Case(
         WhenThen(IsNotNull(SelectField(a1, str(IntervalKey)).embed).embed, a1)
       )(
         Else(Null[T[N1QL]].embed)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.TimeOfDay(a1) =>
       def fracZeroTime(a1: T[N1QL]): T[N1QL] = {
         val fz = fracZero(a1)
@@ -244,21 +244,21 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
       )(
         Else(fracZeroTime(MillisToUTC(Millis(a1).embed, zeroTime.some).embed))
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ToTimestamp(a1) =>
-      Timestamp(MillisToUTC(a1, none).embed).embed.η[M]
+      Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
     case MF.TypeOf(a1) =>
-      unimplementedP("TypeOf")
+      unimplemented("TypeOf")
     case MF.ExtractCentury(a1) =>
-      Ceil(Div(extract(a1, year), int(100)).embed).embed.η[M]
+      Ceil(Div(extract(a1, year), int(100)).embed).embed.η[F]
     case MF.ExtractDayOfMonth(a1) =>
-      extract(a1, day).η[M]
+      extract(a1, day).η[F]
     case MF.ExtractDecade(a1)         =>
-      extract(a1, decade).η[M]
+      extract(a1, decade).η[F]
     case MF.ExtractDayOfWeek(a1)      =>
-      extract(a1, dayOfWeek).η[M]
+      extract(a1, dayOfWeek).η[F]
     case MF.ExtractDayOfYear(a1)      =>
-      extract(a1, dayOfYear).η[M]
+      extract(a1, dayOfYear).η[F]
     case MF.ExtractEpoch(a1) =>
       Div(
         Millis(
@@ -278,48 +278,48 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ).embed
         ).embed,
         int(1000)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ExtractHour(a1) =>
-      extract(a1, hour).η[M]
+      extract(a1, hour).η[F]
     case MF.ExtractIsoDayOfWeek(a1) =>
-      extract(a1, isoDow).η[M]
+      extract(a1, isoDow).η[F]
     case MF.ExtractIsoYear(a1)        =>
-      extract(a1, isoYear).η[M]
+      extract(a1, isoYear).η[F]
     case MF.ExtractMicroseconds(a1) =>
       Mult(
         Add(
           Mult(extract(a1, second), int(1000)).embed,
           extract(a1, millisecond)).embed,
         int(1000)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ExtractMillennium(a1) =>
-      Ceil(Div(extract(a1, year), int(1000)).embed).embed.η[M]
+      Ceil(Div(extract(a1, year), int(1000)).embed).embed.η[F]
     case MF.ExtractMilliseconds(a1) =>
       Add(
         Mult(extract(a1, second), int(1000)).embed,
         extract(a1, millisecond)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ExtractMinute(a1) =>
-      extract(a1, minute).η[M]
+      extract(a1, minute).η[F]
     case MF.ExtractMonth(a1) =>
-      extract(a1, month).η[M]
+      extract(a1, month).η[F]
     case MF.ExtractQuarter(a1) =>
-      extract(a1, quarter).η[M]
+      extract(a1, quarter).η[F]
     case MF.ExtractSecond(a1) =>
       Add(
         extract(a1, second),
         Div(extract(a1, millisecond), int(1000)).embed
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ExtractTimezone(a1) =>
-      extract(a1, timezone).η[M]
+      extract(a1, timezone).η[F]
     case MF.ExtractTimezoneHour(a1) =>
-      extract(a1, timezoneHour).η[M]
+      extract(a1, timezoneHour).η[F]
     case MF.ExtractTimezoneMinute(a1) =>
-      extract(a1, timezoneMinute).η[M]
+      extract(a1, timezoneMinute).η[F]
     case MF.ExtractWeek(a1) =>
-      extract(a1, isoWeek).η[M]
+      extract(a1, isoWeek).η[F]
     case MF.ExtractYear(a1) =>
-      extract(a1, year).η[M]
+      extract(a1, year).η[F]
     case MF.StartOfDay(a1) =>
         Case(
           WhenThen(
@@ -330,73 +330,73 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(DateKey)).embed, zeroTimeSuffix).embed)).embed)
         )(
           Else(undefined)
-        ).embed.η[M]
+        ).embed.η[F]
     case MF.TemporalTrunc(Microsecond | Millisecond, a2) =>
-      a2.η[M]
+      a2.η[F]
     case MF.TemporalTrunc(a1, a2) =>
-      temporalTrunc(a1, a2).η[M]
+      temporalTrunc(a1, a2).η[F]
     case MF.Now() =>
-      NowStr[T[N1QL]].embed.η[M]
+      NowStr[T[N1QL]].embed.η[F]
 
     // math
     case MF.Negate(a1) =>
-      Neg(a1).embed.η[M]
+      Neg(a1).embed.η[F]
     case MF.Add(a1, a2) =>
-      Add(a1, a2).embed.η[M]
+      Add(a1, a2).embed.η[F]
     case MF.Multiply(a1, a2) =>
-      Mult(a1, a2).embed.η[M]
+      Mult(a1, a2).embed.η[F]
     case MF.Subtract(a1, a2) =>
-      Sub(a1, a2).embed.η[M]
+      Sub(a1, a2).embed.η[F]
     case MF.Divide(a1, a2) =>
-      Div(a1, a2).embed.η[M]
+      Div(a1, a2).embed.η[F]
     case MF.Modulo(a1, a2) =>
-      Mod(a1, a2).embed.η[M]
+      Mod(a1, a2).embed.η[F]
     case MF.Power(a1, a2) =>
-      Pow(a1, a2).embed.η[M]
+      Pow(a1, a2).embed.η[F]
 
     // relations
     case MF.Not(a1) =>
-      Not(a1).embed.η[M]
+      Not(a1).embed.η[F]
     case MF.Eq(a1, a2) => a2.project match {
-      case Data(QData.Null) => IsNull(unwrap(a1)).embed.η[M]
-      case _                => rel(Eq(a1, a2)).η[M]
+      case Data(QData.Null) => IsNull(unwrap(a1)).embed.η[F]
+      case _                => rel(Eq(a1, a2)).η[F]
     }
     case MF.Neq(a1, a2) => a2.project match {
-      case Data(QData.Null) => IsNotNull(unwrap(a1)).embed.η[M]
-      case _                => rel(Neq(a1, a2)).η[M]
+      case Data(QData.Null) => IsNotNull(unwrap(a1)).embed.η[F]
+      case _                => rel(Neq(a1, a2)).η[F]
     }
     case MF.Lt(a1, a2) =>
-      rel(Lt(a1, a2)).η[M]
+      rel(Lt(a1, a2)).η[F]
     case MF.Lte(a1, a2) =>
-      rel(Lte(a1, a2)).η[M]
+      rel(Lte(a1, a2)).η[F]
     case MF.Gt(a1, a2) =>
-      rel(Gt(a1, a2)).η[M]
+      rel(Gt(a1, a2)).η[F]
     case MF.Gte(a1, a2) =>
-      rel(Gte(a1, a2)).η[M]
+      rel(Gte(a1, a2)).η[F]
     case MF.IfUndefined(a1, a2) =>
-      IfMissing(a1, a2).embed.η[M]
+      IfMissing(a1, a2).embed.η[F]
     case MF.And(a1, a2) =>
-      And(a1, a2).embed.η[M]
+      And(a1, a2).embed.η[F]
     case MF.Or(a1, a2) =>
-      Or(a1, a2).embed.η[M]
+      Or(a1, a2).embed.η[F]
     case MF.Between(a1, a2, a3) =>
-      And(rel(Gte(a1, a2)), rel(Lte(a1, a3))).embed.η[M]
+      And(rel(Gte(a1, a2)), rel(Lte(a1, a3))).embed.η[F]
     case MF.Cond(cond, then_, else_) =>
       Case(
         WhenThen(cond, then_)
       )(
         Else(else_)
-      ).embed.η[M]
+      ).embed.η[F]
 
     // set
     case MF.Within(a1, a2) =>
-      ArrContains(a2, a1).embed.η[M]
+      ArrContains(a2, a1).embed.η[F]
 
     // string
     case MF.Lower(a1) =>
-      Lower(a1).embed.η[M]
+      Lower(a1).embed.η[F]
     case MF.Upper(a1) =>
-      Upper(a1).embed.η[M]
+      Upper(a1).embed.η[F]
     case MF.Bool(a1) =>
       Case(
         WhenThen(
@@ -407,7 +407,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           bool(false))
       )(
         Else(undefined)
-      ).embed.η[M]
+      ).embed.η[F]
     // TODO: Handle large numbers across the board. Couchbase's number type truncates.
     case MF.Integer(a1) =>
       Case(
@@ -418,9 +418,9 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ToNumber(a1).embed)
       )(
         Else(undefined)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.Decimal(a1) =>
-      ToNumber(a1).embed.η[M]
+      ToNumber(a1).embed.η[F]
     case MF.Null(a1) =>
       Case(
         WhenThen(
@@ -428,7 +428,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Null[T[N1QL]].embed)
       )(
         Else(undefined)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.ToString(a1) =>
       IfNull(
         ToString(a1).embed,
@@ -440,7 +440,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         )(
           Else(a1)
         ).embed
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.Search(a1, a2, a3)    =>
       Case(
         WhenThen(
@@ -448,7 +448,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           RegexContains(a1, ConcatStr(str("(?i)(?s)"), a2).embed).embed)
       )(
         Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
-      ).embed.η[M]
+      ).embed.η[F]
     case MF.Substring(a1, a2, a3) =>
       Case(
         WhenThen(
@@ -467,13 +467,13 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             Least(a3, Sub(Length(a1).embed, a2).embed).embed.some
           ).embed,
           emptyStr).embed)
-      ).embed.η[M]
+      ).embed.η[F]
 
     // structural
     case MF.MakeArray(a1) =>
-      Arr(List(a1)).embed.η[M]
+      Arr(List(a1)).embed.η[F]
     case MF.MakeMap(a1, a2) =>
-      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], F] ∘ (id1 => selectOrElse(
         a2,
         Select(
           Value(true),
@@ -498,8 +498,8 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       }.isEmpty
 
       (containsAgg(a1) || containsAgg(a2)).fold(
-        ConcatArr(a1, a2).embed.η[M],
-        (genId[T[N1QL], M] ⊛ genId[T[N1QL], M]) { (id1, id2) =>
+        ConcatArr(a1, a2).embed.η[F],
+        (genId[T[N1QL], F] ⊛ genId[T[N1QL], F]) { (id1, id2) =>
           SelectElem(
             Select(
               Value(true),
@@ -521,9 +521,9 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             int(0)).embed
         })
     case MF.ConcatMaps(a1, a2) =>
-      ConcatObj(a1, a2).embed.η[M]
+      ConcatObj(a1, a2).embed.η[F]
     case MF.ProjectField(a1, a2) =>
-      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], F] ∘ (id1 => selectOrElse(
         a1,
         Select(
           Value(true),
@@ -537,7 +537,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           orderBy = nil).embed,
         SelectField(a1, a2).embed))
     case MF.ProjectIndex(a1, a2) =>
-      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+      genId[T[N1QL], F] ∘ (id1 => selectOrElse(
         a1,
         Select(
           Value(true),
@@ -551,22 +551,22 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           orderBy = nil).embed,
         SelectElem(a1, a2).embed))
     case MF.DeleteField(a1, a2) =>
-      ObjRemove(a1, a2).embed.η[M]
+      ObjRemove(a1, a2).embed.η[F]
 
     case MF.Meta(a1) =>
-      Meta(a1).embed.η[M]
+      Meta(a1).embed.η[F]
 
     // helpers & QScript-specific
     case MF.Range(a1, a2) =>
-      Slice(a2, Add(a1, int(1)).embed.some).embed.η[M]
+      Slice(a2, Add(a1, int(1)).embed.some).embed.η[F]
     case MF.Guard(expr, typ, cont, _) =>
       def grd(f: T[N1QL] => T[N1QL], e: T[N1QL], c: T[N1QL]): T[N1QL] =
         Case(
           WhenThen(f(e), c))(
           Else(undefined)).embed
 
-      def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
-        genId[T[N1QL], M] ∘ (id =>
+      def grdSel(f: T[N1QL] => T[N1QL]): F[T[N1QL]] =
+        genId[T[N1QL], F] ∘ (id =>
           Select(
             Value(true),
             ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
@@ -584,9 +584,9 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       (cont.project, typ) match {
         case (_: Select[T[N1QL]], _: QType.FlexArr) => grdSel(isArr)
         case (_: Select[T[N1QL]], _: QType.Obj)     => grdSel(isObj)
-        case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).η[M]
-        case (_                 , _: QType.Obj)     => grd(isObj, expr, cont).η[M]
-        case _                                      => cont.η[M]
+        case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).η[F]
+        case (_                 , _: QType.Obj)     => grd(isObj, expr, cont).η[F]
+        case _                                      => cont.η[F]
       }
   }
 }

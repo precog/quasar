@@ -2,14 +2,12 @@
     "name": "match LIKE with multiple lines",
     "backends": {
         "mimir": "skip",
-        "marklogic_json": "pending",
-        "marklogic_xml":  "pending",
         "postgresql":     "pending",
         "spark_hdfs":     "pending",
         "spark_local":    "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select count(*) from slamengine_commits where commit.message like \"Merge%\"",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [13]
 }

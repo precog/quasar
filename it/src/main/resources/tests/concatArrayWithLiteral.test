@@ -1,15 +1,15 @@
 {
     "name": "concat unknown with literal array",
     "backends": {
-        "mimir": "skip",
-        "mongodb_read_only": "pending",
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "skip",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["marklogic_json"],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "arr": [-72.51565,  42.377017, 1, 2], "city": "CUSHMAN"          },
                  { "arr": [-72.576142, 42.176443, 1, 2], "city": "CHICOPEE"         },
                  { "arr": [-72.626193, 42.202007, 1, 2], "city": "HOLYOKE"          },

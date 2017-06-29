@@ -19,7 +19,7 @@ package quasar
 import slamdata.Predef.{Long, Map}
 import quasar.contrib.pathy.ADir
 import quasar.effect._
-import quasar.fp.{TaskRef}
+import quasar.fp.TaskRef
 import quasar.fp.free, free._
 import quasar.fs.{QueryFile, AnalyticalFileSystem}
 

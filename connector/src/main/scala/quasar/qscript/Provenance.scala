@@ -21,7 +21,7 @@ import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import scala.Predef.$conforms
 
@@ -80,9 +80,9 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
 
   def genComparison(lp: Provenance, rp: Provenance): Option[JoinFunc] =
     (lp, rp) match {
-      case (Value(v1), Value(v2)) => Free.roll(MapFuncs.Eq[T, JoinFunc](v1.as(LeftSide), v2.as(RightSide))).some
-      case (Value(v1), Proj(d2)) => Free.roll(MapFuncs.Eq[T, JoinFunc](v1.as(LeftSide), Free.roll(Constant(d2)))).some
-      case (Proj(d1), Value(v2)) => Free.roll(MapFuncs.Eq[T, JoinFunc](Free.roll(Constant(d1)), v2.as(RightSide))).some
+      case (Value(v1), Value(v2)) => Free.roll(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), v2.as(RightSide))).some
+      case (Value(v1), Proj(d2)) => Free.roll(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), Free.roll(Constant(d2)))).some
+      case (Proj(d1), Value(v2)) => Free.roll(MapFuncsCore.Eq[T, JoinFunc](Free.roll(Constant(d1)), v2.as(RightSide))).some
       case (Both(l1, r1),  Both(l2, r2)) =>
         genComparison(l1, l2).fold(
           genComparison(r1, r2))(

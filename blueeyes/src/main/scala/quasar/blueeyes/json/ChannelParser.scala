@@ -18,6 +18,7 @@ package quasar.blueeyes.json
 
 import quasar.blueeyes._
 
+import java.io.{File, FileInputStream}
 import java.nio.channels.ReadableByteChannel
 
 object ChannelParser {

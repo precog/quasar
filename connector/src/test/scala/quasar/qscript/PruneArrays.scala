@@ -18,8 +18,9 @@ package quasar.qscript
 
 import slamdata.Predef.List
 import quasar.common.{JoinType, SortDir}
+import quasar.contrib.pathy.AFile
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 import quasar.sql.CompilerHelpers
 
 import matryoshka.data.Fix
@@ -27,7 +28,7 @@ import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   private def makeLeftShift3[A](src: A): QST[A] =
     QCT.inj(LeftShift(
       src,
@@ -501,6 +502,40 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               MakeArrayR(IntLit(8))))).embed,
           ProjectIndexR(HoleF, IntLit(1)),
           ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      initial.pruneArraysF must equal(expected)
+    }
+
+    "rewrite array used in from of subset" in {
+      val initial: Fix[QST] =
+        QCT.inj(Reduce(
+          QCT.inj(Subset(
+            UnreferencedRT.embed,
+            Free.roll(QCT.inj(LeftShift(
+              Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("zips"))))),
+              HoleF,
+              IncludeId,
+              ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF))))),
+            Drop,
+            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
+          NullLit(),
+          List(ReduceFuncs.Count(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)))),
+          ReduceIndexF(0.some))).embed
+
+      val expected: Fix[QST] =
+        QCT.inj(Reduce(
+          QCT.inj(Subset(
+            UnreferencedRT.embed,
+            Free.roll(QCT.inj(LeftShift(
+              Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("zips"))))),
+              HoleF,
+              IncludeId,
+              MakeArrayR(RightSideF)))),
+            Drop,
+            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
+          NullLit(),
+          List(ReduceFuncs.Count(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
+          ReduceIndexF(0.some))).embed
 
       initial.pruneArraysF must equal(expected)
     }

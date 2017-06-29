@@ -16,11 +16,9 @@
 
 package quasar
 
-import quasar.precog.PackageAliases
-
 import scalaz._
 
-package object niflheim extends PackageAliases {
+package object niflheim {
 
   /**
    * Dear god don't use this!  It's a shim to make old things work.  This is NOT

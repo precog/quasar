@@ -33,35 +33,35 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed abstract class MapFunc[T[_[_]], A]
+sealed abstract class MapFuncCore[T[_[_]], A]
 
-sealed abstract class Nullary[T[_[_]], A] extends MapFunc[T, A]
+sealed abstract class Nullary[T[_[_]], A] extends MapFuncCore[T, A]
 
-sealed abstract class Unary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Unary[T[_[_]], A] extends MapFuncCore[T, A] {
   def a1: A
 }
-sealed abstract class Binary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Binary[T[_[_]], A] extends MapFuncCore[T, A] {
   def a1: A
   def a2: A
 }
-sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Ternary[T[_[_]], A] extends MapFuncCore[T, A] {
   def a1: A
   def a2: A
   def a3: A
 }
 
 // TODO all `Free` should be generalized to `T` once we can handle recursive `Free`
-object MapFunc {
-  import MapFuncs._
+object MapFuncCore {
+  import MapFuncsCore._
 
   val EC = Inject[Common,    EJson]
   val EX = Inject[Extension, EJson]
 
-  type CoMapFuncR[T[_[_]], A] = CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]
+  type CoMapFuncR[T[_[_]], A] = CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]]
 
-  def rollMF[T[_[_]], A](mf: MapFunc[T, FreeMapA[T, A]])
-      : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
-    CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](mf.right[A])
+  def rollMF[T[_[_]], A](mf: MapFuncCore[T, FreeMapA[T, A]])
+      : CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]] =
+    CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]](mf.right[A])
 
   /** Returns a List that maps element-by-element to a MapFunc array. If we
     * can’t statically determine _all_ of the elements, it doesn’t match.
@@ -128,21 +128,21 @@ object MapFunc {
       Constant[T, A](EJson.fromCommon(ejson.Arr[T[EJson]](Nil)))
   }
 
-  // TODO: subtyping is preventing embedding of MapFuncs
+  // TODO: subtyping is preventing embedding of MapFuncsCore
   /** This returns the set of expressions that are concatenated together. It can
     * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
     * also arbitrary expressions that may evaluate to an array of any size.
     */
   object ConcatArraysN {
     def apply[T[_[_]]: BirecursiveT, A](args: List[FreeMapA[T, A]])
-        : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
+        : CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => rollMF[T, A](ConcatArrays(a, b)).embed).project
         case Nil    => rollMF[T, A](EmptyArray[T, FreeMapA[T, A]])
       }
     }
 
-    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]]):
         Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
@@ -157,17 +157,17 @@ object MapFunc {
 
   }
 
-  // TODO subtyping is preventing embeding of MapFuncs
+  // TODO subtyping is preventing embedding of MapFuncsCore
   object ConcatMapsN {
     def apply[T[_[_]]: BirecursiveT, A](args: List[FreeMapA[T, A]])
-        : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
+        : CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => rollMF[T, A](ConcatMaps(a, b)).embed).project
         case Nil    => rollMF[T, A](Constant(EJson.fromCommon(ejson.Arr[T[EJson]](Nil))))
       }
     }
 
-    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]]):
         Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
@@ -291,13 +291,13 @@ object MapFunc {
       })
   }
 
-  implicit def traverse[T[_[_]]]: Traverse[MapFunc[T, ?]] =
-    new Traverse[MapFunc[T, ?]] {
+  implicit def traverse[T[_[_]]]: Traverse[MapFuncCore[T, ?]] =
+    new Traverse[MapFuncCore[T, ?]] {
       def traverseImpl[G[_], A, B](
-        fa: MapFunc[T, A])(
+        fa: MapFuncCore[T, A])(
         f: A => G[B])(
         implicit G: Applicative[G]):
-          G[MapFunc[T, B]] = fa match {
+          G[MapFuncCore[T, B]] = fa match {
         // nullary
         case Constant(v) => G.point(Constant[T, B](v))
         case Undefined() => G.point(Undefined[T, B]())
@@ -382,9 +382,9 @@ object MapFunc {
       }
   }
 
-  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFunc[T, ?]] =
-    new Delay[Equal, MapFunc[T, ?]] {
-      def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
+  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFuncCore[T, ?]] =
+    new Delay[Equal, MapFuncCore[T, ?]] {
+      def apply[A](in: Equal[A]): Equal[MapFuncCore[T, A]] = Equal.equal {
         // nullary
         case (Constant(v1), Constant(v2)) => v1.equals(v2)
         case (JoinSideName(n1), JoinSideName(n2)) => n1.equals(n2)
@@ -471,9 +471,9 @@ object MapFunc {
       }
     }
 
-  implicit def show[T[_[_]]: ShowT]: Delay[Show, MapFunc[T, ?]] =
-    new Delay[Show, MapFunc[T, ?]] {
-      def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = {
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, MapFuncCore[T, ?]] =
+    new Delay[Show, MapFuncCore[T, ?]] {
+      def apply[A](sh: Show[A]): Show[MapFuncCore[T, A]] = {
         def shz(label: String, a: A*) =
           Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
 
@@ -570,12 +570,12 @@ object MapFunc {
 
   // TODO: replace this with some kind of pretty-printing based on a syntax for
   // MapFunc + EJson.
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFunc[T, ?]] =
-    new Delay[RenderTree, MapFunc[T, ?]] {
-      val nt = "MapFunc" :: Nil
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFuncCore[T, ?]] =
+    new Delay[RenderTree, MapFuncCore[T, ?]] {
+      val nt = "MapFuncCore" :: Nil
 
       @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-      def apply[A](r: RenderTree[A]): RenderTree[MapFunc[T, A]] = {
+      def apply[A](r: RenderTree[A]): RenderTree[MapFuncCore[T, A]] = {
         def nAry(typ: String, as: A*): RenderedTree =
           NonTerminal(typ :: nt, None, as.toList.map(r.render(_)))
 
@@ -666,11 +666,11 @@ object MapFunc {
       }
     }
 
-  def translateNullaryMapping[T[_[_]], A]: NullaryFunc => MapFunc[T, A] = {
+  def translateNullaryMapping[T[_[_]], A]: NullaryFunc => MapFuncCore[T, A] = {
     case date.Now => Now()
   }
 
-  def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFunc[T, A] = {
+  def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFuncCore[T, A] = {
     case date.ExtractCentury => ExtractCentury(_)
     case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
     case date.ExtractDecade => ExtractDecade(_)
@@ -715,7 +715,7 @@ object MapFunc {
   }
 
   def translateBinaryMapping[T[_[_]], A]
-      : BinaryFunc => (A, A) => MapFunc[T, A] = {
+      : BinaryFunc => (A, A) => MapFuncCore[T, A] = {
     // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
     //     about the second. And it shouldn’t even have two in LP.
     case array.ArrayLength => (a, b) => Length(a)
@@ -746,7 +746,7 @@ object MapFunc {
   }
 
   def translateTernaryMapping[T[_[_]], A]
-      : TernaryFunc => (A, A, A) => MapFunc[T, A] = {
+      : TernaryFunc => (A, A, A) => MapFuncCore[T, A] = {
     case relations.Between => Between(_, _, _)
     case relations.Cond    => Cond(_, _, _)
     case string.Search     => Search(_, _, _)
@@ -754,7 +754,7 @@ object MapFunc {
   }
 }
 
-object MapFuncs {
+object MapFuncsCore {
   // nullary
   /** A value that is statically known.
     */
@@ -938,7 +938,7 @@ object MapFuncs {
   }
 
   object IntLitMapFunc {
-    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[BigInt] = mf match {
+    def unapply[T[_[_]]: RecursiveT, A](mf: MapFuncCore[T, A]): Option[BigInt] = mf match {
       case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None

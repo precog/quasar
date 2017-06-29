@@ -3,7 +3,6 @@
 
     "backends": {
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
 
@@ -11,7 +10,8 @@
 
     "query": "select count(*) as cnt from smallZips where pop < 1000 and length(city) < 8",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "cnt": 7 }]
 }

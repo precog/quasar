@@ -2,12 +2,12 @@
     "name": "filter on `!= null`",
     "backends": {
         "mimir": "skip",
-        "marklogic_json": "pending",
         "mongodb_q_3_2":  "pending",
         "postgresql":     "pending"
     },
     "data": "nulls.data",
     "query": "select distinct (val != null) as expr from nulls where val != null",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "expr": true }]
 }

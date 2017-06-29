@@ -21,6 +21,13 @@ import quasar.precog.common._
 
 import scala.collection.mutable
 
+import java.io.{
+  BufferedOutputStream,
+  File,
+  FileOutputStream,
+  OutputStream
+}
+
 object RawHandler {
   // file doesn't exist -> create new file
   def empty(id: Long, f: File): RawHandler = {

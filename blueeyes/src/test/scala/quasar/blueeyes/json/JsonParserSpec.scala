@@ -21,8 +21,9 @@ import quasar.precog._, JsonTestSupport._
 
 import scalaz._
 
-import scala.util.control.Exception._
+import scala.collection.mutable
 import scala.math.min
+import scala.util.control.Exception._
 import scala.util.Random.nextInt
 
 import java.net.URLDecoder
@@ -101,7 +102,7 @@ object AsyncParserSpec extends Specification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs = ArrayBuffer.empty[JValue]
+    var vs = mutable.ArrayBuffer.empty[JValue]
     val n = data.length
     var i                   = 0
     var parser: AsyncParser = async

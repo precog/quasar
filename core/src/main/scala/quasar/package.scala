@@ -17,11 +17,17 @@
 import slamdata.Predef._
 import quasar.common.{PhaseResult, PhaseResultW}
 import quasar.connector.CompileM
-import quasar.contrib.pathy.ADir
+import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
+import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, Free => _, _}
+import quasar.fs.{FileSystemError, FileSystemErrT}
+import quasar.fs.FileSystemError._
+import quasar.fs.PathError._
+import quasar.fs.mount.Mounting
 import quasar.sql._
 import quasar.std.StdLib.set._
 
@@ -42,19 +48,18 @@ package object quasar {
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
   def precompile[T: Equal: RenderTree]
-    (query: Blob[Fix[Sql]], vars: Variables, basePath: ADir)
+    (query: Fix[Sql], vars: Variables, basePath: ADir)
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : CompileM[T] = {
     import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
-      substAst <- phase("Variables Substituted", ast.mapExpressionM(Variables.substVars(_, vars)))
-      absAst   <- phase("Absolutized", substAst.map(_.mkPathsAbsolute(basePath)).right)
-      normed   <- phase("Normalized Projections", absAst.map(normalizeProjections[Fix[Sql]]).right)
-      sortProj <- phase("Sort Keys Projected", normed.map(projectSortKeys[Fix[Sql]]).right)
-      annBlob  <- phase("Annotated Tree", (sortProj.traverse(annotate[Fix[Sql]])))
-      scope    =  annBlob.scope.collect{ case func: FunctionDecl[_] => func }
-      logical  <- phase("Logical Plan", Compiler.compile[T](annBlob.expr, scope) leftMap (_.wrapNel))
+      substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
+      absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
+      normed   <- phase("Normalized Projections", normalizeProjections[Fix[Sql]](absAst).right)
+      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](normed).right)
+      annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
     } yield logical
   }
 
@@ -78,13 +83,24 @@ package object quasar {
       case _                           => lp.right
     }
 
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S],
+    fsFail: Failure.Ops[FileSystemError, S]
+  ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
+    EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
+
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S]
+  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
+    resolveImportsImpl(scopedExpr, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
+
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
     * results, if the query was foldable to a constant.
     */
   def queryPlan(
-    blob: Blob[Fix[Sql]], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
+    expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LP]] =
-    precompile[Fix[LP]](blob, vars, basePath)
+    precompile[Fix[LP]](expr, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 

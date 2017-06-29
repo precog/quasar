@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fs.PathError
@@ -30,6 +31,12 @@ import scalaz._, Scalaz._
 import shapeless.Nat
 
 object Planner {
+  type PlannerErrorME[F[_]] = MonadError_[F, PlannerError]
+
+  object PlannerErrorME {
+    def apply[F[_]](implicit F: PlannerErrorME[F]) = F
+  }
+
   sealed abstract class PlannerError {
     def message: String
   }
@@ -79,6 +86,10 @@ object Planner {
         "None of these directories contain any files to read from: " ++
           ds.mkString(", ")
       }
+  }
+
+  final case class CompilationFailed(semErrs: NonEmptyList[SemanticError]) extends PlannerError {
+    def message = "Compilation failed: " + semErrs.list.toList.mkString(", ")
   }
 
   final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {

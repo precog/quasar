@@ -1,14 +1,14 @@
 {
     "name": "negate matches in filter and projection",
     "backends": {
+        "couchbase": "ignoreFieldOrder",
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select city, city !~ \"A\" as noA from largeZips where city !~ \"CHI\"",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "city": "CUSHMAN",     "noA": false },
         { "city": "WORCESTER",   "noA":  true },

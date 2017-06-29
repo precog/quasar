@@ -17,8 +17,6 @@
 package quasar.yggdrasil
 package table
 
-import quasar.blueeyes._
-
 import java.time.LocalDateTime
 
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {

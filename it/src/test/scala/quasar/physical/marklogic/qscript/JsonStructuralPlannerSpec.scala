@@ -19,10 +19,8 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.physical.marklogic.{DocType, ErrorMessages}
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz._, Scalaz._
-import xml.name._
 
 // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
 import WriterT.writerTMonadListen
@@ -35,8 +33,6 @@ final class JsonStructuralPlannerSpec
   val toM = λ[JsonPlan ~> M] { xp =>
     WriterT.writer(xp.run.eval(1)).liftM[EitherT[?[_], ErrorMessages, ?]]
   }
-
-  def asMapKey(qn: QName) = qn.xs.point[JsonPlan]
 }
 
 object JsonStructuralPlannerSpec {

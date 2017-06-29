@@ -21,6 +21,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
+import quasar.contrib.matryoshka.totally
 import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.cts.Query
@@ -28,13 +29,13 @@ import quasar.physical.marklogic.xquery.{cts => ctsfn, _}
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.physical.marklogic.xcc._
 import quasar.qscript._
+import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import _root_.xml.name._
 
 package object qscript {
   type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
@@ -57,11 +58,6 @@ package object qscript {
 
   val EJsonTypeKey  = "_ejson.type"
   val EJsonValueKey = "_ejson.value"
-
-  /** Converts the given string to a QName if valid, failing with an error otherwise. */
-  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
-    (QName.string.getOption(s) orElse QName.string.getOption(encodeForQName(s)))
-      .fold(invalidQName[F, QName](s))(_.point[F])
 
   /** XQuery evaluating to the documents having the specified format in the directory. */
   def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =
@@ -92,17 +88,17 @@ package object qscript {
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
     fm.project match {
-      case MapFunc.StaticArray(elements) =>
+      case MapFuncCore.StaticArray(elements) =>
         for {
           xqyElts <- elements.traverse(planMapFunc[T, F, FMT, Hole](_)(κ(src)))
           arrElts <- xqyElts.traverse(SP.mkArrayElt)
           arr     <- SP.mkArray(mkSeq(arrElts))
         } yield arr
 
-      case MapFunc.StaticMap(entries) =>
+      case MapFuncCore.StaticMap(entries) =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     case Embed(MapFunc.EC(Str(s))) => s.xs.point[F]
+                     case Embed(MapFuncCore.EC(Str(s))) => s.xs.point[F]
                      case key                       => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
                    planMapFunc[T, F, FMT, Hole](_)(κ(src))))
@@ -113,7 +109,7 @@ package object qscript {
       case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mergeXQuery[T[_[_]]: RecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
     jf: JoinFunc[T],
     l: XQuery,
     r: XQuery
@@ -125,13 +121,14 @@ package object qscript {
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: RecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, A](
+  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
     SP: StructuralPlanner[F, FMT]
   ): F[XQuery] =
-    freeMap.cataM(interpretM(recover(_).point[F], (new MapFuncPlanner[F, FMT, T]).plan))
+    freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A])
+      .cataM(interpretM(recover(_).point[F], (new MapFuncPlanner[F, FMT, T]).plan))
 
   /** Returns whether the query is valid and can be executed.
     *
@@ -154,16 +151,30 @@ package object qscript {
   ): F[Search[Q] \/ XQuery] =
     fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q, V]))
 
-  ////
+  def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
+    implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],
+             UC: Corecursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]]
+  ): CoEnv[E, MapFuncCore[T, ?], U] => CoEnv[E, MapFuncCore[T, ?], U] = {
+    object NullLit {
+      def unapply[T[_[_]]: RecursiveT, A](mfc: CoEnv[E, MapFuncCore[T, ?], A]): Boolean =
+        mfc.run.exists[MapFuncCore[T, A]] {
+          case Constant(ej) => EJson.isNull(ej)
+          case _            => false
+        }
+    }
 
-  // A string consisting only of digits.
-  private val IntegralNumber = "^(\\d+)$".r
+    val nullString: U =
+      UC.embed(CoEnv(Constant[T, U](EJson.fromCommon(Str[T[EJson]]("null"))).right))
 
-  // Applies transformations to string to make them valid QNames
-  private val encodeForQName: String => String = {
-    case IntegralNumber(n) => "_" + n
-    case other             => other
+    fa => CoEnv(fa.run.map (totally {
+      case Eq(lhs, Embed(NullLit()))  => Eq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
+      case Eq(Embed(NullLit()), rhs)  => Eq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
+      case Neq(lhs, Embed(NullLit())) => Neq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
+      case Neq(Embed(NullLit()), rhs) => Neq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
+    }))
   }
+
+  ////
 
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(

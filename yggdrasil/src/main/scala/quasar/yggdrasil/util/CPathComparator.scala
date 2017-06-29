@@ -61,7 +61,7 @@ trait CPathComparator { self =>
 object CPathComparator {
   import MaybeOrdering._
 
-  implicit object DateTimeOrder extends SpireOrder[LocalDateTime] {
+  implicit object DateTimeOrder extends spire.algebra.Order[LocalDateTime] {
     def compare(a: LocalDateTime, b: LocalDateTime) = a compareTo b
   }
 
@@ -90,7 +90,7 @@ object CPathComparator {
     case (lCol, rCol: HomogeneousArrayColumn[_])                            => CPathComparator(rPath, rCol, lPath, lCol).swap
     case (lCol, rCol) =>
       val ordering = MaybeOrdering.fromInt {
-        implicitly[ScalazOrder[CType]].apply(lCol.tpe, rCol.tpe).toInt
+        implicitly[scalaz.Order[CType]].apply(lCol.tpe, rCol.tpe).toInt
       }
       new CPathComparator {
         def compare(r1: Int, r2: Int, indices: Array[Int]) = ordering
@@ -112,7 +112,7 @@ object CPathComparator {
       case (CString, CString)   => new ArrayCPathComparator[String, String](lPath, lCol, rPath, rCol)
       case (CDate, CDate)       => new ArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rPath, rCol)
       case (tpe1, tpe2) =>
-        val ordering = MaybeOrdering.fromInt(implicitly[ScalazOrder[CType]].apply(lCol.tpe, rCol.tpe).toInt)
+        val ordering = MaybeOrdering.fromInt(implicitly[scalaz.Order[CType]].apply(lCol.tpe, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {
           val lMask     = makeMask(lPath)
           val rMask     = makeMask(rPath)
@@ -151,7 +151,7 @@ object CPathComparator {
       case (CString, rCol: StrColumn)    => new HalfArrayCPathComparator[String, String](lPath, lCol, rCol(_))
       case (CDate, rCol: DateColumn)     => new HalfArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rCol(_))
       case (tpe1, _) =>
-        val ordering = MaybeOrdering.fromInt(implicitly[ScalazOrder[CType]].apply(tpe1, rCol.tpe).toInt)
+        val ordering = MaybeOrdering.fromInt(implicitly[scalaz.Order[CType]].apply(tpe1, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {
           val mask     = makeMask(lPath)
           val selector = new ArraySelector()(tpe1.classTag)

@@ -10,11 +10,12 @@
 
   "query": "select * from smallZips",
 
-  "predicate": "containsAtLeast",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
 
   "ignoredFields": ["_id"],
 
-  "ignoreFieldOrder": [ "couchbase", "marklogic_json", "mimir" ],
+  "ignoreFieldOrder": true,
 
   "expected": [
     { "city": "NEW SALEM", "loc": [-72.306241 , 42.514643], "pop": 456, "state": "MA" }

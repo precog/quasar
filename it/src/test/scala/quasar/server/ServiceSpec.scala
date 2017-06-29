@@ -22,13 +22,11 @@ import quasar.config.{ConfigOps, FsPath, WebConfig}
 import quasar.contrib.pathy._
 import quasar.db.{DbUtil, StatefulTransactor}
 import quasar.fs.mount._
-import quasar.internal.MountServiceConfig
 import quasar.main._, metastore._
 import quasar.metastore._, MetaStoreAccess._
 import quasar.server.Server.QuasarConfig
-import quasar.sql.{fixParser, Query}
+import quasar.sql._
 import quasar.TestConfig
-import quasar.Variables
 
 import java.io.File
 import scala.util.Random.nextInt
@@ -133,9 +131,7 @@ class ServiceSpec extends quasar.Qspec {
       val sel1 = "sql2:///?q=%28select%201%29"
       val sel2 = "sql2:///?q=%28select%202%29"
 
-      val finalCfg =
-        fixParser.parseExpr(Query("select 2"))
-          .bimap(_.shows, MountConfig.viewConfig(_, Variables.empty))
+      val finalCfg = MountConfig.viewConfig0(sqlB"select 2")
 
       val r = withServer(port) { baseUri: Uri =>
         client.fetch(
@@ -153,7 +149,7 @@ class ServiceSpec extends quasar.Qspec {
         client.expect[Json](baseUri / "mount" / "fs" / "viewA")
       }
 
-      r ==== finalCfg.map(_.asJson)
+      r ==== finalCfg.asJson.right
     }
 
     "MOVE view" in {
@@ -161,7 +157,7 @@ class ServiceSpec extends quasar.Qspec {
 
       val srcPath = rootDir </> dir("view") </> file("a")
       val dstPath = rootDir </> dir("view") </> file("b")
-      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select * from zips"))
+      val viewConfig = MountConfig.viewConfig0(sqlB"select * from zips")
 
       val insertMnts = insertMount(srcPath, viewConfig)
 
@@ -209,7 +205,7 @@ class ServiceSpec extends quasar.Qspec {
       val srcPath = rootDir </> dir("view") </> file("a")
       val dstPath = rootDir </> dir("view") </> file("b")
 
-      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
+      val viewConfig = MountConfig.viewConfig0(sqlB"select 42")
 
       val insertMnts =
         insertMount(srcPath, viewConfig) <*
@@ -240,7 +236,7 @@ class ServiceSpec extends quasar.Qspec {
       val srcPath = rootDir </> dir("a")
       val dstPath = rootDir </> dir("b")
 
-      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
+      val viewConfig = MountConfig.viewConfig0(sqlB"select 42")
 
       val insertMnts =
         insertMount(srcPath </> file("view"), viewConfig) <*

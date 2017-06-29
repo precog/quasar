@@ -17,23 +17,24 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef.{-> => _, _}
-import quasar.{Data, DataCodec}
-import quasar.api._
+import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.api.services.query._
+import quasar.contrib.scalaz.disjunction._
+import quasar.contrib.scalaz.foldable._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.mount.Mounting
 import quasar.main.analysis
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
-import matryoshka.implicits._
-import org.http4s.argonaut._
 import org.http4s.dsl._
+import org.http4s.headers.Accept
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.process1
 import spire.std.double._
 
 object schema {
@@ -49,6 +50,7 @@ object schema {
   def service[S[_]](
     implicit
     Q : QueryFile.Ops[S],
+    M : Mounting.Ops[S],
     S0: Task :<: S,
     S1: FileSystemFailure :<: S
   ): QHttpService[S] =
@@ -75,18 +77,26 @@ object schema {
           valueOrInvalid("unionMaxSize", unionMax0)
             .map(_ | analysis.CompressionSettings.DefaultUnionMaxSize)
 
-        respond_((decodedFile(req.uri.path) |@| arrMax |@| mapMax |@| strMax |@| unionMax) { (file, amax, mmax, smax, umax) =>
-          val compressionSettings = analysis.CompressionSettings(
-            arrayMaxLength  = amax,
-            mapMaxSize      = mmax,
-            stringMaxLength = smax,
-            unionMaxSize    = umax)
+        val compressionSettings =
+          (arrMax |@| mapMax |@| strMax |@| unionMax)((amax, mmax, smax, umax) =>
+            analysis.CompressionSettings(
+              arrayMaxLength  = amax,
+              mapMaxSize      = mmax,
+              stringMaxLength = smax,
+              unionMaxSize    = umax))
 
-          QResponse.streaming(
-            analysis.sample[S](file, DefaultSampleSize)
-              .pipe(analysis.extractSchema[J, Double](compressionSettings))
-              .map(sst => DataCodec.Precise.encode(sst.asEJson[J].cata(Data.fromEJson)))
-              .pipe(process1.stripNone))
+        respondT(for {
+          settings    <- compressionSettings.liftT[Free[S, ?]]
+          rq          <- requestQuery[Fix](req).liftT[Free[S, ?]]
+          (blob, dir) =  rq
+          r           <- analysis.querySchema[S, J, Double](
+                           blob, requestVars(req), dir, DefaultSampleSize, settings
+                         ).leftMap(_.toApiError)
+          schema      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
+        } yield {
+          formattedDataResponse(
+            MessageFormat.fromAccept(req.headers.get(Accept)),
+            schema.map(analysis.schemaToData(_)).toProcess)
         })
     }
 }

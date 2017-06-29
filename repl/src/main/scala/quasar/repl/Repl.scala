@@ -18,7 +18,7 @@ package quasar.repl
 
 import slamdata.Predef._
 
-import quasar.{Data, DataCodec, Variables}
+import quasar.{Data, DataCodec, Variables, resolveImports}
 import quasar.common.PhaseResults
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -35,7 +35,6 @@ import quasar.sql
 import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -57,7 +56,7 @@ object Repl {
       |  [query]
       |  [id] <- [query]
       |  explain [query]
-      |  schema [path]
+      |  schema [query]
       |  ls [path]
       |  save [path] [value]
       |  append [path] [value]
@@ -105,10 +104,11 @@ object Repl {
     W:  WriteFile.Ops[S],
     P:  ConsoleIO.Ops[S],
     T:  Timing.Ops[S],
-    N:  Mounting.Ops[S],
-    S0: RunStateT :<: S,
-    S1: ReplFail :<: S,
-    S2: Task :<: S
+    S0: Mounting :<: S,
+    S1: RunStateT :<: S,
+    S2: ReplFail :<: S,
+    S3: Task :<: S,
+    S4: FileSystemFailure :<: S
   ): Free[S, Unit] = {
     import Command._
 
@@ -198,7 +198,8 @@ object Repl {
               state <- RS.get
               out   =  state.cwd </> file(name)
               expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
-              query =  fsQ.executeQuery(expr, Variables.fromMap(state.variables), state.cwd, out)
+              block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+              query =  fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
               _     <- runQuery(state, query)(p =>
                         P.println(
                           if (p =/= out) "Source file: " + posixCodec.printPath(p)
@@ -210,7 +211,8 @@ object Repl {
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
             lim   =  (state.summaryCount > 0).option(state.summaryCount)
-            query =  fsQ.queryResults(expr, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
+            block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+            query =  fsQ.queryResults(block, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
                        .map(_.toVector)
             _     <- runQuery(state, query)(ds => summarize[S](lim, state.format)(ds))
           } yield ())
@@ -220,7 +222,8 @@ object Repl {
           state <- RS.get
           expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
-          t     <- fsQ.explainQuery(expr, vars, state.cwd).run.run.run
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+          t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
           (log, result) = t
           _     <- printLog(state.debugLevel, log)
           _     <- result.fold(
@@ -230,18 +233,18 @@ object Repl {
                       κ(().point[Free[S, ?]])))
         } yield ()
 
-      case Schema(f) =>
+      case Schema(q) =>
         for {
           state <- RS.get
-          file  =  state targetFile f
-          proc  <- analysis.sampleResults(file, 1000L).run
-          p1    =  analysis.extractSchema[Fix[EJson], Double](
-                     analysis.CompressionSettings.Default)
-          sst   =  proc.map(_.pipe(p1).map(_.asEJson[Fix[EJson]].cata(Data.fromEJson)))
-          js    =  sst.map(_.toVector.headOption.flatMap(DataCodec.Precise.encode))
-          _     <- js.fold(
-                     err => DF.fail(err.shows),
-                     j   => P.println(j.fold("{}")(_.spaces2)))
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          r     <- DF.unattemptT(analysis.querySchema[S, Fix[EJson], Double](
+                     expr, vars, state.cwd, 1000L, analysis.CompressionSettings.Default
+                   ).leftMap(_.shows))
+          sst   <- DF.unattempt_(r.leftMap(_.shows))
+          data  =  sst.map(analysis.schemaToData[Fix, Double])
+          js    =  data >>= DataCodec.Precise.encode
+          _     <- P.println(js.fold("{}")(_.spaces2))
         } yield ()
 
 

@@ -87,7 +87,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
     new QScriptCorePlanner[F, FMT, T]
   }
 
-  implicit def thetaJoin[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions, T[_[_]]: RecursiveT](
+  implicit def thetaJoin[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions, T[_[_]]: BirecursiveT](
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]]

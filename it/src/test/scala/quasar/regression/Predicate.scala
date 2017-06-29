@@ -33,7 +33,8 @@ sealed abstract class Predicate {
   def apply[F[_]: Catchable: Monad](
     expected: Vector[Json],
     actual: Process[F, Json],
-    fieldOrder: FieldOrder
+    fieldOrder: OrderSignificance,
+    resultOrder: OrderSignificance
   ): F[Result]
 }
 
@@ -62,105 +63,126 @@ object Predicate {
     }
   }
 
-  /** Must contain ALL the elements in any order. */
-  final case object ContainsAtLeast extends Predicate {
-    def apply[F[_]: Catchable: Monad](
-      expected: Vector[Json],
-      actual: Process[F, Json],
-      fieldOrder: FieldOrder
-    ): F[Result] =
-      actual.scan((expected.toSet, Set.empty[Json])) {
-        case ((expected, wrongOrder), e) =>
-          expected.find(_ == e) match {
-            case Some(e1) if jsonMatches(e1, e) =>
-              (expected.filterNot(_ == e), wrongOrder)
-            case Some(_) =>
-              (expected.filterNot(_ == e), wrongOrder + e)
-            case None =>
-              (expected, wrongOrder)
-          }
-      }
-        .runLast
-        .map {
-          case Some((exp, wrongOrder)) =>
-            (exp aka "unmatched expected values" must beEmpty) and
-            (wrongOrder aka "matched but field order differs" must beEmpty)
-              .unless(fieldOrder === FieldOrderIgnored): Result
-          case None =>
-            failure
-        }
-  }
-
-  /** Must contain ALL and ONLY the elements in any order. */
-  final case object ContainsExactly extends Predicate {
-    def apply[F[_]: Catchable: Monad](
-      expected: Vector[Json],
-      actual: Process[F, Json],
-      fieldOrder: FieldOrder
-    ): F[Result] =
-      actual.scan((expected.toSet, Set.empty[Json], None: Option[Json])) {
-        case ((expected, wrongOrder, extra), e) =>
-          expected.find(_ == e) match {
-            case Some(e1) if jsonMatches(e1, e) =>
-              (expected.filterNot(_ == e), wrongOrder, extra)
-            case Some(_) =>
-              (expected.filterNot(_ == e), wrongOrder + e, extra)
-            case None =>
-              (expected, wrongOrder, extra.orElse(e.some))
-          }
-      }
-        .runLast
-        .map {
-          case Some((exp, wrongOrder, extra)) =>
-            (extra aka "unexpected value" must beNone) and
-            (wrongOrder aka "matched but field order differs" must beEmpty)
-              .unless(fieldOrder === FieldOrderIgnored) and
-            (exp aka "unmatched expected values" must beEmpty): Result
-          case None =>
-            failure
-        }
-  }
-
-  /** Must EXACTLY match the elements, in order. */
-  final case object EqualsExactly extends Predicate {
+  /** Must contain ALL the elements. */
+  final case object AtLeast extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
       actual0: Process[F, Json],
-      fieldOrder: FieldOrder
-    ): F[Result] = {
-      val actual   = actual0.map(Some(_))
-      val expected = Process.emitAll(expected0).map(Some(_))
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance
+    ): F[Result] = resultOrder match {
+      case OrderPreserved =>
+        // FIXME: This case is the same as `Exactly`, but shouldn’t be.
+        val actual   = actual0.map(Some(_))
+        val expected = Process.emitAll(expected0).map(Some(_))
 
-      (actual tee expected)(tee.zipAll(None, None))
-        .flatMap {
-          case (a, e) if jsonMatches(a, e)                  => Process.halt
-          case (a, e) if (a == e &&
-                          fieldOrder === FieldOrderIgnored) => Process.halt
-          case (a, e)                                       => Process.emit(a must matchJson(e) : Result)
+        (actual tee expected)(tee.zipAll(None, None))
+          .flatMap {
+            case (a, e) if jsonMatches(a, e) =>
+              Process.halt
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
+              Process.halt
+            case (a, e) =>
+              Process.emit(a must matchJson(e) : Result)
+          }
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
+      case OrderIgnored =>
+        actual0.scan((expected0.toSet, Set.empty[Json])) {
+          case ((expected, wrongOrder), e) =>
+            expected.find(_ == e) match {
+              case Some(e1) if jsonMatches(e1, e) =>
+                (expected.filterNot(_ == e), wrongOrder)
+              case Some(_) =>
+                (expected.filterNot(_ == e), wrongOrder + e)
+              case None =>
+                (expected, wrongOrder)
+            }
         }
-        .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .runLast
+          .map {
+            case Some((exp, wrongOrder)) =>
+              (exp aka "unmatched expected values" must beEmpty) and
+                (wrongOrder aka "matched but field order differs" must beEmpty)
+                .unless(fieldOrder ≟ OrderIgnored): Result
+            case None =>
+              failure
+          }
+    }
+  }
+
+  /** Must ALL and ONLY the elements. */
+  final case object Exactly extends Predicate {
+    def apply[F[_]: Catchable: Monad](
+      expected0: Vector[Json],
+      actual0: Process[F, Json],
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance
+    ): F[Result] = resultOrder match {
+      case OrderPreserved =>
+        val actual   = actual0.map(Some(_))
+        val expected = Process.emitAll(expected0).map(Some(_))
+
+        (actual tee expected)(tee.zipAll(None, None))
+          .flatMap {
+            case (a, e) if jsonMatches(a, e) =>
+              Process.halt
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
+              Process.halt
+            case (a, e) =>
+              Process.emit(a must matchJson(e) : Result)
+          }
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
+      case OrderIgnored =>
+        actual0.scan((expected0.toSet, Set.empty[Json], None: Option[Json])) {
+          case ((expected, wrongOrder, extra), e) =>
+            expected.find(_ == e) match {
+              case Some(e1) if jsonMatches(e1, e) =>
+                (expected.filterNot(_ == e), wrongOrder, extra)
+              case Some(_) =>
+                (expected.filterNot(_ == e), wrongOrder + e, extra)
+              case None =>
+                (expected, wrongOrder, extra.orElse(e.some))
+            }
+        }
+          .runLast
+          .map {
+            case Some((exp, wrongOrder, extra)) =>
+              (extra aka "unexpected value" must beNone) and
+                (wrongOrder aka "matched but field order differs" must beEmpty)
+                .unless(fieldOrder ≟ OrderIgnored) and
+                (exp aka "unmatched expected values" must beEmpty): Result
+            case None =>
+              failure
+          }
     }
   }
 
   /** Must START WITH the elements, in order. */
-  final case object EqualsInitial extends Predicate {
+  final case object Initial extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
       actual0: Process[F, Json],
-      fieldOrder: FieldOrder
-    ): F[Result] = {
-      val actual   = actual0.map(Some(_))
-      val expected = Process.emitAll(expected0).map(Some(_))
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance
+    ): F[Result] = resultOrder match {
+      case OrderPreserved =>
+        val actual   = actual0.map(Some(_))
+        val expected = Process.emitAll(expected0).map(Some(_))
 
-      (actual tee expected)(tee.zipAll(None, None))
-        .flatMap {
-          case (a, None)                                    => Process.halt
-          case (a, e) if (jsonMatches(a, e))                => Process.halt
-          case (a, e) if (a == e &&
-                          fieldOrder === FieldOrderIgnored) => Process.halt
-          case (a, e)                                       => Process.emit(a must matchJson(e) : Result)
-        }
-        .runLog.map(_.foldMap()(Result.ResultMonoid))
+        (actual tee expected)(tee.zipAll(None, None))
+          .flatMap {
+            case (a, None) =>
+              Process.halt
+            case (a, e) if (jsonMatches(a, e)) =>
+              Process.halt
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
+              Process.halt
+            case (a, e) =>
+              Process.emit(a must matchJson(e) : Result)
+          }
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
+      case OrderIgnored =>
+        AtLeast(expected0, actual0, fieldOrder, resultOrder)
     }
   }
 
@@ -169,7 +191,8 @@ object Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
       actual: Process[F, Json],
-      fieldOrder: FieldOrder
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance
     ): F[Result] = {
       val expected = expected0.toSet
 
@@ -180,7 +203,7 @@ object Predicate {
           // NB: want to ignore field-order here
           exp.filterNot(_ == e)
         }
-        .dropWhile(_.size == expected.size)
+        .dropWhile(_.size ≟ expected.size)
         .take(1)
         .map(unseen => expected.filterNot(unseen contains _) aka "prohibited values" must beEmpty : Result)
         .runLastOr(success)
@@ -195,11 +218,10 @@ object Predicate {
 
   implicit val PredicateDecodeJson: DecodeJson[Predicate] =
     DecodeJson(c => c.as[String].flatMap {
-      case "containsAtLeast"  => jok(ContainsAtLeast)
-      case "containsExactly"  => jok(ContainsExactly)
-      case "doesNotContain"   => jok(DoesNotContain)
-      case "equalsExactly"    => jok(EqualsExactly)
-      case "equalsInitial"    => jok(EqualsInitial)
-      case str                => jfail("Expected one of: containsAtLeast, containsExactly, doesNotContain, equalsExactly, equalsInitial, but found: " + str, c.history)
+      case "atLeast"        => jok(AtLeast)
+      case "exactly"        => jok(Exactly)
+      case "doesNotContain" => jok(DoesNotContain)
+      case "initial"        => jok(Initial)
+      case str              => jfail("Expected one of: atLeast, exactly, doesNotContain, initial, but found: " + str, c.history)
     })
 }

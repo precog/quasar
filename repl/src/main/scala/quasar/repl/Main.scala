@@ -112,7 +112,8 @@ object Main {
     S1: QueryFile :<: S,
     S2: ReadFile :<: S,
     S3: WriteFile :<: S,
-    S4: ManageFile :<: S
+    S4: ManageFile :<: S,
+    S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
       val i: ReplEff[S, ?] ~> DriverEffM =

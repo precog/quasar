@@ -21,10 +21,13 @@ import quasar.precog.util._
 import scalaz._
 
 import scala.concurrent.ExecutionContext
+import scala.math.BigDecimal
 
 import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.util.UUID
 
-package object blueeyes extends precog.PackageTime with precog.PackageAliases {
+package object blueeyes extends precog.PackageTime {
   type spec    = scala.specialized
   type switch  = scala.annotation.switch
   type tailrec = scala.annotation.tailrec
@@ -37,18 +40,18 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type BitSet             = quasar.precog.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = quasar.precog.util.RawBitSet
-  type ByteBufferPoolS[A] = State[quasar.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+  type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
 
-  def Utf8Charset: Charset                                               = java.nio.charset.Charset forName "UTF-8"
+  def Utf8Charset: Charset                                               = Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
-  def uuid(s: String): UUID                                              = java.util.UUID fromString s
-  def randomUuid(): UUID                                                 = java.util.UUID.randomUUID
+  def uuid(s: String): UUID                                              = UUID fromString s
+  def randomUuid(): UUID                                                 = UUID.randomUUID
   def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
-  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
+  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
+  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
@@ -58,13 +61,13 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
 
   implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
-    scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
+  implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
+    scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
 
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
+  implicit def bigDecimalOrder: scalaz.Order[BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
 
   implicit class ScalaSeqOps[A](xs: scala.collection.Seq[A]) {

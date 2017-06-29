@@ -16,15 +16,14 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
+import scala.collection.mutable
 
 trait DAGTransform extends DAG {
   import dag._
-  // import instructions.{ DerefObject, Eq, JoinObject, Line, PushString, WrapObject }
 
   def transformBottomUp(graph: DepGraph)(f: DepGraph => DepGraph): DepGraph = {
 
-    val memotable = scmMap[DepGraphWrapper, DepGraph]()
+    val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
 
     def transformSpec(spec: BucketSpec): BucketSpec = spec match {
       case UnionBucketSpec(left, right) =>

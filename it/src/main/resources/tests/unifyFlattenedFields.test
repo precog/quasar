@@ -2,12 +2,13 @@
     "name": "unify flattened fields",
     "backends": {
         "mimir": "skip",
-        "couchbase":  "skip",
+        "couchbase":  "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [-72.622739,
                  -72.51565,
                  -72.108354,

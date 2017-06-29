@@ -21,7 +21,9 @@ import quasar.blueeyes.json.serialization.{ Extractor, Decomposer }
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
 import quasar.blueeyes.json.serialization.Versioned._
+
 import scalaz._
+import scalaz.std.string._
 
 sealed trait MetadataType
 
@@ -174,7 +176,7 @@ case class StringValueStats(count: Long, min: String, max: String) extends Metad
 
   def merge(that: Metadata) = that match {
     case StringValueStats(count, min, max) =>
-      Some(StringValueStats(this.count + count, ScalazOrder[String].min(this.min, min), ScalazOrder[String].max(this.max, max)))
+      Some(StringValueStats(this.count + count, scalaz.Order[String].min(this.min, min), scalaz.Order[String].max(this.max, max)))
     case _ => None
   }
 }

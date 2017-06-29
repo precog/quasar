@@ -18,10 +18,7 @@ package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
 import quasar.{Data => QData, NameGenerator}
-import quasar.common.PhaseResultT
-import quasar.connector.PlannerErrT
 import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz.eitherT._
 import quasar.physical.couchbase._,
   common.ContextReader,
   N1QL.{Eq, Id, _},
@@ -32,17 +29,17 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Monad: ContextReader: NameGenerator]
+final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Applicative: ContextReader: NameGenerator]
   extends Planner[T, F, Const[ShiftedRead[AFile], ?]] {
 
   def str(v: String) = Data[T[N1QL]](QData.Str(v))
   def id(v: String)  = Id[T[N1QL]](v)
 
-  val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], T[N1QL]] = {
+  val plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], T[N1QL]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      (genId[T[N1QL], M] ⊛ ContextReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]) { (gId, ctx) =>
+      (genId[T[N1QL], F] ⊛ ContextReader[F].ask) { (gId, ctx) =>
         val collection = common.docTypeValueFromPath(absFile)
-        
+
         val v =
           IfMissing(
             SelectField(gId.embed, str("value").embed).embed,

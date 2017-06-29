@@ -24,6 +24,7 @@ import quasar.RepresentableDataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
+import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.csv.CsvParser
 import quasar.fp._
@@ -48,8 +49,6 @@ import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
 import scodec.bits.ByteVector
-
-import quasar.api.MessageFormatGen._
 
 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._

@@ -20,7 +20,6 @@ import quasar.yggdrasil.bytecode._
 
 import quasar.blueeyes.json.JNum
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.{ IdGen, Identifier }
 import quasar.yggdrasil._
@@ -442,7 +441,7 @@ trait DAG extends Instructions {
     def containsSplitArg: Boolean
 
     def mapDown(body: (DepGraph => DepGraph) => PartialFunction[DepGraph, DepGraph]): DepGraph = {
-      val memotable = scmMap[DepGraphWrapper, DepGraph]()
+      val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
 
       def memoized(node: DepGraph): DepGraph = {
         lazy val pf: PartialFunction[DepGraph, DepGraph] = body(memoized)
@@ -598,7 +597,7 @@ trait DAG extends Instructions {
       type BucketSpecState = State[SubstitutionState, BucketSpec]
       type DepGraphState   = State[SubstitutionState, DepGraph]
 
-      val memotable = scmMap[DepGraph, DepGraphState]()
+      val memotable = mutable.Map[DepGraph, DepGraphState]()
 
       def memoized(node: DepGraph): DepGraphState = {
 

@@ -65,29 +65,29 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
   val qsr = new Transform[Fix, QScriptTotal[Fix, ?]]
 
   /** Translate to MapFunc (common to all QScript backends). */
-  def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
-    prg.cata[Free[MapFunc[Fix, ?], A]] {
+  def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFuncCore[Fix, ?], A] =
+    prg.cata[Free[MapFuncCore[Fix, ?], A]] {
       case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateUnaryMapping(func)(a1))
+        Free.roll(MapFuncCore.translateUnaryMapping(func)(a1))
 
       case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
+        Free.roll(MapFuncCore.translateBinaryMapping(func)(a1, a2))
 
       case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
+        Free.roll(MapFuncCore.translateTernaryMapping(func)(a1, a2, a3))
 
       case lp.Free(sym) => Free.pure(args(sym))
 
       case lp.Constant(data) =>
         qsr.fromData(data).fold(
           _ => sys.error("invalid Data"),
-          ej => Free.roll(MapFuncs.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej)))
+          ej => Free.roll(MapFuncsCore.Constant[Fix, Free[MapFuncCore[Fix, ?], A]](ej)))
 
       case lp.TemporalTrunc(part, src) =>
-        Free.roll(MapFuncs.TemporalTrunc(part, src))
+        Free.roll(MapFuncsCore.TemporalTrunc(part, src))
     }
 
   def absurd[A, B](a: A): B = sys.error("impossible!")

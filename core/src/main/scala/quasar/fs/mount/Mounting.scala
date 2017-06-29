@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.sql.{Sql, Statement}
+import quasar.sql.{ScopedExpr, Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -47,7 +47,7 @@ object Mounting {
   final case class LookupConfig(path: APath)
     extends Mounting[Option[MountConfig]]
 
-  final case class MountView(loc: AFile, query: Fix[Sql], vars: Variables)
+  final case class MountView(loc: AFile, scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables)
     extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
@@ -106,8 +106,11 @@ object Mounting {
     def lookupConfig(path: APath): OptionT[FreeS, MountConfig] =
       OptionT(lift(LookupConfig(path)))
 
+    def lookupViewConfig(path: AFile): OptionT[FreeS, ViewConfig] =
+      OptionT(lookupConfig(path).run.map(_.flatMap(viewConfig.getOption).map(ViewConfig.tupled)))
+
     def lookupModuleConfig(path: ADir): OptionT[FreeS, ModuleConfig] =
-      lookupConfig(path).flatMap(config => OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS]))
+      OptionT(lookupConfig(path).run.map(_.flatMap(moduleConfig.getOption).map(ModuleConfig(_))))
 
     /** Returns the type of mount the path refers to, if any. */
     def lookupType(path: APath): OptionT[FreeS, MountType] =
@@ -116,12 +119,12 @@ object Mounting {
     /** Create a view mount at the given location. */
     def mountView(
       loc: AFile,
-      query: Fix[Sql],
+      scopedExpr: ScopedExpr[Fix[Sql]],
       vars: Variables
     )(implicit
       S0: MountingFailure :<: S
     ): FreeS[Unit] =
-      MountingFailure.Ops[S].unattempt(lift(MountView(loc, query, vars)))
+      MountingFailure.Ops[S].unattempt(lift(MountView(loc, scopedExpr, vars)))
 
     /** Create a filesystem mount at the given location. */
     def mountFileSystem(

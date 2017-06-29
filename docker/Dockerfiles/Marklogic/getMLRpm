@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+ML_VERSION="8.0-5.8"
+ML_SHA="48cfbd30d003547feb6b60e120abd4542e8b83f9"
+ML_DOWNLOAD_EMAIL="quasarci@slamdata.com"
+ML_DOWNLOAD_PASSWORD="quasarci"
+ML_DEV_COOKIES=".ml-dev-cookies"
+ML_DEV_URL="https://developer.marklogic.com"
+ML_DEV_LOGIN="${ML_DEV_URL}/login"
+ML_DEV_GET_TOKEN="${ML_DEV_URL}/get-download-url"
+ML_DEV_URL="https://developer.marklogic.com"
+ML_ASSET_PATH="/download/binaries/8.0/MarkLogic-RHEL6-${ML_VERSION}.x86_64.rpm"
+
+function downloadMLRpm() {
+  curl -X POST --data "email=${ML_DOWNLOAD_EMAIL}&password=${ML_DOWNLOAD_PASSWORD}" -c $ML_DEV_COOKIES $ML_DEV_LOGIN
+  curl -X POST --data "download=$ML_ASSET_PATH" -b $ML_DEV_COOKIES $ML_DEV_GET_TOKEN > /tmp/json
+  cat /tmp/json | cut -f 3 -d: | cut -c2- | rev | cut -c3- | rev > /tmp/url
+  curl -o $ML_RPM_PATH -m 2000 "${ML_DEV_URL}$(cat /tmp/url)"
+  rm $ML_DEV_COOKIES /tmp/url /tmp/json
+}
+
+CACHE_DIR="$HOME/.cache/quasar/marklogic"
+mkdir -p $CACHE_DIR
+ML_RPM_PATH="$CACHE_DIR/MarkLogic.rpm"
+ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"
+
+echo "$ML_SHA  $ML_RPM_PATH" > $ML_RPM_SHA1
+
+if [ ! -f $ML_RPM_PATH ]
+then
+  echo "Didn't find MarkLogic.rpm in cache, downloading ..."
+  downloadMLRpm
+fi
+
+cp $ML_RPM_PATH docker/Dockerfiles/Marklogic/
+
+shasum --status -c $ML_RPM_SHA1

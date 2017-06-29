@@ -17,6 +17,7 @@
 package quasar.blueeyes
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
   * This object contains some methods to do faster iteration over primitives.

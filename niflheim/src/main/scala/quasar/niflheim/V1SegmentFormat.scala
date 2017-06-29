@@ -21,6 +21,7 @@ import quasar.precog.common._
 import quasar.precog.BitSet
 import quasar.precog.util.BitSetUtil.Implicits._
 
+import java.io.IOException
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
 import java.nio.ByteBuffer
 

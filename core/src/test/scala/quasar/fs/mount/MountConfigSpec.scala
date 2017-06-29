@@ -18,22 +18,16 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
-import quasar.sql
-import quasar.sql.fixpoint._
+import quasar.sql._
 
 import argonaut._, Argonaut._, JsonScalaz._
 import scalaz.Scalaz._
-import pathy.Path._
 
 class MountConfigSpec extends quasar.Qspec {
   import MountConfig._
 
   "View config codec" should {
-    val read = SelectR(
-      sql.SelectAll,
-      List(sql.Proj(SpliceR(None), None)),
-      Some(sql.TableRelationAST(file("zips"), None)),
-      None, None, None)
+    val read = sqlB"select * from zips"
 
     def viewJson(uri: String) =
       Json("view" := Json("connectionUri" := uri))

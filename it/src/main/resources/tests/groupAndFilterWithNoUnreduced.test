@@ -10,7 +10,8 @@
 
     "query": "select count(*) as cnt from zips where pop < 5 group by pop",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "cnt": 66 },
                  { "cnt": 10 },
                  { "cnt":  9 },

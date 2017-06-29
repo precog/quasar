@@ -11,7 +11,8 @@
 
   "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": ["Wednesday", "Thursday", "Friday", "Saturday"]
 }

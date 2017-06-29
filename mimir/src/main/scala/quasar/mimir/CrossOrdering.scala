@@ -16,15 +16,16 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.yggdrasil.TableModule
+
+import scala.collection.mutable
 
 trait CrossOrdering extends DAG {
   import TableModule.CrossOrder // TODO: Move CrossOrder out somewhere else.
   import dag._
 
   def orderCrosses(node: DepGraph): DepGraph = {
-    val memotable = scmMap[DepGraphWrapper, DepGraph]()
+    val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
 
     def memoizedSpec(spec: BucketSpec): BucketSpec = spec match {
       case UnionBucketSpec(left, right) =>

@@ -16,13 +16,18 @@
 
 package quasar.main
 
-import quasar.Data
+import slamdata.Predef._
+import quasar.{Data, queryPlan, resolveImports_, Variables}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, EncodeEJson}
+import quasar.ejson.implicits._
 import quasar.fp.numeric.Positive
 import quasar.fs._
+import quasar.fs.mount.Mounting
+import quasar.frontend.SemanticErrors
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.sql.{ScopedExpr, Sql}
 import quasar.sst._
 import quasar.std.StdLib
 
@@ -32,7 +37,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.stream._
-import spire.algebra.Field
+import spire.algebra.{Field, NRoot}
 import spire.math.ConvertableTo
 
 object analysis {
@@ -89,22 +94,70 @@ object analysis {
       .reduce((x, y) => repeatedly(compress)(x |+| y))
   }
 
-  /** A random sample of the dataset at the given path. */
-  def sample[S[_]](file: AFile, size: Positive)(
-    implicit Q: QueryFile.Ops[S]
-  ): Process[Q.M, Data] =
-    Q.evaluate(sampleQuery(file, size)).translate(Q.transforms.dropPhases)
+  /** The schema of the results of the given query. */
+  def querySchema[S[_], J: Order, A: ConvertableTo: Field: Order](
+    query: ScopedExpr[Fix[Sql]],
+    vars: Variables,
+    baseDir: ADir,
+    sampleSize: Positive,
+    settings: CompressionSettings
+  )(implicit
+    Q : QueryFile.Ops[S],
+    M : Mounting.Ops[S],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): Q.M[SemanticErrors \/ Option[SST[J, A] \/ PopulationSST[J, A]]] = {
+    type TS   = TypeStat[A]
+    type P[X] = StructuralType[J, Option[X]]
 
-  /** Query representing a random sample of `size` items from the specified file. */
-  def sampleQuery(file: AFile, size: Positive): Fix[LogicalPlan] = {
-    val lpr   = new LogicalPlanR[Fix[LogicalPlan]]
-    val dsize = Data._int(size.value)
-    lpr.invoke2(StdLib.set.Sample, lpr.read(file), lpr.constant(dsize))
+    val k: A = ConvertableTo[A].fromLong(sampleSize.value)
+
+    EitherT(sampleOfQuery[S](query, vars, baseDir, sampleSize))
+      .map(s =>
+        s.pipe(extractSchema[J, A](settings))
+          .map(sst => (SST.size(sst) < k) either Population.subst[P, TS](sst) or sst)
+          .toVector.headOption)
+      .run
   }
 
-  /** An eager random sample of the dataset at the given path. */
-  def sampleResults[S[_]](file: AFile, size: Positive)(
+  /** A plan representing a random sample of `size` items from the dataset
+    * represented by the given plan.
+    */
+  def sampled[P](plan: P, size: Positive)(
+    implicit
+    TR: Recursive.Aux[P, LogicalPlan],
+    TC: Corecursive.Aux[P, LogicalPlan]
+  ): P = {
+    val lpr   = new LogicalPlanR[P]
+    val dsize = Data._int(size.value)
+    lpr.invoke2(StdLib.set.Sample, plan, lpr.constant(dsize))
+  }
+
+  /** A random sample of at most `size` elements from the dataset represented
+    * by the given plan.
+    */
+  def sampleOfPlan[S[_]](plan: Fix[LogicalPlan], size: Positive)(
     implicit Q: QueryFile.Ops[S]
   ): Q.M[Process0[Data]] =
-    Q.transforms.dropPhases(Q.results(sampleQuery(file, size)))
+    Q.transforms.dropPhases(Q.results(sampled(plan, size)))
+
+  /** A random sample of at most `size` elements from the dataset represented
+    * by the given query.
+    */
+  def sampleOfQuery[S[_]](expr: ScopedExpr[Fix[Sql]], vars: Variables, baseDir: ADir, size: Positive)(
+    implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]
+  ): Q.M[SemanticErrors \/ Process0[Data]] =
+    resolveImports_[S](expr, baseDir)
+      .leftMap(_.wrapNel)
+      .flatMapF(query =>
+        queryPlan(query, vars, baseDir, 0L, none).run.value
+          .traverse(_.fold(
+            xs => Process.emitAll(xs).point[Q.M],
+            sampleOfPlan[S](_, size))))
+      .run
+
+  def schemaToData[T[_[_]]: BirecursiveT, A: EncodeEJson: Equal: Field: NRoot](
+    schema: SST[T[EJson], A] \/ PopulationSST[T[EJson], A]
+  ): Data =
+    schema.fold(_.asEJson[T[EJson]], _.asEJson[T[EJson]]).cata(Data.fromEJson)
 }

@@ -8,52 +8,66 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
-  private val algebraVersion           = "0.7.0"
-  private val argonautVersion          = "6.2"
-  private val disciplineVersion        = "0.5"
-  private val jawnVersion              = "0.10.4"
-  private val jacksonVersion           = "2.4.4"
-  private val matryoshkaVersion        = "0.18.3"
-  private val pathyVersion             = "0.2.9"
-  private val slamdataPredefVersion    = "0.0.4"
-  private val raptureVersion           = "2.0.0-M6"
-  private val scodecBitsVersion        = "1.1.0"
-  private val http4sVersion            = "0.15.13a"
+  private val algebraVersion      = "0.7.0"
+  private val argonautVersion     = "6.2"
+  private val disciplineVersion   = "0.5"
+  // Upgrading to doobie `0.4.1` is not trivial for a relatively minor annoyance that
+  // will be addressed in `0.4.2` in which case the only thing I think needed to upgrade will be
+  // changing `AnalysisSpec` to `TaskChecker`. Also, the "contrib" dependencies no longer have
+  // contrib in their name, so they need to be updated. As well as `postgresql` having been changed to `postgres`
+  private val doobieVersion       = "0.3.0"
+  private val jawnVersion         = "0.10.4"
+  private val jacksonVersion      = "2.4.4"
+  private val matryoshkaVersion   = "0.18.3"
+  private val monocleVersion      = "1.4.0"
+  private val pathyVersion        = "0.2.11"
+  private val raptureVersion      = "2.0.0-M9"
+  // Staying on 0.8.0 version of refined due to latest version using scala 2.11.11 which
+  // causes duplicate libjansi libraries for linux, mac, and windows that in turn make assembly sbt task fail.
+  private val refinedVersion      = "0.8.0"
+  private val scodecBitsVersion   = "1.1.0"
+  private val http4sVersion       = "0.15.13a"
+  private val scalacheckVersion   = "1.13.4"
+  private val scalazVersion       = "7.2.13"
+  private val scalazStreamVersion = "0.8.6a"
+  private val shapelessVersion    = "2.3.2"
+  private val simulacrumVersion   = "0.10.0"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion             = "3.8.4"
-  private val spireVersion             = "0.14.1"
+  private val specsVersion        = "3.8.4"
+  private val spireVersion        = "0.14.1"
 
   def foundation = Seq(
-    CommonDependencies.scalaz.core,
-    CommonDependencies.scalaz.concurrent,
-    CommonDependencies.scalazStream.scalazStream,
-    CommonDependencies.monocle.core,
-    "org.typelevel" %% "algebra"         % algebraVersion,
-    "org.typelevel" %% "spire"           % spireVersion,
-    "io.argonaut"   %% "argonaut"        % argonautVersion,
-    "io.argonaut"   %% "argonaut-scalaz" % argonautVersion,
-    "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
-    "com.slamdata"  %% "pathy-core"      % pathyVersion,
-    "com.slamdata"  %% "pathy-argonaut"  % pathyVersion,
-    "com.slamdata"  %% "slamdata-predef" % slamdataPredefVersion,
-    CommonDependencies.refined.refined,
-    CommonDependencies.shapeless.shapeless,
-    CommonDependencies.scalacheck.scalacheck                  % Test,
-    CommonDependencies.simulacrum.simulacrum                  % Test,
-    "org.typelevel" %% "algebra-laws"    % algebraVersion     % Test,
-    "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
-    "org.typelevel" %% "spire-laws"      % spireVersion       % Test,
-    "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
-    CommonDependencies.scalaz.scalacheckBinding               % Test,
-    CommonDependencies.typelevel.shapelessScalacheck          % Test,
-    CommonDependencies.typelevel.scalazSpecs2                 % Test
+    "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
+    "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
+    "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
+    "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
+    "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
+    "org.typelevel"              %% "algebra"                   % algebraVersion,
+    "org.typelevel"              %% "spire"                     % spireVersion,
+    "io.argonaut"                %% "argonaut"                  % argonautVersion,
+    "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
+    "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
+    "com.slamdata"               %% "pathy-core"                % pathyVersion,
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    "eu.timepit"                 %% "refined"                   % refinedVersion,
+    "com.chuusai"                %% "shapeless"                 % shapelessVersion,
+    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
+    "com.propensive"             %% "contextual"                % "1.0.1",
+    "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
+    "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
+    "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
+    "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
+    "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
+    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6"                                % Test,
+    "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              % Test
   )
 
   def frontend = Seq(
-    CommonDependencies.monocle.`macro`,
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
-    "org.typelevel"          %% "algebra-laws"             % algebraVersion  % Test
+    "com.github.julien-truffaut" %% "monocle-macro"            % monocleVersion,
+    "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6",
+    "org.typelevel"              %% "algebra-laws"             % algebraVersion  % Test
   )
 
   def ejson = Seq(
@@ -63,20 +77,20 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    CommonDependencies.doobie.core,
-    CommonDependencies.doobie.hikari,
-    CommonDependencies.doobie.postgres,
-    "org.http4s"           %% "http4s-core" % http4sVersion,
-    CommonDependencies.monocle.`macro`,
-    "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
-    "com.slamdata"         %% "pathy-argonaut" % pathyVersion,
-    CommonDependencies.doobie.specs2                          % Test,
-    CommonDependencies.doobie.h2                              % Test
+    "org.tpolecat"               %% "doobie-core"               % doobieVersion,
+    "org.tpolecat"               %% "doobie-contrib-hikari"     % doobieVersion,
+    "org.tpolecat"               %% "doobie-contrib-postgresql" % doobieVersion,
+    "org.http4s"                 %% "http4s-core"               % http4sVersion,
+    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+    "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    "org.tpolecat"               %% "doobie-contrib-specs2"     % doobieVersion % Test,
+    "org.tpolecat"               %% "doobie-contrib-h2"         % doobieVersion % Test
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.jboss.aesh"    % "aesh"  % "0.66.8",
-    "com.h2database"    % "h2"    % "1.4.192"
+    "org.jboss.aesh"    % "aesh"  % "0.66.17",
+    "com.h2database"    % "h2"    % "1.4.195"
   )
 
   def mongodb = {
@@ -96,12 +110,12 @@ object Dependencies {
   }
 
   val postgresql = Seq(
-    CommonDependencies.doobie.core     % "compile, test",
-    CommonDependencies.doobie.postgres % "compile, test"
+    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
+    "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
@@ -113,17 +127,16 @@ object Dependencies {
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
-    "org.http4s"         %% "http4s-core" % http4sVersion
+    "org.http4s"         %% "http4s-core"   % http4sVersion
   )
 
   def marklogic = Seq(
-    "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
-    "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
-    "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "com.slamdata"               %% "xml-names-core"      % "0.0.1",
-    "eu.timepit"                 %% "refined-scalaz"      % CommonDependencies.refinedVersion,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
-    CommonDependencies.refined.scalacheck                                   % Test,
+    "com.fasterxml.jackson.core" %  "jackson-core"         % jacksonVersion,
+    "com.fasterxml.jackson.core" %  "jackson-databind"     % jacksonVersion,
+    "com.marklogic"              %  "marklogic-xcc"        % "8.0.5",
+    "com.slamdata"               %% "xml-names-core"       % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"            % "1.0.6",
+    "eu.timepit"                 %% "refined-scalaz"       % refinedVersion,
     "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
@@ -143,7 +156,7 @@ object Dependencies {
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
-    CommonDependencies.refined.scalacheck                          % Test
+    "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
   )
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.13",
@@ -156,8 +169,8 @@ object Dependencies {
     "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
-    "io.argonaut"      %% "argonaut-monocle" % argonautVersion     % Test,
-    CommonDependencies.http4s.blazeClient                          % Test,
-    CommonDependencies.refined.scalacheck                          % Test,
-    "io.verizon.knobs" %% "core"             % "4.0.30-scalaz-7.2" % Test)
+    "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
+    "org.http4s"       %% "http4s-blaze-client" % http4sVersion       % Test,
+    "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
+    "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test)
 }

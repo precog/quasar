@@ -5,7 +5,6 @@
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "skip",
         "spark_hdfs":        "skip",
@@ -13,6 +12,7 @@
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "BOSTON" }]
 }

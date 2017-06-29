@@ -34,7 +34,7 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty[Need]
 
-    val jvalueOrdering     = ScalazOrder[JValue].toScalaOrdering
+    val jvalueOrdering = scalaz.Order[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 
     val globalIdPath = JPath(".globalId")

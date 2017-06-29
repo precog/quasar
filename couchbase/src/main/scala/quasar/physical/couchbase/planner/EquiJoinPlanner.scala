@@ -17,10 +17,8 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.common.{JoinType, PhaseResultT}
-import quasar.connector.PlannerErrT
+import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz.eitherT._
 import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
@@ -28,7 +26,8 @@ import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
+import quasar.Planner.PlannerErrorME
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
 
 import matryoshka._
 import matryoshka.data._
@@ -38,7 +37,9 @@ import scalaz._, Scalaz._
 
 // NB: Only handling a limited simple set of cases to start
 
-final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextReader: NameGenerator]
+final class EquiJoinPlanner[
+    T[_[_]]: BirecursiveT: ShowT,
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
@@ -76,7 +77,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
         case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2)))))) => true
           case _                                                                       => false
         }
         case v => false
@@ -85,28 +86,28 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
     }
   }
 
-  lazy val tPlan: AlgebraM[M, QScriptTotal[T, ?], T[N1QL]] =
+  lazy val tPlan: AlgebraM[F, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[F, MapFuncCore[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
-  def unimpl[F[_]: Applicative, A] =
-    unimplementedP[F, A]("EquiJoin: Not currently mapped to N1QL's key join")
+  def unimpl[A] =
+    unimplemented[F, A]("EquiJoin: Not currently mapped to N1QL's key join")
 
   def keyJoin(
     branch: FreeQS[T], key: FreeMap[T], combine: JoinFunc[T],
     col: String, side: JoinSide, joinType: LookupJoinType
-  ): M[T[N1QL]] =
+  ): F[T[N1QL]] =
     for {
-      id1 <- genId[T[N1QL], M]
-      id2 <- genId[T[N1QL], M]
-      ctx <- ContextReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]
-      b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[M]), tPlan))
-      k   <- key.cataM(interpretM(κ(id1.embed.η[M]), mfPlan))
+      id1 <- genId[T[N1QL], F]
+      id2 <- genId[T[N1QL], F]
+      ctx <- ContextReader[F].ask
+      b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[F]), tPlan))
+      k   <- key.cataM(interpretM(κ(id1.embed.η[F]), mfPlan))
       c   <- combine.cataM(interpretM({
-               case `side` => id1.embed.η[M]
-               case _      => Arr(List(N1QL.Null[T[N1QL]]().embed, id2.embed)).embed.η[M]
+               case `side` => id1.embed.η[F]
+               case _      => Arr(List(N1QL.Null[T[N1QL]]().embed, id2.embed)).embed.η[F]
              }, mfPlan))
     } yield Select(
       Value(true),
@@ -119,7 +120,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
         Data[T[N1QL]](quasar.Data.Str(col)).embed).embed).some,
       groupBy = none, orderBy = nil).embed
 
-  def plan: AlgebraM[M, EquiJoin[T, ?], T[N1QL]] = {
+  def plan: AlgebraM[F, EquiJoin[T, ?], T[N1QL]] = {
     case EquiJoin(
         Embed(Unreferenced()),
         lBranch, BranchCollection(rCol),

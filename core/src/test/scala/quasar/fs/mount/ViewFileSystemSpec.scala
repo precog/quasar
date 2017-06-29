@@ -24,19 +24,22 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._
-import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+
 import monocle.macros.Lenses
+
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
+
 import scalaz.{Failure => _, _}, Scalaz._
 
 class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
@@ -60,7 +63,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     def emptyWithViews(views: Map[AFile, Fix[Sql]]) =
       mountConfigs.set(views.map { case (p, expr) =>
-        p -> MountConfig.viewConfig(expr, Variables.empty)
+        p -> MountConfig.viewConfig(ScopedExpr(expr, Nil), Variables.empty)
       })(empty)
   }
 
@@ -112,7 +115,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
-      views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, expr, Variables.empty) }
+      views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, ScopedExpr(expr, Nil), Variables.empty) }
 
     val toBeTraced: Free[ViewFileSystem, A] =
       mountViews *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
@@ -155,7 +158,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
-      val lp = queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 
@@ -567,7 +570,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def unsafeParse(sqlQry: String): Fix[Sql] =
       sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
-    def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): SemanticErrors \/ Fix[LogicalPlan] =
+    def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
       view.resolveViewRefs[Mounting](lp).run
         .foldMap(runMounting[State[VS, ?]])
         .eval(VS.emptyWithViews(views))
@@ -612,7 +615,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile[Fix[LogicalPlan]](Blob(inner, Nil), Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
@@ -677,7 +680,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(Blob(q, Nil), Variables.empty, rootDir, 0L, None)
+        quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
           .run.value.toOption.get
           .valueOr(_ => scala.sys.error("impossible constant plan"))
 

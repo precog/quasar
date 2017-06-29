@@ -22,7 +22,7 @@ import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.sql.{Blob, Sql}
+import quasar.sql.Sql
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
@@ -39,7 +39,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     * SQL^2 query.
     */
   def evaluateQuery(
-    query: Blob[Fix[Sql]],
+    query: Fix[Sql],
     vars: Variables,
     basePath: ADir,
     off: Natural,
@@ -55,7 +55,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     * using the given output file if possible.
     */
   def executeQuery(
-    query: Blob[Fix[Sql]],
+    query: Fix[Sql],
     vars: Variables,
     basePath: ADir,
     out: AFile)(
@@ -68,7 +68,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
 
   /** Returns the physical execution plan for the given SQL^2 query. */
   def explainQuery(
-    query: Blob[Fix[Sql]],
+    query: Fix[Sql],
     vars: Variables,
     basePath: ADir
   ): CompExecM[ExecutionPlan] =
@@ -79,7 +79,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
 
   /** The results of executing the given SQL^2 query. */
   def queryResults(
-    query: Blob[Fix[Sql]],
+    query: Fix[Sql],
     vars: Variables,
     basePath: ADir,
     off: Natural,

@@ -6,6 +6,7 @@
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
         "postgresql":        "pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending"
@@ -17,6 +18,7 @@
                     and date_trunc(\"day\", ts) <= start_of_day(date(\"2014-08-20\")))
                   and date_trunc(\"day\", ts) != start_of_day(date(\"2014-08-19\")))
                 or date_trunc(\"day\", ts) = start_of_day(date(\"2014-08-22\"))",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Monday", "Wednesday", "Friday"]
 }

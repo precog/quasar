@@ -145,6 +145,9 @@ object fn {
   def nodeName(node: XQuery): XQuery =
     XQuery(s"fn:node-name($node)")
 
+  def name(): XQuery =
+    XQuery("fn:name()")
+
   def not(bool: XQuery): XQuery =
     XQuery(s"fn:not($bool)")
 

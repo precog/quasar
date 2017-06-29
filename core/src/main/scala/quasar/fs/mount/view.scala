@@ -19,6 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
@@ -26,7 +27,6 @@ import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
-import quasar.sql.{Sql, Blob}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -79,8 +79,7 @@ object view {
         } yield h
 
       for {
-        lp <- resolveViewRefs[S](readLP).leftMap(se =>
-                planningFailed(readLP, Planner.InternalError fromMsg se.shows))
+        lp <- resolveViewRefs[S](readLP)
         h  <- refineConstantPlan(lp).fold(dataHandle(_).liftM[FileSystemErrT], queryHandle)
       } yield h
     }
@@ -142,7 +141,7 @@ object view {
 
     def resolve[A](lp: Fix[LP], op: Fix[LP] => ExecM[A]) =
       resolveViewRefs[S](lp).run.flatMap(_.fold(
-        e => planningFailed(lp, Planner.InternalError fromMsg e.shows).raiseError[ExecM, A],
+        e => e.raiseError[ExecM, A],
         p => op(p)).run.run)
 
     def listViews(dir: ADir): Free[S, Set[PathSegment]] =
@@ -232,31 +231,31 @@ object view {
 
   /** Resolve view references in the given `LP`. */
   def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])
-    : SemanticErrsT[Free[S, ?], Fix[LP]] = {
-    import MountConfig._
+    : FileSystemErrT[Free[S, ?], Fix[LP]] = {
 
     def lift(e: Set[FPath], plan: Fix[LP]) =
-      plan.project.map((e, _)).point[SemanticErrsT[Free[S, ?], ?]]
+      plan.project.map((e, _)).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
 
-    def lookup(loc: AFile): OptionT[Free[S, ?], (Fix[Sql], Variables)] =
-      OptionT(M.lookupConfig(loc).run.map(_.flatMap(viewConfig.getOption)))
-
-    def compiledView(loc: AFile): OptionT[Free[S, ?], SemanticErrors \/ Fix[LP]] =
-      lookup(loc).map { case (expr, vars) =>
-         precompile[Fix[LP]](Blob(expr, Nil), vars, fileParent(loc)).run.value
-      }
+    def compiledView(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
+      for {
+        viewConfig   <- M.lookupViewConfig(loc)
+        block        <- resolveImports_(viewConfig.query, rootDir).run.run.liftM[OptionT]
+      } yield block.map(_.leftMap(_.wrapNel).flatMap(precompile[Fix[LP]](_, viewConfig.vars, fileParent(loc)).run.value))
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
-    (Set[FPath](), cleaned).anaM[Fix[LP]] {
-      case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
-        refineTypeAbs(p).swap.map(f =>
-          EitherT(compiledView(f) getOrElse i.right).map(_.project.map((e + f, _)))
-        ).getOrElse(lift(e, i))
+    val newLP: SemanticErrsT[FileSystemErrT[Free[S, ?], ?], Fix[LP]] =
+      (Set[FPath](), cleaned).anaM[Fix[LP]] {
+        case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
+          refineTypeAbs(p).swap.map(f =>
+            EitherT(EitherT(compiledView(f) getOrElse i.right.right)).map(_.project.map((e + f, _)))
+          ).getOrElse(lift(e, i))
 
-      case (e, i) => lift(e, i)
-    } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[Free[S, ?]]))
+        case (e, i) => lift(e, i)
+      } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[FileSystemErrT[Free[S, ?], ?]]))
+
+    newLP.leftMap(e => planningFailed(plan, Planner.CompilationFailed(e))).flattenLeft
   }
 }

@@ -17,15 +17,19 @@
 package quasar.yggdrasil
 package table
 
+import quasar.blueeyes._, json._
 import quasar.precog.common._, security._
+import quasar.precog.TestSupport._, Gen._
 import quasar.yggdrasil.bytecode.JType
+
 import org.slf4j.LoggerFactory
 
-import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
+
 import TableModule._
 import SampleData._
-import quasar.precog.TestSupport._, Gen._
+
+import java.nio.CharBuffer
 
 trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int

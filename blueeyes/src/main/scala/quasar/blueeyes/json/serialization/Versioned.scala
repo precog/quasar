@@ -119,21 +119,21 @@ object Versioned {
 
   class MkDecomposerV[T] {
     def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
+        implicit iso: Generic.Aux[T, L],
         decomposer: DecomposerAux[F, L]): Decomposer[T] =
       new IsoDecomposer(fields, iso, decomposer).versioned(version, versionProperty)
   }
 
   class MkExtractorV[T] {
     def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
+        implicit iso: Generic.Aux[T, L],
         extractor: ExtractorAux[F, L]): Extractor[T] =
       new IsoExtractor(fields, iso, extractor).versioned(version, versionProperty)
   }
 
   class MkSerializationV[T] {
     def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
+        implicit iso: Generic.Aux[T, L],
         decomposer: DecomposerAux[F, L],
         extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
       (new IsoDecomposer(fields, iso, decomposer).versioned(version, versionProperty),

@@ -134,4 +134,14 @@ object SqlRelation {
         }
       }
     }
+
+  implicit val functor: Functor[SqlRelation] = new Functor[SqlRelation] {
+    def map[A, B](fa: SqlRelation[A])(f: A => B) = fa match {
+      case IdentRelationAST(name, alias)  => IdentRelationAST(name, alias)
+      case VariRelationAST(vari, alias)   => VariRelationAST(vari.map(f), alias)
+      case ExprRelationAST(select, alias) => ExprRelationAST(f(select), alias)
+      case TableRelationAST(name, alias)  => TableRelationAST(name, alias)
+      case JoinRelation(left, right, jt, clause) => JoinRelation(left.map(f), right.map(f), jt, f(clause))
+    }
+  }
 }

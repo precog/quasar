@@ -203,6 +203,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
         })
     })
 
+
   // ejson:type-of($item as item()*) as xs:string?
   private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
     ejs.declare[F]("type-of") flatMap (_(

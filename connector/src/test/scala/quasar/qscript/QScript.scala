@@ -22,8 +22,8 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
-import quasar.qscript.MapFuncs._
-import quasar.sql.{CompilerHelpers, JoinDir}
+import quasar.qscript.MapFuncsCore._
+import quasar.sql.{CompilerHelpers, JoinDir, SqlStringContext}
 import quasar.std.StdLib, StdLib._
 
 import scala.Predef.implicitly
@@ -85,7 +85,7 @@ class QScriptSpec
     }
 
     "convert a basic select with type checking" in {
-      val lp = fullCompileExp("select foo as foo from bar")
+      val lp = fullCompileExp(sqlE"select foo as foo from bar")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
@@ -103,7 +103,7 @@ class QScriptSpec
 
     // TODO: This would benefit from better normalization around Sort (#1545)
     "convert a basic order by" in {
-      val lp = fullCompileExp("select * from zips order by city")
+      val lp = fullCompileExp(sqlE"select * from zips order by city")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -133,7 +133,7 @@ class QScriptSpec
     }
 
     "convert a basic reduction" in {
-      val lp = fullCompileExp("select sum(pop) as pop from bar")
+      val lp = fullCompileExp(sqlE"select sum(pop) as pop from bar")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
@@ -154,7 +154,7 @@ class QScriptSpec
     }
 
     "convert a simple wildcard take" in {
-      val lp = fullCompileExp("select * from bar limit 10")
+      val lp = fullCompileExp(sqlE"select * from bar limit 10")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(
         QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
@@ -174,7 +174,7 @@ class QScriptSpec
     }
 
     "convert a multi-field select" in {
-      val lp = fullCompileExp("select city, state from bar")
+      val lp = fullCompileExp(sqlE"select city, state from bar")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
@@ -408,35 +408,26 @@ class QScriptSpec
           HoleF,
           IncludeId,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
-              Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
-            Free.roll(Constant(ejsonArr(ejsonStr("loc")))))))),
+            Free.roll(MakeArray(LeftSideF)),
+            Free.roll(MakeArray(RightSideF)))))),
         QC.inj(LeftShift((),
           ProjectFieldR(
-            ProjectIndexR(HoleF, IntLit(1)),
-            ProjectIndexR(HoleF, IntLit(2))),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
+            StrLit("loc")),
           IdOnly,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(ConcatArrays(
-                  Free.roll(MakeArray(RightSideF)),
-                  Free.roll(MakeArray(
-                    ProjectIndexR(
-                      ProjectIndexR(LeftSideF, IntLit(0)),
-                      IntLit(0)))))))),
-              Free.roll(MakeArray(RightSideF)))),
-            Free.roll(Constant(ejsonArr(ejsonInt(10)))))))),
+            Free.roll(MakeArray(LeftSideF)),
+            Free.roll(MakeArray(RightSideF)))))),
         QC.inj(Reduce((),
           Free.roll(MakeArray(
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
+            ProjectIndexR(
+              ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)),
+              IntLit(0)))),
           List(
             ReduceFuncs.UnshiftArray(
               Free.roll(Multiply(
                 ProjectIndexR(HoleF, IntLit(1)),
-                ProjectIndexR(HoleF, IntLit(2)))))),
+                IntLit(10))))),
           Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             ReduceIndexF(0.some))))))(
@@ -511,7 +502,7 @@ class QScriptSpec
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val query =
-        lpf.let('__tmp0, 
+        lpf.let('__tmp0,
           lpf.join(
             lpRead("/foo"),
             lpRead("/bar"),
@@ -574,7 +565,7 @@ class QScriptSpec
     }
 
     "convert union" in {
-      val lp = fullCompileExp("select * from city union select * from person")
+      val lp = fullCompileExp(sqlE"select * from city union select * from person")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
@@ -606,7 +597,7 @@ class QScriptSpec
     }
 
     "convert distinct by" in {
-      val lp = fullCompileExp("select distinct(city) from zips order by pop")
+      val lp = fullCompileExp(sqlE"select distinct(city) from zips order by pop")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -656,7 +647,7 @@ class QScriptSpec
     }
 
     "convert a multi-field reduce" in {
-      val lp = fullCompileExp("select max(pop), min(city) from zips")
+      val lp = fullCompileExp(sqlE"select max(pop), min(city) from zips")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -707,7 +698,7 @@ class QScriptSpec
     }
 
     "convert a filter followed by a reduce" in {
-      val lp = fullCompileExp("select count(*) from zips where pop > 1000")
+      val lp = fullCompileExp(sqlE"select count(*) from zips where pop > 1000")
       val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
@@ -752,7 +743,7 @@ class QScriptSpec
     }
 
     "convert a non-static array projection" in {
-      val lp = fullCompileExp("select (loc || [7, 8])[0] from zips")
+      val lp = fullCompileExp(sqlE"select (loc || [7, 8])[0] from zips")
       val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
@@ -776,7 +767,7 @@ class QScriptSpec
     }
 
     "convert a static array projection prefix" in {
-      val lp = fullCompileExp("select ([7, 8] || loc)[1] from zips")
+      val lp = fullCompileExp(sqlE"select ([7, 8] || loc)[1] from zips")
       val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
@@ -796,7 +787,7 @@ class QScriptSpec
     }
 
     "convert a group by with reduction" in {
-      val lp = fullCompileExp("select (loc[0] > -78.0) as l, count(*) as c from zips group by (loc[0] > -78.0)")
+      val lp = fullCompileExp(sqlE"select (loc[0] > -78.0) as l, count(*) as c from zips group by (loc[0] > -78.0)")
       val qs = convert(lc.some, lp)
 
       val inner: FreeMap =
@@ -843,7 +834,7 @@ class QScriptSpec
     }
 
     "convert an ordered filtered distinct" in {
-      val lp = fullCompileExp("select distinct city from zips where pop <= 10 order by pop")
+      val lp = fullCompileExp(sqlE"select distinct city from zips where pop <= 10 order by pop")
       val qs = convert(lc.some, lp)
 
       val guard: JoinFunc =
@@ -886,7 +877,7 @@ class QScriptSpec
     }
 
     "convert an ordered filtered distinct with cases" in {
-      val lp = fullCompileExp("""select distinct case state when "MA" then "Massachusetts" else "unknown" end as name from zips where pop <= 10 order by pop""")
+      val lp = fullCompileExp(sqlE"""select distinct case state when "MA" then "Massachusetts" else "unknown" end as name from zips where pop <= 10 order by pop""")
       val qs = convert(lc.some, lp)
 
       val guard: JoinFunc =
@@ -935,7 +926,7 @@ class QScriptSpec
     }
 
     "convert a flattened array" in {
-      val lp = fullCompileExp("select city, loc[*] from zips")
+      val lp = fullCompileExp(sqlE"select city, loc[*] from zips")
       val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
@@ -946,50 +937,47 @@ class QScriptSpec
           ConcatArraysR(
             MakeArrayR(ConcatArraysR(
               ConcatArraysR(
-                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("city"))))),
-              MakeArrayR(
-                ProjectFieldR(
+                ConcatArraysR(
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
+                MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
+              MakeArrayR(ProjectIndexR(RightSideF, IntLit(1))))),
+            MakeArrayR(ConcatArraysR(
+              ConcatArraysR(
+                ConcatArraysR(
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
+                MakeArrayR(ProjectFieldR(
                   Free.roll(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(), Some(Type.Top)),
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Free.roll(Undefined()))),
-                  StrLit("city"))))),
-            MakeArrayR(ConcatArraysR(
-              ConcatArraysR(
-                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    ConcatArraysR(
-                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
-                    MakeArrayR(ProjectFieldR(
-                      Free.roll(Guard(
-                        ProjectIndexR(RightSideF, IntLit(1)),
-                        Type.Obj(ScalaMap(), Some(Type.Top)),
-                        ProjectIndexR(RightSideF, IntLit(1)),
-                        Free.roll(Undefined()))),
-                      StrLit("loc")))),
-                  MakeArrayR(ProjectFieldR(
-                    Free.roll(Guard(
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      Type.Obj(ScalaMap(), Some(Type.Top)),
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      Free.roll(Undefined()))),
-                    StrLit("loc")))))),
-              MakeArrayR(Free.roll(Undefined()))))))),
+                  StrLit("loc")))),
+              MakeArrayR(ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Type.Obj(ScalaMap(), Some(Type.Top)),
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Free.roll(Undefined()))),
+                StrLit("loc")))))))),
         QC.inj(LeftShift((),
           Free.roll(Guard(
-            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(2)),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)),
             Type.FlexArr(0, None, Type.Top),
-            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(3)),
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)))),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(3)),
+            Free.roll(Undefined()))),
           ExcludeId,
           ConcatMapsR(
             MakeMapR(
-              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2))),
+              StrLit("city"),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2)),
+                  Type.Obj(ScalaMap(), Some(Type.Top)),
+                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(3)),
+                  Free.roll(Undefined()))),
+                StrLit("city"))),
             MakeMapR(StrLit("loc"), RightSideF)))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }

@@ -23,6 +23,7 @@ import quasar.api.services._
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.mount.Mounting
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.qscript.QScriptTotal
 
@@ -38,7 +39,9 @@ object analysis {
   type QST[A] = QScriptTotal[Fix, A]
 
   def service[S[_]](implicit
-      A: Analyze.Ops[S]
+      A: Analyze.Ops[S],
+      S0: Mounting :<: S,
+      S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
       Json(
@@ -46,18 +49,22 @@ object analysis {
         "value" := data.map(DataCodec.Precise.encode).unite)
 
     def analyzeQuery(
-      blob: sql.Blob[Fix[sql.Sql]],
+      scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
       vars: Variables,
       basePath: ADir,
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      queryPlan(blob, vars, basePath, offset, limit)
-        .run.value
-        .traverse(_.fold(
-          data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-          lp   => A.queryCost(lp).bimap(_.toApiError, _.asJson).run))
-        .map(_.valueOr(_.toApiError.left[Json]))
+      quasar.resolveImports(scopedExpr, basePath).run.flatMap(block =>
+        block.fold(
+          semErr => semErr.toApiError.left.point[Free[S, ?]],
+          block => queryPlan(block, vars, basePath, offset, limit)
+                    .run.value
+                    .traverse(_.fold(
+                      data => constantResponse(data).right[ApiError].point[Free[S, ?]],
+                      lp   => A.queryCost(lp).bimap(_.toApiError, _.asJson).run))
+                    .map(_.valueOr(_.toApiError.left[Json]))))
+
 
 
     QHttpService {

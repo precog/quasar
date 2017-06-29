@@ -18,9 +18,8 @@ package quasar.physical.couchbase
 
 import slamdata.Predef._
 import quasar.NameGenerator
-import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.PhaseResultT
-import quasar.connector.PlannerErrT
+import quasar.Planner.InternalError
+import quasar.Planner.PlannerErrorME
 
 import matryoshka._
 import matryoshka.implicits._
@@ -28,8 +27,6 @@ import scalaz._, Scalaz._
 
 package object planner {
   import N1QL.{Id, Select}, Select.{Value, ResultExpr}
-
-  type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
 
   def genId[T, F[_]: Functor: NameGenerator]: F[Id[T]] =
     NameGenerator[F].prefixedName("_") ∘ (Id(_))
@@ -50,16 +47,9 @@ package object planner {
         Value(true), ResultExpr(a, none).wrapNel, keyspace = none, join = none,
         unnest = none, let = nil,  filter = none, groupBy = none, orderBy = Nil).embed)
 
-  def unexpected[A](name: String): PlannerError \/ A =
-    InternalError.fromMsg(s"unexpected $name").left
+  def unexpected[F[_]: PlannerErrorME, A](name: String): F[A] =
+    PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unexpected $name"))
 
-  def unexpectedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
-    EitherT(unexpected[A](name).η[PhaseResultT[F, ?]])
-
-  def unimplemented[A](name: String): PlannerError \/ A =
-    InternalError.fromMsg(s"unimplemented $name").left
-
-  def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
-    EitherT(unimplemented[A](name).η[PhaseResultT[F, ?]])
-
+  def unimplemented[F[_]: PlannerErrorME, A](name: String): F[A] =
+    PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unimplemented $name"))
 }

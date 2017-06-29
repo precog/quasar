@@ -33,6 +33,10 @@ import quasar.yggdrasil.util._
 
 import scalaz._, Scalaz._, Validation._
 
+import java.io.File
+
+import scala.collection.mutable
+
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
 }
@@ -110,7 +114,7 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
 
   object Table extends TableCompanion
 
-  private var initialIndices = scmMap[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
+  private var initialIndices = mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
   private var currentIndex   = 0                      // if we were doing this for real: j.u.c.a.AtomicInteger
   private val indexLock      = new AnyRef             // if we were doing this for real: DIE IN A FIRE!!!
 }

@@ -32,6 +32,8 @@ import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 import java.time.LocalDateTime
 
+import scala.collection.mutable
+
 trait Slice { source =>
   import Slice._
   import TableModule._
@@ -671,7 +673,7 @@ trait Slice { source =>
     }
   }
 
-  def order: SpireOrder[Int] =
+  def order: spire.algebra.Order[Int] =
     if (columns.size == 1) {
       val col = columns.head._2
       Column.rowOrder(col)
@@ -708,7 +710,7 @@ trait Slice { source =>
             }
             .toArray
 
-          new SpireOrder[Int] {
+          new spire.algebra.Order[Int] {
             def compare(i: Int, j: Int): Int = {
               var k = 0
               while (k < cols.length) {
@@ -1089,7 +1091,7 @@ trait Slice { source =>
         // we have the schema, now emit
 
         var buffer = CharBuffer.allocate(BufferSize)
-        val vector = new ArrayBuffer[CharBuffer](math.max(1, size / 10))
+        val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
         def checkPush(length: Int) {

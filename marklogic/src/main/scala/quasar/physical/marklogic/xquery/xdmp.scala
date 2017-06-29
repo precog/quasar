@@ -109,4 +109,7 @@ object xdmp {
 
   def yeardayFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:yearday-from-date($date)")
+
+  def castableAs(namespace: XQuery, localName: XQuery, item: XQuery): XQuery =
+    XQuery(s"xdmp:castable-as($namespace, $localName, $item)")
 }

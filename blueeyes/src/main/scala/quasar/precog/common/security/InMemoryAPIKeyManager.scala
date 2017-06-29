@@ -26,6 +26,8 @@ import scalaz.syntax.monad._
 
 import java.time.LocalDateTime
 
+import scala.collection.mutable
+
 class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) extends APIKeyManager[M] {
   import Permission._
 
@@ -50,14 +52,14 @@ class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) exte
 
     val rootAPIKeyRecord = APIKeyRecord(rootAPIKey, some("root-apiKey"), some("The root API key"), rootAPIKey, Set(rootGrantId), true)
 
-    (rootAPIKeyRecord, scmMap(rootGrantId -> rootGrant), scmMap(rootAPIKey -> rootAPIKeyRecord))
+    (rootAPIKeyRecord, mutable.HashMap(rootGrantId -> rootGrant), mutable.HashMap(rootAPIKey -> rootAPIKeyRecord))
   }
 
   def rootAPIKey: M[APIKey]   = rootAPIKeyRecord.apiKey.point[M]
   def rootGrantId: M[GrantId] = rootAPIKeyRecord.grants.head.point[M]
 
-  private val deletedAPIKeys = scmMap[APIKey, APIKeyRecord]()
-  private val deletedGrants  = scmMap[GrantId, Grant]()
+  private val deletedAPIKeys = mutable.HashMap[APIKey, APIKeyRecord]()
+  private val deletedGrants  = mutable.HashMap[GrantId, Grant]()
 
   def createAPIKey(name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId]): M[APIKeyRecord] = {
     val record = APIKeyRecord(APIKeyManager.newAPIKey(), name, description, issuerKey, grants, false)

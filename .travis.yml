@@ -11,22 +11,20 @@ services:
 # needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
-
+ 
 # create all the docker containers we need for IT testing
 install:
-  - cd $TRAVIS_BUILD_DIR/docker/scripts
-  - ./initContainer quasar_metastore
-  - ./initContainer quasar_$CONNECTOR
-  - docker-compose ps
+  - docker/scripts/initContainer quasar_metastore
+  - docker/scripts/initContainer quasar_$CONNECTOR
+  - docker ps
 
 # run db config scripts and populate the it/testing.conf file
 before_script:
-  - cd $TRAVIS_BUILD_DIR/docker/scripts
-  - ./setupContainers -c quasar_metastore
-  - ./setupContainers -c quasar_$CONNECTOR
-  - ./assembleTestingConf -c quasar_metastore
-  - ./assembleTestingConf -i quasar_$CONNECTOR
-  - cd $TRAVIS_BUILD_DIR/it && cat testing.conf
+  - docker/scripts/setupContainers -c quasar_metastore
+  - docker/scripts/setupContainers -c quasar_$CONNECTOR
+  - docker/scripts/assembleTestingConf -c quasar_metastore
+  - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
+  - cat it/testing.conf
 
 # export some needed env vars, build, then publish and tag resources
 script:
@@ -54,6 +52,7 @@ branches:
 
 cache:
   directories:
+    - $HOME/.cache/quasar/marklogic
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
@@ -68,15 +67,15 @@ before_cache:
 
 env:
   matrix:
-    - CONNECTOR=mongodb_2_6
-    - CONNECTOR=mimir
-    - CONNECTOR=marklogic_xml
-    - CONNECTOR=marklogic_json
     - CONNECTOR=couchbase
+    - CONNECTOR=marklogic_json
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=mimir
+    - CONNECTOR=mongodb_2_6
     - CONNECTOR=mongodb_3_0
-    - CONNECTOR=mongodb_read_only
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
+    - CONNECTOR=mongodb_read_only
     - CONNECTOR=postgresql
     - CONNECTOR=spark_local_test
 

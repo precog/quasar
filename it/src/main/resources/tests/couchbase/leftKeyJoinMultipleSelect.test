@@ -1,17 +1,19 @@
 {
     "name": "left key join with multiple fields selected (Couchbase)",
     "backends": {
-        "mimir": "skip",
+        "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
+        "mimir": "skip",
         "mongodb_2_6":       "skip",
         "mongodb_3_0":       "skip",
         "mongodb_read_only": "skip",
         "mongodb_3_2":       "skip",
+        "mongodb_3_4":       "skip",
         "mongodb_q_3_2":     "skip",
         "postgresql":        "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip"
     },
     "data": [],
     "query": "SELECT META(brewery).id AS brewery_meta_id,
@@ -22,8 +24,8 @@
               FROM `brewery` AS brewery JOIN `beer` AS beer
               ON META(brewery).id = beer.brewery_id
               WHERE beer.category = \"North American Ale\"",
-    "ignoreFieldOrder": [ "couchbase" ],
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         {
             "brewery_meta_id": "21st_amendment_brewery_cafe",

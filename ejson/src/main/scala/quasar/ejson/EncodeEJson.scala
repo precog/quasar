@@ -83,7 +83,6 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
         oa.fold(CommonEJson(nul[J]()).embed)(A.encode[J](_))
     }
 
-
   implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]: EncodeEJson[T[F]] =
     EncodeEJson.encodeEJsonR[T[F], F]
 }

@@ -23,6 +23,7 @@ import serialization.Extractor.Error._
 import serialization.SerializationImplicits._
 import scalaz._, Scalaz._
 
+import java.io.File
 import java.nio.ByteBuffer
 
 import Validation.fromTryCatchNonFatal

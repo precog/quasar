@@ -22,6 +22,8 @@ import quasar.yggdrasil._
 
 import scalaz._, Scalaz._
 
+import scala.collection.mutable
+
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   type Table <: SamplableTable
 
@@ -114,7 +116,7 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
     }
   }
 
-  private case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]] = scmMap.empty) {
+  private case class RowInserter(size: Int, slice: Slice, cols: mutable.Map[ColumnRef, ArrayColumn[_]] = mutable.Map.empty) {
     import RowInserter._
 
     def toSlice(maxSize: Int): Slice = Slice(cols.toMap, size min maxSize)

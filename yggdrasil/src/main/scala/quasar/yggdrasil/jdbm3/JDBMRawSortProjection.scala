@@ -17,15 +17,20 @@
 package quasar.yggdrasil
 package jdbm3
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.TableModule._
+
 import org.apache.jdbm._
+
 import org.slf4s.Logging
+
+import java.io.File
 import java.util.SortedMap
-import scala.collection.JavaConverters._
+
 import scalaz._
+
+import scala.collection.JavaConverters._
 
 /**
   * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that

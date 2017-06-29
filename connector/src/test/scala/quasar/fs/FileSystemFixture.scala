@@ -34,14 +34,6 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
 
-case class AlphaCharacters(value: String)
-
-object AlphaCharacters {
-  implicit val arb: Arbitrary[AlphaCharacters] =
-    Arbitrary(Gen.nonEmptyListOf(Gen.alphaChar).map(chars => AlphaCharacters(chars.mkString)))
-  implicit val show: Show[AlphaCharacters] = Show.shows(_.value)
-}
-
 /** Useful for debugging by producing easier to read paths but that still tend to trigger corner cases */
 case class AlphaAndSpecialCharacters(value: String)
 

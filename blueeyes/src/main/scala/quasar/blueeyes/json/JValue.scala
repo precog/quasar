@@ -336,7 +336,7 @@ object JString {
 final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
   def _1                        = name
   def _2                        = value
-  def toTuple: String -> JValue = name -> value
+  def toTuple: (String, JValue) = name -> value
   def isUndefined               = value == JUndefined
 }
 

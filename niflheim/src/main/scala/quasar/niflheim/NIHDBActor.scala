@@ -28,6 +28,8 @@ import akka.util.Timeout
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
+import org.slf4s.Logging
+
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
@@ -35,9 +37,11 @@ import quasar.blueeyes.json.serialization.IsoSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
 
 import scalaz._
+import scalaz.effect.IO
 import scalaz.Validation._
 import scalaz.syntax.monad._
 
+import java.io.File
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
 

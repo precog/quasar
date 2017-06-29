@@ -20,7 +20,7 @@
            in a map.",
 
     "query": "select distinct discipline from olympics order by discipline",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": ["Alpine Skiing",
                  "Biathlon",
                  "Bobsleigh",

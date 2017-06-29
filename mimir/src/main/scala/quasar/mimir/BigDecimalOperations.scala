@@ -16,8 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
-
 object BigDecimalOperations {
 
   /**

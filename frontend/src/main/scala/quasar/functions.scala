@@ -35,7 +35,7 @@ final case object Reduction extends DimensionalEffect
   * an operation.
   */
 final case object Expansion extends DimensionalEffect
-/** Describes a function that each individual value. */
+/** Describes a function that maps each individual value. */
 final case object Mapping extends DimensionalEffect
 /** Describes a function that compresses the identity information. */
 final case object Squashing extends DimensionalEffect

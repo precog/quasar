@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka.data.Fix
 import matryoshka.implicits._

@@ -21,7 +21,9 @@ import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 
+import contextual._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -59,6 +61,19 @@ package object sql {
 
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
+
+  // Note: This is hardcoded to `Fix` but cannot be made generic with version `1.0.1` of contextual,
+  //       it results in a `ClassNotFound` exception being thrown at compile time
+  //       https://github.com/propensive/contextual/issues/28
+  // Note: This cannot be moved to tests as it will also result in a `ClassNotFound`
+  //       exception being thrown at compile time as of contextual `1.0.1`
+  //       https://github.com/propensive/contextual/issues/29
+  // TODO: Write custom macro to do this ourselves in order to work around above issues
+  implicit class SqlStringContext(sc: StringContext) {
+    val sqlE = Prefix(SqlInterpolator.Expr,       sc)
+    val sqlB = Prefix(SqlInterpolator.ScopedExpr, sc)
+    val sqlM = Prefix(SqlInterpolator.Module,     sc)
+  }
 
   def CrossRelation[T]
     (left: SqlRelation[T], right: SqlRelation[T])
@@ -129,8 +144,7 @@ package object sql {
           case other => other
         }
 
-        // TODO use lenses
-        sel2.copy(relations = sel2.relations.map(mkRel(_))).embed
+        Select.relation.modify((r: Option[SqlRelation[T[Sql]]]) => r.map(mkRel(_)))(sel2).embed
       }
 
       case Let(ident, bindTo, in) => {
@@ -141,6 +155,57 @@ package object sql {
 
       case other => other.map(_.makeTables(bindings)).embed
     }
+
+    /**
+      * Inlines all function invocations with the bodies of functions in scope.
+      * Leaves invocations to functions outside of scope untouched (as opposed to erroring out)
+      * @param scope Returns the list of function definitions that match a given name and function arity along with a
+      *              path specifying whether this function was found
+      */
+    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]]): EitherT[M, SemanticError, T[Sql]] = {
+      q.cataM[EitherT[M, SemanticError, ?], T[Sql]] {
+        case invoke @ InvokeFunction(name, args) =>
+          EitherT(scope(name, args.size).flatMap {
+            case Nil                => invoke.embed.right.point[M]
+            case List((funcDef, _)) => funcDef.applyArgs(args).point[M]
+            case ambiguous          =>
+              SemanticError.ambiguousFunctionInvoke(name, ambiguous.map { case(func, from) => (func.name, from)}).left.point[M]
+          })
+        case other => EitherT.right(other.embed.point[M])
+      }
+    }
+  }
+
+  def resolveImportsImpl[M[_]: Monad, T[_[_]]: BirecursiveT](scopedExpr: ScopedExpr[T[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[T[Sql]]]])
+  : EitherT[M, SemanticError, T[Sql]] = {
+
+    def absImport(i: Import[T[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
+
+    def scopeFromHere(imports: List[Import[T[Sql]]], funcsHere: List[FunctionDecl[T[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[T[Sql]], ADir)]] = {
+      case (name, arity) =>
+        // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
+        val funcsFromImports = imports.map(absImport(_, here)).traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
+        // All functions in "this" scope along with their own imports
+        val allFuncs         = funcsFromImports.map((funcsHere, imports, here) :: _)
+        EitherT.right(allFuncs).flatMap(_.traverse{ case (funcs, imports, from) =>
+          def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
+          funcs.filter(matchesSignature).traverse { decl =>
+            val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
+            val currentScope = scopeFromHere(imports, others, from)
+            decl.traverse(_.inlineInvokes(currentScope)).flattenLeft.strengthR(from)
+          }
+        }).map(_.join)
+    }
+
+    scopedExpr.expr.inlineInvokes(scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir)).flattenLeft
+  }
+
+  implicit class StatementsOps[A](a: List[Statement[A]]) {
+    def decls: List[FunctionDecl[A]] =
+      a.collect { case funcDec: FunctionDecl[_] => funcDec }
+
+    def imports: List[Import[A]] =
+      a.collect { case i: Import[_] => i }
   }
 
   def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
@@ -230,7 +295,7 @@ package object sql {
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
         case UnshiftMap => "{" + lhs._2 + " : " + rhs._2 + " ...}"
-        case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
+        case _ => List("((" + lhs._2 + ")", op.sql, "(" + rhs._2 + "))").mkString(" ")
       }
       case Unop(expr, op) => op match {
         case FlattenMapKeys      => "(" + expr._2 + "){*:}"

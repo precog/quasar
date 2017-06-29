@@ -11,7 +11,8 @@
     "query": "cityzips := select zips.city, zips.state from zips where zips.state = \"CT\";
                   select city, state from cityzips where city = \"SOUTHBURY\" ",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "city": "SOUTHBURY", "state": "CT" }]
 }

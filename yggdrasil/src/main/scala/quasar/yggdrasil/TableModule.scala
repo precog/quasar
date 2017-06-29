@@ -16,15 +16,14 @@
 
 package quasar.yggdrasil
 
-import vfs.ResourceError
+import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.common.security._
 
 import quasar.blueeyes.json._
 
-import collection.Set
+import scala.collection.Set
 
 import scalaz._
 import scalaz.syntax.monad._

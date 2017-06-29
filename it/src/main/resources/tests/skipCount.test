@@ -3,22 +3,14 @@
 
     "backends": {
         "mimir": "skip",
-        "couchbase":      "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending",
-        "spark_hdfs":     "skip",
-        "spark_local":    "skip"
+        "postgresql": "pending"
     },
-
-    "NB": "#1748: Disabled in spark due to ListMap serialization stack overflow.
-           #2122: Improves the qscript, but the qscript _should_ currently be correct.",
 
     "data": "zips.data",
 
     "query": "select count(*) from (select * from zips offset 10) as x",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [29343]
 }

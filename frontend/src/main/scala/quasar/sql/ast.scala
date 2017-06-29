@@ -19,10 +19,14 @@ package quasar.sql
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 
 import matryoshka._
+import matryoshka.implicits._
 import monocle.macros.Lenses
+import pathy.Path._
 import scalaz._, Scalaz._
+import scalaz.Liskov._
 
 sealed abstract class Sql[A]
 object Sql {
@@ -176,12 +180,36 @@ object Sql {
 @Lenses final case class Select[A] private[sql] (
   isDistinct:  IsDistinct,
   projections: List[Proj[A]],
-  relations:   Option[SqlRelation[A]],
+  relation:    Option[SqlRelation[A]],
   filter:      Option[A],
   groupBy:     Option[GroupBy[A]],
   orderBy:     Option[OrderBy[A]])
-    extends Sql[A]
-@Lenses final case class Vari[A] private[sql] (symbol: String) extends Sql[A]
+    extends Sql[A] {
+  def substituteRelationVariable[M[_]: Monad, T](mapping: Vari[A] => M[A])(implicit
+    T0: Recursive.Aux[T, Sql],
+    T1: Corecursive.Aux[T, Sql],
+    ev: A <~< T
+  ): M[SemanticError \/ Select[A]] = {
+      val newRelation = relation.traverse(_.transformM[EitherT[M, SemanticError, ?], A]({
+        case VariRelationAST(vari, alias) =>
+          EitherT(mapping(vari).map(ev(_).project match {
+            case Ident(name) =>
+              posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
+                TableRelationAST(_, alias).right,
+                SemanticError.GenericError(s"bad path: $name (note: absolute file path required)").left) // FIXME
+            // If the variable points to another variable, substitute the old one for the new one
+            case Vari(symbol) => VariRelationAST(Vari(symbol), alias).right
+            case x =>
+              SemanticError.GenericError(s"not a valid table name: ${pprint(x.embed)}").left // FIXME
+          }))
+        case otherRelation => otherRelation.point[EitherT[M, SemanticError, ?]]
+      }, _.point[EitherT[M, SemanticError, ?]]))
+      newRelation.map(r => this.copy(relation = r)).run
+  }
+}
+@Lenses final case class Vari[A] private[sql] (symbol: String) extends Sql[A] {
+  def map[B](f: A => B): Vari[B] = Vari(symbol)
+}
 @Lenses final case class SetLiteral[A] private[sql] (exprs: List[A]) extends Sql[A]
 @Lenses final case class ArrayLiteral[A] private[sql] (exprs: List[A]) extends Sql[A]
 /** Can’t be a Map, because we need to arbitrarily transform the key */

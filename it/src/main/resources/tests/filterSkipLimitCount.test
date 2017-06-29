@@ -10,6 +10,7 @@
 
     "query": "select count(*) as cnt from (select * from zips where city like \"BOU%\" offset 15 limit 10) as x",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "cnt": 5 }]
 }

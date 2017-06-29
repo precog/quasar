@@ -2,10 +2,11 @@
   "name": "regexes in expressions and filter, with fields and constants providing the pattern",
 
   "backends": {
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
-    "mongodb_read_only": "pending",
-    "mongodb_q_3_2":  "pending",
-    "postgresql":        "pending"
+        "mongodb_q_3_2":  "pending",
+        "postgresql":        "pending"
   },
 
   "data": "largeZips.data",
@@ -15,9 +16,8 @@
       from largeZips
       where city ~ \"^B[^ ]+ER$\" and \"BOULDER or BEELER\" ~ city",
 
-  "predicate": "containsExactly",
-
-  "ignoreFieldOrder": ["couchbase", "marklogic_json"],
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "city": "BOULDER", "a": true,  "b": true  },

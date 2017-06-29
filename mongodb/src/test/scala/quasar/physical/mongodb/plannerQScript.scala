@@ -121,7 +121,7 @@ class PlannerQScriptSpec extends
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
+  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
@@ -136,7 +136,8 @@ class PlannerQScriptSpec extends
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]])
       : Either[FileSystemError, Crystallized[WorkflowF]] = {
-    fixParser.parse(Query(query)).fold(
+    // TODO: plan0 should take a Fix[Expr] and the tests should use the sql string interpolator
+    fixParser.parseExpr(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
       queryPlanner(_, model, stats, indexes).run).value.toEither
   }
@@ -175,7 +176,7 @@ class PlannerQScriptSpec extends
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- fixParser.parse(Query(query))
+      expr <- fixParser.parseExpr(Query(query))
     } yield queryPlanner(expr, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))

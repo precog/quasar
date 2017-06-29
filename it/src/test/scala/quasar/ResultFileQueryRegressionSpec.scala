@@ -21,7 +21,7 @@ import quasar.contrib.pathy._
 import quasar.fp.liftMT
 import quasar.fs._
 import quasar.regression._
-import quasar.sql.{Blob, Sql}
+import quasar.sql.Sql
 
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
@@ -40,7 +40,7 @@ class ResultFileQueryRegressionSpec
 
   val suiteName = "ResultFile Queries"
 
-  def queryResults(expr: Blob[Fix[Sql]], vars: Variables, basePath: ADir) = {
+  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) = {
     import qfTransforms._
 
     type M[A] = FileSystemErrT[F, A]

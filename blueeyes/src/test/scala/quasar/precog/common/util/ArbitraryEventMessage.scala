@@ -21,6 +21,9 @@ import security._
 import quasar.blueeyes._, json._
 import quasar.precog.JsonTestSupport._, Gen._
 
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
+
 trait ArbitraryEventMessage {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
 
@@ -91,7 +94,7 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
 
   lazy val producers = 4
 
-  lazy val eventIds: Map[Int, AtomicInt] = 0.until(producers).map(_ -> new AtomicInt).toMap
+  lazy val eventIds: Map[Int, AtomicInteger] = 0.until(producers).map(_ -> new AtomicInteger).toMap
 
   lazy val paths = buildBoundedPaths(3)
   lazy val jpaths = buildBoundedJPaths(3)

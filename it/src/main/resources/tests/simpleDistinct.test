@@ -2,18 +2,18 @@
   "name": "simple distinct",
 
   "backends": {
+        "marklogic_json":    "ignoreFieldOrder",
         "mimir": "skip",
-    "mongodb_q_3_2": "pending",
-    "postgresql": "pending"
+        "mongodb_q_3_2": "pending",
+        "postgresql": "pending"
   },
 
   "data": "olympics.data",
 
   "query": "select distinct discipline, event from olympics where event like \"%pursuit\"",
 
-  "predicate": "containsExactly",
-
-  "ignoreFieldOrder": ["marklogic_json"],
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "discipline": "Speed skating",   "event": "Team pursuit" },

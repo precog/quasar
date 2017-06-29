@@ -21,7 +21,7 @@ import quasar.{Data, DataCodec}
 import quasar.Planner._
 import quasar.common.PrimaryType
 import quasar.fp.ski._
-import quasar.qscript._, MapFuncs._
+import quasar.qscript._, MapFuncsCore._
 import quasar.std.{DateLib, StringLib}
 import quasar.std.TemporalPart
 
@@ -44,21 +44,21 @@ object CoreMap extends Serializable {
 
   def changeJoinFunc[T[_[_]]: RecursiveT](f: JoinFunc[T])
       : PlannerError \/ ((Data, Data) => Data) =
-    f.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
+    f.cataM(interpretM[PlannerError \/ ?, MapFuncCore[T, ?], JoinSide, ((Data, Data)) => Data](
       (js: JoinSide) => (js match {
         case LeftSide  => (_: (Data, Data))._1
         case RightSide => (_: (Data, Data))._2
       }).right,
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
-  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
+  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFuncCore[T, ?], ReduceIndex])
       : PlannerError \/ ((Data, List[Data]) => Data) =
     f.cataM(interpretM(
       _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
       change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
 
   def change[T[_[_]]: RecursiveT, A]
-      : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
+      : AlgebraM[PlannerError \/ ?, MapFuncCore[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
     case Undefined() => κ(undefined).right
     case JoinSideName(n) => UnexpectedJoinSide(n).left

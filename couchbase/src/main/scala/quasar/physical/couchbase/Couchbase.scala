@@ -29,6 +29,7 @@ import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.Write
 import quasar.fs.mount._, FileSystemDef.DefErrT
 import quasar.physical.couchbase.common._
 import quasar.physical.couchbase.planner.Planner
+import quasar.Planner.PlannerError
 import quasar.qscript.{Map => _, _}
 
 import scala.Predef.implicitly
@@ -87,15 +88,15 @@ trait Couchbase extends BackendModule {
     cp: T[QSM[T, ?]]
   ): Backend[Repr] =
     for {
-      cfg <- MR.ask
-      ctx =  cfg.ctx
-      f   <- cp.cataM(Planner[T, Kleisli[Free[Eff, ?], Context, ?], QSM[T, ?]].plan)
-               .bimap(
-                 FileSystemError.qscriptPlanningFailed(_),
-                 _.convertTo[Mu[N1QL]])
-               .run.run.run(Context(BucketName(ctx.bucket.name), ctx.docTypeKey))
-               .liftB
-      plan <- f._2.fold(ME.raiseError, _.η[Backend])
+      cfg  <- MR.ask
+      ctx  =  cfg.ctx
+      plan <- ME.unattempt(
+                cp.cataM(Planner[T, EitherT[Kleisli[Free[Eff, ?], Context, ?], PlannerError, ?], QSM[T, ?]].plan)
+                  .bimap(
+                    FileSystemError.qscriptPlanningFailed(_),
+                    _.convertTo[Mu[N1QL]])
+                  .run(Context(BucketName(ctx.bucket.name), ctx.docTypeKey))
+                  .liftB)
       _    <- MT.tell(Vector(detail("N1QL AST", RenderTreeT[Mu].render(plan).shows)))
     } yield plan
 

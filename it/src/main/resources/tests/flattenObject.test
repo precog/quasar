@@ -1,14 +1,14 @@
 {
     "name": "flatten object",
     "backends": {
+        "couchbase":  "ignoreFieldOrder",
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         {"text":"North America, bordering both the North Atlantic Ocean and the North Pacific Ocean, between Canada and Mexico"},
         {"text":"38 00 N, 97 00 W"},

@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs.{Search => QSearch, _}
+import quasar.qscript.{MapFuncCore, MapFuncsCore}, MapFuncsCore.{Search => QSearch, _}
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
@@ -36,7 +36,7 @@ private[qscript] final class MapFuncPlanner[
 ](implicit SP: StructuralPlanner[F, FMT]) {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
-  val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => DataPlanner[F, FMT](ejson.cata(Data.fromEJson))
     case Undefined()                  => emptySeq.point[F]
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
@@ -52,7 +52,7 @@ private[qscript] final class MapFuncPlanner[
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
+    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
@@ -95,7 +95,7 @@ private[qscript] final class MapFuncPlanner[
 
     // relations
     case Not(x)                       => SP.castIfNode(x) map (fn.not)
-    case MapFuncs.Eq(x, y)            => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
+    case MapFuncsCore.Eq(x, y)        => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
     case Neq(x, y)                    => castedBinOp(x, y)((a, b) => handleWith(a ne b, fn.True))
     case Lt(x, y)                     => castedBinOp(x, y)(_ lt _)
     case Lte(x, y)                    => castedBinOp(x, y)(_ le _)
@@ -115,7 +115,7 @@ private[qscript] final class MapFuncPlanner[
     case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => SP.null_ map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
     case ToString(x)                  => SP.asString(x)
-    case QSearch(in, ptn, ci)         => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
+    case QSearch(in, ptn, ci)         => fn.matches(in, ptn, Some(if_ (ci) then_ "im".xs else_ "m".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
 
     // structural

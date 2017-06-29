@@ -16,8 +16,9 @@
 
 package quasar.niflheim
 
-final class CookedBlock(segments: Map[SegmentId, File]) {
-}
+import java.io.File
+
+final class CookedBlock(segments: Map[SegmentId, File])
 
 object CookedBlock {
   def fromFiles(files: Seq[File]): CookedBlock = {

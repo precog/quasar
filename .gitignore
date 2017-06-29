@@ -12,5 +12,4 @@ tmp
 .settings
 *.sw*
 tags
-scripts/marklogic/docker/
-.ml-dev-cookies
+docker/Dockerfiles/Marklogic/MarkLogic.rpm

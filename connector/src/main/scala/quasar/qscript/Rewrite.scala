@@ -21,8 +21,8 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -57,7 +57,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       : Option[(IdStatus, JoinFunc)] =
     (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
       def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFunc, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+        Free.roll[MapFuncCore, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
 
       val zeroRef: JoinFunc = makeRef(0)
       val oneRef: JoinFunc = makeRef(1)
@@ -124,7 +124,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
-  //       • normalize ⇒ a whole bunch, based on MapFuncs
+  //       • normalize ⇒ a whole bunch, based on MapFuncsCore
   //       • elideNopJoin ⇒ no `ThetaJoin(???, HoleF, HoleF, LeftSide === RightSide, ???, ???)`
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`

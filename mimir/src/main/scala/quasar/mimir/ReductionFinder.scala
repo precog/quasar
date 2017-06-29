@@ -18,10 +18,11 @@ package quasar.mimir
 
 import scalaz._
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
+
+import scala.collection.mutable
 
 trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
   type TS1 = trans.TransSpec1
@@ -88,7 +89,7 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
     }
 
     def megaReduce(node: DepGraph, st: MegaReduceState): DepGraph = {
-      val reduceTable = scmMap[DepGraph, dag.MegaReduce]()
+      val reduceTable = mutable.Map[DepGraph, dag.MegaReduce]()
 
       node mapDown { recurse =>
         {

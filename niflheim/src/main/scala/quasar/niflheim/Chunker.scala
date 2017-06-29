@@ -16,6 +16,7 @@
 
 package quasar.niflheim
 
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 import java.util.zip.Adler32

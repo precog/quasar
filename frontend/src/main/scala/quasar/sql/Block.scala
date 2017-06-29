@@ -22,19 +22,19 @@ import quasar._, RenderTree.ops._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-@Lenses final case class Blob[T](expr: T, scope: List[Statement[T]]) {
-  def mapExpressionM[M[_]:Functor](f: T => M[T]) =
-    f(expr).map(Blob(_, scope))
+@Lenses final case class Block[T](expr: T, defs: List[FunctionDecl[T]]) {
+  def mapExpressionM[M[_]:Functor](f: T => M[T]): M[Block[T]] =
+    f(expr).map(Block(_, defs))
 }
 
-object Blob {
-  implicit def renderTree[T:RenderTree]: RenderTree[Blob[T]] =
-    new RenderTree[Blob[T]] {
-      def render(blob: Blob[T]) =
-        NonTerminal("Sql Blob" :: Nil, None, List(blob.scope.render, blob.expr.render))
+object Block {
+  implicit def renderTree[T:RenderTree]: RenderTree[Block[T]] =
+    new RenderTree[Block[T]] {
+      def render(block: Block[T]) =
+        NonTerminal("Sql Block" :: Nil, None, List(block.defs.render, block.expr.render))
     }
-  implicit val traverse: Traverse[Blob] = new Traverse[Blob] {
-    def traverseImpl[G[_]:Applicative,A,B](ba: Blob[A])(f: A => G[B]): G[Blob[B]] =
-      (f(ba.expr) |@| ba.scope.traverse(_.traverse(f)))(Blob(_, _))
+  implicit val traverse: Traverse[Block] = new Traverse[Block] {
+    def traverseImpl[G[_]:Applicative,A,B](ba: Block[A])(f: A => G[B]): G[Block[B]] =
+      (f(ba.expr) |@| ba.defs.traverse(_.traverse(f)))(Block(_, _))
   }
 }

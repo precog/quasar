@@ -23,8 +23,8 @@ import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.jdbm3._
 
-import java.util.SortedMap
-import java.util.Comparator
+import java.io.File
+import java.util.{Comparator, SortedMap}
 
 import org.apache.jdbm.DBMaker
 import org.apache.jdbm.DB
@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
+
+import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {
   def maxSliceSize: Int
@@ -130,8 +132,8 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         }
 
         new CellMatrix {
-          private[this] val allCells: scmMap[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
-          private[this] val comparatorMatrix                 = fillMatrix(initialCells)
+          private[this] val allCells: mutable.Map[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
+          private[this] val comparatorMatrix = fillMatrix(initialCells)
 
           def cells = allCells.values
 
@@ -892,7 +894,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                                         rightKeySpec: TransSpec1,
-                                                                                        joinSpec: TransSpec2): M[JoinOrder -> Table] = {
+                                                                                        joinSpec: TransSpec2): M[(JoinOrder, Table)] = {
 
       def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)

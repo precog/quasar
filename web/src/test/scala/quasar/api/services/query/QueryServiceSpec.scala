@@ -23,7 +23,7 @@ import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._
-import quasar.fs._, InMemory._
+import quasar.fs._, InMemory._, mount._
 
 import argonaut._, Argonaut._
 import org.http4s._
@@ -38,7 +38,7 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](test: (InMemState => HttpService) => Fragment) = {
+    def testBoth[A](test: ((InMemState, Map[APath, MountConfig]) => HttpService) => Fragment) = {
       "Compile" should {
         test(compileService)
       }
@@ -133,7 +133,7 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
             val parentAsFile = asFile(filesystem.parent).get
 
             val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
-            val resp = service(filesystem.state)(req).unsafePerformSync
+            val resp = service(filesystem.state, Map.empty)(req).unsafePerformSync
             resp.status must_== Status.BadRequest
             resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
               Status.BadRequest withReason "Directory path expected.",

@@ -22,25 +22,32 @@ import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.contrib.pathy._
+import quasar.effect._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.fs._, InMemory.InMemState
+import quasar.fs.mount._
 import quasar.main.analysis
+import quasar.sst._
+import quasar.std.IdentityLib
 
 import argonaut._, Argonaut._, JsonScalaz._
 import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl._
+import org.http4s.headers._
+import org.http4s.util.{NonEmptyList => HNel}
 import org.scalacheck._
 import org.specs2.specification.core.Fragments
+import pathy.Path.{dir, file, posixCodec, rootDir}
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -54,20 +61,32 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
 
   type J = Fix[EJson]
 
+  val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+
+  def simpleRead(file: AFile): Fix[LogicalPlan] =
+    lpr.invoke1(IdentityLib.Squash, lpr.read(file))
+
   def stateForFile(file: AFile, contents: Vector[Data]) =
     InMemState.empty.copy(queryResps = Map(
-      analysis.sampleQuery(file, schema.DefaultSampleSize) -> contents
+      analysis.sampled(simpleRead(file), schema.DefaultSampleSize) -> contents
     ))
+
+  def baseUri(file: AFile) =
+    pathUri(rootDir) +? ("q", s"select * from `${posixCodec.printPath(file)}`")
 
   def nonPos(i: Int): Int =
     if (i > 0) -i else i
 
-  def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json =
+  def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json = {
+    type P[X] = StructuralType[J, Option[X]]
+
     Process.emitAll(dataset)
       .pipe(analysis.extractSchema[J, Double](cfg))
-      .map(sst => DataCodec.Precise.encode(sst.asEJson[J].cata[Data](Data.fromEJson)))
+      .map(Population.subst[P, TypeStat[Double]] _)
+      .map(psst => DataCodec.Precise.encode(analysis.schemaToData(psst.right)))
       .pipe(process1.stripNone)
       .toVector.headOption.getOrElse(Json.jNull)
+  }
 
   case class SmallPositive(p: Positive)
 
@@ -75,21 +94,37 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
     Arbitrary(chooseRefinedNum(1L: Positive, 10L: Positive) map (SmallPositive(_)))
 
   "respond with bad request when" >> {
-    "no path given" >> {
-      service(InMemState.empty)(Request())
+    "file path given" >> prop { file: AFile =>
+      service(InMemState.empty)(Request(uri = pathUri(file) +? ("q", "select 1")))
         .flatMap(_.as[ApiError])
         .map(_ must beApiErrorWithMessage(
-          BadRequest withReason "File path expected.",
-          "path" := "/"))
+          BadRequest withReason "Directory path expected.",
+          "path" := file))
         .unsafePerformSync
     }
 
-    "directory path given" >> prop { dir: ADir =>
+    "query missing" >> prop { dir: ADir =>
       service(InMemState.empty)(Request(uri = pathUri(dir)))
         .flatMap(_.as[ApiError])
+        .map(_ must equal(ApiError.fromStatus(
+          BadRequest withReason "No SQL^2 query found in URL.")))
+        .unsafePerformSync
+    }
+
+    "query malformed" >> prop { dir: ADir =>
+      service(InMemState.empty)(Request(uri = pathUri(dir) +? ("q", "select foo from")))
+        .flatMap(_.as[ApiError])
         .map(_ must beApiErrorWithMessage(
-          BadRequest withReason "File path expected.",
-          "path" := dir))
+          BadRequest withReason "Malformed SQL^2 query."))
+        .unsafePerformSync
+    }
+
+    "variable unbound" >> prop { dir: ADir =>
+      service(InMemState.empty)(Request(uri = pathUri(dir) +? ("q", "select * from :foo")))
+        .flatMap(_.as[ApiError])
+        .map(_ must beApiErrorWithMessage(
+          BadRequest withReason "Unbound variable.",
+          "varName" := "foo"))
         .unsafePerformSync
     }
 
@@ -107,47 +142,50 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
   }
 
   "successful response" >> {
-    def shouldSucceed(file: AFile, x: Data, y: Data, cfg: analysis.CompressionSettings, req: Request) = {
-      val dataset = Vector.fill(5)(x) ++ Vector.fill(5)(y)
+    val testFile = rootDir </> dir("foo") </> file("bar")
 
-      service(stateForFile(file, dataset))(req)
+    def shouldSucceed(x: Data, y: Data, cfg: analysis.CompressionSettings, req: Request) = {
+      val dataset = Vector.fill(5)(x) ++ Vector.fill(5)(y)
+      val mt = JsonFormat.LineDelimited.mediaType.withExtensions(Map("mode" -> "precise"))
+      val accept = Accept(HNel(MediaRangeAndQValue.withDefaultQValue(mt)))
+
+      service(stateForFile(testFile, dataset))(req.transformHeaders(_.put(accept)))
         .flatMap(_.as[Json])
         .map(_ must_= sstResponse(dataset, cfg))
         .unsafePerformSync
     }
 
-    "includes the sst for the dataset as JSON-encoded EJson" >> prop { (file: AFile, x: Data, y: Data) =>
-      shouldSucceed(file, x, y,
+    def testReq(f: Uri => Uri) =
+      Request(uri = f(baseUri(testFile)))
+
+    "includes the sst for the query results as JSON-encoded EJson" >> prop { (x: Data, y: Data) =>
+      shouldSucceed(x, y,
         analysis.CompressionSettings.Default,
-        Request(uri = pathUri(file)))
+        testReq(a => a))
     }
 
-    "applies arrayMaxLength when specified" >> prop { (file: AFile, x: Data, y: Data, len: SmallPositive) =>
+    "applies arrayMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallPositive) =>
       val cfg = analysis.CompressionSettings.Default.copy(arrayMaxLength = len.p)
-      val req = Request(uri = pathUri(file) +? ("arrayMaxLength", len.p.shows))
-      shouldSucceed(file, x, y, cfg, req)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("arrayMaxLength", len.p.shows)))
     }
 
-    "applies mapMaxSize when specified" >> prop { (file: AFile, x: Data, y: Data, size: SmallPositive) =>
+    "applies mapMaxSize when specified" >> prop { (x: Data, y: Data, size: SmallPositive) =>
       val cfg = analysis.CompressionSettings.Default.copy(mapMaxSize = size.p)
-      val req = Request(uri = pathUri(file) +? ("mapMaxSize", size.p.shows))
-      shouldSucceed(file, x, y, cfg, req)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("mapMaxSize", size.p.shows)))
     }
 
-    "applies stringMaxLength when specified" >> prop { (file: AFile, x: Data, y: Data, len: SmallPositive) =>
+    "applies stringMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallPositive) =>
       val cfg = analysis.CompressionSettings.Default.copy(stringMaxLength = len.p)
-      val req = Request(uri = pathUri(file) +? ("stringMaxLength", len.p.shows))
-      shouldSucceed(file, x, y, cfg, req)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("stringMaxLength", len.p.shows)))
     }
 
-    "applies unionMaxSize when specified" >> prop { (file: AFile, x: Data, y: Data, size: SmallPositive) =>
+    "applies unionMaxSize when specified" >> prop { (x: Data, y: Data, size: SmallPositive) =>
       val cfg = analysis.CompressionSettings.Default.copy(unionMaxSize = size.p)
-      val req = Request(uri = pathUri(file) +? ("unionMaxSize", size.p.shows))
-      shouldSucceed(file, x, y, cfg, req)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("unionMaxSize", size.p.shows)))
     }
 
-    "has an empty body when file exists but is empty" >> prop { file: AFile =>
-      service(stateForFile(file, Vector()))(Request(uri = pathUri(file)))
+    "has an empty body when query has no results" >> {
+      service(stateForFile(testFile, Vector()))(testReq(a => a))
         .flatMap(_.as[String])
         .map(_ must beEmpty)
         .unsafePerformSync
@@ -156,19 +194,26 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
 }
 
 object SchemaServiceSpec {
-  type SchemaEff[A] = (QueryFile :\: FileSystemFailure :/: Task)#M[A]
+  type SchemaEff[A] = (Mounting :\: QueryFile :\: FileSystemFailure :/: Task)#M[A]
 
   def runQueryFile(mem: InMemState): Task[QueryFile ~> ResponseOr] =
     InMemory.runStatefully(mem) map { eval =>
       liftMT[Task, ResponseT] compose eval compose InMemory.queryFile
     }
 
+  val runMounting: Task[Mounting ~> ResponseOr] =
+    KeyValueStore.impl.empty[APath, MountConfig] map { eval =>
+      liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
+    }
+
   def service(mem: InMemState): HttpService =
-    Kleisli(req => runQueryFile(mem) flatMap { runQF =>
-      schema.service[SchemaEff].toHttpService(
-        runQF                              :+:
-        failureResponseOr[FileSystemError] :+:
-        liftMT[Task, ResponseT]
-      )(req)
+    Kleisli(req => runQueryFile(mem).tuple(runMounting) flatMap {
+      case (runQF, runM) =>
+        schema.service[SchemaEff].toHttpService(
+          runM                               :+:
+          runQF                              :+:
+          failureResponseOr[FileSystemError] :+:
+          liftMT[Task, ResponseT]
+        )(req)
     })
 }

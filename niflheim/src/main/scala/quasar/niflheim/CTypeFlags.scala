@@ -23,6 +23,7 @@ import scalaz.{ Validation, Success, Failure }
 import scala.annotation.tailrec
 import scala.collection.mutable
 
+import java.io.IOException
 import java.nio.ByteBuffer
 
 object CTypeFlags {

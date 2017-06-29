@@ -21,11 +21,11 @@ import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.util._
 
-import scala.collection.mutable.{Map => MMap}
+import scala.collection.mutable
 
 import java.time.LocalDateTime
 
-case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[CTree], types: MMap[CType, Int]) {
+case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutable.ArrayBuffer[CTree], types: mutable.Map[CType, Int]) {
   def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
   def getIndex(n: Int): CTree = {
     var i = indices.length
@@ -47,15 +47,15 @@ case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[
 }
 
 object CTree {
-  def empty(path: CPath) = CTree(path, MMap.empty[String, CTree], ArrayBuffer.empty[CTree], MMap.empty[CType, Int])
+  def empty(path: CPath) = CTree(path, mutable.Map.empty[String, CTree], mutable.ArrayBuffer.empty[CTree], mutable.Map.empty[CType, Int])
 }
 
 object Segments {
   def empty(id: Long): Segments =
-    Segments(id, 0, CTree.empty(CPath.Identity), ArrayBuffer.empty[Segment])
+    Segments(id, 0, CTree.empty(CPath.Identity), mutable.ArrayBuffer.empty[Segment])
 }
 
-case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]) {
+case class Segments(id: Long, var length: Int, t: CTree, a: mutable.ArrayBuffer[Segment]) {
 
   override def equals(that: Any): Boolean = that match {
     case Segments(`id`, length2, t2, a2) =>

@@ -26,9 +26,11 @@ import scalaz._, Scalaz._
 
 import java.time.LocalDateTime
 
+import scala.collection.mutable
+
 class LongAdder {
   var t = 0L
-  val ts = ArrayBuffer.empty[BigDecimal]
+  val ts = mutable.ArrayBuffer.empty[BigDecimal]
 
   final def maxLongSqrt = 3037000499L
 

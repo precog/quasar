@@ -41,6 +41,7 @@ final case class NamedConstraint[T]
 final case class ConstrainedPlan[T]
   (inferred: Type, constraints: List[NamedConstraint[T]], plan: T)
 
+// TODO: Move constraints to methods and/or pull the constructors into own class.
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._

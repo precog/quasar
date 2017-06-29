@@ -21,7 +21,7 @@ import quasar.blueeyes._
 import scalaz.Ordering._
 
 trait RowComparator { self =>
-  def compare(i1: Int, i2: Int): ScalazOrdering
+  def compare(i1: Int, i2: Int): scalaz.Ordering
 
   def swap: RowComparator = new RowComparator {
     def compare(i1: Int, i2: Int) = self.compare(i2, i1).complement

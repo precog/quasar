@@ -53,7 +53,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
 
-  @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: ScalazOrder[A]): CogroupResult[A] = {
+  @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Order[A]): CogroupResult[A] = {
     (l, r) match {
       case (lh #:: lt, rh #:: rt) => ord.order(lh, rh) match {
         case EQ => {
@@ -84,7 +84,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     val ltable = fromSample(l)
     val rtable = fromSample(r)
 
-    val keyOrder = ScalazOrder[JValue].contramap((_: JValue) \ "key")
+    val keyOrder = Order[JValue].contramap((_: JValue) \ "key")
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
       case Left3(jv) => jv

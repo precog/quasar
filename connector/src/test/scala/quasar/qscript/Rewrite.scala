@@ -25,7 +25,7 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.sql.CompilerHelpers
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import scala.Predef.implicitly
 
@@ -117,6 +117,62 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           BoolLit[Fix, Hole](true),
           ExcludeId,
           RightSideF).some)
+    }
+
+    "coalesce a Filter into a preceding ThetaJoin" in {
+      val sampleFile = rootDir </> file("bar")
+
+      val exp =
+        QCT.inj(Filter(
+          TJT.inj(ThetaJoin(
+            QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
+            Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
+            Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
+            AndR(
+              EqR(ProjectFieldR(LeftSideF, StrLit("l_id")), ProjectFieldR(RightSideF, StrLit("r_id"))),
+              EqR(
+                AddR(
+                  ProjectFieldR(LeftSideF, StrLit("l_min")),
+                  ProjectFieldR(LeftSideF, StrLit("l_max"))),
+                SubtractR(
+                  ProjectFieldR(RightSideF, StrLit("l_max")),
+                  ProjectFieldR(RightSideF, StrLit("l_min"))))),
+            JoinType.Inner,
+            ConcatMapsR(
+              MakeMapR(StrLit("l"), LeftSideF),
+              MakeMapR(StrLit("r"), RightSideF)))).embed,
+            LtR(
+              ProjectFieldR(
+                ProjectFieldR(HoleF, StrLit("l")),
+                StrLit("lat")),
+              ProjectFieldR(
+                ProjectFieldR(HoleF, StrLit("l")),
+                StrLit("lon")))))
+
+      Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalize[QST]) must
+      equal(
+        TJT.inj(ThetaJoin(
+          QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
+          Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
+          Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
+          AndR(
+            AndR(
+              EqR(ProjectFieldR(LeftSideF, StrLit("l_id")), ProjectFieldR(RightSideF, StrLit("r_id"))),
+              EqR(
+                AddR(
+                  ProjectFieldR(LeftSideF, StrLit("l_min")),
+                  ProjectFieldR(LeftSideF, StrLit("l_max"))),
+                SubtractR(
+                  ProjectFieldR(RightSideF, StrLit("l_max")),
+                  ProjectFieldR(RightSideF, StrLit("l_min"))))),
+            LtR(
+              ProjectFieldR(LeftSideF, StrLit("lat")),
+              ProjectFieldR(LeftSideF, StrLit("lon")))),
+          JoinType.Inner,
+          ConcatMapsR(
+            MakeMapR(StrLit("l"), LeftSideF),
+            MakeMapR(StrLit("r"), RightSideF)))).some)
+
     }
 
     "fold a constant array value" in {

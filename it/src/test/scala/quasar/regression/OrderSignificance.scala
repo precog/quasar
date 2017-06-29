@@ -16,8 +16,12 @@
 
 package quasar.regression
 
-sealed abstract class FieldOrder
+import scalaz._
 
-final case object FieldOrderPreserved extends FieldOrder
+sealed abstract class OrderSignificance
+final case object OrderPreserved extends OrderSignificance
+final case object OrderIgnored extends OrderSignificance
 
-final case object FieldOrderIgnored extends FieldOrder
+object OrderSignificance {
+  implicit val equal: Equal[OrderSignificance] = Equal.equalRef
+}

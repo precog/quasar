@@ -22,6 +22,8 @@ import org.specs2.mutable.Specification
 import org.specs2._
 import org.scalacheck._
 
+import java.io.File
+
 class V1CookedBlockFormatSpecs extends CookedBlockFormatSpecs {
   val format = V1CookedBlockFormat
 }

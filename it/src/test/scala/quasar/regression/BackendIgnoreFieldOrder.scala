@@ -21,5 +21,4 @@ import quasar.BackendName
 
 sealed abstract class IgnoreFieldOrderBackend
 
-final case object IgnoreFieldOrderAllBackends                           extends IgnoreFieldOrderBackend
 final case class  IgnoreFieldOrderBackends(backends: List[BackendName]) extends IgnoreFieldOrderBackend

@@ -2,7 +2,6 @@
     "name": "convert a field to ObjectId",
     "backends": {
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
         "marklogic_json":    "skip",
@@ -13,7 +12,8 @@
     },
     "data": "../objectids.data",
     "query": "select oid(bar) from `../objectids`",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "$oid": "4f95e00d9060633ce7fbab93" },
                  { "$oid": "4f95e0119060633ce7fbab95" },
                  { "$oid": "4f95e0119060633ce7fbab97" }]

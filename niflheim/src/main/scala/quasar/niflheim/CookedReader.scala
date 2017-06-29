@@ -20,6 +20,7 @@ import quasar.precog.common._
 
 import java.lang.ref.SoftReference
 
+import java.io.{File, FileInputStream, IOException}
 import java.nio.channels._
 
 import scalaz._

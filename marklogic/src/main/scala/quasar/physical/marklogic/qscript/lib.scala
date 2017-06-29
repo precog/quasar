@@ -127,6 +127,21 @@ object lib {
       }
     })
 
+  // qscript:type-of($item as item()*) as xs:string?
+  def typeOf[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
+    qs.declare[F]("type-of-q") flatMap (_(
+      $("item") as ST.Top
+    ).as(ST("xs:string?")) { item: XQuery =>
+      val (lookup, mapped) = ($("lookup"), $("mapped"))
+      SP.typeOf(item) map ( tpe =>
+        if_(tpe === "object".xs)
+        .then_("map".xs)
+        .else_(if_(tpe === "string".xs)
+        .then_("array".xs)
+        .else_(if_(tpe === "na".xs)
+        .then_(emptySeq).else_(tpe))))
+    })
+
   // qscript:concat($x as item()?, $y as item()?) as item()?
   def concat[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     qs.declare("concat") flatMap (_(

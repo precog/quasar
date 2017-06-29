@@ -28,7 +28,7 @@ import scalaz._, Scalaz._
 private[qscript] final class ThetaJoinPlanner[
   F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
   FMT: SearchOptions,
-  T[_[_]]: RecursiveT
+  T[_[_]]: BirecursiveT
 ](implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
   SP : StructuralPlanner[F, FMT]

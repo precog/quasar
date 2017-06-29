@@ -17,15 +17,12 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.AnalyticalFileSystem
-import quasar.sql.Blob
 import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
 import monocle.function.Field1
-import pathy.Path.fileParent
 import scalaz._, Scalaz._
 
 /** Handles mount requests, validating them and updating a hierarchical
@@ -41,7 +38,7 @@ final class MountRequestHandler[F[_], S[_]](
   S1: MountedResultH :<: S,
   S2: MonotonicSeq :<: S
 ) {
-  import MountRequest._, MountingError._, MountConfig._
+  import MountRequest._
 
   type HierarchicalFsRef[A] = AtomicRef[AnalyticalFileSystem ~> Free[S, ?], A]
 
@@ -60,15 +57,13 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
-        case MountView(f, qry, vars) =>
-          queryPlan(Blob(qry, Nil), vars, fileParent(f), 0L, None).run.value
-            .leftMap(e => invalidConfig(viewConfig(qry, vars), e.map(_.shows)))
-            .void.point[Free[T, ?]]
-
-        case MountFileSystem(d, typ, uri) =>
-          fsm.mount[T](d, typ, uri)
-
-        case MountModule(d, s) => ().right.point[Free[T, ?]]
+        case MountFileSystem(d, typ, uri) => fsm.mount[T](d, typ, uri)
+        // Previously we would validate at this point that a view's Sql could be compiled
+        // to `LogicalPlan` but now that views can contain Imports, that's no longer easy or very
+        // valuable. Validation can once again be performed once `LogicalPlan` has a representation
+        // for functions and imports
+        // See https://github.com/quasar-analytics/quasar/issues/2398
+        case _ => ().right.point[Free[T, ?]]
       })
 
     (handleMount *> updateHierarchy[T].liftM[MntErrT]).run

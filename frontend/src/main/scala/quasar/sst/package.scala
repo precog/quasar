@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.{BinaryTag, EJson, CommonEJson => C, ExtEJson => E, Meta, Null, SizedTypeTag, Str}
+import quasar.ejson.{BinaryTag, EJson, CommonEJson => C, ExtEJson => E, EncodeEJson, Meta, Null, SizedTypeTag, Str}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -26,13 +26,20 @@ import matryoshka._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import spire.algebra.Field
+import spire.algebra.{AdditiveMonoid, Field, NRoot}
 import spire.math.ConvertableTo
 
 package object sst {
   /** Statistical Structural Type */
-  type SSTF[J, A, B] = EnvT[Option[TypeStat[A]], TypeF[J, ?], B]
-  type SST[J, A]     = StructuralType[J, Option[TypeStat[A]]]
+  type SSTF[J, A, B]       = EnvT[Option[TypeStat[A]], TypeF[J, ?], B]
+  type SST[J, A]           = StructuralType[J, Option[TypeStat[A]]]
+  type PopulationSST[J, A] = StructuralType[J, Option[TypeStat[A] @@ Population]]
+
+  /** Type tag indicating the tagged value represents an entire population
+    * as opposed to a sample of a population.
+    */
+  sealed abstract class Population
+  val Population = Tag.of[Population]
 
   object SST {
     def fromData[J: Order, A: ConvertableTo: Field: Order](
@@ -59,6 +66,9 @@ package object sst {
         TypeStat.fromTypeFƒ(count),
         ejson.transCata[J](elideNonBinaryMetadata[J]))
 
+    def size[J, A: AdditiveMonoid](sst: SST[J, A]): A =
+      sst.copoint.fold(AdditiveMonoid[A].zero)(_.size)
+
     ////
 
     private def elideNonBinaryMetadata[J](
@@ -76,4 +86,11 @@ package object sst {
         case _                                                               => none
       }
   }
+
+  // NB: Defined here as adding the tag causes the compiler not to consider the TypeStat companion.
+  implicit def populationTypeStatEncodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A] @@ Population] =
+    new EncodeEJson[TypeStat[A] @@ Population] {
+      def encode[J](ts: TypeStat[A] @@ Population)(implicit J: Corecursive.Aux[J, EJson]): J =
+        TypeStat.encodeEJson0(Population.unwrap(ts), isPopulation = true)
+    }
 }

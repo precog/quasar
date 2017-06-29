@@ -49,7 +49,7 @@ package object mount {
       KeyValueStore.Ops[APath, MountConfig, S]
   }
 
-  
+
   //-- Views --
 
   sealed abstract class ResultSet

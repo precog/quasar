@@ -27,6 +27,7 @@ import quasar.fs._, InMemory._
 import quasar.fs.mount._
 import quasar.fs.mount.Fixture.runConstantMount
 import quasar.sql._
+import quasar.sql.Arbitraries._
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -60,7 +61,7 @@ object MetadataFixture {
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import metadata.FsNode
-  import VariablesArbitrary._, ExprArbitrary._
+  import VariablesArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
   import MetadataFixture._
   import PathError._
@@ -109,7 +110,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         fsMountName: DirName,
         viewName: FileName,
         moduleName: DirName,
-        vcfg: (Fix[Sql], Variables),
+        vcfg: (ScopedExpr[Fix[Sql]], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
       ) => (fileName ≠ viewName &&
           directoryName ≠ fsMountName &&

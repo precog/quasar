@@ -14,26 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.contrib
 
 import slamdata.Predef._
+import quasar.fp.ski._
 
-import argonaut._, Argonaut._
+import _root_.scalaz._, Scalaz._
 
-sealed abstract class SkipDirective
-
-object SkipDirective {
-  final case object Skip    extends SkipDirective
-  final case object SkipCI  extends SkipDirective
-  final case object Pending extends SkipDirective
-
-  import DecodeResult.{ok, fail}
-
-  implicit val SkipDirectiveDecodeJson: DecodeJson[SkipDirective] =
-    DecodeJson(c => c.as[String].flatMap {
-      case "skip"    => ok(Skip)
-      case "skipCI"  => ok(SkipCI)
-      case "pending" => ok(Pending)
-      case str       => fail("skip, skipCI, pending; found: \"" + str + "\"", c.history)
-    })
+package object std {
+  implicit class AugmentedList[A](val a: List[A]) extends scala.AnyVal {
+    def duplicates: List[NonEmptyList[A]] = {
+      a.groupBy1(ι).values.filter(_.size > 1).toList
+    }
+  }
 }

@@ -11,7 +11,8 @@
 
     "query": "select day from `../days` where date_part(\"dow\", epoch) >= 3",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": []
 }

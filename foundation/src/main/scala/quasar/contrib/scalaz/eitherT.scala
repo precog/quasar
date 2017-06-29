@@ -75,4 +75,9 @@ trait EitherTInstances2 {
     EitherT.monadTell[F, W, E]
 }
 
-object eitherT extends EitherTInstances
+object eitherT extends EitherTInstances {
+  implicit class NestedEitherT[E,F[_]: Monad, A](a: EitherT[EitherT[F, E, ?], E, A]) {
+    def flattenLeft: EitherT[F, E, A] =
+      a.run.flatMapF(_.point[F])
+  }
+}

@@ -6,6 +6,7 @@
     },
     "data": "zips.data",
     "query": "select count(*) as cnt from zips where state not in (\"AZ\", \"CO\")",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{"cnt": 28669}]
 }

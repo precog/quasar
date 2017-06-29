@@ -12,9 +12,10 @@
 
     "ignoredFields": ["_id"],
 
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [{ "city": "ARVADA", "loc": [-105.098402, 39.794533], "pop": 12065, "state": "CO" }]
 }

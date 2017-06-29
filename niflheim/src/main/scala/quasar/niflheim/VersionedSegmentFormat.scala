@@ -21,6 +21,8 @@ import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 import scalaz.{Validation, Failure}
 import scalaz.syntax.monad._
 
+import java.io.IOException
+
 /**
  * A `VersionedSegmentFormat` wraps formats and is used to deal with multiple
  * versions for `SegmentFormat`s. The version of a segment format is always

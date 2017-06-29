@@ -62,8 +62,8 @@ package object analysis {
       EitherT.fromDisjunction(afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
     val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
       (lp: Fix[LogicalPlan]) => queryOps.first(lp).mapT(_.value)
-    
-    (lp >>= (dataFromLp)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0) 
+
+    (lp >>= (dataFromLp)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0)
   }
 
   object Cardinality {
@@ -89,7 +89,7 @@ package object analysis {
           case Map(card, f) => card.point[M]
           case Reduce(card, bucket, reducers, repair) =>
             bucket.fold(κ(card / 2), {
-              case MapFuncs.Constant(v) => 1
+              case MapFuncsCore.Constant(v) => 1
               case _ => card / 2
             }).point[M]
           case Sort(card, bucket, orders) => card.point[M]
@@ -97,7 +97,7 @@ package object analysis {
           case Subset(card, from, sel, count) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
             def c = count.fold(κ(card / 2), {
-              case I(Map(_, MapFuncs.IntLit(v))) => v.toInt
+              case I(Map(_, MapFuncsCore.IntLit(v))) => v.toInt
               case _ => card / 2
             })
             sel match {
@@ -154,7 +154,7 @@ package object analysis {
   }
 
   /**
-    * This is a "generic" implementation for `Cost` that can be used by any connector. 
+    * This is a "generic" implementation for `Cost` that can be used by any connector.
     * Can be used for newly created connectors. More mature connectors should provide
     * their own instance that will take into account connector-specific information.
     */

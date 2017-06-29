@@ -25,9 +25,9 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad] extends Planner[T, F, ReduceFunc] {
+final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative] extends Planner[T, F, ReduceFunc] {
 
-  def plan: AlgebraM[M, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[M])
+  def plan: AlgebraM[F, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[F])
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val planʹ: Transform[T[N1QL], ReduceFunc, N1QL] = {

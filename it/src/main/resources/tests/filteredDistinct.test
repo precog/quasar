@@ -7,6 +7,7 @@
     },
     "data": "olympics.data",
     "query": "select distinct discipline from olympics where event like \"%pursuit\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Speed skating", "Biathlon", "Cross Country S"]
 }

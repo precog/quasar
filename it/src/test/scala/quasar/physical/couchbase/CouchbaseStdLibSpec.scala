@@ -25,9 +25,9 @@ import quasar.fs.FileSystemError
 import quasar.physical.couchbase.common.CBDataCodec
 import quasar.physical.couchbase.fs.{parseConfig, FsType}
 import quasar.physical.couchbase.Couchbase._, QueryFileModule.n1qlResults
-import quasar.physical.couchbase.planner.CBPhaseLog
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
-import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
+import quasar.Planner.PlannerError
+import quasar.qscript.{MapFuncCore, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
 
 import java.time.LocalDate
@@ -47,10 +47,10 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   implicit val codec = CBDataCodec
 
   type F[A] = Free[Eff, A]
-  type M[A] = CBPhaseLog[F, A]
+  type M[A] = EitherT[F, PlannerError, A]
 
   def run[A](
-    fm: Free[MapFunc[Fix, ?], A],
+    fm: Free[MapFuncCore[Fix, ?], A],
     args: A => QData,
     expected: QData,
     cfg: Config
@@ -61,8 +61,9 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     val r: FileSystemError \/ (String, Vector[QData]) = (
       for {
         q  <- ME.unattempt(
-                fm.cataM(interpretM(a => argN1ql(args(a)), mapFuncPlanner[Fix, F].plan))
-                  .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.value.liftB)
+                fm.cataM(interpretM(a =>
+                    argN1ql(args(a)), mapFuncPlanner[Fix, EitherT[F, PlannerError, ?]].plan))
+                  .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.liftB)
         s  =  Select(
                 Value(false),
                 ResultExpr(q, Id("v").some).wrapNel,

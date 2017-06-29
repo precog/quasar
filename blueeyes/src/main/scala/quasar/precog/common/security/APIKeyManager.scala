@@ -17,7 +17,6 @@
 package quasar.precog.common
 package security
 
-import quasar.blueeyes._
 import service._
 import quasar.precog.common.accounts.{ Account, AccountId }
 

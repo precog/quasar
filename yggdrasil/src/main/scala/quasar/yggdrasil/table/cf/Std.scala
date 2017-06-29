@@ -18,7 +18,6 @@ package quasar.yggdrasil
 package table
 package cf
 
-import quasar.blueeyes._
 import quasar.precog.util.NumericComparisons
 
 object std {

@@ -37,6 +37,7 @@ package object pathy {
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
   type FPath = Path[scala.Any,File,Sandboxed]
+  type DPath = Path[scala.Any,Dir, Sandboxed]
 
   type PathSegment = DirName \/ FileName
 
@@ -61,7 +62,7 @@ package object pathy {
   /** PathCodec with URI-encoded segments. */
   val UriPathCodec: PathCodec = {
     /** This encoder translates spaces into pluses, but we want the
-      *  more rigorous %20 encoding.
+      * more rigorous %20 encoding.
       */
     val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
     val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")

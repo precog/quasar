@@ -25,6 +25,8 @@ import IsoSerialization._, Iso8601Serialization._, Versioned._
 import Extractor._
 import scalaz._, Scalaz._, Validation._
 
+import java.util.UUID
+
 sealed trait Event {
   def fold[A](ingest: Ingest => A, archive: Archive => A): A
   def split(n: Int): List[Event]

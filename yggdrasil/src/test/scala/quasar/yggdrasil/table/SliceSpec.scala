@@ -205,7 +205,7 @@ object ArbitrarySlice {
   }
 
   def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
-    val zero    = Nil: Gen[List[ColumnRef -> Column]]
+    val zero    = Nil: Gen[List[(ColumnRef, Column)]]
     val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
     val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
 

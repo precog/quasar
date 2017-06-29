@@ -17,74 +17,75 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{ Data, Type }
+import quasar.{Data, Type, SemanticError}
 import quasar.common.{JoinType, SortDir}
 import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan => LP}
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
+import pathy.Path._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.NonEmptyList
-import scalaz.syntax.nel._
+import scalaz.{ Divide => _, _}, Scalaz._
 
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
   //     need to do a better job of handling this.
   import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
+  import SemanticError._
 
   "compiler" should {
     "compile simple constant example 1" in {
       testLogicalPlanCompile(
-        "select 1",
+        sqlE"select 1",
         lpf.constant(Data.Int(1)))
     }
 
     "compile simple constant example 1 with field name" in {
       testLogicalPlanCompile(
-        "select 1 as one",
+        sqlE"select 1 as one",
         makeObj("one" -> lpf.constant(Data.Int(1))))
     }
 
     "compile simple boolean literal (true)" in {
       testLogicalPlanCompile(
-        "select true",
+        sqlE"select true",
         lpf.constant(Data.Bool(true)))
     }
 
     "compile simple boolean literal (false)" in {
       testLogicalPlanCompile(
-        "select false",
+        sqlE"select false",
         lpf.constant(Data.Bool(false)))
     }
 
     "compile simple constant with multiple named projections" in {
       testLogicalPlanCompile(
-        "select 1.0 as a, \"abc\" as b",
+        sqlE"""select 1.0 as a, "abc" as b""",
         makeObj(
           "a" -> lpf.constant(Data.Dec(1.0)),
           "b" -> lpf.constant(Data.Str("abc"))))
     }
 
     "compile complex constant" in {
-      testTypedLogicalPlanCompile("[1, 2, 3, 4, 5][*] limit 3 offset 1",
+      testTypedLogicalPlanCompile(sqlE"[1, 2, 3, 4, 5][*] limit 3 offset 1",
         lpf.constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
     }
 
     "select complex constant" in {
       testTypedLogicalPlanCompile(
-        "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1",
+        sqlE"""select {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}{*} limit 3 offset 1""",
         lpf.constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
     }
 
     "select complex constant 2" in {
       testTypedLogicalPlanCompile(
-        "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*:} limit 3 offset 1",
+        sqlE"""select {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}{*:} limit 3 offset 1""",
         lpf.constant(Data.Set(List(Data.Str("b"), Data.Str("c")))))
     }
 
     "compile reduced constant" in {
       testTypedLogicalPlanCompile(
-        "select count(*) as total from (select \"Hello world\") as lit",
+        sqlE"""select count(*) as total from (select "Hello world") as lit""",
         lpf.constant(Data.Obj("total" -> Data.Int(1))))
     }
 
@@ -92,7 +93,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       import java.time.{Instant, LocalDate, LocalTime}
 
       testTypedLogicalPlanCompile(
-        """select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
+        sqlE"""select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
         lpf.constant(Data.Obj(ListMap(
           "0" -> Data.Timestamp(Instant.parse("2014-11-17T22:43:40Z")),
           "1" -> Data.Date(LocalDate.parse("2015-01-19")),
@@ -100,12 +101,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile simple constant from collection" in {
-      testTypedLogicalPlanCompile("select 1 from zips",
+      testTypedLogicalPlanCompile(sqlE"select 1 from zips",
         lpf.constant(Data.Int(1)))
     }
 
     "compile with typecheck in join condition" in {
-      val query = "select * from zips join smallZips on zips.x = smallZips.foo.bar"
+      val query = sqlE"select * from zips join smallZips on zips.x = smallZips.foo.bar"
 
       testTypedLogicalPlanCompile(query,
         lpf.let('__tmp0,
@@ -207,12 +208,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile with typecheck in multiple join condition" in {
       val query =
-        "select l.sha as child, " +
-          "l.author.login as c_auth, " +
-          "r.sha as parent, " +
-          "r.author.login as p_auth " +
-          "from slamengine_commits as l join slamengine_commits_dup as r " +
-          "on r.sha = l.parents[0].sha and l.author.login = r.author.login"
+        sqlE"""select l.sha as child,
+               l.author.login as c_auth,
+               r.sha as parent,
+               r.author.login as p_auth
+               from slamengine_commits as l join slamengine_commits_dup as r
+               on r.sha = l.parents[0].sha and l.author.login = r.author.login"""
 
       testTypedLogicalPlanCompile(query,
         complexJoinTypecheck(
@@ -272,13 +273,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile with typecheck in multiple join condition followed by filter" in {
       val query =
-        "select l.sha as child, " +
-          "l.author.login as c_auth, " +
-          "r.sha as parent, " +
-          "r.author.login as p_auth " +
-          "from slamengine_commits as l join slamengine_commits_dup as r " +
-          "on r.sha = l.parents[0].sha and l.author.login = r.author.login " +
-          "where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\""
+        sqlE"""select l.sha as child,
+               l.author.login as c_auth,
+               r.sha as parent,
+               r.author.login as p_auth
+               from slamengine_commits as l join slamengine_commits_dup as r
+               on r.sha = l.parents[0].sha and l.author.login = r.author.login
+               where r.author.login || "," || l.author.login = "jdegoes,jdegoes" """
 
       testTypedLogicalPlanCompile(query,
         complexJoinTypecheck(
@@ -382,7 +383,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile select substring" in {
       testLogicalPlanCompile(
-        "select substring(bar, 2, 3) from foo",
+        sqlE"select substring(bar, 2, 3) from foo",
         lpf.invoke1(Squash,
           lpf.invoke3(Substring,
             lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))),
@@ -392,22 +393,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile select length" in {
       testLogicalPlanCompile(
-        "select length(bar) from foo",
+        sqlE"select length(bar) from foo",
         lpf.invoke1(Squash,
           lpf.invoke1(Length, lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))))))
     }
 
     "compile simple select *" in {
-      testLogicalPlanCompile("select * from foo", lpf.invoke1(Squash, read("foo")))
+      testLogicalPlanCompile(sqlE"select * from foo", lpf.invoke1(Squash, read("foo")))
     }
 
     "compile qualified select *" in {
-      testLogicalPlanCompile("select foo.* from foo", lpf.invoke1(Squash, read("foo")))
+      testLogicalPlanCompile(sqlE"select foo.* from foo", lpf.invoke1(Squash, read("foo")))
     }
 
     "compile qualified select * with additional fields" in {
       testLogicalPlanCompile(
-        "select foo.*, bar.address from foo, bar",
+        sqlE"select foo.*, bar.address from foo, bar",
         lpf.let('__tmp0,
           lpf.join(
             read("foo"),
@@ -426,7 +427,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile deeply-nested qualified select *" in {
       testLogicalPlanCompile(
-        "select foo.bar.baz.*, bar.address from foo, bar",
+        sqlE"select foo.bar.baz.*, bar.address from foo, bar",
         lpf.let('__tmp0,
           lpf.join(
             read("foo"),
@@ -449,7 +450,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple select with unnamed projection which is just an identifier" in {
       testLogicalPlanCompile(
-        "select name, place from city",
+        sqlE"select name, place from city",
         lpf.let('__tmp0, read("city"),
           lpf.invoke1(Squash,
             makeObj(
@@ -459,24 +460,24 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile basic let" in {
       testLogicalPlanCompile(
-        "foo := 5; foo",
+        sqlE"foo := 5; foo",
         lpf.constant(Data.Int(5)))
     }
 
     "compile basic let, ignoring the form" in {
       testLogicalPlanCompile(
-        "bar := 5; 7",
+        sqlE"bar := 5; 7",
         lpf.constant(Data.Int(7)))
     }
 
     "compile nested lets" in {
       testLogicalPlanCompile(
-        """foo := 5; bar := 7; bar + foo""",
+        sqlE"foo := 5; bar := 7; bar + foo",
         lpf.invoke2(Add, lpf.constant(Data.Int(7)), lpf.constant(Data.Int(5))))
     }
 
     "compile let with select in body from let binding ident" in {
-      val query = """foo := (1,2,3); select * from foo"""
+      val query = sqlE"foo := (1,2,3); select * from foo"
       val expectation =
         lpf.invoke1(Squash,
           lpf.invoke1(ShiftArray,
@@ -490,7 +491,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile let with select in body selecting let binding ident" in {
-      val query = """foo := 12; select foo from bar"""
+      val query = sqlE"foo := 12; select foo from bar"
       val expectation =
         lpf.invoke1(Squash, lpf.constant(Data.Int(12)))
 
@@ -498,12 +499,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail to compile let inside select with ambigious reference" in {
-      compile("""select foo from (bar := 12; baz) as quag""") must
-        beLeftDisjunction  // AmbiguousReference(baz)
+      // TODO: Investigate why this is not producing an ambigious reference
+      compile(sqlE"select foo from (bar := 12; baz) as quag") must_===
+        compiledSubtableMissing("quag").wrapNel.left
     }
 
     "compile let inside select with table reference" in {
-      val query = """select foo from (bar := 12; select * from baz) as quag"""
+      val query = sqlE"select foo from (bar := 12; select * from baz) as quag"
       val expectation =
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject,
@@ -514,7 +516,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile let inside select with ident reference" in {
-      val query = """select foo from (bar := 12; select * from bar) as quag"""
+      val query = sqlE"select foo from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject,
@@ -525,7 +527,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile selection with same ident as nested let" in {
-      val query = """select bar from (bar := 12; select * from bar) as quag"""
+      val query = sqlE"select bar from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject,
@@ -536,7 +538,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile selection with same ident as nested let and alias" in {
-      val query = """select bar from (bar := 12; select * from bar) as bar"""
+      val query = sqlE"select bar from (bar := 12; select * from bar) as bar"
       val expectation =
         lpf.invoke1(Squash, lpf.constant(Data.Int(12)))
 
@@ -544,14 +546,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile let with select in form and body" in {
-      val query = """foo := select * from bar; select * from foo"""
+      val query = sqlE"foo := select * from bar; select * from foo"
       val expectation = lpf.invoke1(Squash, read("bar"))
 
       testLogicalPlanCompile(query, expectation)
     }
 
     "compile let with inner context that shares a table reference" in {
-      val query = """select (foo := select * from bar; select * from foo) from foo"""
+      val query = sqlE"select (foo := select * from bar; select * from foo) from foo"
       val expectation =
         lpf.invoke1(Squash, read("bar"))
 
@@ -559,20 +561,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile let with an inner context of as that shares a binding name" in {
-      val query = """foo := 4; select * from bar as foo"""
+      val query = sqlE"foo := 4; select * from bar as foo"
       val expectation = lpf.invoke1(Squash, read("bar"))
 
       testLogicalPlanCompile(query, expectation)
     }
 
     "fail to compile let with an inner context of let that shares a binding name in expression context" in {
-      val query = """foo := 4; select * from (foo := bar; foo) as quag"""
+      // TODO: Investigate why this is not producing an ambigious reference
+      val query = sqlE"foo := 4; select * from (foo := bar; foo) as quag"
 
-      compile(query) must beLeftDisjunction // ambiguous reference for `bar` - `4` or `foo`
+      compile(query) must_=== compiledSubtableMissing("quag").wrapNel.left
     }
 
     "compile let with an inner context of as that shares a binding name in table context" in {
-      val query = """foo := 4; select * from (foo := select * from bar; foo) as quag"""
+      val query = sqlE"foo := 4; select * from (foo := select * from bar; foo) as quag"
       val expectation = lpf.invoke1(Squash, read("bar"))
 
       testLogicalPlanCompile(query, expectation)
@@ -581,7 +584,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple 1-table projection when root identifier is also a projection" in {
       // 'foo' must be interpreted as a projection because only this interpretation is possible
       testLogicalPlanCompile(
-        "select foo.bar from baz",
+        sqlE"select foo.bar from baz",
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject,
             lpf.invoke2(ObjectProject, read("baz"), lpf.constant(Data.Str("foo"))),
@@ -592,14 +595,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // 'foo' must be interpreted as a table reference because this
       // interpretation is possible and consistent with ANSI SQL.
       testLogicalPlanCompile(
-        "select foo.bar from foo",
+        sqlE"select foo.bar from foo",
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar")))))
     }
 
     "compile two term addition from one table" in {
       testLogicalPlanCompile(
-        "select foo + bar from baz",
+        sqlE"select foo + bar from baz",
         lpf.let('__tmp0, read("baz"),
           lpf.invoke1(Squash,
             lpf.invoke2(Add,
@@ -609,14 +612,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile negate" in {
       testLogicalPlanCompile(
-        "select -foo from bar",
+        sqlE"select -foo from bar",
         lpf.invoke1(Squash,
           lpf.invoke1(Negate, lpf.invoke2(ObjectProject, read("bar"), lpf.constant(Data.Str("foo"))))))
     }
 
     "compile modulo" in {
       testLogicalPlanCompile(
-        "select foo % baz from bar",
+        sqlE"select foo % baz from bar",
         lpf.let('__tmp0, read("bar"),
           lpf.invoke1(Squash,
             lpf.invoke2(Modulo,
@@ -626,7 +629,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile coalesce" in {
       testLogicalPlanCompile(
-        "select coalesce(bar, baz) from foo",
+        sqlE"select coalesce(bar, baz) from foo",
         lpf.let('__tmp0, read("foo"),
           lpf.let('__tmp1, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
             lpf.invoke1(Squash,
@@ -638,7 +641,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile date field extraction" in {
       testLogicalPlanCompile(
-        "select date_part(\"day\", baz) from foo",
+        sqlE"""select date_part("day", baz) from foo""",
         lpf.invoke1(Squash,
           lpf.invoke1(ExtractDayOfMonth,
             lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("baz"))))))
@@ -646,7 +649,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile conditional" in {
       testLogicalPlanCompile(
-        "select case when pop < 10000 then city else loc end from zips",
+        sqlE"select case when pop < 10000 then city else loc end from zips",
         lpf.let('__tmp0, read("zips"),
           lpf.invoke1(Squash,
             lpf.invoke3(Cond,
@@ -659,31 +662,31 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile conditional (match) without else" in {
       testLogicalPlanCompile(
-                   "select case when pop = 0 then \"nobody\" end from zips",
-        compileExp("select case when pop = 0 then \"nobody\" else null end from zips"))
+                   sqlE"""select case when pop = 0 then "nobody" end from zips""",
+        compileExp(sqlE"""select case when pop = 0 then "nobody" else null end from zips"""))
     }
 
     "compile conditional (switch) without else" in {
       testLogicalPlanCompile(
-                   "select case pop when 0 then \"nobody\" end from zips",
-        compileExp("select case pop when 0 then \"nobody\" else null end from zips"))
+                   sqlE"""select case pop when 0 then "nobody" end from zips""",
+        compileExp(sqlE"""select case pop when 0 then "nobody" else null end from zips"""))
     }
 
     "have ~~ as alias for LIKE" in {
       testLogicalPlanCompile(
-                   "select pop from zips where city ~~ \"%BOU%\"",
-        compileExp("select pop from zips where city LIKE \"%BOU%\""))
+                   sqlE"""select pop from zips where city ~~ "%BOU%" """,
+        compileExp(sqlE"""select pop from zips where city LIKE "%BOU%" """))
     }
 
     "have !~~ as alias for NOT LIKE" in {
       testLogicalPlanCompile(
-                   "select pop from zips where city !~~ \"%BOU%\"",
-        compileExp("select pop from zips where city NOT LIKE \"%BOU%\""))
+                   sqlE"""select pop from zips where city !~~ "%BOU%" """,
+        compileExp(sqlE"""select pop from zips where city NOT LIKE "%BOU%" """))
     }
 
     "compile array length" in {
       testLogicalPlanCompile(
-        "select array_length(bar, 1) from foo",
+        sqlE"select array_length(bar, 1) from foo",
         lpf.invoke1(Squash,
           lpf.invoke2(ArrayLength,
             lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))),
@@ -692,7 +695,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile concat" in {
       testLogicalPlanCompile(
-        "select concat(foo, concat(\" \", bar)) from baz",
+        sqlE"""select concat(foo, concat(" ", bar)) from baz""",
         lpf.let('__tmp0, read("baz"),
           lpf.invoke1(Squash,
             lpf.invoke2(Concat,
@@ -703,18 +706,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "filter on constant false" in {
-      testTypedLogicalPlanCompile("select * from zips where false",
+      testTypedLogicalPlanCompile(sqlE"select * from zips where false",
         lpf.constant(Data.Set(Nil)))
     }
 
     "filter with field in empty set" in {
-      testTypedLogicalPlanCompile("select * from zips where state in ()",
+      testTypedLogicalPlanCompile(sqlE"select * from zips where state in ()",
         lpf.constant(Data.Set(Nil)))
     }
 
     "compile between" in {
       testLogicalPlanCompile(
-        "select * from foo where bar between 1 and 10",
+        sqlE"select * from foo where bar between 1 and 10",
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(Filter,
@@ -727,7 +730,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile not between" in {
       testLogicalPlanCompile(
-        "select * from foo where bar not between 1 and 10",
+        sqlE"select * from foo where bar not between 1 and 10",
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(Filter,
@@ -741,7 +744,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile like" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar like \"a%\"",
+        sqlE"""select bar from foo where bar like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject,
@@ -756,7 +759,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile like with escape char" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar like \"a=%\" escape \"=\"",
+        sqlE"""select bar from foo where bar like "a=%" escape "=" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject,
@@ -771,7 +774,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile not like" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar not like \"a%\"",
+        sqlE"""select bar from foo where bar not like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject, lpf.invoke2(Filter,
@@ -786,7 +789,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile ~" in {
       testLogicalPlanCompile(
-        "select bar from foo where bar ~ \"a.$\"",
+        sqlE"""select bar from foo where bar ~ "a.$$" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject,
@@ -801,7 +804,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile complex expression" in {
       testLogicalPlanCompile(
-        "select avgTemp*9/5 + 32 from cities",
+        sqlE"select avgTemp*9/5 + 32 from cities",
         lpf.invoke1(Squash,
           lpf.invoke2(Add,
             lpf.invoke2(Divide,
@@ -814,7 +817,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile parenthesized expression" in {
       testLogicalPlanCompile(
-        "select (avgTemp + 32)/5 from cities",
+        sqlE"select (avgTemp + 32)/5 from cities",
         lpf.invoke1(Squash,
           lpf.invoke2(Divide,
             lpf.invoke2(Add,
@@ -825,7 +828,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile cross select *" in {
       testLogicalPlanCompile(
-        "select * from person, car",
+        sqlE"select * from person, car",
         lpf.let('__tmp0,
           lpf.join(
             read("person"),
@@ -840,7 +843,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile two term multiplication from two tables" in {
       testLogicalPlanCompile(
-        "select person.age * car.modelYear from person, car",
+        sqlE"select person.age * car.modelYear from person, car",
         lpf.let('__tmp0,
           lpf.join(
             read("person"),
@@ -859,7 +862,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple where (with just a constant)" in {
       testLogicalPlanCompile(
-        "select name from person where 1",
+        sqlE"select name from person where 1",
         lpf.invoke1(Squash,
           lpf.invoke2(ObjectProject,
             lpf.invoke2(Filter, read("person"), lpf.constant(Data.Int(1))),
@@ -868,7 +871,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple where" in {
       testLogicalPlanCompile(
-        "select name from person where age > 18",
+        sqlE"select name from person where age > 18",
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject,
@@ -882,7 +885,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple group by" in {
       testLogicalPlanCompile(
-        "select count(*) from person group by name",
+        sqlE"select count(*) from person group by name",
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
             lpf.invoke1(Count,
@@ -895,7 +898,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile group by with projected keys" in {
       testLogicalPlanCompile(
-        "select lower(name), person.gender, avg(age) from person group by lower(person.name), gender",
+        sqlE"select lower(name), person.gender, avg(age) from person group by lower(person.name), gender",
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke2(GroupBy,
@@ -924,7 +927,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile group by with perverse aggregated expression" in {
       testLogicalPlanCompile(
-        "select count(name) from person group by name",
+        sqlE"select count(name) from person group by name",
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
             lpf.invoke1(Count,
@@ -939,7 +942,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile sum in expression" in {
       testLogicalPlanCompile(
-        "select sum(pop) * 100 from zips",
+        sqlE"select sum(pop) * 100 from zips",
         lpf.invoke1(Squash,
           lpf.invoke2(Multiply,
             lpf.invoke1(Sum, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("pop")))),
@@ -957,110 +960,110 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile union" in {
       testLogicalPlanCompile(
-        "select loc, pop from zips union select city from zips",
+        sqlE"select loc, pop from zips union select city from zips",
           lpf.normalizeLets(lpf.normalizeLets(
             lpf.invoke1(Distinct, lpf.invoke2(Union, setA, setB)))))
     }
 
     "compile union all" in {
       testLogicalPlanCompile(
-        "select loc, pop from zips union all select city from zips",
+        sqlE"select loc, pop from zips union all select city from zips",
         lpf.normalizeLets(lpf.normalizeLets(
           lpf.invoke2(Union, setA, setB))))
     }
 
     "compile intersect" in {
       testLogicalPlanCompile(
-        "select loc, pop from zips intersect select city from zips",
+        sqlE"select loc, pop from zips intersect select city from zips",
         lpf.normalizeLets(lpf.normalizeLets(
           lpf.invoke1(Distinct, lpf.invoke2(Intersect, setA, setB)))))
     }
 
     "compile intersect all" in {
       testLogicalPlanCompile(
-        "select loc, pop from zips intersect all select city from zips",
+        sqlE"select loc, pop from zips intersect all select city from zips",
         lpf.normalizeLets(lpf.normalizeLets(
           lpf.invoke2(Intersect, setA, setB))))
     }
 
     "compile except" in {
       testLogicalPlanCompile(
-        "select loc, pop from zips except select city from zips",
+        sqlE"select loc, pop from zips except select city from zips",
         lpf.normalizeLets(lpf.normalizeLets(
           lpf.invoke2(Except, setA, setB))))
     }
 
     "have {*} as alias for {:*}" in {
       testLogicalPlanCompile(
-                   "SELECT bar{*} FROM foo",
-        compileExp("SELECT bar{:*} FROM foo"))
+                   sqlE"SELECT bar{*} FROM foo",
+        compileExp(sqlE"SELECT bar{:*} FROM foo"))
     }
 
     "have [*] as alias for [:*]" in {
       testLogicalPlanCompile(
-                   "SELECT foo[*] FROM foo",
-        compileExp("SELECT foo[:*] FROM foo"))
+                   sqlE"SELECT foo[*] FROM foo",
+        compileExp(sqlE"SELECT foo[:*] FROM foo"))
     }
 
     "expand top-level map flatten" in {
       testLogicalPlanCompile(
-                   "SELECT foo{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo) FROM foo"))
+                   sqlE"SELECT foo{:*} FROM foo",
+        compileExp(sqlE"SELECT Flatten_Map(foo) FROM foo"))
     }
 
     "expand nested map flatten" in {
       testLogicalPlanCompile(
-                   "SELECT foo.bar{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo.bar) FROM foo"))
+                   sqlE"SELECT foo.bar{:*} FROM foo",
+        compileExp(sqlE"SELECT Flatten_Map(foo.bar) FROM foo"))
     }
 
     "expand field map flatten" in {
       testLogicalPlanCompile(
-                   "SELECT bar{:*} FROM foo",
-        compileExp("SELECT Flatten_Map(foo.bar) FROM foo"))
+                   sqlE"SELECT bar{:*} FROM foo",
+        compileExp(sqlE"SELECT Flatten_Map(foo.bar) FROM foo"))
     }
 
     "expand top-level array flatten" in {
       testLogicalPlanCompile(
-                   "SELECT foo[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo) FROM foo"))
+                   sqlE"SELECT foo[:*] FROM foo",
+        compileExp(sqlE"SELECT Flatten_Array(foo) FROM foo"))
     }
 
     "expand nested array flatten" in {
       testLogicalPlanCompile(
-        "SELECT foo.bar[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo.bar) FROM foo"))
+        sqlE"SELECT foo.bar[:*] FROM foo",
+        compileExp(sqlE"SELECT Flatten_Array(foo.bar) FROM foo"))
     }
 
     "expand field array flatten" in {
       testLogicalPlanCompile(
-                   "SELECT bar[:*] FROM foo",
-        compileExp("SELECT Flatten_Array(foo.bar) FROM foo"))
+                   sqlE"SELECT bar[:*] FROM foo",
+        compileExp(sqlE"SELECT Flatten_Array(foo.bar) FROM foo"))
     }
 
     "compile top-level map flatten" in {
       testLogicalPlanCompile(
-        "select zips{:*} from zips",
+        sqlE"select zips{:*} from zips",
         lpf.invoke1(Squash, lpf.invoke1(FlattenMap, read("zips"))))
     }
 
     "have {_} as alias for {:_}" in {
       testLogicalPlanCompile(
-                   "select length(commit.author{_}) from slamengine_commits",
-        compileExp("select length(commit.author{:_}) from slamengine_commits"))
+                   sqlE"select length(commit.author{_}) from slamengine_commits",
+        compileExp(sqlE"select length(commit.author{:_}) from slamengine_commits"))
     }
 
     "have [_] as alias for [:_]" in {
       testLogicalPlanCompile(
-                   "select loc[_] / 10 from zips",
-        compileExp("select loc[:_] / 10 from zips"))
+                   sqlE"select loc[_] / 10 from zips",
+        compileExp(sqlE"select loc[:_] / 10 from zips"))
     }
 
     "compile map shift / unshift" in {
       val inner = lpf.invoke1(ShiftMap, lpf.invoke2(ObjectProject, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
-        "select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
+        sqlE"select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
         lpf.let('__tmp0, read("slamengine_commits"),
           lpf.invoke1(Squash, lpf.invoke2(UnshiftMap, inner, lpf.invoke1(Length, inner)))))
     }
@@ -1069,14 +1072,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val inner = lpf.invoke1(ShiftMapKeys, lpf.invoke2(ObjectProject, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
-        "select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
+        sqlE"select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
         lpf.let('__tmp0, read("slamengine_commits"),
           lpf.invoke1(Squash, lpf.invoke2(UnshiftMap, inner, lpf.invoke1(Length, inner)))))
     }
 
     "compile array shift / unshift" in {
       testLogicalPlanCompile(
-        "select [loc[:_] / 10 ...] from zips",
+        sqlE"select [loc[:_] / 10 ...] from zips",
         lpf.invoke1(Squash,
           lpf.invoke1(UnshiftArray,
             lpf.invoke2(Divide,
@@ -1086,7 +1089,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile array shift / unshift indices" in {
       testLogicalPlanCompile(
-        "select [loc[_:] * 10 ...] from zips",
+        sqlE"select [loc[_:] * 10 ...] from zips",
         lpf.invoke1(Squash,
           lpf.invoke1(UnshiftArray,
             lpf.invoke2(Multiply,
@@ -1096,14 +1099,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile array flatten" in {
       testLogicalPlanCompile(
-        "select loc[:*] from zips",
+        sqlE"select loc[:*] from zips",
         lpf.invoke1(Squash,
           lpf.invoke1(FlattenArray, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("loc"))))))
     }
 
     "compile simple order by" in {
       testLogicalPlanCompile(
-        "select name from person order by height",
+        sqlE"select name from person order by height",
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1119,7 +1122,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile order by reusing selected field" in {
       testLogicalPlanCompile(
-        "select name from person order by name",
+        sqlE"select name from person order by name",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("name")))),
@@ -1130,7 +1133,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
-        "select name from person where gender = \"male\" order by name, height",
+        sqlE"""select name from person where gender = "male" order by name, height""",
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke2(Filter,
@@ -1154,7 +1157,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple order by with wildcard" in {
       testLogicalPlanCompile(
-        "select * from person order by height",
+        sqlE"select * from person order by height",
         lpf.let('__tmp0, lpf.invoke1(Squash, read("person")),
           lpf.sort(
             lpf.free('__tmp0),
@@ -1163,7 +1166,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple order by with ascending and descending" in {
       testLogicalPlanCompile(
-        "select * from person order by height desc, name",
+        sqlE"select * from person order by height desc, name",
         lpf.let('__tmp0, lpf.invoke1(Squash, read("person")),
           lpf.sort(
             lpf.free('__tmp0),
@@ -1174,7 +1177,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple order by with expression" in {
       testLogicalPlanCompile(
-        "select * from person order by height*2.54",
+        sqlE"select * from person order by height*2.54",
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1193,7 +1196,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile order by with alias" in {
       testLogicalPlanCompile(
-        "select firstName as name from person order by name",
+        sqlE"select firstName as name from person order by name",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
             makeObj(
@@ -1205,7 +1208,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple order by with expression in synthetic field" in {
       testLogicalPlanCompile(
-        "select name from person order by height*2.54",
+        sqlE"select name from person order by height*2.54",
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1224,7 +1227,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile order by with nested projection" in {
       testLogicalPlanCompile(
-        "select bar from foo order by foo.bar.baz.quux/3",
+        sqlE"select bar from foo order by foo.bar.baz.quux/3",
         lpf.let('__tmp0, read("foo"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1249,46 +1252,46 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // Note: not using wildcard here because the simple case is optimized
       //       differently
       testLogicalPlanCompile(
-                   "select foo from bar order by bar.baz",
-        compileExp("select foo from bar order by baz"))
+                   sqlE"select foo from bar order by bar.baz",
+        compileExp(sqlE"select foo from bar order by baz"))
     }
 
     "compile order by with root projection a table ref with alias" in {
       // Note: not using wildcard here because the simple case is optimized
       //       differently
       testLogicalPlanCompile(
-                   "select foo from bar as b order by b.baz",
-        compileExp("select foo from bar as b order by baz"))
+                   sqlE"select foo from bar as b order by b.baz",
+        compileExp(sqlE"select foo from bar as b order by baz"))
     }
 
     "compile order by with root projection a table ref with alias, mismatched" in {
       testLogicalPlanCompile(
-                   "select * from bar as b order by bar.baz",
-        compileExp("select * from bar as b order by b.bar.baz"))
+                   sqlE"select * from bar as b order by bar.baz",
+        compileExp(sqlE"select * from bar as b order by b.bar.baz"))
     }
 
     "compile order by with root projection a table ref, embedded in expr" in {
       testLogicalPlanCompile(
-                   "select * from bar order by bar.baz/10",
-        compileExp("select * from bar order by baz/10"))
+                   sqlE"select * from bar order by bar.baz/10",
+        compileExp(sqlE"select * from bar order by baz/10"))
     }
 
     "compile order by with root projection a table ref, embedded in complex expr" in {
       testLogicalPlanCompile(
-                   "select * from bar order by bar.baz/10 - 3*bar.quux",
-        compileExp("select * from bar order by baz/10 - 3*quux"))
+                   sqlE"select * from bar order by bar.baz/10 - 3*bar.quux",
+        compileExp(sqlE"select * from bar order by baz/10 - 3*quux"))
     }
 
     "compile multiple stages" in {
       testLogicalPlanCompile(
-        "select height*2.54 as cm" +
-          " from person" +
-          " where height > 60" +
-          " group by gender, height" +
-          " having count(*) > 10" +
-          " order by cm" +
-          " offset 10" +
-          " limit 5",
+        sqlE"""select height*2.54 as cm
+               from person
+               where height > 60
+               group by gender, height
+               having count(*) > 10
+               order by cm
+               offset 10
+               limit 5""",
         lpf.let('__tmp0, read("person"), // from person
           lpf.let('__tmp1,    // where height > 60
             lpf.invoke2(Filter,
@@ -1325,14 +1328,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple sum" in {
       testLogicalPlanCompile(
-        "select sum(height) from person",
+        sqlE"select sum(height) from person",
         lpf.invoke1(Squash,
           lpf.invoke1(Sum, lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("height"))))))
     }
 
     "compile simple inner equi-join" in {
       val query =
-        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
+        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
 
       testLogicalPlanCompile(query,
         lpf.let('__tmp0,
@@ -1357,8 +1360,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile cross join to the equivalent inner equi-join" in {
-      val query = "select foo.name, bar.address from foo, bar where foo.id = bar.foo_id"
-      val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
+      val query = sqlE"select foo.name, bar.address from foo, bar where foo.id = bar.foo_id"
+      val equiv = sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
 
       val expected = renameJoinSides(compileExp(equiv))(
         '__leftJoin9, '__leftJoin23, '__rightJoin10, '__rightJoin24)
@@ -1367,8 +1370,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile inner join with additional equi-condition to the equivalent inner equi-join" in {
-      val query = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x = bar.y"
-      val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id and foo.x = bar.y"
+      val query = sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x = bar.y"
+      val equiv = sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id and foo.x = bar.y"
 
       val expected = renameJoinSides(compileExp(equiv))(
         '__leftJoin9, '__leftJoin23, '__rightJoin10, '__rightJoin24)
@@ -1377,8 +1380,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile inner non-equi join to the equivalent cross join" in {
-      val query = "select foo.name, bar.address from foo join bar on foo.x < bar.y"
-      val equiv = "select foo.name, bar.address from foo, bar where foo.x < bar.y"
+      val query = sqlE"select foo.name, bar.address from foo join bar on foo.x < bar.y"
+      val equiv = sqlE"select foo.name, bar.address from foo, bar where foo.x < bar.y"
 
       val expected = renameJoinSides(compileExp(equiv))(
         '__leftJoin23, '__leftJoin9, '__rightJoin24, '__rightJoin10)
@@ -1387,30 +1390,25 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile nested cross join to the equivalent inner equi-join" in {
-      val query = "select a.x, b.y, c.z from a, b, c where a.id = b.a_id and b.`_id` = c.b_id"
-      val equiv = "select a.x, b.y, c.z from (a join b on a.id = b.a_id) join c on b.`_id` = c.b_id"
+      val query = sqlE"select a.x, b.y, c.z from a, b, c where a.id = b.a_id and b.`_id` = c.b_id"
+      val equiv = sqlE"select a.x, b.y, c.z from (a join b on a.id = b.a_id) join c on b.`_id` = c.b_id"
 
       testLogicalPlanCompile(query, compileExp(equiv))
     }.pendingUntilFixed("SD-1190 (should these really be identical as of #1943?)")
 
     "compile filtered cross join with one-sided conditions" in {
       val query =
-        "select foo.name, bar.address from foo, bar " +
-          "where foo.id = bar.foo_id and foo.x < 10 and bar.y = 20"
+        sqlE"select foo.name, bar.address from foo, bar where foo.id = bar.foo_id and foo.x < 10 and bar.y = 20"
 
       val equiv =
-        "select foo.name, bar.address from foo join bar " +
-          "on foo.id = bar.foo_id " +
-          "where foo.x < 10 and bar.y = 20"
+        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x < 10 and bar.y = 20"
 
       testLogicalPlanCompile(query, compileExp(equiv))
     }
 
     "compile filtered join with one-sided conditions" in {
       val query =
-        "select foo.name, bar.address from foo join bar " +
-          "on foo.id = bar.foo_id " +
-          "where foo.x < 10 and bar.y = 20"
+        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x < 10 and bar.y = 20"
 
       testLogicalPlanCompile(query,
         lpf.let('__tmp0, read("foo"),
@@ -1444,8 +1442,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple left ineq-join" in {
       testLogicalPlanCompile(
-        "select foo.name, bar.address " +
-          "from foo left join bar on foo.id < bar.foo_id",
+        sqlE"select foo.name, bar.address from foo left join bar on foo.id < bar.foo_id",
         lpf.let('__tmp0,
           lpf.join(
             read("foo"),
@@ -1469,9 +1466,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile complex equi-join" in {
       testLogicalPlanCompile(
-        "select foo.name, bar.address " +
-          "from foo join bar on foo.id = bar.foo_id " +
-          "join baz on baz.bar_id = bar.id",
+        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id join baz on baz.bar_id = bar.id",
         lpf.let('__tmp0,
           lpf.join(
             lpf.join(
@@ -1509,13 +1504,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile sub-select in filter" in {
       testLogicalPlanCompile(
-        "select city, pop from zips where pop > (select avg(pop) from zips)",
+        sqlE"select city, pop from zips where pop > (select avg(pop) from zips)",
         read("zips"))
     }.pendingUntilFixed
 
     "compile simple sub-select" in {
       testLogicalPlanCompile(
-        "select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) as temp",
+        sqlE"select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) as temp",
         lpf.let('__tmp0, read("zips"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1530,7 +1525,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile sub-select with same un-qualified names" in {
       testLogicalPlanCompile(
-        "select city, pop from (select city, pop from zips) as temp",
+        sqlE"select city, pop from (select city, pop from zips) as temp",
         lpf.let('__tmp0, read("zips"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
@@ -1545,7 +1540,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple distinct" in {
       testLogicalPlanCompile(
-        "select distinct city from zips",
+        sqlE"select distinct city from zips",
         lpf.invoke1(Distinct,
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city"))))))
@@ -1553,7 +1548,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple distinct ordered" in {
       testLogicalPlanCompile(
-        "select distinct city from zips order by city",
+        sqlE"select distinct city from zips order by city",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
@@ -1565,7 +1560,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile distinct with unrelated order by" in {
       testLogicalPlanCompile(
-        "select distinct city from zips order by pop desc",
+        sqlE"select distinct city from zips order by pop desc",
         lpf.let('__tmp0,
           read("zips"),
           lpf.let('__tmp1,
@@ -1585,7 +1580,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile count(distinct(...))" in {
       testLogicalPlanCompile(
-        "select count(distinct(lower(city))) from zips",
+        sqlE"select count(distinct(lower(city))) from zips",
         lpf.invoke1(Squash,
           lpf.invoke1(Count,
             lpf.invoke1(Distinct,
@@ -1595,7 +1590,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple distinct with two named projections" in {
       testLogicalPlanCompile(
-        "select distinct city as CTY, state as ST from zips",
+        sqlE"select distinct city as CTY, state as ST from zips",
         lpf.let('__tmp0, read("zips"),
           lpf.invoke1(Distinct,
             lpf.invoke1(Squash,
@@ -1606,35 +1601,41 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile count distinct with two exprs" in {
       testLogicalPlanCompile(
-        "select count(distinct city, state) from zips",
+        sqlE"select count(distinct city, state) from zips",
         read("zips"))
     }.pendingUntilFixed
 
     "compile distinct as function" in {
       testLogicalPlanCompile(
-        "select distinct(city, state) from zips",
+        sqlE"select distinct(city, state) from zips",
         read("zips"))
     }.pendingUntilFixed
 
     "fail with ambiguous reference" in {
-      compile("select foo from bar, baz") must beLeftDisjunction
+      compile(sqlE"select foo from bar, baz") must beLeftDisjunction(
+        NonEmptyList(
+          SemanticError.AmbiguousReference(
+            ident[Fix[Sql]]("foo").embed,
+            List(
+              TableRelationAST(currentDir </> file("baz"),None),
+              TableRelationAST(currentDir </> file("bar"),None)))))
     }
 
     "fail with ambiguous reference in cond" in {
-      compile("select (case when a = 1 then 'ok' else 'reject' end) from bar, baz") must beLeftDisjunction
+      compile(sqlE"""select (case when a = 1 then "ok" else "reject" end) from bar, baz""") must beLeftDisjunction
     }
 
     "fail with ambiguous reference in else" in {
-      compile("select (case when bar.a = 1 then 'ok' else foo end) from bar, baz") must beLeftDisjunction
+      compile(sqlE"""select (case when bar.a = 1 then "ok" else foo end) from bar, baz""") must beLeftDisjunction
     }
 
     "fail with duplicate alias" in {
-      compile("select car.name as name, owner.name as name from owners as owner join cars as car on car.`_id` = owner.carId") must
-        beLeftDisjunction("DuplicateAlias(name)")
+      compile(sqlE"select car.name as name, owner.name as name from owners as owner join cars as car on car.`_id` = owner.carId") must_===
+        SemanticError.duplicateAlias("name").wrapNel.left
     }
 
     "translate free variable" in {
-      testLogicalPlanCompile("select name from zips where age < :age",
+      testLogicalPlanCompile(sqlE"select name from zips where age < :age",
         lpf.let('__tmp0, read("zips"),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject,
@@ -1648,13 +1649,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   }
 
   "error when too few arguments passed to a function" in {
-    fullCompile("""select substring("foo") from zips""")
-      .toEither must beLeft(contain("3,1"))
+    fullCompile(sqlE"""select substring("foo") from zips""") must_===
+      wrongArgumentCount(CIName("substring"), 3, 1).wrapNel.left
   }
 
   "error when too many arguments passed to a function" in {
-    fullCompile("select count(*, 1, 2, 4) from zips")
-      .toEither must beLeft(contain("1,4"))
+    fullCompile(sqlE"select count(*, 1, 2, 4) from zips") must_===
+      wrongArgumentCount(CIName("count"), 1, 4).wrapNel.left
   }
 
   "reduceGroupKeys" should {
@@ -1752,75 +1753,45 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
   }
 
-  "compile expression and functions" >> {
-    val expr = parseAndAnnotateUnsafe("select FLOOR(10.4)")
-    val funcs = List(FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")))
-    val expected =
-      lpf.invoke2(Subtract,
-        lpf.constant(Data.Dec(10.4)),
-        lpf.invoke2(Modulo,
-          lpf.constant(Data.Dec(10.4)),
-          lpf.constant(Data.Int(1))))
-    Compiler.compile[Fix[LP]](expr, funcs).toEither must beRight(equalToPlan(expected))
-  }
-
-  "compile expression and functions that depend on themselves" >> {
-    val expr = parseAndAnnotateUnsafe("select ROUND(10.4)")
-    val funcs = List(
-      FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
-      FunctionDecl(CIName("round"), List(CIName("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
-    val floorArgumentLP =
-      lpf.invoke2(Add,
-        lpf.constant(Data.Dec(10.4)),
-        lpf.constant(Data.Dec(0.5)))
-    val expected =
-      lpf.invoke2(Subtract,
-        floorArgumentLP,
-        lpf.invoke2(Modulo,
-          floorArgumentLP,
-          lpf.constant(Data.Int(1))))
-    Compiler.compile[Fix[LP]](expr, funcs).toEither must beRight(equalToPlan(expected))
-  }
-
   "constant folding" >> {
-    def testFolding(name: String, query: String, expected: String) = {
+    def testFolding(name: String, query: String, expected: Fix[Sql]) = {
       s"${name}" >> {
-        testTypedLogicalPlanCompile(query, fullCompileExp(expected))
+        testTypedLogicalPlanCompile(unsafeParse(query), fullCompileExp(expected))
       }
 
       s"${name} with collection" >> {
-        testTypedLogicalPlanCompile(s"$query from zips", fullCompileExp(expected))
+        testTypedLogicalPlanCompile(unsafeParse(s"$query from zips"), fullCompileExp(expected))
       }
     }
 
     testFolding("ARBITRARY",
       "select arbitrary((3, 4, 5))",
-      "select 3")
+  sqlE"select 3")
 
     testFolding("AVG",
       "select avg((0.5, 1.0, 4.5))",
-      "select 2.0")
+  sqlE"select 2.0")
 
     testFolding("COUNT",
       """select count(("foo", "quux", "baz"))""",
-      "select 3")
+    sqlE"select 3")
 
     testFolding("MAX",
       "select max((4, 2, 1001, 17))",
-      "select 1001")
+  sqlE"select 1001")
 
     testFolding("MIN",
       "select min((4, 2, 1001, 17))",
-      "select 2")
+  sqlE"select 2")
 
     testFolding("SUM",
       "select sum((1, 1, 1, 1, 1, 3, 4))",
-      "select 12")
+  sqlE"select 12")
   }
 
   List("avg", "sum") foreach { fn =>
     s"passing a literal set of the wrong type to '${fn.toUpperCase}' fails" >> {
-      fullCompile(s"""select $fn(("one", "two", "three"))""") must beLeftDisjunction
+      fullCompile(unsafeParse(s"""select $fn(("one", "two", "three"))""")) must beLeftDisjunction
     }
   }
 }

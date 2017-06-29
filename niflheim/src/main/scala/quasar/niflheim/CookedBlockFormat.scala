@@ -18,6 +18,7 @@ package quasar.niflheim
 
 import quasar.precog.common._
 
+import java.io.{File, IOException}
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 import scalaz._

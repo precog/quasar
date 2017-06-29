@@ -33,6 +33,9 @@ trait PathArbitrary {
   implicit val arbitraryFPath: Arbitrary[FPath] =
     Arbitrary(Gen.oneOf(Arbitrary.arbitrary[AFile], Arbitrary.arbitrary[RFile]))
 
+  implicit val arbitraryDPath: Arbitrary[DPath] =
+    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[ADir], Arbitrary.arbitrary[RDir]))
+
   implicit val shrinkAFile: Shrink[AFile] = Shrink { aFile =>
     if (depth(aFile) <= 1) Stream.empty
     else (1 until depth(aFile)).map(removeDirAt(aFile, _)).toStream

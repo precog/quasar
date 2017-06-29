@@ -3,11 +3,11 @@
   "backends": {
         "mimir": "skip",
       "marklogic_json":    "pending",
-      "mongodb_read_only": "pending",
       "postgresql":        "pending"
   },
   "data": "zips.data",
   "query": "select distinct * from zips where pop ~* \"foo\"",
-  "predicate": "equalsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
   "expected": []
 }

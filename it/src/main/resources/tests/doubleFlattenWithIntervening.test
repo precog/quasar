@@ -2,11 +2,11 @@
     "name": "double flatten with intervening field",
     "backends": {
         "mimir": "skip",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql": "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["m", "n", "o"]
 }

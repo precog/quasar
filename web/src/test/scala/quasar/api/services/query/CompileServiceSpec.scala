@@ -23,6 +23,7 @@ import argonaut.{Json => AJson}
 import org.http4s._
 import org.http4s.argonaut._
 import pathy.Path._, posixCodec._
+import pathy.scalacheck.AlphaCharacters
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 

@@ -18,15 +18,15 @@ package quasar.physical.couchbase
 
 import slamdata.Predef._
 import quasar.{Planner => _, _}
-import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
-import quasar.sql.CompilerHelpers
+import quasar.Planner.PlannerError
+import quasar.qscript.{Map => _, Read => _, _}, MapFuncsCore._
+import quasar.sql._
 
 import scala.collection.JavaConverters._
 
@@ -63,6 +63,8 @@ class BasicQueryEnablementSpec
 
   val cbEnv = DefaultCouchbaseEnvironment.builder.build
 
+  val docTypeKey = DocTypeKey("type")
+
   val cfg =
     Config(
       ClientContext(
@@ -72,15 +74,16 @@ class BasicQueryEnablementSpec
           "beer-sample",
           "",
           List[transcoder.Transcoder[_, _]]().asJava),
-        DocTypeKey("type")),
+        docTypeKey,
+        ListContentsView(docTypeKey)),
       CouchbaseCluster.create(cbEnv))
 
-  def compileLogicalPlan(query: String): Fix[LogicalPlan] =
+  def compileLogicalPlan(query: Fix[Sql]): Fix[LogicalPlan] =
     compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
 
   def interp: CB.Eff ~> Task = fs.interp.unsafePerformSync
 
-  def n1qlFromSql2(sql2: String): String =
+  def n1qlFromSql2(sql2: Fix[Sql]): String =
     (CB.lpToRepr(compileLogicalPlan(sql2)) ∘ (_.repr) >>= (CB.QueryFileModule.explain))
       .run.value.run(cfg)
       .foldMap(interp)
@@ -88,46 +91,46 @@ class BasicQueryEnablementSpec
       .unsafePerformSync
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], Context, ?], QST].plan) >>= (n1ql =>
-      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]].liftM[PhaseResultT])
-    )).run.run.run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey)).map(_._2)
+    qs.cataM(Planner[Fix, EitherT[Kleisli[Free[MonotonicSeq, ?], Context, ?], PlannerError, ?], QST].plan)
+      .flatMapF(RenderQuery.compact(_).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]])
+      .run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey))
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
-  def testSql2ToN1ql(sql2: String, n1ql: String): Fragment =
-    sql2 in (n1qlFromSql2(sql2) must_= n1ql)
+  def testSql2ToN1ql(sql2: Fix[Sql], n1ql: String): Fragment =
+    pprint(sql2) in (n1qlFromSql2(sql2) must_= n1ql)
 
   def testSql2ToN1qlPending(sql2: String, p: Pending): Fragment =
     sql2 in p
 
   "SQL² to N1QL" should {
     testSql2ToN1ql(
-      "select * from `beer`",
+      sqlE"select * from `beer`",
       """select v from (select value `_1` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name from `beer`",
+      sqlE"select name from `beer`",
       """select v from (select value `_1`.['name'] from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name, type from `beer`",
+      sqlE"select name, type from `beer`",
       """select v from (select value {'name': `_1`.['name'], 'type': `_1`.['type']} from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name from `beer` offset 1",
+      sqlE"select name from `beer` offset 1",
       """select v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5` where (`type` = 'beer')) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
 
     testSql2ToN1ql(
-      "select count(*) from `beer`",
+      sqlE"select count(*) from `beer`",
       """select v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
-      "select count(name) from `beer`",
+      sqlE"select count(name) from `beer`",
       """select v from (select value `_2` from (select count(`_1`.['name']) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
-      "select geo.lat + geo.lon from `brewery`",
+      sqlE"select geo.lat + geo.lon from `brewery`",
       """select v from (select value (`_1`.['geo'].['lat'] + `_1`.['geo'].['lon']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'brewery')) as `_1`) v""")
   }
 

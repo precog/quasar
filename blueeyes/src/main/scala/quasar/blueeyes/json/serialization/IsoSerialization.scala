@@ -212,11 +212,11 @@ object IsoSerialization {
       }
   }
 
-  class IsoDecomposer[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], decomposer: DecomposerAux[F, L]) extends Decomposer[T] {
+  class IsoDecomposer[T, F <: HList, L <: HList](fields: F, iso: Generic.Aux[T, L], decomposer: DecomposerAux[F, L]) extends Decomposer[T] {
     def decompose(t: T) = decomposer.decompose(fields, iso.to(t))
   }
 
-  class IsoExtractor[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], extractor: ExtractorAux[F, L]) extends Extractor[T] {
+  class IsoExtractor[T, F <: HList, L <: HList](fields: F, iso: Generic.Aux[T, L], extractor: ExtractorAux[F, L]) extends Extractor[T] {
     def validated(source: JValue) =
       for {
         l <- extractor.extract(source, fields)
@@ -224,18 +224,18 @@ object IsoSerialization {
   }
 
   class MkDecomposer[T] {
-    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Iso[T, L], decomposer: DecomposerAux[F, L]): Decomposer[T] =
+    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Generic.Aux[T, L], decomposer: DecomposerAux[F, L]): Decomposer[T] =
       new IsoDecomposer(fields, iso, decomposer)
   }
 
   class MkExtractor[T] {
-    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Iso[T, L], extractor: ExtractorAux[F, L]): Extractor[T] =
+    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Generic.Aux[T, L], extractor: ExtractorAux[F, L]): Extractor[T] =
       new IsoExtractor(fields, iso, extractor)
   }
 
   class MkSerialization[T] {
     def apply[F <: HList, L <: HList](
-        fields: F)(implicit iso: Iso[T, L], decomposer: DecomposerAux[F, L], extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
+        fields: F)(implicit iso: Generic.Aux[T, L], decomposer: DecomposerAux[F, L], extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
       (new IsoDecomposer(fields, iso, decomposer), new IsoExtractor(fields, iso, extractor))
   }
 }

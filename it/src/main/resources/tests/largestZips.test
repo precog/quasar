@@ -8,7 +8,7 @@
     },
     "data": "zips.data",
     "query": "select city, pop from zips where pop > 90000 order by city, pop desc",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "city": "BELL GARDENS", "pop":  99568 },
                  { "city": "BROOKLYN",     "pop": 111396 },
                  { "city": "CHICAGO",      "pop": 112047 },

@@ -29,11 +29,26 @@ object cts {
   def andQuery(queries: XQuery): XQuery =
     XQuery(s"cts:and-query($queries)")
 
+  def andNotQuery(positive: XQuery, negative: XQuery): XQuery =
+    XQuery(s"cts:and-not-query($positive, $negative)")
+
   def directoryQuery(uris: XQuery, depth: XQuery): XQuery =
     XQuery(s"cts:directory-query($uris, $depth)")
 
   def documentQuery(uris: XQuery): XQuery =
     XQuery(s"cts:document-query($uris)")
+
+  def collectionQuery(uris: XQuery): XQuery =
+    XQuery(s"cts:collection-query($uris)")
+
+  def elementQuery(elements: XQuery, query: XQuery): XQuery =
+    XQuery(s"cts:element-query($elements)")
+
+  def elementAttributeRange(elements: XQuery, attributes: XQuery, operator: XQuery, values: XQuery) =
+    XQuery(s"element-attribute-range-query($elements, $attributes, $operator, $values)")
+
+  def documentFragmentQuery(query: XQuery): XQuery =
+    XQuery(s"cts:document-fragment-query($query)")
 
   def indexOrder(index: XQuery, options: XQuery*): XQuery =
     XQuery(s"cts:index-order($index, ${mkSeq(options)})")
@@ -79,4 +94,9 @@ object cts {
     forestIds: IList[XQuery] = IList.empty
   ): XQuery =
     XQuery(s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
+
+  val True: XQuery =
+    XQuery("cts:true-query()")
+  val False: XQuery =
+    XQuery("cts:false-query()")
 }

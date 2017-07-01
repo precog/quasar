@@ -145,27 +145,34 @@ object Query extends QueryInstances {
   // TODO: Options
   final case class Word[V, A](words: IList[String]) extends Query[V, A]
 
-  def toXQuery[V]: Algebra[Query[V, ?], XQuery] = {
+  def mkSeqF[F[_]: Foldable: Functor, A](fa: F[A])(f: A => XQuery): XQuery =
+    mkSeq(fa map f)
+
+  def toXQuery[V]: Algebra[Query[XQuery, ?], XQuery] = {
     case AndNot(positive, negative) =>
-      ???
+      cts.andNotQuery(positive, negative)
     case And(queries) =>
       cts.andQuery(mkSeq(queries))
     case Collection(uris) =>
-      ???
+      cts.collectionQuery(mkSeq(uris map (_.value.xs)))
     case Directory(uris, depth) =>
       cts.directoryQuery(mkSeq(uris map (_.value.xs)), MatchDepth toXQuery depth)
     case DocumentFragment(query) =>
-      ???
+      cts.documentFragmentQuery(query)
     case Document(uris) =>
       cts.documentQuery(mkSeq(uris map (_.value.xs)))
     case ElementAttributeRange(elements, attributes, op, values) =>
-      ???
+      cts.elementAttributeRange(
+        mkSeqF(elements)(_.xqy),
+        mkSeqF(attributes)(_.xqy),
+        ComparisonOp toXQuery op,
+        mkSeq(values))
     case ElementAttributeValue(elements, attributes, values) =>
       ???
     case ElementAttributeWord(elements, attributes, words) =>
       ???
     case Element(elements, query) =>
-      ???
+      cts.elementQuery(mkSeqF(elements)(_.xqy), query)
     case ElementRange(elements, op, values) =>
       ???
     case ElementValue(elements, values) =>
@@ -173,7 +180,7 @@ object Query extends QueryInstances {
     case ElementWord(elements, words) =>
       ???
     case False() =>
-      ???
+      cts.False
     case JsonPropertyRange(properties, op, values) =>
       ???
     case JsonPropertyScope(properties, query) =>
@@ -191,7 +198,7 @@ object Query extends QueryInstances {
     case PathRange(paths, op, values) =>
       ???
     case True() =>
-      ???
+      cts.True
     case Word(words) =>
       ???
   }

@@ -43,7 +43,6 @@ object Search {
     import axes.child
     val x = $("x")
 
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def docsOnly: XQuery =
       cts.search(
         expr    = fn.doc(),

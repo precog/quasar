@@ -20,7 +20,10 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.RenderTree.ops._
 import quasar.specs2.QuasarMatchers._
+import quasar.sql.StatementArbitrary._
 import quasar.sql.fixpoint._
+
+import scala.Predef.$conforms
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -34,7 +37,7 @@ class SQLParserSpec extends quasar.Qspec {
   implicit def stringToQuery(s: String): Query = Query(s)
 
   def parse(query: Query): ParsingError \/ Fix[Sql] =
-    fixParser.parseExpr(query).map(_.makeTables(Nil))
+    fixParser.parseExpr(query)
 
   "SQLParser" should {
     "parse query1" in {
@@ -667,7 +670,7 @@ class SQLParserSpec extends quasar.Qspec {
       }.pendingUntilFixed("SD-1536")
     }
 
-    "round-trip to SQL and back" >> prop { (node: Fix[Sql]) =>
+    "round-trip to SQL and back" >> prop { node: Fix[Sql] =>
       val parsed = parse(pprint(node))
 
       parsed.fold(
@@ -676,6 +679,19 @@ class SQLParserSpec extends quasar.Qspec {
 
       parsed must beRightDisjOrDiff(node)
     }.set(minTestsOk = 1000) // one cannot test a parser too much
+
+    "round-trip module" >> prop { module: List[Statement[Fix[Sql]]] =>
+      val back = fixParser.parseModule(module.pprint)
+
+      back must beRightDisjOrDiff(module)
+    }
+
+    "pprint an import statement should escpae backticks" >> {
+      val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
+      val string = List(`import`).pprint
+      string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
+      fixParser.parseModule(string) must_=== List(`import`).right
+    }
 
     "round-trip through the pretty-printer" >> {
       def roundTrip(q: String) = {

@@ -85,7 +85,7 @@ object MountConfig {
     case FileSystemConfig(typ, uri) =>
       typ.value -> uri.value
     case ModuleConfig(statements) =>
-      "module" -> stmtsAsSqlStr(statements)
+      "module" -> statements.pprint
   }
 
   val fromConfigPair: (String, String) => String \/ MountConfig = {
@@ -102,7 +102,7 @@ object MountConfig {
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({
       case ModuleConfig(statements)   =>
-        Json("module" := stmtsAsSqlStr(statements))
+        Json("module" := statements.pprint)
       case ViewConfig(query, vars)    =>
         Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
       case FileSystemConfig(typ, uri) =>
@@ -149,7 +149,7 @@ object MountConfig {
   private def viewCfgAsUri(scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): String = {
     import org.http4s._, util._, CaseInsensitiveString._
 
-    val qryMap = vars.value.foldLeft(Map("q" -> List(scopedExprAsSqlStr(scopedExpr)))) {
+    val qryMap = vars.value.foldLeft(Map("q" -> List(scopedExpr.pprint))) {
       case (qm, (n, v)) => qm + ((VarPrefix + n.value, List(v.value)))
     }
 
@@ -164,13 +164,5 @@ object MountConfig {
       path      = "/",
       query     = Query.fromMap(qryMap)
     ).renderString
-  }
-
-  private def stmtsAsSqlStr(stmts: List[Statement[Fix[Sql]]]): String =
-    stmts.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n")
-
-  private def scopedExprAsSqlStr(scopedExpr: ScopedExpr[Fix[Sql]]): String = {
-    val scopeString = if (scopedExpr.scope.isEmpty) "" else stmtsAsSqlStr(scopedExpr.scope) + ";\n"
-    scopeString + sql.pprint(scopedExpr.expr)
   }
 }

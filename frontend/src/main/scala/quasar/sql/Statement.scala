@@ -66,7 +66,7 @@ object Statement {
   def transformBodyM[M[_]: Functor, B](f: BODY => M[B]) =
     f(body).map(FunctionDecl(name, args, _))
   override def pprint(implicit ev: BODY <~< String) =
-    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${ev(body)}\n  END"
+    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(", ")})\n  BEGIN\n    ${ev(body)}\n  END"
   def applyArgs[T[_[_]]: BirecursiveT](argsProvided: List[T[Sql]])(implicit ev: BODY <~< T[Sql]): SemanticError \/ T[Sql] = {
     val expected = args.size
     val actual   = argsProvided.size
@@ -102,5 +102,8 @@ object FunctionDecl {
 
 @Lenses final case class Import[BODY](path: DPath) extends Statement[BODY] {
   override def pprint(implicit ev: BODY <~< String) =
-    s"import `$path`"
+    // We need to escape any backticks in the resulting String as pathy is
+    // indiferent but since this is a SQL string they yield invalid SQL
+    // if not escaped
+    s"import `${posixCodec.printPath(path).replace("`", "\\`")}`"
 }

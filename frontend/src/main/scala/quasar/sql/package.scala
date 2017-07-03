@@ -30,6 +30,7 @@ import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
+import scalaz.Liskov._
 
 package object sql {
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
@@ -206,6 +207,9 @@ package object sql {
 
     def imports: List[Import[A]] =
       a.collect { case i: Import[_] => i }
+
+    def pprint(implicit T: Recursive.Aux[A, Sql]): String =
+      a.map(st => st.map(b => sql.pprint(b)).pprint).mkString(";\n")
   }
 
   def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
@@ -216,7 +220,7 @@ package object sql {
 
   private def _qq(delimiter: String, s: String): String = s match {
     case SimpleNamePattern() => s
-    case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
+    case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\" + delimiter) + delimiter
   }
 
   private def pprintRelationƒ[T]

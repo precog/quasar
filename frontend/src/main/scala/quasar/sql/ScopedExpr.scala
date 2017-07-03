@@ -19,6 +19,7 @@ package quasar.sql
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 
+import matryoshka.Recursive
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -29,6 +30,10 @@ import scalaz._, Scalaz._
     scope.collect { case i: Import[_] => i }
   def defs: List[FunctionDecl[T]] =
     scope.collect { case d: FunctionDecl[_] => d }
+  def pprint(implicit T: Recursive.Aux[T, Sql]): String = {
+    val scopeString = if (scope.isEmpty) "" else scope.pprint + ";\n"
+    scopeString + sql.pprint(expr)
+  }
 }
 
 object ScopedExpr {

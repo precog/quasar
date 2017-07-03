@@ -148,11 +148,21 @@ object Query extends QueryInstances {
   def mkSeqF[F[_]: Foldable: Functor, A](fa: F[A])(f: A => XQuery): XQuery =
     mkSeq(fa map f)
 
-  def toXQuery[V]: Algebra[Query[V, ?], XQuery] = {
+  def strSeq[F[_]: Foldable: Functor, A](fa: F[String]): XQuery =
+    mkSeqF(fa)(_.xs)
+
+  def qnameSeq[F[_]: Foldable: Functor, A](fa: F[QName]): XQuery =
+    mkSeqF(fa)(_.xqy)
+
+  def toXQuery[V](f: V => XQuery): Algebra[Query[V, ?], XQuery] = {
     case AndNot(positive, negative) =>
       cts.andNotQuery(positive, negative)
     case And(queries) =>
       cts.andQuery(mkSeq(queries))
+    case Not(query) =>
+      cts.notQuery(query)
+    case Or(queries) =>
+      cts.orQuery(mkSeq(queries))
     case Collection(uris) =>
       cts.collectionQuery(mkSeq(uris map (_.value.xs)))
     case Directory(uris, depth) =>
@@ -162,45 +172,37 @@ object Query extends QueryInstances {
     case Document(uris) =>
       cts.documentQuery(mkSeq(uris map (_.value.xs)))
     case ElementAttributeRange(elements, attributes, op, values) =>
-      cts.elementAttributeRange(
-        mkSeqF(elements)(_.xqy),
-        mkSeqF(attributes)(_.xqy),
-        ComparisonOp toXQuery op,
-        ???)
+      cts.elementAttributeRangeQuery(qnameSeq(elements), qnameSeq(attributes), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case ElementAttributeValue(elements, attributes, values) =>
-      ???
+      cts.elementAttributeValueQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(values))
     case ElementAttributeWord(elements, attributes, words) =>
-      ???
+      cts.elementAttributeWordQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(words))
     case Element(elements, query) =>
-      cts.elementQuery(mkSeqF(elements)(_.xqy), query)
+      cts.elementQuery(qnameSeq(elements), query)
     case ElementRange(elements, op, values) =>
-      ???
+      cts.elementRangeQuery(qnameSeq(elements), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case ElementValue(elements, values) =>
-      ???
+      cts.elementValueQuery(qnameSeq(elements), strSeq(values))
     case ElementWord(elements, words) =>
-      ???
-    case False() =>
-      cts.False
+      cts.elementWordQuery(qnameSeq(elements), strSeq(words))
     case JsonPropertyRange(properties, op, values) =>
-      ???
+      cts.jsonPropertyRangeQuery(strSeq(properties), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case JsonPropertyScope(properties, query) =>
-      ???
+      cts.jsonPropertyScopeQuery(strSeq(properties), query)
     case JsonPropertyValue(properties, values) =>
-      ???
+      cts.jsonPropertyValueQuery(strSeq(properties), mkSeqF(values)(f))
     case JsonPropertyWord(properties, words) =>
-      ???
+      cts.jsonPropertyWordQuery(strSeq(properties), strSeq(words))
     case Near(queries, weight) =>
-      ???
-    case Not(query) =>
-      cts.notQuery(query)
-    case Or(queries) =>
-      cts.orQuery(mkSeq(queries))
+      cts.nearQuery(mkSeq(queries), weight)
+    case Word(words) =>
+      cts.wordQuery(strSeq(words))
     case PathRange(paths, op, values) =>
-      ???
+      cts.pathRangeQuery(strSeq(paths), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case True() =>
       cts.True
-    case Word(words) =>
-      ???
+    case False() =>
+      cts.False
   }
 }
 

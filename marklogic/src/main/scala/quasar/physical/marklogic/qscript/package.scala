@@ -134,11 +134,12 @@ package object qscript {
     *
     * TODO: Return any missing indexes when invalid.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def queryIsValid[F[_]: Monad: Xcc, Q, V](query: Q)(
     implicit Q: Recursive.Aux[Q, Query[V, ?]]
   ): F[Boolean] = {
     val err = axes.descendant.elementNamed("error:error")
-    val xqy = fn.empty(xdmp.plan(query.cata(Query.toXQuery[V])) `//` err)
+    val xqy = fn.empty(xdmp.plan(query.cata(Query.toXQuery[V](???))) `//` err)
     Xcc[F].queryResults(xqy) map booleanResult
   }
 

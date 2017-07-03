@@ -16,6 +16,8 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
+
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._, syntax._
 import quasar.qscript._
@@ -32,7 +34,7 @@ import xml.name._
 final case class Search[Q](query: Q, idStatus: IdStatus)
 
 object Search {
-  def plan[F[_]: Monad: PrologW, Q, V, FMT](s: Search[Q])(
+  def plan[F[_]: Monad: PrologW, Q, V, FMT](s: Search[Q], asLit: V => XQuery)(
     implicit
     Q:  Recursive.Aux[Q, Query[V, ?]],
     SP: StructuralPlanner[F, FMT],
@@ -41,10 +43,11 @@ object Search {
     import axes.child
     val x = $("x")
 
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def docsOnly: XQuery =
       cts.search(
         expr    = fn.doc(),
-        query   = Q.cata(s.query)(Query.toXQuery),
+        query   = Q.cata(s.query)(Query.toXQuery(asLit)),
         options = SearchOptions[FMT].searchOptions
       ) `/` child.node()
 

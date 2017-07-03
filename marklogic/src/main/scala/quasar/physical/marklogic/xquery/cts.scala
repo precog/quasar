@@ -38,17 +38,53 @@ object cts {
   def documentQuery(uris: XQuery): XQuery =
     XQuery(s"cts:document-query($uris)")
 
+  def documentFragmentQuery(query: XQuery): XQuery =
+    XQuery(s"cts:document-fragment-query($query)")
+
   def collectionQuery(uris: XQuery): XQuery =
     XQuery(s"cts:collection-query($uris)")
 
   def elementQuery(elements: XQuery, query: XQuery): XQuery =
     XQuery(s"cts:element-query($elements)")
 
-  def elementAttributeRange(elements: XQuery, attributes: XQuery, operator: XQuery, values: XQuery) =
-    XQuery(s"element-attribute-range-query($elements, $attributes, $operator, $values)")
+  def elementRangeQuery(elements: XQuery, operator: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:element-range-query($elements, $operator, $values)")
 
-  def documentFragmentQuery(query: XQuery): XQuery =
-    XQuery(s"cts:document-fragment-query($query)")
+  def elementValueQuery(elements: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:element-value-query($elements, $values)")
+
+  def elementWordQuery(elements: XQuery, words: XQuery): XQuery =
+    XQuery(s"cts:element-word-query($elements, $words)")
+
+  def elementAttributeRangeQuery(elements: XQuery, attributes: XQuery, operator: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:element-attribute-range-query($elements, $attributes, $operator, $values)")
+
+  def elementAttributeValueQuery(elements: XQuery, attributes: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:element-attribute-value-query($elements, $attributes, $values)")
+
+  def elementAttributeWordQuery(elements: XQuery, attributes: XQuery, words: XQuery): XQuery =
+    XQuery(s"cts:element-attribute-word-query($elements, $attributes, $words)")
+
+  def jsonPropertyRangeQuery(properties: XQuery, op: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:json-property-range-query($properties, $op, $values)")
+
+  def jsonPropertyScopeQuery(properties: XQuery, query: XQuery): XQuery =
+    XQuery(s"cts:json-property-scope-query($properties, $query)")
+
+  def jsonPropertyValueQuery(properties: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:json-property-value-query($properties, $values)")
+
+  def jsonPropertyWordQuery(properties: XQuery, words: XQuery): XQuery =
+    XQuery(s"cts:json-property-word-query($properties, $words)")
+
+  def nearQuery(queries: XQuery, weight: Double): XQuery =
+    XQuery(s"cts:near-query($queries, $weight)")
+
+  def wordQuery(texts: XQuery): XQuery =
+    XQuery(s"cts:word-query($texts)")
+
+  def pathRangeQuery(paths: XQuery, op: XQuery, values: XQuery) =
+    XQuery(s"cts:path-range-query($paths, $op, $values)")
 
   def indexOrder(index: XQuery, options: XQuery*): XQuery =
     XQuery(s"cts:index-order($index, ${mkSeq(options)})")

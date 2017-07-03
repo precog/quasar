@@ -148,7 +148,7 @@ object Query extends QueryInstances {
   def mkSeqF[F[_]: Foldable: Functor, A](fa: F[A])(f: A => XQuery): XQuery =
     mkSeq(fa map f)
 
-  def toXQuery[V]: Algebra[Query[XQuery, ?], XQuery] = {
+  def toXQuery[V]: Algebra[Query[V, ?], XQuery] = {
     case AndNot(positive, negative) =>
       cts.andNotQuery(positive, negative)
     case And(queries) =>
@@ -166,7 +166,7 @@ object Query extends QueryInstances {
         mkSeqF(elements)(_.xqy),
         mkSeqF(attributes)(_.xqy),
         ComparisonOp toXQuery op,
-        mkSeq(values))
+        ???)
     case ElementAttributeValue(elements, attributes, values) =>
       ???
     case ElementAttributeWord(elements, attributes, words) =>

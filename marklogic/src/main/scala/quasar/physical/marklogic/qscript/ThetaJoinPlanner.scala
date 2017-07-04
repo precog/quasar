@@ -46,8 +46,8 @@ private[qscript] final class ThetaJoinPlanner[
         r      <- freshName[F]
         lhs0   <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
         rhs0   <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
-        lhs    <- elimSearch[Q, V](lhs0)
-        rhs    <- elimSearch[Q, V](rhs0)
+        lhs    <- elimSearch[Q, V, T](lhs0)
+        rhs    <- elimSearch[Q, V, T](rhs0)
         filter <- mergeXQuery[T, F, FMT](on, ~l, ~r)
         body   <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
       } yield ((lhs, rhs) match {

@@ -20,9 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.qscript._
-import quasar.fp.ski.κ
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -41,10 +39,10 @@ trait Planner[M[_], FMT, F[_]] {
     F : Functor[F]
   ): AlgebraM[M, F, XQuery] = {
     type Q = Fix[Query[Unit, ?]]
-    Kleisli(elimSearch[Q, Unit] _) <==< (plan[Q, Unit] <<< F.lift((_: XQuery).right[Search[Q]]))
+    Kleisli(elimSearch[Q, Unit, Fix] _) <==< (plan[Q, Unit] <<< F.lift((_: XQuery).right[Search[Q]]))
   }
 
-  protected def elimSearch[Q, V](x: Search[Q] \/ XQuery)(
+  protected def elimSearch[Q, V, T[_[_]]: BirecursiveT](x: Search[Q] \/ XQuery)(
     implicit
     Q: Recursive.Aux[Q, Query[V, ?]],
     M0: Monad[M],
@@ -52,7 +50,7 @@ trait Planner[M[_], FMT, F[_]] {
     O : SearchOptions[FMT],
     SP: StructuralPlanner[M, FMT]
   ): M[XQuery] =
-    x.fold(Search.plan[M, Q, V, FMT](_, κ(emptySeq)), _.point[M])
+    x.fold(Search.plan[M, Q, FMT, V, T](_), _.point[M])
 }
 
 object Planner extends PlannerInstances {

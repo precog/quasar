@@ -25,7 +25,7 @@ import matryoshka.implicits._
 import scalaz._
 
 private[qscript] object EJsonPlanner {
-  def apply[T[_[_]]: RecursiveT, M[_]: Monad, FMT](implicit SP: StructuralPlanner[M, FMT]
+  def plan[T[_[_]]: RecursiveT, M[_]: Monad, FMT](implicit SP: StructuralPlanner[M, FMT]
   ): T[EJson] => M[XQuery] =
     (ejs => DataPlanner[M, FMT](ejs.cata(Data.fromEJson)))
 }

@@ -23,7 +23,6 @@ import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
 import matryoshka._
-import matryoshka.data.Fix
 import monocle.macros.Lenses
 import scalaz._
 import scalaz.syntax.monad._
@@ -34,9 +33,10 @@ import xml.name._
 final case class Search[Q](query: Q, idStatus: IdStatus)
 
 object Search {
-  def plan[F[_]: Monad: PrologW, Q, FMT, V, T[_[_]]: BirecursiveT](s: Search[Q])(
+  def plan[F[_]: Monad: PrologW, Q, FMT, V, T[_[_]]: BirecursiveT]
+    (s: Search[Q], f: V => T[EJson])(
     implicit
-    Q:  Recursive.Aux[Q, Query[Fix[EJson], ?]],
+    Q:  Recursive.Aux[Q, Query[V, ?]],
     SP: StructuralPlanner[F, FMT],
     O:  SearchOptions[FMT]
   ): F[XQuery] = {
@@ -44,8 +44,8 @@ object Search {
     val x = $("x")
 
     def docsOnly: F[XQuery] = {
-      val ejsPlanner: Fix[EJson] => F[XQuery] = EJsonPlanner[Fix, F, FMT]
-      val queryM = Q.cataM(s.query)(Query.toXQuery[Fix[EJson], F](ejsPlanner))
+      val ejsPlanner: V => F[XQuery] = f andThen EJsonPlanner.plan[T, F, FMT]
+      val queryM = Q.cataM(s.query)(Query.toXQuery[V, F](ejsPlanner))
 
       queryM.map(q =>
         cts.search(

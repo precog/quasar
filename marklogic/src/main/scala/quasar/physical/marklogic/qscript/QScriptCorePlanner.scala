@@ -50,7 +50,7 @@ private[qscript] final class QScriptCorePlanner[
   def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
     case Map(src0, f) =>
       for {
-        src <- elimSearch[Q, V](src0)
+        src <- elimSearch[Q, V, T](src0)
         x   <- freshName[F]
         g   <- mapFuncXQuery[T, F, FMT](f, ~x)
       } yield (src match {
@@ -71,7 +71,7 @@ private[qscript] final class QScriptCorePlanner[
         r0      <- freshName[F]
         r       <- freshName[F]
         i       <- freshName[F]
-        src     <- elimSearch[Q, V](src0)
+        src     <- elimSearch[Q, V, T](src0)
         extract <- mapFuncXQuery[T, F, FMT](struct, ~l)
         lshift  <- SP.leftShift(~ext)
         chkArr  <- SP.isArray(~ext)
@@ -103,7 +103,7 @@ private[qscript] final class QScriptCorePlanner[
     // TODO: Start leveraging the cts:* aggregation functions when possible
     case Reduce(src0, bucket, reducers, repair) =>
       for {
-        src   <- elimSearch[Q, V](src0)
+        src   <- elimSearch[Q, V, T](src0)
         inits <- reducers traverse (reduceFuncInit)
         init  <- lib.combineApply[F] apply (mkSeq(inits))
         cmbs  <- reducers traverse (reduceFuncCombine)
@@ -121,7 +121,7 @@ private[qscript] final class QScriptCorePlanner[
     // TODO: Add an order param to Search and leverage cts:index-order
     case Sort(src0, bucket, order) =>
       for {
-        src      <- elimSearch[Q, V](src0)
+        src      <- elimSearch[Q, V, T](src0)
         x        <- freshName[F]
         xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
                       mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
@@ -140,13 +140,13 @@ private[qscript] final class QScriptCorePlanner[
       for {
         l0  <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
         r0  <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
-        l   <- elimSearch[Q, V](l0)
-        r   <- elimSearch[Q, V](r0)
+        l   <- elimSearch[Q, V, T](l0)
+        r   <- elimSearch[Q, V, T](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
     case Filter(src0, f) =>
       for {
-        src <- elimSearch[Q, V](src0)
+        src <- elimSearch[Q, V, T](src0)
         x   <- freshName[F]
         p   <- mapFuncXQuery[T, F, FMT](f, ~x) map (xs.boolean)
       } yield (src match {
@@ -166,14 +166,14 @@ private[qscript] final class QScriptCorePlanner[
     // NB: XQuery sequences use 1-based indexing.
     case Subset(src0, from, sel, count) =>
       for {
-        src <- elimSearch[Q, V](src0)
+        src <- elimSearch[Q, V, T](src0)
         s   <- freshName[F]
         f   <- freshName[F]
         c   <- freshName[F]
         fm0 <- rebaseXQuery[T, F, FMT, Q, V](from, (~s).right)
         ct0 <- rebaseXQuery[T, F, FMT, Q, V](count, (~s).right)
-        fm  <- elimSearch[Q, V](fm0)
-        ct  <- elimSearch[Q, V](ct0)
+        fm  <- elimSearch[Q, V, T](fm0)
+        ct  <- elimSearch[Q, V, T](ct0)
       } yield (let_(s := src, f := fm, c := ct) return_ (sel match {
         case Drop   => fn.subsequence(~f, ~c + 1.xqy)
         case Take   => fn.subsequence(~f, 1.xqy, some(~c))

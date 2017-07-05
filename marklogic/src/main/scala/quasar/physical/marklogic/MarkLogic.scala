@@ -130,7 +130,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       MainModule.fromWritten(
         qs.cataM(cfg.planner[T].plan[Q, V])
           .flatMap(_.fold(s =>
-            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq))(
+            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
               implicitly,
               implicitly,
               implicitly,

@@ -52,7 +52,7 @@ trait Planner[M[_], FMT, F[_]] {
     O : SearchOptions[FMT],
     SP: StructuralPlanner[M, FMT]
   ): M[XQuery] =
-    x.fold(Search.plan[M, Q, V, FMT](_, κ(emptySeq)), _.point[M])
+    x.fold(Search.plan[M, Q, V, FMT](_, κ(emptySeq.point[M])), _.point[M])
 }
 
 object Planner extends PlannerInstances {

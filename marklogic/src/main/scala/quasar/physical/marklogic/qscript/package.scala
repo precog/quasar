@@ -139,8 +139,9 @@ package object qscript {
     implicit Q: Recursive.Aux[Q, Query[V, ?]]
   ): F[Boolean] = {
     val err = axes.descendant.elementNamed("error:error")
-    val xqy = fn.empty(xdmp.plan(query.cata(Query.toXQuery[V](κ(emptySeq)))) `//` err)
-    Xcc[F].queryResults(xqy) map booleanResult
+    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q => fn.empty(xdmp.plan(q) `//` err))
+
+    xqy >>= (Xcc[F].queryResults(_) map booleanResult)
   }
 
   def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](

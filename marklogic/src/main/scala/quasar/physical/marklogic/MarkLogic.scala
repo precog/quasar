@@ -29,6 +29,7 @@ import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
@@ -38,9 +39,9 @@ import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => QRead, _}
-import quasar.ejson.EJson
 
 import scala.Predef.implicitly
 
@@ -63,7 +64,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   type Repr        = MainModule
   type Config      = MLBackendConfig
   type M[A]        = MLFS[A]
-  type V           = Fix[EJson]
+  type V           = Unit
   type Q           = Fix[Query[V, ?]]
 
   val Type = FsType
@@ -129,8 +130,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       MainModule.fromWritten(
         qs.cataM(cfg.planner[T].plan[Q, V])
           .flatMap(_.fold(s =>
-            Search.plan[cfg.M, Q, cfg.FMT, V, T](s)(
-              implicitly,
+            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq))(
               implicitly,
               implicitly,
               implicitly,

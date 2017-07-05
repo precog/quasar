@@ -19,7 +19,6 @@ package quasar.physical.marklogic.qscript
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._, syntax._
 import quasar.qscript._
-import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
 import matryoshka._
@@ -33,8 +32,7 @@ import xml.name._
 final case class Search[Q](query: Q, idStatus: IdStatus)
 
 object Search {
-  def plan[F[_]: Monad: PrologW, Q, FMT, V, T[_[_]]: BirecursiveT]
-    (s: Search[Q], f: V => T[EJson])(
+  def plan[F[_]: Monad: PrologW, Q, V, FMT](s: Search[Q], asLit: V => XQuery)(
     implicit
     Q:  Recursive.Aux[Q, Query[V, ?]],
     SP: StructuralPlanner[F, FMT],
@@ -43,30 +41,25 @@ object Search {
     import axes.child
     val x = $("x")
 
-    def docsOnly: F[XQuery] = {
-      val ejsPlanner: V => F[XQuery] = f andThen EJsonPlanner.plan[T, F, FMT]
-      val queryM = Q.cataM(s.query)(Query.toXQuery[V, F](ejsPlanner))
-
-      queryM.map(q =>
-        cts.search(
-          expr    = fn.doc(),
-          query   = q,
-          options = SearchOptions[FMT].searchOptions
-        ) `/` child.node())
-    }
+    def docsOnly: XQuery =
+      cts.search(
+        expr    = fn.doc(),
+        query   = Q.cata(s.query)(Query.toXQuery(asLit)),
+        options = SearchOptions[FMT].searchOptions
+      ) `/` child.node()
 
     def urisAndDocs: F[XQuery] =
-      docsOnly >>= (docOnly => SP.seqToArray(mkSeq_(fn.baseUri(~x), ~x)) map { pair =>
-        fn.map(expr.func(x.render) { pair }, docOnly)
-      })
+      SP.seqToArray(mkSeq_(fn.baseUri(~x), ~x)) map { pair =>
+        fn.map(expr.func(x.render) { pair }, docsOnly)
+      }
 
-    def urisOnly: F[XQuery] =
-      docsOnly map (fn.map(fn.ns(NCName("base-uri")) :# 1, _))
+    def urisOnly: XQuery =
+      fn.map(fn.ns(NCName("base-uri")) :# 1, docsOnly)
 
     s.idStatus match {
-      case ExcludeId => docsOnly
+      case ExcludeId => docsOnly.point[F]
       case IncludeId => urisAndDocs
-      case IdOnly    => urisOnly
+      case IdOnly    => urisOnly.point[F]
     }
   }
 }

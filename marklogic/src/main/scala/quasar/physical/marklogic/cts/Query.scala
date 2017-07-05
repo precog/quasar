@@ -154,60 +154,55 @@ object Query extends QueryInstances {
   def qnameSeq[F[_]: Foldable: Functor, A](fa: F[QName]): XQuery =
     mkSeqF(fa)(_.xqy)
 
-  def toXQuery[V, F[_]: Monad](f: V => F[XQuery]): AlgebraM[F, Query[V, ?], XQuery] = {
+  def toXQuery[V](f: V => XQuery): Algebra[Query[V, ?], XQuery] = {
     case AndNot(positive, negative) =>
-      cts.andNotQuery(positive, negative).point[F]
+      cts.andNotQuery(positive, negative)
     case And(queries) =>
-      cts.andQuery(mkSeq(queries)).point[F]
+      cts.andQuery(mkSeq(queries))
     case Not(query) =>
-      cts.notQuery(query).point[F]
+      cts.notQuery(query)
     case Or(queries) =>
-      cts.orQuery(mkSeq(queries)).point[F]
+      cts.orQuery(mkSeq(queries))
     case Collection(uris) =>
-      cts.collectionQuery(mkSeq(uris map (_.value.xs))).point[F]
+      cts.collectionQuery(mkSeq(uris map (_.value.xs)))
     case Directory(uris, depth) =>
-      cts.directoryQuery(mkSeq(uris map (_.value.xs)), MatchDepth toXQuery depth).point[F]
+      cts.directoryQuery(mkSeq(uris map (_.value.xs)), MatchDepth toXQuery depth)
     case DocumentFragment(query) =>
-      cts.documentFragmentQuery(query).point[F]
+      cts.documentFragmentQuery(query)
     case Document(uris) =>
-      cts.documentQuery(mkSeq(uris map (_.value.xs))).point[F]
+      cts.documentQuery(mkSeq(uris map (_.value.xs)))
     case ElementAttributeRange(elements, attributes, op, values) =>
-      values.traverse(f).map(mkSeq(_))
-        .map(cts.elementAttributeRangeQuery(qnameSeq(elements), qnameSeq(attributes), ComparisonOp toXQuery op, _))
+      cts.elementAttributeRangeQuery(qnameSeq(elements), qnameSeq(attributes), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case ElementAttributeValue(elements, attributes, values) =>
-      cts.elementAttributeValueQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(values)).point[F]
+      cts.elementAttributeValueQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(values))
     case ElementAttributeWord(elements, attributes, words) =>
-      cts.elementAttributeWordQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(words)).point[F]
+      cts.elementAttributeWordQuery(qnameSeq(elements), qnameSeq(attributes), strSeq(words))
     case Element(elements, query) =>
-      cts.elementQuery(qnameSeq(elements), query).point[F]
+      cts.elementQuery(qnameSeq(elements), query)
     case ElementRange(elements, op, values) =>
-      values.traverse(f).map(mkSeq(_))
-        .map(cts.elementRangeQuery(qnameSeq(elements), ComparisonOp toXQuery op, _))
+      cts.elementRangeQuery(qnameSeq(elements), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case ElementValue(elements, values) =>
-      cts.elementValueQuery(qnameSeq(elements), strSeq(values)).point[F]
+      cts.elementValueQuery(qnameSeq(elements), strSeq(values))
     case ElementWord(elements, words) =>
-      cts.elementWordQuery(qnameSeq(elements), strSeq(words)).point[F]
+      cts.elementWordQuery(qnameSeq(elements), strSeq(words))
     case JsonPropertyRange(properties, op, values) =>
-      values.traverse(f).map(mkSeq(_))
-        .map(cts.jsonPropertyRangeQuery(strSeq(properties), ComparisonOp toXQuery op, _))
+      cts.jsonPropertyRangeQuery(strSeq(properties), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case JsonPropertyScope(properties, query) =>
-      cts.jsonPropertyScopeQuery(strSeq(properties), query).point[F]
+      cts.jsonPropertyScopeQuery(strSeq(properties), query)
     case JsonPropertyValue(properties, values) =>
-      values.traverse(f).map(mkSeq(_))
-        .map(cts.jsonPropertyValueQuery(strSeq(properties), _))
+      cts.jsonPropertyValueQuery(strSeq(properties), mkSeqF(values)(f))
     case JsonPropertyWord(properties, words) =>
-      cts.jsonPropertyWordQuery(strSeq(properties), strSeq(words)).point[F]
+      cts.jsonPropertyWordQuery(strSeq(properties), strSeq(words))
     case Near(queries, weight) =>
-      cts.nearQuery(mkSeq(queries), weight).point[F]
+      cts.nearQuery(mkSeq(queries), weight)
     case Word(words) =>
-      cts.wordQuery(strSeq(words)).point[F]
+      cts.wordQuery(strSeq(words))
     case PathRange(paths, op, values) =>
-      values.traverse(f).map(mkSeq(_))
-        .map(cts.pathRangeQuery(strSeq(paths), ComparisonOp toXQuery op, _))
+      cts.pathRangeQuery(strSeq(paths), ComparisonOp toXQuery op, mkSeqF(values)(f))
     case True() =>
-      cts.True.point[F]
+      cts.True
     case False() =>
-      cts.False.point[F]
+      cts.False
   }
 }
 

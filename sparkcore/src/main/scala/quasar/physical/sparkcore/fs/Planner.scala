@@ -45,8 +45,8 @@ object Planner {
   implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
   implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
   implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] = ShiftedReadPlanner
-  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Planner[QScriptCore[T, ?]] = new QScriptCorePlanner
-  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Planner[EquiJoin[T, ?]] = new EquiJoinPlanner
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT]: Planner[QScriptCore[T, ?]] = new QScriptCorePlanner
+  implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT]: Planner[EquiJoin[T, ?]] = new EquiJoinPlanner
 
   implicit def coproduct[F[_], G[_]](
     implicit F: Planner[F], G: Planner[G]):

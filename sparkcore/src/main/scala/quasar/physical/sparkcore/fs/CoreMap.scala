@@ -27,6 +27,7 @@ import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
+import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data.free._
@@ -38,26 +39,42 @@ object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 
-  def changeFreeMap[T[_[_]]: RecursiveT](f: FreeMap[T])
+  def changeFreeMap[T[_[_]]: BirecursiveT](f: FreeMap[T])
       : PlannerError \/ (Data => Data) =
     f.cataM(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
 
-  def changeJoinFunc[T[_[_]]: RecursiveT](f: JoinFunc[T])
+  def changeJoinFunc[T[_[_]]: BirecursiveT](f: JoinFunc[T])
       : PlannerError \/ ((Data, Data) => Data) =
-    f.cataM(interpretM[PlannerError \/ ?, MapFuncCore[T, ?], JoinSide, ((Data, Data)) => Data](
+    f.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
       (js: JoinSide) => (js match {
         case LeftSide  => (_: (Data, Data))._1
         case RightSide => (_: (Data, Data))._2
       }).right,
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
-  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFuncCore[T, ?], ReduceIndex])
+  def changeReduceFunc[T[_[_]]: BirecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
       : PlannerError \/ ((Data, List[Data]) => Data) =
     f.cataM(interpretM(
       _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
       change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
 
-  def change[T[_[_]]: RecursiveT, A]
+  def change[T[_[_]]: BirecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] =
+    _.run.fold(changeCore, changeDerived)
+
+  def changeDerived[T[_[_]]: BirecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFuncDerived[T, ?], A => Data] = {
+    val doChange: AlgebraM[(Option ∘ (PlannerError \/ ?))#λ[?], MapFuncDerived[T, ?], A => Data] =
+      { _ => None }
+
+    { f => doChange(f).getOrElse(
+        Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+          interpretM(implicitly[Monad[PlannerError \/ ?]].point[A => Data](_), changeCore)
+        )
+    )}
+  }
+
+  def changeCore[T[_[_]]: RecursiveT, A]
       : AlgebraM[PlannerError \/ ?, MapFuncCore[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
     case Undefined() => κ(undefined).right

@@ -148,6 +148,9 @@ object Mimir extends BackendModule with Logging {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
+    val MFC = quasar.qscript.MFC[T]
+    val MFD = quasar.qscript.MFD[T]
+
 // M = Backend
 // F[_] = MapFuncCore[T, ?]
 // B = Repr
@@ -175,7 +178,7 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
-    lazy val planMapFunc: AlgebraM[Backend, MapFuncCore[T, ?], Repr] = {
+    lazy val planMapFuncCore: AlgebraM[Backend, MapFuncCore[T, ?], Repr] = {
       // EJson => Data => JValue => RValue => Table
       case MapFuncsCore.Constant(ejson) =>
         val data: Data = ejson.cata(Data.fromEJson)
@@ -188,6 +191,21 @@ object Mimir extends BackendModule with Logging {
         }).liftB
 
       case _ => ???
+    }
+
+    lazy val doPlanMapFuncDerived: AlgebraM[(Option ∘ Backend)#λ, MapFuncDerived[T, ?], Repr] = _ => None
+
+    lazy val planMapFuncDerived: AlgebraM[Backend, MapFuncDerived[T, ?], Repr] = { f =>
+      doPlanMapFuncDerived(f).getOrElse(
+        Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+          interpretM(implicitly[Monad[Backend]].point[Repr](_), planMapFuncCore)
+        )
+      )
+    }
+
+    lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
+      case MFC(mfc) => planMapFuncCore(mfc)
+      case MFD(mfd) => planMapFuncDerived(mfd)
     }
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {

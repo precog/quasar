@@ -930,6 +930,21 @@ abstract class StdLibSpec extends Qspec {
         // TODO: Interval
       }
 
+      "Abs" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Abs(_).embed, Data.Int(x), Data.Int(x.abs))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Abs(_).embed, Data.Dec(x), Data.Dec(x.abs))
+        }
+
+        // TODO: add support for interval
+        // "any Interval" >> prop { (x: Duration) =>
+        //   unary(Abs(_).embed, Data.Interval(x), if (x.isNegative) Data.Interval(x.negated) else Data.Interval(x))
+        // }
+      }
+
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
@@ -1263,7 +1278,7 @@ abstract class StdLibSpec extends Qspec {
 
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
-        "returns metadata associated with a value" >> skipped("Requires EJson.")
+        "returns metadata associated with a value" >> pending("Requires EJson.")
       }
     }
   }

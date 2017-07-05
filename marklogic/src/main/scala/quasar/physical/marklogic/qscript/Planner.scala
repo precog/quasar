@@ -49,12 +49,18 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {
-  implicit def mapFunc[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
+  implicit def mapFuncCore[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
     implicit
     DP: Planner[M, FMT, Const[Data, ?]],
     SP: StructuralPlanner[M, FMT]
   ): Planner[M, FMT, MapFuncCore[T, ?]] =
-    new MapFuncPlanner[M, FMT, T]
+    new MapFuncCorePlanner[M, FMT, T]
+
+  implicit def mapFuncDerived[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
+    implicit
+    CP: Planner[M, FMT, MapFuncCore[T, ?]]
+  ): Planner[M, FMT, MapFuncDerived[T, ?]] =
+    new MapFuncDerivedPlanner[M, FMT, T]
 }
 
 sealed abstract class PlannerInstances1 extends PlannerInstances2 {
@@ -79,7 +85,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
   implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: BirecursiveT](
     implicit
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): Planner[F, FMT, ThetaJoin[T, ?]] = {
     implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new ThetaJoinPlanner[F, FMT, T]

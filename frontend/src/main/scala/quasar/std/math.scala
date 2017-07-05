@@ -276,6 +276,24 @@ trait MathLib extends Library {
       case t             => success(Func.Input1(t))
     })
 
+  val Abs = UnaryFunc(
+    Mapping,
+    "Returns the absolute value of a numeric or interval value",
+    MathRel,
+    Func.Input1(MathRel),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v.abs)))
+      case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.abs)))
+      case Sized(Type.Const(Data.Interval(v))) => success(Type.Const(Data.Interval(v.abs)))
+
+      case Sized(t) if (Type.Numeric ⨿ Type.Interval) contains t => success(t)
+    },
+    untyper[nat._1] {
+      case Type.Const(d) => success(Func.Input1(d.dataType))
+      case t             => success(Func.Input1(t))
+    })
+
   val Modulo = BinaryFunc(
     Mapping,
     "Finds the remainder of one number divided by another",

@@ -148,7 +148,7 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
         acc.embed.cata[Free[QScriptTotal, Hole]](g => Free.roll(FI.inject(g))))))
 
   def wrapDir(name: String, d: O[T[O]]): O[T[O]] =
-    QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
+    QC.inj(Map(d.embed, Free.roll(MFC(MakeMap(StrLit(name), HoleF)))))
 
   def allDescendents[M[_]: Monad: MonadFsErr]
     (listContents: DiscoverPath.ListContents[M], wrapFile: AFile => O[T[O]])

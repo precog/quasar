@@ -41,7 +41,7 @@ import scalaz.concurrent.Task
 
 abstract class MarkLogicStdLibSpec[F[_]: Monad, FMT](
   implicit
-  MP: Planner[F, FMT, MapFuncCore[Fix, ?]],
+  MP: Planner[F, FMT, MapFunc[Fix, ?]],
   DP: Planner[F, FMT, Const[Data, ?]]
 ) extends StdLibSpec {
   type RunT[X[_], A] = EitherT[X, Result, A]

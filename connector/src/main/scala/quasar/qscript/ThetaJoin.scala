@@ -127,7 +127,7 @@ object ThetaJoin {
                 // `(l join r on X) as lj inner join (l join r on Y) as rj on lj = rj`
                 // is equivalent to
                 // `l join r on X and Y`
-                val on: JoinFunc[IT] = (onL ≟ onR).fold(onL, Free.roll(MapFuncsCore.And(onL, onR)))
+                val on: JoinFunc[IT] = (onL ≟ onR).fold(onL, Free.roll(MFC(MapFuncsCore.And(onL, onR))))
 
                 val cL: JoinFunc[IT] = updateJoin(c1, resL.lval, resR.lval)
                 val cR: JoinFunc[IT] = updateJoin(c2, resL.rval, resR.rval)

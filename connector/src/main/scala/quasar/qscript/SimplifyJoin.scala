@@ -67,6 +67,8 @@ object SimplifyJoin {
       type IT[F[_]] = T[F]
       type G[A] = F[A]
 
+      val MFC = quasar.qscript.MFC[T]
+
       def simplifyJoin[H[_]: Functor](GtoH: G ~> H): ThetaJoin[T, T[H]] => H[T[H]] =
         tj => {
           // TODO: This can potentially rewrite conditions to try to get left
@@ -82,14 +84,14 @@ object SimplifyJoin {
 
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
-              case -\/(And(a, b)) =>
+              case -\/(MFC(And(a, b))) =>
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
                   fir.keys ++ sec.keys,
                   fir.filter.fold(
                     sec.filter)(
-                    f => sec.filter.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
-              case -\/(Eq(l, r)) =>
+                    f => sec.filter.fold(f.some)(s => Free.roll(MFC(And[T, JoinFunc[T]](f, s))).some)))
+              case -\/(MFC(Eq(l, r))) =>
                 alignCondition(l, r).fold(
                   SimplifiedJoinCondition(Nil, fm.some))(
                   pair => SimplifiedJoinCondition(List(pair), None))
@@ -98,8 +100,8 @@ object SimplifyJoin {
 
           def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
             jf >>= {
-              case LeftSide  => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0)))
-              case RightSide => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))
+              case LeftSide  => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(0))))
+              case RightSide => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(1))))
             }
 
           val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
@@ -108,12 +110,12 @@ object SimplifyJoin {
               tj.src,
               applyToBranch(tj.lBranch),
               applyToBranch(tj.rBranch),
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))).embed,
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))).embed,
+              ConcatArraysN(keys.map(k => Free.roll(MFC(MakeArray[T, FreeMap[T]](k.left))))).embed,
+              ConcatArraysN(keys.map(k => Free.roll(MFC(MakeArray[T, FreeMap[T]](k.right))))).embed,
               tj.f,
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide)))))))).embed)(
+              Free.roll(MFC(ConcatArrays(
+                Free.roll(MFC(MakeArray(Free.point(LeftSide)))),
+                Free.roll(MFC(MakeArray(Free.point(RightSide)))))))))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
             mergeSides(tj.combine))))
         }

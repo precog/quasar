@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.physical.mongodb.Bson
+import quasar.physical.mongodb.{Bson, BsonCodec}
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, MapFuncsDerived => D,  _}, MapFuncsCore._
 
@@ -87,7 +87,7 @@ trait FuncHandler[IN[_]] {
 
 object FuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: CorecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
       def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
@@ -100,11 +100,12 @@ object FuncHandler {
             val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
             import fp._
 
-            mfc.some collect {
-              case Undefined()           => $literal(Bson.Undefined)
-              case Add(a1, a2)           => $add(a1, a2)
-              case Multiply(a1, a2)      => $multiply(a1, a2)
-              case Subtract(a1, a2)      => $subtract(a1, a2)
+            mfc match {
+              case Undefined()           => $literal(Bson.Undefined).some
+              case Constant(v1)          => v1.cataM(BsonCodec.fromEJson).toOption.map($literal(_))
+              case Add(a1, a2)           => $add(a1, a2).some
+              case Multiply(a1, a2)      => $multiply(a1, a2).some
+              case Subtract(a1, a2)      => $subtract(a1, a2).some
               case Divide(a1, a2)        =>
                 // TODO
                 // 1) remove workaround for appropriate Mongo version driver
@@ -117,84 +118,84 @@ object FuncHandler {
                     $cond($gt(a1, $literal(Bson.Int32(0))),
                       $literal(Bson.Dec(Double.PositiveInfinity)),
                       $literal(Bson.Dec(Double.NegativeInfinity)))),
-                  $divide(a1, a2))
-              case Modulo(a1, a2)        => $mod(a1, a2)
-              case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
-              case MapFuncsCore.Eq(a1, a2)   => $eq(a1, a2)
-              case Neq(a1, a2)           => $neq(a1, a2)
-              case Lt(a1, a2)            => $lt(a1, a2)
-              case Lte(a1, a2)           => $lte(a1, a2)
-              case Gt(a1, a2)            => $gt(a1, a2)
-              case Gte(a1, a2)           => $gte(a1, a2)
+                  $divide(a1, a2)).some
+              case Modulo(a1, a2)        => $mod(a1, a2).some
+              case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1).some
+              case MapFuncsCore.Eq(a1, a2)   => $eq(a1, a2).some
+              case Neq(a1, a2)           => $neq(a1, a2).some
+              case Lt(a1, a2)            => $lt(a1, a2).some
+              case Lte(a1, a2)           => $lte(a1, a2).some
+              case Gt(a1, a2)            => $gt(a1, a2).some
+              case Gte(a1, a2)           => $gte(a1, a2).some
 
-              case ConcatArrays(a1, a2)  => $concat(a1, a2)  // NB: this is valid for strings only
-              case Lower(a1)             => $toLower(a1)
-              case Upper(a1)             => $toUpper(a1)
-              case Substring(a1, a2, a3) => $substr(a1, a2, a3)
-              case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
+              case ConcatArrays(a1, a2)  => $concat(a1, a2).some  // NB: this is valid for strings only
+              case Lower(a1)             => $toLower(a1).some
+              case Upper(a1)             => $toUpper(a1).some
+              case Substring(a1, a2, a3) => $substr(a1, a2, a3).some
+              case Cond(a1, a2, a3)      => $cond(a1, a2, a3).some
 
-              case Or(a1, a2)            => $or(a1, a2)
-              case And(a1, a2)           => $and(a1, a2)
-              case Not(a1)               => $not(a1)
+              case Or(a1, a2)            => $or(a1, a2).some
+              case And(a1, a2)           => $and(a1, a2).some
+              case Not(a1)               => $not(a1).some
 
               case Null(a1) =>
                 $cond($eq(a1, $literal(Bson.Text("null"))),
                   $literal(Bson.Null),
-                  $literal(Bson.Undefined))
+                  $literal(Bson.Undefined)).some
 
               case Bool(a1) =>
                 $cond($eq(a1, $literal(Bson.Text("true"))),
                   $literal(Bson.Bool(true)),
                   $cond($eq(a1, $literal(Bson.Text("false"))),
                     $literal(Bson.Bool(false)),
-                    $literal(Bson.Undefined)))
+                    $literal(Bson.Undefined))).some
 
               case ExtractCentury(a1) =>
-                trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
-              case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
-              case ExtractDecade(a1) => trunc($divide($year(a1), $literal(Bson.Int32(10))))
-              case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))
-              case ExtractDayOfYear(a1) => $dayOfYear(a1)
+                trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100)))).some
+              case ExtractDayOfMonth(a1) => $dayOfMonth(a1).some
+              case ExtractDecade(a1) => trunc($divide($year(a1), $literal(Bson.Int32(10)))).some
+              case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1))).some
+              case ExtractDayOfYear(a1) => $dayOfYear(a1).some
               case ExtractEpoch(a1) =>
                 $divide(
                   $subtract(a1, $literal(Bson.Date(0))),
-                  $literal(Bson.Int32(1000)))
-              case ExtractHour(a1) => $hour(a1)
+                  $literal(Bson.Int32(1000))).some
+              case ExtractHour(a1) => $hour(a1).some
               case ExtractIsoDayOfWeek(a1) =>
                 $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
                   $literal(Bson.Int32(7)),
-                  $add($dayOfWeek(a1), $literal(Bson.Int32(-1))))
+                  $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))).some
               // TODO: case ExtractIsoYear(a1) =>
               case ExtractMicroseconds(a1) =>
                 $multiply(
                   $add(
                     $multiply($second(a1), $literal(Bson.Int32(1000))),
                     $millisecond(a1)),
-                  $literal(Bson.Int32(1000)))
+                  $literal(Bson.Int32(1000))).some
               case ExtractMillennium(a1) =>
-                trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
+                trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000)))).some
               case ExtractMilliseconds(a1) =>
                 $add(
                   $multiply($second(a1), $literal(Bson.Int32(1000))),
-                  $millisecond(a1))
-              case ExtractMinute(a1) => $minute(a1)
-              case ExtractMonth(a1) => $month(a1)
+                  $millisecond(a1)).some
+              case ExtractMinute(a1) => $minute(a1).some
+              case ExtractMonth(a1) => $month(a1).some
               case ExtractQuarter(a1) =>
                 trunc(
                   $add(
                     $divide(
                       $subtract($month(a1), $literal(Bson.Int32(1))),
                       $literal(Bson.Int32(3))),
-                    $literal(Bson.Int32(1))))
+                    $literal(Bson.Int32(1)))).some
               case ExtractSecond(a1) =>
-                $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
-              case ExtractWeek(a1) => $week(a1)
-              case ExtractYear(a1) => $year(a1)
+                $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000)))).some
+              case ExtractWeek(a1) => $week(a1).some
+              case ExtractYear(a1) => $year(a1).some
 
               case ToTimestamp(a1) =>
-               $add($literal(Bson.Date(0)), a1)
+               $add($literal(Bson.Date(0)), a1).some
 
-              case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
+              case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3)).some
               // TODO: With type info, we could reduce the number of comparisons necessary.
               case TypeOf(a1) =>
                $cond($lt(a1, $literal(Bson.Null)),                             $literal(Bson.Undefined),
@@ -210,7 +211,8 @@ object FuncHandler {
                                $cond($lt(a1, $literal(Check.minTimestamp)),    $literal(Bson.Text("_ejson.timestamp")),
                                  // FIXME: This only sorts distinct from Date in 3.0+, so we have to be careful … somehow.
                                  $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
-                                                                               $literal(Bson.Text("_bson.regularexpression"))))))))))))
+                                                                               $literal(Bson.Text("_bson.regularexpression")))))))))))).some
+              case _ => None
             }
           }
         }
@@ -281,9 +283,8 @@ object FuncHandler {
         }
     }
 
-  // TODO generalize this and make available for other connectors
   implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
-      (implicit core: FuncHandler[MapFuncCore[T, ?]])
+    (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived

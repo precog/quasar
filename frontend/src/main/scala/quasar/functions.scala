@@ -182,6 +182,7 @@ trait GenericFuncInstances {
       case identity.Squash                => "Squash"
       case identity.ToId                  => "ToId"
       case math.Add                       => "Add"
+      case math.Abs                       => "Abs"
       case math.Multiply                  => "Multiply"
       case math.Power                     => "Power"
       case math.Subtract                  => "Subtract"

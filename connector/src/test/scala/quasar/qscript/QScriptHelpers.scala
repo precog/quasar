@@ -83,63 +83,63 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
 
   def ConstantR[A](value: Fix[EJson]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Constant[Fix, FreeMapA[A]](value))
+    Free.roll(MFC(MapFuncsCore.Constant[Fix, FreeMapA[A]](value)))
 
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.ProjectField(src, field))
+    Free.roll(MFC(MapFuncsCore.ProjectField(src, field)))
 
   def DeleteFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.DeleteField(src, field))
+    Free.roll(MFC(MapFuncsCore.DeleteField(src, field)))
 
   def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.ProjectIndex(src, field))
+    Free.roll(MFC(MapFuncsCore.ProjectIndex(src, field)))
 
   def MakeArrayR[A](src: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.MakeArray(src))
+    Free.roll(MFC(MapFuncsCore.MakeArray(src)))
 
   def MakeMapR[A](key: FreeMapA[A], src: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.MakeMap(key, src))
+    Free.roll(MFC(MapFuncsCore.MakeMap(key, src)))
 
   def ConcatArraysR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.ConcatArrays(left, right))
+    Free.roll(MFC(MapFuncsCore.ConcatArrays(left, right)))
 
   def ConcatMapsR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.ConcatMaps(left, right))
+    Free.roll(MFC(MapFuncsCore.ConcatMaps(left, right)))
 
   def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Add(left, right))
+    Free.roll(MFC(MapFuncsCore.Add(left, right)))
 
   def SubtractR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Subtract(left, right))
+    Free.roll(MFC(MapFuncsCore.Subtract(left, right)))
 
   def EqR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Eq(left, right))
+    Free.roll(MFC(MapFuncsCore.Eq(left, right)))
 
   def LtR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Lt(left, right))
+    Free.roll(MFC(MapFuncsCore.Lt(left, right)))
 
   def AndR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.And(left, right))
+    Free.roll(MFC(MapFuncsCore.And(left, right)))
 
   def OrR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Or(left, right))
+    Free.roll(MFC(MapFuncsCore.Or(left, right)))
 
   def NotR[A](value: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MapFuncsCore.Not(value))
+    Free.roll(MFC(MapFuncsCore.Not(value)))
 
   def lpRead(path: String): Fix[LP] =
     lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))

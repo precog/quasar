@@ -35,6 +35,7 @@ trait TTypes[T[_[_]]] {
   type ProjectBucket[A] = quasar.qscript.ProjectBucket[T, A]
   type ThetaJoin[A]     = quasar.qscript.ThetaJoin[T, A]
   type MapFuncCore[A]   = quasar.qscript.MapFuncCore[T, A]
+  type MapFunc[A]       = quasar.qscript.MapFunc[T, A]
   type FreeMapA[A]      = quasar.qscript.FreeMapA[T, A]
   type FreeMap          = quasar.qscript.FreeMap[T]
   type JoinFunc         = quasar.qscript.JoinFunc[T]
@@ -45,6 +46,9 @@ trait TTypes[T[_[_]]] {
   type FreeQS           = quasar.qscript.FreeQS[T]
   type Ann              = quasar.qscript.Ann[T]
   type Target[F[_]]     = quasar.qscript.Target[T, F]
+
+  val MFC = quasar.qscript.MFC[T]
+  val MFD = quasar.qscript.MFD[T]
 }
 
 object TTypes {
@@ -59,8 +63,8 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
-      case BucketField(src, value, field) => QC inj Map(src, Free roll MapFuncsCore.ProjectField(value, field))
-      case BucketIndex(src, value, index) => QC inj Map(src, Free roll MapFuncsCore.ProjectIndex(value, index))
+      case BucketField(src, value, field) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectField(value, field)))))
+      case BucketIndex(src, value, index) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
     }
   )
 

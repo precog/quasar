@@ -29,7 +29,7 @@ import matryoshka._, Recursive.ops._
 import scalaz.{Const, Monad, Show}
 import scalaz.syntax.monad._
 
-private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
+private[qscript] final class MapFuncCorePlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
   implicit
   DP: Planner[F, FMT, Const[Data, ?]],
   SP: StructuralPlanner[F, FMT]

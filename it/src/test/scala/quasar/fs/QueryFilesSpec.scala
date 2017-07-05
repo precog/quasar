@@ -81,7 +81,7 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
           Data.Obj("c" -> Data._int(2)))))
       }
 
-      "listing directory returns immediate child nodes" >> pendingFor(fs)(Set("mimir")) {
+      "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lschildren")
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
@@ -110,7 +110,7 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
         runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))
       }
 
-      "listing results should not contain deleted files" >> pendingFor(fs)(Set("mimir")) {
+      "listing results should not contain deleted files" >> {
         val d = queryPrefix </> dir("lsdeleted")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")

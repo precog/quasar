@@ -1,7 +1,7 @@
 {
     "name": "flatten array",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

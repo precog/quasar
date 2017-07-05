@@ -2,7 +2,7 @@
     "name": "skip and count",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql": "pending"
     },
 

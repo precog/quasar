@@ -2,7 +2,7 @@
   "name": "filter with negated regex selector",
 
   "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
     "postgresql": "pending"
   },
 

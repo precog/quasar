@@ -59,6 +59,21 @@ package object pathy {
       pathEncodeJson
   }
 
+  object RPath {
+    import PosixCodecJson._
+
+    // this will be sound so long as we're round-tripping
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+    private def resandbox[R, T](path: Path[R, T, Unsandboxed]): Path[Rel, T, Sandboxed] =
+      Path.sandbox(Path.currentDir, path).get
+
+    implicit val rPathDecodeJson: DecodeJson[RPath] =
+      (relDirDecodeJson.map(resandbox(_)).widen[RPath] ||| relFileDecodeJson.map(resandbox(_))).setName("RPath")
+
+    implicit val rPathEncodeJson: EncodeJson[RPath] =
+      pathEncodeJson
+  }
+
   /** PathCodec with URI-encoded segments. */
   val UriPathCodec: PathCodec = {
     /** This encoder translates spaces into pluses, but we want the

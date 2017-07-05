@@ -2,7 +2,7 @@
   "name": "population of Boulder-like towns",
 
   "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
       "postgresql": "pending"
   },
 

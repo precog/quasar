@@ -2,7 +2,7 @@
     "name": "sort, project, and limit",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql": "pending"
     },
 

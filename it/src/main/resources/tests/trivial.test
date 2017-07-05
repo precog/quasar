@@ -2,7 +2,6 @@
   "name": "simple read",
 
   "backends": {
-    "mimir": "skip",
     "postgresql": "pending"
   },
 

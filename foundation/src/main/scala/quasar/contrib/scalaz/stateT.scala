@@ -35,4 +35,16 @@ trait StateTInstances {
     }
 }
 
-object stateT extends StateTInstances
+object stateT extends StateTInstances {
+
+  object StateTContrib {
+
+    // how is this not a member of StateT???
+    def put[F[_]: Monad, S](s: S): StateT[F, S, Unit] =
+      StateT[F, S, Unit](_ => (s, ()).point[F])
+
+    // ditto
+    def get[F[_]: Monad, S]: StateT[F, S, S] =
+      StateT[F, S, S](s => (s, s).point[F])
+  }
+}

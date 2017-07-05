@@ -16,174 +16,165 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.blueeyes.json.{ JParser, JString }
-import quasar.blueeyes.json.serialization._
-import quasar.blueeyes.json.serialization.DefaultSerialization._
-import quasar.blueeyes.json.serialization.Extractor._
-import quasar.blueeyes.json.serialization.Versioned._
+import quasar.contrib.pathy.{ADir, RDir, RFile}
+import quasar.contrib.scalaz.stateT, stateT._
 
-import quasar.precog.util.{FileLock, IOUtils}
+import argonaut.{Argonaut, Parse}
 
-import org.slf4s.Logging
+import fs2.Stream
+import fs2.interop.scalaz.StreamScalazOps
 
-import java.io._
-import java.util.UUID
-import java.time.Instant
+import pathy.Path
 
-import scalaz._
-import scalaz.effect.IO
+import scalaz.{:<:, Free, Monad, StateT}
+import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.option._
+import scalaz.std.string._
+import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
-import scalaz.syntax.applicative._
-import scalaz.syntax.std.boolean._
 
-import shapeless._
+import scodec.bits.ByteVector
 
+import java.util.UUID
+
+final case class VersionLog(baseDir: ADir, committed: List[Version], versions: Set[Version]) {
+  def head: Option[Version] = committed.headOption
+}
+
+// TODO implement VERSION files
 object VersionLog {
-  final val lockName = "versionLog"
-  final val logName = "versionLog"
-  final val completedLogName = "completedLog"
-  final val currentVersionFilename = "HEAD"
+  import Argonaut._
 
-  final val unsetSentinel = "unset"
-  final val unsetSentinelJV = unsetSentinel.serialize.renderCompact
+  private type ST[F[_], A] = StateT[F, VersionLog, A]
 
-  final def currentVersionEntry(dir: File): EitherT[IO, ResourceError, VersionEntry] = {
-    import ResourceError._
-    val currentFile = new File(dir, currentVersionFilename)
-    EitherT {
-      IO {
-        if (currentFile.exists) {
-          for {
-            jv <- JParser.parseFromFile(currentFile).leftMap(ioError).disjunction
-            version <- jv match {
-              case JString(`unsetSentinel`) =>
-                \/.left(NotFound("No current data for the path %s exists; it has been archived.".format(dir)))
-              case other =>
-                other.validated[VersionEntry].disjunction leftMap { err => Corrupt(err.message) }
-            }
-          } yield version
-        } else {
-          \/.left(NotFound("No data found for path %s.".format(dir)))
-        }
+  private val Head: RDir = Path.dir("HEAD")
+  private val VersionsJson: RFile = Path.file("versions.json")
+  private val VersionsJsonNew: RFile = Path.file("versions.json.new")
+
+  // keep the 5 most recent versions, by default
+  private val KeepLimit = 5
+
+  // TODO failure recovery
+  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
+    for {
+      exists <- POSIX.exists[S](baseDir </> VersionsJson)
+
+      committed <- if (exists) {
+        for {
+          fileStream <- POSIX.openR[S](baseDir </> VersionsJson)
+
+          // TODO character encoding!
+          fileString = fileStream.map(_.toArray).map(new String(_)).foldMonoid
+          json <- POSIXWithTask.generalize[S](fileString.runLast)
+        } yield json.flatMap(Parse.decodeOption[List[Version]](_)).getOrElse(Nil)
+      } else {
+        for {
+          vnew <- POSIX.openW[S](baseDir </> VersionsJsonNew)
+
+          json = List[Version]().asJson.nospaces
+          // TODO character encoding!
+          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
+          _ <- POSIXWithTask.generalize(writer)
+
+          _ <- POSIX.move[S](baseDir </> VersionsJsonNew, baseDir </> VersionsJson)
+        } yield Nil
       }
-    }
-  }
 
-  class LogFiles(val baseDir: File) {
-    val headFile = new File(baseDir, currentVersionFilename)
-    val logFile = new File(baseDir, logName)
-    val completedFile = new File(baseDir, completedLogName)
-  }
+      paths <- POSIX.ls[S](baseDir)
 
-  def open(baseDir: File): IO[Validation[Error, VersionLog]] = IO {
-    if (!baseDir.isDirectory) {
-      if (!baseDir.mkdirs) throw new IllegalStateException(baseDir + " cannot be created as a directory.")
-    }
+      versions = for {
+        path <- paths
+        dir <- Path.maybeDir(path).toList
+        dirName <- Path.dirName(dir).toList
 
-    val logFiles = new LogFiles(baseDir)
-    import logFiles._
-
-    // Read in the list of versions as well as the current version
-    val currentVersion: Validation[Error, Option[VersionEntry]] = if (headFile.exists) {
-      for {
-        jv <- JParser.parseFromFile(headFile).leftMap(Error.thrown)
-        version <- jv match {
-          case JString(`unsetSentinel`) => Success(None)
-          case other => other.validated[VersionEntry].map(Some(_))
+        version <- try {
+          Version(UUID.fromString(dirName.value)) :: Nil
+        } catch {
+          case _: IllegalArgumentException => Nil
         }
       } yield version
-    } else {
-      Success(None)
-    }
-
-    val allVersions: Validation[Error, List[VersionEntry]] = if (logFile.exists) {
-      for {
-        jvs <- JParser.parseManyFromFile(logFile).leftMap(Error.thrown)
-        versions <- jvs.toList.traverse[({ type λ[α] = Validation[Error, α] })#λ, VersionEntry](_.validated[VersionEntry])
-      } yield versions
-    } else {
-      Success(Nil)
-    }
-
-    val completedVersions: Validation[Error, Set[UUID]] = if (completedFile.exists) {
-      for {
-        jvs <- JParser.parseManyFromFile(completedFile).leftMap(Error.thrown)
-        versions <- jvs.toList.traverse[({ type λ[α] = Validation[Error, α] })#λ, UUID](_.validated[UUID])
-      } yield versions.toSet
-    } else {
-      Success(Set.empty)
-    }
-
-    (currentVersion |@| allVersions |@| completedVersions) { new VersionLog(logFiles, _, _, _) }
-  }
-}
-
-/**
-  * Track path versions. This class is not thread safe
-  */
-class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry], initAllVersions: List[VersionEntry], initCompletedVersions: Set[UUID]) extends Logging {
-  import VersionLog._
-  import logFiles._
-
-  private[this] val workLock = FileLock(logFiles.baseDir, lockName)
-
-  private[this] var currentVersion: Option[VersionEntry] = initVersion
-  private[this] var allVersions: List[VersionEntry] = initAllVersions
-  private[this] var completedVersions: Set[UUID] = initCompletedVersions
-
-  def current: Option[VersionEntry] = currentVersion
-  def find(version: UUID): Option[VersionEntry] = allVersions.find(_.id == version)
-  def isCompleted(version: UUID) = completedVersions.contains(version)
-
-  def close = {
-    workLock.release
+    } yield VersionLog(baseDir, committed, versions.toSet)
   }
 
-  def addVersion(entry: VersionEntry): IO[Unit] = allVersions.find(_ == entry) map { _ =>
-    IO(())
-  } getOrElse {
-    log.debug(s"Adding version entry $entry for base directory $baseDir.")
-    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) flatMap { _ =>
-      IO(allVersions = allVersions :+ entry)
-    }
-  }
+  def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
+    for {
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
+      uuid <- POSIX.genUUID[S].liftM[ST]
+      v = Version(uuid)
 
-  def completeVersion(version: UUID): IO[Unit] = {
-    if (allVersions.exists(_.id == version)) {
-      !isCompleted(version) whenM {
-        log.debug("Completing version " + version)
-        IOUtils.writeToFile(version.serialize.renderCompact + "\n", completedFile, false)
-      } map { _ => () }
-    } else {
-      IO.throwIO(new IllegalStateException("Cannot make nonexistent version %s current" format version))
-    }
-  }
-
-  def setHead(newHead: UUID): IO[Unit] = {
-    currentVersion.exists(_.id == newHead) unlessM {
-      allVersions.find(_.id == newHead) traverse { entry =>
-        log.debug("Setting HEAD to " + newHead)
-        IOUtils.writeToFile(entry.serialize.renderCompact + "\n", headFile, false) map { _ =>
-          currentVersion = Some(entry);
-        }
-      } flatMap {
-        _.isEmpty.whenM(IO.throwIO(new IllegalStateException("Attempt to set head to nonexistent version %s" format newHead)))
+      back <- if (log.versions.contains(v)) {
+        fresh[S]
+      } else {
+        for {
+          _ <- StateTContrib.put[Free[S, ?], VersionLog](log.copy(versions = log.versions + v))
+          target <- underlyingDir[Free[S, ?]](v)
+          _ <- POSIX.mkDir[S](target).liftM[ST]
+        } yield v
       }
-    } map { _ => () }
+    } yield back
   }
 
-  def clearHead = IOUtils.writeToFile(unsetSentinelJV, headFile, false).map { _ =>
-    currentVersion = None
+  // TODO there isn't any error handling here
+  def underlyingDir[F[_]: Monad](v: Version): StateT[F, VersionLog, ADir] =
+    StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
+
+  // TODO add symlink
+  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+    for {
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
+      log2 = log.copy(committed = v :: log.committed)
+
+      _ <- if (log.versions.contains(v)) {
+        for {
+          _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)
+
+          vnew <- POSIX.openW[S](log.baseDir </> VersionsJsonNew).liftM[ST]
+
+          json = log2.committed.asJson.nospaces
+          // TODO character encoding!
+          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
+          _ <- POSIXWithTask.generalize(writer).liftM[ST]
+
+          _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
+
+          _ <- POSIX.delete[S](log.baseDir </> Head).liftM[ST]
+          _ <- POSIX.linkDir[S](
+            log.baseDir </> Path.dir(v.value.toString),
+            log.baseDir </> Head).liftM[ST]
+        } yield ()
+      } else {
+        ().point[StateT[Free[S, ?], VersionLog, ?]]
+      }
+    } yield ()
   }
-}
 
-case class VersionEntry(id: UUID, typeName: PathData.DataType, timestamp: Instant)
+  def underlyingHeadDir[F[_]: Monad]: StateT[F, VersionLog, Option[ADir]] = {
+    for {
+      log <- StateTContrib.get[F, VersionLog]
 
-object VersionEntry {
-  val schemaV1 = "id" :: "typeName" :: "timestamp" :: HNil
+      back <- log.head.traverse(underlyingDir[F](_))
+    } yield back
+  }
 
-  implicit val Decomposer: Decomposer[VersionEntry] = decomposerV(schemaV1, Some("1.0".v))
-  implicit val Extractor: Extractor[VersionEntry] = extractorV(schemaV1, Some("1.0".v))
+  def purgeOld[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+    for {
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
+      toPurge = log.committed.drop(KeepLimit)
+
+      _ <- toPurge traverse { v =>
+        for {
+          dir <- underlyingDir[Free[S, ?]](v)
+          _ <- POSIX.delete[S](dir).liftM[ST]
+        } yield ()
+      }
+
+      log2 = log.copy(
+        committed = log.committed.take(KeepLimit),
+        versions = log.versions -- toPurge)
+
+      // TODO write new versions.json
+      _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)
+    } yield ()
+  }
 }

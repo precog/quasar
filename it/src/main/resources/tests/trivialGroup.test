@@ -2,7 +2,7 @@
     "name": "trivial group by",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir": "skip",
+        "mimir":"pending",
         "mongodb_2_6": "ignoreFieldOrder",
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",

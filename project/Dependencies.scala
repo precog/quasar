@@ -167,7 +167,8 @@ object Dependencies {
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
     "org.quartz-scheduler" %  "quartz"          % "2.3.0",
-    "commons-io"           %  "commons-io"      % "2.5"
+    "commons-io"           %  "commons-io"      % "2.5",
+    "org.scodec"           %% "scodec-bits"     % scodecBitsVersion
   )
   def it = Seq(
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,

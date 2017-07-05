@@ -2,7 +2,7 @@
     "name": "handle let as project of select",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql": "pending"
     },
 

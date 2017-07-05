@@ -2,7 +2,7 @@
     "name": "count grouped joined tables",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "couchbase":         "timeout",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",

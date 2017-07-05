@@ -2,7 +2,7 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
 

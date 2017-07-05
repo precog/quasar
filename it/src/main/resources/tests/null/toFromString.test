@@ -2,7 +2,7 @@
     "name": "convert null to/from strings",
     "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
     "data": "nulls.data",

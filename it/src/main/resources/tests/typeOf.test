@@ -1,7 +1,7 @@
 {
     "name": "use type_of function",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "couchbase":      "pending",
         "postgresql":     "pending",
         "spark_hdfs":     "pending",

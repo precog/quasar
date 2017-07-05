@@ -2,7 +2,7 @@
     "name": "combine case (3-arg expr) with group by",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql": "pending",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",

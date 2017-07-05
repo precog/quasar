@@ -1,7 +1,7 @@
 {
     "name": "convert a field to ObjectId",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
         "marklogic_json":    "skip",

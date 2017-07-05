@@ -1,7 +1,7 @@
 {
   "name": "distinct of one field",
   "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
     "mongodb_q_3_2": "pending",
     "postgresql": "pending"
   },

@@ -1,7 +1,7 @@
 {
     "name": "filter with date literals",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

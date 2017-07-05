@@ -2,7 +2,7 @@
     "name": "filter with pipeline and JS",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
 

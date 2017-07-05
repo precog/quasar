@@ -3,7 +3,7 @@
 
   "backends": {
     "couchbase": "ignoreFieldOrder",
-    "mimir": "skip",
+    "mimir":"pending",
     "postgresql":        "pending"
   },
 

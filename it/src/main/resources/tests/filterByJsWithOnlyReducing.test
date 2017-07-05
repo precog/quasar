@@ -2,7 +2,7 @@
     "name": "filter by JS expression, with only reducing projections",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
 

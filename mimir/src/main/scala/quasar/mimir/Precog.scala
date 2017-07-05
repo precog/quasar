@@ -16,26 +16,21 @@
 
 package quasar.mimir
 
-import quasar.blueeyes.json.JValue
 import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
-import quasar.precog.common.Path
-import quasar.precog.common.ingest.{EventId, IngestMessage, IngestRecord, StreamRef}
 import quasar.precog.common.accounts.AccountFinder
 
 import quasar.precog.common.security.{
   APIKey,
   APIKeyFinder,
   APIKeyManager,
-  Authorities,
   DirectAPIKeyFinder,
   InMemoryAPIKeyManager,
   PermissionsFinder
 }
 
-import quasar.yggdrasil.PathMetadata
-import quasar.yggdrasil.table.{Slice, VFSColumnarTableModule}
-import quasar.yggdrasil.vfs.{ActorVFSModule, ResourceError, SecureVFSModule}
+import quasar.yggdrasil.table.VFSColumnarTableModule
+import quasar.yggdrasil.vfs.SerialVFS
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.routing.{
@@ -47,32 +42,57 @@ import akka.routing.{
   Router
 }
 
-import scalaz.{EitherT, Monad, StreamT}
+import delorean._
+
+import fs2.async
+import fs2.interop.scalaz._
+
+import scalaz.Monad
+import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
-import scalaz.syntax.applicative._
-import scalaz.syntax.show._
 
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
 
-import scala.concurrent.duration.{FiniteDuration, SECONDS}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
 
 // calling this constructor is a side-effect; you must always shutdown allocated instances
-class Precog(dataDir0: File)
-    extends SecureVFSModule[Future, Slice]
-    with ActorVFSModule
-    with VFSColumnarTableModule {
+final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
 
   object Config {
     val howManyChefsInTheKitchen: Int = 4
-    val cookThreshold: Int = 20000
-    val storageTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val maxOpenPaths: Int = 500
     val dataDir: File = dataDir0
+  }
+
+  val CookThreshold: Int = 20000
+  val StorageTimeout: FiniteDuration = 300.seconds
+
+  private var _vfs: SerialVFS = _
+  def vfs = _vfs
+
+  private val vfsLatch = new CountDownLatch(1)
+
+  private val vfsShutdownSignal =
+    async.signalOf[Task, Option[Unit]](Some(())).unsafePerformSync
+
+  {
+    // setup VFS stuff as a side-effect (and a race condition!)
+    val vfsStr = SerialVFS(dataDir0).evalMap { v =>
+      Task delay {
+        _vfs = v
+        vfsLatch.countDown()
+      }
+    }
+    val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
+
+    gated.run.unsafePerformAsync(_ => ())
+    vfsLatch.await()      // sigh....
   }
 
   // for the time being, do everything with this key
@@ -90,7 +110,7 @@ class Precog(dataDir0: File)
   def permissionsFinder: PermissionsFinder[Future] =
     new PermissionsFinder(apiKeyFinder, accountFinder, Instant.EPOCH)
 
-  private val actorSystem: ActorSystem =
+  val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
   private val props: Props = Props(Chef(
@@ -107,13 +127,11 @@ class Precog(dataDir0: File)
       Router(RoundRobinRoutingLogic(), chefs(system))
   }
 
-  private val masterChef: ActorRef =
+  // needed for nihdb
+  val masterChef: ActorRef =
     actorSystem.actorOf(props.withRouter(routerConfig))
 
   private val clock: Clock = Clock.System
-
-  def resourceBuilder: ResourceBuilder =
-    new ResourceBuilder(actorSystem, clock, masterChef, Config.cookThreshold, Config.storageTimeout)
 
   // Members declared in quasar.yggdrasil.table.ColumnarTableModule
   implicit def M: Monad[Future] = futureInstance
@@ -122,75 +140,15 @@ class Precog(dataDir0: File)
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
-  private lazy val pathRoutingActor =
-    new PathRoutingActor(Config.dataDir, Config.storageTimeout, Config.quiescenceTimeout, Config.maxOpenPaths, clock)
-
-  // Members declared in quasar.yggdrasil.table.VFSColumnarTableModule
-  private val projectionsActor: ActorRef =
-    actorSystem.actorOf(Props(pathRoutingActor))
-
-  private val actorVFS: ActorVFS =
-    new ActorVFS(projectionsActor, Config.storageTimeout, Config.storageTimeout)
-
-  def stopPath(path: Path): Unit =
-    pathRoutingActor.stopPath(path)
-
-  def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] =
-    actorVFS.findDirectChildren(path)
-
-  val vfs: SecureVFS = new SecureVFS(actorVFS, permissionsFinder, clock)
-
-  // TODO this could be trivially rewritten with fs2.Stream
-  def ingest(path: Path, chunks: StreamT[Future, Vector[JValue]]): Future[Unit] = {
-    val streamId = java.util.UUID.randomUUID()
-
-    def stream = StreamT.unfoldM((0, chunks)) {
-      case (pseudoOffset, chunks) =>
-        chunks.uncons flatMap {
-          case Some((chunk, tail)) =>
-            val ingestRecords = chunk.zipWithIndex map {
-              case (v, i) => IngestRecord(EventId(pseudoOffset, i), v)
-            }
-
-            log.debug("Persisting %d stream records (from slice of size %d) to %s".format(ingestRecords.size, chunk.length, path))
-
-            for {
-              terminal <- tail.isEmpty
-              _ = log.debug(s"Replacing with new version $streamId.")
-              streamRef = StreamRef.Replace(streamId, terminal)
-              apiKey <- RootAPIKey
-              msg =
-                IngestMessage(
-                  apiKey,
-                  path,
-                  Authorities(AccountFinder.DefaultId),
-                  ingestRecords,
-                  None,
-                  clock.instant(),
-                  streamRef)
-
-              // use the vfs inside of SecureVFS
-              par <- actorVFS.writeAllSync(Seq((pseudoOffset, msg))).run
-            } yield {
-              par.fold(
-                errors => {
-                  log.error("Unable to complete persistence of result stream to %s: %s".format(path.path, errors.shows))
-                  None
-                },
-                _ => Some((chunk, (pseudoOffset + 1, tail)))
-              )
-            }
-
-          case None =>
-            log.debug("Persist stream writing to %s complete.".format(path.path))
-            Future.successful(None)
-        }
-    }
-
-    ().point[Future]
-    // TODO reenable ingest when it doesn't throw exceptions
-    //stream.foldLeft(())((_, _) => ())
+  def shutdown: Future[Unit] = {
+    for {
+      _ <- vfsShutdownSignal.set(None).unsafeToFuture
+      _ <- actorSystem.terminate.map(_ => ())
+    } yield ()
   }
+}
 
-  def shutdown: Future[Unit] = actorSystem.terminate.map(_ => ())
+object Precog {
+  def apply(dataDir: File): Task[Precog] =
+    Task.delay(new Precog(dataDir))
 }

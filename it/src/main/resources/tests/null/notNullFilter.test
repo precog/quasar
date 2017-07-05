@@ -1,7 +1,7 @@
 {
     "name": "filter on is not null",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "mongodb_q_3_2":  "pending",
         "postgresql":     "pending"
     },

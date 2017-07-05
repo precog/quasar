@@ -307,20 +307,6 @@ object ColumnarTableModule extends Logging {
         StreamT.empty[N, CharBuffer]
     }
   }
-
-  def byteStream[M[+ _]](blockStream: StreamT[M, Slice], mimeType: Option[MimeType])(implicit M: Monad[M]): Option[StreamT[M, Array[Byte]]] = {
-    import vfs.VFSModule.bufferOutput
-    import FileContent._
-
-    mimeType match {
-      case Some(ApplicationJson) | None => Some(bufferOutput(toCharBuffers(ApplicationJson, blockStream)))
-      case Some(XJsonStream)            => Some(bufferOutput(toCharBuffers(XJsonStream, blockStream)))
-      case Some(TextCSV)                => Some(bufferOutput(toCharBuffers(TextCSV, blockStream)))
-      case Some(other) =>
-        log.warn("NIHDB resource cannot be rendered to a byte stream of type %s".format(other.value))
-        None
-    }
-  }
 }
 
 trait ColumnarTableModule[M[+ _]]

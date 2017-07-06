@@ -29,7 +29,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.physical.marklogic.xcc._
 
-import com.marklogic.xcc.types.{XdmItem, XSBoolean, XSString}
+import com.marklogic.xcc.types.{XdmItem, XSString}
 import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -230,11 +230,6 @@ object ops {
   ////
 
   private type W[A] = Writer[Prologs, A]
-
-  private val booleanResult: Vector[XdmItem] => Boolean = {
-    case Vector(b: XSBoolean) => b.asPrimitiveBoolean
-    case _                    => false
-  }
 
   private def main10ml[F[_]: Functor: PrologL](query: F[XQuery]): F[MainModule] =
     MainModule fromWritten (query strengthL Version.`1.0-ml`)

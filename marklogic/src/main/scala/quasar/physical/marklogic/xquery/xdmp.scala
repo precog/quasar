@@ -84,6 +84,9 @@ object xdmp {
   def parseDateTime(picture: XQuery, value: XQuery): XQuery =
     XQuery(s"xdmp:parse-dateTime($picture, $value)")
 
+  def plan(expression: XQuery): XQuery =
+    XQuery(s"xdmp:plan($expression)")
+
   // TODO: Works, but has a bug that reorders `where` and `order by` clausees
   //       in FLWOR expressions, causing them to be malformed.
   def prettyPrint(qstring: XQuery): XQuery =

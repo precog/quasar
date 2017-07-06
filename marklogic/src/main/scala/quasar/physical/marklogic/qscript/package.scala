@@ -24,8 +24,11 @@ import quasar.fp.ski.κ
 import quasar.contrib.matryoshka.totally
 import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
-import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.cts.Query
+import quasar.physical.marklogic.xquery.{cts => ctsfn, _}
 import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.xquery.expr.emptySeq
+import quasar.physical.marklogic.xcc._
 import quasar.qscript._
 import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
 
@@ -59,16 +62,16 @@ package object qscript {
 
   /** XQuery evaluating to the documents having the specified format in the directory. */
   def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =
-    cts.search(
+    ctsfn.search(
       expr    = fn.doc(),
-      query   = cts.directoryQuery(uri, (includeDescendants ? "infinity" | "1").xs),
+      query   = ctsfn.directoryQuery(uri, (includeDescendants ? "infinity" | "1").xs),
       options = SearchOptions[FMT].searchOptions)
 
   /** XQuery evaluating to the document node at the given URI. */
   def documentNode[FMT: SearchOptions](uri: XQuery): XQuery =
-    cts.search(
+    ctsfn.search(
       expr    = fn.doc(),
-      query   = cts.documentQuery(uri),
+      query   = ctsfn.documentQuery(uri),
       options = SearchOptions[FMT].searchOptions)
 
   /** XQuery evaluating to the document node at the given path. */
@@ -79,11 +82,10 @@ package object qscript {
   def fileRoot[FMT: SearchOptions](file: AFile): XQuery =
     fileNode[FMT](file) `/` axes.child.node()
 
-  def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: MonadPlanErr, FMT](
+  def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
     fm: FreeMap[T],
     src: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]],
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
     fm.project match {
@@ -108,33 +110,48 @@ package object qscript {
       case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad, FMT](
+  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
     jf: JoinFunc[T],
     l: XQuery,
     r: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
+    SP: StructuralPlanner[F, FMT]
   ): F[XQuery] =
     planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad, FMT, A](
+  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
+    SP: StructuralPlanner[F, FMT]
   ): F[XQuery] =
-    freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A]).cataM(interpretM(recover(_).point[F], MFP.plan))
+    freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A])
+      .cataM(interpretM(recover(_).point[F], (new MapFuncPlanner[F, FMT, T]).plan))
 
-  def rebaseXQuery[T[_[_]], F[_]: Monad, FMT](
+  /** Returns whether the query is valid and can be executed.
+    *
+    * TODO: Return any missing indexes when invalid.
+    */
+  def queryIsValid[F[_]: Monad: Xcc, Q, V](query: Q)(
+    implicit Q: Recursive.Aux[Q, Query[V, ?]]
+  ): F[Boolean] = {
+    val err = axes.descendant.elementNamed("error:error")
+    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q => fn.empty(xdmp.plan(q) `//` err))
+
+    xqy >>= (Xcc[F].queryResults(_) map booleanResult)
+  }
+
+  def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](
     fqs: FreeQS[T],
-    src: XQuery
+    src: Search[Q] \/ XQuery
   )(implicit
+    Q  : Birecursive.Aux[Q, Query[V, ?]],
     QTP: Planner[F, FMT, QScriptTotal[T, ?]]
-  ): F[XQuery] =
-    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan))
+  ): F[Search[Q] \/ XQuery] =
+    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q, V]))
 
   def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
     implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],

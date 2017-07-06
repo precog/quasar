@@ -29,14 +29,17 @@ import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
 import quasar.fs.mount._
+import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => QRead, _}
 
@@ -44,6 +47,7 @@ import scala.Predef.implicitly
 
 import com.marklogic.xcc.{ContentSource, Session}
 import matryoshka._
+import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -60,6 +64,8 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   type Repr        = MainModule
   type Config      = MLBackendConfig
   type M[A]        = MLFS[A]
+  type V           = Unit
+  type Q           = Fix[Query[V, ?]]
 
   val Type = FsType
 
@@ -118,12 +124,27 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     }
   }
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] =
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
+    def doPlan(cfg: Config): Backend[MainModule] = {
+      import cfg.{searchOptions, structuralPlannerM}
+      MainModule.fromWritten(
+        qs.cataM(cfg.planner[T].plan[Q, V])
+          .flatMap(_.fold(s =>
+            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
+              implicitly,
+              implicitly,
+              implicitly,
+              // NB: Not sure why these aren't found implicitly, maybe something
+              //     isn't a "stable" value?
+              structuralPlannerM,
+              searchOptions),
+            _.point[cfg.M]))
+          .strengthL(Version.`1.0-ml`)
+      ).liftQB
+    }
+
     for {
-      cfg    <- config[Backend]
-      main   <- MainModule.fromWritten(
-                  qs.cataM(cfg.planner[T].plan) strengthL Version.`1.0-ml`
-                ).liftQB
+      main   <- config[Backend] >>= doPlan
       pp     <- fs.ops.prettyPrint[Backend](main.queryBody)
       xqyLog =  MainModule.queryBody.modify(pp getOrElse _)(main).render
       _      <- PhaseResultTell[Backend].tell(Vector(PhaseResult.detail("XQuery", xqyLog)))
@@ -132,6 +153,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
       //     causing them to be malformed.
     } yield main
+  }
 
   object ManagedQueryFileModule extends ManagedQueryFileModule {
     def executePlan(repr: Repr, out: AFile): Backend[AFile] = {

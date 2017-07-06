@@ -39,10 +39,8 @@ import org.specs2.execute._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-abstract class MarkLogicStdLibSpec[F[_]: Monad, FMT](
-  implicit
-  MP: Planner[F, FMT, MapFuncCore[Fix, ?]],
-  DP: Planner[F, FMT, Const[Data, ?]]
+abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  implicit SP: StructuralPlanner[F, FMT]
 ) extends StdLibSpec {
   type RunT[X[_], A] = EitherT[X, Result, A]
 
@@ -123,7 +121,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad, FMT](
       result.run.unsafePerformSync.merge
     }
 
-    private def asXqy(d: Data): F[XQuery] = DP.plan(Const(d))
+    private def asXqy(d: Data): F[XQuery] = DataPlanner[F, FMT](d)
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

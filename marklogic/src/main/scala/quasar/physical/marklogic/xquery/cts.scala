@@ -133,6 +133,7 @@ object cts {
 
   val True: XQuery =
     XQuery("cts:true-query()")
+
   val False: XQuery =
     XQuery("cts:false-query()")
 }

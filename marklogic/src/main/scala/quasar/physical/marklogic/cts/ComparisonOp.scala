@@ -19,7 +19,6 @@ package quasar.physical.marklogic.cts
 import slamdata.Predef._
 import quasar.RenderTree
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz.{Enum, Show}
 import scalaz.syntax.order._
@@ -35,14 +34,15 @@ object ComparisonOp {
   final object EQ extends ComparisonOp
   final object NE extends ComparisonOp
 
-  val toXQuery: ComparisonOp => XQuery = {
-    case LT => "<".xqy
-    case LE => "<=".xqy
-    case GT => ">".xqy
-    case GE => ">=".xqy
-    case EQ => "=".xqy
-    case NE => "!=".xqy
-  }
+  def toXQuery(op: ComparisonOp): XQuery =
+    XQuery.StringLit(op match {
+      case LT => "<"
+      case LE => "<="
+      case GT => ">"
+      case GE => ">="
+      case EQ => "="
+      case NE => "!="
+    })
 
   implicit val enum: Enum[ComparisonOp] =
     new Enum[ComparisonOp] {

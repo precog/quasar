@@ -145,13 +145,13 @@ object Query extends QueryInstances {
   // TODO: Options
   final case class Word[V, A](words: IList[String]) extends Query[V, A]
 
-  def mkSeqF[F[_]: Foldable: Functor, A](fa: F[A])(f: A => XQuery): XQuery =
+  private def mkSeqF[F[_]: Foldable: Functor, A](fa: F[A])(f: A => XQuery): XQuery =
     mkSeq(fa map f)
 
-  def strSeq[F[_]: Foldable: Functor, A](fa: F[String]): XQuery =
+  private def strSeq[F[_]: Foldable: Functor, A](fa: F[String]): XQuery =
     mkSeqF(fa)(_.xs)
 
-  def qnameSeq[F[_]: Foldable: Functor, A](fa: F[QName]): XQuery =
+  private def qnameSeq[F[_]: Foldable: Functor, A](fa: F[QName]): XQuery =
     mkSeqF(fa)(_.xqy)
 
   def toXQuery[V, F[_]: Monad](f: V => F[XQuery]): AlgebraM[F, Query[V, ?], XQuery] = {

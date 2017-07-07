@@ -24,7 +24,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import eu.timepit.refined.auto._
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 
 // TODO: We assume a FLWOR expression emits single values if at least one tuple
@@ -183,6 +183,20 @@ private[qscript] final class QScriptCorePlanner[
 
     case Unreferenced() =>
       "Unreferenced".xs.right.point[F]
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  object FilterPlanner {
+    import matryoshka.patterns.CoEnv
+
+    def planPredicate[T[_[_]], Q](pr: FreeMap[T])(
+      implicit U: Recursive.Aux[FreeMap[T], CoEnv[Hole, MapFuncCore[T, ?], ?]]
+    ): Search[Q] = {
+      // val ealg: ElgotAlgebra[(FreeMap[T], ?), CoEnv[Hole, MapFuncCore[T, ?], ?], Search[Q]] = ???
+      val ealg0: ((FreeMap[T], CoEnv[Hole, MapFuncCore[T, ?], Search[Q]])) => Search[Q] = ???
+
+      U.elgotPara[Search[Q]](pr)(ealg0)
+    }
   }
 
   ////

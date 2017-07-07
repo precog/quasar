@@ -144,14 +144,14 @@ package object qscript {
     xqy >>= (Xcc[F].queryResults(_) map booleanResult)
   }
 
-  def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](
+  def rebaseXQuery[T[_[_]]: BirecursiveT, F[_]: Monad, FMT, Q](
     fqs: FreeQS[T],
     src: Search[Q] \/ XQuery
   )(implicit
-    Q  : Birecursive.Aux[Q, Query[V, ?]],
-    QTP: Planner[F, FMT, QScriptTotal[T, ?]]
+    Q  : Birecursive.Aux[Q, Query[T[EJson], ?]],
+    QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]]
   ): F[Search[Q] \/ XQuery] =
-    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q, V]))
+    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q]))
 
   def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
     implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],

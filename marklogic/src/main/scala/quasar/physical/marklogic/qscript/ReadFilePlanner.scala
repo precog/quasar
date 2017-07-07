@@ -20,23 +20,25 @@ import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
+import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ReadFilePlanner[M[_]: Applicative: MonadPlanErr, FMT]
-    extends Planner[M, FMT, Const[Read[AFile], ?]] {
+private[qscript] final class ReadFilePlanner[M[_]: Applicative: MonadPlanErr, FMT, J]
+    extends Planner[M, FMT, Const[Read[AFile], ?], J] {
 
   import MarkLogicPlannerError._
 
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[M, Const[Read[AFile], ?], Search[Q] \/ XQuery] = {
+  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]], J: Birecursive.Aux[J, EJson]
+  ): AlgebraM[M, Const[Read[AFile], ?], Search[Q] \/ XQuery] = {
     case Const(Read(file)) =>
       val fileUri = UriPathCodec.printPath(file)
 
       Uri.getOption(fileUri).cata(uri =>
         Search(
-          Q.embed(Query.Document[V, Q](IList(uri))),
+          Q.embed(Query.Document[J, Q](IList(uri))),
           ExcludeId
         ).left[XQuery].point[M],
         MonadPlanErr[M].raiseError(invalidUri(fileUri)))

@@ -28,6 +28,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
+import quasar.ejson.EJson
 import quasar.fp.free._
 import quasar.fp.ski.κ
 import quasar.fp.numeric._
@@ -47,7 +48,7 @@ import scala.Predef.implicitly
 
 import com.marklogic.xcc.{ContentSource, Session}
 import matryoshka._
-import matryoshka.data.Fix
+import matryoshka.data._
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -64,8 +65,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   type Repr        = MainModule
   type Config      = MLBackendConfig
   type M[A]        = MLFS[A]
-  type V           = Unit
-  type Q           = Fix[Query[V, ?]]
+  type Q           = Fix[Query[Fix[EJson], ?]]
 
   val Type = FsType
 
@@ -128,9 +128,9 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     def doPlan(cfg: Config): Backend[MainModule] = {
       import cfg.{searchOptions, structuralPlannerM}
       MainModule.fromWritten(
-        qs.cataM(cfg.planner[T].plan[Q, V])
+        qs.cataM(cfg.planner[T].plan[T[Query[T[EJson], ?]]])
           .flatMap(_.fold(s =>
-            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
+            Search.plan[cfg.M, T[Query[T[EJson], ?]], T[EJson], cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
               implicitly,
               implicitly,
               implicitly,

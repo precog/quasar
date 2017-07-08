@@ -26,6 +26,7 @@ import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
 import matryoshka.{Hole => _, _}
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 // TODO: We assume a FLWOR expression emits single values if at least one tuple
@@ -148,23 +149,12 @@ private[qscript] final class QScriptCorePlanner[
         r   <- elimSearch[Q](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
-    case Filter(src0, f) =>
-      for {
-        src <- elimSearch[Q](src0)
-        x   <- freshName[F]
-        p   <- mapFuncXQuery[T, F, FMT](f, ~x) map (xs.boolean)
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          XQuery.Flwor(
-            bindings :::> IList(BindingClause.let_(x := result)),
-            Some(filter.fold(p)(_ and p)),
-            order,
-            isStable,
-            ~x)
+    case Filter(\/-(src), f) =>
+      xqueryFilter(src, f) map (_.right)
 
-        case _ =>
-          for_(x in src) where_ p return_ ~x
-      }).right
+    case Filter(-\/(src), f) =>
+      FilterPlanner.planPredicate[T, Q].lift(f)
+        .fold(xqueryFilter(elimSearch[Q](src.left), f))((q: Q) => Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src))
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.
@@ -189,19 +179,38 @@ private[qscript] final class QScriptCorePlanner[
       "Unreferenced".xs.right.point[F]
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
+    for {
+      x   <- freshName[F]
+      p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
+    } yield src match {
+      case IterativeFlwor(bindings, filter, order, isStable, result) =>
+        XQuery.Flwor(
+          bindings :::> IList(BindingClause.let_(x := result)),
+          Some(filter.fold(p)(_ and p)),
+          order,
+          isStable,
+          ~x)
+
+      case _ =>
+        for_(x in src) where_ p return_ ~x
+    }
+
   object FilterPlanner {
     import matryoshka.patterns.CoEnv
+    import matryoshka.data.free._
+    import quasar.ejson.EJson
+    import quasar.physical.marklogic.cts._
+    import quasar.qscript.{MapFuncsCore => MFC}
 
-    def planPredicate[T[_[_]], Q](pr: FreeMap[T])(
-      implicit U: Recursive.Aux[FreeMap[T], CoEnv[Hole, MapFuncCore[T, ?], ?]]
-    ): Search[Q] = {
-      // val ealg: ElgotAlgebra[(FreeMap[T], ?), CoEnv[Hole, MapFuncCore[T, ?], ?], Search[Q]] = ???
-      val ealg0: ((FreeMap[T], CoEnv[Hole, MapFuncCore[T, ?], Search[Q]])) => Search[Q] = ???
-
-      U.elgotPara[Search[Q]](pr)(ealg0)
+    def planPredicate[T[_[_]]: RecursiveT, Q](
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): PartialFunction[FreeMap[T], Q] = {
+      case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(-\/(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>
+        Query.PathRange[T[EJson], Q](IList("/" + key), ComparisonOp.EQ, IList(v)).embed
     }
   }
+
 
   ////
 

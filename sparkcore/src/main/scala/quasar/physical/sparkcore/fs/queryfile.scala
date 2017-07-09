@@ -43,6 +43,7 @@ import scalaz.concurrent.Task
 object queryfile {
 
   final case class Input[S[_]](
+    createSparkContext: SparkConf => Free[S, SparkContext],
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Free[S, Unit],
     fileExists: AFile => Free[S, Boolean],
@@ -50,11 +51,11 @@ object queryfile {
     readChunkSize: () => Int
   )
 
-  type SparkContextRead[A] = effect.Read[SparkContext, A]
+  type SparkConfRead[A] = effect.Read[SparkConf, A]
 
   def chrooted[S[_]](input: Input[S], fsType: FileSystemType, prefix: ADir)(implicit
     s0: Task :<: S,
-    s1: SparkContextRead :<: S,
+    s1: SparkConfRead :<: S,
     s2: MonotonicSeq :<: S,
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] =
@@ -62,7 +63,7 @@ object queryfile {
 
   def interpreter[S[_]](input: Input[S], fsType: FileSystemType)(implicit
     s0: Task :<: S,
-    s1: SparkContextRead :<: S,
+    s1: SparkConfRead :<: S,
     s2: MonotonicSeq :<: S,
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] = {
@@ -100,65 +101,86 @@ object queryfile {
   // This might be more complicated then it looks at first glance
   private def explainPlan[S[_]](input: Input[S], fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
-    read: Read.Ops[SparkContext, S]
+    read: Read.Ops[SparkConf, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
-    read.asks { sc =>
-      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc).run
+    read.asks { sparkConf =>
 
-      injectFT.apply {
-        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
+      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] = for {
+        sc <- input.createSparkContext(sparkConf)
+        stuff <- lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+      } yield stuff
+
+      sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
+          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
           rdd => {
-            val rddDebug = rdd.toDebugString
-            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
-            Task.delay(Writer(
+            lift(Task.delay{
+              val rddDebug = rdd.toDebugString
+              val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
+
+              println("-------------> explain called")
+              rdd.sparkContext.stop()
+
+              Writer(
               Vector(PhaseResult.detail("RDD", rddDebug)),
-              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))
+              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs))}).into[S]
           })).map(EitherT(_))
-      }
+      
     }.join
   }
 
   private def executePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
-    read: effect.Read.Ops[SparkContext, S]
+    read: effect.Read.Ops[SparkConf, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
-    read.asks { sc =>
-      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
-        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+    read.asks { sparkConf =>
+
+      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] = for {
+        sc <- input.createSparkContext(sparkConf)
+        stuff <- lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+      } yield stuff
 
       sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
         planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
-        rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+        rdd => for {
+          v <- input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))
+          _ <- lift(Task.delay {
+            rdd.sparkContext.stop()
+          }).into[S]
+        } yield v).map(EitherT(_)))
 
     }.join
   }
 
   // TODO for Q4.2016  - unify it with ReadFile
-  final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
+  final case class RddState(rdd: RDD[(Data, Long)], pointer: Int)
 
   private def evaluatePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
       s0: Task :<: S,
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S],
-      read: Read.Ops[SparkContext, S],
+      read: Read.Ops[SparkConf, S],
       ms: MonotonicSeq.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ResultHandle]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
+    // FIX-ME extract common
+    def sparkStuff(sparkConf: SparkConf): Free[S, PlannerError \/ RDD[Data]] = for {
+      sc <- input.createSparkContext(sparkConf)
+      stuff <- lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+    } yield stuff
+
     val open: Free[S, PlannerError \/ (ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (ResultHandle(_).right[PlannerError]))
-      rdd <- EitherT(read.asks { sc =>
-        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+      rdd <- EitherT(read.asks { sparkConf =>
+        sparkStuff(sparkConf)
       }.join)
-      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
+      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
 
     open
@@ -176,29 +198,34 @@ object queryfile {
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
     kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
-      case RddState(None, _) =>
-        Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-      case RddState(Some(rdd), p) =>
+     case RddState(rdd, p) =>
         for {
           collected <- lift(Task.delay {
             rdd
               .filter(d => d._2 >= p && d._2 < (p + step))
               .map(_._1).collect.toVector
           }).into[S].liftM[FileSystemErrT]
-          rddState <- lift(Task.delay {
-            if(collected.isEmpty) {
-              ignore(rdd.unpersist())
-              RddState(None, 0)
-            } else RddState(Some(rdd), p + step)
-          }).into[S].liftM[FileSystemErrT]
+          rddState <- lift(Task.delay { RddState(rdd, p + step)}).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
         } yield collected
     }.run
   }
 
   private def close[S[_]](h: ResultHandle)(implicit
-      kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
-  ): Free[S, Unit] = kvs.delete(h)
+    kvs: KeyValueStore.Ops[ResultHandle, RddState, S],
+    s: Task :<: S
+  ): Free[S, Unit] = for {
+    maybeRddState <- kvs.get(h).run
+    _ <- lift(Task.delay {
+      maybeRddState.foreach {
+        case RddState(rdd, _) =>
+          val sc = rdd.sparkContext
+          ignore(rdd.unpersist())
+          ignore(sc.stop)
+      }
+    }).into[S]
+    _ <- kvs.delete(h)
+  } yield ()
 
   private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
     s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)

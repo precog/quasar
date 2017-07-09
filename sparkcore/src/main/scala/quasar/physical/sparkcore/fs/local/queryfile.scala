@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fs.FileSystemError
 import quasar.fs.PathError._
+import quasar.fs._
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
@@ -32,7 +33,7 @@ import java.nio.file._
 import org.apache.spark._
 import org.apache.spark.rdd._
 import pathy.Path._
-import scalaz._, Scalaz._, scalaz.concurrent.Task
+import scalaz.{Failure => _, _}, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
 
@@ -77,6 +78,7 @@ object queryfile {
   def readChunkSize: Int = 5000
 
   def input[S[_]](implicit
-    S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Input[S] = Input[S](readfile.createSparkContext _, fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 }

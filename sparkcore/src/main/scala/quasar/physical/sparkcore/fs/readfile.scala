@@ -24,7 +24,7 @@ import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._, FileSystemError._
 
-import org.apache.spark.SparkContext
+import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -37,7 +37,8 @@ object readfile {
   type Limit = Option[Positive]
 
   final case class Input[S[_]](
-    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]],
+    createSparkContext: SparkConf => Free[S, SparkContext],
+    rddFrom: (SparkContext, AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]],
     fileExists: AFile => Free[S, Boolean],
     readChunkSize: () => Int
   )
@@ -46,17 +47,19 @@ object readfile {
 
   def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
-    s1: Read[SparkContext, ?] :<: S,
+    s1: Read[SparkConf, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    s4: PhysErr :<: S
   ): ReadFile ~> Free[S, ?] =
     flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](input: Input[S])(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
-    s1: Read[SparkContext, ?] :<: S,
+    s1: Read[SparkConf, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    s4: PhysErr :<: S
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
@@ -68,7 +71,7 @@ object readfile {
 
   private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
-    s1: Read[SparkContext, ?] :<: S,
+    read: Read.Ops[SparkConf, S],
     gen: MonotonicSeq.Ops[S]
   ): Free[S, FileSystemError \/ ReadHandle] = {
 
@@ -76,7 +79,9 @@ object readfile {
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f, offset, limit)
+      conf <- read.ask
+      sc <- input.createSparkContext(conf)
+      rdd <- input.rddFrom(sc, f, offset, limit)
       cur = SparkCursor(rdd.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
@@ -113,14 +118,30 @@ object readfile {
 
         for {
           collected <- collect
-          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(some(rdd), p + step)
+          cur = SparkCursor(some(rdd), p + step)
           _ <- kvs.put(h, cur).liftM[FileSystemErrT]
         } yield collected
         
     }.run
   }
 
+  new (From ~> To) {
+    def apply[A](from: From[A]) = from match {
+      case _ =>
+    }
+  }
+
+
   private def close[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
-  ): Free[S, Unit] = kvs.delete(h)
+    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
+    s0: Task :<: S
+  ): Free[S, Unit] = for {
+    _ <- kvs.get(h).flatMapF {
+      case SparkCursor(Some(rdd), _) => lift(Task.delay {
+        rdd.sparkContext.stop()
+      }).into[S]
+      case SparkCursor(None, _) => ().point[Free[S, ?]]
+    }.run
+    _ <- kvs.delete(h)
+  } yield ()
 }

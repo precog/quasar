@@ -150,11 +150,11 @@ private[qscript] final class QScriptCorePlanner[
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
     case Filter(\/-(src), f) =>
-      xqueryFilter(src, f) map (_.right)
+      FilterPlanner.xqueryFilter(src, f) map (_.right)
 
     case Filter(-\/(src), f) =>
       FilterPlanner.planPredicate[T, Q].lift(f)
-        .fold(xqueryFilter(elimSearch[Q](src.left), f))((q: Q) => Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src))
+        .fold(FilterPlanner.planFilter(src, f))(FilterPlanner.planFilterSearch(src, f))
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.
@@ -179,29 +179,40 @@ private[qscript] final class QScriptCorePlanner[
       "Unreferenced".xs.right.point[F]
   }
 
-  def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
-    for {
-      x   <- freshName[F]
-      p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
-    } yield src match {
-      case IterativeFlwor(bindings, filter, order, isStable, result) =>
-        XQuery.Flwor(
-          bindings :::> IList(BindingClause.let_(x := result)),
-          Some(filter.fold(p)(_ and p)),
-          order,
-          isStable,
-          ~x)
-
-      case _ =>
-        for_(x in src) where_ p return_ ~x
-    }
-
   object FilterPlanner {
     import matryoshka.patterns.CoEnv
     import matryoshka.data.free._
     import quasar.ejson.EJson
     import quasar.physical.marklogic.cts._
     import quasar.qscript.{MapFuncsCore => MFC}
+
+    def planFilter[Q](src: Search[Q], f: FreeMap[T])(
+      implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Search[Q] \/ XQuery] =
+      (elimSearch[Q](src.left) >>= (FilterPlanner.xqueryFilter(_: XQuery, f))) map (_.right)
+
+    def planFilterSearch[Q](src: Search[Q], f: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Q => F[Search[Q] \/ XQuery] = { q: Q =>
+      Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).left.point[F]
+    }
+
+    def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
+      for {
+        x   <- freshName[F]
+        p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
+      } yield src match {
+        case IterativeFlwor(bindings, filter, order, isStable, result) =>
+          XQuery.Flwor(
+            bindings :::> IList(BindingClause.let_(x := result)),
+            Some(filter.fold(p)(_ and p)),
+            order,
+            isStable,
+            ~x)
+
+        case _ =>
+          for_(x in src) where_ p return_ ~x
+      }
 
     def planPredicate[T[_[_]]: RecursiveT, Q](
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]

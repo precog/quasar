@@ -19,9 +19,7 @@ package quasar.physical.marklogic.qscript
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.ejson.EJson
-import quasar.fp.ski.κ
 import quasar.qscript._
 
 import matryoshka._
@@ -30,8 +28,7 @@ import shapeless.Lazy
 
 trait Planner[M[_], FMT, F[_], J] {
   def plan[Q](
-    implicit Q: Birecursive.Aux[Q, Query[J, ?]],
-             J: Birecursive.Aux[J, EJson]
+    implicit Q: Birecursive.Aux[Q, Query[J, ?]]
   ): AlgebraM[M, F, Search[Q] \/ XQuery]
 
   def planXQuery[Q](
@@ -49,13 +46,14 @@ trait Planner[M[_], FMT, F[_], J] {
 
   protected def elimSearch[Q](x: Search[Q] \/ XQuery)(
     implicit
-    Q:  Recursive.Aux[Q, Query[J, ?]],
+    Q : Recursive.Aux[Q, Query[J, ?]],
+    J : Recursive.Aux[J, EJson],
     M0: Monad[M],
     M1: PrologW[M],
     O : SearchOptions[FMT],
     SP: StructuralPlanner[M, FMT]
   ): M[XQuery] =
-    x.fold(Search.plan[M, Q, J, FMT](_, κ(emptySeq.point[M])), _.point[M])
+    x.fold(Search.plan[M, Q, J, FMT](_, EJsonPlanner.plan[J, M, FMT]), _.point[M])
 }
 
 object Planner extends PlannerInstances {
@@ -68,8 +66,7 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
   ): Planner[M, FMT, Coproduct[F, G, ?], J] =
     new Planner[M, FMT, Coproduct[F, G, ?], J] {
       def plan[Q](
-        implicit Q: Birecursive.Aux[Q, Query[J, ?]],
-                 J: Birecursive.Aux[J, EJson]
+        implicit Q: Birecursive.Aux[Q, Query[J, ?]]
       ): AlgebraM[M, Coproduct[F, G, ?], Search[Q] \/ XQuery] =
         _.run.fold(F.value.plan, G.value.plan)
     }
@@ -126,13 +123,13 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
 sealed abstract class PlannerInstances1 {
   implicit def eitherTPlanner[M[_]: Functor, FMT, F[_], E, J](implicit P: Planner[M, FMT, F, J]): Planner[EitherT[M, E, ?], FMT, F, J] =
     new Planner[EitherT[M, E, ?], FMT, F, J] {
-      def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]], J: Birecursive.Aux[J, EJson]) =
+      def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]) =
         fx => EitherT(P.plan.apply(fx) map (_.right[E]))
     }
 
   implicit def writerTPlanner[M[_]: Functor, FMT, F[_], W: Monoid, J](implicit P: Planner[M, FMT, F, J]): Planner[WriterT[M, W, ?], FMT, F, J] =
     new Planner[WriterT[M, W, ?], FMT, F, J] {
-      def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]], J: Birecursive.Aux[J, EJson]) =
+      def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]) =
         fx => WriterT(P.plan.apply(fx) strengthL mzero[W])
     }
 }

@@ -50,8 +50,7 @@ private[qscript] final class QScriptCorePlanner[
   import ReduceFuncs._
 
   def plan[Q](
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-             J: Birecursive.Aux[T[EJson], EJson]
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
     case Map(src0, f) =>
       for {
@@ -217,7 +216,7 @@ private[qscript] final class QScriptCorePlanner[
     def planPredicate[T[_[_]]: RecursiveT, Q](
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): PartialFunction[FreeMap[T], Q] = {
-      case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(-\/(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>
+      case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(\/-(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>
         Query.PathRange[T[EJson], Q](IList("/" + key), ComparisonOp.EQ, IList(v)).embed
     }
   }

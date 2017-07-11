@@ -41,8 +41,7 @@ private[qscript] final class ThetaJoinPlanner[
   //        assign it to a variable? It may be necessary in order to be able to
   //        use the cts:query features, but we'll need to profile otherwise.
   def plan[Q](
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-             J: Birecursive.Aux[T[EJson], EJson]
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): AlgebraM[F, ThetaJoin[T, ?], Search[Q] \/ XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, _, combine) =>
       for {

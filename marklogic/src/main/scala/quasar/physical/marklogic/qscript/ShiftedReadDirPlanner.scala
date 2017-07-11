@@ -20,7 +20,6 @@ import quasar.contrib.pathy.{ADir, UriPathCodec}
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
-import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
 import matryoshka._
@@ -31,7 +30,7 @@ private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanE
 
   import MarkLogicPlannerError._
 
-  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]], J: Birecursive.Aux[J, EJson]
+  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]
   ): AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
     case Const(ShiftedRead(dir, idStatus)) =>
       val dirUri = UriPathCodec.printPath(dir)

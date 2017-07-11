@@ -30,7 +30,6 @@ import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.ejson.EJson
 import quasar.fp.free._
-import quasar.fp.ski.κ
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
@@ -40,7 +39,6 @@ import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => QRead, _}
 
@@ -127,10 +125,11 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {
       import cfg.{searchOptions, structuralPlannerM}
+      val ejsPlanner = EJsonPlanner.plan[T[EJson], cfg.M, cfg.FMT](implicitly, structuralPlannerM, implicitly)
       MainModule.fromWritten(
         qs.cataM(cfg.planner[T].plan[Q[T]])
           .flatMap(_.fold(s =>
-            Search.plan[cfg.M, Q[T], V[T], cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
+            Search.plan[cfg.M, Q[T], V[T], cfg.FMT](s, ejsPlanner)(
               implicitly,
               implicitly,
               implicitly,

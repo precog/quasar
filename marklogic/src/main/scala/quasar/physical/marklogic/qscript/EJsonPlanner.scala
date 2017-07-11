@@ -24,7 +24,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._
 
-private[qscript] object EJsonPlanner {
+object EJsonPlanner {
   def plan[J, M[_]: Monad, FMT](
     implicit SP: StructuralPlanner[M, FMT],
              R:  Recursive.Aux[J, EJson]

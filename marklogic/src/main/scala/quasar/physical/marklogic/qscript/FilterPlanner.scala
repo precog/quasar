@@ -58,18 +58,19 @@ private[qscript] final class FilterPlanner[
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = src match {
     case \/-(src) => xqueryFilter(src, f) map (_.right)
-    case -\/(src) => planPredicate[T, Q].lift(f).fold(planFilter(src, f))(planFilterSearch(src, f))
+    case -\/(src) => planPredicate[T, Q].lift(f)
+        .fold(fallbackFilter(src, f) map (_.right[Search[Q]]))(searchFilter(src, f) andThen (_.left[XQuery].point[F]))
   }
 
-  private def planFilter[Q](src: Search[Q], f: FreeMap[T])(
+  private def fallbackFilter[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Search[Q] \/ XQuery] =
-    (interpretSearch[Q](src) >>= (xqueryFilter(_: XQuery, f))) map (_.right)
+  ): F[XQuery] =
+    (interpretSearch[Q](src) >>= (xqueryFilter(_: XQuery, f)))
 
-  private def planFilterSearch[Q](src: Search[Q], f: FreeMap[T])(
+  private def searchFilter[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Q => F[Search[Q] \/ XQuery] = ((q: Q) =>
-    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).left.point[F])
+  ): Q => Search[Q] = ((q: Q) =>
+    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src))
 
   private def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
     for {

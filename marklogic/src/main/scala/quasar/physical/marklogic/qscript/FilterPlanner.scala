@@ -54,17 +54,24 @@ private[qscript] final class FilterPlanner[
   T[_[_]]: BirecursiveT
 ](implicit SP: StructuralPlanner[F, FMT]) {
 
-  def planFilter[Q](src: Search[Q], f: FreeMap[T])(
+  def plan[Q](src: Search[Q] \/ XQuery, f: FreeMap[T])(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): F[Search[Q] \/ XQuery] = src match {
+    case \/-(src) => xqueryFilter(src, f) map (_.right)
+    case -\/(src) => planPredicate[T, Q].lift(f).fold(planFilter(src, f))(planFilterSearch(src, f))
+  }
+
+  private def planFilter[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] =
     (interpretSearch[Q](src) >>= (xqueryFilter(_: XQuery, f))) map (_.right)
 
-  def planFilterSearch[Q](src: Search[Q], f: FreeMap[T])(
+  private def planFilterSearch[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Q => F[Search[Q] \/ XQuery] = ((q: Q) =>
     Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).left.point[F])
 
-  def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
+  private def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
     for {
       x   <- freshName[F]
       p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
@@ -85,7 +92,7 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def planPredicate[T[_[_]]: RecursiveT, Q](
+  private def planPredicate[T[_[_]]: RecursiveT, Q](
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): PartialFunction[FreeMap[T], Q] = {
     case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(\/-(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>

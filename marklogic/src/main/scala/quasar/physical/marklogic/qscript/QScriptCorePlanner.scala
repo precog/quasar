@@ -146,12 +146,7 @@ private[qscript] final class QScriptCorePlanner[
         r   <- elimSearch[Q](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
-    case Filter(\/-(src), f) =>
-      (new FilterPlanner[F, FMT, T]).xqueryFilter(src, f) map (_.right)
-
-    case Filter(-\/(src), f) =>
-      (new FilterPlanner[F, FMT, T]).planPredicate[T, Q].lift(f)
-        .fold((new FilterPlanner[F, FMT, T]).planFilter(src, f))((new FilterPlanner[F, FMT, T]).planFilterSearch(src, f))
+    case Filter(src, f) => (new FilterPlanner[F, FMT, T]).plan(src, f)
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.

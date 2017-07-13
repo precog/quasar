@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.common.SortDir
 import quasar.physical.marklogic.cts.Query
+import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -36,7 +37,7 @@ import scalaz._, Scalaz._
 //       return expression to a variable as, if it is a sequence, the results will,
 //       in the best case, also be sequences and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
   FMT: SearchOptions,
   T[_[_]]: BirecursiveT
 ](implicit

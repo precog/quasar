@@ -35,6 +35,7 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.ejson.EJson
 import quasar.physical.marklogic.cts._
+import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
@@ -49,7 +50,7 @@ import scalaz._, Scalaz._
 import xml.name._
 
 private[qscript] final class FilterPlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
   FMT: SearchOptions,
   T[_[_]]: BirecursiveT
 ](implicit SP: StructuralPlanner[F, FMT]) {
@@ -59,18 +60,24 @@ private[qscript] final class FilterPlanner[
   ): F[Search[Q] \/ XQuery] = src match {
     case \/-(src) => xqueryFilter(src, f) map (_.right)
     case -\/(src) => planPredicate[T, Q].lift(f)
-        .fold(fallbackFilter(src, f) map (_.right[Search[Q]]))(searchFilter(src, f) andThen (_.left[XQuery].point[F]))
+        .fold(fallbackFilter(src, f) map (_.right[Search[Q]]))(searchFilter(src, f))
   }
+
+  private def searchFilter[Q](src: Search[Q], f: FreeMap[T])(q: Q)(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): F[Search[Q] \/ XQuery] =
+    queryIsValid[F, Q, T[EJson], FMT](planAsSearch(src, f, q).query)
+      .ifM(planAsSearch(src, f, q).left[XQuery].point[F], fallbackFilter(src, f) map (_.right[Search[Q]]))
 
   private def fallbackFilter[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
   ): F[XQuery] =
     (interpretSearch[Q](src) >>= (xqueryFilter(_: XQuery, f)))
 
-  private def searchFilter[Q](src: Search[Q], f: FreeMap[T])(
+  private def planAsSearch[Q](src: Search[Q], f: FreeMap[T], q: Q)(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Q => Search[Q] = ((q: Q) =>
-    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src))
+  ): Search[Q] =
+    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
   private def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
     for {

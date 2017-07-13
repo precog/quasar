@@ -31,7 +31,7 @@ import matryoshka._
   * NB: This is in a separate file in order to break up the compilation units.
   */
 private[marklogic] sealed abstract class MLBackendConfig {
-  type M[A] = MLFSQ[A]
+  type M[A]            = MLFSQ[A]
   type QSM[T[_[_]], A] = MLQScriptCP[T]#M[A]
 
   type FMT
@@ -50,19 +50,20 @@ private[marklogic] object MLBackendConfig {
   final class JsonConfig(val cfg: MarkLogicConfig) extends MLBackendConfig {
     type FMT = DocType.Json
     def planner[T[_[_]]: BirecursiveT] = Planner[M, FMT, QSM[T, ?]]
-    val structuralPlanner = StructuralPlanner.jsonStructuralPlanner[XccEval]
-    val searchOptions = SearchOptions[FMT]
-    val dataAsContent = AsContent[FMT, Data]
+    val structuralPlanner              = StructuralPlanner.jsonStructuralPlanner[XccEval]
+    val searchOptions                  = SearchOptions[FMT]
+    val dataAsContent                  = AsContent[FMT, Data]
   }
 
   final class XmlConfig(val cfg: MarkLogicConfig) extends MLBackendConfig {
     type FMT = DocType.Xml
     def planner[T[_[_]]: BirecursiveT] = Planner[M, FMT, QSM[T, ?]]
-    val structuralPlanner = StructuralPlanner.xmlStructuralPlanner[XccEval]
-    val searchOptions = SearchOptions[FMT]
-    val dataAsContent = AsContent[FMT, Data]
+    val structuralPlanner              = StructuralPlanner.xmlStructuralPlanner[XccEval]
+    val searchOptions                  = SearchOptions[FMT]
+    val dataAsContent                  = AsContent[FMT, Data]
   }
 
   def fromMarkLogicConfig(cfg: MarkLogicConfig): MLBackendConfig =
-    cfg.docType.fold[MLBackendConfig](json = new JsonConfig(cfg), xml = new XmlConfig(cfg))
+    cfg.docType
+      .fold[MLBackendConfig](json = new JsonConfig(cfg), xml = new XmlConfig(cfg))
 }

@@ -30,10 +30,9 @@ import scalaz._, Scalaz._
 // TODO: expose the individual operation of `updates` as List[Update0], so
 // they could be `check`ed, etc.? That would restrict what updates are
 // allowed to do, though.
-final case class Schema[A: Atom: Order](
-  readVersion: ConnectionIO[Option[A]],
-  writeVersion: A => ConnectionIO[Unit],
-  updates: SortedMap[A, ConnectionIO[Unit]]) {
+final case class Schema[A: Atom: Order](readVersion: ConnectionIO[Option[A]],
+                                        writeVersion: A => ConnectionIO[Unit],
+                                        updates: SortedMap[A, ConnectionIO[Unit]]) {
 
   /** Most recent known version, to which the schema will be updated. */
   def latestVersion: A = updates.lastKey
@@ -42,20 +41,30 @@ final case class Schema[A: Atom: Order](
     * and return a tuple showing the update to be applied, if needed.
     */
   def updateRequired: ConnectionIO[Option[(Option[A], A)]] =
-    readVersion.flatMap(_.cata(
-      ver =>
-        if (ver < latestVersion) (ver.some, latestVersion).some.point[ConnectionIO]
-        else if (ver === latestVersion) none.point[ConnectionIO]
-        else connFail(s"unexpected schema version; found: $ver; latest known: $latestVersion"),
-      (none[A], latestVersion).some.point[ConnectionIO]))
+    readVersion.flatMap(
+      _.cata(
+        ver =>
+          if (ver < latestVersion) (ver.some, latestVersion).some.point[ConnectionIO]
+          else if (ver === latestVersion) none.point[ConnectionIO]
+          else
+            connFail(
+              s"unexpected schema version; found: $ver; latest known: $latestVersion"),
+        (none[A], latestVersion).some.point[ConnectionIO]
+      ))
 
   def updateToLatest: ConnectionIO[Unit] =
-    updateRequired.flatMap(_.cata(
-      { case (first, _) =>
-        updates.collect {
-          case (ver, upd) if first.cata(_ < ver, true) =>
-            upd *> writeVersion(ver) *> HC.commit
-        }.toList.sequence_[ConnectionIO, Unit]
-      },
-      ().point[ConnectionIO]))
+    updateRequired.flatMap(
+      _.cata(
+        {
+          case (first, _) =>
+            updates
+              .collect {
+                case (ver, upd) if first.cata(_ < ver, true) =>
+                  upd *> writeVersion(ver) *> HC.commit
+              }
+              .toList
+              .sequence_[ConnectionIO, Unit]
+        },
+        ().point[ConnectionIO]
+      ))
 }

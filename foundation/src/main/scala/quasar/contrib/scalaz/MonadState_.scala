@@ -36,16 +36,16 @@ trait MonadState_[F[_], S] { self =>
 object MonadState_ {
   def apply[F[_], S](implicit F: MonadState_[F, S]): MonadState_[F, S] = F
 
-  implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S])
-      : MonadState_[F, S] =
+  implicit def monadStateNoMonad[F[_], S](
+      implicit F: MonadState[F, S]): MonadState_[F, S] =
     new MonadState_[F, S] {
       def MS = F
 
       def bind[A, B](fa: F[A])(f: (A) ⇒ F[B]) = F.bind(fa)(f)
-      def get = F.get
-      def init = F.init
-      def point[A](a: ⇒ A) = F.point(a)
-      def put(s: S) = F.put(s)
+      def get                                 = F.get
+      def init                                = F.init
+      def point[A](a: ⇒ A)                    = F.point(a)
+      def put(s: S)                           = F.put(s)
     }
 
   implicit def toMonadState[F[_], S](ms: MonadState_[F, S]): MonadState[F, S] =

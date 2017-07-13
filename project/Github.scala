@@ -10,19 +10,23 @@ import sbt._, Keys._
 
 object GithubPlugin extends Plugin {
   object GithubKeys {
-    lazy val repoSlug       = settingKey[String]("The repo slug, e.g. 'quasar-analytics/quasar'")
-    lazy val tag            = settingKey[String]("The name of the tag, e.g. v1.2.3")
-    lazy val releaseName    = taskKey[String]("The name of the release")
-    lazy val commitish      = settingKey[String]("The commitish value from which the tag is created")
-    lazy val draft          = settingKey[Boolean]("The draft / final flag")
-    lazy val prerelease     = settingKey[Boolean]("The prerelease / release flag")
-    lazy val assets         = taskKey[Seq[File]]("The binary assets to upload")
-    lazy val githubAuth     = taskKey[GitHub]("Creates a Github based on GITHUB_TOKEN OAuth variable")
-    lazy val githubRelease  = taskKey[GHRelease]("Publishes a new Github release")
+    lazy val repoSlug =
+      settingKey[String]("The repo slug, e.g. 'quasar-analytics/quasar'")
+    lazy val tag         = settingKey[String]("The name of the tag, e.g. v1.2.3")
+    lazy val releaseName = taskKey[String]("The name of the release")
+    lazy val commitish =
+      settingKey[String]("The commitish value from which the tag is created")
+    lazy val draft      = settingKey[Boolean]("The draft / final flag")
+    lazy val prerelease = settingKey[Boolean]("The prerelease / release flag")
+    lazy val assets     = taskKey[Seq[File]]("The binary assets to upload")
+    lazy val githubAuth =
+      taskKey[GitHub]("Creates a Github based on GITHUB_TOKEN OAuth variable")
+    lazy val githubRelease = taskKey[GHRelease]("Publishes a new Github release")
 
-    lazy val versionFile      = settingKey[String]("The JSON version file, e.g. 'version.json")
-    lazy val versionRepo      = settingKey[String]("The repo slug for the JSON version file")
-    lazy val githubUpdateVer  = taskKey[String]("Updates the JSON version file in the version repo")
+    lazy val versionFile = settingKey[String]("The JSON version file, e.g. 'version.json")
+    lazy val versionRepo = settingKey[String]("The repo slug for the JSON version file")
+    lazy val githubUpdateVer =
+      taskKey[String]("Updates the JSON version file in the version repo")
   }
 
   import GithubKeys._
@@ -34,21 +38,22 @@ object GithubPlugin extends Plugin {
   }
 
   lazy val githubSettings: Seq[Setting[_]] = Seq(
-    repoSlug    := Travis.RepoSlug.fold(organization.value + "/" + normalizedName.value)(Predef.identity),
-    tag         := "v" + version.value +
-                   (if (prerelease.value) Travis.BuildNumber.fold("")("-" + _) else ""),
+    repoSlug := Travis.RepoSlug
+      .fold(organization.value + "/" + normalizedName.value)(Predef.identity),
+    tag := "v" + version.value +
+      (if (prerelease.value) Travis.BuildNumber.fold("")("-" + _) else ""),
     releaseName := name.value +
-                   (" " + tag.value) +
-                   (if (draft.value) " (draft)" else ""),
-    commitish   := Travis.Commit.getOrElse(""),
-    draft       := false,
-    prerelease  := version.value.matches(""".*SNAPSHOT.*"""),
-    assets      := Seq((packageBin in Compile).value),
-
+      (" " + tag.value) +
+      (if (draft.value) " (draft)" else ""),
+    commitish := Travis.Commit.getOrElse(""),
+    draft := false,
+    prerelease := version.value.matches(""".*SNAPSHOT.*"""),
+    assets := Seq((packageBin in Compile).value),
     githubAuth := {
       val log = streams.value.log
 
-      val token = Option(System.getenv("GITHUB_TOKEN")).getOrElse(scala.sys.error("You must define GITHUB_TOKEN"))
+      val token = Option(System.getenv("GITHUB_TOKEN"))
+        .getOrElse(scala.sys.error("You must define GITHUB_TOKEN"))
 
       val github = GitHub.connectUsingOAuth(token)
 
@@ -56,7 +61,6 @@ object GithubPlugin extends Plugin {
 
       github
     },
-
     githubRelease := {
       val log = streams.value.log
 
@@ -66,9 +70,15 @@ object GithubPlugin extends Plugin {
         val repo = github.getRepository(repoSlug.value)
 
         val body =
-          repo.listTags.find(_.getName == tag.value).map { tagUnpopulated =>
-            repo.getCommit(tagUnpopulated.getCommit.getSHA1).getCommitShortInfo.getMessage
-          }.getOrElse(scala.sys.error("Tag not found"))
+          repo.listTags
+            .find(_.getName == tag.value)
+            .map { tagUnpopulated =>
+              repo
+                .getCommit(tagUnpopulated.getCommit.getSHA1)
+                .getCommitShortInfo
+                .getMessage
+            }
+            .getOrElse(scala.sys.error("Tag not found"))
 
         log.info("repoSlug    = " + repoSlug.value)
         log.info("tag         = " + tag.value)
@@ -102,22 +112,21 @@ object GithubPlugin extends Plugin {
 
       log.info("Created Github release: " + release)
 
-      assets.value foreach { asset =>
-        val relativePath = asset.relativeTo(baseDirectory.value).getOrElse(asset)
-        val mimeType     = Option(java.nio.file.Files.probeContentType(asset.toPath())).getOrElse("application/java-archive")
+      assets.value foreach {
+        asset =>
+          val relativePath = asset.relativeTo(baseDirectory.value).getOrElse(asset)
+          val mimeType = Option(java.nio.file.Files.probeContentType(asset.toPath()))
+            .getOrElse("application/java-archive")
 
-        log.info("Uploading " + relativePath + " (" + mimeType + ") to release")
+          log.info("Uploading " + relativePath + " (" + mimeType + ") to release")
 
-        release.uploadAsset(asset, mimeType)
+          release.uploadAsset(asset, mimeType)
       }
 
       release
     },
-
     versionFile := "version.json",
-
     versionRepo := { repoSlug.value },
-
     githubUpdateVer := {
       val log = streams.value.log
 

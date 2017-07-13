@@ -16,10 +16,10 @@
 
 package quasar.sql
 
-trait Arbitraries extends
-  ExprArbitrary with
-  ScopedExprArbitrary with
-  StatementArbitrary with
-  CINameArbitrary
+trait Arbitraries
+    extends ExprArbitrary
+    with ScopedExprArbitrary
+    with StatementArbitrary
+    with CINameArbitrary
 
 object Arbitraries extends Arbitraries

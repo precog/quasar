@@ -33,7 +33,8 @@ object JDBMSlice {
     var lastKey: Array[Byte]  = null.asInstanceOf[Array[Byte]]
 
     @tailrec
-    def consumeRows(source: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]], row: Int): Int = {
+    def consumeRows(source: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]],
+                    row: Int): Int = {
       if (source.hasNext) {
         val entry  = source.next
         val rowKey = entry.getKey
@@ -74,7 +75,8 @@ object JDBMSlice {
     (firstKey, lastKey, rows)
   }
 
-  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): (ColumnRef, ArrayColumn[_]) =
+  def columnFor(prefix: CPath, sliceSize: Int)(
+      ref: ColumnRef): (ColumnRef, ArrayColumn[_]) =
     (ref.copy(selector = (prefix \ ref.selector)), ref.ctype match {
       case CString              => ArrayStrColumn.empty(sliceSize)
       case CBoolean             => ArrayBoolColumn.empty()

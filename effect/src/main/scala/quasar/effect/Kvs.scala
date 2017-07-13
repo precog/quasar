@@ -37,7 +37,8 @@ trait Kvs[F[_], K, V] {
 object Kvs extends KvsInstances {
   def apply[F[_], K, V](implicit K: Kvs[F, K, V]): Kvs[F, K, V] = K
 
-  def forTrans[F[_]: Monad, K, V, T[_[_], _]: MonadTrans](implicit K: Kvs[F, K, V]): Kvs[T[F, ?], K, V] =
+  def forTrans[F[_]: Monad, K, V, T[_[_], _]: MonadTrans](
+      implicit K: Kvs[F, K, V]): Kvs[T[F, ?], K, V] =
     new Kvs[T[F, ?], K, V] {
       def keys                                    = K.keys.liftM[T]
       def get(k: K)                               = K.get(k).liftM[T]
@@ -57,26 +58,32 @@ sealed abstract class KvsInstances extends KvsInstances0 {
       def delete(k: K)                            = KeyValueStore.Delete(k)
     }
 
-  implicit def freeKvs[K, V, F[_], S[_]](implicit F: Kvs[F, K, V], I: F :<: S): Kvs[Free[S, ?], K, V] =
+  implicit def freeKvs[K, V, F[_], S[_]](implicit F: Kvs[F, K, V],
+                                         I: F :<: S): Kvs[Free[S, ?], K, V] =
     new Kvs[Free[S, ?], K, V] {
-      def keys                                    = Free.liftF(I(F.keys))
-      def get(k: K)                               = Free.liftF(I(F.get(k)))
-      def put(k: K, v: V)                         = Free.liftF(I(F.put(k, v)))
-      def compareAndPut(k: K, e: Option[V], u: V) = Free.liftF(I(F.compareAndPut(k, e, u)))
-      def delete(k: K)                            = Free.liftF(I(F.delete(k)))
+      def keys            = Free.liftF(I(F.keys))
+      def get(k: K)       = Free.liftF(I(F.get(k)))
+      def put(k: K, v: V) = Free.liftF(I(F.put(k, v)))
+      def compareAndPut(k: K, e: Option[V], u: V) =
+        Free.liftF(I(F.compareAndPut(k, e, u)))
+      def delete(k: K) = Free.liftF(I(F.delete(k)))
     }
 }
 
 sealed abstract class KvsInstances0 {
-  implicit def eitherTKvs[K, V, E, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[EitherT[F, E, ?], K, V] =
+  implicit def eitherTKvs[K, V, E, F[_]: Monad: Kvs[?[_], K, V]]
+    : Kvs[EitherT[F, E, ?], K, V] =
     Kvs.forTrans[F, K, V, EitherT[?[_], E, ?]]
 
-  implicit def readerTKvs[K, V, R, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[ReaderT[F, R, ?], K, V] =
+  implicit def readerTKvs[K, V, R, F[_]: Monad: Kvs[?[_], K, V]]
+    : Kvs[ReaderT[F, R, ?], K, V] =
     Kvs.forTrans[F, K, V, ReaderT[?[_], R, ?]]
 
-  implicit def stateTKvs[K, V, S, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[StateT[F, S, ?], K, V] =
+  implicit def stateTKvs[K, V, S, F[_]: Monad: Kvs[?[_], K, V]]
+    : Kvs[StateT[F, S, ?], K, V] =
     Kvs.forTrans[F, K, V, StateT[?[_], S, ?]]
 
-  implicit def writerTKvs[K, V, W: Monoid, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[WriterT[F, W, ?], K, V] =
+  implicit def writerTKvs[K, V, W: Monoid, F[_]: Monad: Kvs[?[_], K, V]]
+    : Kvs[WriterT[F, W, ?], K, V] =
     Kvs.forTrans[F, K, V, WriterT[?[_], W, ?]]
 }

@@ -23,7 +23,7 @@ import quasar.fs._
 import matryoshka._
 import scalaz._, Scalaz._
 
-sealed abstract class ParsingError { def message: String}
+sealed abstract class ParsingError { def message: String }
 final case class GenericParsingError(message: String) extends ParsingError
 final case class ParsingPathError(error: PathError) extends ParsingError {
   def message = error.shows

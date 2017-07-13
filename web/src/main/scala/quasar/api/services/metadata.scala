@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import slamdata.Predef.{ -> => _, _ }
+import slamdata.Predef.{-> => _, _}
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
@@ -35,19 +35,24 @@ import scalaz.syntax.std.boolean._
 
 object metadata {
 
-  final case class FsNode(name: String, typ: String, mount: Option[String], args: Option[List[String]])
+  final case class FsNode(name: String,
+                          typ: String,
+                          mount: Option[String],
+                          args: Option[List[String]])
 
   object FsNode {
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String], args: Option[List[String]]): FsNode =
-      FsNode(
-        pathSegment.fold(_.value, _.value),
-        pathSegment.fold(κ("directory"), κ("file")),
-        mount,
-        args)
+    def apply(pathSegment: PathSegment,
+              mount: Option[String],
+              args: Option[List[String]]): FsNode =
+      FsNode(pathSegment.fold(_.value, _.value),
+             pathSegment.fold(κ("directory"), κ("file")),
+             mount,
+             args)
 
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode = apply(pathSegment, mount, args = None)
+    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
+      apply(pathSegment, mount, args = None)
 
     implicit val fsNodeOrdering: Ordering[FsNode] =
       Ordering.by(n => (n.name, n.typ, n.mount, n.args.map(_.toIterable))) // toIterable is because scala.math.Ordering is defined for Iterable
@@ -56,12 +61,13 @@ object metadata {
       Order.fromScalaOrdering
 
     implicit val fsNodeEncodeJson: EncodeJson[FsNode] =
-      EncodeJson { case FsNode(name, typ, mount, args) =>
-        ("name" := name)    ->:
-        ("type" := typ)     ->:
-        ("mount" :=? mount) ->?:
-        ("args" :=? args)   ->?:
-        jEmptyObject
+      EncodeJson {
+        case FsNode(name, typ, mount, args) =>
+          ("name" := name) ->:
+            ("type" := typ) ->:
+            ("mount" :=? mount) ->?:
+            ("args" :=? args) ->?:
+            jEmptyObject
       }
 
     implicit val fsNodeDecodeJson: DecodeJson[FsNode] =
@@ -77,30 +83,40 @@ object metadata {
       // We go through the trouble of "overlaying" things here as opposed to just using the MountConfig
       // so that interpreters are free to modify the results of `QueryFile` and those changes will be
       // reflected here
-      M.lookupConfig(parent).flatMap(c => OptionT(moduleConfig.getOption(c).point[M.FreeS])).map { statements =>
-        val args = statements.collect { case FunctionDecl(name, args, _ ) => name.value -> args.map(_.value) }.toMap
-        names.map { name =>
-          FsNode(name, mount = None, args = args.get(stringValue(name)))
+      M.lookupConfig(parent)
+        .flatMap(c => OptionT(moduleConfig.getOption(c).point[M.FreeS]))
+        .map { statements =>
+          val args = statements.collect {
+            case FunctionDecl(name, args, _) => name.value -> args.map(_.value)
+          }.toMap
+          names.map { name =>
+            FsNode(name, mount = None, args = args.get(stringValue(name)))
+          }
+        // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
         }
-      // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
-      }.getOrElseF {
-        M.havingPrefix(parent).map { mounts =>
-          names map { name =>
-            val path = name.fold(parent </> dir1(_), parent </> file1(_))
-            FsNode(name, mounts.get(path).map(_.fold(_.value, "view", "module")), args = None)
+        .getOrElseF {
+          M.havingPrefix(parent).map { mounts =>
+            names map { name =>
+              val path = name.fold(parent </> dir1(_), parent </> file1(_))
+              FsNode(name,
+                     mounts.get(path).map(_.fold(_.value, "view", "module")),
+                     args = None)
+            }
           }
         }
-      }.liftM[FileSystemErrT]
+        .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(
-      Q.ls(d)
-        .flatMap(mkNodes(d, _))
-        .map(nodes => Json.obj("children" := nodes.toList.sorted))
-        .run)
+    def dirMetadata(d: ADir): Free[S, QResponse[S]] =
+      respond(
+        Q.ls(d)
+          .flatMap(mkNodes(d, _))
+          .map(nodes => Json.obj("children" := nodes.toList.sorted))
+          .run)
 
-    def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
-      Q.fileExists(f)
-        .map(_ either Json() or PathError.pathNotFound(f)))
+    def fileMetadata(f: AFile): Free[S, QResponse[S]] =
+      respond(
+        Q.fileExists(f)
+          .map(_ either Json() or PathError.pathNotFound(f)))
 
     QHttpService {
       case GET -> AsPath(path) =>

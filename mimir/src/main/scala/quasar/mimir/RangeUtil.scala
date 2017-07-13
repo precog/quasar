@@ -27,7 +27,7 @@ object RangeUtil {
     * the provided callback 'f' on each position. Assumes that step is 1.
     */
   def loop(r: Range)(f: Int => Unit) {
-    var i = r.start
+    var i     = r.start
     val limit = r.end
     while (i < limit) {
       f(i)

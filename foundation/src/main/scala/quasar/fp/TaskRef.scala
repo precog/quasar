@@ -40,19 +40,20 @@ sealed abstract class TaskRef[A] {
 object TaskRef {
   def apply[A](initial: A): Task[TaskRef[A]] = Task delay {
     new TaskRef[A] {
-      val ref = new AtomicReference(initial)
-      def read = Task.delay(ref.get)
+      val ref         = new AtomicReference(initial)
+      def read        = Task.delay(ref.get)
       def write(a: A) = Task.delay(ref.set(a))
       def compareAndSet(oldA: A, newA: A) =
         Task.delay(ref.compareAndSet(oldA, newA))
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def modifyS[B](f: A => (A, B)) = for {
-        a0 <- read
-        (a1, b) = f(a0)
-        p  <- compareAndSet(a0, a1)
-        b  <- if (p) Task.now(b) else modifyS(f)
-      } yield b
+      def modifyS[B](f: A => (A, B)) =
+        for {
+          a0 <- read
+          (a1, b) = f(a0)
+          p <- compareAndSet(a0, a1)
+          b <- if (p) Task.now(b) else modifyS(f)
+        } yield b
     }
   }
 }

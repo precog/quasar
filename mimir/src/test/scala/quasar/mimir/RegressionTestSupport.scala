@@ -23,7 +23,7 @@ import quasar.precog.common._
 import quasar.yggdrasil.util.CPathUtils._
 import quasar.blueeyes.json._
 
-trait RegressionTestSupport[M[+_]] {
+trait RegressionTestSupport[M[+ _]] {
   def makeTBounded: Double = {
     val theta = Random.nextGaussian * 10
     // we omit values of theta close to zero
@@ -43,25 +43,36 @@ trait RegressionTestSupport[M[+_]] {
     seq.toArray
   }
 
-  def jvalues(samples: Seq[(Array[Double], Double)], cpaths: Seq[CPath], mod: Int = 1): Seq[JValue] = samples.zipWithIndex map { case ((xs, y), idx) =>
-    val cvalues = xs.map { x => CDouble(x).asInstanceOf[CValue] } :+ CDouble(y.toDouble).asInstanceOf[CValue]
-    val withCPath = {
-      if (idx % mod == 0) cpaths zip cvalues.toSeq
-      else if (idx % mod == 1) cpaths.tail zip cvalues.tail.toSeq
-      else cpaths.tail.tail zip cvalues.tail.tail.toSeq
-    }
-    val withJPath = withCPath map { case (cpath, cvalue) => cPathToJPaths(cpath, cvalue) head }  // `head` is only okay if we don't have any homogeneous arrays
-    val withJValue = withJPath map { case (jpath, cvalue) => (jpath, cvalue.toJValue) }
-    withJValue.foldLeft(JArray(Nil).asInstanceOf[JValue]) { case (target, (jpath, jvalue)) => target.unsafeInsert(jpath, jvalue) }
+  def jvalues(samples: Seq[(Array[Double], Double)],
+              cpaths: Seq[CPath],
+              mod: Int = 1): Seq[JValue] = samples.zipWithIndex map {
+    case ((xs, y), idx) =>
+      val cvalues = xs.map { x =>
+        CDouble(x).asInstanceOf[CValue]
+      } :+ CDouble(y.toDouble).asInstanceOf[CValue]
+      val withCPath = {
+        if (idx % mod == 0) cpaths zip cvalues.toSeq
+        else if (idx % mod == 1) cpaths.tail zip cvalues.tail.toSeq
+        else cpaths.tail.tail zip cvalues.tail.tail.toSeq
+      }
+      val withJPath = withCPath map {
+        case (cpath, cvalue) => cPathToJPaths(cpath, cvalue) head
+      } // `head` is only okay if we don't have any homogeneous arrays
+      val withJValue = withJPath map { case (jpath, cvalue) => (jpath, cvalue.toJValue) }
+      withJValue.foldLeft(JArray(Nil).asInstanceOf[JValue]) {
+        case (target, (jpath, jvalue)) => target.unsafeInsert(jpath, jvalue)
+      }
   }
 
   def stdDevMean(values: List[Double]): (Double, Double) = {
     val count = values.size
-    val sum = values.sum
-    val sumsq = values map { x => math.pow(x, 2) } sum
+    val sum   = values.sum
+    val sumsq = values map { x =>
+      math.pow(x, 2)
+    } sum
 
     val stdDev = math.sqrt(count * sumsq - sum * sum) / count
-    val mean = sum / count
+    val mean   = sum / count
 
     (stdDev, mean)
   }
@@ -86,27 +97,30 @@ trait RegressionTestSupport[M[+_]] {
 
     val median = computeMedian(values)
 
-    val diffs = values map { v => math.abs(v - median) }
+    val diffs = values map { v =>
+      math.abs(v - median)
+    }
     val mad = computeMedian(diffs) / constant
 
     (mad, median)
   }
 
   def combineResults(num: Int, thetas: List[List[Double]]) = {
-    thetas.foldLeft(mutable.Seq.fill(num)(List.empty[Double])) { case (acc, li) =>
-      var i = 0
-      while (i < li.length) {
-        acc(i) = acc(i) :+ li(i)
-        i += 1
-      }
-      acc
+    thetas.foldLeft(mutable.Seq.fill(num)(List.empty[Double])) {
+      case (acc, li) =>
+        var i = 0
+        while (i < li.length) {
+          acc(i) = acc(i) :+ li(i)
+          i += 1
+        }
+        acc
     }
   }
 
   def isOk(actual: Double, computed: List[Double]): Boolean = {
     val (mad, median) = madMedian(computed)
-    val diff = math.abs(median - actual)
-    val numStdDev = 4D
+    val diff          = math.abs(median - actual)
+    val numStdDev     = 4D
 
     diff < mad * numStdDev
   }

@@ -26,6 +26,7 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object jscore {
+
   /** Javascript AST (functional subset) */
   type JsCore = Fix[JsCoreF]
 
@@ -54,12 +55,13 @@ package object jscore {
   }
 
   def copyAllFields(src: JsCore, dst: Name): Js.Stmt = {
-    val tmp = Js.Ident("__attr")  // TODO: use properly-generated temp name (see SD-583)
-    Js.ForIn(tmp, src.toJs,
-      Js.If(
-        Js.Call(Js.Select(src.toJs, "hasOwnProperty"), List(tmp)),
-        Js.BinOp("=", Js.Access(Ident(dst).toJs, tmp), Js.Access(src.toJs, tmp)),
-        None))
+    val tmp = Js.Ident("__attr") // TODO: use properly-generated temp name (see SD-583)
+    Js.ForIn(
+      tmp,
+      src.toJs,
+      Js.If(Js.Call(Js.Select(src.toJs, "hasOwnProperty"), List(tmp)),
+            Js.BinOp("=", Js.Access(Ident(dst).toJs, tmp), Js.Access(src.toJs, tmp)),
+            None))
   }
 
   private def smartDeref(expr: Js.Expr, key: Js.Expr): Js.Expr =
@@ -72,32 +74,32 @@ package object jscore {
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
     Js.BinOp("=", lhs.toJs, rhs.toJs)
 
-  private def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore):
-      Option[JsCore] =
+  private def replaceSolitary(oldForm: JsCore,
+                              newForm: JsCore,
+                              in: JsCore): Option[JsCore] =
     in.elgotPara(count(oldForm)) match {
       case 0 => in.some
       case 1 => in.substitute(oldForm, newForm).some
       case _ => None
     }
 
-  private def maybeReplace(oldForm: JsCore, newForm: JsCore, in: JsCore):
-      Option[JsCore] =
+  private def maybeReplace(oldForm: JsCore, newForm: JsCore, in: JsCore): Option[JsCore] =
     newForm match {
       // NB: inline simple names and selects (e.g. `x`, `x.y`, and `x.y.z`)
-      case Literal(_)
-         | Ident(_)
-         | Access(Ident(_), Literal(Js.Str(_)))
-         | Access(Access(Ident(_), Literal(Js.Str(_))), Literal(Js.Str(_))) =>
+      case Literal(_) | Ident(_) | Access(Ident(_), Literal(Js.Str(_))) |
+          Access(Access(Ident(_), Literal(Js.Str(_))), Literal(Js.Str(_))) =>
         in.substitute(oldForm, newForm).some
       // NB: Inline other cases if the oldForm only occurs once
       case _ => replaceSolitary(oldForm, newForm, in)
     }
 
   private def simplifyƒ: JsCoreF[JsCore] => Option[JsCoreF[JsCore]] = {
-    case AccessF(obj, field) => (obj.project, field.project) match {
-      case (ObjF(values), LiteralF(Js.Str(name))) => values.get(Name(name)).map(_.project)
-      case (_,            _)                      => None
-    }
+    case AccessF(obj, field) =>
+      (obj.project, field.project) match {
+        case (ObjF(values), LiteralF(Js.Str(name))) =>
+          values.get(Name(name)).map(_.project)
+        case (_, _) => None
+      }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
     case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 ≟ alt1 =>
@@ -106,14 +108,16 @@ package object jscore {
       maybeReplace(Ident(name), expr, body).fold(expr.project match {
         case ObjF(values) =>
           // TODO: inline _part_ of the object when possible
-          values.toList.foldRightM(body)((v, bod) =>
-            maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.elgotPara(count(Ident(name))) match {
-              case 0 => finalBody.project.some
-              case _ => None
+          values.toList
+            .foldRightM(body)((v, bod) =>
+              maybeReplace(Select(Ident(name), v._1.value), v._2, bod))
+            .flatMap(finalBody =>
+              finalBody.elgotPara(count(Ident(name))) match {
+                case 0 => finalBody.project.some
+                case _ => None
             })
         case _ => None
-      })(
-        _.project.some)
+      })(_.project.some)
     case _ => None
   }
 
@@ -121,88 +125,109 @@ package object jscore {
     // TODO: Turn this into an algebra, and implement `Show[JsCore]` with it.
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def toJs: Js.Expr = expr.simplify match {
-      case Literal(value)      => value
-      case Ident(name)         => Js.Ident(name.value)
+      case Literal(value) => value
+      case Ident(name)    => Js.Ident(name.value)
 
-      case Access(expr, key)   => smartDeref(expr.toJs, key.toJs)
+      case Access(expr, key) => smartDeref(expr.toJs, key.toJs)
 
-      case Call(Access(New(name, args1), Literal(Js.Str(mName))), args2)  =>
+      case Call(Access(New(name, args1), Literal(Js.Str(mName))), args2) =>
         // NB: if we are explicitly constructing a value, we presumably know its fields,
         // so no need to check them, but the args may still come from an unreliable source.
-        Js.Call(Js.Select(Js.New(Js.Call(Ident(name).toJs, args1.map(_.toJs))), mName), args2.map(_.toJs))
-      case Call(callee, args)  => Js.Call(callee.toJs, args.map(_.toJs))
+        Js.Call(Js.Select(Js.New(Js.Call(Ident(name).toJs, args1.map(_.toJs))), mName),
+                args2.map(_.toJs))
+      case Call(callee, args) => Js.Call(callee.toJs, args.map(_.toJs))
 
       case New(name, args)     => Js.New(Js.Call(Ident(name).toJs, args.map(_.toJs)))
       case If(cond, cons, alt) => Js.Ternary(cond.toJs, cons.toJs, alt.toJs)
 
-      case UnOp(op, arg)       => Js.UnOp(op.js, arg.toJs)
+      case UnOp(op, arg)          => Js.UnOp(op.js, arg.toJs)
       case BinOp(op, left, right) => Js.BinOp(op.js, left.toJs, right.toJs)
-      case Arr(values)         => Js.AnonElem(values.map(_.toJs))
-      case Fun(params, body)   =>
+      case Arr(values)            => Js.AnonElem(values.map(_.toJs))
+      case Fun(params, body) =>
         Js.AnonFunDecl(params.map(_.value), List(Js.Return(body.toJs)))
-      case Obj(values)         =>
+      case Obj(values) =>
         Js.AnonObjDecl(values.toList.map { case (k, v) => k.value -> v.toJs })
 
       case Let(name, expr, body) =>
         Js.Let(ListMap(name.value -> expr.toJs), Nil, body.toJs)
 
-      case s @ SpliceObjects(srcs)    =>
-        val tmp = Name("__rez")  // TODO: use properly-generated temp name (see SD-583)
+      case s @ SpliceObjects(srcs) =>
+        val tmp = Name("__rez") // TODO: use properly-generated temp name (see SD-583)
         Js.Let(
           Map(tmp.value -> Js.AnonObjDecl(Nil)),
           srcs.flatMap {
-            case Obj(values) => values.map { case (k, v) => Js.BinOp("=", smartDeref(Ident(tmp).toJs, Js.Str(k.value)), v.toJs) }
+            case Obj(values) =>
+              values.map {
+                case (k, v) =>
+                  Js.BinOp("=", smartDeref(Ident(tmp).toJs, Js.Str(k.value)), v.toJs)
+              }
             case src => copyAllFields(src, tmp) :: Nil
           },
-          Ident(tmp).toJs)
+          Ident(tmp).toJs
+        )
 
-      case s @ SpliceArrays(srcs)    =>
-        val tmp = Name("__rez") // TODO: use properly-generated temp name (see SD-583)
+      case s @ SpliceArrays(srcs) =>
+        val tmp  = Name("__rez")  // TODO: use properly-generated temp name (see SD-583)
         val elem = Name("__elem") // TODO: use properly-generated temp name (see SD-583)
         Js.Let(
           Map(tmp.value -> Js.AnonElem(Nil)),
           srcs.flatMap {
-            case Arr(values) => values.map(v => Js.Call(Js.Select(Ident(tmp).toJs, "push"), List(v.toJs)))
-            case src => List(
-              Js.ForIn(Js.Ident(elem.value), src.toJs,
-                Js.If(
-                  Js.Call(Js.Select(src.toJs, "hasOwnProperty"), List(Ident(elem).toJs)),
-                  Js.Call(Js.Select(Ident(tmp).toJs, "push"), List(Js.Access(src.toJs, Ident(elem).toJs))),
-                  None)))
+            case Arr(values) =>
+              values.map(v => Js.Call(Js.Select(Ident(tmp).toJs, "push"), List(v.toJs)))
+            case src =>
+              List(
+                Js.ForIn(
+                  Js.Ident(elem.value),
+                  src.toJs,
+                  Js.If(
+                    Js.Call(Js.Select(src.toJs, "hasOwnProperty"),
+                            List(Ident(elem).toJs)),
+                    Js.Call(Js.Select(Ident(tmp).toJs, "push"),
+                            List(Js.Access(src.toJs, Ident(elem).toJs))),
+                    None
+                  )
+                ))
           },
-          Ident(tmp).toJs)
+          Ident(tmp).toJs
+        )
     }
 
     val simplify = expr.transCata[JsCore](repeatedly(simplifyƒ))
 
     def substitute(oldExpr: JsCore, newExpr: JsCore): JsCore = {
-      @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
+      @SuppressWarnings(
+        Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
       def loop(x: JsCore, inScope: Set[JsCore]): JsCore =
         if (x == oldExpr && !(inScope contains x)) newExpr
         else
           x match {
-            case Let(name, expr, body) => Let(name, loop(expr, inScope), loop(body, inScope + Ident(name)))
-            case Fun(params, body)     => Fun(params, loop(body, inScope ++ params.map(Ident(_)).toSet))
+            case Let(name, expr, body) =>
+              Let(name, loop(expr, inScope), loop(body, inScope + Ident(name)))
+            case Fun(params, body) =>
+              Fun(params, loop(body, inScope ++ params.map(Ident(_)).toSet))
 
-            case Access(expr, key)     => Access(loop(expr, inScope), loop(key, inScope))
-            case Arr(values)           => Arr(values.map(loop(_, inScope)))
-            case BinOp(op, l, r)       => BinOp(op, loop(l, inScope), loop(r, inScope))
-            case Call(callee, args)    => Call(loop(callee, inScope), args.map(loop(_, inScope)))
-            case id @ Ident(_)         => id
-            case If(cond, cons, alt)   => If(loop(cond, inScope), loop(cons, inScope), loop(alt, inScope))
-            case lit @ Literal(_)      => lit
-            case New(name, args)       => New(name, args.map(loop(_, inScope)))
-            case Obj(values)           => Obj(values ∘ (x => loop(x, inScope)))
-            case SpliceArrays(srcs)    => SpliceArrays(srcs.map(loop(_, inScope)))
-            case SpliceObjects(srcs)   => SpliceObjects(srcs.map(loop(_, inScope)))
-            case UnOp(op, x)           => UnOp(op, loop(x, inScope))
+            case Access(expr, key) => Access(loop(expr, inScope), loop(key, inScope))
+            case Arr(values)       => Arr(values.map(loop(_, inScope)))
+            case BinOp(op, l, r)   => BinOp(op, loop(l, inScope), loop(r, inScope))
+            case Call(callee, args) =>
+              Call(loop(callee, inScope), args.map(loop(_, inScope)))
+            case id @ Ident(_) => id
+            case If(cond, cons, alt) =>
+              If(loop(cond, inScope), loop(cons, inScope), loop(alt, inScope))
+            case lit @ Literal(_)    => lit
+            case New(name, args)     => New(name, args.map(loop(_, inScope)))
+            case Obj(values)         => Obj(values ∘ (x => loop(x, inScope)))
+            case SpliceArrays(srcs)  => SpliceArrays(srcs.map(loop(_, inScope)))
+            case SpliceObjects(srcs) => SpliceObjects(srcs.map(loop(_, inScope)))
+            case UnOp(op, x)         => UnOp(op, loop(x, inScope))
           }
       loop(expr, Set.empty)
     }
   }
 
   implicit val JsCoreTraverse: Traverse[JsCoreF] = new Traverse[JsCoreF] {
-    def traverseImpl[G[_], A, B](fa: JsCoreF[A])(f: A => G[B])(implicit G: Applicative[G]): G[JsCoreF[B]] = {
+    def traverseImpl[G[_], A, B](fa: JsCoreF[A])(f: A => G[B])(
+        implicit G: Applicative[G]): G[JsCoreF[B]] = {
       fa match {
         case LiteralF(lit)           => G.point(LiteralF(lit))
         case IdentF(name)            => G.point(IdentF(name))
@@ -226,8 +251,8 @@ package object jscore {
     val nodeType = List("JsCore")
 
     def simpleƒ(v: JsCoreF[Boolean]): Boolean = v match {
-      case IdentF(_)            => true
-      case LiteralF(_)          => true
+      case IdentF(_)   => true
+      case LiteralF(_) => true
 
       case ArrF(values)         => values.all(_ ≟ true)
       case AccessF(expr, key)   => expr && key
@@ -238,10 +263,10 @@ package object jscore {
       case NewF(_, args)        => args.all(_ ≟ true)
       case UnOpF(_, x)          => x
 
-      case FunF(_, body)        => false
-      case ObjF(_)              => false
-      case SpliceArraysF(_)     => false
-      case SpliceObjectsF(_)    => false
+      case FunF(_, body)     => false
+      case ObjF(_)           => false
+      case SpliceArraysF(_)  => false
+      case SpliceObjectsF(_) => false
     }
 
     def renderSimple(v: JsCore): Option[RenderedTree] =
@@ -250,34 +275,52 @@ package object jscore {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def render(v: JsCore) = v match {
-      case Ident(name)           => Terminal("Ident" :: nodeType, Some(name.value))
-      case Literal(js)           => Terminal("Literal" :: nodeType, Some(js.pprint(0)))
+      case Ident(name) => Terminal("Ident" :: nodeType, Some(name.value))
+      case Literal(js) => Terminal("Literal" :: nodeType, Some(js.pprint(0)))
 
-      case Arr(values)           => renderSimple(v).getOrElse(
-        NonTerminal("Arr" :: nodeType, None, values.map(render)))
-      case Access(expr, key)     => renderSimple(v).getOrElse(
-        NonTerminal("Access" :: nodeType, None, List(render(expr), render(key))))
-      case BinOp(op, l, r)       => renderSimple(v).getOrElse(
-        NonTerminal("BinOp" :: nodeType, Some(op.js), List(render(l), render(r))))
-      case Call(callee, args)    => renderSimple(v).getOrElse(
-        NonTerminal("Call" :: nodeType, None, render(callee) :: args.map(render)))
-      case If(cond, cons, alt)   => renderSimple(v).getOrElse(
-        NonTerminal("If" :: nodeType, None, List(render(cond), render(cons), render(alt))))
-      case New(name, args)       => renderSimple(v).getOrElse(
-        NonTerminal("New" :: nodeType, Some(name.value), args.map(render)))
-      case UnOp(op, x)           => renderSimple(v).getOrElse(
-        NonTerminal("UnOp" :: nodeType, Some(op.js), List(render(x))))
+      case Arr(values) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("Arr" :: nodeType, None, values.map(render)))
+      case Access(expr, key) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("Access" :: nodeType, None, List(render(expr), render(key))))
+      case BinOp(op, l, r) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("BinOp" :: nodeType, Some(op.js), List(render(l), render(r))))
+      case Call(callee, args) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("Call" :: nodeType, None, render(callee) :: args.map(render)))
+      case If(cond, cons, alt) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("If" :: nodeType,
+                      None,
+                      List(render(cond), render(cons), render(alt))))
+      case New(name, args) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("New" :: nodeType, Some(name.value), args.map(render)))
+      case UnOp(op, x) =>
+        renderSimple(v).getOrElse(
+          NonTerminal("UnOp" :: nodeType, Some(op.js), List(render(x))))
 
-      case Obj(values)           =>
-        NonTerminal("Obj" :: nodeType, None,
-          values.toList.map { case (n, v) =>
-            if (v.cata(simpleƒ)) Terminal("Key" :: nodeType, Some(n.value + ": " + v.toJs.pprint(0)))
-            else NonTerminal("Key" :: nodeType, Some(n.value), List(render(v)))
-          })
-      case SpliceArrays(srcs)    => NonTerminal("SpliceArrays" :: nodeType, None, srcs.map(render))
-      case SpliceObjects(srcs)   => NonTerminal("SpliceObjects" :: nodeType, None, srcs.map(render))
-      case Let(name, expr, body) => NonTerminal("Let" :: nodeType, Some(name.value), List(render(expr), render(body)))
-      case Fun(params, body)     => NonTerminal("Fun" :: nodeType, Some(params.mkString(", ")), List(render(body)))
+      case Obj(values) =>
+        NonTerminal(
+          "Obj" :: nodeType,
+          None,
+          values.toList.map {
+            case (n, v) =>
+              if (v.cata(simpleƒ))
+                Terminal("Key" :: nodeType, Some(n.value + ": " + v.toJs.pprint(0)))
+              else NonTerminal("Key" :: nodeType, Some(n.value), List(render(v)))
+          }
+        )
+      case SpliceArrays(srcs) =>
+        NonTerminal("SpliceArrays" :: nodeType, None, srcs.map(render))
+      case SpliceObjects(srcs) =>
+        NonTerminal("SpliceObjects" :: nodeType, None, srcs.map(render))
+      case Let(name, expr, body) =>
+        NonTerminal("Let" :: nodeType, Some(name.value), List(render(expr), render(body)))
+      case Fun(params, body) =>
+        NonTerminal("Fun" :: nodeType, Some(params.mkString(", ")), List(render(body)))
     }
   }
 }

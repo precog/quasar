@@ -25,10 +25,9 @@ import scalaz.concurrent.Task
 sealed abstract class Timing[A]
 object Timing {
   final case object Timestamp extends Timing[Instant]
-  final case object Nanos extends Timing[Long]
+  final case object Nanos     extends Timing[Long]
 
-  final class Ops[S[_]](implicit S: Timing :<: S)
-    extends LiftedOps[Timing, S] {
+  final class Ops[S[_]](implicit S: Timing :<: S) extends LiftedOps[Timing, S] {
 
     private val lowLevel = LowLevel[S]
 
@@ -53,8 +52,7 @@ object Timing {
       new Ops[S]
   }
 
-  final class LowLevel[S[_]](implicit S: Timing :<: S)
-    extends LiftedOps[Timing, S] {
+  final class LowLevel[S[_]](implicit S: Timing :<: S) extends LiftedOps[Timing, S] {
 
     /** Raw nanoseconds value; note that these values are only meaningful when
       * compared to each other.

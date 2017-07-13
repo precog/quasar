@@ -1,7 +1,7 @@
 import github.GithubPlugin._
 import quasar.project._
 
-import java.lang.{ String, Integer }
+import java.lang.{String, Integer}
 import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
@@ -29,36 +29,31 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
   organization := "org.quasar-analytics",
   initialize := {
     val version = sys.props("java.specification.version")
-    assert(
-      Integer.parseInt(version.split("\\.")(1)) >= 8,
-      "Java 8 or above required, found " + version)
+    assert(Integer.parseInt(version.split("\\.")(1)) >= 8,
+           "Java 8 or above required, found " + version)
   },
-
   ScoverageKeys.coverageHighlighting := true,
-
-  scalacOptions ++= Seq(
-    "-target:jvm-1.8",
-    "-Ybackend:GenBCode"),
+  scalacOptions ++= Seq("-target:jvm-1.8", "-Ybackend:GenBCode"),
   // NB: -Xlint triggers issues that need to be fixed
-  scalacOptions --= Seq(
-    "-Xlint"),
+  scalacOptions --= Seq("-Xlint"),
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.Any,                   // - see wartremover/wartremover#263
-    Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
-    Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
-    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing),              // - see wartremover/wartremover#263
+    Wart.Any, // - see wartremover/wartremover#263
+    Wart.PublicInference, // - creates many compile errors when enabled - needs to be enabled incrementally
+    Wart.ImplicitParameter, // - creates many compile errors when enabled - needs to be enabled incrementally
+    Wart.ImplicitConversion, // - see mpilquist/simulacrum#35
+    Wart.Nothing
+  ), // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
   // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
-
+  testOptions in ExclusiveTests := Seq(
+    Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
   logBuffered in Test := isTravisBuild.value,
-
-  console := { (console in Test).value }) // console alias test:console
+  console := { (console in Test).value }
+) // console alias test:console
 
 val targetSettings = Seq(
   target := {
@@ -67,7 +62,8 @@ val targetSettings = Seq(
     val root = (baseDirectory in ThisBuild).value.getAbsolutePath
     val ours = baseDirectory.value.getAbsolutePath
 
-    new File(root + File.separator + ".targets" + File.separator + ours.substring(root.length))
+    new File(
+      root + File.separator + ".targets" + File.separator + ours.substring(root.length))
   }
 )
 
@@ -94,35 +90,35 @@ lazy val publishSettings = commonPublishSettings ++ Seq(
       url("https://github.com/quasar-analytics/quasar"),
       "scm:git@github.com:quasar-analytics/quasar.git"
     )
-  ))
+  )
+)
 
 lazy val assemblySettings = Seq(
   test in assembly := {},
-
   assemblyMergeStrategy in assembly := {
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
-    // After recent library version upgrades there seems to be a library pulling 
+    // After recent library version upgrades there seems to be a library pulling
     // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
-    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11 
-    // So the merge needed the following lines to avoid the "deduplicate: different file contents found" 
+    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
+    // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
     // produced by web/assembly. Look into removing this once we move to scala v2.11.11.
-    case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
-    case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
-    case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
+    case s if s.endsWith("libjansi.jnilib") => MergeStrategy.last
+    case s if s.endsWith("jansi.dll")       => MergeStrategy.last
+    case s if s.endsWith("libjansi.so")     => MergeStrategy.last
 
     case other => (assemblyMergeStrategy in assembly).value apply other
   },
-
   assemblyExcludedJars in assembly := {
     val cp = (fullClasspath in assembly).value
 
     cp filter { af =>
       val file = af.data
 
-      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.11\.\d+\.jar""")
+      val excludeByName: Boolean =
+        file.getName.matches("""scala-library-2\.11\.\d+\.jar""")
       val excludeByPath: Boolean = file.getPath.contains("org/scala-lang")
 
       excludeByName && excludeByPath
@@ -145,21 +141,23 @@ lazy val githubReleaseSettings =
     GithubKeys.releaseName := "quasar " + GithubKeys.tag.value,
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
-    releaseProcess := Seq[ReleaseStep](
-      checkSnapshotDependencies,
-      inquireVersions,
-      runTest,
-      setReleaseVersion,
-      commitReleaseVersion,
-      pushChanges)
+    releaseProcess := Seq[ReleaseStep](checkSnapshotDependencies,
+                                       inquireVersions,
+                                       runTest,
+                                       setReleaseVersion,
+                                       commitReleaseVersion,
+                                       pushChanges)
   )
 
-lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
-lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
+lazy val isCIBuild =
+  settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
+lazy val sparkDependencyProvided = settingKey[Boolean](
+  "Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
-lazy val root = project.in(file("."))
+lazy val root = project
+  .in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(transferPublishAndTagResources)
@@ -171,30 +169,43 @@ lazy val root = project.in(file("."))
 // sql       core      marklogic  mongodb  ...
 //  └──────────┼───────────┴─────────┴──────┘
 //         interface
-
-        foundation,
+    foundation,
 //     / / | | \ \
 //
-      ejson, js,
+    ejson,
+    js,
 //       \  /
-        common,    // <------------------------------------------------------
+    common, // <------------------------------------------------------
 //        |    \                                                             \
-    effect, frontend,                                                       precog,
+    effect,
+    frontend,
+    precog,
 //   |       |  |  \________________________________________________________  |
-                                                                           blueeyes,
+    blueeyes,
 //                                                                            |
-                                                                           niflheim,
+    niflheim,
 //   |    |   |                                                               |
-    sql, connector,                                                        yggdrasil,
+    sql,
+    connector,
+    yggdrasil,
 //   |   /  | | \ \______ __________________________________________________  |
 //   |  /   | |  \                                                          \ |
-    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
+    core,
+    couchbase,
+    marklogic,
+    mongodb,
+    postgresql,
+    skeleton,
+    sparkcore,
+    mimir,
 //      \ \ | / /                                                           /
-        interface,
+    interface,
 //        /   \
-       repl,  web,
+    repl,
+    web,
 //             |
-              it)
+    it
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -209,12 +220,18 @@ lazy val foundation = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoKeys := Seq[BuildInfoKey](version,
+                                       ScoverageKeys.coverageEnabled,
+                                       isCIBuild,
+                                       isIsolatedEnv,
+                                       exclusiveTestTag),
     buildInfoPackage := "quasar.build",
     exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
-    isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    libraryDependencies ++= Dependencies.foundation)
+    isIsolatedEnv := java.lang.Boolean.parseBoolean(
+      java.lang.System.getProperty("isIsolatedEnv")),
+    libraryDependencies ++= Dependencies.foundation
+  )
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -267,10 +284,9 @@ lazy val core = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.core,
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(libraryDependencies ++= Dependencies.core,
+            ScoverageKeys.coverageMinimum := 79,
+            ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
@@ -283,10 +299,9 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.frontend,
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(libraryDependencies ++= Dependencies.frontend,
+            ScoverageKeys.coverageMinimum := 79,
+            ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -304,17 +319,15 @@ lazy val sql = project
   */
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
-  .dependsOn(
-    common   % BothScopes,
-    effect   % BothScopes,
-    frontend % BothScopes,
-    sql      % "test->test")
+  .dependsOn(common   % BothScopes,
+             effect   % BothScopes,
+             frontend % BothScopes,
+             sql      % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
-  .settings(
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(ScoverageKeys.coverageMinimum := 79,
+            ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -342,18 +355,13 @@ lazy val marklogic = project
   */
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
-  .dependsOn(
-    connector % BothScopes,
-    js        % BothScopes,
-    core      % "test->compile")
+  .dependsOn(connector % BothScopes, js % BothScopes, core % "test->compile")
   .settings(commonSettings)
   .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.mongodb,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Equals,
-      Wart.Overloading))
+  .settings(libraryDependencies ++= Dependencies.mongodb,
+            wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf,
+                                                              Wart.Equals,
+                                                              Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Postgresql connector.
@@ -382,15 +390,14 @@ lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(
     connector % BothScopes
-    )
+  )
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(githubReleaseSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(parallelExecution in Test := false)
-  .settings(
-    sparkDependencyProvided := false,
-    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
+  .settings(sparkDependencyProvided := false,
+            libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -399,15 +406,14 @@ lazy val sparkcore = project
   */
 lazy val interface = project
   .settings(name := "quasar-interface-internal")
-  .dependsOn(
-    core % BothScopes,
-    couchbase,
-    marklogic % BothScopes,
-    mongodb,
-    postgresql,
-    sparkcore,
-    skeleton,
-    mimir)
+  .dependsOn(core % BothScopes,
+             couchbase,
+             marklogic % BothScopes,
+             mongodb,
+             postgresql,
+             sparkcore,
+             skeleton,
+             mimir)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -422,10 +428,9 @@ lazy val repl = project
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
-  .settings(
-    fork in run := true,
-    connectInput in run := true,
-    outputStrategy := Some(StdoutOutput))
+  .settings(fork in run := true,
+            connectInput in run := true,
+            outputStrategy := Some(StdoutOutput))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
@@ -437,9 +442,8 @@ lazy val web = project
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
-  .settings(
-    mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web)
+  .settings(mainClass in Compile := Some("quasar.server.Server"),
+            libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Integration tests that have some dependency on a running connector.
@@ -457,18 +461,16 @@ lazy val it = project
   .settings(parallelExecution in Test := false)
   .enablePlugins(AutomateHeaderPlugin)
 
-
 /***** PRECOG *****/
-
 // copied from sbt-slamdata (remove redundancy when slamdata/sbt-slamdata#23 is fixed)
 val headerSettings = Seq(
-  headers := Map(
-     ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
-     ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
-   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
-   checkHeaders := {
-     if ((createHeaders in Compile).value.nonEmpty) sys.error("headers not all present")
-  })
+  headers := Map(("scala", Apache2_0("2014–2017", "SlamData Inc.")),
+                 ("java", Apache2_0("2014–2017", "SlamData Inc."))),
+  licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
+  checkHeaders := {
+    if ((createHeaders in Compile).value.nonEmpty) sys.error("headers not all present")
+  }
+)
 
 import precogbuild.Build._
 
@@ -487,7 +489,7 @@ lazy val blueeyes = project.setup
   .settings(name := "quasar-blueeyes-internal")
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
-  .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
+  .settings(libraryDependencies += "com.google.guava" % "guava" % "13.0")
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -500,11 +502,9 @@ lazy val mimir = project.setup
   .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(
-    libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
+    libraryDependencies ++= Seq("io.verizon.delorean" %% "core"       % "1.2.42-scalaz-7.2",
+                                "co.fs2"              %% "fs2-core"   % "0.9.6",
+                                "co.fs2"              %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -516,11 +516,11 @@ lazy val niflheim = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
-  .settings(
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
-      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
-      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
+  .settings(libraryDependencies ++= Seq(
+    "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
+    "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
+    "org.objectweb.howl" % "howl"        % "1.0.1-1"
+  ))
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -533,15 +533,14 @@ lazy val yggdrasil = project.setup
   .withWarnings
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
-
     libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-io"     % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0",
-
-      "com.codecommit" %% "smock" % "0.3-specs2-3.8.4" % "test"))
+      "io.verizon.delorean" %% "core"       % "1.2.42-scalaz-7.2",
+      "co.fs2"              %% "fs2-core"   % "0.9.6",
+      "co.fs2"              %% "fs2-io"     % "0.9.6",
+      "co.fs2"              %% "fs2-scalaz" % "0.2.0",
+      "com.codecommit"      %% "smock"      % "0.3-specs2-3.8.4" % "test"
+    )
+  )
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

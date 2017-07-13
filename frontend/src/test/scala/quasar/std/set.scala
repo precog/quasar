@@ -38,35 +38,40 @@ class SetSpec extends quasar.Qspec with TypeArbitrary {
     }
 
     "type inner join on false" in {
-      val expr = InnerJoin.tpe(Func.Input3(Type.Int, Type.Int, Type.Const(Data.Bool(false))))
+      val expr =
+        InnerJoin.tpe(Func.Input3(Type.Int, Type.Int, Type.Const(Data.Bool(false))))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type inner join with empty left" in {
-      val expr = InnerJoin.tpe(Func.Input3(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
+      val expr =
+        InnerJoin.tpe(Func.Input3(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type inner join with empty right" in {
-      val expr = InnerJoin.tpe(Func.Input3(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
+      val expr =
+        InnerJoin.tpe(Func.Input3(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type left outer join with empty left" in {
-      val expr = LeftOuterJoin.tpe(Func.Input3(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
+      val expr =
+        LeftOuterJoin.tpe(Func.Input3(Type.Const(Data.Set(Nil)), Type.Int, Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
     "type right outer join with empty right" in {
-      val expr = RightOuterJoin.tpe(Func.Input3(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
+      val expr =
+        RightOuterJoin.tpe(Func.Input3(Type.Int, Type.Const(Data.Set(Nil)), Type.Bool))
       expr should beSuccessful(Type.Const(Data.Set(Nil)))
     }
 
-    "maintain first type for constantly" >> prop { (t1 : Type, t2 : Type) =>
+    "maintain first type for constantly" >> prop { (t1: Type, t2: Type) =>
       val expr = Constantly.tpe(Func.Input2(t1, t2))
       (t1, t2) match {
         case (Const(r), Const(Data.Set(l))) =>
-           expr must beSuccessful(Const(Data.Set(l.map(κ(r)))))
+          expr must beSuccessful(Const(Data.Set(l.map(κ(r)))))
         case (_, _) => expr must beSuccessful(t1)
       }
     }.set(maxSize = 10)

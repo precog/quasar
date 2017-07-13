@@ -53,16 +53,18 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
   implicit def toApiErrorQResponse[A: ToApiError, S[_]]: ToQResponse[A, S] =
     response(_.toApiError.toResponse)
 
-  implicit def disjunctionQResponse[A, B, S[_]]
-    (implicit ev1: ToQResponse[A, S], ev2: ToQResponse[B, S])
-    : ToQResponse[A \/ B, S] =
-      response(_.fold(ev1.toResponse, ev2.toResponse))
+  implicit def disjunctionQResponse[A, B, S[_]](
+      implicit ev1: ToQResponse[A, S],
+      ev2: ToQResponse[B, S]): ToQResponse[A \/ B, S] =
+    response(_.fold(ev1.toResponse, ev2.toResponse))
 
-  implicit def http4sResponseToQResponse[S[_]](implicit ev: Task :<: S): ToQResponse[Response, S] =
-    response(r => QResponse(
-      status = r.status,
-      headers = r.headers,
-      body = r.body.translate[Free[S, ?]](free.injectFT[Task, S])))
+  implicit def http4sResponseToQResponse[S[_]](
+      implicit ev: Task :<: S): ToQResponse[Response, S] =
+    response(
+      r =>
+        QResponse(status = r.status,
+                  headers = r.headers,
+                  body = r.body.translate[Free[S, ?]](free.injectFT[Task, S])))
 
   implicit def qResponseToQResponse[S[_]]: ToQResponse[QResponse[S], S] =
     response(ι)

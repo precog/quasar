@@ -27,33 +27,34 @@ import scalaz.std.tuple._
 sealed abstract class MarkLogicPlannerError
 
 object MarkLogicPlannerError {
-  final case class InvalidQName(strLit: String) extends MarkLogicPlannerError
-  final case class InvalidUri(uri: String) extends MarkLogicPlannerError
+  final case class InvalidQName(strLit: String)    extends MarkLogicPlannerError
+  final case class InvalidUri(uri: String)         extends MarkLogicPlannerError
   final case class Unimplemented(function: String) extends MarkLogicPlannerError
-  final case class Unreachable(desc: String) extends MarkLogicPlannerError
+  final case class Unreachable(desc: String)       extends MarkLogicPlannerError
 
   val invalidQName = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidQName(s) => s
-  } (InvalidQName)
+  }(InvalidQName)
 
   val invalidUri = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidUri(s) => s
-  } (InvalidUri)
+  }(InvalidUri)
 
   val unimplemented = Prism.partial[MarkLogicPlannerError, String] {
     case Unimplemented(f) => f
-  } (Unimplemented)
+  }(Unimplemented)
 
   val unreachable = Prism.partial[MarkLogicPlannerError, String] {
     case Unreachable(d) => d
-  } (Unreachable)
+  }(Unreachable)
 
   implicit val equal: Equal[MarkLogicPlannerError] =
-    Equal.equalBy(e => (
-      invalidQName.getOption(e),
-      invalidUri.getOption(e),
-      unimplemented.getOption(e),
-      unreachable.getOption(e)))
+    Equal.equalBy(
+      e =>
+        (invalidQName.getOption(e),
+         invalidUri.getOption(e),
+         unimplemented.getOption(e),
+         unreachable.getOption(e)))
 
   implicit val show: Show[MarkLogicPlannerError] =
     Show.shows {

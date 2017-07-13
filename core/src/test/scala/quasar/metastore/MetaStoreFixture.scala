@@ -50,15 +50,16 @@ trait MetaStoreFixture {
 }
 
 trait H2MetaStoreFixture extends MetaStoreFixture {
-  def rawTransactor = DbUtil.simpleTransactor(
-    DbUtil.inMemoryConnectionInfo(s"test_mem_${this.getClass.getSimpleName}"))
+  def rawTransactor =
+    DbUtil.simpleTransactor(
+      DbUtil.inMemoryConnectionInfo(s"test_mem_${this.getClass.getSimpleName}"))
 }
 
 trait PostgreSqlMetaStoreFixture
     extends MetaStoreFixture
-    with    PostgresTxFixture
-    with    SpecificationLike
-    with    AfterAll {
+    with PostgresTxFixture
+    with SpecificationLike
+    with AfterAll {
   // The `toLowerCase` is important here to make sure `doobie` can connect to the database properly
   lazy val transactorOption =
     postgreSqlTransactor(this.getClass.getSimpleName.toLowerCase).run.unsafePerformSync
@@ -66,10 +67,10 @@ trait PostgreSqlMetaStoreFixture
   args(skipAll = transactorOption.isEmpty)
 
   private val failMessage = "You must configure the quasar_metastore backend as described in the README " +
-                        "in order to run this test without encountering a failure (yes, we know it "      +
-                        "would be better if we could tell specs2 to mark it as skipped when that "        +
-                        "backend is not present, but that's tricky because of the way doobie "            +
-                        "provides us with some fixtures that are inheritance based"
+    "in order to run this test without encountering a failure (yes, we know it " +
+    "would be better if we could tell specs2 to mark it as skipped when that " +
+    "backend is not present, but that's tricky because of the way doobie " +
+    "provides us with some fixtures that are inheritance based"
 
   override def rawTransactor =
     transactorOption.getOrElse(throw new Exception(failMessage)).transactor

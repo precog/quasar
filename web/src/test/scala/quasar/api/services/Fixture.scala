@@ -36,55 +36,64 @@ import scalaz.concurrent.Task
 
 object Fixture {
 
-  implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
+  implicit val arbJson: Arbitrary[Json] = Arbitrary(
+    Arbitrary.arbitrary[String].map(jString(_)))
 
-  val jsonReadableLine = JsonContentType(Readable,LineDelimited)
-  val jsonPreciseLine = JsonContentType(Precise,LineDelimited)
-  val jsonReadableArray = JsonContentType(Readable,SingleArray)
-  val jsonPreciseArray = JsonContentType(Precise,SingleArray)
+  val jsonReadableLine  = JsonContentType(Readable, LineDelimited)
+  val jsonPreciseLine   = JsonContentType(Precise, LineDelimited)
+  val jsonReadableArray = JsonContentType(Readable, SingleArray)
+  val jsonPreciseArray  = JsonContentType(Precise, SingleArray)
 
   sealed abstract class JsonType
 
   case class PreciseJson(value: Json) extends JsonType
   object PreciseJson {
     implicit val entityEncoder: EntityEncoder[PreciseJson] =
-      EntityEncoder.encodeBy(`Content-Type`(jsonPreciseArray.mediaType, Charset.`UTF-8`)) { pJson =>
-        org.http4s.argonaut.jsonEncoder.toEntity(pJson.value)
+      EntityEncoder.encodeBy(`Content-Type`(jsonPreciseArray.mediaType, Charset.`UTF-8`)) {
+        pJson =>
+          org.http4s.argonaut.jsonEncoder.toEntity(pJson.value)
       }
-    implicit val arb: Arbitrary[PreciseJson] = Arbitrary(Arbitrary.arbitrary[Json].map(PreciseJson(_)))
+    implicit val arb: Arbitrary[PreciseJson] = Arbitrary(
+      Arbitrary.arbitrary[Json].map(PreciseJson(_)))
   }
 
   case class ReadableJson(value: Json) extends JsonType
   object ReadableJson {
     implicit val entityEncoder: EntityEncoder[ReadableJson] =
-      EntityEncoder.encodeBy(`Content-Type`(jsonReadableArray.mediaType, Charset.`UTF-8`)) { rJson =>
-        org.http4s.argonaut.jsonEncoder.toEntity(rJson.value)
+      EntityEncoder.encodeBy(`Content-Type`(jsonReadableArray.mediaType, Charset.`UTF-8`)) {
+        rJson =>
+          org.http4s.argonaut.jsonEncoder.toEntity(rJson.value)
       }
-    implicit val arb: Arbitrary[ReadableJson] = Arbitrary(Arbitrary.arbitrary[Json].map(ReadableJson(_)))
+    implicit val arb: Arbitrary[ReadableJson] = Arbitrary(
+      Arbitrary.arbitrary[Json].map(ReadableJson(_)))
   }
 
   implicit val readableLineDelimitedJson: EntityEncoder[List[ReadableJson]] =
-    EntityEncoder.stringEncoder.contramap[List[ReadableJson]] { rJsons =>
-      rJsons.map(rJson => Argonaut.nospace.pretty(rJson.value)).mkString("\n")
-    }.withContentType(`Content-Type`(jsonReadableLine.mediaType, Charset.`UTF-8`))
+    EntityEncoder.stringEncoder
+      .contramap[List[ReadableJson]] { rJsons =>
+        rJsons.map(rJson => Argonaut.nospace.pretty(rJson.value)).mkString("\n")
+      }
+      .withContentType(`Content-Type`(jsonReadableLine.mediaType, Charset.`UTF-8`))
 
   implicit val preciseLineDelimitedJson: EntityEncoder[List[PreciseJson]] =
-    EntityEncoder.stringEncoder.contramap[List[PreciseJson]] { pJsons =>
-      pJsons.map(pJson => Argonaut.nospace.pretty(pJson.value)).mkString("\n")
-    }.withContentType(`Content-Type`(jsonPreciseLine.mediaType, Charset.`UTF-8`))
+    EntityEncoder.stringEncoder
+      .contramap[List[PreciseJson]] { pJsons =>
+        pJsons.map(pJson => Argonaut.nospace.pretty(pJson.value)).mkString("\n")
+      }
+      .withContentType(`Content-Type`(jsonPreciseLine.mediaType, Charset.`UTF-8`))
 
   case class Csv(value: String)
   object Csv {
     implicit val entityEncoder: EntityEncoder[Csv] =
-      EntityEncoder.encodeBy(`Content-Type`(MediaType.`text/csv`, Charset.`UTF-8`)) { csv =>
-        EntityEncoder.stringEncoder(Charset.`UTF-8`).toEntity(csv.value)
+      EntityEncoder.encodeBy(`Content-Type`(MediaType.`text/csv`, Charset.`UTF-8`)) {
+        csv =>
+          EntityEncoder.stringEncoder(Charset.`UTF-8`).toEntity(csv.value)
       }
   }
 
   def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
     type MEff[A] = Coproduct[Task, MountConfigs, A]
     TaskRef(mounts).map { configsRef =>
-
       val mounter: Mounting ~> Free[MEff, ?] = Mounter.trivial[MEff]
 
       val meff: MEff ~> Task =

@@ -21,7 +21,7 @@ import quasar.precog.TestSupport._
 
 class DiffExamplesSpec extends Specification {
   import JParser._
-  import MergeExamples.{ scala1, scala2, lotto1, lotto2, mergedLottoResult }
+  import MergeExamples.{scala1, scala2, lotto1, lotto2, mergedLottoResult}
 
   "Diff example" in {
     val Diff(changed, added, deleted) = scala1 diff scala2
@@ -74,5 +74,10 @@ class DiffExamplesSpec extends Specification {
     deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
   }
 
-  private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
+  private def read(resource: String) =
+    parseUnsafe(
+      scala.io.Source
+        .fromInputStream(getClass.getResourceAsStream(resource))
+        .getLines
+        .mkString)
 }

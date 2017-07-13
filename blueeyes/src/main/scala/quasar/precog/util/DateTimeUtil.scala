@@ -49,27 +49,31 @@ object DateTimeUtil {
     })
   }
 
-  def isValidISO(str: String): Boolean = try {
-    parseDateTime(str); true
-  } catch {
-    case e:IllegalArgumentException => { false }
-  }
+  def isValidISO(str: String): Boolean =
+    try {
+      parseDateTime(str); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidTimeZone(str: String): Boolean = try {
-    ZoneId.of(str); true
-  } catch {
-    case e:IllegalArgumentException => { false }
-  }
+  def isValidTimeZone(str: String): Boolean =
+    try {
+      ZoneId.of(str); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidFormat(time: String, fmt: String): Boolean = try {
-    DateTimeFormatter.ofPattern(fmt)./*withOffsetParsed().*/parse(time); true
-  } catch {
-    case e: IllegalArgumentException => { false }
-  }
+  def isValidFormat(time: String, fmt: String): Boolean =
+    try {
+      DateTimeFormatter.ofPattern(fmt). /*withOffsetParsed().*/ parse(time); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidPeriod(period: String): Boolean = try {
-    Period.parse(period); true
-  } catch {
-    case e: IllegalArgumentException => { false }
-  }
+  def isValidPeriod(period: String): Boolean =
+    try {
+      Period.parse(period); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 }

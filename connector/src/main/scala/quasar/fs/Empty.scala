@@ -54,7 +54,8 @@ object Empty {
   def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
     case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
     case ManageFile.Delete(p)    => fsPathNotFound(p)
-    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+    case ManageFile.TempFile(p) =>
+      (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
   }
 
   def queryFile[F[_]: Applicative]: QueryFile ~> F =
@@ -86,12 +87,14 @@ object Empty {
       }
     }
 
-  def analyze[F[_] : Applicative]: Analyze ~> F = new (Analyze ~> F) {
+  def analyze[F[_]: Applicative]: Analyze ~> F = new (Analyze ~> F) {
     def apply[A](from: Analyze[A]) = from match {
-      case Analyze.QueryCost(lp) => lpResult[F, FileSystemError \/ Int](lp).map(_._2).map(Bind[FileSystemError \/ ?].join(_))
+      case Analyze.QueryCost(lp) =>
+        lpResult[F, FileSystemError \/ Int](lp)
+          .map(_._2)
+          .map(Bind[FileSystemError \/ ?].join(_))
     }
   }
-
 
   def fileSystem[F[_]: Applicative]: FileSystem ~> F =
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
@@ -103,16 +106,19 @@ object Empty {
 
   private val lp = new LogicalPlanR[Fix[LogicalPlan]]
 
-  private def lpResult[F[_]: Applicative, A](plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
+  private def lpResult[F[_]: Applicative, A](
+      plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
     lp.paths(plan)
       .findMin
       // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)), unsupportedPlan[F, A](plan))
+      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)),
+            unsupportedPlan[F, A](plan))
       .strengthL(Vector())
 
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
     pathErr(pathNotFound(p)).left.point[F]
 
-  private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
+  private def unsupportedPlan[F[_]: Applicative, A](
+      lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
     planningFailed(lp, UnsupportedPlan(lp.project, None)).left.point[F]
 }

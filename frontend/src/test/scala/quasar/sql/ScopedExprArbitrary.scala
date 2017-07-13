@@ -29,7 +29,7 @@ trait ScopedExprArbitrary {
 
   implicit val scopedExprArbitrary: Arbitrary[ScopedExpr[Fix[Sql]]] =
     Arbitrary(for {
-      expr <- Arbitrary.arbitrary[Fix[Sql]]
+      expr  <- Arbitrary.arbitrary[Fix[Sql]]
       scope <- Arbitrary.arbitrary[List[Statement[Fix[Sql]]]]
     } yield ScopedExpr(expr, scope))
 }

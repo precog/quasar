@@ -45,15 +45,15 @@ import scalaz._, Scalaz._
   */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class MapReduce(
-  map:       Js.Expr, // "function if (...) emit(...) }"
-  reduce:    Js.Expr, // "function (key, values) { ...; return ... }"
-  selection: Option[Selector] = None,
-  inputSort: Option[NonEmptyList[(BsonField, SortDir)]] = None,
-  limit:     Option[Long] = None,
-  finalizer: Option[Js.Expr] = None, // "function (key, reducedValue) { ...; return ... }"
-  scope:     MapReduce.Scope = ListMap(),
-  jsMode:    Option[Boolean] = None,
-  verbose:   Option[Boolean] = None) {
+    map: Js.Expr, // "function if (...) emit(...) }"
+    reduce: Js.Expr, // "function (key, values) { ...; return ... }"
+    selection: Option[Selector] = None,
+    inputSort: Option[NonEmptyList[(BsonField, SortDir)]] = None,
+    limit: Option[Long] = None,
+    finalizer: Option[Js.Expr] = None, // "function (key, reducedValue) { ...; return ... }"
+    scope: MapReduce.Scope = ListMap(),
+    jsMode: Option[Boolean] = None,
+    verbose: Option[Boolean] = None) {
 
   import MapReduce._
 
@@ -69,15 +69,17 @@ final case class MapReduce(
     def sortBson(xs: NonEmptyList[(BsonField, SortDir)]): Bson.Doc =
       Bson.Doc(ListMap(xs.list.toList.map(_ bimap (_.asText, sortDirToBson(_))): _*))
 
-    Bson.Doc(ListMap(("out" -> out) :: List(
-      selection        map  ("query"    -> _.bson),
-      inputSort        map  ("sort"     -> sortBson(_)),
-      limit            map  ("limit"    -> Bson.Int64(_)),
-      finalizer        map  ("finalize" -> Bson.JavaScript(_)),
-      scope.nonEmpty option ("scope"    -> Bson.Doc(scope)),
-      jsMode           map  ("jsMode"   -> Bson.Bool(_)),
-      verbose          map  ("verbose"  -> Bson.Bool(_))
-    ).unite: _*))
+    Bson.Doc(
+      ListMap(
+        ("out" -> out) :: List(
+          selection map ("query"         -> _.bson),
+          inputSort map ("sort"          -> sortBson(_)),
+          limit map ("limit"             -> Bson.Int64(_)),
+          finalizer map ("finalize"      -> Bson.JavaScript(_)),
+          scope.nonEmpty option ("scope" -> Bson.Doc(scope)),
+          jsMode map ("jsMode"           -> Bson.Bool(_)),
+          verbose map ("verbose"         -> Bson.Bool(_))
+        ).unite: _*))
   }
 }
 
@@ -89,6 +91,7 @@ object MapReduce {
   }
 
   object Action {
+
     /** Replace any existing documents in the destination collection with the
       * result of the map reduce.
       */
@@ -128,22 +131,24 @@ object MapReduce {
     *                              sharding).
     */
   final case class ActionedOutput(
-    action: Action,
-    database: Option[DatabaseName],
-    shardOutputCollection: Option[Boolean]
+      action: Action,
+      database: Option[DatabaseName],
+      shardOutputCollection: Option[Boolean]
   ) {
     def bson(coll: CollectionName): Bson.Doc =
-      Bson.Doc(ListMap((Action.bsonFieldName(action) -> coll.bson) :: List(
-        database              map ("db"        -> _.bson),
-        shardOutputCollection map ("sharded"   -> Bson.Bool(_)),
-        action.nonAtomic      map ("nonAtomic" -> Bson.Bool(_))
-      ).unite: _*))
+      Bson.Doc(
+        ListMap(
+          (Action.bsonFieldName(action) -> coll.bson) :: List(
+            database map ("db"                   -> _.bson),
+            shardOutputCollection map ("sharded" -> Bson.Bool(_)),
+            action.nonAtomic map ("nonAtomic"    -> Bson.Bool(_))
+          ).unite: _*))
   }
 
   /** Output collection for non-inline map-reduce jobs. */
   final case class OutputCollection(
-    collection: CollectionName,
-    withAction: Option[ActionedOutput]
+      collection: CollectionName,
+      withAction: Option[ActionedOutput]
   ) {
     def bson: Bson =
       withAction.fold[Bson](collection.bson)(_ bson collection)

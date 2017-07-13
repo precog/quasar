@@ -35,49 +35,51 @@ package object fs {
   val FsType = FileSystemType("postgresql")
 
   type Eff[A] = (
-        ConnectionIO
-    :\: MonotonicSeq
-    :\: KeyValueStore[ReadHandle, impl.DataStream[ConnectionIO], ?]
-    :/: KeyValueStore[WriteHandle, writefile.TableName, ?]
+    ConnectionIO
+      :\: MonotonicSeq
+      :\: KeyValueStore[ReadHandle, impl.DataStream[ConnectionIO], ?]
+      :/: KeyValueStore[WriteHandle, writefile.TableName, ?]
   )#M[A]
 
   def interp[S[_]](uri: ConnectionUri)(
-    implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S
   ): Free[S, Free[Eff, ?] ~> Free[S, ?]] = {
     val transactor = DriverManagerTransactor[Task]("org.postgresql.Driver", uri.value)
 
-    def taskInterp: Task[Free[Eff, ?] ~> Free[S, ?]]  =
-      (TaskRef(Map.empty[ReadHandle,  impl.DataStream[ConnectionIO]]) |@|
-       TaskRef(Map.empty[WriteHandle, writefile.TableName])           |@|
-       TaskRef(0L)
-      )((kvR, kvW, i) =>
-        mapSNT(injectNT[Task, S] compose (
-          transactor.trans                    :+:
-          MonotonicSeq.fromTaskRef(i)         :+:
-          KeyValueStore.impl.fromTaskRef(kvR) :+:
-          KeyValueStore.impl.fromTaskRef(kvW))))
+    def taskInterp: Task[Free[Eff, ?] ~> Free[S, ?]] =
+      (TaskRef(Map.empty[ReadHandle, impl.DataStream[ConnectionIO]]) |@|
+        TaskRef(Map.empty[WriteHandle, writefile.TableName]) |@|
+        TaskRef(0L))(
+        (kvR, kvW, i) =>
+          mapSNT(
+            injectNT[Task, S] compose (transactor.trans :+:
+              MonotonicSeq.fromTaskRef(i) :+:
+              KeyValueStore.impl.fromTaskRef(kvR) :+:
+              KeyValueStore.impl.fromTaskRef(kvW))))
 
     lift(taskInterp).into[S]
   }
 
   def definition[S[_]](
-    implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
-        interp(uri).map { run =>
-          FileSystemDef.DefinitionResult[Free[S, ?]](
-            run compose interpretAnalyticalFileSystem(
-              Empty.analyze[Free[Eff, ?]],
-              queryfile.interpret,
-              readfile.interpret,
-              writefile.interpret,
-              managefile.interpret),
-            Free.point(()))
-        }.liftM[DefErrT]
+        interp(uri)
+          .map { run =>
+            FileSystemDef.DefinitionResult[Free[S, ?]](
+              run compose interpretAnalyticalFileSystem(Empty.analyze[Free[Eff, ?]],
+                                                        queryfile.interpret,
+                                                        readfile.interpret,
+                                                        writefile.interpret,
+                                                        managefile.interpret),
+              Free.point(())
+            )
+          }
+          .liftM[DefErrT]
     }
 }

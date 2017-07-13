@@ -27,7 +27,8 @@ class StaticContentSpec extends quasar.Qspec {
 
   "fromCliOptions" should {
     "be empty with defaults" in {
-      fromCliOptions(defLoc, CliOptions.default).run.unsafePerformSync must beRightDisjunction(None)
+      fromCliOptions(defLoc, CliOptions.default).run.unsafePerformSync must beRightDisjunction(
+        None)
     }
 
     "fail with loc and no path" in {
@@ -37,16 +38,20 @@ class StaticContentSpec extends quasar.Qspec {
 
     "use supplied default location when none specified" in {
       val opts = CliOptions.default.copy(contentPath = Some("foo"))
-      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(Some(StaticContent("/static", "foo")))
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(
+        Some(StaticContent("/static", "foo")))
     }
 
     "handle loc and path" in {
-      val opts = CliOptions.default.copy(contentLoc = Some("/foo"), contentPath = Some("bar"))
-      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(Some(StaticContent("/foo", "bar")))
+      val opts =
+        CliOptions.default.copy(contentLoc = Some("/foo"), contentPath = Some("bar"))
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(
+        Some(StaticContent("/foo", "bar")))
     }
 
     "relative" in {
-      val opts = CliOptions.default.copy(contentPath = Some("foo"), contentPathRelative = true)
+      val opts =
+        CliOptions.default.copy(contentPath = Some("foo"), contentPathRelative = true)
       fromCliOptions(defLoc, opts).run.unsafePerformSync must beLike {
         case \/-(Some(StaticContent(_, path))) => path must endWith("/foo")
       }

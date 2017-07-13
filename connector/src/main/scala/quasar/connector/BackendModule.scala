@@ -46,12 +46,17 @@ trait BackendModule {
   type Backend[A]           = BackendT[M, A]
 
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
-  private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
-  private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
+  private final implicit def _DelayRenderTreeQSM[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] =
+    DelayRenderTreeQSM
+  private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]
+    : ExtractPath[QSM[T, ?], APath]                 = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
-  private final implicit def _MonadM = MonadM
-  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
-  private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
+  private final implicit def _MonadM                = MonadM
+  private final implicit def _UnirewriteT[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
+  private final implicit def _UnicoalesceCap[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
   implicit class LiftBackend[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -63,11 +68,13 @@ trait BackendModule {
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
 
-  def interpreter(cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] =
+  def interpreter(
+      cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] =
     compile(cfg) map {
       case (runM, close) =>
         val runCfg = λ[Configured ~> M](_.run(cfg))
-        val runFs: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
+        val runFs
+          : AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
         (runM compose runCfg compose runFs, close)
     }
 
@@ -82,38 +89,38 @@ trait BackendModule {
       case QueryFile.EvaluatePlan(lp) =>
         lpToRepr(lp).flatMap(p => QueryFileModule.evaluatePlan(p.repr)).run.run
 
-      case QueryFile.More(h) => QueryFileModule.more(h).run.value
+      case QueryFile.More(h)  => QueryFileModule.more(h).run.value
       case QueryFile.Close(h) => QueryFileModule.close(h)
 
       case QueryFile.Explain(lp) =>
         (for {
-          pp <- lpToRepr(lp)
+          pp          <- lpToRepr(lp)
           explanation <- QueryFileModule.explain(pp.repr)
         } yield ExecutionPlan(Type, explanation, pp.paths)).run.run
 
       case QueryFile.ListContents(dir) => QueryFileModule.listContents(dir).run.value
-      case QueryFile.FileExists(file) => QueryFileModule.fileExists(file)
+      case QueryFile.FileExists(file)  => QueryFileModule.fileExists(file)
     }
 
     val rfInter: ReadFile ~> Configured = λ[ReadFile ~> Configured] {
       case ReadFile.Open(file, offset, limit) =>
         ReadFileModule.open(file, offset, limit).run.value
 
-      case ReadFile.Read(h) => ReadFileModule.read(h).run.value
+      case ReadFile.Read(h)  => ReadFileModule.read(h).run.value
       case ReadFile.Close(h) => ReadFileModule.close(h)
     }
 
     val wfInter: WriteFile ~> Configured = λ[WriteFile ~> Configured] {
-      case WriteFile.Open(file) => WriteFileModule.open(file).run.value
+      case WriteFile.Open(file)      => WriteFileModule.open(file).run.value
       case WriteFile.Write(h, chunk) => WriteFileModule.write(h, chunk)
-      case WriteFile.Close(h) => WriteFileModule.close(h)
+      case WriteFile.Close(h)        => WriteFileModule.close(h)
     }
 
     val mfInter: ManageFile ~> Configured = λ[ManageFile ~> Configured] {
       case ManageFile.Move(scenario, semantics) =>
         ManageFileModule.move(scenario, semantics).run.value
 
-      case ManageFile.Delete(path) => ManageFileModule.delete(path).run.value
+      case ManageFile.Delete(path)   => ManageFileModule.delete(path).run.value
       case ManageFile.TempFile(near) => ManageFileModule.tempFile(near).run.value
     }
 
@@ -135,13 +142,13 @@ trait BackendModule {
     val O = new Optimize[T]
 
     for {
-      qs <- QueryFile.convertToQScriptRead[T, Backend, QSR](lc)(lp)
+      qs      <- QueryFile.convertToQScriptRead[T, Backend, QSR](lc)(lp)
       shifted <- Unirewrite[T, QS[T], Backend](R, lc).apply(qs)
 
       _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
 
-      optimized =
-        shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
+      optimized = shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]),
+                                    Unicoalesce.Capture[T, QS[T]].run)
 
       _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
 
@@ -157,18 +164,21 @@ trait BackendModule {
 
   type QS[T[_[_]]] <: CoM
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptToQScriptTotal[T[_[_]]]
+    : Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]]
 
   type Repr
   type M[A]
 
   def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    : Delay[RenderTree, QSM[T, ?]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
   def MonadM: Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    : Unicoalesce.Capture[T, QS[T]]
 
   type Config
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config]
@@ -177,7 +187,8 @@ trait BackendModule {
 
   val Type: FileSystemType
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
+      cp: T[QSM[T, ?]]): Backend[Repr]
 
   trait QueryFileModule {
     import QueryFile._

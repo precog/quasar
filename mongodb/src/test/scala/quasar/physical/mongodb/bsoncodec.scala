@@ -46,14 +46,14 @@ class BsonCodecSpecs extends quasar.Qspec {
       import Data._
 
       def preserved(d: Data): Boolean = d match {
-        case Int(x)           => x.isValidLong
-        case Interval(_)      => false
-        case Date(_)          => false
-        case Time(_)          => false
-        case Set(_)           => false
-        case Arr(value)       => value.forall(preserved)
-        case Obj(value)       => value.values.forall(preserved)
-        case _                => true
+        case Int(x)      => x.isValidLong
+        case Interval(_) => false
+        case Date(_)     => false
+        case Time(_)     => false
+        case Set(_)      => false
+        case Arr(value)  => value.forall(preserved)
+        case Obj(value)  => value.values.forall(preserved)
+        case _           => true
       }
 
       preserved(data) ==> {
@@ -87,10 +87,10 @@ class BsonCodecSpecs extends quasar.Qspec {
   }
 
   "round trip to repr (all Data types)" >> prop { (data: Data) =>
-      val v = fromData(data)
-      v.isRight ==> {
-        val wrapped = v.map(bson => Bson.Doc(ListMap("value" -> bson)))
-        wrapped.map(w => Bson.fromRepr(w.repr)) must_== wrapped
-      }
+    val v = fromData(data)
+    v.isRight ==> {
+      val wrapped = v.map(bson => Bson.Doc(ListMap("value" -> bson)))
+      wrapped.map(w => Bson.fromRepr(w.repr)) must_== wrapped
+    }
   }
 }

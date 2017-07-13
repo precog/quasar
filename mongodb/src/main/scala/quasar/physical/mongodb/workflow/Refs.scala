@@ -28,17 +28,18 @@ import simulacrum.typeclass
 }
 
 object Refs {
-  def fromRewrite[F[_]](rewrite: PartialFunction[DocVar, DocVar] => RewriteRefs[F]) = new Refs[F] {
-    def refs[A](op: F[A]): List[DocVar] = {
-      // FIXME: Sorry world
-      val vf = new scala.collection.mutable.ListBuffer[DocVar]
-      ignore(rewrite { case v => ignore(vf += v); v } (op))
-      vf.toList
+  def fromRewrite[F[_]](rewrite: PartialFunction[DocVar, DocVar] => RewriteRefs[F]) =
+    new Refs[F] {
+      def refs[A](op: F[A]): List[DocVar] = {
+        // FIXME: Sorry world
+        val vf = new scala.collection.mutable.ListBuffer[DocVar]
+        ignore(rewrite { case v => ignore(vf += v); v }(op))
+        vf.toList
+      }
     }
-  }
 
-  implicit def coproduct[F[_], G[_]](implicit RF: Refs[F], RG: Refs[G]):
-      Refs[Coproduct[F, G, ?]] =
+  implicit def coproduct[F[_], G[_]](implicit RF: Refs[F],
+                                     RG: Refs[G]): Refs[Coproduct[F, G, ?]] =
     new Refs[Coproduct[F, G, ?]] {
       def refs[A](op: Coproduct[F, G, A]) = op.run.fold(RF.refs, RG.refs)
     }

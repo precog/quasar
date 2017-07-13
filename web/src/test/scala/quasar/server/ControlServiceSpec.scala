@@ -34,11 +34,15 @@ class ControlServiceSpec extends quasar.Qspec {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 
-  def withServerExpectingRestart[B](timeoutMillis: Long = 30000, initialPort: Int = 8888, defaultPort: Int = 8888)
-                                      (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
+  def withServerExpectingRestart[B](timeoutMillis: Long = 30000,
+                                    initialPort: Int = 8888,
+                                    defaultPort: Int = 8888)(
+      causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
     val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
-    val servers = Http4sUtils.startServers(initialPort, reload => control.service(defaultPort, reload) orElse info.service)
+    val servers = Http4sUtils.startServers(
+      initialPort,
+      reload => control.service(defaultPort, reload) orElse info.service)
 
     (for {
       result <- servers
@@ -46,7 +50,7 @@ class ControlServiceSpec extends quasar.Qspec {
       b <- (for {
         unconsResult <- servers.unconsOption
         (_, others) = unconsResult.get
-        _ <- causeRestart(uri)
+        _             <- causeRestart(uri)
         unconsResult2 <- others.unconsOption
         (_, others2) = unconsResult2.get
         b <- afterRestart
@@ -58,27 +62,33 @@ class ControlServiceSpec extends quasar.Qspec {
 
   "Control Service" should {
     def checkRunningOn(port: Int) = {
-      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))), method = Method.GET)
+      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))),
+                        method = Method.GET)
       client.fetch(req)(response => Task.now(response.status must_== Status.Ok))
     }
     "restart on new port when PUT succeeds" in {
-      val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
+      val Seq(startPort, newPort) =
+        Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
-      withServerExpectingRestart(initialPort = startPort){ baseUri: Uri =>
+      withServerExpectingRestart(initialPort = startPort) { baseUri: Uri =>
         for {
           req <- Request(uri = baseUri, method = Method.PUT).withBody(newPort.toString)
           _   <- client.fetch(req)(Task.now)
         } yield ()
-      }{ checkRunningOn(newPort) }
-    }.flakyTest("java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
+      } { checkRunningOn(newPort) }
+    }.flakyTest(
+      "java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
 
     "restart on default port when DELETE succeeds" in {
-      val Seq(startPort, defaultPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
+      val Seq(startPort, defaultPort) =
+        Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
-      withServerExpectingRestart(initialPort = startPort, defaultPort = defaultPort){ baseUri: Uri =>
-        val req = Request(uri = baseUri, method = Method.DELETE)
-        client.fetch(req)(Task.now).void
-      }{ checkRunningOn(defaultPort) }
-    }.flakyTest("java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
+      withServerExpectingRestart(initialPort = startPort, defaultPort = defaultPort) {
+        baseUri: Uri =>
+          val req = Request(uri = baseUri, method = Method.DELETE)
+          client.fetch(req)(Task.now).void
+      } { checkRunningOn(defaultPort) }
+    }.flakyTest(
+      "java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
   }
 }

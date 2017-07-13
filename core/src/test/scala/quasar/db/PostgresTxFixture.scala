@@ -36,20 +36,24 @@ trait PostgresTxFixture {
 
     postgresConfigStr.flatMapF(cfgStr =>
       for {
-        cfgJson <- Parse.parse(cfgStr).fold(
-                    err => Task.fail(new RuntimeException(err)),
-                    json => Task.now(Json("postgresql" -> json)))
-        mainCfg <- cfgJson.as[DbConnectionConfig].result.fold(
-                    err => Task.fail(new RuntimeException(err.toString)),
-                    Task.now)
+        cfgJson <- Parse
+          .parse(cfgStr)
+          .fold(err => Task.fail(new RuntimeException(err)),
+                json => Task.now(Json("postgresql" -> json)))
+        mainCfg <- cfgJson
+          .as[DbConnectionConfig]
+          .result
+          .fold(err => Task.fail(new RuntimeException(err.toString)), Task.now)
 
         // Reset the test DB:
-        interp  =  DbUtil.noTxInterp(DbConnectionConfig.connectionInfo(mainCfg))
-        _       <- interp(recreateDb(dbName))
+        interp = DbUtil.noTxInterp(DbConnectionConfig.connectionInfo(mainCfg))
+        _ <- interp(recreateDb(dbName))
 
         // Connect to the fresh test DB:
-        testCfg =  mainCfg.asInstanceOf[DbConnectionConfig.PostgreSql].copy(database = dbName.some)
-        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig)
+        testCfg = mainCfg
+          .asInstanceOf[DbConnectionConfig.PostgreSql]
+          .copy(database = dbName.some)
+        tr <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig)
       } yield tr)
   }
 }

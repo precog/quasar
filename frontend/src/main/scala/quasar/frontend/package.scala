@@ -19,6 +19,6 @@ package quasar
 import scalaz._
 
 package object frontend {
-  type SemanticErrors = NonEmptyList[SemanticError]
+  type SemanticErrors         = NonEmptyList[SemanticError]
   type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
 }

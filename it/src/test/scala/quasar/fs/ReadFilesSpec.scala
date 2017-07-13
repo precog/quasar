@@ -27,7 +27,7 @@ import java.lang.RuntimeException
 import scala.annotation.tailrec
 
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.{Positive => RPositive,_}
+import eu.timepit.refined.numeric.{Positive => RPositive, _}
 import eu.timepit.refined.scalacheck.numeric._
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
@@ -71,7 +71,8 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
 
     "Reading Files" should {
       // Load read-only data
-      step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
+      step(
+        (deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
 
       "read unopened file handle returns UnknownReadHandle" >>* {
         val h = ReadHandle(rootDir </> file("f1"), 42)
@@ -118,7 +119,8 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
       }
 
       // disabled for mimir, not because it doesn't work, but because it's absurdly slow
-      "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(
+        Set("mimir")) {
         prop { k: Int Refined RPositive =>
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
           val r     = runLogT(run, read.scan(smallFile.file, widenPositive(k), None)).run_\/
@@ -126,7 +128,7 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
           val d = rFull.map(_.drop(k))
 
           (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-          (r must_= d)
+            (r must_= d)
         }.set(minTestsOk = 10)
       }
 
@@ -140,23 +142,24 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
           val d = rFull.map(_.take(j.value))
 
           (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-          (r must_= d)
+            (r must_= d)
         }.set(minTestsOk = 10)
       }
 
       "scan with offset k and limit j takes j data, starting from k" >> {
-        Prop.forAll(
-          chooseRefinedNum[Refined, Int, RPositive](1, 50),
-          chooseRefinedNum[Refined, Int, NonNegative](0, 50))
-        { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
-          val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
-          val r     = runLogT(run, read.scan(smallFile.file, k, Some(j))).run_\/
+        Prop
+          .forAll(chooseRefinedNum[Refined, Int, RPositive](1, 50),
+                  chooseRefinedNum[Refined, Int, NonNegative](0, 50)) {
+            (j: Int Refined RPositive, k: Int Refined NonNegative) =>
+              val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
+              val r     = runLogT(run, read.scan(smallFile.file, k, Some(j))).run_\/
 
-          val d = rFull.map(_.drop(k).take(j.value))
+              val d = rFull.map(_.drop(k).take(j.value))
 
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-          (r must_= d)
-        }.set(minTestsOk = 5)
+              (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+                (r must_= d)
+          }
+          .set(minTestsOk = 5)
       }
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
@@ -168,15 +171,15 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
 
           val d = rFull.map(_.take(j.value))
 
-          (j.value must beGreaterThan(smallFile.data.length))    and
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-          (r must_= d)
+          (j.value must beGreaterThan(smallFile.data.length)) and
+            (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+            (r must_= d)
         }.set(minTestsOk = 10)
       }
 
       "scan very long file is stack-safe" >> {
-        runLogT(run, read.scanAll(largeFile.file).foldMap(_ => 1))
-          .runEither must beRight(List(largeFile.data.length).toIndexedSeq)
+        runLogT(run, read.scanAll(largeFile.file).foldMap(_ => 1)).runEither must beRight(
+          List(largeFile.data.length).toIndexedSeq)
       }
 
       // TODO: This was copied from existing tests, but what is being tested?
@@ -185,7 +188,7 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         val l = Vector(largeFile.data.length)
 
         (r.run_\/ must_= l.right) and
-        (r.run_\/ must_= l.right)
+          (r.run_\/ must_= l.right)
       }
 
       step(deleteForReading(fs.setupInterpM).runVoid)
@@ -200,20 +203,15 @@ object ReadFilesSpec {
 
   val readsPrefix: ADir = rootDir </> dir("forreading")
 
-  val emptyFile = TestDatum(
-    readsPrefix </> file("empty"),
-    EStream())
+  val emptyFile = TestDatum(readsPrefix </> file("empty"), EStream())
 
   type SmallFileSize = W.`100`.T
   val smallFileSize: Natural = 100L
 
-  val smallFile = TestDatum(
-    readsPrefix </> file("small"),
-    manyDocs(smallFileSize.toInt))
+  val smallFile = TestDatum(readsPrefix </> file("small"), manyDocs(smallFileSize.toInt))
 
-  val largeFile = TestDatum(
-    readsPrefix </> dir("length") </> file("large"),
-    manyDocs(10000))
+  val largeFile =
+    TestDatum(readsPrefix </> dir("length") </> file("large"), manyDocs(10000))
 
   ////
 
@@ -232,8 +230,9 @@ object ReadFilesSpec {
             (EStream(), v)
         }
 
-    EStream.unfold(chunk0(s, Vector(), size)) { case (ys, v) =>
-      if (v.isEmpty) None else Some((v, chunk0(ys, Vector(), size)))
+    EStream.unfold(chunk0(s, Vector(), size)) {
+      case (ys, v) =>
+        if (v.isEmpty) None else Some((v, chunk0(ys, Vector(), size)))
     }
   }
 }

@@ -32,8 +32,10 @@ import CValueGenerators.JSchema
 
 case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = None) {
   override def toString = {
-    "SampleData: \ndata = "+data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
-    "\nschema: " + schema
+    "SampleData: \ndata = " + data
+      .map(_.toString.replaceAll("\n", "\n  "))
+      .mkString("[\n  ", ",\n  ", "]\n") +
+      "\nschema: " + schema
   }
 
   def sortBy[B: scala.math.Ordering](f: JValue => B) = copy(data = data.sortBy(f))
@@ -41,33 +43,39 @@ case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = Non
 
 object SampleData extends CValueGenerators {
   def toRecord(ids: Array[Long], jv: JValue): JValue = {
-    JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
+    JObject(Nil)
+      .set(JPath(".key"), JArray(ids.map(JNum(_)).toList))
+      .set(JPath(".value"), jv)
   }
 
-  implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
+  implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] =
+    tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
 
   def sample(schema: Int => Gen[JSchema]) = Arbitrary(
     for {
-      depth   <- choose(0, 1)
-      jschema <- schema(depth)
+      depth           <- choose(0, 1)
+      jschema         <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
-    }
-    yield {
+    } yield {
       SampleData(
         data.sorted.toStream flatMap {
           // Sometimes the assembly process will generate overlapping values which will
           // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
           // out here than prevent it from happening in the first place.
-          case (ids, jv) => try { Some(toRecord(ids, assemble(jv))) } catch { case _ : RuntimeException => None }
+          case (ids, jv) =>
+            try { Some(toRecord(ids, assemble(jv))) } catch {
+              case _: RuntimeException => None
+            }
         },
         Some((idCount, jschema))
       )
     }
   )
 
-  def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
+  def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(
+      implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
-    val seen = mutable.HashSet[S]()
+    val seen    = mutable.HashSet[S]()
 
     for (t <- c) {
       if (!seen(key(t))) {
@@ -79,7 +87,8 @@ object SampleData extends CValueGenerators {
     builder.result
   }
 
-  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
+  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(
+      implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
 
     for (t <- c)
@@ -110,7 +119,7 @@ object SampleData extends CValueGenerators {
     Arbitrary(gen)
   }
 
-  def distinct(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
+  def distinct(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
     Arbitrary(
       for {
         sampleData <- arbitrary(sample)
@@ -120,7 +129,7 @@ object SampleData extends CValueGenerators {
     )
   }
 
-  def distinctKeys(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
+  def distinctKeys(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
     Arbitrary(
       for {
         sampleData <- arbitrary(sample)
@@ -130,7 +139,7 @@ object SampleData extends CValueGenerators {
     )
   }
 
-  def distinctValues(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
+  def distinctValues(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
     Arbitrary(
       for {
         sampleData <- arbitrary(sample)
@@ -145,7 +154,7 @@ object SampleData extends CValueGenerators {
       for {
         sampleData <- arbitrary(sample)
       } yield {
-        val rows = sampleData.data
+        val rows       = sampleData.data
         val duplicates = randomSubset(rows, 0.25)
         SampleData(Random.shuffle(rows ++ duplicates), sampleData.schema)
       }
@@ -158,7 +167,7 @@ object SampleData extends CValueGenerators {
       for {
         sampleData <- arbitrary(sample)
       } yield {
-        val rows = for(row <- sampleData.data)
+        val rows = for (row <- sampleData.data)
           yield if (Random.nextDouble < 0.25) JUndefined else row
         SampleData(rows, sampleData.schema)
       }
@@ -166,7 +175,8 @@ object SampleData extends CValueGenerators {
     Arbitrary(gen)
   }
 
-  def undefineRowsForColumn(sample: Arbitrary[SampleData], path: JPath): Arbitrary[SampleData] = {
+  def undefineRowsForColumn(sample: Arbitrary[SampleData],
+                            path: JPath): Arbitrary[SampleData] = {
     val gen = for {
       sampleData <- arbitrary(sample)
     } yield {
@@ -185,6 +195,3 @@ object SampleData extends CValueGenerators {
     Arbitrary(gen)
   }
 }
-
-
-

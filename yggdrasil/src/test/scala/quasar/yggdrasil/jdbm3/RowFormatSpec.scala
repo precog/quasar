@@ -29,7 +29,8 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
   // This should generate some jpath ids, then generate CTypes for these.
   def genJpathIds: Gen[List[String]] = Gen.alphaStr filter (_.length > 0) list
   def genColumnRefs: Gen[List[ColumnRef]] = genJpathIds >> { ids =>
-    val generators = ids.distinct map (id => listOf(genCType) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
+    val generators = ids.distinct map (id =>
+      listOf(genCType) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
     Gen.sequence(generators) ^^ (_.flatten.toList)
   }
 
@@ -39,7 +40,9 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
       case Nil =>
         prev.reverse
       case a :: _ =>
-        val bs = as takeWhile { b => f(a) == f(b) }
+        val bs = as takeWhile { b =>
+          f(a) == f(b)
+        }
         build(as drop bs.size, bs :: prev)
     }
 
@@ -50,11 +53,10 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     val generators = groupConsecutive(refs)(_.selector) map (refs =>
       genIndex(refs.size) >> (i =>
         Gen.sequence(refs.zipWithIndex map {
-          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValue(cType), 1 -> Gen.const(CUndefined))
-          case _                          => Gen.const(CUndefined)
-        })
-      )
-    )
+          case (ColumnRef(_, cType), `i`) =>
+            Gen.frequency(5 -> genCValue(cType), 1 -> Gen.const(CUndefined))
+          case _ => Gen.const(CUndefined)
+        })))
     (Gen sequence generators) ^^ (_.flatten.toList)
   }
 
@@ -62,41 +64,45 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     refs map JDBMSlice.columnFor(CPath.Identity, size) map (_._2)
 
   def verify(rows: List[List[CValue]], cols: List[Column]) = {
-    rows.zipWithIndex foreach { case (values, row) =>
-      (values zip cols) foreach (_ must beLike {
-        case (CUndefined, col) if !col.isDefinedAt(row)                              => ok
-        case (_, col) if !col.isDefinedAt(row)                                       => ko
-        case (CString(s), col: StrColumn)                                            => col(row) must_== s
-        case (CBoolean(x), col: BoolColumn)                                          => col(row) must_== x
-        case (CLong(x), col: LongColumn)                                             => col(row) must_== x
-        case (CDouble(x), col: DoubleColumn)                                         => col(row) must_== x
-        case (CNum(x), col: NumColumn)                                               => col(row) must_== x
-        case (CDate(x), col: DateColumn)                                             => col(row) must_== x
-        case (CNull, col: NullColumn)                                                => ok
-        case (CEmptyObject, col: EmptyObjectColumn)                                  => ok
-        case (CEmptyArray, col: EmptyArrayColumn)                                    => ok
-        case (CArray(xs, cType), col: HomogeneousArrayColumn[_]) if cType == col.tpe => col(row) must_== xs
-      })
+    rows.zipWithIndex foreach {
+      case (values, row) =>
+        (values zip cols) foreach (_ must beLike {
+          case (CUndefined, col) if !col.isDefinedAt(row) => ok
+          case (_, col) if !col.isDefinedAt(row)          => ko
+          case (CString(s), col: StrColumn)               => col(row) must_== s
+          case (CBoolean(x), col: BoolColumn)             => col(row) must_== x
+          case (CLong(x), col: LongColumn)                => col(row) must_== x
+          case (CDouble(x), col: DoubleColumn)            => col(row) must_== x
+          case (CNum(x), col: NumColumn)                  => col(row) must_== x
+          case (CDate(x), col: DateColumn)                => col(row) must_== x
+          case (CNull, col: NullColumn)                   => ok
+          case (CEmptyObject, col: EmptyObjectColumn)     => ok
+          case (CEmptyArray, col: EmptyArrayColumn)       => ok
+          case (CArray(xs, cType), col: HomogeneousArrayColumn[_]) if cType == col.tpe =>
+            col(row) must_== xs
+        })
     }
   }
 
   implicit lazy val arbColumnRefs = Arbitrary(genColumnRefs)
 
   implicit val shrinkCValues: Shrink[List[CValue]] = Shrink.shrinkAny[List[CValue]]
-  implicit val shrinkRows: Shrink[List[List[CValue]]] = Shrink.shrinkAny[List[List[CValue]]]
+  implicit val shrinkRows: Shrink[List[List[CValue]]] =
+    Shrink.shrinkAny[List[List[CValue]]]
 
   "ValueRowFormat" should {
     checkRoundTrips(RowFormat.forValues(_))
   }
 
-  private def identityCols(len: Int): List[ColumnRef] = (0 until len).map({ i =>
-    ColumnRef(CPath(CPathIndex(i)), CLong)
-  })(scala.collection.breakOut)
+  private def identityCols(len: Int): List[ColumnRef] =
+    (0 until len).map({ i =>
+      ColumnRef(CPath(CPathIndex(i)), CLong)
+    })(scala.collection.breakOut)
 
   "IdentitiesRowFormat" should {
     "round-trip CLongs" in {
       prop { id: List[Long] =>
-        val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
+        val rowFormat         = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val cId: List[CValue] = id map (CLong(_))
         rowFormat.decode(rowFormat.encode(cId)) must_== cId
       }
@@ -104,7 +110,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
     "encodeIdentities matches encode format" in {
       prop { id: List[Long] =>
-        val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
+        val rowFormat         = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val cId: List[CValue] = id map (CLong(_))
         rowFormat.decode(rowFormat.encodeIdentities(id.toArray)) must_== cId
       }
@@ -112,8 +118,8 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
     "round-trip CLongs -> Column -> CLongs" in {
       prop { id: List[Long] =>
-        val columns = arrayColumnsFor(1, identityCols(id.size))
-        val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
+        val columns       = arrayColumnsFor(1, identityCols(id.size))
+        val rowFormat     = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val columnDecoder = rowFormat.ColumnDecoder(columns)
         val columnEncoder = rowFormat.ColumnEncoder(columns)
 
@@ -132,22 +138,21 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
     "sort encoded as ValueFormat does" in {
       prop { refs: List[ColumnRef] =>
-        val valueRowFormat = RowFormat.forValues(refs)
+        val valueRowFormat      = RowFormat.forValues(refs)
         val sortingKeyRowFormat = RowFormat.forSortingKey(refs)
         implicit val arbRows: Arbitrary[List[List[CValue]]] =
           Arbitrary(Gen.listOfN(10, genCValuesForColumnRefs(refs)))
 
-
-
         prop { (vals: List[List[CValue]]) =>
           val valueEncoded = vals map (valueRowFormat.encode(_))
-          val sortEncoded = vals map (sortingKeyRowFormat.encode(_))
+          val sortEncoded  = vals map (sortingKeyRowFormat.encode(_))
 
           val sortedA = valueEncoded.sorted(new Ordering[Array[Byte]] {
             def compare(a: Array[Byte], b: Array[Byte]) = valueRowFormat.compare(a, b)
           }) map (valueRowFormat.decode(_))
           val sortedB = sortEncoded.sorted(new Ordering[Array[Byte]] {
-            def compare(a: Array[Byte], b: Array[Byte]) = sortingKeyRowFormat.compare(a, b)
+            def compare(a: Array[Byte], b: Array[Byte]) =
+              sortingKeyRowFormat.compare(a, b)
           }) map (sortingKeyRowFormat.decode(_))
 
           sortedA must_== sortedB
@@ -160,7 +165,8 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     "survive round-trip from CValue -> Array[Byte] -> CValue" in {
       prop { (refs: List[ColumnRef]) =>
         val rowFormat = toRowFormat(refs)
-        implicit val arbColumnValues: Arbitrary[List[CValue]] = Arbitrary(genCValuesForColumnRefs(refs))
+        implicit val arbColumnValues: Arbitrary[List[CValue]] =
+          Arbitrary(genCValuesForColumnRefs(refs))
 
         prop { (vals: List[CValue]) =>
           assert(refs.size == vals.size)
@@ -177,24 +183,24 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
           Arbitrary(Gen.listOfN(size, genCValuesForColumnRefs(refs)))
 
         prop { (rows: List[List[CValue]]) =>
-          val columns = arrayColumnsFor(size, refs)
+          val columns       = arrayColumnsFor(size, refs)
           val columnDecoder = rowFormat.ColumnDecoder(columns)
           val columnEncoder = rowFormat.ColumnEncoder(columns)
 
           // Fill up the columns with the values from the rows.
-          rows.zipWithIndex foreach { case (vals, row) =>
-            columnDecoder.decodeToRow(row, rowFormat.encode(vals))
+          rows.zipWithIndex foreach {
+            case (vals, row) =>
+              columnDecoder.decodeToRow(row, rowFormat.encode(vals))
           }
 
           verify(rows, columns)
 
-          rows.zipWithIndex forall { case (vals, row) =>
-            rowFormat.decode(columnEncoder.encodeFromRow(row)) must_== vals
+          rows.zipWithIndex forall {
+            case (vals, row) =>
+              rowFormat.decode(columnEncoder.encodeFromRow(row)) must_== vals
           }
         }
       }
     }
   }
 }
-
-

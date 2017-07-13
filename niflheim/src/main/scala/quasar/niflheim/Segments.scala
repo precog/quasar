@@ -25,8 +25,12 @@ import scala.collection.mutable
 
 import java.time.LocalDateTime
 
-case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutable.ArrayBuffer[CTree], types: mutable.Map[CType, Int]) {
-  def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
+case class CTree(path: CPath,
+                 fields: mutable.Map[String, CTree],
+                 indices: mutable.ArrayBuffer[CTree],
+                 types: mutable.Map[CType, Int]) {
+  def getField(s: String): CTree =
+    fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
   def getIndex(n: Int): CTree = {
     var i = indices.length
     while (i <= n) {
@@ -35,7 +39,7 @@ case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutab
     }
     indices(n)
   }
-  def getType(ctype: CType): Int = types.getOrElse(ctype, -1)
+  def getType(ctype: CType): Int          = types.getOrElse(ctype, -1)
   def setType(ctype: CType, n: Int): Unit = types(ctype) = n
 
   override def equals(that: Any): Boolean = that match {
@@ -47,7 +51,11 @@ case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutab
 }
 
 object CTree {
-  def empty(path: CPath) = CTree(path, mutable.Map.empty[String, CTree], mutable.ArrayBuffer.empty[CTree], mutable.Map.empty[CType, Int])
+  def empty(path: CPath) =
+    CTree(path,
+          mutable.Map.empty[String, CTree],
+          mutable.ArrayBuffer.empty[CTree],
+          mutable.Map.empty[CType, Int])
 }
 
 object Segments {
@@ -114,7 +122,7 @@ case class Segments(id: Long, var length: Int, t: CTree, a: mutable.ArrayBuffer[
   def detectDateTime(s: String): LocalDateTime = {
     if (!DateTimeUtil.looksLikeIso8601(s)) return null
     try {
-      DateTimeUtil.parseDateTime(s/*, true*/).toLocalDateTime // !!???
+      DateTimeUtil.parseDateTime(s /*, true*/ ).toLocalDateTime // !!???
     } catch {
       case e: IllegalArgumentException => null
     }
@@ -242,15 +250,15 @@ case class Segments(id: Long, var length: Int, t: CTree, a: mutable.ArrayBuffer[
 
   def initializeSegments(row: Int, j: JValue, tree: CTree): Unit = {
     j match {
-      case JNull => addNull(row, tree)
-      case JTrue => addTrue(row, tree)
+      case JNull  => addNull(row, tree)
+      case JTrue  => addTrue(row, tree)
       case JFalse => addFalse(row, tree)
 
-      case JString(s) => addString(row, tree, s)
-      case JNumLong(n) => addLong(row, tree, n)
+      case JString(s)    => addString(row, tree, s)
+      case JNumLong(n)   => addLong(row, tree, n)
       case JNumDouble(n) => addDouble(row, tree, n)
       case JNumBigDec(n) => addBigDecimal(row, tree, n)
-      case JNumStr(s) => addNum(row, tree, s)
+      case JNumStr(s)    => addNum(row, tree, s)
 
       case JObject(m) =>
         if (m.isEmpty) {

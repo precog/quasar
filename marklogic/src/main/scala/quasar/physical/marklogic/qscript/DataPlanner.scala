@@ -32,7 +32,8 @@ import scalaz._, Scalaz._
 private[qscript] object DataPlanner {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def apply[M[_]: Monad, FMT](data: Data)(implicit SP: StructuralPlanner[M, FMT]): M[XQuery] =
+  def apply[M[_]: Monad, FMT](data: Data)(
+      implicit SP: StructuralPlanner[M, FMT]): M[XQuery] =
     data match {
       case Data.Binary(bytes) => xs.base64Binary(base64Bytes(bytes).xs).point[M]
       case Data.Bool(b)       => b.fold(fn.True, fn.False).point[M]
@@ -48,11 +49,13 @@ private[qscript] object DataPlanner {
       case Data.Timestamp(ts) => xs.dateTime(isoInstant(ts).xs).point[M]
 
       case Data.Arr(elements) =>
-        elements.traverse(Kleisli(apply[M, FMT]) >==> SP.mkArrayElt _) >>= (xs => SP.mkArray(mkSeq(xs)))
+        elements.traverse(Kleisli(apply[M, FMT]) >==> SP.mkArrayElt _) >>= (xs =>
+          SP.mkArray(mkSeq(xs)))
 
-      case Data.Obj(entries)  =>
-        entries.toList.traverse { case (key, value) =>
-          apply[M, FMT](value) >>= (SP.mkObjectEntry(key.xs, _))
+      case Data.Obj(entries) =>
+        entries.toList.traverse {
+          case (key, value) =>
+            apply[M, FMT](value) >>= (SP.mkObjectEntry(key.xs, _))
         } >>= (ents => SP.mkObject(mkSeq(ents)))
 
       case Data.Set(elements) =>

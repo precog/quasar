@@ -76,9 +76,9 @@ package object xquery {
   }
 
   final case class BindingName(value: QName) {
-    def unary_~ : XQuery = XQuery(render)
+    def unary_~ : XQuery                        = XQuery(render)
     def as(tpe: SequenceType): TypedBindingName = TypedBindingName(this, tpe)
-    def render: String = s"$$${value}"
+    def render: String                          = s"$$${value}"
   }
 
   object BindingName {
@@ -103,7 +103,7 @@ package object xquery {
 
   final case class TypedBindingName(name: BindingName, tpe: SequenceType) {
     def unary_~ : XQuery = ~name
-    def render: String = s"${name.render} as $tpe"
+    def render: String   = s"${name.render} as $tpe"
   }
 
   object TypedBindingName {
@@ -129,7 +129,9 @@ package object xquery {
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
 
-  def module(prefix: String Refined IsNCName, uri: String Refined Uri, locs: (String Refined Uri)*): ModuleImport =
+  def module(prefix: String Refined IsNCName,
+             uri: String Refined Uri,
+             locs: (String Refined Uri)*): ModuleImport =
     ModuleImport(Some(NSPrefix(NCName(prefix))), NSUri(uri), locs.map(NSUri(_)).toIList)
 
   def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =

@@ -28,10 +28,13 @@ import scalaz._, Scalaz._
 
 final case class Variables(value: Map[VarName, VarValue]) {
   def lookup(name: VarName): SemanticError \/ Fix[Sql] =
-    value.get(name).fold[SemanticError \/ Fix[Sql]](
-      UnboundVariable(name).left)(
-      varValue => sql.fixParser.parseExpr(Query(varValue.value))
-        .leftMap(VariableParseError(name, varValue, _)))
+    value
+      .get(name)
+      .fold[SemanticError \/ Fix[Sql]](UnboundVariable(name).left)(
+        varValue =>
+          sql.fixParser
+            .parseExpr(Query(varValue.value))
+            .leftMap(VariableParseError(name, varValue, _)))
 }
 final case class VarName(value: String) {
   override def toString = ":" + value
@@ -44,28 +47,31 @@ object Variables {
   def fromMap(value: Map[String, String]): Variables =
     Variables(value.map(t => VarName(t._1) -> VarValue(t._2)))
 
-  def substVarsƒ(vars: Variables):
-      AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
+  def substVarsƒ(vars: Variables): AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
     case Vari(name) =>
       vars.lookup(VarName(name))
     case sel: Select[Fix[Sql]] =>
-      sel.substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v => vars.lookup(VarName(v.symbol))).join.map(_.embed)
+      sel
+        .substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v =>
+          vars.lookup(VarName(v.symbol)))
+        .join
+        .map(_.embed)
     case x => x.embed.right
   }
 
   def allVariables: Algebra[Sql, List[VarName]] = {
-    case Vari(name)                                      => List(VarName(name))
+    case Vari(name) => List(VarName(name))
     case sel @ Select(_, _, rel, _, _, _) =>
       rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol) } ++
-      (sel: Sql[List[VarName]]).fold
-    case other                                           => other.fold
+        (sel: Sql[List[VarName]]).fold
+    case other => other.fold
   }
 
   // FIXME: Get rid of this
-  def substVars(expr: Fix[Sql], variables: Variables)
-      : SemanticErrors \/ Fix[Sql] = {
+  def substVars(expr: Fix[Sql], variables: Variables): SemanticErrors \/ Fix[Sql] = {
     val allVars = expr.cata(allVariables)
-    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
+    val errors =
+      allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
     errors.fold(
       expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
       errors => errors.left)

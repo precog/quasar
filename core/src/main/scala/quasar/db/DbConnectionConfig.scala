@@ -34,34 +34,35 @@ object DbConnectionConfig {
 
   final case class HostInfo(name: String, port: Option[Int])
 
-  final case class PostgreSql(
-    host: Option[HostInfo],
-    database: Option[String],
-    userName: String,
-    password: String,
-    parameters: Map[String, String]) extends DbConnectionConfig
+  final case class PostgreSql(host: Option[HostInfo],
+                              database: Option[String],
+                              userName: String,
+                              password: String,
+                              parameters: Map[String, String])
+      extends DbConnectionConfig
 
   implicit val encodeJson: EncodeJson[DbConnectionConfig] =
     EncodeJson {
       case H2(file) => Json("h2" -> Json("file" := file))
       case PostgreSql(host, database, userName, password, parameters) =>
-        Json("postgresql" -> (
-          ("host"       :=? host.map(_.name)) ->?:
-          ("port"       :=? host.flatMap(_.port)) ->?:
-          ("database"   :=? database) ->?:
-          ("userName"   :=  userName) ->:
-          ("password"   :=  password) ->:
-          ("parameters" :=? parameters.nonEmpty.option(parameters)) ->?:
+        Json(
+          "postgresql" -> (("host" :=? host.map(_.name)) ->?:
+            ("port" :=? host.flatMap(_.port)) ->?:
+            ("database" :=? database) ->?:
+            ("userName" := userName) ->:
+            ("password" := password) ->:
+            ("parameters" :=? parameters.nonEmpty.option(parameters)) ->?:
             jEmptyObject))
     }
 
   implicit val decodeJson: DecodeJson[DbConnectionConfig] = {
     final case class ParamValue(value: String)
     implicit val decodeParamValue: DecodeJson[ParamValue] =
-      DecodeJson(cur =>
-        (cur.as[String] |||
-          cur.as[Int].map(_.toString) |||
-          cur.as[Boolean].map(_.toString)).map(ParamValue(_)))
+      DecodeJson(
+        cur =>
+          (cur.as[String] |||
+            cur.as[Int].map(_.toString) |||
+            cur.as[Boolean].map(_.toString)).map(ParamValue(_)))
 
     DecodeJson(cur =>
       cur.fields match {
@@ -69,53 +70,51 @@ object DbConnectionConfig {
         case Some("postgresql" :: Nil) =>
           val pg = cur --\ "postgresql"
           for {
-            host     <- (pg --\ "host").as[Option[String]]
-            port     <- (pg --\ "port").as[Option[Int]]
+            host <- (pg --\ "host").as[Option[String]]
+            port <- (pg --\ "port").as[Option[Int]]
             _ <- if (host.empty && port.nonEmpty)
-                  DecodeResult.fail("host required when port specified", cur.history)
-                 else DecodeResult.ok(())
+              DecodeResult.fail("host required when port specified", cur.history)
+            else DecodeResult.ok(())
             database <- (pg --\ "database").as[Option[String]]
             userName <- (pg --\ "userName").as[String]
             password <- (pg --\ "password").as[String]
             params   <- (pg --\ "parameters").as[Option[Map[String, ParamValue]]]
-          } yield PostgreSql(
-            host.map(HostInfo(_, port)),
-            database,
-            userName,
-            password,
-            params.cata(_.mapValues(_.value), ListMap.empty))
+          } yield
+            PostgreSql(host.map(HostInfo(_, port)),
+                       database,
+                       userName,
+                       password,
+                       params.cata(_.mapValues(_.value), ListMap.empty))
         case Some(fields) =>
-          DecodeResult.fail(s"""unrecognized metastore type: ${fields.mkString(", ")}; expected 'h2' or 'postgresql'""", cur.history)
+          DecodeResult.fail(s"""unrecognized metastore type: ${fields
+            .mkString(", ")}; expected 'h2' or 'postgresql'""", cur.history)
         case None =>
           DecodeResult.fail(s"""expected metastore""", cur.history)
-      })
+    })
   }
 
   def connectionInfo(config: DbConnectionConfig): ConnectionInfo = config match {
     case H2(file) =>
-      ConnectionInfo(
-        "org.h2.Driver",
-        "jdbc:h2:file:" + file,
-        "sa",
-        "")
+      ConnectionInfo("org.h2.Driver", "jdbc:h2:file:" + file, "sa", "")
     case cfg @ PostgreSql(_, _, _, _, _) =>
       ConnectionInfo(
         "org.postgresql.Driver",
-        "jdbc:postgresql:"              ⊹
-          cfg.host.cata(
-            {
-              case HostInfo(name, Some(port)) => s"//$name:$port/"
-              case HostInfo(name, None)       => s"//$name/"
-            },
-            "")                         ⊹
-          cfg.database.getOrElse("/")   ⊹
+        "jdbc:postgresql:" ⊹
+          cfg.host.cata({
+            case HostInfo(name, Some(port)) => s"//$name:$port/"
+            case HostInfo(name, None)       => s"//$name/"
+          }, "") ⊹
+          cfg.database.getOrElse("/") ⊹
           (if (cfg.parameters.nonEmpty)
-            "?" + cfg.parameters.map {
-              case (k, v) => k + "=" + v  // TODO: URL-encode keys and values
-            }.mkString("&")
-          else ""),
+             "?" + cfg.parameters
+               .map {
+                 case (k, v) => k + "=" + v // TODO: URL-encode keys and values
+               }
+               .mkString("&")
+           else ""),
         cfg.userName,
-        cfg.password)
+        cfg.password
+      )
   }
 
   val defaultConnectionConfig: Task[DbConnectionConfig] =

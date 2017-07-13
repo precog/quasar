@@ -44,13 +44,13 @@ object InMemory {
   import ReadFile._, WriteFile._, ManageFile._, QueryFile._
   import FileSystemError._, PathError._
 
-  type FileMap = Map[AFile, Vector[Data]]
-  type RM = Map[ReadHandle, Reading]
-  type WM = Map[WriteHandle, AFile]
+  type FileMap        = Map[AFile, Vector[Data]]
+  type RM             = Map[ReadHandle, Reading]
+  type WM             = Map[WriteHandle, AFile]
   type QueryResponses = Map[Fix[LogicalPlan], Vector[Data]]
-  type ResultMap = Map[ResultHandle, Vector[Data]]
+  type ResultMap      = Map[ResultHandle, Vector[Data]]
 
-  type InMemoryFs[A]  = State[InMemState, A]
+  type InMemoryFs[A] = State[InMemState, A]
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 
@@ -60,13 +60,12 @@ object InMemory {
     * @param rm Currently open [[quasar.fs.ReadFile.ReadHandle]]s
     * @param wm Currently open [[quasar.fs.WriteFile.WriteHandle]]s
     */
-  final case class InMemState(
-    seq: Long,
-    contents: FileMap,
-    rm: RM,
-    wm: WM,
-    queryResps: QueryResponses,
-    resultMap: ResultMap)
+  final case class InMemState(seq: Long,
+                              contents: FileMap,
+                              rm: RM,
+                              wm: WM,
+                              queryResps: QueryResponses,
+                              resultMap: ResultMap)
 
   object InMemState {
     val empty = InMemState(0, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
@@ -92,9 +91,9 @@ object InMemory {
                   st.value.toInt + pos
 
                 val rCount =
-                  rChunkSize                          min
-                  lim.cata(_.value.toInt - pos, rChunkSize) min
-                  (xs.length - rIdx)
+                  rChunkSize min
+                    lim.cata(_.value.toInt - pos, rChunkSize) min
+                    (xs.length - rIdx)
 
                 if (rCount <= 0)
                   Vector.empty.right.point[InMemoryFs]
@@ -146,10 +145,14 @@ object InMemory {
         refineType(path).fold(deleteDir, deleteFile)
 
       case TempFile(path) =>
-        nextSeq map (n => refineType(path).fold(
-          _ </> file(tmpName(n)),
-          renameFile(_, κ(FileName(tmpName(n))))
-        ).right[FileSystemError])
+        nextSeq map (
+            n =>
+              refineType(path)
+                .fold(
+                  _ </> file(tmpName(n)),
+                  renameFile(_, κ(FileName(tmpName(n))))
+                )
+                .right[FileSystemError])
     }
   }
 
@@ -191,26 +194,30 @@ object InMemory {
         contentsL.st.map(_.contains(file))
     }
 
-    private def evalPlan[A](lp: Fix[LogicalPlan])
-                           (f: Vector[Data] => InMemoryFs[A])
-                           : InMemoryFs[(PhaseResults, FileSystemError \/ A)] = {
+    private def evalPlan[A](lp: Fix[LogicalPlan])(f: Vector[Data] => InMemoryFs[A])
+      : InMemoryFs[(PhaseResults, FileSystemError \/ A)] = {
       phaseResults(lp)
-        .tuple(simpleEvaluation(lp).flatMap(f andThen EitherT.right[InMemoryFs, FileSystemError, A]).run)
+        .tuple(
+          simpleEvaluation(lp)
+            .flatMap(f andThen EitherT.right[InMemoryFs, FileSystemError, A])
+            .run)
     }
 
     private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
       queryResponsesL.st map (qrs =>
-        Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).physicalPlan)))
+        Vector(
+          PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).physicalPlan)))
 
-    private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
-      ExecutionPlan(
-        FileSystemType("in-memory"),
-        s"Lookup $lp in $queries",
-        lpr.absolutePaths(lp))
+    private def executionPlan(lp: Fix[LogicalPlan],
+                              queries: QueryResponses): ExecutionPlan =
+      ExecutionPlan(FileSystemType("in-memory"),
+                    s"Lookup $lp in $queries",
+                    lpr.absolutePaths(lp))
 
     private val optimizer = new Optimizer[Fix[LogicalPlan]]
 
-    private def simpleEvaluation(lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
+    private def simpleEvaluation(
+        lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
       val optLp = optimizer.optimize(lp0)
       EitherT[InMemoryFs, FileSystemError, Vector[Data]](State.gets { mem =>
         import quasar.std.StdLib.set.{Drop, Take}
@@ -220,12 +227,13 @@ object InMemory {
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
-          case InvokeUnapply(Drop, Sized((_,src), (Fix(Constant(Data.Int(skip))),_))) =>
+          case InvokeUnapply(Drop, Sized((_, src), (Fix(Constant(Data.Int(skip))), _))) =>
             (src ⊛ skip.safeToInt.toRightDisjunction(unsupported(optLp)))(_.drop(_))
-          case InvokeUnapply(Take, Sized((_,src), (Fix(Constant(Data.Int(limit))),_))) =>
+          case InvokeUnapply(Take,
+                             Sized((_, src), (Fix(Constant(Data.Int(limit))), _))) =>
             (src ⊛ limit.safeToInt.toRightDisjunction(unsupported(optLp)))(_.take(_))
-          case InvokeUnapply(Squash, Sized((_,src))) => src
-          case Constant(data) => Vector(data).right
+          case InvokeUnapply(Squash, Sized((_, src))) => src
+          case Constant(data)                         => Vector(data).right
           case other =>
             queryResponsesL
               .get(mem)
@@ -237,9 +245,11 @@ object InMemory {
     }
 
     private def unsupported(lp: Fix[LogicalPlan]) =
-      planningFailed(lp, UnsupportedPlan(
-        lp.project,
-        some("In Memory interpreter does not currently support this plan")))
+      planningFailed(
+        lp,
+        UnsupportedPlan(
+          lp.project,
+          some("In Memory interpreter does not currently support this plan")))
   }
 
   val fileSystem: FileSystem ~> InMemoryFs =
@@ -318,18 +328,20 @@ object InMemory {
   private def fsPathExists[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
     pathErr(pathExists(f)).left.point[InMemoryFs]
 
-  private def moveDir(src: ADir, dst: ADir, s: MoveSemantics):
-      InMemoryFs[FileSystemError \/ Unit] =
+  private def moveDir(src: ADir,
+                      dst: ADir,
+                      s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
       files <- contentsL.st ∘
-                 (_.keys.toStream.map(_ relativeTo src).unite ∘
-                   (sufx => (src </> sufx, dst </> sufx)))
-      r     <- files.traverse { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run ∘
-                 (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(src))))
+        (_.keys.toStream.map(_ relativeTo src).unite ∘
+          (sufx => (src </> sufx, dst </> sufx)))
+      r <- files.traverse { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run ∘
+        (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(src))))
     } yield r
 
-  private def moveFile(src: AFile, dst: AFile, s: MoveSemantics):
-      InMemoryFs[FileSystemError \/ Unit] = {
+  private def moveFile(src: AFile,
+                       dst: AFile,
+                       s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
     import MoveSemantics._
 
     val move0: InMemoryFs[FileSystemError \/ Unit] =
@@ -349,8 +361,8 @@ object InMemory {
   private def deleteDir(d: ADir): InMemoryFs[FileSystemError \/ Unit] =
     for {
       ss <- contentsL.st ∘ (_.keys.toStream.map(_ relativeTo d).unite)
-      r  <- ss.traverse(f => EitherT(deleteFile(d </> f))).run ∘
-              (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(d))))
+      r <- ss.traverse(f => EitherT(deleteFile(d </> f))).run ∘
+        (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(d))))
     } yield r
 
   private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
@@ -365,8 +377,10 @@ object InMemory {
     Lens.mapVLens(h) <=< resultMapL
 
   private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[PathSegment]] =
-    contentsL.st map (
-      _.keys.toList.map(_ relativeTo d).unite.toNel
-        .map(_ foldMap (f => firstSegmentName(f).toSet))
-        .toRightDisjunction(pathErr(pathNotFound(d))))
+    contentsL.st map (_.keys.toList
+      .map(_ relativeTo d)
+      .unite
+      .toNel
+      .map(_ foldMap (f => firstSegmentName(f).toSet))
+      .toRightDisjunction(pathErr(pathNotFound(d))))
 }

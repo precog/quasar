@@ -30,7 +30,7 @@ import scala.collection.immutable.SortedMap
 
 object CookStateLog {
   final val lockName = "txLog"
-  final val logName = "CookStateLog"
+  final val logName  = "CookStateLog"
 }
 
 class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends Logging {
@@ -51,7 +51,9 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
 
   def close = {
     if (pendingCookIds0.size > 0) {
-      log.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
+      log.warn(
+        "Closing txLog with pending cooks: " + pendingCookIds0.keys
+          .mkString("[", ", ", "]"))
     }
     txLog.close()
     workLock.release
@@ -122,17 +124,16 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
 
     txLog.mark(pendingCookIds0.headOption match {
       case Some((_, txKey)) => txKey
-      case None => completeTxKey
+      case None             => completeTxKey
     })
   }
 }
-
 
 sealed trait TXLogEntry {
   def blockId: Long
 }
 
-case class StartCook(blockId: Long) extends TXLogEntry
+case class StartCook(blockId: Long)    extends TXLogEntry
 case class CompleteCook(blockId: Long) extends TXLogEntry
 
 object TXLogEntry extends Logging {
@@ -142,13 +143,19 @@ object TXLogEntry extends Logging {
     buffer.getShort match {
       case 0x1 => StartCook(buffer.getLong)
       case 0x2 => CompleteCook(buffer.getLong)
-      case other => log.error("Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
+      case other =>
+        log.error(
+          "Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(
+            other,
+            record.isCTRL,
+            record.isEOB,
+            record.data.mkString("[", ", ", "]")))
     }
   }
 
   def toBytes(entry: TXLogEntry): Array[Array[Byte]] = {
     val (tpe, size) = entry match {
-      case StartCook(blockId) => (0x1, 42)
+      case StartCook(blockId)    => (0x1, 42)
       case CompleteCook(blockId) => (0x2, 42)
     }
 
@@ -161,5 +168,3 @@ object TXLogEntry extends Logging {
     Array[Array[Byte]](record)
   }
 }
-
-

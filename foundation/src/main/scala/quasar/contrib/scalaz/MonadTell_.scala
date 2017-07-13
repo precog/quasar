@@ -33,17 +33,20 @@ object MonadTell_ extends MonadTell_Instances {
 }
 
 sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
-  implicit def eitherTMonadTell[F[_]: Functor, W, E](implicit T: MonadTell_[F, W]): MonadTell_[EitherT[F, E, ?], W] =
+  implicit def eitherTMonadTell[F[_]: Functor, W, E](
+      implicit T: MonadTell_[F, W]): MonadTell_[EitherT[F, E, ?], W] =
     new MonadTell_[EitherT[F, E, ?], W] {
       def writer[A](w: W, a: A) = EitherT(T.writer(w, a) map (_.right[E]))
     }
 
-  implicit def writerTMonadTell[F[_]: Functor, W1, W2: Monoid](implicit T: MonadTell_[F, W1]): MonadTell_[WriterT[F, W2, ?], W1] =
+  implicit def writerTMonadTell[F[_]: Functor, W1, W2: Monoid](
+      implicit T: MonadTell_[F, W1]): MonadTell_[WriterT[F, W2, ?], W1] =
     new MonadTell_[WriterT[F, W2, ?], W1] {
       def writer[A](w: W1, a: A) = WriterT(T.writer(w, a) strengthL mzero[W2])
     }
 
-  implicit def stateTMonadTell[F[_]: Monad, W, S](implicit T: MonadTell_[F, W]): MonadTell_[StateT[F, S, ?], W] =
+  implicit def stateTMonadTell[F[_]: Monad, W, S](
+      implicit T: MonadTell_[F, W]): MonadTell_[StateT[F, S, ?], W] =
     new MonadTell_[StateT[F, S, ?], W] {
       def writer[A](w: W, a: A) = StateT(T.writer(w, a) strengthL _)
     }
@@ -62,7 +65,7 @@ sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
     new MonadTell_[T[F, ?], W] {
       def writer[A](w: W, a: A): T[F, A] = Hoist[T].liftM(MonadTell_[F, W].writer(w, a))
     }
-   */
+ */
 }
 
 sealed abstract class MonadTell_Instances0 {
@@ -72,7 +75,8 @@ sealed abstract class MonadTell_Instances0 {
     }
 }
 
-final class MonadTell_Ops[F[_], W, A] private[scalaz] (self: F[A])(implicit F: MonadTell_[F, W]) {
+final class MonadTell_Ops[F[_], W, A] private[scalaz] (self: F[A])(
+    implicit F: MonadTell_[F, W]) {
   final def :++>(w: ⇒ W)(implicit B: Bind[F]): F[A] =
     B.bind(self)(a => B.map(F.tell(w))(_ => a))
 

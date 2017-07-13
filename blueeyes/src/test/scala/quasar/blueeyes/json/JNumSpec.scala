@@ -57,12 +57,12 @@ class JNumSpec extends Specification {
     val b12: JNum = JNum(BigDecimal("0.0000000100000000000000001"))
 
     val nums: List[JNum] = (
-        s1 :: s2 :: s3 :: s4 ::
-          n1 :: n2 :: n3 :: n4 :: n5 :: n6 ::
-            d1 :: d2 :: d3 :: d4 :: d5 :: d6 :: d7 :: d8 :: d9 :: d10 ::
-              b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: b9 :: b10 :: b11 :: b12 ::
-                Nil
-      )
+      s1 :: s2 :: s3 :: s4 ::
+        n1 :: n2 :: n3 :: n4 :: n5 :: n6 ::
+        d1 :: d2 :: d3 :: d4 :: d5 :: d6 :: d7 :: d8 :: d9 :: d10 ::
+        b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: b9 :: b10 :: b11 :: b12 ::
+        Nil
+    )
 
     type Q = (JNum, BigDecimal, Double, Long)
     implicit val ordq = new scala.math.Ordering[Q] {

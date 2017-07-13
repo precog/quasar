@@ -17,7 +17,7 @@
 package quasar.yggdrasil.jdbm3
 
 import quasar.blueeyes._
-import java.io.{ DataInput, DataOutput }
+import java.io.{DataInput, DataOutput}
 import org.apache.jdbm.Serializer
 
 object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {

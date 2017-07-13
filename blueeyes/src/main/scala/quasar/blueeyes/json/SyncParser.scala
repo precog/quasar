@@ -31,7 +31,7 @@ private[json] trait SyncParser extends Parser {
     */
   final def parse(): JValue = {
     val (value, i) = parse(0)
-    var j = i
+    var j          = i
     while (!atEof(j)) {
       (at(j): @switch) match {
         case '\n'              => newline(j); j += 1
@@ -54,7 +54,7 @@ private[json] trait SyncParser extends Parser {
     */
   final def parseMany(): Seq[JValue] = {
     val results = mutable.ArrayBuffer.empty[JValue]
-    var i = 0
+    var i       = 0
     while (!atEof(i)) {
       (at(i): @switch) match {
         case '\n'              => newline(i); i += 1

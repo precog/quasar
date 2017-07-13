@@ -41,9 +41,8 @@ object uuid {
 
     def type1[F[_]: Capture]: F[GenUUID ~> F] =
       Capture[F].capture(
-        fromNoArg[F](Option(EthernetAddress.fromInterface).fold(
-          Generators.timeBasedGenerator)(
-          Generators.timeBasedGenerator)))
+        fromNoArg[F](Option(EthernetAddress.fromInterface)
+          .fold(Generators.timeBasedGenerator)(Generators.timeBasedGenerator)))
 
     def type4[F[_]: Capture]: F[GenUUID ~> F] =
       Capture[F].capture(fromNoArg[F](Generators.randomBasedGenerator))

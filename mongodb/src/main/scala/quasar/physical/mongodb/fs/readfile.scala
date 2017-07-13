@@ -52,17 +52,17 @@ object readfile {
       case Close(h) =>
         OptionT[MongoRead, BsonCursor](MongoRead(cursorL(h) <:= None))
           .flatMapF(c => DC.close(c).liftM[ReadStateT])
-          .run.void
+          .run
+          .void
     }
   }
 
   /** Run [[MongoRead]], using the given `MongoClient`. */
   def run[S[_]](
-    client: MongoClient
+      client: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): Task[MongoRead ~> Free[S, ?]] =
+    S1: PhysErr :<: S): Task[MongoRead ~> Free[S, ?]] =
     TaskRef[ReadState]((0, Map.empty)) map { ref =>
       new (MongoRead ~> Free[S, ?]) {
         def apply[A](rm: MongoRead[A]) = rm.run(ref).runF(client)
@@ -99,21 +99,22 @@ object readfile {
     OptionT[MongoRead, BsonCursor](readState map (cursorL(h).get))
 
   private def openCursor(
-    f: AFile,
-    off: Natural,
-    lim: Option[Positive]
+      f: AFile,
+      off: Natural,
+      lim: Option[Positive]
   ): MongoRead[FileSystemError \/ ReadHandle] = {
     def openCursor0(c: Collection): MongoRead[ReadHandle] =
       for {
-        it   <- find(c).liftM[ReadStateT]
-        skpd =  it skip off.value.toInt
-        ltd  =  lim cata (n => skpd.limit(n.value.toInt), skpd)
-        cur  <- async(ltd.batchCursor).liftM[ReadStateT]
-        h    <- recordCursor(f, cur)
+        it <- find(c).liftM[ReadStateT]
+        skpd = it skip off.value.toInt
+        ltd  = lim cata (n => skpd.limit(n.value.toInt), skpd)
+        cur <- async(ltd.batchCursor).liftM[ReadStateT]
+        h   <- recordCursor(f, cur)
       } yield h
 
-    Collection.fromFile(f).fold(
-      err  => freshHandle(f).map(_.right[FileSystemError]),
-      coll => openCursor0(coll) map(_.right[FileSystemError]))
+    Collection
+      .fromFile(f)
+      .fold(err => freshHandle(f).map(_.right[FileSystemError]),
+            coll => openCursor0(coll) map (_.right[FileSystemError]))
   }
 }

@@ -23,17 +23,22 @@ import quasar.yggdrasil.bytecode._
 import scalaz._, Scalaz._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
-trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] with ProjectionModule[M, Slice] {
+trait SliceColumnarTableModule[M[+ _]]
+    extends BlockStoreColumnarTableModule[M]
+    with ProjectionModule[M, Slice] {
   type TableCompanion <: SliceColumnarTableCompanion
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table] = EitherT.right {
+    def load(table: Table,
+             apiKey: APIKey,
+             tpe: JType): EitherT[M, vfs.ResourceError, Table] = EitherT.right {
       for {
-        paths <- pathsM(table)
+        paths       <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[M, Slice] = {
+        def slices(proj: Projection,
+                   constraints: Option[Set[ColumnRef]]): StreamT[M, Slice] = {
           StreamT.unfoldM[M, Slice, Option[proj.Key]](None) { key =>
             proj.getBlockAfter(key, constraints).map { b =>
               b.map {

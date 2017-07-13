@@ -27,8 +27,9 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class WriteFilesSpec extends FileSystemTest[AnalyticalFileSystem](
-  FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+class WriteFilesSpec
+    extends FileSystemTest[AnalyticalFileSystem](
+      FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._
@@ -79,17 +80,17 @@ class WriteFilesSpec extends FileSystemTest[AnalyticalFileSystem](
       }
 
       "append two files, one in subdir of the other's parent, should succeed" >> {
-        val d = writesPrefix </> dir("subdir1")
+        val d           = writesPrefix </> dir("subdir1")
         val descendant1 = file[Sandboxed]("subdirfile1")
-        val f1 = d </> descendant1
+        val f1          = d </> descendant1
         val descendant2 = dir[Sandboxed]("subdir2") </> file[Sandboxed]("subdirfile2")
-        val f2 = d </> descendant2
+        val f2          = d </> descendant2
         val p = write.append(f1, oneDoc.toProcess).drain ++
-                write.append(f2, oneDoc.toProcess).drain ++
-                query.descendantFiles(d).liftM[Process]
+          write.append(f2, oneDoc.toProcess).drain ++
+          query.descendantFiles(d).liftM[Process]
 
-        runLogT(run, p).map(_.flatMap(_.toVector))
-          .runEither must beRight(containTheSameElementsAs(List(descendant1, descendant2)))
+        runLogT(run, p).map(_.flatMap(_.toVector)).runEither must beRight(
+          containTheSameElementsAs(List(descendant1, descendant2)))
       }
 
       step(deleteForWriting(fs.setupInterpM).runVoid)

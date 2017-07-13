@@ -48,12 +48,15 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   args.report(showtimes = ArgProperty(true))
 
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
+  def shortCircuit[N <: Nat](backend: BackendName,
+                             func: GenericFunc[N],
+                             args: List[Data]): Result \/ Unit
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
+  def compile(queryModel: MongoQueryModel,
+              coll: Collection,
+              lp: Fix[LP]): PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
 
   def is2_6(backend: BackendName): Boolean = backend === TestConfig.MONGO_2_6.name
   def is3_2(backend: BackendName): Boolean = backend === TestConfig.MONGO_3_2.name
@@ -73,86 +76,85 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(func, _)     => shortCircuit(backend, func, args)
       case lp.TemporalTrunc(_, _) => shortCircuitTC(args)
-      case _ => ().right
+      case _                      => ().right
     }
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
         exc <- WorkflowExecutor.mongoDb.run.unattemptRuntime
         v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattemptRuntime
-        rez <- v.fold(
-                _.map(BsonCodec.toData(_)).point[MongoDbIO],
-                c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
+        rez <- v.fold(_.map(BsonCodec.toData(_)).point[MongoDbIO],
+                      c =>
+                        DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]]
+                          .process(c)
+                          .runLog
+                          .map(_.toList))
       } yield rez
 
     def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
       prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
-        .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
+        .cataM[Result \/ ?, Unit](shortCircuitLP(args))
+        .swap
+        .toOption
 
-    final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
-      "a single result",
-      {
-        case Data.Obj(m) :: Nil =>
-          m.toList match {
-            case (_, v) :: Nil => v.some
-            case _             => None
-          }
-        case _ => None
-      },
-      check)
+    final case class SingleResultCheckedMatcher(check: ValueCheck[Data])
+        extends OptionLikeCheckedMatcher[List, Data, Data]("a single result", {
+          case Data.Obj(m) :: Nil =>
+            m.toList match {
+              case (_, v) :: Nil => v.some
+              case _             => None
+            }
+          case _ => None
+        }, check)
 
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
     def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
-      check(args, prg).getOrElse(
-        (for {
-          coll <- MongoDbSpec.tempColl(prefix)
-          argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
-                      BsonCodec.fromData(arg).point[Task].unattemptRuntime.strengthL("arg" + idx) }
-          _     <- insert(
-                    coll,
-                    List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
+      check(args, prg).getOrElse((for {
+        coll <- MongoDbSpec.tempColl(prefix)
+        argsBson <- args.zipWithIndex.traverse {
+          case (arg, idx) =>
+            BsonCodec.fromData(arg).point[Task].unattemptRuntime.strengthL("arg" + idx)
+        }
+        _ <- insert(coll, List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
 
-          qm  <- serverVersion.map(MongoQueryModel(_)).run(testClient)
+        qm <- serverVersion.map(MongoQueryModel(_)).run(testClient)
 
-          lp = prg(
-                (0 until args.length).toList.map(idx =>
-                  Fix(StructuralLib.ObjectProject(
-                    lpf.read(coll.asFile),
-                    lpf.constant(Data.Str("arg" + idx))))))
-          t  <- compile(qm, coll, lp).point[Task].unattemptRuntime
-          (wf, resultField) = t
+        lp = prg(
+          (0 until args.length).toList.map(idx =>
+            Fix(StructuralLib.ObjectProject(lpf.read(coll.asFile),
+                                            lpf.constant(Data.Str("arg" + idx))))))
+        t <- compile(qm, coll, lp).point[Task].unattemptRuntime
+        (wf, resultField) = t
 
-          rez <- evaluate(wf, coll).run(testClient)
+        rez <- evaluate(wf, coll).run(testClient)
 
-          _     <- dropCollection(coll).run(setupClient)
-        } yield {
-          rez must beSingleResult(beCloseTo(massage(expected)))
-        }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
+        _ <- dropCollection(coll).run(setupClient)
+      } yield {
+        rez must beSingleResult(beCloseTo(massage(expected)))
+      }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
     val runner = new StdLibTestRunner with MongoDbDomain {
-      def nullary(
-        prg: Fix[LP],
-        expected: Data): Result =
+      def nullary(prg: Fix[LP], expected: Data): Result =
         run(Nil, κ(prg), expected)
 
-      def unary(
-        prg: Fix[LP] => Fix[LP],
-        arg: Data,
-        expected: Data): Result =
+      def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data): Result =
         run(List(arg), { case List(arg) => prg(arg) }, expected)
 
-      def binary(
-        prg: (Fix[LP], Fix[LP]) => Fix[LP],
-        arg1: Data, arg2: Data,
-        expected: Data): Result =
+      def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP],
+                 arg1: Data,
+                 arg2: Data,
+                 expected: Data): Result =
         run(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }, expected)
 
-      def ternary(
-        prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
-        arg1: Data, arg2: Data, arg3: Data,
-        expected: Data): Result =
-        run(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }, expected)
+      def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+                  arg1: Data,
+                  arg2: Data,
+                  arg3: Data,
+                  expected: Data): Result =
+        run(List(arg1, arg2, arg3), {
+          case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3)
+        }, expected)
     }
 
     backend.name should tests(runner)

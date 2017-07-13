@@ -24,7 +24,7 @@ import scalaz.{NonEmptyList, MonadError}
 package object marklogic {
   type ErrorMessages = NonEmptyList[String]
 
-  type MonadErrMsgs[F[_]]  = MonadError[F, ErrorMessages]
+  type MonadErrMsgs[F[_]] = MonadError[F, ErrorMessages]
 
   object MonadErrMsgs {
     def apply[F[_]](implicit F: MonadErrMsgs[F]): MonadErrMsgs[F] = F

@@ -26,8 +26,8 @@ object mounted {
   /** Strips the `mountPoint` off of all input paths in `ReadFile` operations
     * and restores it on output paths.
     */
-   def readFile[S[_]](mountPoint: ADir)(implicit S: ReadFile :<: S): S ~> Free[S, ?] =
-     transformPaths.readFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
+  def readFile[S[_]](mountPoint: ADir)(implicit S: ReadFile :<: S): S ~> Free[S, ?] =
+    transformPaths.readFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `WriteFile` operations
     * and restores it on output paths.
@@ -50,18 +50,16 @@ object mounted {
   def analyze[S[_]](mountPoint: ADir)(implicit S: Analyze :<: S): S ~> Free[S, ?] =
     transformPaths.analyze[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
 
-
   def fileSystem[S[_]](
-    mountPoint: ADir
+      mountPoint: ADir
   )(implicit
     S0: ReadFile :<: S,
     S1: WriteFile :<: S,
     S2: ManageFile :<: S,
-    S3: QueryFile :<: S
-  ): S ~> Free[S, ?] = {
-    flatMapSNT(readFile[S](mountPoint))   compose
-    flatMapSNT(writeFile[S](mountPoint))  compose
-    flatMapSNT(manageFile[S](mountPoint)) compose
-    queryFile[S](mountPoint)
+    S3: QueryFile :<: S): S ~> Free[S, ?] = {
+    flatMapSNT(readFile[S](mountPoint)) compose
+      flatMapSNT(writeFile[S](mountPoint)) compose
+      flatMapSNT(manageFile[S](mountPoint)) compose
+      queryFile[S](mountPoint)
   }
 }

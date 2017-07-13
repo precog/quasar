@@ -22,17 +22,20 @@ import xml.name._
 object namespaces {
   // NB: We've choosen to only support EJSON maps with string keys for the
   //     time-being as that maps reasonably to XML elements.
-  val ejsonNs         = Namespace(NSPrefix(NCName("ejson")), NSUri("http://quasar-analytics.org/ejson"))
-  val ejsonEjson      = ejsonNs(NCName("ejson"))
-  val ejsonArrayElt   = ejsonNs(NCName("array-element"))
-  val ejsonType       = ejsonNs(NCName("type"))
+  val ejsonNs =
+    Namespace(NSPrefix(NCName("ejson")), NSUri("http://quasar-analytics.org/ejson"))
+  val ejsonEjson    = ejsonNs(NCName("ejson"))
+  val ejsonArrayElt = ejsonNs(NCName("array-element"))
+  val ejsonType     = ejsonNs(NCName("type"))
 
   // Related to encoding of non-QName elements
   val ejsonEncodedName = ejsonNs(NCName("key"))
   val ejsonEncodedAttr = ejsonNs(NCName("key-id"))
 
-  val filesystemNs    = Namespace(NSPrefix(NCName("filesystem")), NSUri("http://quasar-analytics.org/filesystem"))
+  val filesystemNs = Namespace(NSPrefix(NCName("filesystem")),
+                               NSUri("http://quasar-analytics.org/filesystem"))
   val filesystemError = filesystemNs(NCName("error"))
 
-  val qscriptNs       = Namespace(NSPrefix(NCName("qscript")), NSUri("http://quasar-analytics.org/qscript"))
+  val qscriptNs =
+    Namespace(NSPrefix(NCName("qscript")), NSUri("http://quasar-analytics.org/qscript"))
 }

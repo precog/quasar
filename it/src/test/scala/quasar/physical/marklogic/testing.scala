@@ -33,21 +33,21 @@ object testing {
   import xcc._, xquery._, fs._
 
   def multiFormatDef(
-    uri: ConnectionUri,
-    readChunkSize: Positive,
-    writeChunkSize: Positive
+      uri: ConnectionUri,
+      readChunkSize: Positive,
+      writeChunkSize: Positive
   ): Task[(AnalyticalFileSystem ~> Task, AnalyticalFileSystem ~> Task, Task[Unit])] = {
     def failOnError[A](err: FileSystemDef.DefinitionError): Task[A] =
-      err.fold[Task[A]](
-        errs => Task.fail(new RuntimeException(errs intercalate ", ")),
-        ee   => Task.fail(new RuntimeException(ee.shows)))
+      err.fold[Task[A]](errs => Task.fail(new RuntimeException(errs intercalate ", ")),
+                        ee => Task.fail(new RuntimeException(ee.shows)))
 
     val defn = MarkLogic(readChunkSize, writeChunkSize).definition
 
-    MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
+    MarkLogicConfig
+      .fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
       .leftMap(_.left[EnvironmentError])
       .flatMap { cfg =>
-        val js = defn(FsType, ConnectionUri(cfg.copy(docType = DocType.json).asUriString))
+        val js  = defn(FsType, ConnectionUri(cfg.copy(docType = DocType.json).asUriString))
         val xml = defn(FsType, ConnectionUri(cfg.copy(docType = DocType.xml).asUriString))
 
         js.tuple(xml) map {
@@ -59,8 +59,10 @@ object testing {
   /** Returns the results, as `Data`, of evaluating the module or `None` if
     * evaluation succeded without producing any results.
     */
-  def moduleResults[F[_]: Monad: Capture: Catchable: CSourceReader](main: MainModule): F[ErrorMessages \/ Option[Data]] =
-    contentsource.defaultSession[F] >>= Xcc[ReaderT[F, Session, ?]].results(main) map { items =>
-      items.headOption traverse xdmitem.toData[ErrorMessages \/ ?] _
+  def moduleResults[F[_]: Monad: Capture: Catchable: CSourceReader](
+      main: MainModule): F[ErrorMessages \/ Option[Data]] =
+    contentsource.defaultSession[F] >>= Xcc[ReaderT[F, Session, ?]].results(main) map {
+      items =>
+        items.headOption traverse xdmitem.toData[ErrorMessages \/ ?] _
     }
 }

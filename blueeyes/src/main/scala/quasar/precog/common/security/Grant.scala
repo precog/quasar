@@ -68,15 +68,25 @@ object Grant extends Logging {
   val extractorV2: Extractor[Grant]   = extractorV[Grant](schemaV1, Some("1.0".v))
   val extractorV1: Extractor[Grant]   = extractorV[Grant](schemaV1, None)
 
-  @deprecated("V0 serialization schemas should be removed when legacy data is no longer needed", "2.1.5")
+  @deprecated(
+    "V0 serialization schemas should be removed when legacy data is no longer needed",
+    "2.1.5")
   val extractorV0: Extractor[Grant] = new Extractor[Grant] {
     override def validated(obj: JValue) = {
       (obj.validated[GrantId]("gid") |@|
-            obj.validated[Option[APIKey]]("cid").map(_.getOrElse("(undefined)")) |@|
-            obj.validated[Option[GrantId]]("issuer") |@|
-            obj.validated[Permission]("permission")(Permission.extractorV0) |@|
-            obj.validated[Option[LocalDateTime]]("permission.expirationDate")).apply { (gid, cid, issuer, permission, expiration) =>
-        Grant(gid, None, None, cid, issuer.toSet, Set(permission), instant.zero, expiration)
+        obj.validated[Option[APIKey]]("cid").map(_.getOrElse("(undefined)")) |@|
+        obj.validated[Option[GrantId]]("issuer") |@|
+        obj.validated[Permission]("permission")(Permission.extractorV0) |@|
+        obj.validated[Option[LocalDateTime]]("permission.expirationDate")).apply {
+        (gid, cid, issuer, permission, expiration) =>
+          Grant(gid,
+                None,
+                None,
+                cid,
+                issuer.toSet,
+                Set(permission),
+                instant.zero,
+                expiration)
       }
     }
   }
@@ -84,7 +94,9 @@ object Grant extends Logging {
   implicit val decomposer: Decomposer[Grant] = decomposerV1
   implicit val extractor: Extractor[Grant]   = extractorV2 <+> extractorV1 <+> extractorV0
 
-  def implies(grants: Set[Grant], perms: Set[Permission], at: Option[LocalDateTime] = None) = {
+  def implies(grants: Set[Grant],
+              perms: Set[Permission],
+              at: Option[LocalDateTime] = None) = {
     log.trace("Checking implication of %s to %s".format(grants, perms))
     perms.nonEmpty && perms.forall(perm => grants.exists(_.implies(perm, at)))
   }
@@ -100,29 +112,37 @@ object Grant extends Logging {
    * If the supplied set of grants is insufficient to support the supplied set of permissions the result is the empty
    * set.
    */
-  def coveringGrants(grants: Set[Grant], perms: Set[Permission], at: Option[LocalDateTime] = None): Set[Grant] = {
+  def coveringGrants(grants: Set[Grant],
+                     perms: Set[Permission],
+                     at: Option[LocalDateTime] = None): Set[Grant] = {
     if (!implies(grants, perms, at)) Set.empty[Grant]
     else {
-      def tsort(grants: List[Grant]): List[Grant] = grants.find(g1 => !grants.exists(g2 => g2 != g1 && g2.implies(g1))) match {
-        case Some(undominated) => undominated +: tsort(grants.filterNot(_ == undominated))
-        case _                 => List()
-      }
+      def tsort(grants: List[Grant]): List[Grant] =
+        grants.find(g1 => !grants.exists(g2 => g2 != g1 && g2.implies(g1))) match {
+          case Some(undominated) =>
+            undominated +: tsort(grants.filterNot(_ == undominated))
+          case _ => List()
+        }
 
-      def minimize(grants: Seq[Grant], perms: Seq[Permission]): Set[Grant] = grants match {
-        case Seq(head, tail @ _ *) =>
-          perms.partition { perm =>
-            tail.exists(_.implies(perm, at))
-          } match {
-            case (Nil, Nil)          => Set()
-            case (rest, Nil)         => minimize(tail, rest)
-            case (rest, requireHead) => minimize(tail, rest) + head
-          }
-        case _ => Set()
-      }
+      def minimize(grants: Seq[Grant], perms: Seq[Permission]): Set[Grant] =
+        grants match {
+          case Seq(head, tail @ _*) =>
+            perms.partition { perm =>
+              tail.exists(_.implies(perm, at))
+            } match {
+              case (Nil, Nil)          => Set()
+              case (rest, Nil)         => minimize(tail, rest)
+              case (rest, requireHead) => minimize(tail, rest) + head
+            }
+          case _ => Set()
+        }
 
-      val distinct = grants.groupBy { g =>
-        (g.permissions, g.expirationDate)
-      }.map(_._2.head).toList
+      val distinct = grants
+        .groupBy { g =>
+          (g.permissions, g.expirationDate)
+        }
+        .map(_._2.head)
+        .toList
       minimize(tsort(distinct), perms.toList)
     }
   }

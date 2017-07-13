@@ -36,18 +36,21 @@ object matchers {
 
   def beApiErrorWithMessage(status: Status, otherFields: JsonAssoc*): Matcher[ApiError] =
     (haveSameCodeAndReason(status) ^^ { (_: ApiError).status }) and
-    (equal(JsonObject.fromTraversableOnce(otherFields.toList)) ^^ { (_: ApiError).detail - "message" }) and
-    (haveFields("message" :: otherFields.map(_._1).toList : _*) ^^ { (_: ApiError).detail })
+      (equal(JsonObject.fromTraversableOnce(otherFields.toList)) ^^ {
+        (_: ApiError).detail - "message"
+      }) and
+      (haveFields("message" :: otherFields.map(_._1).toList: _*) ^^ {
+        (_: ApiError).detail
+      })
 
   def beHeaderMissingError(name: String): Matcher[ApiError] =
-    equal(apiError(
-      BadRequest withReason s"'$name' header missing.",
-      "headerName" := name))
+    equal(
+      apiError(BadRequest withReason s"'$name' header missing.", "headerName" := name))
 
   private def haveSameCodeAndReason(status: Status): Matcher[Status] =
     (equal(status.code) ^^ { (_: Status).code }) and
-    (equal(status.reason) ^^ { (_: Status).reason })
+      (equal(status.reason) ^^ { (_: Status).reason })
 
   private def haveFields(fields: JsonField*): Matcher[JsonObject] =
-    contain(exactly(fields : _*)) ^^ { (_: JsonObject).fields }
+    contain(exactly(fields: _*)) ^^ { (_: JsonObject).fields }
 }

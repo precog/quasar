@@ -28,36 +28,33 @@ import org.scalacheck.Gen
 
 /** The operations needed to execute the various StdLib tests for a backend. */
 trait StdLibTestRunner {
+
   /** The result of comparing `expected` to the result of the executing the given
     * nullary function on the backend.
     */
-  def nullary(
-    prg: Fix[LP],
-    expected: Data): Result
+  def nullary(prg: Fix[LP], expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
     * unary function on the backend.
     */
-  def unary(
-    prg: Fix[LP] => Fix[LP],
-    arg: Data,
-    expected: Data): Result
+  def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
     * binary function on the backend.
     */
-  def binary(
-    prg: (Fix[LP], Fix[LP]) => Fix[LP],
-    arg1: Data, arg2: Data,
-    expected: Data): Result
+  def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP],
+             arg1: Data,
+             arg2: Data,
+             expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
     * ternary function on the backend.
     */
-  def ternary(
-    prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
-    arg1: Data, arg2: Data, arg3: Data,
-    expected: Data): Result
+  def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+              arg1: Data,
+              arg2: Data,
+              arg3: Data,
+              expected: Data): Result
 
   /** Defines the domain of values for `Data.Int` for which the implementation is
     * well-behaved.

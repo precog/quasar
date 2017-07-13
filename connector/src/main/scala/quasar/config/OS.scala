@@ -38,12 +38,12 @@ sealed abstract class OS {
 
 object OS {
   private case object Windows extends OS
-  private case object Mac extends OS
-  private case object Posix extends OS
+  private case object Mac     extends OS
+  private case object Posix   extends OS
 
   val windows: OS = Windows
-  val mac: OS = Mac
-  val posix: OS = Posix
+  val mac: OS     = Mac
+  val posix: OS   = Posix
 
   // NB: We lump everything that isn't Windows or Mac into posix, this may need
   //     to change.

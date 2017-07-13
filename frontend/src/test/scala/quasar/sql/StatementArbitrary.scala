@@ -34,7 +34,7 @@ trait StatementArbitrary {
   implicit val statementShrink: Shrink[Statement[Fix[Sql]]] = Shrink {
     case func @ FunctionDecl(name, args, body) =>
       shrink(args).map(a => func.copy(args = a)) append
-      shrink(body).map(b => func.copy(body = b))
+        shrink(body).map(b => func.copy(body = b))
     case Import(path) => shrink(path).map(Import[Fix[Sql]](_))
   }
 
@@ -53,8 +53,13 @@ trait StatementArbitrary {
   // of path special characters
   val importGen: Gen[Import[Fix[Sql]]] =
     Gen.oneOf(
-      Arbitrary.arbitrary[PathOf[Abs, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](unsandbox(p.path))),
-      Arbitrary.arbitrary[PathOf[Rel, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](unsandbox(p.path))))
+      Arbitrary
+        .arbitrary[PathOf[Abs, Dir, Sandboxed, AlphaCharacters]]
+        .map(p => Import[Fix[Sql]](unsandbox(p.path))),
+      Arbitrary
+        .arbitrary[PathOf[Rel, Dir, Sandboxed, AlphaCharacters]]
+        .map(p => Import[Fix[Sql]](unsandbox(p.path)))
+    )
 }
 
 object StatementArbitrary extends StatementArbitrary

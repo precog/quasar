@@ -55,12 +55,13 @@ abstract class KeyValueStoreSpec extends quasar.Qspec {
         ops.put(key, value) *> ops.put(key, newValue) *> ops.get(key).run
       ) must_= newValue.some
     }
-    "retrieve all keys" >> prop { (key: Int, value: String, otherKey: Int, otherValue: String) =>
-      key ≠ otherKey ==> {
-        eval(
-          ops.put(key, value) *> ops.put(otherKey, otherValue) *> ops.keys
-        ) must contain(key, otherKey)
-      }
+    "retrieve all keys" >> prop {
+      (key: Int, value: String, otherKey: Int, otherValue: String) =>
+        key ≠ otherKey ==> {
+          eval(
+            ops.put(key, value) *> ops.put(otherKey, otherValue) *> ops.keys
+          ) must contain(key, otherKey)
+        }
     }
   }
 }

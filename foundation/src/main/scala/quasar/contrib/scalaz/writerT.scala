@@ -21,14 +21,14 @@ import slamdata.Predef.Throwable
 import scalaz._, Scalaz._
 
 trait WriterTInstances {
-  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
+  implicit def writerTCatchable[F[_]: Catchable: Functor, W: Monoid]
+    : Catchable[WriterT[F, W, ?]] =
     new Catchable[WriterT[F, W, ?]] {
       def attempt[A](fa: WriterT[F, W, A]) =
-        WriterT[F, W, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)      => (mzero[W], t.left)
-            case \/-((w, a)) => (w, a.right)
-          })
+        WriterT[F, W, Throwable \/ A](Catchable[F].attempt(fa.run) map {
+          case -\/(t)      => (mzero[W], t.left)
+          case \/-((w, a)) => (w, a.right)
+        })
 
       def fail[A](t: Throwable) =
         WriterT(Catchable[F].fail(t).strengthL(mzero[W]))

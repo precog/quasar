@@ -21,7 +21,7 @@ import scalaz._
 sealed abstract class IdHandling
 final case object ExcludeId extends IdHandling
 final case object IncludeId extends IdHandling
-final case object IgnoreId extends IdHandling
+final case object IgnoreId  extends IdHandling
 
 object IdHandling {
   implicit val monoid: Monoid[IdHandling] = new Monoid[IdHandling] {

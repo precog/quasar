@@ -66,10 +66,11 @@ object Mimir extends BackendModule with Logging {
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
     QScriptCore[T, ?] :\:
-    EquiJoin[T, ?] :/:
-    Const[ShiftedRead[AFile], ?]
+      EquiJoin[T, ?] :/:
+      Const[ShiftedRead[AFile], ?]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]
+    : Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   private type Cake = Precog with Singleton
@@ -81,18 +82,18 @@ object Mimir extends BackendModule with Logging {
     val table: P.Table
 
     /**
-     * Given a term which is a type derived from the generic cake,
-     * produce the equivalent term which is typed specific to the
-     * cake in this repr.  For example:
-     *
-     * {{{
-     * val transM: M[Cake#trans#TransSpec1] = cake.flatMap(_.trans.Single.Value)
-     *
-     * def foo(repr: Repr) = for {
-     *   trans <- repr.unsafeCoerce[λ[`P <: Cake` => P.trans.TransSpec1]](transM).liftM[MT]
-     * } yield repr.table.transform(trans)
-     * }}}
-     */
+      * Given a term which is a type derived from the generic cake,
+      * produce the equivalent term which is typed specific to the
+      * cake in this repr.  For example:
+      *
+      * {{{
+      * val transM: M[Cake#trans#TransSpec1] = cake.flatMap(_.trans.Single.Value)
+      *
+      * def foo(repr: Repr) = for {
+      *   trans <- repr.unsafeCoerce[λ[`P <: Cake` => P.trans.TransSpec1]](transM).liftM[MT]
+      * } yield repr.table.transform(trans)
+      * }}}
+      */
     def unsafeCoerce[F[_ <: Cake]](term: F[Cake]): Task[F[P]] =
       Task.delay(term.asInstanceOf[F[P]])
 
@@ -105,28 +106,31 @@ object Mimir extends BackendModule with Logging {
       new Repr {
         type P = P0.type
 
-        val P: P = P0
+        val P: P           = P0
         val table: P.Table = table0
       }
 
     def meld[F[_]: Monad](fn: DepFn1[Cake, λ[`P <: Cake` => F[P#Table]]])(
-      implicit
+        implicit
         F: MonadReader_[F, Cake]): F[Repr] =
       F.ask.flatMap(cake => fn(cake).map(table => Repr(cake)(table)))
   }
 
   private type MT[F[_], A] = Kleisli[F, Cake, A]
-  type M[A] = MT[Task, A]
+  type M[A]                = MT[Task, A]
 
   def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def QSCoreInject[T[_[_]]]               = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def MonadM                              = Monad[M]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   final case class Config(dataDir: java.io.File)
 
@@ -160,70 +164,75 @@ object Mimir extends BackendModule with Logging {
       _.run.fold(
         planQScriptCore,
         _.run.fold(
-          _ => ???,   // ProjectBucket
+          _ => ???, // ProjectBucket
           _.run.fold(
-            _ => ???,   // ThetaJoin
+            _ => ???, // ThetaJoin
             _.run.fold(
               planEquiJoin,
-              _.run.fold(
-                _ => ???,    // ShiftedRead[ADir]
-                _.run.fold(
-                  planShiftedRead,
-                  _.run.fold(
-                    _ => ???,   // Read[ADir]
-                    _.run.fold(
-                      _ => ???,   // Read[AFile]
-                      _ => ???))))))))    // DeadEnd
+              _.run.fold(_ => ???, // ShiftedRead[ADir]
+                         _.run.fold(planShiftedRead,
+                                    _.run.fold(_ => ???, // Read[ADir]
+                                               _.run.fold(_ => ???, // Read[AFile]
+                                                          _ => ???))))
+            )
+          )
+        )
+      ) // DeadEnd
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
+            interpretM(κ(src.P.trans.TransSpec1.Id.point[Backend]),
+                       mapFuncPlanner.plan(src.P)))
         } yield Repr(src.P)(src.table.transform(trans))
 
-      case qscript.LeftShift(src, struct, id, repair) => ???
+      case qscript.LeftShift(src, struct, id, repair)    => ???
       case qscript.Reduce(src, bucket, reducers, repair) => ???
-      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Sort(src, bucket, order)              => ???
 
       case qscript.Filter(src, f) =>
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
-        } yield Repr(src.P)(src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
+            interpretM(κ(src.P.trans.TransSpec1.Id.point[Backend]),
+                       mapFuncPlanner.plan(src.P)))
+        } yield
+          Repr(src.P)(
+            src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
 
       case qscript.Union(src, lBranch, rBranch) => ???
-        //for {
-        //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
-        //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
+      //for {
+      //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+      //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+      //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
+      //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
 
       case qscript.Subset(src, from, op, count) =>
         for {
-          fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
+          fromRepr  <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
           countRepr <- count.cataM(interpretM(κ(src.point[Backend]), planQST))
           back <- {
-            def result = for {
-              vals <- countRepr.table.toJson
-              nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
-              number = nums.head
-              compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
-              back <- op match {
-                case Take =>
-                  Future.successful(compacted.takeRange(0, number))
+            def result =
+              for {
+                vals <- countRepr.table.toJson
+                nums      = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+                number    = nums.head
+                compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
+                back <- op match {
+                  case Take =>
+                    Future.successful(compacted.takeRange(0, number))
 
-                case Drop =>
-                  Future.successful(compacted.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                  case Drop =>
+                    Future.successful(compacted.takeRange(
+                      number,
+                      slamdata.Predef.Int.MaxValue.toLong)) // blame precog
 
-                case Sample =>
-                  compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
-              }
-            } yield Repr(fromRepr.P)(back)
+                  case Sample =>
+                    compacted
+                      .sample(number, List(fromRepr.P.trans.TransSpec1.Id))
+                      .map(_.head) // the number of Reprs returned equals the number of transspecs
+                }
+              } yield Repr(fromRepr.P)(back)
 
             result.toTask.liftM[MT].liftB
           }
@@ -231,10 +240,12 @@ object Mimir extends BackendModule with Logging {
 
       // FIXME look for Map(Unreferenced, Constant) and return constant table
       case qscript.Unreferenced() =>
-        Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
-          def apply(P: Cake): M[P.Table] =
-            P.Table.constLong(Set(0)).point[M]
-        }).liftB
+        Repr
+          .meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
+            def apply(P: Cake): M[P.Table] =
+              P.Table.constLong(Set(0)).point[M]
+          })
+          .liftB
     }
 
     lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
@@ -246,26 +257,32 @@ object Mimir extends BackendModule with Logging {
         val loaded: EitherT[M, FileSystemError, Repr] =
           for {
             precog <- cake[EitherT[M, FileSystemError, ?]]
-            apiKey <- precog.RootAPIKey.toTask.liftM[MT].liftM[EitherT[?[_], FileSystemError, ?]]
+            apiKey <- precog.RootAPIKey.toTask
+              .liftM[MT]
+              .liftM[EitherT[?[_], FileSystemError, ?]]
 
-            repr <-
-              Repr.meld[EitherT[M, FileSystemError, ?]](
-                new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
-                  def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
-                    val et =
-                      P.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask)
+            repr <- Repr.meld[EitherT[M, FileSystemError, ?]](
+              new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
+                def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
+                  val et =
+                    P.Table
+                      .constString(Set(pathStr))
+                      .load(apiKey, JType.JUniverseT)
+                      .mapT(_.toTask)
 
-                    et.mapT(_.liftM[MT]) leftMap { err =>
-                      val msg = err.messages.toList.reduce(_ + ";" + _)
-                      readFailed(posixCodec.printPath(path), msg)
-                    }
+                  et.mapT(_.liftM[MT]) leftMap { err =>
+                    val msg = err.messages.toList.reduce(_ + ";" + _)
+                    readFailed(posixCodec.printPath(path), msg)
                   }
-                })
+                }
+              })
           } yield {
             status match {
-              case IdOnly => repr.map(_.transform(repr.P.trans.constants.SourceKey.Single))
+              case IdOnly =>
+                repr.map(_.transform(repr.P.trans.constants.SourceKey.Single))
               case IncludeId => repr
-              case ExcludeId => repr.map(_.transform(repr.P.trans.constants.SourceValue.Single))
+              case ExcludeId =>
+                repr.map(_.transform(repr.P.trans.constants.SourceValue.Single))
             }
           }
 
@@ -284,7 +301,8 @@ object Mimir extends BackendModule with Logging {
     cp.cataM(planQSM _)
   }
 
-  private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
+  private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(
+      until: A => Boolean): StreamT[F, A] = {
     StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
       q.dequeue1 map { a =>
         if (until(a))
@@ -295,7 +313,7 @@ object Mimir extends BackendModule with Logging {
     }
   }
 
-  private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
+  private def dirToPath(dir: ADir): Path    = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
 
   object QueryFileModule extends QueryFileModule {
@@ -311,21 +329,24 @@ object Mimir extends BackendModule with Logging {
       val driver = for {
         q <- async.boundedQueue[Task, Vector[JValue]](1)
 
-        populator = repr.table.slices.trans(λ[Future ~> Task](_.toTask)) foreachRec { slice =>
-          if (!slice.isEmpty) {
-            val json = slice.toJsonElements
-            if (!json.isEmpty)
-              q.enqueue1(json)
-            else
+        populator = repr.table.slices.trans(λ[Future ~> Task](_.toTask)) foreachRec {
+          slice =>
+            if (!slice.isEmpty) {
+              val json = slice.toJsonElements
+              if (!json.isEmpty)
+                q.enqueue1(json)
+              else
+                Task.now(())
+            } else {
               Task.now(())
-          } else {
-            Task.now(())
-          }
+            }
         }
 
         populatorWithTermination = populator >> q.enqueue1(Vector.empty)
 
-        ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
+        ingestor = repr.P
+          .ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits))
+          .run
 
         // generally this function is bad news (TODO provide a way to ingest as a Stream)
         _ <- Task.gatherUnordered(Seq(populatorWithTermination, ingestor))
@@ -337,8 +358,8 @@ object Mimir extends BackendModule with Logging {
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
       val t = for {
         handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
-        pager <- repr.P.TablePager(repr.table)
-        _ <- Task.delay(map.put(handle, pager))
+        pager  <- repr.P.TablePager(repr.table)
+        _      <- Task.delay(map.put(handle, pager))
       } yield handle
 
       t.liftM[MT].liftB
@@ -357,7 +378,7 @@ object Mimir extends BackendModule with Logging {
       val t = for {
         pager <- Task.delay(Option(map.get(h)).get)
         check <- Task.delay(map.remove(h, pager))
-        _ <- if (check) pager.close else Task.now(())
+        _     <- if (check) pager.close else Task.now(())
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]
@@ -398,18 +419,24 @@ object Mimir extends BackendModule with Logging {
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
 
         // apparently read on a non-existent file is equivalent to reading the empty file??!!
-        eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
+        eitherTable <- precog.Table
+          .load(target, JType.JUniverseT)
+          .mapT(_.toTask)
+          .run
+          .liftM[MT]
+          .liftB
         table = eitherTable.fold(_ => precog.Table.empty, table => table)
 
         limited = if (offset.value === 0L && !limit.isDefined)
           table
         else
-          table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+          table.takeRange(offset.value,
+                          limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
 
         projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
         pager <- precog.TablePager(projected).liftM[MT].liftB
-        _ <- Task.delay(map.put(handle, pager)).liftM[MT].liftB
+        _     <- Task.delay(map.put(handle, pager)).liftM[MT].liftB
       } yield handle
     }
 
@@ -433,7 +460,7 @@ object Mimir extends BackendModule with Logging {
       val t = for {
         pager <- Task.delay(Option(map.get(h)).get)
         check <- Task.delay(map.remove(h, pager))
-        _ <- if (check) pager.close else Task.now(())
+        _     <- if (check) pager.close else Task.now(())
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]
@@ -447,7 +474,9 @@ object Mimir extends BackendModule with Logging {
     // quasar's paging logic.  See also: TablePager.apply
     private val QueueLimit = 1
 
-    private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
+    private val map
+      : ConcurrentHashMap[WriteHandle,
+                          (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
       new ConcurrentHashMap
 
     private val cur = new AtomicLong(0L)
@@ -456,20 +485,23 @@ object Mimir extends BackendModule with Logging {
       val run: Task[M[WriteHandle]] = Task delay {
         log.debug(s"open file $file")
 
-        val id = cur.getAndIncrement()
+        val id     = cur.getAndIncrement()
         val handle = WriteHandle(file, id)
 
         for {
-          queue <- Queue.bounded[Task, Vector[Data]](QueueLimit).liftM[MT]
+          queue  <- Queue.bounded[Task, Vector[Data]](QueueLimit).liftM[MT]
           signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
 
           path = fileToPath(file)
-          jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
+          jvs = queue.dequeue
+            .takeWhile(_.nonEmpty)
+            .flatMap(Stream.emits)
+            .map(JValue.fromData)
 
           precog <- cake[M]
 
           ingestion = for {
-            _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
+            _ <- precog.ingest(path, jvs).run // TODO log resource errors?
             _ <- signal.set(true)
           } yield ()
 
@@ -540,7 +572,8 @@ object Mimir extends BackendModule with Logging {
             _ <- if (exists)
               ().point[Backend]
             else
-              MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
+              MonadError_[Backend, FileSystemError].raiseError(
+                pathErr(pathNotFound(from)))
 
             result <- precog.fs.moveDir(from, to, semantics).liftM[MT].liftB
 
@@ -549,7 +582,7 @@ object Mimir extends BackendModule with Logging {
             } else {
               val error = semantics match {
                 case MoveSemantics.FailIfMissing => pathNotFound(to)
-                case _ => pathExists(to)
+                case _                           => pathExists(to)
               }
 
               MonadError_[Backend, FileSystemError].raiseError(pathErr(error))
@@ -565,7 +598,8 @@ object Mimir extends BackendModule with Logging {
             _ <- if (exists)
               ().point[Backend]
             else
-              MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
+              MonadError_[Backend, FileSystemError].raiseError(
+                pathErr(pathNotFound(from)))
 
             result <- precog.fs.moveFile(from, to, semantics).liftM[MT].liftB
 
@@ -574,13 +608,14 @@ object Mimir extends BackendModule with Logging {
             } else {
               val error = semantics match {
                 case MoveSemantics.FailIfMissing => pathNotFound(to)
-                case _ => pathExists(to)
+                case _                           => pathExists(to)
               }
 
               MonadError_[Backend, FileSystemError].raiseError(pathErr(error))
             }
           } yield ()
-        })
+        }
+      )
     }
 
     def delete(path: APath): Backend[Unit] = {

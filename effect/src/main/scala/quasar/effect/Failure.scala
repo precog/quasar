@@ -34,7 +34,7 @@ object Failure {
   final case class Fail[E, A](e: E) extends Failure[E, A]
 
   final class Ops[E, S[_]](implicit S: Failure[E, ?] :<: S)
-    extends LiftedOps[Failure[E, ?], S] {
+      extends LiftedOps[Failure[E, ?], S] {
 
     def attempt[A](fa: FreeS[A]): FreeS[E \/ A] =
       fa.foldMap(attempt0).run
@@ -43,12 +43,10 @@ object Failure {
       lift(Fail(e))
 
     def onFinish[A](fa: FreeS[A], f: Option[E] => FreeS[Unit]): FreeS[A] =
-      attempt(fa).flatMap(_.fold(
-        e => f(Some(e)) *> fail(e),
-        a => f(None)    as a))
+      attempt(fa).flatMap(_.fold(e => f(Some(e)) *> fail(e), a => f(None) as a))
 
     def onFail[A](fa: FreeS[A], f: E => FreeS[Unit]): FreeS[A] =
-      onFinish(fa, _.cata(f,().pure[FreeS]))
+      onFinish(fa, _.cata(f, ().pure[FreeS]))
 
     def recover[A](fa: FreeS[A], f: E => FreeS[A]): FreeS[A] =
       attempt(fa).flatMap(_.fold(f, _.point[FreeS]))
@@ -65,10 +63,10 @@ object Failure {
 
     implicit val monadError: MonadError[FreeS, E] =
       new MonadError[FreeS, E] {
-        def raiseError[A](e: E) = fail(e)
+        def raiseError[A](e: E)                            = fail(e)
         def handleError[A](fa: FreeS[A])(f: E => FreeS[A]) = recover(fa, f)
-        def point[A](a: => A) = Free.pure(a)
-        def bind[A, B](fa: FreeS[A])(f: A => FreeS[B]) = fa flatMap f
+        def point[A](a: => A)                              = Free.pure(a)
+        def bind[A, B](fa: FreeS[A])(f: A => FreeS[B])     = fa flatMap f
       }
 
     ////
@@ -126,7 +124,7 @@ object Failure {
 
   def monadError_[E, S[_]](implicit O: Ops[E, S]): MonadError_[Free[S, ?], E] =
     new MonadError_[Free[S, ?], E] {
-      def raiseError[A](e: E) = O.fail(e)
+      def raiseError[A](e: E)                                = O.fail(e)
       def handleError[A](fa: Free[S, A])(f: E => Free[S, A]) = O.recover(fa, f)
     }
 }

@@ -45,22 +45,27 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
     "descendantFiles" >> {
       "returns all descendants of the given directory" >> prop {
         (target: ADir, descendants: NonEmptyList[RFile], others: List[AFile]) =>
-          val data = Vector(Data.Str("foo"))
+          val data            = Vector(Data.Str("foo"))
           val outsideOfTarget = others.filterNot(_.relativeTo(target).isDefined)
-          val insideOfTarget = descendants.list.map(target </> _)
+          val insideOfTarget  = descendants.list.map(target </> _)
 
-          val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget).map((_,data)).toMap
+          val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget)
+            .map((_, data))
+            .toMap
           val expected = descendants.list.toList.distinct
 
           Mem.interpret(query.descendantFiles(target).run).eval(state).toEither must
             beRight(containTheSameElementsAs(expected))
-      }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
+      }.setArbitrary2(nonEmptyListSmallerThan(10))
+        .setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
-      "returns not found when dir does not exist" >> prop { d: ADir => (d =/= rootDir) ==> {
-        Mem.interpretEmpty(query.descendantFiles(d).run)
-          .toEither must beLeft(pathErr(pathNotFound(d)))
-      }}
+      "returns not found when dir does not exist" >> prop { d: ADir =>
+        (d =/= rootDir) ==> {
+          Mem.interpretEmpty(query.descendantFiles(d).run).toEither must beLeft(
+            pathErr(pathNotFound(d)))
+        }
+      }
     }
 
     "fileExists" >> {
@@ -68,38 +73,42 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
         Mem.interpret(query.fileExists(s.file)).eval(s.state) must_=== true
       }
 
-      "return false when file doesn't exist" >> prop { (absentFile: AFile, s: SingleFileMemState) =>
-        absentFile ≠ s.file ==> {
-          Mem.interpret(query.fileExists(absentFile)).eval(s.state) must_=== false
-        }
+      "return false when file doesn't exist" >> prop {
+        (absentFile: AFile, s: SingleFileMemState) =>
+          absentFile ≠ s.file ==> {
+            Mem.interpret(query.fileExists(absentFile)).eval(s.state) must_=== false
+          }
       }
 
-      "return false when dir exists with same name as file" >> prop { (f: AFile, data: Vector[Data]) =>
-        val n = fileName(f)
-        val fd = parentDir(f).get </> dir(n.value) </> file("different.txt")
+      "return false when dir exists with same name as file" >> prop {
+        (f: AFile, data: Vector[Data]) =>
+          val n  = fileName(f)
+          val fd = parentDir(f).get </> dir(n.value) </> file("different.txt")
 
-        Mem.interpret(query.fileExists(f)).eval(InMemState fromFiles Map(fd -> data)) must_=== false
+          Mem
+            .interpret(query.fileExists(f))
+            .eval(InMemState fromFiles Map(fd -> data)) must_=== false
       }
     }
 
     "evaluate" >> {
-      "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
-        val query = lpf.read(s.file)
-        val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = Mem.interpret(evaluate(query).runLogCatch.run.value).eval(state)
-        result must_=== s.contents.right.right
+      "streams the results of evaluating the logical plan" >> prop {
+        s: SingleFileMemState =>
+          val query  = lpf.read(s.file)
+          val state  = s.state.copy(queryResps = Map(query -> s.contents))
+          val result = Mem.interpret(evaluate(query).runLogCatch.run.value).eval(state)
+          result must_=== s.contents.right.right
       }
     }
 
     "results" >> {
-      "returns the results of the query" >> prop {
-        s: SingleFileMemState =>
-
-        val query = lpf.read(s.file)
-        val state = s.state.copy(queryResps = Map(query -> s.contents))
+      "returns the results of the query" >> prop { s: SingleFileMemState =>
+        val query  = lpf.read(s.file)
+        val state  = s.state.copy(queryResps = Map(query -> s.contents))
         val result = Mem.interpret(results(query).map(_.toVector).run.value)
 
-        result.run(state)
+        result
+          .run(state)
           .leftMap(_.resultMap) must_=== ((Map.empty, s.contents.right))
       }
     }

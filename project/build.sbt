@@ -5,6 +5,4 @@ disablePlugins(TravisCiPlugin)
 scalacOptions ++= scalacOptions_2_10
 
 // sbt/sbt#2572
-scalacOptions in (Compile, console) --= Seq(
-  "-Yno-imports",
-  "-Ywarn-unused-import")
+scalacOptions in (Compile, console) --= Seq("-Yno-imports", "-Ywarn-unused-import")

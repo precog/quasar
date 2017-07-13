@@ -25,7 +25,7 @@ import Scalaz._
 
 final case class CsvWriter(format: Option[CsvParser.Format]) {
   def apply(values: List[String]): String = {
-    val w = new java.io.StringWriter
+    val w  = new java.io.StringWriter
     val cw = format.map(f => CSVWriter.open(w)(f)).getOrElse(CSVWriter.open(w))
     cw.writeRow(values)
     cw.close
@@ -48,16 +48,21 @@ object CsvParser {
       val reader = CSVReader.open(new java.io.StringReader(text))(format)
       // NB: CSVReader's `toStream` does not allow the exceptions to be captured,
       // so here I re-implement it.
-      Stream.continually(
-        \/.fromTryCatchNonFatal(reader.readNext).fold(
-            err => Some(-\/(err.getMessage)),
-            _.map(v => \/-(Record(v)))))
-        .takeWhile(_.isDefined).collect { case Some(v) => v }
+      Stream
+        .continually(
+          \/.fromTryCatchNonFatal(reader.readNext).fold(err => Some(-\/(err.getMessage)),
+                                                        _.map(v => \/-(Record(v)))))
+        .takeWhile(_.isDefined)
+        .collect { case Some(v) => v }
     }
   }
 
-  final case class Format(delimiter: Char, quoteChar: Char, escapeChar: Char, lineTerminator: String) extends CSVFormat {
-    val quoting = QUOTE_MINIMAL
+  final case class Format(delimiter: Char,
+                          quoteChar: Char,
+                          escapeChar: Char,
+                          lineTerminator: String)
+      extends CSVFormat {
+    val quoting             = QUOTE_MINIMAL
     val treatEmptyLineAsNil = false
   }
 
@@ -70,19 +75,19 @@ object CsvParser {
   } yield TototoshiCsvParser(Format(del, quot, esc, term))
 }
 
-
 object CsvDetect {
   // NB: to avoid parsing a very large text many times, just impose a limit on the
   // number of records that are inspected for format detection. And since a mis-matched
   // format could miss record boundaries, also impose a character limit.
   val TestRecords = 10
-  val TestChars = (TestRecords+1)*500
+  val TestChars   = (TestRecords + 1) * 500
 
   final case class TestResult(header: Int, rows: List[Int])
 
   def testParse(parser: CsvParser, text: String): Option[TestResult] = {
     val subtext = text.take(TestChars)
-    (parser.parse(subtext) ++ Stream.continually(\/-(Record(Nil)))).take(TestRecords + 1) match {
+    (parser.parse(subtext) ++ Stream.continually(\/-(Record(Nil))))
+      .take(TestRecords + 1) match {
       case header #:: rows =>
         ((header |@| rows.toList.sequence) { (header, rows) =>
           TestResult(header.size, rows.map(_.size))
@@ -98,21 +103,25 @@ object CsvDetect {
     - at least two columns and two rows
     - no rows with more fields than the header (large penalty)
     - few rows with less fields than the header (small penalty)
-   */
+    */
   def score(result: TestResult): Double =
-    ((2 - result.header) max 0)*100.0 +
-      ((2 - result.rows.size) max 0)*100.0 +
-      result.rows.map(n => (n - result.header) max 0).sum*10.0 +
-      result.rows.map(n => (result.header - n) max 0).sum*1.0
+    ((2 - result.header) max 0) * 100.0 +
+      ((2 - result.rows.size) max 0) * 100.0 +
+      result.rows.map(n => (n - result.header) max 0).sum * 10.0 +
+      result.rows.map(n => (result.header - n) max 0).sum * 1.0
 
   def rank[P <: CsvParser](parsers: List[P])(text: String): List[(Double, P)] = {
-    parsers.map(p => testParse(p, text).map(score(_) -> p)).foldMap(_.toList).sorted(Ordering.by[(Double, P), Double](_._1))
+    parsers
+      .map(p => testParse(p, text).map(score(_) -> p))
+      .foldMap(_.toList)
+      .sorted(Ordering.by[(Double, P), Double](_._1))
   }
 
-  def bestParse(parsers: List[CsvParser])(text: String): String \/ Stream[String \/ Record] =
+  def bestParse(parsers: List[CsvParser])(
+      text: String): String \/ Stream[String \/ Record] =
     rank(parsers)(text).headOption match {
-      case None              => -\/ ("no successful parse")
-      case Some((_, parser)) =>  \/-(parser.parse(text))
+      case None              => -\/("no successful parse")
+      case Some((_, parser)) => \/-(parser.parse(text))
     }
 
   val parse = bestParse(CsvParser.AllParsers) _

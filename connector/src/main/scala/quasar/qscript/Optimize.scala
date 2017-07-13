@@ -29,10 +29,8 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
 
   /** Pull more work to _after_ count operations, limiting the dataset. */
   // TODO: we should be able to pull _most_ of a Reduce repair function to after a Subset
-  private def subsetBeforeMap[F[_], G[_]: Functor]
-    (FtoG: F ~> G)
-    (implicit QC: QScriptCore :<: F)
-      : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
+  private def subsetBeforeMap[F[_], G[_]: Functor](FtoG: F ~> G)(
+      implicit QC: QScriptCore :<: F): QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
     case Subset(src, from, sel, count) =>
       from.resume.swap.toOption >>= (FI project _) >>= {
         case Map(fromInner, mf) =>
@@ -42,14 +40,14 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     case _ => None
   }
 
-  private def filterBeforeUnion[F[_]: Functor](implicit QC: QScriptCore :<: F)
-      : QScriptCore[T[F]] => Option[QScriptCore[T[F]]] = {
+  private def filterBeforeUnion[F[_]: Functor](
+      implicit QC: QScriptCore :<: F): QScriptCore[T[F]] => Option[QScriptCore[T[F]]] = {
     case Filter(Embed(src), fm) =>
       QC.prj(src) match {
         case Some(Union(innerSrc, left, right)) =>
           Union(innerSrc,
-            Free.roll(FI.inject(Filter(left, fm))),
-            Free.roll(FI.inject(Filter(right, fm)))).some
+                Free.roll(FI.inject(Filter(left, fm))),
+                Free.roll(FI.inject(Filter(right, fm)))).some
         case _ => None
       }
     case _ => None
@@ -59,10 +57,9 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     * the final, optimized QScript for conversion.
     */
   def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(
-    implicit
+      implicit
       QCF: QScriptCore :<: F,
-      QCG: QScriptCore :<: G)
-      : F[T[G]] => F[T[G]] =
-      liftFF[QScriptCore, F, T[G]](
-        repeatedly(applyTransforms(subsetBeforeMap[F, G](FtoG), filterBeforeUnion[G])))
+      QCG: QScriptCore :<: G): F[T[G]] => F[T[G]] =
+    liftFF[QScriptCore, F, T[G]](
+      repeatedly(applyTransforms(subsetBeforeMap[F, G](FtoG), filterBeforeUnion[G])))
 }

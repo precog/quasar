@@ -49,7 +49,7 @@ import pathy.scalacheck.{AlphaCharacters, PathOf}
 import pathy.scalacheck.PathOf.{absFileOfArbitrary, relFileOfArbitrary}
 import pathy.Path._
 import matryoshka.data.Fix
-import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
+import scalaz.{Failure => _, Zip => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
@@ -61,15 +61,16 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
   type Eff[A]  = Coproduct[Task, Eff0, A]
 
   def effRespOr(inter: Module ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]              :+:
-    failureResponseOr[Module.Error]      :+:
-    (liftMT[Task, ResponseT] compose inter)
+    liftMT[Task, ResponseT] :+:
+      failureResponseOr[Module.Error] :+:
+      (liftMT[Task, ResponseT] compose inter)
 
   def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
-    HttpService.lift(req => runFs(mem).flatMap { fs =>
-      val module = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
-      val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
-      invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
+    HttpService.lift(req =>
+      runFs(mem).flatMap { fs =>
+        val module    = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+        val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
+        invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
     })
 
   def sampleStatement(name: String): Statement[Fix[Sql]] = {
@@ -79,7 +80,8 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
 
   def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
     val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-    response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync.mkString("")
+    response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync
+      .mkString("")
     response.status must_=== Status.Ok
     response.contentType must_=== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
   }
@@ -87,7 +89,8 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
   "Invoke Service" should {
     "GET" >> {
       "produce a 404 if file does not exist" >> prop { file: AFile =>
-        val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
+        val response =
+          service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
         response.status must_= Status.NotFound
         response.as[ApiError].unsafePerformSync must beApiErrorLike[Module.Error](
           Module.Error.FSError(pathErr(pathNotFound(file))))
@@ -95,54 +98,69 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
       "produce a 400 bad request if path is a directory instead of a file" >>
         prop { (file: AFile, sampleData: Vector[Data]) =>
           val state = InMemState.fromFiles(Map(file -> sampleData))
-          val response = service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
+          val response =
+            service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
           response.status must_= Status.BadRequest
           response.as[ApiError].unsafePerformSync must_=
             apiError(BadRequest withReason "Path must be a file")
         }
       "produce a 400 bad request if not all params are supplied with explanation of " +
-      "which function parameters are missing from the query string" >>
+        "which function parameters are missing from the query string" >>
         prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
           val statements = List(sampleStatement(fileName(functionFile).value))
-          val mounts = Map((fileParent(functionFile): APath) -> MountConfig.moduleConfig(statements))
+          val mounts =
+            Map((fileParent(functionFile): APath) -> MountConfig.moduleConfig(statements))
           val state = InMemState.fromFiles(Map(dataFile -> sampleData))
-          val response = service(state, mounts)(Request(uri = pathUri(functionFile))).unsafePerformSync
+          val response =
+            service(state, mounts)(Request(uri = pathUri(functionFile))).unsafePerformSync
           response.status must_= Status.BadRequest
           response.as[ApiError].unsafePerformSync must beApiErrorLike[Module.Error](
             Module.Error.ArgumentsMissing(List(CIName("Bar"))))
         }
       "return evaluation of sql statement contained within function body if all params are supplied" >> {
         "in straightforward case" >>
-          prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                  dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                  sampleData: Vector[Data]) =>
-            val statements = List(sampleStatement(fileName(functionFile.path).value))
-            val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
-            val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
-            val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
-            val request = Request(uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)))
-            val response = service(state, mounts)(request).unsafePerformSync
-            isExpectedResponse(sampleData, response, MessageFormat.Default)
+          prop {
+            (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+             dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+             sampleData: Vector[Data]) =>
+              val statements = List(sampleStatement(fileName(functionFile.path).value))
+              val mounts = Map(
+                (fileParent(functionFile.path): APath) -> MountConfig.moduleConfig(
+                  statements))
+              val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+              val arg   = "`" + posixCodec.printPath(dataFile.path) + "`"
+              val request = Request(
+                uri =
+                  pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)))
+              val response = service(state, mounts)(request).unsafePerformSync
+              isExpectedResponse(sampleData, response, MessageFormat.Default)
           }
         "if file in module function is relative" >>
-          prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                  rDataFile: PathOf[Rel, File, Sandboxed, AlphaCharacters],
-                  sampleData: Vector[Data]) =>
-            val statements = List(sampleStatement(fileName(functionFile.path).value))
-            val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
-            val dataFile = fileParent(functionFile.path) </> rDataFile.path
-            val state = InMemState.fromFiles(Map(dataFile -> sampleData))
-            val arg = "`" + posixCodec.printPath(rDataFile.path) + "`"
-            val request = Request(uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)))
-            val response = service(state, mounts)(request).unsafePerformSync
-            isExpectedResponse(sampleData, response, MessageFormat.Default)
+          prop {
+            (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+             rDataFile: PathOf[Rel, File, Sandboxed, AlphaCharacters],
+             sampleData: Vector[Data]) =>
+              val statements = List(sampleStatement(fileName(functionFile.path).value))
+              val mounts = Map(
+                (fileParent(functionFile.path): APath) -> MountConfig.moduleConfig(
+                  statements))
+              val dataFile = fileParent(functionFile.path) </> rDataFile.path
+              val state    = InMemState.fromFiles(Map(dataFile -> sampleData))
+              val arg      = "`" + posixCodec.printPath(rDataFile.path) + "`"
+              val request = Request(
+                uri =
+                  pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)))
+              val response = service(state, mounts)(request).unsafePerformSync
+              isExpectedResponse(sampleData, response, MessageFormat.Default)
           }
         "if function references other functions in the same module" >>
-          prop { (moduleDir: ADir,
-                  dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                  sampleData: Vector[Data]) => moduleDir ≠ rootDir ==> {
-            val statements =
-              sqlM"""
+          prop {
+            (moduleDir: ADir,
+             dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+             sampleData: Vector[Data]) =>
+              moduleDir ≠ rootDir ==> {
+                val statements =
+                  sqlM"""
                     CREATE FUNCTION FOO(:a)
                       BEGIN
                         tmp := BAR(:a);
@@ -153,56 +171,79 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
                         select * from :a
                       END
                 """
-            val mounts = Map((moduleDir: APath) -> MountConfig.moduleConfig(statements))
-            val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
-            val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
-            val request = Request(uri = pathUri(moduleDir </> file("FOO")).copy(query = Query.fromPairs("a" -> arg)))
-            val response = service(state, mounts)(request).unsafePerformSync
-            isExpectedResponse(sampleData, response, MessageFormat.Default)
-          }}
+                val mounts =
+                  Map((moduleDir: APath) -> MountConfig.moduleConfig(statements))
+                val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+                val arg   = "`" + posixCodec.printPath(dataFile.path) + "`"
+                val request = Request(uri = pathUri(moduleDir </> file("FOO"))
+                  .copy(query = Query.fromPairs("a" -> arg)))
+                val response = service(state, mounts)(request).unsafePerformSync
+                isExpectedResponse(sampleData, response, MessageFormat.Default)
+              }
+          }
       }
       "if query in function is constant even if not supported by connector" >>
         prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters]) =>
           val constant = sqlE"select (1,2)"
-          val statements = List(FunctionDecl(CIName(fileName(functionFile.path).value), Nil, constant))
-          val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
-          val state = InMemState.empty
-          val request = Request(uri = pathUri(functionFile.path))
+          val statements =
+            List(FunctionDecl(CIName(fileName(functionFile.path).value), Nil, constant))
+          val mounts = Map(
+            (fileParent(functionFile.path): APath) -> MountConfig.moduleConfig(
+              statements))
+          val state    = InMemState.empty
+          val request  = Request(uri = pathUri(functionFile.path))
           val response = service(state, mounts)(request).unsafePerformSync
-          isExpectedResponse(Vector(Data.Int(1), Data.Int(2)), response, MessageFormat.Default)
+          isExpectedResponse(Vector(Data.Int(1), Data.Int(2)),
+                             response,
+                             MessageFormat.Default)
         }
       "support offset and limit" >> {
-        prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                sampleData: Vector[Data],
-                offset: Int @@ NonNegative,
-                limit: Int @@ RPositive) =>
-          val statements = List(sampleStatement(fileName(functionFile.path).value))
-          val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
-          val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
-          val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
-          val request = Request(uri = pathUri(functionFile.path).copy(
-            query = Query.fromPairs("bar" -> arg, "offset" -> offset.toString, "limit" -> limit.toString)))
-          val response = service(state, mounts)(request).unsafePerformSync
-          isExpectedResponse(sampleData.drop(offset).take(limit), response, MessageFormat.Default)
+        prop {
+          (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+           dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+           sampleData: Vector[Data],
+           offset: Int @@ NonNegative,
+           limit: Int @@ RPositive) =>
+            val statements = List(sampleStatement(fileName(functionFile.path).value))
+            val mounts = Map(
+              (fileParent(functionFile.path): APath) -> MountConfig.moduleConfig(
+                statements))
+            val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+            val arg   = "`" + posixCodec.printPath(dataFile.path) + "`"
+            val request = Request(
+              uri = pathUri(functionFile.path).copy(
+                query = Query.fromPairs("bar"    -> arg,
+                                        "offset" -> offset.toString,
+                                        "limit"  -> limit.toString)))
+            val response = service(state, mounts)(request).unsafePerformSync
+            isExpectedResponse(sampleData.drop(offset).take(limit),
+                               response,
+                               MessageFormat.Default)
         }
       }
       "support disposition" >>
-        prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
-                sampleData: Vector[Data]) =>
-          val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
-          val statements = List(sampleStatement(fileName(functionFile.path).value))
-          val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
-          val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
-          val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
-          val request = Request(
-            uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)),
-            headers = Headers(Accept(jsonReadableLine.mediaType.withExtensions(Map("disposition" -> disposition.value)))))
-          val response = service(state, mounts)(request).unsafePerformSync
-          isExpectedResponse(sampleData, response, MessageFormat.Default)
-          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
-      }
+        prop {
+          (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+           dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+           sampleData: Vector[Data]) =>
+            val disposition =
+              `Content-Disposition`("attachement", Map("filename" -> "data.json"))
+            val statements = List(sampleStatement(fileName(functionFile.path).value))
+            val mounts = Map(
+              (fileParent(functionFile.path): APath) -> MountConfig.moduleConfig(
+                statements))
+            val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+            val arg   = "`" + posixCodec.printPath(dataFile.path) + "`"
+            val request = Request(
+              uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)),
+              headers = Headers(
+                Accept(jsonReadableLine.mediaType.withExtensions(
+                  Map("disposition" -> disposition.value))))
+            )
+            val response = service(state, mounts)(request).unsafePerformSync
+            isExpectedResponse(sampleData, response, MessageFormat.Default)
+            response.headers.get(`Content-Disposition`) must_=== Some(disposition)
+        }
     }
   }
 }

@@ -33,8 +33,11 @@ import shapeless.Nat
   * (i.e. JavaScript).
   */
 class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
+
   /** Identify constructs that are expected not to be implemented in JS. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+  def shortCircuit[N <: Nat](backend: BackendName,
+                             func: GenericFunc[N],
+                             args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
     case (string.ToString, Data.Date(_) :: Nil) =>
@@ -42,17 +45,16 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Skipped("Interval prints numeric representation").left
 
-    case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
-        if x == 0 && y < 0 =>
+    case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil) if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
-    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
-    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    case (date.ExtractDayOfYear, _) => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)   => Skipped("TODO").left
+    case (date.ExtractWeek, _)      => Skipped("TODO").left
 
-    case (structural.ConcatOp, _)      => Skipped("TODO").left
+    case (structural.ConcatOp, _) => Skipped("TODO").left
 
-    case _                             => ().right
+    case _ => ().right
   }
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = args match {
@@ -61,14 +63,15 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
     case _                   => ().right
   }
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
-      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def compile(
+      queryModel: MongoQueryModel,
+      coll: Collection,
+      mf: FreeMap[Fix]): FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     MongoDbQScriptPlanner.getJsFn[Fix, FileSystemError \/ ?](mf) ∘
       (js =>
         (Crystallize[WorkflowF].crystallize(
-          chain[Fix[WorkflowF]](
-            $read(coll),
-            $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))),
-          BsonField.Name("value")))
+           chain[Fix[WorkflowF]]($read(coll),
+                                 $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))),
+         BsonField.Name("value")))
   }
 }

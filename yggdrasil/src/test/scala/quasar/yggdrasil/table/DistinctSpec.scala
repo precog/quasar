@@ -21,7 +21,10 @@ import quasar.blueeyes._, json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait DistinctSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with SpecificationLike
+    with ScalaCheck {
   import SampleData._
   import trans._
 
@@ -107,11 +110,11 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _ => sys.error("Expected a JArray")
+      case _          => sys.error("Expected a JArray")
     }).toStream
 
     val sample = SampleData(data)
-    val table = fromSample(sample, Some(5))
+    val table  = fromSample(sample, Some(5))
 
     val result = toJson(table.distinct(Leaf(Source)))
 
@@ -187,11 +190,11 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _ => sys.error("Expected JArray")
+      case _          => sys.error("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
-    val table = fromSample(sample, Some(5))
+    val table  = fromSample(sample, Some(5))
 
     val result = toJson(table.distinct(Leaf(Source)))
 
@@ -199,10 +202,16 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
   }
 
   def removeUndefined(jv: JValue): JValue = jv match {
-      case JObject(jfields) => JObject(jfields collect { case (s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
-      case JArray(jvs) => JArray(jvs map { jv => removeUndefined(jv) })
-      case v => v
-    }
+    case JObject(jfields) =>
+      JObject(jfields collect {
+        case (s, v) if v != JUndefined => JField(s, removeUndefined(v))
+      })
+    case JArray(jvs) =>
+      JArray(jvs map { jv =>
+        removeUndefined(jv)
+      })
+    case v => v
+  }
 
   def testDistinct = {
     implicit val gen = sort(duplicateRows(sample(schema)))
@@ -211,7 +220,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
       val distinctTable = table.distinct(Leaf(Source))
 
-      val result = toJson(distinctTable).copoint
+      val result   = toJson(distinctTable).copoint
       val expected = sample.data.toSeq.distinct
 
       result must_== expected

@@ -61,7 +61,7 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
 
 final class FreshAtomicIdSource {
   private val source = new AtomicLong
-  def nextId() = source.getAndIncrement
+  def nextId()       = source.getAndIncrement
   def nextIdBlock(n: Int): Long = {
     var nextId = source.get()
     while (!source.compareAndSet(nextId, nextId + n)) {

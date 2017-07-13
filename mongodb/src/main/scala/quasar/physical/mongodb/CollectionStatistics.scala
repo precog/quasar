@@ -25,7 +25,4 @@ import slamdata.Predef._
   * @param dataSize The total size "in memory" in bytes of all documents in the
   *   collection, not including headers or indexes.
   */
-final case class CollectionStatistics(
-  count: Long,
-  dataSize: Long,
-  sharded: Boolean)
+final case class CollectionStatistics(count: Long, dataSize: Long, sharded: Boolean)

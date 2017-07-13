@@ -30,15 +30,20 @@ private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanE
 
   import MarkLogicPlannerError._
 
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
+  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]])
+    : AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
     case Const(ShiftedRead(dir, idStatus)) =>
       val dirUri = UriPathCodec.printPath(dir)
 
-      Uri.getOption(dirUri).cata(uri =>
-        Search(
-          Q.embed(Query.Directory[V, Q](IList(uri), MatchDepth.Children)),
-          idStatus
-        ).left[XQuery].point[F],
-        MonadPlanErr[F].raiseError(invalidUri(dirUri)))
+      Uri
+        .getOption(dirUri)
+        .cata(
+          uri =>
+            Search(
+              Q.embed(Query.Directory[V, Q](IList(uri), MatchDepth.Children)),
+              idStatus
+            ).left[XQuery].point[F],
+          MonadPlanErr[F].raiseError(invalidUri(dirUri))
+        )
   }
 }

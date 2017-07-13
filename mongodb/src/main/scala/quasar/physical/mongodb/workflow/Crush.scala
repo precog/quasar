@@ -29,15 +29,16 @@ import simulacrum.typeclass
   * the type of plan (i.e. the required MongoDB version) is discarded.
   */
 @typeclass trait Crush[F[_]] {
+
   /** Returns both the final WorkflowTask as well as a DocVar indicating the
     * base of the collection.
     */
-  def crush[T[_[_]]: BirecursiveT](op: F[(T[F], (DocVar, WorkflowTask))])
-      : (DocVar, WorkflowTask)
+  def crush[T[_[_]]: BirecursiveT](
+      op: F[(T[F], (DocVar, WorkflowTask))]): (DocVar, WorkflowTask)
 }
 object Crush {
-  implicit def injected[F[_]: Functor, G[_]: Functor](implicit I: F :<: G, CG: Crush[G]):
-      Crush[F] =
+  implicit def injected[F[_]: Functor, G[_]: Functor](implicit I: F :<: G,
+                                                      CG: Crush[G]): Crush[F] =
     new Crush[F] {
       def crush[T[_[_]]: BirecursiveT](op: F[(T[F], (DocVar, WorkflowTask))]) =
         CG.crush(I.inj(op.map(_.leftMap(_.transCata[T[G]](I.inj(_))))))

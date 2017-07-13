@@ -34,7 +34,8 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
     case e: Exception => e.getMessage must contain("different format exists")
   }
 
-  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task, xml: AnalyticalFileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task,
+                                  xml: AnalyticalFileSystem ~> Task) = {
     "FileSystem operations should respect the mount format" >> {
       "creating a file that already exists in a different format should fail" >> {
         val f: AFile = rootDir </> dir("createconflict") </> file("thefile")
@@ -46,14 +47,13 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         (saves |@| jsData)((saveResult, jsd) =>
           (saveResult.toEither must beLeft(beAFormatConflictError)) and
-          (jsd.toEither must beRight(containTheSameElementsAs(data)))
-        ).unsafePerformSync
+            (jsd.toEither must beRight(containTheSameElementsAs(data)))).unsafePerformSync
       }
 
       "ls should not show files in other formats" >> {
         val cdir: ADir = rootDir </> dir("lscommon")
-        val jsFile = cdir </> file("jsfile")
-        val xmlFile = cdir </> file("xmlfile")
+        val jsFile     = cdir </> file("jsfile")
+        val xmlFile    = cdir </> file("xmlfile")
 
         val jsObj: Data  = Data.Obj("js"  -> Data.True)
         val xmlObj: Data = Data.Obj("xml" -> Data.True)
@@ -61,15 +61,15 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveJs  = write.saveThese(jsFile, Vector(jsObj))
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
-        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
+        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir))).run
+          .map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
           .unsafePerformSync
       }
 
       "ls should exclude dirs that only contain files in other formats" >> {
         val cdir: ADir = rootDir </> dir("excludedirs")
-        val jsFile = cdir </> file("jsfile")
-        val xmlFile = cdir </> dir("xmlfiles") </> file("xmlfile")
+        val jsFile     = cdir </> file("jsfile")
+        val xmlFile    = cdir </> dir("xmlfiles") </> file("xmlfile")
 
         val jsObj: Data  = Data.Obj("js"  -> Data.True)
         val xmlObj: Data = Data.Obj("xml" -> Data.True)
@@ -77,15 +77,15 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveJs  = write.saveThese(jsFile, Vector(jsObj))
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
-        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
+        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir))).run
+          .map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
           .unsafePerformSync
       }
 
       "ls should include dirs contain descendants in current format" >> {
         val cdir: ADir = rootDir </> dir("includedirs")
-        val jsFile = cdir </> dir("jsdir1") </> dir("jsdir2") </> file("jsfile")
-        val xmlFile = cdir </> dir("xmlfiles") </> file("xmlfile")
+        val jsFile     = cdir </> dir("jsdir1") </> dir("jsdir2") </> file("jsfile")
+        val xmlFile    = cdir </> dir("xmlfiles") </> file("xmlfile")
 
         val jsObj: Data  = Data.Obj("js"  -> Data.True)
         val xmlObj: Data = Data.Obj("xml" -> Data.True)
@@ -93,15 +93,15 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveJs  = write.saveThese(jsFile, Vector(jsObj))
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
-        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(dirSeg("jsdir1")))))
+        (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir))).run
+          .map(_.toEither must beRight(contain(exactly(dirSeg("jsdir1")))))
           .unsafePerformSync
       }
 
       "move file should fail when dst exists in another format" >> {
         val cdir: ADir = rootDir </> dir("movefails")
-        val jsFile = cdir </> file("jsfile")
-        val xmlFile = cdir </> file("xmlfile")
+        val jsFile     = cdir </> file("jsfile")
+        val xmlFile    = cdir </> file("xmlfile")
 
         val jsObj: Data  = Data.Obj("js"  -> Data.True)
         val xmlObj: Data = Data.Obj("xml" -> Data.True)
@@ -112,12 +112,12 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         val attemptMove = (
           runFsE(xml)(saveXml) *>
-          runFsE(js)(saveJs *> moveJs)
+            runFsE(js)(saveJs *> moveJs)
         ).run.attempt map (_.toEither must beLeft(beAFormatConflictError))
 
         val checkExists = (
           runFs(xml)(query.fileExists(xmlFile)) |@|
-          runFs(js)(query.fileExists(jsFile))
+            runFs(js)(query.fileExists(jsFile))
         )((xmlExists, jsExists) => (xmlExists && jsExists) must beTrue)
 
         (attemptMove |@| checkExists)(_ and _).unsafePerformSync
@@ -139,16 +139,17 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         val attemptMove =
           runFsE(xml)(saveXml) *>
-          runFsE( js)(saveJs   *> manage.moveDir(jsDir, xmlDir, MoveSemantics.FailIfExists))
+            runFsE(js)(
+              saveJs *> manage.moveDir(jsDir, xmlDir, MoveSemantics.FailIfExists))
 
         val checkSuccess = (
-          runFsE( js)(query.ls( jsDir)).run |@|
-          runFsE( js)(query.ls(xmlDir)).run |@|
-          runFsE(xml)(query.ls(xmlDir)).run
+          runFsE(js)(query.ls(jsDir)).run |@|
+            runFsE(js)(query.ls(xmlDir)).run |@|
+            runFsE(xml)(query.ls(xmlDir)).run
         ) { (lsjs, jslsxml, lsxml) =>
-          (lsjs.toEither    must beLeft)                                                and
-          (jslsxml.toEither must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (lsxml.toEither   must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (lsjs.toEither must beLeft) and
+            (jslsxml.toEither must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
+            (lsxml.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
         }
 
         (attemptMove.run *> checkSuccess).unsafePerformSync
@@ -165,20 +166,20 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val data       = Vector(Data._int(42))
 
         val writeTpl = (write.saveThese _).tupled
-        val saveJs  = List(jsA, jsB).strengthR(data).traverse(writeTpl)
-        val saveXml = List(xmlB, xmlC).strengthR(data).traverse(writeTpl)
+        val saveJs   = List(jsA, jsB).strengthR(data).traverse(writeTpl)
+        val saveXml  = List(xmlB, xmlC).strengthR(data).traverse(writeTpl)
 
         val attemptMove = (
           runFsE(xml)(saveXml) *>
-          runFsE(js)(saveJs *> manage.moveDir(jsDir, xmlDir, MoveSemantics.Overwrite))
+            runFsE(js)(saveJs *> manage.moveDir(jsDir, xmlDir, MoveSemantics.Overwrite))
         ).run.attempt map (_.toEither must beLeft(beAFormatConflictError))
 
         val ensureNothingChanged = (
-          runFsE( js)(query.ls( jsDir)).run |@|
-          runFsE(xml)(query.ls(xmlDir)).run
+          runFsE(js)(query.ls(jsDir)).run |@|
+            runFsE(xml)(query.ls(xmlDir)).run
         ) { (lsjs, lsxml) =>
-          (lsjs.toEither  must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (lsxml.toEither must beRight(contain(exactly(fileSeg("B"), fileSeg("C")))))
+          (lsjs.toEither must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
+            (lsxml.toEither must beRight(contain(exactly(fileSeg("B"), fileSeg("C")))))
         }
 
         (attemptMove |@| ensureNothingChanged)(_ and _).unsafePerformSync
@@ -200,16 +201,17 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         val attemptMove =
           runFsE(xml)(saveXml) *>
-          runFsE( js)(saveJs   *> manage.moveDir(srcDir, dstDir, MoveSemantics.FailIfExists))
+            runFsE(js)(
+              saveJs *> manage.moveDir(srcDir, dstDir, MoveSemantics.FailIfExists))
 
         val checkSuccess = (
-          runFsE( js)(query.ls(srcDir)).run |@|
-          runFsE( js)(query.ls(dstDir)).run |@|
-          runFsE(xml)(query.ls(srcDir)).run
+          runFsE(js)(query.ls(srcDir)).run |@|
+            runFsE(js)(query.ls(dstDir)).run |@|
+            runFsE(xml)(query.ls(srcDir)).run
         ) { (jssrc, jsdst, xmlsrc) =>
-          (jssrc.toEither  must beLeft)                                                and
-          (jsdst.toEither  must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (xmlsrc.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (jssrc.toEither must beLeft) and
+            (jsdst.toEither must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
+            (xmlsrc.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
         }
 
         (attemptMove.run *> checkSuccess).unsafePerformSync
@@ -229,14 +231,14 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         val attemptDelete =
           runFsE(xml)(saveXml) *>
-          runFsE( js)(saveJs   *> manage.delete(cdir))
+            runFsE(js)(saveJs *> manage.delete(cdir))
 
         val checkSuccess = (
-          runFsE( js)(query.ls(cdir)).run |@|
-          runFsE(xml)(query.ls(cdir)).run
+          runFsE(js)(query.ls(cdir)).run |@|
+            runFsE(xml)(query.ls(cdir)).run
         ) { (jsls, xmlls) =>
-          (jsls.toEither  must beLeft)                                                and
-          (xmlls.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (jsls.toEither must beLeft) and
+            (xmlls.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
         }
 
         (attemptDelete.run *> checkSuccess).unsafePerformSync
@@ -244,9 +246,9 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
       "delete dir should not affect subdirs that still contain files in other formats" >> {
         val cdir: ADir = rootDir </> dir("deletesharedsub")
-        val jsA        = cdir   </> file("A")
-        val jsB        = cdir   </> file("B")
-        val xmlsub     = cdir   </> dir("xmlsub")
+        val jsA        = cdir </> file("A")
+        val jsB        = cdir </> file("B")
+        val xmlsub     = cdir </> dir("xmlsub")
         val xmlC       = xmlsub </> file("C")
         val xmlD       = xmlsub </> file("D")
         val data       = Vector(Data._int(42))
@@ -257,14 +259,14 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
 
         val attemptDeleteParent =
           runFsE(xml)(saveXml) *>
-          runFsE( js)(saveJs   *> manage.delete(cdir))
+            runFsE(js)(saveJs *> manage.delete(cdir))
 
         val checkSuccess = (
-          runFsE( js)(query.ls(cdir)).run |@|
-          runFsE(xml)(query.ls(cdir)).run
+          runFsE(js)(query.ls(cdir)).run |@|
+            runFsE(xml)(query.ls(cdir)).run
         ) { (jsls, xmlls) =>
-          (jsls.toEither  must beLeft)                                      and
-          (xmlls.toEither must beRight(contain(exactly(dirSeg("xmlsub")))))
+          (jsls.toEither must beLeft) and
+            (xmlls.toEither must beRight(contain(exactly(dirSeg("xmlsub")))))
         }
 
         (attemptDeleteParent.run *> checkSuccess).unsafePerformSync

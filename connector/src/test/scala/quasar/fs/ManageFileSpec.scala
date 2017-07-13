@@ -29,15 +29,18 @@ class ManageFileSpec extends quasar.Qspec with FileSystemFixture {
   "ManageFile" should {
     "renameFile" >> {
       "moves the existing file to a new name in the same directory" >> prop {
-        (s: SingleFileMemState, name: String) => {
-          val rename = manage.renameFile(s.file, name)
-          val exists = query.fileExistsM(s.file)
-          val data: manage.M[Throwable \/ Vector[Data]] =
-            read.scanAll(fileParent(s.file) </> file(name)).runLogCatch
+        (s: SingleFileMemState, name: String) =>
+          {
+            val rename = manage.renameFile(s.file, name)
+            val exists = query.fileExistsM(s.file)
+            val data: manage.M[Throwable \/ Vector[Data]] =
+              read.scanAll(fileParent(s.file) </> file(name)).runLogCatch
 
-          Mem.interpret((rename *> (exists |@| data).tupled).run).eval(s.state)
-            .toEither must beRight((false, s.contents.right))
-        }
+            Mem
+              .interpret((rename *> (exists |@| data).tupled).run)
+              .eval(s.state)
+              .toEither must beRight((false, s.contents.right))
+          }
       }
     }
   }

@@ -29,7 +29,7 @@ final class JsonParserSpec extends Qspec {
   type J = Fix[Json]
 
   val C = Inject[Common, Json]
-  val O = Inject[Obj,    Json]
+  val O = Inject[Obj, Json]
 
   "EJson JSON parser" should {
     "properly construct values" >> {
@@ -43,15 +43,16 @@ final class JsonParserSpec extends Qspec {
         "string" : "lorem ipsum"
       }"""
 
-      jsonParser[Fix[Json], Json].parseUnsafe(js) must_= O(Obj(ListMap(
-        "array"  -> C(Arr(List(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))).embed,
-        "null"   -> C(Null[J]()).embed,
-        "false"  -> C(Bool[J](false)).embed,
-        "true"   -> C(Bool[J](true)).embed,
-        "num"    -> C(Dec[J](BigDecimal(3598.345455))).embed,
-        "int"    -> C(Dec[J](BigDecimal(998765))).embed,
-        "string" -> C(Str[J]("lorem ipsum")).embed
-      ))).embed
+      jsonParser[Fix[Json], Json].parseUnsafe(js) must_= O(
+        Obj(ListMap(
+          "array"  -> C(Arr(List(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))).embed,
+          "null"   -> C(Null[J]()).embed,
+          "false"  -> C(Bool[J](false)).embed,
+          "true"   -> C(Bool[J](true)).embed,
+          "num"    -> C(Dec[J](BigDecimal(3598.345455))).embed,
+          "int"    -> C(Dec[J](BigDecimal(998765))).embed,
+          "string" -> C(Str[J]("lorem ipsum")).embed
+        ))).embed
     }
   }
 }

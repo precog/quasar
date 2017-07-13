@@ -23,6 +23,8 @@ import quasar.blueeyes.json.serialization.DefaultExtractors._
 import java.util.UUID
 
 object JavaSerialization {
-  implicit val uuidDecomposer: Decomposer[UUID] = implicitly[Decomposer[String]].contramap((_: UUID).toString)
-  implicit val uuidExtractor: Extractor[UUID] = implicitly[Extractor[String]].map(UUID.fromString)
+  implicit val uuidDecomposer: Decomposer[UUID] =
+    implicitly[Decomposer[String]].contramap((_: UUID).toString)
+  implicit val uuidExtractor: Extractor[UUID] =
+    implicitly[Extractor[String]].map(UUID.fromString)
 }

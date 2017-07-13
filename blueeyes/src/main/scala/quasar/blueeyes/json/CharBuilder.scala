@@ -29,7 +29,7 @@ private[json] final class CharBuilder {
   def makeString: String = new String(cs, 0, len)
 
   def extend(s: String) {
-    var i = 0
+    var i   = 0
     val len = s.length
     while (i < len) { append(s.charAt(i)); i += 1 }
   }

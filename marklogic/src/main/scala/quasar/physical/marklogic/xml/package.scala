@@ -30,9 +30,7 @@ package object xml {
 
   object KeywordConfig {
     val ejsonCompliant =
-      KeywordConfig(
-        attributesKeyName = "_xml.attributes",
-        textKeyName       = "_xml.text")
+      KeywordConfig(attributesKeyName = "_xml.attributes", textKeyName = "_xml.text")
   }
 
   import Data._
@@ -66,7 +64,7 @@ package object xml {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
       case Seq() =>
-        m.cata(attrsAndText(_,  ""), _str(""))
+        m.cata(attrsAndText(_, ""), _str(""))
       case LeafText(txt) =>
         m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
@@ -85,9 +83,8 @@ package object xml {
     }
 
     def attrsAndText(attrs: MetaData, txt: String): Data =
-      attrToData(attrs).fold(_str(txt))(d => _obj(ListMap(
-        config.attributesKeyName -> d,
-        config.textKeyName       -> _str(txt))))
+      attrToData(attrs).fold(_str(txt))(d =>
+        _obj(ListMap(config.attributesKeyName -> d, config.textKeyName -> _str(txt))))
 
     Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }

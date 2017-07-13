@@ -27,7 +27,9 @@ trait StaticInlinerModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] {
   }
 }
 
-trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdLibModule[M] {
+trait StdLibStaticInlinerModule[M[+ _]]
+    extends StaticInlinerModule[M]
+    with StdLibModule[M] {
   import dag._
   import instructions._
 
@@ -52,7 +54,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
                         val result = for {
                           // No Op1F1 that can be applied to a complex RValues
                           cvalue <- RValue.toCValue(value)
-                          col <- newOp1.f1.apply(cvalue)
+                          col    <- newOp1.f1.apply(cvalue)
                           if col isDefinedAt 0
                         } yield col cValue 0
 
@@ -167,29 +169,29 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             val right2 = recurse(right)
 
             val graphM = for {
-              op2 <- op2ForBinOp(op)
+              op2   <- op2ForBinOp(op)
               op2F2 <- op2.fold(op2 = const(None), op2F2 = { Some(_) })
               result <- (left2, right2) match {
-                         case (left2 @ Const(CUndefined), _) =>
-                           Some(Const(CUndefined)(left2.loc))
+                case (left2 @ Const(CUndefined), _) =>
+                  Some(Const(CUndefined)(left2.loc))
 
-                         case (_, right2 @ Const(CUndefined)) =>
-                           Some(Const(CUndefined)(right2.loc))
+                case (_, right2 @ Const(CUndefined)) =>
+                  Some(Const(CUndefined)(right2.loc))
 
-                         case (left2 @ Const(leftValue), right2 @ Const(rightValue)) => {
-                           val result = for {
-                             // No Op1F1 that can be applied to a complex RValues
-                             leftCValue <- RValue.toCValue(leftValue)
-                             rightCValue <- RValue.toCValue(rightValue)
-                             col <- op2F2.f2.partialLeft(leftCValue).apply(rightCValue)
-                             if col isDefinedAt 0
-                           } yield col cValue 0
+                case (left2 @ Const(leftValue), right2 @ Const(rightValue)) => {
+                  val result = for {
+                    // No Op1F1 that can be applied to a complex RValues
+                    leftCValue  <- RValue.toCValue(leftValue)
+                    rightCValue <- RValue.toCValue(rightValue)
+                    col         <- op2F2.f2.partialLeft(leftCValue).apply(rightCValue)
+                    if col isDefinedAt 0
+                  } yield col cValue 0
 
-                           Some(Const(result getOrElse CUndefined)(graph.loc))
-                         }
+                  Some(Const(result getOrElse CUndefined)(graph.loc))
+                }
 
-                         case _ => None
-                       }
+                case _ => None
+              }
             } yield result
 
             graphM getOrElse Join(op, sort, left2, right2)(graph.loc)

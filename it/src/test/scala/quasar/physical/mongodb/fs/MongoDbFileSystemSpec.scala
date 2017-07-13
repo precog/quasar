@@ -48,8 +48,9 @@ import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec
-  extends FileSystemTest[AnalyticalFileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
-  with quasar.ExclusiveQuasarSpecification {
+    extends FileSystemTest[AnalyticalFileSystemIO](
+      mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
+    with quasar.ExclusiveQuasarSpecification {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -83,7 +84,7 @@ class MongoDbFileSystemSpec
 
     tmpFile flatMap { f =>
       val p = write.save(f, oneDoc.toProcess).terminated *>
-              manage.delete(f).liftM[Process]
+        manage.delete(f).liftM[Process]
 
       rethrow[Task, FileSystemError].apply(execT(run, p))
     }
@@ -97,20 +98,27 @@ class MongoDbFileSystemSpec
 
     "MongoDB" should {
       "Writing" >> {
-        val invalidData = testPrefix.map(_ </> dir("invaliddata"))
-                            .liftM[FileSystemErrT]
+        val invalidData = testPrefix
+          .map(_ </> dir("invaliddata"))
+          .liftM[FileSystemErrT]
 
         "fail with `InvalidData` when attempting to save non-documents" >> prop {
-          (data: Data, fname: Int) => isNotObj(data) ==> {
-            val path = invalidData map (_ </> file(fname.toHexString))
+          (data: Data, fname: Int) =>
+            isNotObj(data) ==> {
+              val path = invalidData map (_ </> file(fname.toHexString))
 
-            path.flatMap(p => runLogT(run, write.append(p, Process(data)))).map { errs =>
-              vectorFirst[FileSystemError]
-                .composePrism(writeFailed)
-                .composeLens(Field1.first)
-                .nonEmpty(errs.toVector)
-            }.run.unsafePerformSync.toEither must beRight(true)
-          }
+              path
+                .flatMap(p => runLogT(run, write.append(p, Process(data))))
+                .map { errs =>
+                  vectorFirst[FileSystemError]
+                    .composePrism(writeFailed)
+                    .composeLens(Field1.first)
+                    .nonEmpty(errs.toVector)
+                }
+                .run
+                .unsafePerformSync
+                .toEither must beRight(true)
+            }
         }
 
         "fail to save data to DB path" in {
@@ -122,7 +130,8 @@ class MongoDbFileSystemSpec
           //     This sort of thing shouldn't happen once we have primitive
           //     support for save, see SD-1296.
           runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must beLike {
-            case -\/(FileSystemError.PathErr(PathError.InvalidPath(_, msg))) => msg must_== "path names a database, but no collection"
+            case -\/(FileSystemError.PathErr(PathError.InvalidPath(_, msg))) =>
+              msg must_== "path names a database, but no collection"
           }
         }
 
@@ -130,7 +139,9 @@ class MongoDbFileSystemSpec
           val path = rootDir </> file("foo")
 
           runLogT(run, write.append(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must_==
-            -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
+            -\/(
+              FileSystemError.pathErr(
+                PathError.invalidPath(path, "path names a database, but no collection")))
         }
 
         step(invalidData.flatMap(p => runT(run)(manage.delete(p))).runVoid)
@@ -146,56 +157,57 @@ class MongoDbFileSystemSpec
             val f = d </> file("deldb")
 
             (
-              query.ls(rootDir).liftM[Process]           |@|
-              write.save(f, oneDoc.toProcess).terminated |@|
-              query.ls(rootDir).liftM[Process]           |@|
-              manage.delete(d).liftM[Process]            |@|
-              query.ls(rootDir).liftM[Process]
+              query.ls(rootDir).liftM[Process] |@|
+                write.save(f, oneDoc.toProcess).terminated |@|
+                query.ls(rootDir).liftM[Process] |@|
+                manage.delete(d).liftM[Process] |@|
+                query.ls(rootDir).liftM[Process]
             ) { (before, _, create, _, delete) =>
               val pn = d.relativeTo(rootDir).flatMap(firstSegmentName).toSet
               (before.intersect(pn) must beEmpty) and
-              (create.intersect(pn) must_== pn) and
-              (delete must_== before)
+                (create.intersect(pn) must_== pn) and
+                (delete must_== before)
             }
           }
 
-          tmpDir.flatMap(d =>
-            rethrow[Task, FileSystemError]
-              .apply(runLogT(run, check(d)))
-              .handleWith(skipIfUnauthorized)
-              .map(_.headOption getOrElse ko)
-          ).unsafePerformSync
+          tmpDir
+            .flatMap(
+              d =>
+                rethrow[Task, FileSystemError]
+                  .apply(runLogT(run, check(d)))
+                  .handleWith(skipIfUnauthorized)
+                  .map(_.headOption getOrElse ko))
+            .unsafePerformSync
         }
 
         "root dir should delete all databases" >> {
-          def check(d1: ADir, d2: ADir)
-                   (implicit X: Apply[X]) = {
+          def check(d1: ADir, d2: ADir)(implicit X: Apply[X]) = {
 
             val f1 = d1 </> file("delall1")
             val f2 = d2 </> file("delall2")
 
             (
               write.save(f1, oneDoc.toProcess).terminated |@|
-              write.save(f2, oneDoc.toProcess).terminated |@|
-              query.ls(rootDir).liftM[Process]            |@|
-              manage.delete(rootDir).liftM[Process]       |@|
-              query.ls(rootDir).liftM[Process]
+                write.save(f2, oneDoc.toProcess).terminated |@|
+                query.ls(rootDir).liftM[Process] |@|
+                manage.delete(rootDir).liftM[Process] |@|
+                query.ls(rootDir).liftM[Process]
             ) { (_, _, before, _, after) =>
               val dA = d1.relativeTo(rootDir).flatMap(firstSegmentName).toSet
               val dB = d2.relativeTo(rootDir).flatMap(firstSegmentName).toSet
 
               (before.intersect(dA) must_== dA) and
-              (before.intersect(dB) must_== dB) and
-              (after must beEmpty)
+                (before.intersect(dB) must_== dB) and
+                (after must beEmpty)
             }
           }
 
-          (tmpDir |@| tmpDir)((d1, d2) =>
-            rethrow[Task, FileSystemError]
-              .apply(runLogT(run, check(d1, d2)))
-              .handleWith(skipIfUnauthorized)
-              .map(_.headOption getOrElse ko)
-          ).join.unsafePerformSync
+          (tmpDir |@| tmpDir)(
+            (d1, d2) =>
+              rethrow[Task, FileSystemError]
+                .apply(runLogT(run, check(d1, d2)))
+                .handleWith(skipIfUnauthorized)
+                .map(_.headOption getOrElse ko)).join.unsafePerformSync
         }.skippedOnUserEnv("Would destroy user data.")
 
         step(restoreTestDir(run).unsafePerformSync)
@@ -216,8 +228,8 @@ class MongoDbFileSystemSpec
         */
       "Querying" >> {
         def shouldFailWithPathNotFound(f: String => String) = {
-          val dne = testPrefix map (_ </> file("__DNE__"))
-          val q = dne map (p => f(posixCodec.printPath(p)))
+          val dne   = testPrefix map (_ </> file("__DNE__"))
+          val q     = dne map (p => f(posixCodec.printPath(p)))
           val xform = QueryFile.Transforms[query.FreeS]
 
           import xform._
@@ -236,22 +248,21 @@ class MongoDbFileSystemSpec
 
           def check(file: AFile) = {
             val errP: Prism[FileSystemError \/ AFile, APath] =
-              D.left                    composePrism
-              FileSystemError.pathErr composePrism
-              PathError.pathNotFound
+              D.left composePrism
+                FileSystemError.pathErr composePrism
+                PathError.pathNotFound
 
             val out = renameFile(file, κ(FileName("out")))
 
             def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
-              (errP.getOption(
-                runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
-                  .run.value.unsafePerformSync
-              ) must beSome(file))
+                (errP.getOption(
+                  runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out)).run.value.unsafePerformSync
+                ) must beSome(file))
 
-            sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (
-              err => ko(s"Parsing failed: ${err.shows}"),
-              check0)
+            sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (err =>
+              ko(s"Parsing failed: ${err.shows}"),
+            check0)
           }
 
           dne.map(check).unsafePerformSync
@@ -276,15 +287,17 @@ class MongoDbFileSystemSpec
         }
 
         "listing a non-empty top dir (i.e. a database) should succeed" >> {
-          val tdir = rootDir </> dir("__topdir__")
+          val tdir  = rootDir </> dir("__topdir__")
           val tfile = tdir </> file("foobar")
 
           val p = write.save(tfile, oneDoc.toProcess).drain ++
-                  query.ls(tdir).liftM[Process]
-                    .flatMap(ns => Process.emitAll(ns.toVector))
+            query
+              .ls(tdir)
+              .liftM[Process]
+              .flatMap(ns => Process.emitAll(ns.toVector))
 
-          (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
-            .runEither must beRight(contain(FileName("foobar").right[DirName]))
+          (runLogT(run, p) <* runT(run)(manage.delete(tdir))).runEither must beRight(
+            contain(FileName("foobar").right[DirName]))
         }
       }
 
@@ -309,44 +322,45 @@ class MongoDbFileSystemSpec
       "Moving" >> {
         "top-level directory should move database" >> {
           def check(src: ADir, dst: ADir)(implicit X: Apply[X]) = {
-            val f1 = src </> file("movdb1")
-            val f2 = src </> file("movdb2")
+            val f1  = src </> file("movdb1")
+            val f2  = src </> file("movdb2")
             val ovr = MoveSemantics.Overwrite
 
             (
               write.save(f1, oneDoc.toProcess).terminated |@|
-              write.save(f2, oneDoc.toProcess).terminated |@|
-              query.ls(src).liftM[Process]                |@|
-              manage.moveDir(src, dst, ovr).liftM[Process] |@|
-              query.ls(dst).liftM[Process]
+                write.save(f2, oneDoc.toProcess).terminated |@|
+                query.ls(src).liftM[Process] |@|
+                manage.moveDir(src, dst, ovr).liftM[Process] |@|
+                query.ls(dst).liftM[Process]
             ) { (_, _, create, _, moved) =>
-              val pn: Set[PathSegment] = Set(FileName("movdb1").right, FileName("movdb2").right)
+              val pn: Set[PathSegment] =
+                Set(FileName("movdb1").right, FileName("movdb2").right)
               (create must contain(allOf(pn))) and (moved must contain(allOf(pn)))
             }
           }
 
-          (tmpDir |@| tmpDir)((s, d) =>
-            rethrow[Task, FileSystemError]
-              .apply(
-                runLogT(run, check(s, d)) <*
-                runT(run)(manage.delete(s) *> manage.delete(d)))
-              .handleWith(skipIfUnauthorized)
-              .map(_.headOption getOrElse ko)
-          ).join.unsafePerformSync
+          (tmpDir |@| tmpDir)(
+            (s, d) =>
+              rethrow[Task, FileSystemError]
+                .apply(runLogT(run, check(s, d)) <*
+                  runT(run)(manage.delete(s) *> manage.delete(d)))
+                .handleWith(skipIfUnauthorized)
+                .map(_.headOption getOrElse ko)).join.unsafePerformSync
         }
       }
 
       "Temp files" >> {
-        Fragments.foreach(Collection.DatabaseNameEscapes) { case (esc, _) => Fragments(
-          s"be in the same database when db name contains '$esc'" >> {
-            val pdir = rootDir </> dir(s"db${esc}name")
+        Fragments.foreach(Collection.DatabaseNameEscapes) {
+          case (esc, _) =>
+            Fragments(s"be in the same database when db name contains '$esc'" >> {
+              val pdir = rootDir </> dir(s"db${esc}name")
 
-            runT(run)(for {
-              tfile  <- manage.tempFile(pdir)
-              dbName <- EitherT.fromDisjunction[manage.FreeS](
-                          Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
-            } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
-          })
+              runT(run)(for {
+                tfile <- manage.tempFile(pdir)
+                dbName <- EitherT.fromDisjunction[manage.FreeS](
+                  Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
+              } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
+            })
         }
         ok
       }
@@ -356,7 +370,8 @@ class MongoDbFileSystemSpec
   ////
 
   private def skipIfUnauthorized[A]: PartialFunction[Throwable, Task[A]] = {
-    case ex: MongoException if ex.getMessage.contains("Command failed with error 13: 'not authorized on ") =>
+    case ex: MongoException
+        if ex.getMessage.contains("Command failed with error 13: 'not authorized on ") =>
       Task.fail(SkipException(skipped("No db-level permissions.")))
   }
 
@@ -372,11 +387,13 @@ object MongoDbFileSystemSpec {
   val mongoFsUT: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
-        TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(FsType, definition)
-        ).handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
-          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
-        }
+        TestConfig
+          .externalFileSystems(
+            FileSystemTest.fsTestConfig(FsType, definition)
+          )
+          .handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
+            case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+          }
       )(_.liftIO)
 }
 
@@ -386,10 +403,12 @@ object MongoDbQScriptFileSystemSpec {
   val mongoFsUT: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
-        TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
-        ).handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
-          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
-        }
+        TestConfig
+          .externalFileSystems(
+            FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
+          )
+          .handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
+            case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+          }
       )(_.liftIO)
 }

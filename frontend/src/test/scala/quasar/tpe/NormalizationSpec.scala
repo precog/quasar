@@ -44,7 +44,8 @@ final class NormalizationSpec extends Qspec with TypeFArbitrary with EJsonArbitr
 
   "coalesceUnion" >> {
     "resulting union contains no unions" >> prop { (x: T, y: T, zs: IList[T]) =>
-      Unioned.unapply(coalesceUnion[J, T] apply union[J, T](x, y, zs))
+      Unioned
+        .unapply(coalesceUnion[J, T] apply union[J, T](x, y, zs))
         .map(_.any(isUnion)) must beSome(beFalse)
     }
   }

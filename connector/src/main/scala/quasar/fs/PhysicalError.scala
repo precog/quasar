@@ -33,8 +33,7 @@ sealed abstract class PhysicalError {
   val cause: Exception
 }
 
-@Lenses final case class UnhandledFSError(cause: Exception)
-    extends PhysicalError
+@Lenses final case class UnhandledFSError(cause: Exception) extends PhysicalError
 
 object PhysicalError extends PhysicalErrorPrisms {
   implicit val show: Show[PhysicalError] = Show.shows(_.cause.getMessage)
@@ -43,5 +42,5 @@ object PhysicalError extends PhysicalErrorPrisms {
 abstract class PhysicalErrorPrisms {
   val unhandledFSError = Prism.partial[PhysicalError, Exception] {
     case UnhandledFSError(ex) => ex
-  } (UnhandledFSError(_))
+  }(UnhandledFSError(_))
 }

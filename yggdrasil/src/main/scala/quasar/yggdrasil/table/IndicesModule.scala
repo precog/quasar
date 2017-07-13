@@ -26,7 +26,11 @@ import org.slf4s.Logging
 
 import scala.collection.mutable
 
-trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
+trait IndicesModule[M[+ _]]
+    extends Logging
+    with TransSpecModule
+    with ColumnarTableTypes[M]
+    with SliceTransforms[M] {
   self: ColumnarTableModule[M] =>
 
   // we will warn for tables with >1M rows.
@@ -93,9 +97,12 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * Despite being in M, the TableIndex will be eagerly constructed
       * as soon as the underlying slices are available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
+    def createFromTable(table: Table,
+                        groupKeys: Seq[TransSpec1],
+                        valueSpec: TransSpec1): M[TableIndex] = {
 
-      def accumulate(buf: mutable.ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
+      def accumulate(buf: mutable.ListBuffer[SliceIndex],
+                     stream: StreamT[M, SliceIndex]): M[TableIndex] =
         stream.uncons flatMap {
           case None             => M.point(new TableIndex(buf.toList))
           case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
@@ -201,8 +208,8 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
       //assertSorted(as)
       //assertSorted(bs)
-      var i = 0
-      var j = 0
+      var i    = 0
+      var j    = 0
       val alen = as.size
       val blen = bs.size
       val out  = new ArrayIntList(alen min blen)
@@ -227,11 +234,13 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     /**
       * Returns the rows specified by the given group key values.
       */
-    private[table] def getRowsForKeys(keyIds: Seq[Int], keyValues: Seq[RValue]): ArrayIntList = {
+    private[table] def getRowsForKeys(keyIds: Seq[Int],
+                                      keyValues: Seq[RValue]): ArrayIntList = {
       var rows: ArrayIntList = dict.getOrElse((keyIds(0), keyValues(0)), emptyBuffer)
       var i: Int             = 1
       while (i < keyIds.length && !rows.isEmpty) {
-        rows = intersectBuffers(rows, dict.getOrElse((keyIds(i), keyValues(i)), emptyBuffer))
+        rows =
+          intersectBuffers(rows, dict.getOrElse((keyIds(i), keyValues(i)), emptyBuffer))
         i += 1
       }
       rows
@@ -284,7 +293,9 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * Despite being in M, the SliceIndex will be eagerly constructed
       * as soon as the underlying Slice is available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
+    def createFromTable(table: Table,
+                        groupKeys: Seq[TransSpec1],
+                        valueSpec: TransSpec1): M[SliceIndex] = {
 
       val sts = groupKeys.map(composeSliceTransform).toArray
       val vt  = composeSliceTransform(valueSpec)
@@ -304,7 +315,9 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * necessary to associate them into the maps and sets we
       * ultimately need to construct the SliceIndex.
       */
-    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): M[SliceIndex] = {
+    private[table] def createFromSlice(slice: Slice,
+                                       sts: Array[SliceTransform1[_]],
+                                       vt: SliceTransform1[_]): M[SliceIndex] = {
       val numKeys = sts.length
       val n       = slice.size
       val vals    = mutable.Map[Int, mutable.Set[RValue]]()
@@ -318,8 +331,8 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
         var i = 0
         while (i < n) {
           var dead = false
-          val row = new Array[RValue](numKeys)
-          var k = 0
+          val row  = new Array[RValue](numKeys)
+          var k    = 0
           while (!dead && k < numKeys) {
             val jv = keys(k)(i)
             if (jv != null) {
@@ -366,7 +379,9 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * data store is column-oriented but the associations we want to
       * perform are row-oriented.
       */
-    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
+    private[table] def readKeys(
+        slice: Slice,
+        sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
       val n       = slice.size
       val numKeys = sts.length
       val keys    = new mutable.ArrayBuffer[M[Array[RValue]]](numKeys)
@@ -400,15 +415,16 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
         k += 1
       }
 
-      val back = (0 until keys.length).foldLeft(M.point(Vector.fill[Array[RValue]](numKeys)(null))) {
-        case (accM, i) => {
-          val arrM = keys(i)
+      val back = (0 until keys.length)
+        .foldLeft(M.point(Vector.fill[Array[RValue]](numKeys)(null))) {
+          case (accM, i) => {
+            val arrM = keys(i)
 
-          M.apply2(accM, arrM) { (acc, arr) =>
-            acc.updated(i, arr)
+            M.apply2(accM, arrM) { (acc, arr) =>
+              acc.updated(i, arr)
+            }
           }
         }
-      }
 
       back map { _.toArray }
     }
@@ -416,8 +432,8 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     private def unionBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
       //assertSorted(as)
       //assertSorted(bs)
-      var i = 0
-      var j = 0
+      var i    = 0
+      var j    = 0
       val alen = as.size
       val blen = bs.size
       val out  = new ArrayIntList(alen max blen)

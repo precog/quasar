@@ -20,7 +20,10 @@ import slamdata.Predef._
 
 import scalaz._, Scalaz._
 
-final case class ServerVersion(major: Int, minor: Int, revision: Option[Int], extra: String)
+final case class ServerVersion(major: Int,
+                               minor: Int,
+                               revision: Option[Int],
+                               extra: String)
 object ServerVersion {
   val MongoDb2_6 = ServerVersion(2, 6, None, "")
   val MongoDb3_0 = ServerVersion(3, 0, None, "")

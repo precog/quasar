@@ -30,8 +30,10 @@ object Merge {
     case (_, y)                     => y
   }
 
-  private[json] def mergeFields(vs1: Map[String, JValue], vs2: Map[String, JValue]): Map[String, JValue] = {
-    def mergeRec(xleft: Map[String, JValue], yleft: Map[String, JValue]): Map[String, JValue] = {
+  private[json] def mergeFields(vs1: Map[String, JValue],
+                                vs2: Map[String, JValue]): Map[String, JValue] = {
+    def mergeRec(xleft: Map[String, JValue],
+                 yleft: Map[String, JValue]): Map[String, JValue] = {
       if (xleft.isEmpty) yleft
       else {
         val (xn, xv) = xleft.head

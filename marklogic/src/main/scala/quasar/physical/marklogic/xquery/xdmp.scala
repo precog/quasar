@@ -64,7 +64,9 @@ object xdmp {
   def fromJson(node: XQuery): XQuery =
     XQuery(s"xdmp:from-json($node)")
 
-  def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
+  def hmacSha1(password: XQuery,
+               message: XQuery,
+               encoding: Option[XQuery] = None): XQuery =
     XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
 
   def integerToHex(int: XQuery): XQuery =

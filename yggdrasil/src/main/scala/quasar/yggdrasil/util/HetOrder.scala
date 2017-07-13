@@ -22,12 +22,14 @@ import quasar.precog.util.NumericComparisons
 /**
   * Compare values of different types.
   */
-trait HetOrder[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B] {
+trait HetOrder[@specialized(Boolean, Long, Double, AnyRef) A,
+               @specialized(Boolean, Long, Double, AnyRef) B] {
   def compare(a: A, b: B): Int
 }
 
 trait HetOrderLow {
-  def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](ho: HetOrder[A, B]) =
+  def reverse[@specialized(Boolean, Long, Double, AnyRef) A,
+              @specialized(Boolean, Long, Double, AnyRef) B](ho: HetOrder[A, B]) =
     new HetOrder[B, A] {
       def compare(b: B, a: A) = {
         val cmp = ho.compare(a, b)
@@ -35,7 +37,8 @@ trait HetOrderLow {
       }
     }
 
-  implicit def fromOrder[@specialized(Boolean, Long, Double, AnyRef) A](implicit o: spire.algebra.Order[A]) = new HetOrder[A, A] {
+  implicit def fromOrder[@specialized(Boolean, Long, Double, AnyRef) A](
+      implicit o: spire.algebra.Order[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A) = o.compare(a, b)
   }
 }
@@ -61,5 +64,7 @@ object HetOrder extends HetOrderLow {
     def compare(a: Double, b: BigDecimal): Int = NumericComparisons.compare(a, b)
   }
 
-  @inline final def apply[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](implicit ho: HetOrder[A, B]) = ho
+  @inline final def apply[@specialized(Boolean, Long, Double, AnyRef) A,
+                          @specialized(Boolean, Long, Double, AnyRef) B](
+      implicit ho: HetOrder[A, B]) = ho
 }

@@ -26,15 +26,17 @@ package object free {
     def :+:[G[_]](g: G ~> H) = λ[(G :+: F)#λ ~> H](_.run.fold(g, f))
   }
 
-  def mapSNT[S[_], T[_]](f: S ~> T)              = λ[Free[S, ?] ~> Free[T, ?]](_ mapSuspension f)
-  def flatMapSNT[S[_], T[_]](f: S ~> Free[T, ?]) = λ[Free[S, ?] ~> Free[T, ?]](_ flatMapSuspension f)
-  def foldMapNT[F[_], G[_]: Monad](f: F ~> G)    = λ[Free[F, ?] ~> G](_ foldMap f)
+  def mapSNT[S[_], T[_]](f: S ~> T) = λ[Free[S, ?] ~> Free[T, ?]](_ mapSuspension f)
+  def flatMapSNT[S[_], T[_]](f: S ~> Free[T, ?]) =
+    λ[Free[S, ?] ~> Free[T, ?]](_ flatMapSuspension f)
+  def foldMapNT[F[_], G[_]: Monad](f: F ~> G) = λ[Free[F, ?] ~> G](_ foldMap f)
 
   /** `Inject#inj` as a natural transformation. */
   def injectNT[F[_], G[_]](implicit I: F :<: G) = λ[F ~> G](I inj _)
 
   /** Convenience transformation to inject into a coproduct and lift into Free. */
-  def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] = liftFT[S] compose injectNT[F, S]
+  def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] =
+    liftFT[S] compose injectNT[F, S]
 
   /** `Free#liftF` as a natural transformation */
   def liftFT[S[_]] = λ[S ~> Free[S, ?]](Free liftF _)

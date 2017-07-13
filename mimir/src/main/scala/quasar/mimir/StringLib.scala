@@ -21,7 +21,7 @@ import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 
 import quasar.yggdrasil.table._
-import java.util.regex.{ Pattern, PatternSyntaxException }
+import java.util.regex.{Pattern, PatternSyntaxException}
 
 /* DEPRECATED
  *
@@ -41,7 +41,15 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     val StringNamespace = Vector("std", "string")
 
-    override def _lib1 = super._lib1 ++ Set(length, trim, toUpperCase, toLowerCase, isEmpty, intern, parseNum, numToString)
+    override def _lib1 =
+      super._lib1 ++ Set(length,
+                         trim,
+                         toUpperCase,
+                         toLowerCase,
+                         isEmpty,
+                         intern,
+                         parseNum,
+                         numToString)
 
     override def _lib2 =
       super._lib2 ++ Set(
@@ -63,7 +71,8 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         equals,
         indexOf,
         split,
-        splitRegex)
+        splitRegex
+      )
 
     private def isValidInt(num: BigDecimal): Boolean = {
       try {
@@ -75,7 +84,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     class Op1SS(name: String, f: String => String) extends Op1F1(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
-      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      val tpe                         = UnaryOperationType(StrAndDateT, JNumberT)
       private def build(c: StrColumn) = new StrFrom.S(c, _ != null, f)
       def f1: F1 = CF1P("builtin::str::op1ss::" + name) {
         case c: StrColumn  => build(c)
@@ -104,7 +113,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object length extends Op1F1(StringNamespace, "length") {
       //@deprecated, see the DEPRECATED comment in StringLib
-      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      val tpe                         = UnaryOperationType(StrAndDateT, JNumberT)
       private def build(c: StrColumn) = new LongFrom.S(c, _ != null, _.length)
       def f1: F1 = CF1P("builtin::str::length") {
         case c: StrColumn  => build(c)
@@ -112,10 +121,12 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    class Op2SSB(name: String, f: (String, String) => Boolean) extends Op2F2(StringNamespace, name) {
+    class Op2SSB(name: String, f: (String, String) => Boolean)
+        extends Op2F2(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JBooleanT)
-      private def build(c1: StrColumn, c2: StrColumn) = new BoolFrom.SS(c1, c2, neitherNull, f)
+      private def build(c1: StrColumn, c2: StrColumn) =
+        new BoolFrom.SS(c1, c2, neitherNull, f)
       def f2: F2 = CF2P("builtin::str::op2ss" + name) {
         case (c1: StrColumn, c2: StrColumn)   => build(c1, c2)
         case (c1: StrColumn, c2: DateColumn)  => build(c1, dateToStrCol(c2))
@@ -155,7 +166,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
                 val reg = regex(i).r
 
                 str match {
-                  case reg(capture @ _ *) => {
+                  case reg(capture @ _*) => {
                     val capture2 = capture map { str =>
                       if (str == null)
                         ""
@@ -195,35 +206,57 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    class Op2SLL(name: String, defined: (String, Long) => Boolean, f: (String, Long) => Long) extends Op2F2(StringNamespace, name) {
+    class Op2SLL(name: String,
+                 defined: (String, Long) => Boolean,
+                 f: (String, Long) => Long)
+        extends Op2F2(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(StrAndDateT, JNumberT, JNumberT)
       def f2: F2 = CF2P("builtin::str::op2sll::" + name) {
         case (c1: StrColumn, c2: DoubleColumn) =>
-          new LongFrom.SD(c1, c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
+          new LongFrom.SD(c1,
+                          c2,
+                          (s, n) => (n % 1 == 0) && defined(s, n.toLong),
+                          (s, n) => f(s, n.toLong))
 
         case (c1: StrColumn, c2: LongColumn) =>
           new LongFrom.SL(c1, c2, defined, f)
 
         case (c1: StrColumn, c2: NumColumn) =>
-          new LongFrom.SN(c1, c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
+          new LongFrom.SN(c1,
+                          c2,
+                          (s, n) => (n % 1 == 0) && defined(s, n.toLong),
+                          (s, n) => f(s, n.toLong))
 
         case (c1: DateColumn, c2: DoubleColumn) =>
-          new LongFrom.SD(dateToStrCol(c1), c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
+          new LongFrom.SD(dateToStrCol(c1),
+                          c2,
+                          (s, n) => (n % 1 == 0) && defined(s, n.toLong),
+                          (s, n) => f(s, n.toLong))
 
         case (c1: DateColumn, c2: LongColumn) =>
           new LongFrom.SL(dateToStrCol(c1), c2, defined, f)
 
         case (c1: DateColumn, c2: NumColumn) =>
-          new LongFrom.SN(dateToStrCol(c1), c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
+          new LongFrom.SN(dateToStrCol(c1),
+                          c2,
+                          (s, n) => (n % 1 == 0) && defined(s, n.toLong),
+                          (s, n) => f(s, n.toLong))
       }
     }
 
-    object codePointAt extends Op2SLL("codePointAt", (s, n) => n >= 0 && s.length > n, (s, n) => s.codePointAt(n.toInt))
+    object codePointAt
+        extends Op2SLL("codePointAt",
+                       (s, n) => n >= 0 && s.length > n,
+                       (s, n) => s.codePointAt(n.toInt))
 
-    object codePointBefore extends Op2SLL("codePointBefore", (s, n) => n >= 0 && s.length > n, (s, n) => s.codePointBefore(n.toInt))
+    object codePointBefore
+        extends Op2SLL("codePointBefore",
+                       (s, n) => n >= 0 && s.length > n,
+                       (s, n) => s.codePointBefore(n.toInt))
 
-    class Substring(name: String)(f: (String, Int) => String) extends Op2F2(StringNamespace, name) {
+    class Substring(name: String)(f: (String, Int) => String)
+        extends Op2F2(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(StrAndDateT, JNumberT, JTextT)
       def f2: F2 = CF2P("builtin::str::substring::" + name) {
@@ -245,12 +278,14 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             f(s, n.toInt)
           })
         case (c1: DateColumn, c2: DoubleColumn) =>
-          new StrFrom.SD(dateToStrCol(c1), c2, (s, n) => n >= 0 && (n % 1 == 0), { (s, n) =>
-            f(s, n.toInt)
+          new StrFrom.SD(dateToStrCol(c1), c2, (s, n) => n >= 0 && (n % 1 == 0), {
+            (s, n) =>
+              f(s, n.toInt)
           })
         case (c1: DateColumn, c2: NumColumn) =>
-          new StrFrom.SN(dateToStrCol(c1), c2, (s, n) => n >= 0 && (n % 1 == 0), { (s, n) =>
-            f(s, n.toInt)
+          new StrFrom.SN(dateToStrCol(c1), c2, (s, n) => n >= 0 && (n % 1 == 0), {
+            (s, n) =>
+              f(s, n.toInt)
           })
       }
     }
@@ -275,7 +310,8 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           s.substring(0, math.max(0, s.length - n))
         })
 
-    class Op2SSL(name: String, f: (String, String) => Long) extends Op2F2(StringNamespace, name) {
+    class Op2SSL(name: String, f: (String, String) => Long)
+        extends Op2F2(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JNumberT)
       def f2: F2 = CF2P("builtin::str::op2ssl::" + name) {
@@ -300,7 +336,8 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object parseNum extends Op1F1(StringNamespace, "parseNum") {
       val intPattern = Pattern.compile("^-?(?:0|[1-9][0-9]*)$")
-      val decPattern = Pattern.compile("^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$")
+      val decPattern =
+        Pattern.compile("^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$")
 
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(StrAndDateT, JNumberT)
@@ -356,29 +393,30 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       lazy val mapper = splitMapper(false)
     }
 
-    def splitMapper(quote: Boolean) = CF2Array[String, M]("std::string::split(%s)".format(quote)) {
-      case (left: StrColumn, right: StrColumn, range) => {
-        val result  = new Array[Array[String]](range.length)
-        val defined = new BitSet(range.length)
+    def splitMapper(quote: Boolean) =
+      CF2Array[String, M]("std::string::split(%s)".format(quote)) {
+        case (left: StrColumn, right: StrColumn, range) => {
+          val result  = new Array[Array[String]](range.length)
+          val defined = new BitSet(range.length)
 
-        RangeUtil.loop(range) { row =>
-          if (left.isDefinedAt(row) && right.isDefinedAt(row)) {
-            try {
-              val pattern = if (quote) Pattern.quote(right(row)) else right(row)
+          RangeUtil.loop(range) { row =>
+            if (left.isDefinedAt(row) && right.isDefinedAt(row)) {
+              try {
+                val pattern = if (quote) Pattern.quote(right(row)) else right(row)
 
-              // TOOD cache compiled patterns for awesome sauce
-              result(row) = Pattern.compile(pattern).split(left(row), -1)
+                // TOOD cache compiled patterns for awesome sauce
+                result(row) = Pattern.compile(pattern).split(left(row), -1)
 
-              defined.flip(row)
-            } catch {
-              case _: PatternSyntaxException =>
+                defined.flip(row)
+              } catch {
+                case _: PatternSyntaxException =>
+              }
             }
           }
-        }
 
-        (CString, result, defined)
+          (CString, result, defined)
+        }
       }
-    }
 
     val UnifyStrDate = CF1P("builtin::str::unifyStrDate")({
       case c: StrColumn  => c

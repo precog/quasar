@@ -30,44 +30,42 @@ object queryfile {
   import QueryFile._
 
   def interpret[S[_]](
-    implicit
-    S0: ConnectionIO :<: S
+      implicit
+      S0: ConnectionIO :<: S
   ): QueryFile ~> Free[S, ?] = new (QueryFile ~> Free[S, ?]) {
     @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def apply[A](qf: QueryFile[A]) = qf match {
       case ExecutePlan(lp, out) => ???
-      case EvaluatePlan(lp) => ???
-      case More(h) => ???
-      case Close(h) => ???
-      case Explain(lp) => ???
-      case ListContents(dir) => listContents(dir)
-      case FileExists(file) => fileExists(file)
+      case EvaluatePlan(lp)     => ???
+      case More(h)              => ???
+      case Close(h)             => ???
+      case Explain(lp)          => ???
+      case ListContents(dir)    => listContents(dir)
+      case FileExists(file)     => fileExists(file)
     }
   }
 
   def listContents[S[_]](
-    dir: APath
+      dir: APath
   )(implicit
-    S0: ConnectionIO :<: S
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
+    S0: ConnectionIO :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
     (for {
-      dt  <- EitherT(dbTableFromPath(dir).point[Free[S, ?]])
-      r   <- lift(tablesWithPrefix(dt.table)).into.liftM[FileSystemErrT]
-      _   <- EitherT((
-               if (r.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
-               else ().right
-             ).point[Free[S, ?]])
+      dt <- EitherT(dbTableFromPath(dir).point[Free[S, ?]])
+      r  <- lift(tablesWithPrefix(dt.table)).into.liftM[FileSystemErrT]
+      _ <- EitherT(
+        (
+          if (r.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
+          else ().right
+        ).point[Free[S, ?]])
     } yield pathSegmentsFromPrefix(dt.table, r)).run
 
   def fileExists[S[_]](
-    file: AFile
+      file: AFile
   )(implicit
-    S0: ConnectionIO :<: S
-  ): Free[S, Boolean] =
+    S0: ConnectionIO :<: S): Free[S, Boolean] =
     (for {
-      dt  <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
-      r   <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
+      dt <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
+      r  <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
     } yield r).leftMap(κ(false)).merge[Boolean]
-
 
 }

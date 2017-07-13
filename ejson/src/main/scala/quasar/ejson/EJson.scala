@@ -34,11 +34,8 @@ object Common extends CommonInstances
 
 sealed abstract class CommonInstances extends CommonInstances0 {
   implicit val traverse: Traverse[Common] = new Traverse[Common] {
-    def traverseImpl[G[_], A, B](
-      fa: Common[A])(
-      f: A => G[B])(
-      implicit G: Applicative[G]):
-        G[Common[B]] =
+    def traverseImpl[G[_], A, B](fa: Common[A])(f: A => G[B])(
+        implicit G: Applicative[G]): G[Common[B]] =
       fa match {
         case Arr(value)  => value.traverse(f).map(Arr(_))
         case Null()      => G.point(Null())
@@ -58,13 +55,15 @@ sealed abstract class CommonInstances extends CommonInstances0 {
 
   implicit val show: Delay[Show, Common] =
     new Delay[Show, Common] {
-      def apply[α](eq: Show[α]) = Show.show(a => a match {
-        case Arr(v)  => Cord(s"Arr($v)")
-        case Null()  => Cord("Null()")
-        case Bool(v) => Cord(s"Bool($v)")
-        case Str(v)  => Cord(s"Str($v)")
-        case Dec(v)  => Cord(s"Dec($v)")
-      })
+      def apply[α](eq: Show[α]) =
+        Show.show(a =>
+          a match {
+            case Arr(v)  => Cord(s"Arr($v)")
+            case Null()  => Cord("Null()")
+            case Bool(v) => Cord(s"Bool($v)")
+            case Str(v)  => Cord(s"Str($v)")
+            case Dec(v)  => Cord(s"Dec($v)")
+        })
     }
 }
 
@@ -80,9 +79,9 @@ sealed abstract class CommonInstances0 {
   ////
 
   private[ejson] def generic[A](c: Common[A]) = (
-    arr.getOption(c) ,
+    arr.getOption(c),
     bool.getOption(c),
-    dec.getOption(c) ,
+    dec.getOption(c),
     nul.nonEmpty(c),
     str.getOption(c)
   )
@@ -94,8 +93,7 @@ object Obj extends ObjInstances
 
 sealed abstract class ObjInstances extends ObjInstances0 {
   implicit val traverse: Traverse[Obj] = new Traverse[Obj] {
-    def traverseImpl[G[_]: Applicative, A, B](fa: Obj[A])(f: A => G[B]):
-        G[Obj[B]] =
+    def traverseImpl[G[_]: Applicative, A, B](fa: Obj[A])(f: A => G[B]): G[Obj[B]] =
       fa.value.traverse(f).map(Obj(_))
   }
 
@@ -145,11 +143,8 @@ object Extension extends ExtensionInstances {
 
 sealed abstract class ExtensionInstances {
   implicit val traverse: Traverse[Extension] = new Traverse[Extension] {
-    def traverseImpl[G[_], A, B](
-      fa: Extension[A])(
-      f: A => G[B])(
-      implicit G: Applicative[G]):
-        G[Extension[B]] =
+    def traverseImpl[G[_], A, B](fa: Extension[A])(f: A => G[B])(
+        implicit G: Applicative[G]): G[Extension[B]] =
       fa match {
         case Meta(value, meta) => (f(value) ⊛ f(meta))(Meta(_, _))
         case Map(value)        => value.traverse(_.bitraverse(f, f)).map(Map(_))
@@ -161,13 +156,15 @@ sealed abstract class ExtensionInstances {
 
   implicit val show: Delay[Show, Extension] =
     new Delay[Show, Extension] {
-      def apply[α](eq: Show[α]) = Show.show(a => a match {
-        case Meta(v, m) => Cord(s"Meta($v, $m)")
-        case Map(v)     => Cord(s"Map($v)")
-        case Byte(v)    => Cord(s"Byte($v)")
-        case Char(v)    => Cord(s"Char($v)")
-        case Int(v)     => Cord(s"Int($v)")
-      })
+      def apply[α](eq: Show[α]) =
+        Show.show(a =>
+          a match {
+            case Meta(v, m) => Cord(s"Meta($v, $m)")
+            case Map(v)     => Cord(s"Map($v)")
+            case Byte(v)    => Cord(s"Byte($v)")
+            case Char(v)    => Cord(s"Char($v)")
+            case Int(v)     => Cord(s"Int($v)")
+        })
     }
 
   // NB: Private as we don't consider metadata for purposes of EJson equality
@@ -181,13 +178,15 @@ sealed abstract class ExtensionInstances {
         implicit val ordA: Order[α] = ord
         // TODO: Not sure why this isn't found?
         implicit val ordC: Order[SChar] = scalaz.std.anyVal.char
-        Order.orderBy(e => (
-          byte.getOption(e)                          ,
-          char.getOption(e)                          ,
-          int.getOption(e)                           ,
-          map.getOption(e) map (IMap fromFoldable _) ,
-          meta.getOption(e)
-        ))
+        Order.orderBy(
+          e =>
+            (
+              byte.getOption(e),
+              char.getOption(e),
+              int.getOption(e),
+              map.getOption(e) map (IMap fromFoldable _),
+              meta.getOption(e)
+          ))
       }
     }
 }

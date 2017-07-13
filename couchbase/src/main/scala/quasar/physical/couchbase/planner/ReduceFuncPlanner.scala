@@ -25,7 +25,8 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative] extends Planner[T, F, ReduceFunc] {
+final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative]
+    extends Planner[T, F, ReduceFunc] {
 
   def plan: AlgebraM[F, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[F])
 

@@ -28,7 +28,7 @@ trait StdLibEvaluatorStack[M[+ _]]
     with JoinOptimizerModule[M]
     with PredicatePullupsModule[M] {
 
-  trait Lib extends StdLib with StdLibOpFinder
+  trait Lib      extends StdLib with StdLibOpFinder
   object library extends Lib
 
   abstract class Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
@@ -36,9 +36,9 @@ trait StdLibEvaluatorStack[M[+ _]]
       with StdLibOpFinder
       with StdLibStaticInliner {
 
-    val Exists = library.Exists
-    val Forall = library.Forall
-    def concatString = library.Infix.concatString.f2
+    val Exists         = library.Exists
+    val Forall         = library.Forall
+    def concatString   = library.Infix.concatString.f2
     def coerceToDouble = cf.util.CoerceToDouble
   }
 }

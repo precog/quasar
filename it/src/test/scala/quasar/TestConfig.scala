@@ -41,34 +41,76 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
-  val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.fs.FsType)
-  val MONGO_Q_2_6     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_2_6")    , BackendCapability.All), mongodb.fs.QScriptFsType)
-  val MONGO_Q_3_0     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All), mongodb.fs.QScriptFsType)
-  val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), mongodb.fs.QScriptFsType)
-  val MONGO_Q_3_4     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_4")    , BackendCapability.All), mongodb.fs.QScriptFsType)
-  val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), postgresql.fs.FsType)
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
+  val COUCHBASE = ExternalBackendRef(
+    BackendRef(BackendName("couchbase"), BackendCapability.All),
+    couchbase.fs.FsType)
+  val MARKLOGIC_JSON = ExternalBackendRef(
+    BackendRef(BackendName("marklogic_json"), BackendCapability.All),
+    marklogic.fs.FsType)
+  val MARKLOGIC_XML = ExternalBackendRef(
+    BackendRef(BackendName("marklogic_xml"), BackendCapability.All),
+    marklogic.fs.FsType)
+  val MIMIR = ExternalBackendRef(BackendRef(BackendName("mimir"), BackendCapability.All),
+                                 mimir.Mimir.Type)
+  val MONGO_2_6 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_2_6"), BackendCapability.All),
+    mongodb.fs.FsType)
+  val MONGO_3_0 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_3_0"), BackendCapability.All),
+    mongodb.fs.FsType)
+  val MONGO_3_2 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_3_2"), BackendCapability.All),
+    mongodb.fs.FsType)
+  val MONGO_3_4 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_3_4"), BackendCapability.All),
+    mongodb.fs.FsType)
+  val MONGO_READ_ONLY = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_read_only"),
+               ISet singleton BackendCapability.query()),
+    mongodb.fs.FsType)
+  val MONGO_Q_2_6 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_q_2_6"), BackendCapability.All),
+    mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_0 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_q_3_0"), BackendCapability.All),
+    mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_2 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_q_3_2"), BackendCapability.All),
+    mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_4 = ExternalBackendRef(
+    BackendRef(BackendName("mongodb_q_3_4"), BackendCapability.All),
+    mongodb.fs.QScriptFsType)
+  val POSTGRESQL = ExternalBackendRef(
+    BackendRef(BackendName("postgresql"), ISet singleton BackendCapability.write()),
+    postgresql.fs.FsType)
+  val SPARK_HDFS = ExternalBackendRef(
+    BackendRef(BackendName("spark_hdfs"), BackendCapability.All),
+    sparkcore.fs.hdfs.FsType)
+  val SPARK_LOCAL = ExternalBackendRef(
+    BackendRef(BackendName("spark_local"), BackendCapability.All),
+    sparkcore.fs.local.FsType)
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
-    MARKLOGIC_JSON, MARKLOGIC_XML,
+    MARKLOGIC_JSON,
+    MARKLOGIC_XML,
     MIMIR,
-    MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
-    MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2, MONGO_Q_3_4,
+    MONGO_2_6,
+    MONGO_3_0,
+    MONGO_3_2,
+    MONGO_3_4,
+    MONGO_READ_ONLY,
+    MONGO_Q_2_6,
+    MONGO_Q_3_0,
+    MONGO_Q_3_2,
+    MONGO_Q_3_4,
     POSTGRESQL,
-    SPARK_HDFS, SPARK_LOCAL)
+    SPARK_HDFS,
+    SPARK_LOCAL
+  )
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
-    extends RuntimeException(s"Unsupported filesystem config: $c")
+      extends RuntimeException(s"Unsupported filesystem config: $c")
 
   /** True if this backend configuration is for a couchbase connection.
     */
@@ -90,22 +132,22 @@ object TestConfig {
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
-    pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
+      pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
   ): Task[IList[SupportedFs[S]]] = {
     def fs(
-      envName: String,
-      p: ADir,
-      typ: FileSystemType
+        envName: String,
+        p: ADir,
+        typ: FileSystemType
     ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
       TestConfig.loadConnectionUri(envName) flatMapF { uri =>
         val config = MountConfig.fileSystemConfig(typ, uri)
-        pf.lift((config, p)).cata(
-          Task.delay(_),
-          Task.fail(new UnsupportedFileSystemConfig(config)))
+        pf.lift((config, p))
+          .cata(Task.delay(_), Task.fail(new UnsupportedFileSystemConfig(config)))
       }
 
     def lookupFileSystem(r: ExternalBackendRef, p: ADir): OptionT[Task, FileSystemUT[S]] = {
-      def rsrc(connect: Task[(S ~> Task, Task[Unit])]): Task[TaskResource[(S ~> Task, Task[Unit])]] =
+      def rsrc(connect: Task[(S ~> Task, Task[Unit])])
+        : Task[TaskResource[(S ~> Task, Task[Unit])]] =
         TaskResource(connect, Strategy.DefaultStrategy)(_._2)
 
       // Put the evaluation of a Task to produce an interpreter _into_ the interpreter:
@@ -120,34 +162,39 @@ object TestConfig {
         s        <- NameGenerator.salt.liftM[OptionT]
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
-      } yield FileSystemUT(r.ref,
-          embed(testRef.get.map(_._1)),
-          embed(setupRef.get.map(_._1)),
-          p </> dir("run_" + s),
-          testRef.release *> setupRef.release)
+      } yield
+        FileSystemUT(r.ref,
+                     embed(testRef.get.map(_._1)),
+                     embed(setupRef.get.map(_._1)),
+                     p </> dir("run_" + s),
+                     testRef.release *> setupRef.release)
     }
 
     TestConfig.testDataPrefix flatMap { prefix =>
       TestConfig.backendRefs.toIList
-        .traverse(r => lookupFileSystem(r, prefix).run.map(SupportedFs(r.ref,_)))
+        .traverse(r => lookupFileSystem(r, prefix).run.map(SupportedFs(r.ref, _)))
     }
   }
 
   /** Loads all the configurations for a particular type of FileSystem. */
-  def fileSystemConfigs(tpe: FileSystemType): Task[List[(BackendRef, ConnectionUri, ConnectionUri)]] =
-    backendRefs.filter(_.fsType === tpe).foldMapM(r => TestConfig.loadConnectionUriPair(r.name).run map (_.toList map {
-      case (testUri, setupUri) => (r.ref, testUri, setupUri)
-    }))
+  def fileSystemConfigs(
+      tpe: FileSystemType): Task[List[(BackendRef, ConnectionUri, ConnectionUri)]] =
+    backendRefs
+      .filter(_.fsType === tpe)
+      .foldMapM(r =>
+        TestConfig.loadConnectionUriPair(r.name).run map (_.toList map {
+          case (testUri, setupUri) => (r.ref, testUri, setupUri)
+        }))
 
-  val confFile: String = "it/testing.conf"
+  val confFile: String        = "it/testing.conf"
   val defaultConfFile: String = "it/testing.conf.example"
 
   def confValue(name: String): OptionT[Task, String] = {
     val config = knobs.loadImmutable(
-      Optional(SysPropsResource(Prefix("")))                    ::
-      Optional(FileResource(new java.io.File(confFile)))        ::
-      Required(FileResource(new java.io.File(defaultConfFile))) ::
-      Nil)
+      Optional(SysPropsResource(Prefix(""))) ::
+        Optional(FileResource(new java.io.File(confFile))) ::
+        Required(FileResource(new java.io.File(defaultConfFile))) ::
+        Nil)
     OptionT(config.map(_.lookup[String](name)))
   }
 
@@ -165,10 +212,13 @@ object TestConfig {
     * the second for actually running tests. If no config is specified for
     * inserting, then the test config is just returned twice.
     */
-  def loadConnectionUriPair(name: BackendName): OptionT[Task, (ConnectionUri, ConnectionUri)] = {
-    OptionT((loadConnectionUri(insertConfName(name)).run |@| loadConnectionUri(backendConfName(name)).run) { (c1, c2) =>
-      c2.map(c2 => (c1.getOrElse(c2), c2))
-    })
+  def loadConnectionUriPair(
+      name: BackendName): OptionT[Task, (ConnectionUri, ConnectionUri)] = {
+    OptionT(
+      (loadConnectionUri(insertConfName(name)).run |@| loadConnectionUri(
+        backendConfName(name)).run) { (c1, c2) =>
+        c2.map(c2 => (c1.getOrElse(c2), c2))
+      })
   }
 
   /** Returns the absolute path within a filesystem to the directory where tests
@@ -180,9 +230,11 @@ object TestConfig {
     */
   def testDataPrefix: Task[ADir] =
     console.readEnv(TestPathPrefixEnvName) flatMap { s =>
-      posixCodec.parseAbsDir(s).cata(
-        d => OptionT(sandbox(rootDir, d).map(rootDir </> _).point[Task]),
-        fail[ADir](s"Test data dir must be an absolute dir, got: $s").liftM[OptionT])
+      posixCodec
+        .parseAbsDir(s)
+        .cata(
+          d => OptionT(sandbox(rootDir, d).map(rootDir </> _).point[Task]),
+          fail[ADir](s"Test data dir must be an absolute dir, got: $s").liftM[OptionT])
     } getOrElse DefaultTestPrefix
 
   ////

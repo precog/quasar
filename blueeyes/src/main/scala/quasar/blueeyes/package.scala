@@ -37,34 +37,37 @@ package object blueeyes extends precog.PackageTime {
   val MimeTypes = quasar.precog.MimeTypes
 
   // Temporary
-  type BitSet             = quasar.precog.BitSet
-  type RawBitSet          = Array[Int]
-  val RawBitSet           = quasar.precog.util.RawBitSet
+  type BitSet    = quasar.precog.BitSet
+  type RawBitSet = Array[Int]
+  val RawBitSet = quasar.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
 
-  def Utf8Charset: Charset                                               = Charset forName "UTF-8"
-  def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
-  def uuid(s: String): UUID                                              = UUID fromString s
-  def randomUuid(): UUID                                                 = UUID.randomUUID
-  def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
-  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
-  def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
-  def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
-  def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
-  def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
+  def Utf8Charset: Charset                        = Charset forName "UTF-8"
+  def utf8Bytes(s: String): Array[Byte]           = s getBytes Utf8Charset
+  def uuid(s: String): UUID                       = UUID fromString s
+  def randomUuid(): UUID                          = UUID.randomUUID
+  def randomInt(end: Int): Int                    = scala.util.Random.nextInt(end)
+  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer = ByteBuffer.wrap(xs)
+  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer =
+    ByteBuffer.wrap(xs, offset, len)
+  def abort(msg: String): Nothing     = throw new RuntimeException(msg)
+  def decimal(d: String): BigDecimal  = BigDecimal(d, java.math.MathContext.UNLIMITED)
+  def lp[T](label: String): T => Unit = (t: T) => println(label + ": " + t)
+  def lpf[T](label: String)(f: T => Any): T => Unit =
+    (t: T) => println(label + ": " + f(t))
 
-  def doto[A](x: A)(f: A => Unit): A = { f(x) ; x }
+  def doto[A](x: A)(f: A => Unit): A = { f(x); x }
 
   implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
+  implicit def comparableOrder[A <: Comparable[A]]: scalaz.Order[A] =
     scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
 
-  @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
+  @inline implicit def ValidationFlatMapRequested[E, A](
+      d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
   implicit def bigDecimalOrder: scalaz.Order[BigDecimal] =
@@ -93,5 +96,6 @@ package object blueeyes extends precog.PackageTime {
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
 
-  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
+  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations =
+    new BitSetUtil.BitSetOperations(bs)
 }

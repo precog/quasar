@@ -42,17 +42,18 @@ import scalaz.concurrent.Task
 
 trait Couchbase extends BackendModule {
   type Eff[A] = (
-    Task                                       :\:
-    MonotonicSeq                               :\:
-    GenUUID                                    :\:
-    KeyValueStore[ReadHandle,   Cursor,  ?]    :\:
-    KeyValueStore[WriteHandle,  Collection, ?] :/:
-    KeyValueStore[ResultHandle, Cursor, ?]
+    Task :\:
+      MonotonicSeq :\:
+      GenUUID :\:
+      KeyValueStore[ReadHandle, Cursor, ?] :\:
+      KeyValueStore[WriteHandle, Collection, ?] :/:
+      KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]
+    : Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   type Repr = Mu[N1QL]
@@ -67,10 +68,12 @@ trait Couchbase extends BackendModule {
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def QSCoreInject[T[_[_]]]               = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def MonadM                              = Monad[M]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   type Config = common.Config
 
@@ -85,19 +88,20 @@ trait Couchbase extends BackendModule {
   val ME = MonadError_[Backend, FileSystemError]
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-    cp: T[QSM[T, ?]]
+      cp: T[QSM[T, ?]]
   ): Backend[Repr] =
     for {
-      cfg  <- MR.ask
-      ctx  =  cfg.ctx
+      cfg <- MR.ask
+      ctx = cfg.ctx
       plan <- ME.unattempt(
-                cp.cataM(Planner[T, EitherT[Kleisli[Free[Eff, ?], Context, ?], PlannerError, ?], QSM[T, ?]].plan)
-                  .bimap(
-                    FileSystemError.qscriptPlanningFailed(_),
-                    _.convertTo[Mu[N1QL]])
-                  .run(Context(BucketName(ctx.bucket.name), ctx.docTypeKey))
-                  .liftB)
-      _    <- MT.tell(Vector(detail("N1QL AST", RenderTreeT[Mu].render(plan).shows)))
+        cp.cataM(
+            Planner[T,
+                    EitherT[Kleisli[Free[Eff, ?], Context, ?], PlannerError, ?],
+                    QSM[T, ?]].plan)
+          .bimap(FileSystemError.qscriptPlanningFailed(_), _.convertTo[Mu[N1QL]])
+          .run(Context(BucketName(ctx.bucket.name), ctx.docTypeKey))
+          .liftB)
+      _ <- MT.tell(Vector(detail("N1QL AST", RenderTreeT[Mu].render(plan).shows)))
     } yield plan
 
   val QueryFileModule = new fs.queryfile with QueryFileModule

@@ -29,7 +29,7 @@ import java.time.LocalDateTime
 import scala.collection.mutable
 
 class LongAdder {
-  var t = 0L
+  var t  = 0L
   val ts = mutable.ArrayBuffer.empty[BigDecimal]
 
   final def maxLongSqrt = 3037000499L
@@ -60,7 +60,19 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     val ReductionNamespace = Vector()
 
     override def _libReduction =
-      super._libReduction ++ Set(Count, Max, Min, MaxTime, MinTime, Sum, Mean, GeometricMean, SumSq, Variance, StdDev, Forall, Exists)
+      super._libReduction ++ Set(Count,
+                                 Max,
+                                 Min,
+                                 MaxTime,
+                                 MinTime,
+                                 Sum,
+                                 Mean,
+                                 GeometricMean,
+                                 SumSq,
+                                 Variance,
+                                 StdDev,
+                                 Forall,
+                                 Exists)
 
     val CountMonoid = implicitly[Monoid[Count.Result]]
     object Count extends Reduction(ReductionNamespace, "count") {
@@ -73,7 +85,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       def reducer: Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
-          val cx = schema.columns(JType.JUniverseT).toArray
+          val cx    = schema.columns(JType.JUniverseT).toArray
           var count = 0L
           RangeUtil.loop(range) { i =>
             if (Column.isDefinedAt(cx, i)) count += 1L
@@ -364,7 +376,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           val results = schema.columns(JNumberT) map {
 
             case col: LongColumn =>
-              val ls = new LongAdder()
+              val ls    = new LongAdder()
               var count = 0L
               RangeUtil.loopDefined(range, col) { i =>
                 ls.add(col(i))
@@ -651,7 +663,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             var defined = false
 
             schema.columns(JBooleanT) foreach { c =>
-              val bc = c.asInstanceOf[BoolColumn]
+              val bc  = c.asInstanceOf[BoolColumn]
               var acc = back
 
               val idef = RangeUtil.loopDefined(range, bc) { i =>
@@ -673,7 +685,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         }
       }
 
-      private val default = true
+      private val default              = true
       private def perform(res: Result) = res getOrElse default
 
       def extract(res: Result): Table = Table.constBoolean(Set(perform(res)))
@@ -704,7 +716,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             var defined = false
 
             schema.columns(JBooleanT) foreach { c =>
-              val bc = c.asInstanceOf[BoolColumn]
+              val bc  = c.asInstanceOf[BoolColumn]
               var acc = back
 
               val idef = RangeUtil.loopDefined(range, bc) { i =>
@@ -726,7 +738,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         }
       }
 
-      private val default = false
+      private val default              = false
       private def perform(res: Result) = res getOrElse default
 
       def extract(res: Result): Table = Table.constBoolean(Set(perform(res)))

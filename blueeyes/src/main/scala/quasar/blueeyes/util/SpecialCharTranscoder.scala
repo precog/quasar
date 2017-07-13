@@ -19,7 +19,9 @@ package util
 
 /** Transcodes special characters using an escape character.
   */
-case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Char, Char], decoding: PartialFunction[Char, Char]) {
+case class SpecialCharTranscoder(val escape: Char,
+                                 encoding: PartialFunction[Char, Char],
+                                 decoding: PartialFunction[Char, Char]) {
   private val defaultEscapeMapping: PartialFunction[Char, Char] = {
     case `escape` => escape
   }
@@ -51,14 +53,15 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
   /** Takes an encoded string, and decodes it.
     */
   def decode(s: String): String = {
-    val decoded = new StringBuilder
+    val decoded  = new StringBuilder
     var escaping = false
 
     for (i <- 0 until s.length) {
       val c = s.charAt(i)
 
       if (escaping) {
-        val original = decodingF(c).getOrElse(sys.error("Expected to find encoded character but found: " + c))
+        val original = decodingF(c).getOrElse(
+          sys.error("Expected to find encoded character but found: " + c))
 
         decoded.append(original)
 
@@ -74,5 +77,6 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
   }
 }
 object SpecialCharTranscoder {
-  def fromMap(escape: Char, map: Map[Char, Char]) = new SpecialCharTranscoder(escape, map, map.map(t => (t._2, t._1)))
+  def fromMap(escape: Char, map: Map[Char, Char]) =
+    new SpecialCharTranscoder(escape, map, map.map(t => (t._2, t._1)))
 }

@@ -28,39 +28,50 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait Planner[F[_]] extends Serializable {
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
+  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]])
+    : AlgebraM[Planner.SparkState, F, RDD[Data]]
 }
 
 object Planner {
 
   def apply[F[_]](implicit P: Planner[F]): Planner[F] = P
 
-  type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
+  type SparkState[A]        = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
-
 
   implicit def deadEnd: Planner[Const[DeadEnd, ?]] = unreachable("deadEnd")
   implicit def read[A]: Planner[Const[Read[A], ?]] = unreachable("read")
-  implicit def shiftedReadPath: Planner[Const[ShiftedRead[ADir], ?]] = unreachable("shifted read of a dir")
-  implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
-  implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
+  implicit def shiftedReadPath: Planner[Const[ShiftedRead[ADir], ?]] =
+    unreachable("shifted read of a dir")
+  implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] =
+    unreachable("projectBucket")
+  implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]]       = unreachable("thetajoin")
   implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] = ShiftedReadPlanner
-  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Planner[QScriptCore[T, ?]] = new QScriptCorePlanner
-  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Planner[EquiJoin[T, ?]] = new EquiJoinPlanner
+  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Planner[QScriptCore[T, ?]] =
+    new QScriptCorePlanner
+  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Planner[EquiJoin[T, ?]] =
+    new EquiJoinPlanner
 
-  implicit def coproduct[F[_], G[_]](
-    implicit F: Planner[F], G: Planner[G]):
-      Planner[Coproduct[F, G, ?]] =
+  implicit def coproduct[F[_], G[_]](implicit F: Planner[F],
+                                     G: Planner[G]): Planner[Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]])
+        : AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] =
+        _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 
   private def unreachable[F[_]](what: String): Planner[F] =
     new Planner[F] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, F, RDD[Data]] =
-        _ =>  StateT((sc: SparkContext) => {
-          EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
-        })
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]])
+        : AlgebraM[SparkState, F, RDD[Data]] =
+        _ =>
+          StateT((sc: SparkContext) => {
+            EitherT(
+              InternalError
+                .fromMsg(s"unreachable $what")
+                .left[(SparkContext, RDD[Data])]
+                .point[Task])
+          })
     }
 
 }

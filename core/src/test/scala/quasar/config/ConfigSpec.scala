@@ -36,7 +36,8 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
   val TestConfigStr: String
 
   def testConfigFile: Task[FsPath.Aux[Rel, File, Sandboxed]] =
-    Task.delay(scala.util.Random.nextInt.toString)
+    Task
+      .delay(scala.util.Random.nextInt.toString)
       .map(i => Uniform(currentDir </> file(s"test-config-${i}.json")))
 
   def withTestConfigFile[A](f: FsPath.Aux[Rel, File, Sandboxed] => Task[A]): Task[A] = {
@@ -65,19 +66,18 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
 
   "toFile" should {
     "create loadable config" in {
-      withTestConfigFile(fp =>
-        configOps.toFile(TestConfig, Some(fp)) *>
-        configOps.fromFile(fp).run
-      ).unsafePerformSync must beRightDisjunction(TestConfig)
+      withTestConfigFile(
+        fp =>
+          configOps.toFile(TestConfig, Some(fp)) *>
+            configOps.fromFile(fp).run).unsafePerformSync must beRightDisjunction(
+        TestConfig)
     }
   }
 
   "fromFile" should {
     "result in error when file not found" in {
       val (p, r) =
-        withTestConfigFile(fp =>
-          configOps.fromFile(fp).run.map((fp, _))
-        ).unsafePerformSync
+        withTestConfigFile(fp => configOps.fromFile(fp).run.map((fp, _))).unsafePerformSync
       r must beLeftDisjunction(fileNotFound(p))
     }
   }

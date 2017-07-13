@@ -42,48 +42,47 @@ object compression {
     * and their values to the unknown value field.
     */
   def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
-    maxSize: Positive
+      maxSize: Positive
   )(implicit
     JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
-    case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
-      val grouped =
-        kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit])((m, j, _) =>
-          m.alter(
-            primaryTypeOf(j),
-            _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
+    JR: Recursive.Aux[J, EJson]): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] =
+    totally {
+      case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
+        val grouped =
+          kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit])(
+            (m, j, _) =>
+              m.alter(primaryTypeOf(j),
+                      _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
 
-      val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
-        val toCompress = kn intersection m
-        (kn \\ toCompress, some(compressMap(toCompress)) |+| unk)
-      }
+        val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
+          val toCompress = kn intersection m
+          (kn \\ toCompress, some(compressMap(toCompress)) |+| unk)
+        }
 
-      envT(ts, map[J, SST[J, A]](kn1, unk1))
-  }
+        envT(ts, map[J, SST[J, A]](kn1, unk1))
+    }
 
   /** Compress unions by combining any constants with their primary type if it
     * also appears in the union.
     */
   def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case sstf @ EnvT((ts, Unioned(xs))) if xs.any(sstConst[J, A].isEmpty) =>
       val grouped = xs.list groupBy { sst =>
-        sstConst[J, A].isEmpty(sst).fold(
-          TypeF.primary[J](sst.project.lower),
-          none)
+        sstConst[J, A].isEmpty(sst).fold(TypeF.primary[J](sst.project.lower), none)
       }
 
-      grouped.minView flatMap { case (nonPrimary, m0) =>
-        val coalesced = nonPrimary.foldLeft(m0 map (_.suml1)) { (m, sst) =>
-          TypeF.primary[J](sst.project.lower) flatMap { pt =>
-            m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(sst))
-          } getOrElse m.updateAppend(none, sst)
-        }
-        coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
+      grouped.minView flatMap {
+        case (nonPrimary, m0) =>
+          val coalesced = nonPrimary.foldLeft(m0 map (_.suml1)) { (m, sst) =>
+            TypeF.primary[J](sst.project.lower) flatMap { pt =>
+              m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(sst))
+            } getOrElse m.updateAppend(none, sst)
+          }
+          coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
       } getOrElse sstf
   }
 
@@ -92,9 +91,9 @@ object compression {
     * known key.
     */
   def coalesceWithUnknown[J: Order, A: Order: Field: ConvertableTo](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Map(xs, Some((k, v))))) =>
       val unkPrimaries = k.toType[Fix[TypeF[J, ?]]].project match {
@@ -113,9 +112,9 @@ object compression {
     * of unknown size.
     */
   def limitArrays[J: Order, A: Order](maxLength: Positive)(
-    implicit
-    A : Field[A],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      A: Field[A],
+      JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Arr(-\/(elts)))) if elts.length > maxLength.value =>
       val (cnt, len) = (size1(ts), A fromInt elts.length)
@@ -124,9 +123,9 @@ object compression {
 
   /** Replace literal string types longer than the given limit with `char[]`. */
   def limitStrings[J, A](maxLength: Positive)(
-    implicit
-    A : Ring[A],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      A: Ring[A],
+      JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
       val (cnt, len) = (size1(ts), A fromInt s.length)
@@ -137,32 +136,32 @@ object compression {
     * values sharing a primary type to their shared type.
     */
   def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
-    maxSize: Positive
+      maxSize: Positive
   )(implicit
     JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
-    case sstf @ EnvT((ts, Unioned(xs))) if xs.length > maxSize.value =>
-      val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
-      val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
+    JR: Recursive.Aux[J, EJson]): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] =
+    totally {
+      case sstf @ EnvT((ts, Unioned(xs))) if xs.length > maxSize.value =>
+        val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
+        val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
 
-      val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
-        case (pt, ssts) =>
-          grouped.insert(some(pt), ssts.foldMap(widenConst[J, A]).wrapNel)
-      }
+        val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
+          case (pt, ssts) =>
+            grouped.insert(some(pt), ssts.foldMap(widenConst[J, A]).wrapNel)
+        }
 
-      compressed.foldMap(_.list) match {
-        case ICons(x, ICons(y, zs)) => envT(ts, union[J, SST[J, A]](x, y, zs))
-        case ICons(x, INil())       => envT(ts, x.project.lower)
-        case INil()                 => sstf
-      }
-  }
+        compressed.foldMap(_.list) match {
+          case ICons(x, ICons(y, zs)) => envT(ts, union[J, SST[J, A]](x, y, zs))
+          case ICons(x, INil())       => envT(ts, x.project.lower)
+          case INil()                 => sstf
+        }
+    }
 
   /** Replace encoded binary strings with `byte[]`. */
   def z85EncodedBinary[J, A](
-    implicit
-    A : Field[A],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      A: Field[A],
+      JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Const(Embed(EncodedBinary(size))))) =>
       // NB: Z85 uses 5 chars for every 4 bytes.
@@ -187,13 +186,13 @@ object compression {
     arr[J, SST[J, A]](envT(some(TS.count(cnt)), simple[J, SST[J, A]](st)).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
-    m: J ==>> SST[J, A]
+      m: J ==>> SST[J, A]
   )(implicit
     JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): (SST[J, A], SST[J, A]) =
-    m.toList foldMap { case (j, sst) =>
-      (SST.fromEJson(size1(sst.copoint), j), sst)
+    JR: Recursive.Aux[J, EJson]): (SST[J, A], SST[J, A]) =
+    m.toList foldMap {
+      case (j, sst) =>
+        (SST.fromEJson(size1(sst.copoint), j), sst)
     }
 
   /** Returns the SST of the primary type of the given EJson value.
@@ -201,9 +200,9 @@ object compression {
     * ∀ a j. Const(j).embed <: primarySST(a, j).toType[T]
     */
   private def primarySST[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): SST[J, A] = j match {
     case SimpleEJson(s)   => envT(some(TS.fromEJson(cnt, j)), simple[J, SST[J, A]](s)).embed
     case Embed(C(Str(_))) => envT(some(TS.fromEJson(cnt, j)), charArr[J, A](cnt)).embed
@@ -217,11 +216,10 @@ object compression {
     * the argument itself.
     */
   private def widenConst[J: Order, A: ConvertableTo: Field: Order](
-    sst: SST[J, A]
+      sst: SST[J, A]
   )(implicit
     JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] =
+    JR: Recursive.Aux[J, EJson]): SST[J, A] =
     sstConst[J, A].headOption(sst).fold(sst) { j =>
       val ts = sstMeasure[J, A].get(sst)
       sstMeasure[J, A].set(ts)(primarySST(size1(ts), j))

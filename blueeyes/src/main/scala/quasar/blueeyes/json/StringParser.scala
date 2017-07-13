@@ -23,7 +23,9 @@ package quasar.blueeyes.json
   * JSON documents it's better to avoid using this parser and go straight from
   * disk, to avoid having to load the whole thing into memory at once.
   */
-private[json] final class StringParser(s: String) extends SyncParser with CharBasedParser {
+private[json] final class StringParser(s: String)
+    extends SyncParser
+    with CharBasedParser {
   var line                                                             = 0
   final def column(i: Int): Int                                        = i
   final def newline(i: Int): Unit                                      = line += 1

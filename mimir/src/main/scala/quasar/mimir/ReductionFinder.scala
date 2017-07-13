@@ -24,7 +24,10 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scala.collection.mutable
 
-trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
+trait ReductionFinderModule[M[+ _]]
+    extends DAG
+    with EvaluatorMethodsModule[M]
+    with TransSpecableModule[M] {
   type TS1 = trans.TransSpec1
   import library._
   import trans._
@@ -38,7 +41,8 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
     case class ReduceInfo(reduce: dag.Reduce, spec: TransSpec1, ancestor: DepGraph)
 
     def buildReduceInfo(reduce: dag.Reduce, ctx: EvaluationContext): ReduceInfo = {
-      val (spec, ancestor) = findTransSpecAndAncestor(reduce.parent, ctx).getOrElse((Leaf(Source), reduce.parent))
+      val (spec, ancestor) = findTransSpecAndAncestor(reduce.parent, ctx)
+        .getOrElse((Leaf(Source), reduce.parent))
       ReduceInfo(reduce, spec, ancestor)
     }
 
@@ -56,22 +60,26 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
       val info: List[ReduceInfo] = reduces map { buildReduceInfo(_: dag.Reduce, ctx) }
 
       // for each reduce node, associate it with its ancestor
-      val (ancestorByReduce, specByParent) = info.foldLeft((Map[dag.Reduce, DepGraph](), Map[DepGraph, TransSpec1]())) {
-        case ((ancestorByReduce, specByParent), ReduceInfo(reduce, spec, ancestor)) =>
-          (ancestorByReduce + (reduce -> ancestor), specByParent + (reduce.parent -> spec))
-      }
+      val (ancestorByReduce, specByParent) =
+        info.foldLeft((Map[dag.Reduce, DepGraph](), Map[DepGraph, TransSpec1]())) {
+          case ((ancestorByReduce, specByParent), ReduceInfo(reduce, spec, ancestor)) =>
+            (ancestorByReduce + (reduce    -> ancestor),
+             specByParent + (reduce.parent -> spec))
+        }
 
       // for each ancestor, assemble a list of the parents it created
-      val parentsByAncestor = (info groupBy { _.ancestor }).foldLeft(Map[DepGraph, List[DepGraph]]()) {
-        case (parentsByAncestor, (ancestor, lst)) =>
-          parentsByAncestor + (ancestor -> (lst map { _.reduce.parent } distinct))
-      }
+      val parentsByAncestor =
+        (info groupBy { _.ancestor }).foldLeft(Map[DepGraph, List[DepGraph]]()) {
+          case (parentsByAncestor, (ancestor, lst)) =>
+            parentsByAncestor + (ancestor -> (lst map { _.reduce.parent } distinct))
+        }
 
       // for each parent, assemble a list of the reduces it created
-      val reducesByParent = (info groupBy { _.reduce.parent }).foldLeft(Map[DepGraph, List[dag.Reduce]]()) {
-        case (reducesByParent, (parent, lst)) =>
-          reducesByParent + (parent -> (lst map { _.reduce }))
-      }
+      val reducesByParent =
+        (info groupBy { _.reduce.parent }).foldLeft(Map[DepGraph, List[dag.Reduce]]()) {
+          case (reducesByParent, (parent, lst)) =>
+            reducesByParent + (parent -> (lst map { _.reduce }))
+        }
 
       MegaReduceState(ancestorByReduce, parentsByAncestor, reducesByParent, specByParent)
     }
@@ -109,8 +117,12 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
             dag.Join(
               DerefArray,
               Cross(Some(CrossLeft)),
-              dag.Join(DerefArray, Cross(Some(CrossLeft)), left, Const(CLong(firstIndex))(graph.loc))(graph.loc),
-              Const(CLong(secondIndex))(graph.loc))(graph.loc)
+              dag.Join(DerefArray,
+                       Cross(Some(CrossLeft)),
+                       left,
+                       Const(CLong(firstIndex))(graph.loc))(graph.loc),
+              Const(CLong(secondIndex))(graph.loc)
+            )(graph.loc)
           }
         }
       }

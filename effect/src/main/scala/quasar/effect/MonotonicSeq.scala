@@ -42,7 +42,7 @@ object MonotonicSeq {
   case object Next extends MonotonicSeq[Long]
 
   final class Ops[S[_]](implicit S: MonotonicSeq :<: S)
-    extends LiftedOps[MonotonicSeq, S] {
+      extends LiftedOps[MonotonicSeq, S] {
 
     def next: FreeS[Long] =
       lift(Next)
@@ -77,8 +77,7 @@ object MonotonicSeq {
       new Aux[F]
 
     final class Aux[F[_]] {
-      def apply[S](l: Lens[S, Long])(implicit F: MonadState[F, S])
-                  : MonotonicSeq ~> F =
+      def apply[S](l: Lens[S, Long])(implicit F: MonadState[F, S]): MonotonicSeq ~> F =
         new (MonotonicSeq ~> F) {
           def apply[A](seq: MonotonicSeq[A]) = seq match {
             case Next => F.gets(l.get) <* F.modify(l.modify(_ + 1))

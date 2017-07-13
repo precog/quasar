@@ -41,14 +41,12 @@ object WriteFile {
     implicit val equal: Equal[WriteHandle] = Equal.equalBy(tupleIso.get)
   }
 
-  final case class Open(file: AFile)
-    extends WriteFile[FileSystemError \/ WriteHandle]
+  final case class Open(file: AFile) extends WriteFile[FileSystemError \/ WriteHandle]
 
   final case class Write(h: WriteHandle, chunk: Vector[Data])
-    extends WriteFile[Vector[FileSystemError]]
+      extends WriteFile[Vector[FileSystemError]]
 
-  final case class Close(h: WriteHandle)
-    extends WriteFile[Unit]
+  final case class Close(h: WriteHandle) extends WriteFile[Unit]
 
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     import FileSystemError._, PathError._
@@ -73,9 +71,11 @@ object WriteFile {
     }
 
     /** Same as `append` but accepts chunked `Data`. */
-    def appendChunked(dst: AFile, src: Process[F, Vector[Data]]): Process[M, FileSystemError] = {
+    def appendChunked(dst: AFile,
+                      src: Process[F, Vector[Data]]): Process[M, FileSystemError] = {
       val accumPartialWrites =
-        process1.id[FileSystemError]
+        process1
+          .id[FileSystemError]
           .map(partialWrite.getOption)
           .reduceSemigroup
           .pipe(process1.stripNone)
@@ -107,12 +107,12 @@ object WriteFile {
       */
     def appendThese(dst: AFile, data: Vector[Data]): M[Vector[FileSystemError]] =
       // NB: the handle will be closed even if `write` produces errors in its value
-      unsafe.open(dst) flatMapF (h => unsafe.write(h, data) <* unsafe.close(h) map (_.right))
+      unsafe.open(dst) flatMapF (h =>
+        unsafe.write(h, data) <* unsafe.close(h) map (_.right))
 
     /** Same as `save` but accepts chunked `Data`. */
-    def saveChunked(dst: AFile, src: Process[F, Vector[Data]])
-                   (implicit MF: ManageFile.Ops[S])
-                   : Process[M, FileSystemError] = {
+    def saveChunked(dst: AFile, src: Process[F, Vector[Data]])(
+        implicit MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
       saveChunked0(dst, src, MoveSemantics.Overwrite)
     }
@@ -121,9 +121,8 @@ object WriteFile {
       * atomically. Any errors during writing will abort the entire operation
       * leaving any existing values unaffected.
       */
-    def save(dst: AFile, src: Process[F, Data])
-            (implicit MF: ManageFile.Ops[S])
-            : Process[M, FileSystemError] = {
+    def save(dst: AFile, src: Process[F, Data])(
+        implicit MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
       saveChunked(dst, src map (Vector(_)))
     }
@@ -132,57 +131,58 @@ object WriteFile {
       * contents, atomically. Any errors during writing will abort the
       * entire operation leaving any existing values unaffected.
       */
-    def saveThese(dst: AFile, data: Vector[Data])
-                 (implicit MF: ManageFile.Ops[S])
-                 : M[Vector[FileSystemError]] = {
+    def saveThese(dst: AFile, data: Vector[Data])(
+        implicit MF: ManageFile.Ops[S]): M[Vector[FileSystemError]] = {
 
       saveThese0(dst, data, MoveSemantics.Overwrite)
     }
 
     /** Same as `create` but accepts chunked `Data`. */
-    def createChunked(dst: AFile, src: Process[F, Vector[Data]])
-                     (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                     : Process[M, FileSystemError] = {
+    def createChunked(dst: AFile, src: Process[F, Vector[Data]])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
-      QF.fileExistsM(dst).liftM[Process].ifM(
-        shouldNotExist(dst).liftM[Process],
-        saveChunked0(dst, src, MoveSemantics.FailIfExists))
+      QF.fileExistsM(dst)
+        .liftM[Process]
+        .ifM(shouldNotExist(dst).liftM[Process],
+             saveChunked0(dst, src, MoveSemantics.FailIfExists))
     }
 
     /** Create the given file with the contents of `src`. Fails if already exists. */
-    def create(dst: AFile, src: Process[F, Data])
-              (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-              : Process[M, FileSystemError] = {
+    def create(dst: AFile, src: Process[F, Data])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
       createChunked(dst, src map (Vector(_)))
     }
 
     /** Create the given file with the contents of `data`. Fails if already exists. */
-    def createThese(dst: AFile, data: Vector[Data])
-                   (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                   : M[Vector[FileSystemError]] = {
+    def createThese(dst: AFile, data: Vector[Data])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): M[Vector[FileSystemError]] = {
 
-      QF.fileExistsM(dst).ifM(
-        shouldNotExist(dst) map (Vector(_)),
-        saveThese0(dst, data, MoveSemantics.FailIfExists))
+      QF.fileExistsM(dst)
+        .ifM(shouldNotExist(dst) map (Vector(_)),
+             saveThese0(dst, data, MoveSemantics.FailIfExists))
     }
 
     /** Same as `replace` but accepts chunked `Data`. */
-    def replaceChunked(dst: AFile, src: Process[F, Vector[Data]])
-                      (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                      : Process[M, FileSystemError] = {
+    def replaceChunked(dst: AFile, src: Process[F, Vector[Data]])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
-      QF.fileExistsM(dst).liftM[Process].ifM(
-        saveChunked0(dst, src, MoveSemantics.FailIfMissing),
-        shouldExist(dst).liftM[Process])
+      QF.fileExistsM(dst)
+        .liftM[Process]
+        .ifM(saveChunked0(dst, src, MoveSemantics.FailIfMissing),
+             shouldExist(dst).liftM[Process])
     }
 
     /** Replace the contents of the given file with `src`. Fails if the file
       * doesn't exist.
       */
-    def replace(dst: AFile, src: Process[F, Data])
-               (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-               : Process[M, FileSystemError] = {
+    def replace(dst: AFile, src: Process[F, Data])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
       replaceChunked(dst, src map (Vector(_)))
     }
@@ -190,18 +190,18 @@ object WriteFile {
     /** Replace the contents of the given file with `data`. Fails if the file
       * doesn't exist.
       */
-    def replaceWithThese(dst: AFile, data: Vector[Data])
-                        (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                        : M[Vector[FileSystemError]] = {
+    def replaceWithThese(dst: AFile, data: Vector[Data])(
+        implicit QF: QueryFile.Ops[S],
+        MF: ManageFile.Ops[S]): M[Vector[FileSystemError]] = {
 
-      QF.fileExistsM(dst).ifM(
-        saveThese0(dst, data, MoveSemantics.FailIfMissing),
-        shouldExist(dst) map (Vector(_)))
+      QF.fileExistsM(dst)
+        .ifM(saveThese0(dst, data, MoveSemantics.FailIfMissing),
+             shouldExist(dst) map (Vector(_)))
     }
 
     ////
 
-    type GE[A] = G[FileSystemError,A]
+    type GE[A] = G[FileSystemError, A]
 
     private def shouldNotExist(dst: AFile): M[FileSystemError] =
       MonadError[GE, FileSystemError].raiseError(pathErr(pathExists(dst)))
@@ -209,27 +209,27 @@ object WriteFile {
     private def shouldExist(dst: AFile): M[FileSystemError] =
       MonadError[GE, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
 
-    private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
-                            (implicit MF: ManageFile.Ops[S])
-                            : Process[M, FileSystemError] = {
+    private def saveChunked0(dst: AFile,
+                             src: Process[F, Vector[Data]],
+                             sem: MoveSemantics)(
+        implicit MF: ManageFile.Ops[S]): Process[M, FileSystemError] = {
 
       def cleanupTmp(tmp: AFile)(t: Throwable): Process[M, Nothing] =
         Process.eval_(ensureAbsent(tmp)).causedBy(Cause.Error(t))
 
       MF.tempFile(dst).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src)
-          .map(some).append(Process.emit(none))
+          .map(some)
+          .append(Process.emit(none))
           .take(1)
-          .flatMap(_.cata(
-            werr => ensureAbsent(tmp).as(werr).liftM[Process],
-            Process.eval_(MF.moveFile(tmp, dst, sem))))
+          .flatMap(_.cata(werr => ensureAbsent(tmp).as(werr).liftM[Process],
+                          Process.eval_(MF.moveFile(tmp, dst, sem))))
           .onFailure(cleanupTmp(tmp))
       }
     }
 
-    private def saveThese0(dst: AFile, data: Vector[Data], sem: MoveSemantics)
-                          (implicit MF: ManageFile.Ops[S])
-                          : M[Vector[FileSystemError]] = {
+    private def saveThese0(dst: AFile, data: Vector[Data], sem: MoveSemantics)(
+        implicit MF: ManageFile.Ops[S]): M[Vector[FileSystemError]] = {
       for {
         tmp  <- MF.tempFile(dst)
         errs <- appendThese(tmp, data)
@@ -249,8 +249,7 @@ object WriteFile {
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S: WriteFile :<: S)
-    extends LiftedOps[WriteFile, S] {
+  final class Unsafe[S[_]](implicit S: WriteFile :<: S) extends LiftedOps[WriteFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
 
@@ -285,11 +284,12 @@ object WriteFile {
   implicit def renderTree[A]: RenderTree[WriteFile[A]] =
     new RenderTree[WriteFile[A]] {
       def render(wf: WriteFile[A]) = wf match {
-        case Open(file)           => NonTerminal(List("Open"), None, List(file.render))
+        case Open(file) => NonTerminal(List("Open"), None, List(file.render))
         case Write(handle, chunk) =>
-          NonTerminal(List("Read"), handle.shows.some,
-            chunk.map(d => Terminal(List("Data"), d.shows.some)).toList)
-        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
+          NonTerminal(List("Read"),
+                      handle.shows.some,
+                      chunk.map(d => Terminal(List("Data"), d.shows.some)).toList)
+        case Close(handle) => Terminal(List("Close"), handle.shows.some)
       }
     }
 }

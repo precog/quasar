@@ -22,7 +22,7 @@ import quasar.precog.common._
 import quasar.precog.util._
 import quasar.precog.util.BitSetUtil.Implicits._
 
-import scala.{ specialized => spec }
+import scala.{specialized => spec}
 
 case class SegmentId(blockid: Long, cpath: CPath, ctype: CType)
 
@@ -36,28 +36,40 @@ sealed trait Segment {
   def length: Int
   def extend(amount: Int): Segment
 
-  override def toString = "Segment(%d, %s, %s, %d/%d)".format(blockid, cpath, ctype, defined.cardinality, length)
+  override def toString =
+    "Segment(%d, %s, %s, %d/%d)".format(blockid,
+                                        cpath,
+                                        ctype,
+                                        defined.cardinality,
+                                        length)
 }
 
-sealed trait ValueSegment[@spec(Boolean,Long,Double) A] extends Segment {
+sealed trait ValueSegment[@spec(Boolean, Long, Double) A] extends Segment {
   def ctype: CValueType[A]
-  def map[@spec(Boolean,Long,Double) B: CValueType: Manifest](f: A => B): ValueSegment[B]
+  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](
+      f: A => B): ValueSegment[B]
 
   def normalize: ValueSegment[A] = this match {
     case seg: ArraySegment[_] if seg.ctype == CBoolean =>
       val values0 = seg.values.asInstanceOf[Array[Boolean]]
-      val values = BitSetUtil.create()
+      val values  = BitSetUtil.create()
       defined.foreach { row =>
         values(row) = values0(row)
       }
-      BooleanSegment(blockid, cpath, defined, values, values.length).asInstanceOf[ValueSegment[A]]
+      BooleanSegment(blockid, cpath, defined, values, values.length)
+        .asInstanceOf[ValueSegment[A]]
 
     case _ =>
       this
   }
 }
 
-case class ArraySegment[@spec(Boolean,Long,Double) A](blockid: Long, cpath: CPath, ctype: CValueType[A], defined: BitSet, values: Array[A]) extends ValueSegment[A] {
+case class ArraySegment[@spec(Boolean, Long, Double) A](blockid: Long,
+                                                        cpath: CPath,
+                                                        ctype: CValueType[A],
+                                                        defined: BitSet,
+                                                        values: Array[A])
+    extends ValueSegment[A] {
   private implicit def m = ctype.classTag
 
   override def equals(that: Any): Boolean = that match {
@@ -71,13 +83,14 @@ case class ArraySegment[@spec(Boolean,Long,Double) A](blockid: Long, cpath: CPat
 
   def extend(amount: Int) = {
     val arr = new Array[A](values.length + amount)
-    var i = 0
+    var i   = 0
     val len = values.length
     while (i < len) { arr(i) = values(i); i += 1 }
     ArraySegment(blockid, cpath, ctype, defined.copy, arr)
   }
 
-  def map[@spec(Boolean,Long,Double) B: CValueType: Manifest](f: A => B): ValueSegment[B] = {
+  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](
+      f: A => B): ValueSegment[B] = {
     val values0 = new Array[B](values.length)
     defined.foreach { row =>
       values0(row) = f(values(row))
@@ -86,7 +99,12 @@ case class ArraySegment[@spec(Boolean,Long,Double) A](blockid: Long, cpath: CPat
   }
 }
 
-case class BooleanSegment(blockid: Long, cpath: CPath, defined: BitSet, values: BitSet, length: Int) extends ValueSegment[Boolean] {
+case class BooleanSegment(blockid: Long,
+                          cpath: CPath,
+                          defined: BitSet,
+                          values: BitSet,
+                          length: Int)
+    extends ValueSegment[Boolean] {
   val ctype = CBoolean
 
   override def equals(that: Any) = that match {
@@ -96,9 +114,11 @@ case class BooleanSegment(blockid: Long, cpath: CPath, defined: BitSet, values: 
       false
   }
 
-  def extend(amount: Int) = BooleanSegment(blockid, cpath, defined.copy, values.copy, length + amount)
+  def extend(amount: Int) =
+    BooleanSegment(blockid, cpath, defined.copy, values.copy, length + amount)
 
-  def map[@spec(Boolean,Long,Double) B: CValueType: Manifest](f: Boolean => B): ValueSegment[B] = {
+  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](
+      f: Boolean => B): ValueSegment[B] = {
     val values0 = new Array[B](values.length)
     defined.foreach { row =>
       values0(row) = f(values(row))
@@ -107,7 +127,12 @@ case class BooleanSegment(blockid: Long, cpath: CPath, defined: BitSet, values: 
   }
 }
 
-case class NullSegment(blockid: Long, cpath: CPath, ctype: CNullType, defined: BitSet, length: Int) extends Segment {
+case class NullSegment(blockid: Long,
+                       cpath: CPath,
+                       ctype: CNullType,
+                       defined: BitSet,
+                       length: Int)
+    extends Segment {
 
   override def equals(that: Any) = that match {
     case NullSegment(`blockid`, `cpath`, `ctype`, d2, `length`) =>
@@ -116,5 +141,6 @@ case class NullSegment(blockid: Long, cpath: CPath, ctype: CNullType, defined: B
       false
   }
 
-  def extend(amount: Int) = NullSegment(blockid, cpath, ctype, defined.copy, length + amount)
+  def extend(amount: Int) =
+    NullSegment(blockid, cpath, ctype, defined.copy, length + amount)
 }

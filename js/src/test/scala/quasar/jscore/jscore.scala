@@ -29,30 +29,27 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
   "toJs" should {
     "de-sugar Let as AnonFunDecl" in {
       val let =
-        Let(Name("a"), BinOp(Add, ident("c"), ident("d")),
-          BinOp(Mult, ident("a"), ident("a")))
+        Let(Name("a"),
+            BinOp(Add, ident("c"), ident("d")),
+            BinOp(Mult, ident("a"), ident("a")))
 
       let.toJs must_==
         Js.Call(
           Js.AnonFunDecl(List("a"),
-            List(Js.Return(Js.BinOp("*", Js.Ident("a"), Js.Ident("a"))))),
+                         List(Js.Return(Js.BinOp("*", Js.Ident("a"), Js.Ident("a"))))),
           List(Js.BinOp("+", Js.Ident("c"), Js.Ident("d"))))
     }
 
     "de-sugar nested Lets as single AnonFunDecl" in {
-      val let = Let(
-        Name("a"),
-        Literal(Js.Num(1, false)),
-        Let(
-          Name("b"),
-          Literal(Js.Num(1, false)),
-          BinOp(Add, ident("a"), ident("a"))))
+      val let =
+        Let(Name("a"),
+            Literal(Js.Num(1, false)),
+            Let(Name("b"), Literal(Js.Num(1, false)), BinOp(Add, ident("a"), ident("a"))))
 
       let.toJs must_==
         Js.Call(
-          Js.AnonFunDecl(
-            List("a", "b"),
-            List(Js.Return(Js.BinOp("+", Js.Ident("a"), Js.Ident("b"))))),
+          Js.AnonFunDecl(List("a", "b"),
+                         List(Js.Return(Js.BinOp("+", Js.Ident("a"), Js.Ident("b"))))),
           List(Js.Num(1, false)))
     }.pendingUntilFixed
 
@@ -62,12 +59,16 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
     }
 
     "don't null-check method call on newly-constructed Array" in {
-      val expr = Call(Select(Arr(List(Literal(Js.Num(0, false)), Literal(Js.Num(1, false)))), "indexOf"), List(ident("x")))
+      val expr =
+        Call(Select(Arr(List(Literal(Js.Num(0, false)), Literal(Js.Num(1, false)))),
+                    "indexOf"),
+             List(ident("x")))
       expr.toJs.pprint(0) must_= "[0, 1].indexOf(x)"
     }
 
     "splice obj constructor" in {
-      val expr = SpliceObjects(List(Obj(ListMap(Name("foo") -> Select(ident("bar"), "baz")))))
+      val expr =
+        SpliceObjects(List(Obj(ListMap(Name("foo") -> Select(ident("bar"), "baz")))))
       expr.toJs.pprint(0) must_==
         "(function (__rez) { __rez.foo = bar.baz; return __rez })({  })"
     }
@@ -83,12 +84,9 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
     }
 
     "splice arrays" in {
-      val expr = SpliceArrays(List(
-        Arr(List(
-          Select(ident("foo"), "bar"))),
-        ident("foo")))
+      val expr = SpliceArrays(List(Arr(List(Select(ident("foo"), "bar"))), ident("foo")))
       expr.toJs.pprint(0) must_==
-      """(function (__rez) {
+        """(function (__rez) {
         |  __rez.push(foo.bar);
         |  for (var __elem in (foo)) if (foo.hasOwnProperty(__elem)) __rez.push(foo[__elem]);
         |  return __rez
@@ -99,28 +97,34 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
 
   "simplify" should {
     "inline select(obj)" in {
-      val x = Select(
-        Obj(ListMap(
-          Name("a") -> ident("x"),
-          Name("b") -> ident("y")
-        )),
-        "a")
+      val x = Select(Obj(
+                       ListMap(
+                         Name("a") -> ident("x"),
+                         Name("b") -> ident("y")
+                       )),
+                     "a")
 
       x.simplify must_=== ident("x")
     }
 
     "inline object components" in {
       val x =
-        Let(Name("a"),
-          Obj(ListMap(
-            Name("x") -> ident("y"),
-            Name("q") -> If(ident("r"), Select(ident("r"), "foo"), ident("bar")))),
-          Arr(List(
-            Select(ident("a"), "x"),
-            Select(ident("a"), "x"),
-            Select(ident("a"), "q"))))
+        Let(
+          Name("a"),
+          Obj(
+            ListMap(
+              Name("x") -> ident("y"),
+              Name("q") -> If(ident("r"), Select(ident("r"), "foo"), ident("bar")))),
+          Arr(
+            List(Select(ident("a"), "x"),
+                 Select(ident("a"), "x"),
+                 Select(ident("a"), "q")))
+        )
 
-      x.simplify must_=== Arr(List(ident("y"), ident("y"), If(ident("r"), Select(ident("r"), "foo"), ident("bar"))))
+      x.simplify must_=== Arr(
+        List(ident("y"),
+             ident("y"),
+             If(ident("r"), Select(ident("r"), "foo"), ident("bar"))))
     }
   }
 
@@ -148,47 +152,41 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
   "JsFn" should {
     "substitute with shadowing Let" in {
       val fn = JsFn(Name("x"),
+                    BinOp(Add,
+                          ident("x"),
+                          Let(Name("x"),
+                              BinOp(Add, Literal(Js.Num(1, false)), ident("x")),
+                              ident("x"))))
+      val exp =
         BinOp(Add,
-          ident("x"),
-          Let(Name("x"),
-            BinOp(Add,
-              Literal(Js.Num(1, false)),
-              ident("x")),
-            ident("x"))))
-      val exp = BinOp(Add,
-        Literal(Js.Num(2, false)),
-        Let(Name("x"),
-          BinOp(Add,
-            Literal(Js.Num(1, false)),
-            Literal(Js.Num(2, false))),
-          ident("x")))
+              Literal(Js.Num(2, false)),
+              Let(Name("x"),
+                  BinOp(Add, Literal(Js.Num(1, false)), Literal(Js.Num(2, false))),
+                  ident("x")))
 
       fn(Literal(Js.Num(2, false))) must_=== exp
     }
 
     "substitute with shadowing Fun" in {
       val fn = JsFn(Name("x"),
+                    BinOp(Add,
+                          ident("x"),
+                          Call(Fun(List(Name("x")), ident("x")),
+                               List(Literal(Js.Num(1, false))))))
+      val exp =
         BinOp(Add,
-          ident("x"),
-          Call(
-            Fun(List(Name("x")),
-              ident("x")),
-            List(Literal(Js.Num(1, false))))))
-      val exp = BinOp(Add,
-        Literal(Js.Num(2, false)),
-        Call(
-          Fun(List(Name("x")),
-            ident("x")),
-          List(Literal(Js.Num(1, false)))))
+              Literal(Js.Num(2, false)),
+              Call(Fun(List(Name("x")), ident("x")), List(Literal(Js.Num(1, false)))))
 
       fn(Literal(Js.Num(2, false))) must_=== exp
     }
 
     "toString" should {
       "be the same as the equivalent JS" in {
-        val js = JsFn(Name("val"), Obj(ListMap(
-          Name("a") -> Select(ident("val"), "x"),
-          Name("b") -> Select(ident("val"), "y"))))
+        val js = JsFn(Name("val"),
+                      Obj(
+                        ListMap(Name("a") -> Select(ident("val"), "x"),
+                                Name("b") -> Select(ident("val"), "y"))))
 
         js.toString must equal("""{ "a": _.x, "b": _.y }""")
 

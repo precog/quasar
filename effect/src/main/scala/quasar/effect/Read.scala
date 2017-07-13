@@ -34,7 +34,7 @@ object Read {
   final case class Ask[R, A](f: R => A) extends Read[R, A]
 
   final class Ops[R, S[_]](implicit S: Read[R, ?] :<: S)
-    extends LiftedOps[Read[R, ?], S] { self =>
+      extends LiftedOps[Read[R, ?], S] { self =>
 
     /** Request a value from the environment. */
     def ask: FreeS[R] = lift(Ask(r => r))
@@ -63,9 +63,9 @@ object Read {
 
     implicit val monadReader: MonadReader[FreeS, R] =
       new MonadReader[FreeS, R] {
-        def ask = self.ask
-        def local[A](f: R => R)(fa: FreeS[A]) = self.local(f)(fa)
-        def point[A](a: => A) = Free.pure(a)
+        def ask                                        = self.ask
+        def local[A](f: R => R)(fa: FreeS[A])          = self.local(f)(fa)
+        def point[A](a: => A)                          = Free.pure(a)
         def bind[A, B](fa: FreeS[A])(f: A => FreeS[B]) = fa flatMap f
       }
   }
@@ -75,15 +75,25 @@ object Read {
       new Ops[R, S]
   }
 
-  def contramapR[Q, R](f: Q => R)                      = λ[Read[R, ?] ~> Read[Q, ?]] { case Ask(g) => Ask(g compose f) }
-  def constant[F[_]: Applicative, R](r: R)             = λ[Read[R, ?] ~> F]          { case Ask(f) => r.point[F] map f }
-  def fromTaskRef[R](tr: TaskRef[R])                   = λ[Read[R, ?] ~> Task]       { case Ask(f) => tr.read map f    }
-  def toState[F[_], R](implicit F: MonadState[F, R])   = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
-  def toReader[F[_], R](implicit F: MonadReader[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F asks f         }
+  def contramapR[Q, R](f: Q => R) = λ[Read[R, ?] ~> Read[Q, ?]] {
+    case Ask(g) => Ask(g compose f)
+  }
+  def constant[F[_]: Applicative, R](r: R) = λ[Read[R, ?] ~> F] {
+    case Ask(f) => r.point[F] map f
+  }
+  def fromTaskRef[R](tr: TaskRef[R]) = λ[Read[R, ?] ~> Task] {
+    case Ask(f) => tr.read map f
+  }
+  def toState[F[_], R](implicit F: MonadState[F, R]) = λ[Read[R, ?] ~> F] {
+    case Ask(f) => F gets f
+  }
+  def toReader[F[_], R](implicit F: MonadReader[F, R]) = λ[Read[R, ?] ~> F] {
+    case Ask(f) => F asks f
+  }
 
   def monadReader_[R, S[_]](implicit O: Ops[R, S]): MonadReader_[Free[S, ?], R] =
     new MonadReader_[Free[S, ?], R] {
-      def ask = O.ask
+      def ask                                 = O.ask
       def local[A](f: R => R)(fa: Free[S, A]) = O.local(f)(fa)
     }
 }

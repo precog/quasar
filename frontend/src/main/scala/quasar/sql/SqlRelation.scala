@@ -32,29 +32,29 @@ sealed abstract class SqlRelation[A] extends Product with Serializable {
     def collect(n: SqlRelation[A]): List[(String, NamedRelation[A])] =
       n match {
         case JoinRelation(left, right, _, _) => collect(left) ++ collect(right)
-        case t: NamedRelation[A] => (t.aliasName -> t) :: Nil
-    }
+        case t: NamedRelation[A]             => (t.aliasName -> t) :: Nil
+      }
 
     collect(this).groupBy(_._1).mapValues(_.map(_._2))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def mapPathsM[F[_]: Monad](f: FUPath => F[FUPath]): F[SqlRelation[A]] = this match {
-    case IdentRelationAST(_, _) => this.point[F]
-    case VariRelationAST(_, _) => this.point[F]
+    case IdentRelationAST(_, _)        => this.point[F]
+    case VariRelationAST(_, _)         => this.point[F]
     case TableRelationAST(path, alias) => f(path).map(TableRelationAST(_, alias))
     case rel @ JoinRelation(left, right, _, _) =>
-      (left.mapPathsM(f) |@| right.mapPathsM(f))((l,r) => rel.copy(left = l, right = r))
-    case ExprRelationAST(_,_) => this.point[F]
+      (left.mapPathsM(f) |@| right.mapPathsM(f))((l, r) => rel.copy(left = l, right = r))
+    case ExprRelationAST(_, _) => this.point[F]
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def transformM[F[_]: Monad, B](f: SqlRelation[A] => F[SqlRelation[B]], g: A => F[B]): F[SqlRelation[B]] = this match {
+  def transformM[F[_]: Monad, B](f: SqlRelation[A] => F[SqlRelation[B]],
+                                 g: A => F[B]): F[SqlRelation[B]] = this match {
     case JoinRelation(left, right, tpe, clause) =>
       (left.transformM[F, B](f, g) |@|
         right.transformM[F, B](f, g) |@|
-        g(clause))((l,r,c) =>
-          JoinRelation(l, r, tpe, c))
+        g(clause))((l, r, c) => JoinRelation(l, r, tpe, c))
     case rel => f(rel)
   }
 }
@@ -64,11 +64,11 @@ sealed abstract class NamedRelation[A] extends SqlRelation[A] {
 }
 
 /**
- * IdentRelationAST allows us to reference a let binding in a relation (i.e. table)
- * context. ExprF.IdentF allows us to reference a let binding in expression context.
- * Ideally we can unify these two contexts, providing a single way to reference a
- * let binding.
- */
+  * IdentRelationAST allows us to reference a let binding in a relation (i.e. table)
+  * context. ExprF.IdentF allows us to reference a let binding in expression context.
+  * Ideally we can unify these two contexts, providing a single way to reference a
+  * let binding.
+  */
 @Lenses final case class IdentRelationAST[A](name: String, alias: Option[String])
     extends NamedRelation[A] {
   def aliasName = alias.getOrElse(name)
@@ -86,7 +86,10 @@ sealed abstract class NamedRelation[A] extends SqlRelation[A] {
 @Lenses final case class ExprRelationAST[A](expr: A, aliasName: String)
     extends NamedRelation[A]
 
-@Lenses final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
+@Lenses final case class JoinRelation[A](left: SqlRelation[A],
+                                         right: SqlRelation[A],
+                                         tpe: JoinType,
+                                         clause: A)
     extends SqlRelation[A]
 
 object SqlRelation {
@@ -101,7 +104,7 @@ object SqlRelation {
           case (VariRelationAST(v1, a1), VariRelationAST(v2, a2)) =>
             Equal[Sql[A]].equal(v1, v2) && a1 ≟ a2
           case (TableRelationAST(t1, a1), TableRelationAST(t2, a2)) =>
-            t1 == t2 && a1 ≟ a2  // TODO use scalaz equal for the `FUPath`
+            t1 == t2 && a1 ≟ a2 // TODO use scalaz equal for the `FUPath`
           case (ExprRelationAST(e1, a1), ExprRelationAST(e2, a2)) =>
             e1 ≟ e2 && a1 ≟ a2
           case (JoinRelation(l1, r1, t1, c1), JoinRelation(l2, r2, t2, c2)) =>
@@ -128,13 +131,16 @@ object SqlRelation {
             val aliasString = alias.cata(" as " + _, "")
             Terminal("VariRelation" :: astType, Some(":" + vari.symbol + aliasString))
           case ExprRelationAST(select, alias) =>
-            NonTerminal("ExprRelation" :: astType, Some("Expr as " + alias), ra.render(select) :: Nil)
+            NonTerminal("ExprRelation" :: astType,
+                        Some("Expr as " + alias),
+                        ra.render(select) :: Nil)
           case TableRelationAST(name, alias) =>
             val aliasString = alias.cata(" as " + _, "")
             Terminal("TableRelation" :: astType, Some(prettyPrint(name) + aliasString))
           case JoinRelation(left, right, jt, clause) =>
-            NonTerminal("JoinRelation" :: astType, Some(jt.shows),
-              List(render(left), render(right), ra.render(clause)))
+            NonTerminal("JoinRelation" :: astType,
+                        Some(jt.shows),
+                        List(render(left), render(right), ra.render(clause)))
         }
       }
     }
@@ -145,7 +151,8 @@ object SqlRelation {
       case VariRelationAST(vari, alias)   => VariRelationAST(vari.map(f), alias)
       case ExprRelationAST(select, alias) => ExprRelationAST(f(select), alias)
       case TableRelationAST(name, alias)  => TableRelationAST(name, alias)
-      case JoinRelation(left, right, jt, clause) => JoinRelation(left.map(f), right.map(f), jt, f(clause))
+      case JoinRelation(left, right, jt, clause) =>
+        JoinRelation(left.map(f), right.map(f), jt, f(clause))
     }
   }
 }

@@ -20,15 +20,17 @@ import slamdata.Predef._
 
 import scalaz.NonEmptyList
 
-final case class Index(name: String, key: NonEmptyList[(BsonField, IndexType)], unique: Boolean) {
+final case class Index(name: String,
+                       key: NonEmptyList[(BsonField, IndexType)],
+                       unique: Boolean) {
   def primary: BsonField = key.head._1
 }
 
 sealed abstract class IndexType(bson: Bson)
 object IndexType {
-  case object Ascending extends IndexType(Bson.Int32(1))
+  case object Ascending  extends IndexType(Bson.Int32(1))
   case object Descending extends IndexType(Bson.Int32(-1))
-  case object Hashed extends IndexType(Bson.Text("hashed"))
+  case object Hashed     extends IndexType(Bson.Text("hashed"))
   // NB: MongoDB provides several additional index types but they're not
   // currently of interest to us.
 }

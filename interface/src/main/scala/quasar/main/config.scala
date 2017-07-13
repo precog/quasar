@@ -25,25 +25,29 @@ import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object config {
+
   /** Attempts to load the specified config file or one found at any of the
     * default paths. If an error occurs, it is logged to STDERR and the
     * default configuration is returned.
     */
-  def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(implicit cfgOps: ConfigOps[C]): Task[C] = {
+  def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(
+      implicit cfgOps: ConfigOps[C]): Task[C] = {
     import ConfigError._
     configFile.fold(cfgOps.fromDefaultPaths)(cfgOps.fromFile).run flatMap {
       case \/-(c) => c.point[Task]
 
-      case -\/(FileNotFound(f)) => for {
-        codec <- FsPath.systemCodec
-        fstr  =  FsPath.printFsPath(codec, f)
-        _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
-        cfg   <- cfgOps.default
-      } yield cfg
+      case -\/(FileNotFound(f)) =>
+        for {
+          codec <- FsPath.systemCodec
+          fstr = FsPath.printFsPath(codec, f)
+          _ <- stderr(
+            s"Configuration file '$fstr' not found, using default configuration.")
+          cfg <- cfgOps.default
+        } yield cfg
 
       case -\/(MalformedConfig(_, rsn)) =>
         stderr(s"Error in configuration file, using default configuration: $rsn") *>
-        cfgOps.default
+          cfgOps.default
     }
   }
 }

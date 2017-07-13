@@ -21,16 +21,16 @@ import java.util.concurrent.{Executors, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * From playframework's NamedThreadFactory
- *
- * Thread factory that creates threads that are named.  Threads will be named with the format:
- *
- * {name}-{threadNo}
- *
- * where threadNo is an integer starting from one.
- */
+  * From playframework's NamedThreadFactory
+  *
+  * Thread factory that creates threads that are named.  Threads will be named with the format:
+  *
+  * {name}-{threadNo}
+  *
+  * where threadNo is an integer starting from one.
+  */
 final case class NamedDaemonThreadFactory(name: String) extends ThreadFactory {
-  val threadNo = new AtomicInteger()
+  val threadNo             = new AtomicInteger()
   val backingThreadFactory = Executors.defaultThreadFactory()
 
   def newThread(r: java.lang.Runnable) = {

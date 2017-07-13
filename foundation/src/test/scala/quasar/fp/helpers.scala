@@ -24,8 +24,7 @@ object Helpers {
   // NB: Should be exposed via matryoshka-scalacheck, which doesn’t yet exist.
   /** A “direct” Arbitrary from a “deferred” Arbitrary.
     */
-  implicit def NTArbitrary[F[_], A](
-    implicit F: Arbitrary ~> (Arbitrary ∘ F)#λ, A: Arbitrary[A]):
-      Arbitrary[F[A]] =
+  implicit def NTArbitrary[F[_], A](implicit F: Arbitrary ~> (Arbitrary ∘ F)#λ,
+                                    A: Arbitrary[A]): Arbitrary[F[A]] =
     F(A)
 }

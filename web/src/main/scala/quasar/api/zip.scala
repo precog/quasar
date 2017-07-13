@@ -58,18 +58,20 @@ object Zip {
 
         // NB: overriding here to process each buffer-worth coming from the ZipOS in one call
         @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-        override def write(b: Array[Byte], off: Int, len: Int) = append(ByteVector(b, off, len))
+        override def write(b: Array[Byte], off: Int, len: Int) =
+          append(ByteVector(b, off, len))
       }
       new jzip.ZipOutputStream(os)
     }
 
-    def accept(op: Op): F[Unit] = (op match {
-      case Op.Start             => ()
-      case Op.StartEntry(entry) => sink.putNextEntry(entry)
-      case Op.Chunk(bytes)      => sink.write(bytes.toArray)
-      case Op.EndEntry          => sink.closeEntry
-      case Op.End               => sink.close
-    }).point[F]
+    def accept(op: Op): F[Unit] =
+      (op match {
+        case Op.Start             => ()
+        case Op.StartEntry(entry) => sink.putNextEntry(entry)
+        case Op.Chunk(bytes)      => sink.write(bytes.toArray)
+        case Op.EndEntry          => sink.closeEntry
+        case Op.End               => sink.close
+      }).point[F]
 
     def poll: F[ByteVector] = {
       val result = chunks
@@ -78,7 +80,8 @@ object Zip {
     }.point[F]
   }
 
-  def zipFiles[F[_]: Monad](files: Map[RelFile[Sandboxed], Process[F, ByteVector]]): Process[F, ByteVector] = {
+  def zipFiles[F[_]: Monad](
+      files: Map[RelFile[Sandboxed], Process[F, ByteVector]]): Process[F, ByteVector] = {
     val ops: Process[F, Op] = {
       def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) =
         Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file)))) ++
@@ -94,29 +97,32 @@ object Zip {
     // of Ops, so that a new instance is created as needed each time
     // the resulting process is run, then flatMap so that each chunk
     // can be handled in Task.
-    ops.zipWithState[Option[Buffer[F]]](None) {
-      case (_, None)         => Some(new Buffer)
-      case (Op.End, Some(_)) => None
-      case (_, buf@Some(_))  => buf
-    }.flatMap {
-      case (Op.Start, _)   => Process.emit(ByteVector.empty)
-      case (op, Some(buf)) =>
-        Process.await(for {
-          _ <- buf.accept(op)
-          b <- buf.poll
-        } yield b) { bytes =>
-          if (bytes.size ≟ 0) Process.halt
-          else Process.emit(bytes)
-        }
-      case (_, None)       => Process.fail(new RuntimeException("unexpected state"))
-    }
+    ops
+      .zipWithState[Option[Buffer[F]]](None) {
+        case (_, None)          => Some(new Buffer)
+        case (Op.End, Some(_))  => None
+        case (_, buf @ Some(_)) => buf
+      }
+      .flatMap {
+        case (Op.Start, _) => Process.emit(ByteVector.empty)
+        case (op, Some(buf)) =>
+          Process.await(for {
+            _ <- buf.accept(op)
+            b <- buf.poll
+          } yield b) { bytes =>
+            if (bytes.size ≟ 0) Process.halt
+            else Process.emit(bytes)
+          }
+        case (_, None) => Process.fail(new RuntimeException("unexpected state"))
+      }
   }
 
-  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, Map[RelFile[Sandboxed], ByteVector]] = {
+  def unzipFiles(zippedBytes: Process[Task, ByteVector])
+    : EitherT[Task, String, Map[RelFile[Sandboxed], ByteVector]] = {
     def entry(zis: jzip.ZipInputStream): OptionT[Task, (String, ByteVector)] =
       for {
         entry <- OptionT(Task.delay(Option(zis.getNextEntry())))
-        name  =  entry.getName
+        name = entry.getName
         bytes <- contents(zis).liftM[OptionT]
         _     <- Task.delay(zis.closeEntry()).liftM[OptionT]
       } yield (name, bytes)
@@ -125,20 +131,23 @@ object Zip {
       def read(bufSize: Int)(is: jzip.ZipInputStream): OptionT[Task, ByteVector] =
         OptionT(Task.delay {
           val buf = new Array[Byte](bufSize)
-          val n = is.read(buf, 0, bufSize)
+          val n   = is.read(buf, 0, bufSize)
           (n >= 0) option ByteVector.view(buf).take(n.toLong)
         })
 
-      Process.unfoldEval(zis)(z => read(4*1024)(z).strengthR(z).run).runFoldMap(ι)
+      Process.unfoldEval(zis)(z => read(4 * 1024)(z).strengthR(z).run).runFoldMap(ι)
     }
 
     def entries(zis: jzip.ZipInputStream): Process[Task, (String, ByteVector)] =
       Process.unfoldEval(zis)(z => entry(z).strengthR(z).run)
 
     def toPath(pathString: String): Task[RelFile[Sandboxed]] =
-      posixCodec.parseRelFile(pathString).flatMap(sandboxCurrent).cata(
-        p => Task.now(p),
-        Task.fail(new RuntimeException(s"relative file path expected; found: $pathString")))
+      posixCodec
+        .parseRelFile(pathString)
+        .flatMap(sandboxCurrent)
+        .cata(p => Task.now(p),
+              Task.fail(
+                new RuntimeException(s"relative file path expected; found: $pathString")))
 
     val is = io.toInputStream(zippedBytes)
     EitherT((for {
@@ -147,7 +156,7 @@ object Zip {
       rez <- es.traverse { case (n: String, bs) => toPath(n).strengthR(bs) }
     } yield rez.toMap).attempt.map(_.leftMap {
       case x: jzip.ZipException => s"zip decoding error: $x"
-      case x => s"$x"
+      case x                    => s"$x"
     }))
   }
 }

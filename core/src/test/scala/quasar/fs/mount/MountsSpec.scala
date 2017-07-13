@@ -41,7 +41,8 @@ class MountsSpec extends quasar.Qspec {
       }
 
       "succeeds when replacing value at existing" >> prop { mnt: AbsDir[Sandboxed] =>
-        Mounts.singleton(mnt, 1)
+        Mounts
+          .singleton(mnt, 1)
           .add(mnt, 2)
           .toOption
           .flatMap(_.toMap.get(mnt)) must beSome(2)

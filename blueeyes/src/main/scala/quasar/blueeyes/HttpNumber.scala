@@ -21,7 +21,7 @@ package quasar.blueeyes
  * cases */
 sealed trait HttpNumber {
   def number: Long
-  def value = number.toString
+  def value             = number.toString
   override def toString = value
 }
 
@@ -34,8 +34,7 @@ object HttpNumbers {
   case class LongNumber(number: Long) extends HttpNumber
 }
 
-
-trait HttpNumberImplicits { 
+trait HttpNumberImplicits {
   implicit def int2HttpNumber(num: Int): HttpNumber =
     HttpNumbers.LongNumber(num)
 

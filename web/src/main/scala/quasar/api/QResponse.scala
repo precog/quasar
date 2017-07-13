@@ -36,7 +36,9 @@ import scalaz.stream.Process
 import scodec.bits.ByteVector
 
 @Lenses
-final case class QResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
+final case class QResponse[S[_]](status: Status,
+                                 headers: Headers,
+                                 body: Process[Free[S, ?], ByteVector]) {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
 
   def flatMapS[T[_]](f: S ~> Free[T, ?]): QResponse[T] =
@@ -57,7 +59,10 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
   def toHttpResponseF(i: Free[S, ?] ~> ResponseOr): Task[Response] = {
     val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
       def apply[A](ror: ResponseOr[A]) =
-        ror.fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)), _.point[Task]).join
+        ror
+          .fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)),
+                _.point[Task])
+          .join
     }
 
     def handleBytes(bytes: Process[ResponseOr, ByteVector]): Response =
@@ -65,7 +70,8 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
         .withStatus(status)
         .putHeaders(headers.toList: _*)
 
-    body.translate[ResponseOr](i)
+    body
+      .translate[ResponseOr](i)
       .stepUntil(_.foldMap(_.length) >= PROCESS_EFFECT_THRESHOLD_BYTES)
       .map(handleBytes)
       .merge
@@ -76,6 +82,7 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
 }
 
 object QResponse {
+
   /** Producing this many bytes from a `Process[F, ByteVector]` should require
     * at least one `F` effect.
     *
@@ -108,7 +115,7 @@ object QResponse {
   val PROCESS_EFFECT_THRESHOLD_BYTES = 100L
 
   final class HttpResponseStreamFailureException(alternate: Response)
-    extends java.lang.Exception
+      extends java.lang.Exception
 
   def empty[S[_]]: QResponse[S] =
     QResponse(NoContent, Headers.empty, Process.halt)
@@ -117,45 +124,38 @@ object QResponse {
     empty[S].withStatus(Ok)
 
   def header[S[_]](key: HeaderKey.Extractable): Optional[QResponse[S], key.HeaderT] =
-    Optional[QResponse[S], key.HeaderT](
-      qr => qr.headers.get(key))(
-      h  => _.modifyHeaders(_.put(h)))
+    Optional[QResponse[S], key.HeaderT](qr => qr.headers.get(key))(h =>
+      _.modifyHeaders(_.put(h)))
 
   def json[A: EncodeJson, S[_]](status: Status, a: A): QResponse[S] =
-    string[S](status, a.asJson.pretty(minspace)).modifyHeaders(_.put(
-      `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
+    string[S](status, a.asJson.pretty(minspace)).modifyHeaders(
+      _.put(`Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
 
-  def response[S[_], A]
-      (status: Status, a: A)
-      (implicit E: EntityEncoder[A], S0: Task :<: S)
-      : QResponse[S] =
-    QResponse(
-      status,
-      E.headers,
-      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
+  def response[S[_], A](status: Status, a: A)(implicit E: EntityEncoder[A],
+                                              S0: Task :<: S): QResponse[S] =
+    QResponse(status,
+              E.headers,
+              Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
 
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def streaming[S[_], A]
-      (p: Process[Free[S, ?], A])
-      (implicit E: EntityEncoder[A], S0: Task :<: S)
-      : QResponse[S] =
+  def streaming[S[_], A](p: Process[Free[S, ?], A])(implicit E: EntityEncoder[A],
+                                                    S0: Task :<: S): QResponse[S] =
     QResponse(
       Ok,
       E.headers,
       p.flatMap[Free[S, ?], ByteVector](a =>
         Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT)))
 
-  def streaming[S[_], A, E]
-      (p: Process[EitherT[Free[S, ?], E, ?], A])
-      (implicit A: EntityEncoder[A], S0: Task :<: S, S1: Failure[E, ?] :<: S)
-      : QResponse[S] = {
+  def streaming[S[_], A, E](p: Process[EitherT[Free[S, ?], E, ?], A])(
+      implicit A: EntityEncoder[A],
+      S0: Task :<: S,
+      S1: Failure[E, ?] :<: S): QResponse[S] = {
     val failure = Failure.Ops[E, S]
     streaming(p.translate(failure.unattemptT))
   }
 
   def string[S[_]](status: Status, s: String): QResponse[S] =
-    QResponse(
-      status,
-      Headers(`Content-Type`(MediaType.`text/plain`, Some(Charset.`UTF-8`))),
-      Process.emit(ByteVector.view(s.getBytes(Charset.`UTF-8`.nioCharset))))
+    QResponse(status,
+              Headers(`Content-Type`(MediaType.`text/plain`, Some(Charset.`UTF-8`))),
+              Process.emit(ByteVector.view(s.getBytes(Charset.`UTF-8`.nioCharset))))
 }

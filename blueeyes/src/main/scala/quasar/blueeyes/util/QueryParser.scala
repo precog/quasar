@@ -34,17 +34,17 @@ object QueryParser {
         .split("&")
         .toList
         .flatMap { nameEqualsValue =>
-        nameEqualsValue.split("=").toList match {
-          case "" :: Nil              => Nil
-          case name :: Nil            => (name, "") :: Nil
-          case name :: value :: Nil   => (name, value) :: Nil
-          case name :: everythingElse => (name, everythingElse.mkString("=")) :: Nil
-          case Nil                    => Nil
-        }
-      })
+          nameEqualsValue.split("=").toList match {
+            case "" :: Nil              => Nil
+            case name :: Nil            => (name, "") :: Nil
+            case name :: value :: Nil   => (name, value) :: Nil
+            case name :: everythingElse => (name, everythingElse.mkString("=")) :: Nil
+            case Nil                    => Nil
+          }
+        })
         .map { nameValue =>
-        (Symbol(decode(nameValue._1, encoding)), decode(nameValue._2, encoding))
-      }: _*)
+          (Symbol(decode(nameValue._1, encoding)), decode(nameValue._2, encoding))
+        }: _*)
 
   def unparseQuery(query: Map[Symbol, String], shouldEncode: Boolean = true): String = {
     def transformFn(nameValue: Tuple2[Symbol, String]) = {
@@ -54,10 +54,14 @@ object QueryParser {
         (nameValue._1.name :: nameValue._2 :: Nil)
     }
 
-    query.map { nameValue =>
-      transformFn(nameValue).filter { n =>
-        !n.isEmpty
-      }.mkString("=")
-    }.mkString("&")
+    query
+      .map { nameValue =>
+        transformFn(nameValue)
+          .filter { n =>
+            !n.isEmpty
+          }
+          .mkString("=")
+      }
+      .mkString("&")
   }
 }

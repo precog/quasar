@@ -56,19 +56,27 @@ sealed trait SValue {
             case JPathIndex(_) => SArray.Empty
           }
 
-          obj.getOrElse(name, child).set(JPath(xs), value).map(sv => (SObject(obj + (name -> sv))))
+          obj
+            .getOrElse(name, child)
+            .set(JPath(xs), value)
+            .map(sv => (SObject(obj + (name -> sv))))
       }
 
     case SArray(arr) =>
       (selector.nodes: @unchecked) match {
-        case JPathIndex(i) :: Nil => Some(SArray(arr.padTo(i + 1, SNull).updated(i, value)))
+        case JPathIndex(i) :: Nil =>
+          Some(SArray(arr.padTo(i + 1, SNull).updated(i, value)))
         case JPathIndex(i) :: xs =>
           val child = xs.head match {
             case JPathField(_) => SObject.Empty
             case JPathIndex(_) => SArray.Empty
           }
 
-          arr.lift(i).getOrElse(child).set(JPath(xs), value).map(sv => SArray(arr.padTo(i + 1, SNull).updated(i, sv)))
+          arr
+            .lift(i)
+            .getOrElse(child)
+            .set(JPath(xs), value)
+            .map(sv => SArray(arr.padTo(i + 1, SNull).updated(i, sv)))
       }
 
     case SNull if (selector == NoJPath) => Some(value)
@@ -115,14 +123,15 @@ sealed trait SValue {
   }
 
   lazy val toJValue: JValue = this match {
-    case SObject(obj) => JObject(obj.map({ case (k, v) => JField(k, v.toJValue) })(breakOut))
-    case SArray(arr)  => JArray(arr.map(_.toJValue)(breakOut): _*)
-    case SString(s)   => JString(s)
-    case STrue        => JBool(true)
-    case SFalse       => JBool(false)
-    case SDecimal(n)  => JNum(n)
-    case SNull        => JNull
-    case SUndefined   => JUndefined
+    case SObject(obj) =>
+      JObject(obj.map({ case (k, v) => JField(k, v.toJValue) })(breakOut))
+    case SArray(arr) => JArray(arr.map(_.toJValue)(breakOut): _*)
+    case SString(s)  => JString(s)
+    case STrue       => JBool(true)
+    case SFalse      => JBool(false)
+    case SDecimal(n) => JNum(n)
+    case SNull       => JNull
+    case SUndefined  => JUndefined
   }
 
   lazy val toRValue: RValue = this match {
@@ -191,14 +200,15 @@ trait SValueInstances {
     private val doubleOrder = scalaz.Order[Double].order _ curried
     private val numOrder    = scalaz.Order[BigDecimal].order _ curried
 
-    def order(sv1: SValue, sv2: SValue) = paired(sv1, sv2).fold(typeIndex(sv1) ?|? typeIndex(sv2))(
-      obj = objectOrder,
-      arr = arrayOrder,
-      str = stringOrder,
-      bool = boolOrder,
-      num = numOrder,
-      nul = EQ
-    )
+    def order(sv1: SValue, sv2: SValue) =
+      paired(sv1, sv2).fold(typeIndex(sv1) ?|? typeIndex(sv2))(
+        obj = objectOrder,
+        arr = arrayOrder,
+        str = stringOrder,
+        bool = boolOrder,
+        num = numOrder,
+        nul = EQ
+      )
   }
 
   implicit def equal: Equal[SValue] = new Equal[SValue] {
@@ -242,18 +252,19 @@ trait SValueInstances {
 object SValue extends SValueInstances {
   @inline
   def fromCValue(cv: CValue): SValue = cv match {
-    case CString(s)                    => SString(s)
-    case CBoolean(b)                   => SBoolean(b)
-    case CLong(n)                      => SDecimal(BigDecimal(n))
-    case CDouble(n)                    => SDecimal(BigDecimal(n))
-    case CNum(n)                       => SDecimal(n)
-    case CDate(d)                      => sys.error("todo") // Should this be SString(d.toString)?
-    case CPeriod(p)                    => sys.error("todo") // Should this be SString(d.toString)?
-    case CArray(as, CArrayType(aType)) => SArray(as.map(a => fromCValue(aType(a)))(breakOut))
-    case CNull                         => SNull
-    case CEmptyArray                   => SArray(Vector())
-    case CEmptyObject                  => SObject(Map())
-    case CUndefined                    => SUndefined
+    case CString(s)  => SString(s)
+    case CBoolean(b) => SBoolean(b)
+    case CLong(n)    => SDecimal(BigDecimal(n))
+    case CDouble(n)  => SDecimal(BigDecimal(n))
+    case CNum(n)     => SDecimal(n)
+    case CDate(d)    => sys.error("todo") // Should this be SString(d.toString)?
+    case CPeriod(p)  => sys.error("todo") // Should this be SString(d.toString)?
+    case CArray(as, CArrayType(aType)) =>
+      SArray(as.map(a => fromCValue(aType(a)))(breakOut))
+    case CNull        => SNull
+    case CEmptyArray  => SArray(Vector())
+    case CEmptyObject => SObject(Map())
+    case CUndefined   => SUndefined
   }
 
   // Note this conversion has a peer for CValues that should always be changed

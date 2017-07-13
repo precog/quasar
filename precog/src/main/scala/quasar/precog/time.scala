@@ -29,17 +29,18 @@ trait PackageTime {
     def getMillis: Long = x.toMillis
   }
   implicit class QuasarInstantOps(private val x: Instant) {
-    def getMillis: Long           = x.toEpochMilli
+    def getMillis: Long         = x.toEpochMilli
     def -(y: Instant): Duration = java.time.Duration.between(x, y)
   }
   implicit class QuasarPeriodOps(private val x: Period) {
-    def getMillis: Long       = toDuration.getMillis
+    def getMillis: Long      = toDuration.getMillis
     def toDuration: Duration = java.time.Duration from x
   }
   implicit class QuasarDateTimeOps(private val x: LocalDateTime) {
-    def until(end: LocalDateTime): Period = java.time.Period.between(x.toLocalDate, end.toLocalDate)
-    def toUtcInstant: Instant        = x toInstant UTC
-    def getMillis: Long              = toUtcInstant.toEpochMilli
+    def until(end: LocalDateTime): Period =
+      java.time.Period.between(x.toLocalDate, end.toLocalDate)
+    def toUtcInstant: Instant = x toInstant UTC
+    def getMillis: Long       = toUtcInstant.toEpochMilli
   }
 
   object duration {
@@ -49,20 +50,23 @@ trait PackageTime {
     def fromMillis(ms: Long): Period = java.time.Period from (duration fromMillis ms)
   }
   object instant {
-    def zero: Instant                             = fromMillis(0L)
-    def ofEpoch(secs: Long, nanos: Long): Instant = java.time.Instant.ofEpochSecond(secs, nanos)
-    def now(): Instant                            = java.time.Instant.now
-    def fromMillis(ms: Long): Instant             = java.time.Instant.ofEpochMilli(ms)
-    def apply(s: String): Instant                 = java.time.Instant parse s
+    def zero: Instant = fromMillis(0L)
+    def ofEpoch(secs: Long, nanos: Long): Instant =
+      java.time.Instant.ofEpochSecond(secs, nanos)
+    def now(): Instant                = java.time.Instant.now
+    def fromMillis(ms: Long): Instant = java.time.Instant.ofEpochMilli(ms)
+    def apply(s: String): Instant     = java.time.Instant parse s
   }
   object dateTime {
-    def minimum: LocalDateTime              = java.time.LocalDateTime.MIN
-    def maximum: LocalDateTime              = java.time.LocalDateTime.MAX
-    def fromIso(s: String): LocalDateTime   = java.time.LocalDateTime.parse(s, ISO_DATE_TIME)
-    def showIso(d: LocalDateTime): String   = d format ISO_DATE_TIME
-    def zero: LocalDateTime                 = fromMillis(0)
-    def now(): LocalDateTime                = java.time.LocalDateTime.now
-    def fromMillis(ms: Long): LocalDateTime = java.time.LocalDateTime.ofInstant(instant fromMillis ms, UTC)
-    def apply(s: String): LocalDateTime     = java.time.LocalDateTime.parse(s)
+    def minimum: LocalDateTime = java.time.LocalDateTime.MIN
+    def maximum: LocalDateTime = java.time.LocalDateTime.MAX
+    def fromIso(s: String): LocalDateTime =
+      java.time.LocalDateTime.parse(s, ISO_DATE_TIME)
+    def showIso(d: LocalDateTime): String = d format ISO_DATE_TIME
+    def zero: LocalDateTime               = fromMillis(0)
+    def now(): LocalDateTime              = java.time.LocalDateTime.now
+    def fromMillis(ms: Long): LocalDateTime =
+      java.time.LocalDateTime.ofInstant(instant fromMillis ms, UTC)
+    def apply(s: String): LocalDateTime = java.time.LocalDateTime.parse(s)
   }
 }

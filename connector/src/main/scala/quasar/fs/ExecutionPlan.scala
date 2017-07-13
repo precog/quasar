@@ -24,7 +24,9 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class ExecutionPlan(typ: FileSystemType, physicalPlan: String, inputs: ISet[APath])
+final case class ExecutionPlan(typ: FileSystemType,
+                               physicalPlan: String,
+                               inputs: ISet[APath])
 
 object ExecutionPlan {
   import APath._
@@ -37,5 +39,7 @@ object ExecutionPlan {
       s"ExecutionPlan[${p.typ}](inputs = ${p.inputs.shows})\n\n${p.physicalPlan}")
 
   implicit val codecJson: CodecJson[ExecutionPlan] =
-    casecodec3(ExecutionPlan.apply, ExecutionPlan.unapply)("type", "physicalPlan", "inputs")
+    casecodec3(ExecutionPlan.apply, ExecutionPlan.unapply)("type",
+                                                           "physicalPlan",
+                                                           "inputs")
 }

@@ -38,9 +38,9 @@ object SerialVFSSpecs extends Specification {
         vfs <- SerialVFS(base)
 
         ta = for {
-          blob <- vfs.scratch
+          blob    <- vfs.scratch
           version <- vfs.fresh(blob)
-          dir <- vfs.underlyingDir(blob, version)
+          dir     <- vfs.underlyingDir(blob, version)
 
           _ <- Task delay {
             dir.exists() mustEqual true
@@ -89,7 +89,7 @@ object SerialVFSSpecs extends Specification {
       test2.take(1).run.unsafePerformSync
 
       val test3 = for {
-        vfs <- SerialVFS(base)
+        vfs   <- SerialVFS(base)
         paths <- Stream.eval(vfs.ls(Path.rootDir))
       } yield paths
 

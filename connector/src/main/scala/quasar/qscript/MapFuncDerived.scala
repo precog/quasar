@@ -46,14 +46,11 @@ object MapFuncDerived {
 
   implicit def traverse[T[_[_]]]: Traverse[MapFuncDerived[T, ?]] =
     new Traverse[MapFuncDerived[T, ?]] {
-      def traverseImpl[G[_], A, B](
-        fa: MapFuncDerived[T, A])(
-        f: A => G[B])(
-        implicit G: Applicative[G]):
-          G[MapFuncDerived[T, B]] = fa match {
-            // unary
-            case Abs(a1) => f(a1) ∘ (Abs(_))
-          }
+      def traverseImpl[G[_], A, B](fa: MapFuncDerived[T, A])(f: A => G[B])(
+          implicit G: Applicative[G]): G[MapFuncDerived[T, B]] = fa match {
+        // unary
+        case Abs(a1) => f(a1) ∘ (Abs(_))
+      }
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
@@ -69,7 +66,10 @@ object MapFuncDerived {
     new Delay[Show, MapFuncDerived[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFuncDerived[T, A]] = {
         def shz(label: String, a: A*) =
-          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
+          Cord(label) ++ Cord("(") ++ a
+            .map(sh.show)
+            .toList
+            .intercalate(Cord(", ")) ++ Cord(")")
 
         Show.show {
           // unary

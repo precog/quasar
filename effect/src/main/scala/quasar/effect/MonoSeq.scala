@@ -39,7 +39,8 @@ trait MonoSeq[F[_]] {
 }
 
 object MonoSeq extends MonoSeqInstances {
-  def forTrans[F[_]: Monad, T[_[_], _]: MonadTrans](implicit S: MonoSeq[F]): MonoSeq[T[F, ?]] =
+  def forTrans[F[_]: Monad, T[_[_], _]: MonadTrans](
+      implicit S: MonoSeq[F]): MonoSeq[T[F, ?]] =
     new MonoSeq[T[F, ?]] { def next = S.next.liftM[T] }
 }
 
@@ -47,7 +48,8 @@ sealed abstract class MonoSeqInstances extends MonoSeqInstances0 {
   implicit val monotonicSeq: MonoSeq[MonotonicSeq] =
     new MonoSeq[MonotonicSeq] { val next = MonotonicSeq.Next }
 
-  implicit def freeMonoSeq[F[_], S[_]](implicit F: MonoSeq[F], I: F :<: S): MonoSeq[Free[S, ?]] =
+  implicit def freeMonoSeq[F[_], S[_]](implicit F: MonoSeq[F],
+                                       I: F :<: S): MonoSeq[Free[S, ?]] =
     new MonoSeq[Free[S, ?]] { def next = Free.liftF(I(F.next)) }
 }
 
@@ -61,6 +63,7 @@ sealed abstract class MonoSeqInstances0 {
   implicit def stateTMonoSeq[F[_]: Monad: MonoSeq, S]: MonoSeq[StateT[F, S, ?]] =
     MonoSeq.forTrans[F, StateT[?[_], S, ?]]
 
-  implicit def writerTMonoSeq[F[_]: Monad: MonoSeq, W: Monoid]: MonoSeq[WriterT[F, W, ?]] =
+  implicit def writerTMonoSeq[F[_]: Monad: MonoSeq, W: Monoid]
+    : MonoSeq[WriterT[F, W, ?]] =
     MonoSeq.forTrans[F, WriterT[?[_], W, ?]]
 }

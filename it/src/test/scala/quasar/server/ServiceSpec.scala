@@ -50,36 +50,40 @@ class ServiceSpec extends quasar.Qspec {
 
   sequential
 
-  def withServer[A]
-    (port: Int = 8888, metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])
-    (f: Uri => Task[A])
-    : String \/ A = {
+  def withServer[A](port: Int = 8888,
+                    metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])(
+      f: Uri => Task[A]): String \/ A = {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
-      cfgPath       <- FsPath.parseSystemFile(
-                         File.createTempFile("quasar", ".json").toString
-                       ).run.liftM[MainErrT]
-      qCfg          =  QuasarConfig(
-                         cmd = Start,
-                         staticContent = Nil,
-                         redirect = None,
-                         port = None,
-                         configPath = cfgPath,
-                         openClient = false)
-      transactor    <- Task.delay(DbUtil.simpleTransactor(
-                         DbUtil.inMemoryConnectionInfo(s"test_mem_service_spec_$nextInt")
-                       )).liftM[MainErrT]
-      _             <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
-      _             <- metastoreInit.transact(transactor).liftM[MainErrT]
-      msCtx         <- metastoreCtx(StatefulTransactor(transactor, Task.now(())))
-      (svc, close)  =  Server.durableService(qCfg, port, msCtx)
+      cfgPath <- FsPath
+        .parseSystemFile(
+          File.createTempFile("quasar", ".json").toString
+        )
+        .run
+        .liftM[MainErrT]
+      qCfg = QuasarConfig(cmd = Start,
+                          staticContent = Nil,
+                          redirect = None,
+                          port = None,
+                          configPath = cfgPath,
+                          openClient = false)
+      transactor <- Task
+        .delay(
+          DbUtil.simpleTransactor(
+            DbUtil.inMemoryConnectionInfo(s"test_mem_service_spec_$nextInt")
+          ))
+        .liftM[MainErrT]
+      _     <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
+      _     <- metastoreInit.transact(transactor).liftM[MainErrT]
+      msCtx <- metastoreCtx(StatefulTransactor(transactor, Task.now(())))
+      (svc, close) = Server.durableService(qCfg, port, msCtx)
       (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
-      r             <- f(uri)
-                          .onFinish(_ => shutdown)
-                          .onFinish(_ => p.run)
-                          .onFinish(_ => close)
-                          .liftM[MainErrT]
+      r <- f(uri)
+        .onFinish(_ => shutdown)
+        .onFinish(_ => p.run)
+        .onFinish(_ => close)
+        .liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
@@ -90,16 +94,14 @@ class ServiceSpec extends quasar.Qspec {
 
       val r = withServer(port) { baseUri: Uri =>
         client.fetch(
-          Request(
-              uri = baseUri / "mount" / "fs",
-              method = Method.POST,
-              headers = Headers(Header("X-File-Name", "a")))
-            .withBody("""{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
-          )(Task.now) *>
-        client.fetch(
-          Request(
-            uri = baseUri / "mount" / "fs" / "a",
-            method = Method.GET)
+          Request(uri = baseUri / "mount" / "fs",
+                  method = Method.POST,
+                  headers = Headers(Header("X-File-Name", "a")))
+            .withBody(
+              """{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "mount" / "fs" / "a", method = Method.GET)
           )(Task.now)
       }
 
@@ -111,15 +113,12 @@ class ServiceSpec extends quasar.Qspec {
 
       val r = withServer(port) { baseUri: Uri =>
         client.fetch(
-          Request(
-              uri = baseUri / "mount" / "fs" / "a",
-              method = Method.PUT)
-            .withBody("""{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
-          )(Task.now) *>
-        client.fetch(
-          Request(
-            uri = baseUri / "mount" / "fs" / "a",
-            method = Method.GET)
+          Request(uri = baseUri / "mount" / "fs" / "a", method = Method.PUT)
+            .withBody(
+              """{ "view": { "connectionUri" : "sql2:///?q=%28select%201%29" } }""")
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "mount" / "fs" / "a", method = Method.GET)
           )(Task.now)
       }
 
@@ -135,18 +134,14 @@ class ServiceSpec extends quasar.Qspec {
 
       val r = withServer(port) { baseUri: Uri =>
         client.fetch(
-          Request(
-              uri = baseUri / "mount" / "fs" / "viewA",
-              method = Method.PUT)
+          Request(uri = baseUri / "mount" / "fs" / "viewA", method = Method.PUT)
             .withBody(s"""{ "view": { "connectionUri" : "$sel1" } }""")
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "mount" / "fs" / "viewA", method = Method.PUT)
+              .withBody(s"""{ "view": { "connectionUri" : "$sel2" } }""")
           )(Task.now) *>
-        client.fetch(
-          Request(
-              uri = baseUri / "mount" / "fs" / "viewA",
-              method = Method.PUT)
-            .withBody(s"""{ "view": { "connectionUri" : "$sel2" } }""")
-          )(Task.now) *>
-        client.expect[Json](baseUri / "mount" / "fs" / "viewA")
+          client.expect[Json](baseUri / "mount" / "fs" / "viewA")
       }
 
       r ==== finalCfg.asJson.right
@@ -155,23 +150,21 @@ class ServiceSpec extends quasar.Qspec {
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-      val srcPath = rootDir </> dir("view") </> file("a")
-      val dstPath = rootDir </> dir("view") </> file("b")
+      val srcPath    = rootDir </> dir("view") </> file("a")
+      val dstPath    = rootDir </> dir("view") </> file("b")
       val viewConfig = MountConfig.viewConfig0(sqlB"select * from zips")
 
       val insertMnts = insertMount(srcPath, viewConfig)
 
       val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
-          Request(
-            uri = baseUri / "mount" / "fs" / "view" / "a",
-            method = Method.MOVE,
-            headers = Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
-          )(Task.now) *>
-        client.fetch(
-          Request(
-            uri = baseUri / "mount" / "fs" / "view" / "b",
-            method = Method.GET)
+          Request(uri = baseUri / "mount" / "fs" / "view" / "a",
+                  method = Method.MOVE,
+                  headers =
+                    Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "mount" / "fs" / "view" / "b", method = Method.GET)
           )(Task.now)
       }
 
@@ -185,9 +178,8 @@ class ServiceSpec extends quasar.Qspec {
         .traverse { ref =>
           val connectionUri = TestConfig.loadConnectionUri(ref.ref)
           connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
-        }.map(_
-          .unite
-          .zipWithIndex
+        }
+        .map(_.unite.zipWithIndex
           .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
           .toMap[APath, MountConfig])
         .unsafePerformSync
@@ -195,9 +187,8 @@ class ServiceSpec extends quasar.Qspec {
     val testName = "MOVE view"
 
     def withFileSystemConfigs[A](result: MatchResult[A]): Result =
-      fileSystemConfigs.isEmpty.fold(
-        skipped("Warning: no test backends enabled"),
-        AsResult(result))
+      fileSystemConfigs.isEmpty.fold(skipped("Warning: no test backends enabled"),
+                                     AsResult(result))
 
     "MOVE view" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
@@ -209,21 +200,19 @@ class ServiceSpec extends quasar.Qspec {
 
       val insertMnts =
         insertMount(srcPath, viewConfig) <*
-        fileSystemConfigs.toList.traverse {
-          case (p, m) => insertMount(p, m)
-        }
+          fileSystemConfigs.toList.traverse {
+            case (p, m) => insertMount(p, m)
+          }
 
       val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
-          Request(
-            uri = baseUri / "data" / "fs" / "view" / "a",
-            method = Method.MOVE,
-            headers = Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
-          )(Task.now) *>
-        client.fetch(
-          Request(
-            uri = baseUri / "data" / "fs" / "view" / "b",
-            method = Method.GET)
+          Request(uri = baseUri / "data" / "fs" / "view" / "a",
+                  method = Method.MOVE,
+                  headers =
+                    Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "data" / "fs" / "view" / "b", method = Method.GET)
           )(Task.now)
       }
 
@@ -240,19 +229,17 @@ class ServiceSpec extends quasar.Qspec {
 
       val insertMnts =
         insertMount(srcPath </> file("view"), viewConfig) <*
-        fileSystemConfigs.toList.traverse { case (p, m) => insertMount(p, m) }
+          fileSystemConfigs.toList.traverse { case (p, m) => insertMount(p, m) }
 
       val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
-          Request(
-            uri = baseUri / "data" / "fs" / "a" / "",
-            method = Method.MOVE,
-            headers = Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
-          )(Task.now) *>
-        client.fetch(
-          Request(
-            uri = baseUri / "data" / "fs" / "b" / "",
-            method = Method.GET)
+          Request(uri = baseUri / "data" / "fs" / "a" / "",
+                  method = Method.MOVE,
+                  headers =
+                    Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
+        )(Task.now) *>
+          client.fetch(
+            Request(uri = baseUri / "data" / "fs" / "b" / "", method = Method.GET)
           )(Task.now)
       }
 

@@ -21,7 +21,8 @@ import quasar.yggdrasil._
 
 import scalaz._
 
-trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
+trait TypeLibSpecs[M[+ _]]
+    extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
 
   import dag._
@@ -31,7 +32,7 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
   def testEval(graph: DepGraph): Set[SEvent] = {
     consumeEval(graph, defaultEvaluationContext) match {
       case Success(results) => results
-      case Failure(error) => throw error
+      case Failure(error)   => throw error
     }
   }
 
@@ -39,7 +40,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isNumber" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isNumber),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isNumber),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)
@@ -59,7 +61,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isBoolean" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isBoolean),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isBoolean),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)
@@ -79,7 +82,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isNull" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isNull),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isNull),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)
@@ -99,7 +103,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isString" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isString),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isString),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)
@@ -119,7 +124,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isObject" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isObject),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isObject),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)
@@ -139,7 +145,8 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     "return correct booleans for isArray" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Operate(BuiltInFunction1Op(isArray),
+      val input = dag.Operate(
+        BuiltInFunction1Op(isArray),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices2"))(line))(line))(line)
 
       val result = testEval(input)

@@ -27,32 +27,31 @@ import scalaz._, Scalaz._
 sealed abstract class MountingError
 
 object MountingError {
-  final case class PError private (err: PathError)
-    extends MountingError
+  final case class PError private (err: PathError) extends MountingError
 
-  final case class EError private (err: EnvironmentError)
-    extends MountingError
+  final case class EError private (err: EnvironmentError) extends MountingError
 
-  final case class InvalidConfig private (config: MountConfig, reasons: NonEmptyList[String])
-    extends MountingError
+  final case class InvalidConfig private (config: MountConfig,
+                                          reasons: NonEmptyList[String])
+      extends MountingError
 
   val pathError: Prism[MountingError, PathError] =
     Prism[MountingError, PathError] {
       case PError(err) => Some(err)
-      case _ => None
-    } (PError)
+      case _           => None
+    }(PError)
 
   val environmentError: Prism[MountingError, EnvironmentError] =
     Prism[MountingError, EnvironmentError] {
       case EError(err) => Some(err)
-      case _ => None
-    } (EError)
+      case _           => None
+    }(EError)
 
   val invalidConfig: Prism[MountingError, (MountConfig, NonEmptyList[String])] =
     Prism[MountingError, (MountConfig, NonEmptyList[String])] {
       case InvalidConfig(cfg, reasons) => Some((cfg, reasons))
-      case _ => None
-    } (InvalidConfig.tupled)
+      case _                           => None
+    }(InvalidConfig.tupled)
 
   implicit def mountingErrorShow: Show[MountingError] =
     Show.shows {

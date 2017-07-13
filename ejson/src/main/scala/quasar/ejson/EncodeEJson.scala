@@ -41,7 +41,8 @@ trait EncodeEJson[A] {
 
 object EncodeEJson extends EncodeEJsonInstances {
   def encodeEJsonR[T, F[_]: Functor](
-    implicit T: Recursive.Aux[T, F], F: EncodeEJsonK[F]
+      implicit T: Recursive.Aux[T, F],
+      F: EncodeEJsonK[F]
   ): EncodeEJson[T] =
     new EncodeEJson[T] {
       def encode[J](t: T)(implicit J: Corecursive.Aux[J, EJson]): J =
@@ -83,7 +84,8 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
         oa.fold(CommonEJson(nul[J]()).embed)(A.encode[J](_))
     }
 
-  implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]: EncodeEJson[T[F]] =
+  implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]
+    : EncodeEJson[T[F]] =
     EncodeEJson.encodeEJsonR[T[F], F]
 }
 

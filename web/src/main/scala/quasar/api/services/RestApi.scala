@@ -37,24 +37,22 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object RestApi {
-  def coreServices[S[_]]
-      (implicit
-        S0: Task :<: S,
-        S1: ReadFile :<: S,
-        S2: WriteFile :<: S,
-        S3: ManageFile :<: S,
-        S4: QueryFile :<: S,
-        S5: FileSystemFailure :<: S,
-        S6: Mounting :<: S,
-        S7: MountingFailure :<: S,
-        S8: PathMismatchFailure :<: S,
-        S9: Module :<: S,
-        S10: Module.Failure :<: S,
-        S11: Analyze :<: S
-      ): Map[String, QHttpService[S]] =
+  def coreServices[S[_]](implicit
+                         S0: Task :<: S,
+                         S1: ReadFile :<: S,
+                         S2: WriteFile :<: S,
+                         S3: ManageFile :<: S,
+                         S4: QueryFile :<: S,
+                         S5: FileSystemFailure :<: S,
+                         S6: Mounting :<: S,
+                         S7: MountingFailure :<: S,
+                         S8: PathMismatchFailure :<: S,
+                         S9: Module :<: S,
+                         S10: Module.Failure :<: S,
+                         S11: Analyze :<: S): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"  -> query.compile.service[S],
-      "/estimate/fs"  -> query.analysis.service[S],
+      "/estimate/fs" -> query.analysis.service[S],
       "/data/fs"     -> data.service[S],
       "/metadata/fs" -> metadata.service[S],
       "/mount/fs"    -> mount.service[S],
@@ -76,39 +74,39 @@ object RestApi {
     // Sort by prefix length so that foldLeft results in routes processed in
     // descending order (longest first), this ensures that something mounted
     // at `/a/b/c` is consulted before a mount at `/a/b`.
-    defaultMiddleware(
-      svcs.toList.sortBy(_._1.length).foldLeft(HttpService.empty) {
-        case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
-      })
+    defaultMiddleware(svcs.toList.sortBy(_._1.length).foldLeft(HttpService.empty) {
+      case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
+    })
   }
 
-  def toHttpServices[S[_]](
-    f: S ~> ResponseOr,
-    svcs: Map[String, QHttpService[S]])
-    : Map[String, HttpService] =
+  def toHttpServices[S[_]](f: S ~> ResponseOr,
+                           svcs: Map[String, QHttpService[S]]): Map[String, HttpService] =
     toHttpServicesF(foldMapNT(f), svcs)
 
   def toHttpServicesF[S[_]](
-    f: Free[S, ?] ~> ResponseOr,
-    svcs: Map[String, QHttpService[S]])
-    : Map[String, HttpService] =
+      f: Free[S, ?] ~> ResponseOr,
+      svcs: Map[String, QHttpService[S]]): Map[String, HttpService] =
     svcs.mapValues(_.toHttpServiceF(f))
 
   def defaultMiddleware: HttpMiddleware =
-    cors                            compose
-    gzip                            compose
-    RFC5987ContentDispositionRender compose
-    HeaderParam                     compose
-    passOptions                     compose
-    errorHandling
+    cors compose
+      gzip compose
+      RFC5987ContentDispositionRender compose
+      HeaderParam compose
+      passOptions compose
+      errorHandling
 
   val cors: HttpMiddleware =
-    CORS(_, CORSConfig(
-      anyOrigin = true,
-      allowCredentials = false,
-      maxAge = 20.days.toSeconds,
-      allowedMethods = Some(Set("GET", "PUT", "POST", "DELETE", "MOVE", "OPTIONS")),
-      allowedHeaders = Some(Set(Destination.name.value)))) // NB: actually needed for POST only
+    CORS(
+      _,
+      CORSConfig(
+        anyOrigin = true,
+        allowCredentials = false,
+        maxAge = 20.days.toSeconds,
+        allowedMethods = Some(Set("GET", "PUT", "POST", "DELETE", "MOVE", "OPTIONS")),
+        allowedHeaders = Some(Set(Destination.name.value))
+      )
+    ) // NB: actually needed for POST only
 
   val gzip: HttpMiddleware =
     GZip(_)

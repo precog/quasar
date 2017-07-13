@@ -29,25 +29,32 @@ object common {
   final case class DbTable(db: String, table: String)
 
   def dbTableFromPath(f: APath): FileSystemError \/ DbTable =
-    Path.flatten(None, None, None, Some(_), Some(_), f)
-      .toIList.unite.uncons(
+    Path
+      .flatten(None, None, None, Some(_), Some(_), f)
+      .toIList
+      .unite
+      .uncons(
         FileSystemError.pathErr(PathError.invalidPath(f, "no database specified")).left,
         (h, t) => DbTable(h, t.intercalate("/")).right)
 
   def pathSegmentsFromPrefix(
-    tableNamePathPrefix: String, tableNamePaths: List[String]
+      tableNamePathPrefix: String,
+      tableNamePaths: List[String]
   ): Set[PathSegment] =
     tableNamePaths
       .map(_.stripPrefix(tableNamePathPrefix).stripPrefix("/").split("/").toList)
       .collect {
         case h :: Nil => FileName(h).right
         case h :: _   => DirName(h).left
-      }.toSet
+      }
+      .toSet
 
   def tableExists[S[_]](tableName: String): ConnectionIO[Boolean] =
     sql"""select table_name from information_schema.tables
           where table_name = $tableName"""
-          .query[String].list.map(_.nonEmpty)
+      .query[String]
+      .list
+      .map(_.nonEmpty)
 
   def tablesWithPrefix(tableNamePrefix: String): ConnectionIO[List[String]] = {
     // NB: Order important to avoid double-escaping
@@ -59,7 +66,8 @@ object common {
 
     sql"""select table_name from information_schema.tables
           where table_name like ${patternEscaped + "%"}"""
-          .query[String].list
+      .query[String]
+      .list
   }
 
 }

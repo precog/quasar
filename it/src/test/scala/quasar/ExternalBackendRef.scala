@@ -26,7 +26,7 @@ import scalaz.std.tuple._
 @Lenses
 final case class ExternalBackendRef(ref: BackendRef, fsType: FileSystemType) {
   def supports(bc: BackendCapability): Boolean = ref.supports(bc)
-  def name = ref.name
+  def name                                     = ref.name
 }
 
 object ExternalBackendRef {

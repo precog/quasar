@@ -36,7 +36,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
   type ResMnts     = Mounts[DefinitionResult[AbortM]]
   type ResMntsS[A] = State[ResMnts, A]
 
-  type MountedFs[A]  = AtomicRef[ResMnts, A]
+  type MountedFs[A] = AtomicRef[ResMnts, A]
 
   type Eff0[A] = Coproduct[Abort, MountedFs, A]
   type Eff[A]  = Coproduct[AbortM, Eff0, A]
@@ -60,13 +60,12 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
       val evalEff: Eff ~> M =
         free.foldMapNT(evalAbort) :+:
-        evalAbort                 :+:
-        (liftMT[ResMntsS, MT] compose evalMnts)
+          evalAbort :+:
+          (liftMT[ResMntsS, MT] compose evalMnts)
 
       def apply[A](ma: EffM[A]) =
         ma.foldMap(evalEff).run(rms)
     }
-
 
   val abortFs: AnalyticalFileSystem ~> AbortM =
     new (AnalyticalFileSystem ~> AbortM) {
@@ -85,14 +84,14 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
   val invalidPath =
     MountingError.pathError composePrism
-    PathError.invalidPath  composeLens
-    Field1.first
+      PathError.invalidPath composeLens
+      Field1.first
 
-  val fsMounter = FileSystemMountHandler(fsDef)
-  val testType = FileSystemType("test")
-  val testUri = ConnectionUri("https://test.example.com")
+  val fsMounter      = FileSystemMountHandler(fsDef)
+  val testType       = FileSystemType("test")
+  val testUri        = ConnectionUri("https://test.example.com")
   def mount(d: ADir) = fsMounter.mount[Eff](d, testType, testUri)
-  val unmount = fsMounter.unmount[Eff] _
+  val unmount        = fsMounter.unmount[Eff] _
 
   "FileSystemMountHandler" should {
     "mounting" >> {
@@ -115,7 +114,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
       }
 
       "fails when filesystem creation fails" >> {
-        val d = rootDir </> dir("create") </> dir("fails")
+        val d   = rootDir </> dir("create") </> dir("fails")
         val fsd = Monoid[FileSystemDef[AbortM]].zero
         val fsm = FileSystemMountHandler(fsd)
 
@@ -130,8 +129,8 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
       }
 
       "cleans up previous filesystem when mount is replaced" >> {
-        val d = rootDir </> dir("replace") </> dir("cleanup")
-        val cln = "CLEAN"
+        val d               = rootDir </> dir("replace") </> dir("cleanup")
+        val cln             = "CLEAN"
         val (rmnts, signal) = eval(Mounts.singleton(d, fsResult(cln)))(mount(d))
 
         (rmnts.toMap.isEmpty must beFalse) and (signal must_=== \/.left(cln))
@@ -140,7 +139,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
     "unmounting" >> {
       "cleanup a filesystem when unmounted" >> {
-        val d = rootDir </> dir("unmount") </> dir("cleanup")
+        val d    = rootDir </> dir("unmount") </> dir("cleanup")
         val undo = "UNDO"
 
         eval(Mounts.singleton(d, fsResult(undo)))(unmount(d))._2 must_= \/.left(undo)

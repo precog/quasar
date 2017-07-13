@@ -33,9 +33,11 @@ package object yggdrasil {
     def apply(id: Identities, sv: SValue): SEvent = (id, sv)
   }
 
-  def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): scalaz.Ordering = {
+  def prefixIdentityOrdering(ids1: Identities,
+                             ids2: Identities,
+                             prefixLength: Int): scalaz.Ordering = {
     var result: scalaz.Ordering = EQ
-    var i                      = 0
+    var i                       = 0
     while (i < prefixLength && (result eq EQ)) {
       result = longInstance.order(ids1(i), ids2(i))
       i += 1
@@ -44,7 +46,8 @@ package object yggdrasil {
     result
   }
 
-  def fullIdentityOrdering(ids1: Identities, ids2: Identities) = prefixIdentityOrdering(ids1, ids2, ids1.length min ids2.length)
+  def fullIdentityOrdering(ids1: Identities, ids2: Identities) =
+    prefixIdentityOrdering(ids1, ids2, ids1.length min ids2.length)
 
   object IdentitiesOrder extends scalaz.Order[Identities] {
     def order(ids1: Identities, ids2: Identities) = fullIdentityOrdering(ids1, ids2)
@@ -52,14 +55,17 @@ package object yggdrasil {
 
   def prefixIdentityOrder(prefixLength: Int): scalaz.Order[Identities] = {
     new scalaz.Order[Identities] {
-      def order(ids1: Identities, ids2: Identities) = prefixIdentityOrdering(ids1, ids2, prefixLength)
+      def order(ids1: Identities, ids2: Identities) =
+        prefixIdentityOrdering(ids1, ids2, prefixLength)
     }
   }
 
-  def tupledIdentitiesOrder[A](idOrder: scalaz.Order[Identities]): scalaz.Order[(Identities, A)] =
+  def tupledIdentitiesOrder[A](
+      idOrder: scalaz.Order[Identities]): scalaz.Order[(Identities, A)] =
     idOrder.contramap((_: (Identities, A))._1)
 
-  def identityValueOrder[A](idOrder: scalaz.Order[Identities])(implicit ord: scalaz.Order[A]): scalaz.Order[(Identities, A)] =
+  def identityValueOrder[A](idOrder: scalaz.Order[Identities])(
+      implicit ord: scalaz.Order[A]): scalaz.Order[(Identities, A)] =
     new scalaz.Order[(Identities, A)] {
       type IA = (Identities, A)
       def order(x: IA, y: IA): scalaz.Ordering = {
@@ -70,10 +76,11 @@ package object yggdrasil {
       }
     }
 
-  def valueOrder[A](implicit ord: scalaz.Order[A]): scalaz.Order[(Identities, A)] = new scalaz.Order[(Identities, A)] {
-    type IA = (Identities, A)
-    def order(x: IA, y: IA): scalaz.Ordering = {
-      ord.order(x._2, y._2)
+  def valueOrder[A](implicit ord: scalaz.Order[A]): scalaz.Order[(Identities, A)] =
+    new scalaz.Order[(Identities, A)] {
+      type IA = (Identities, A)
+      def order(x: IA, y: IA): scalaz.Ordering = {
+        ord.order(x._2, y._2)
+      }
     }
-  }
 }

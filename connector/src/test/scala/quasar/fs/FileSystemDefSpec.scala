@@ -38,21 +38,23 @@ class FileSystemDefSpec extends QuasarSpecification {
     FileSystemDef(κ(defnResult.point[DefId].some))
 
   val failedDef =
-    FileSystemDef(κ(Some(
-      connectionFailed(new RuntimeException("NOPE"))
-        .right[NonEmptyList[String]]
-        .raiseError[DefId, DefinitionResult[Id]])))
+    FileSystemDef(
+      κ(
+        Some(
+          connectionFailed(new RuntimeException("NOPE"))
+            .right[NonEmptyList[String]]
+            .raiseError[DefId, DefinitionResult[Id]])))
 
   val unhandledDef =
     FileSystemDef[Id](κ(None))
 
   val someType = FileSystemType("somefs")
-  val someUri = ConnectionUri("some://filesystem")
+  val someUri  = ConnectionUri("some://filesystem")
 
   val firstErrMsg =
-    D.left[DefinitionError, DefinitionResult[Id]]  composePrism
-    D.left[NonEmptyList[String], EnvironmentError] composeLens
-    Cons1.head
+    D.left[DefinitionError, DefinitionResult[Id]] composePrism
+      D.left[NonEmptyList[String], EnvironmentError] composeLens
+      Cons1.head
 
   "apply" should {
     "return an unsupported filesytem error when unhandled" >> {

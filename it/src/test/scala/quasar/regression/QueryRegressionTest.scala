@@ -49,11 +49,12 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-abstract class QueryRegressionTest[S[_]](
-  fileSystems: Task[IList[SupportedFs[S]]])(
-  implicit S0: QueryFile :<: S, S1: ManageFile :<: S,
-           S2: ReadFile  :<: S, S3: WriteFile  :<: S,
-           S4: Task :<: S
+abstract class QueryRegressionTest[S[_]](fileSystems: Task[IList[SupportedFs[S]]])(
+    implicit S0: QueryFile :<: S,
+    S1: ManageFile :<: S,
+    S2: ReadFile :<: S,
+    S3: WriteFile :<: S,
+    S4: Task :<: S
 ) extends FileSystemTest[S](fileSystems) {
 
   import QueryRegressionTest._
@@ -69,7 +70,8 @@ abstract class QueryRegressionTest[S[_]](
   val injectTask: Task ~> F =
     liftFT[S].compose(injectNT[Task, S])
 
-  val TestsRoot = currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+  val TestsRoot = currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir(
+    "resources") </> dir("tests")
   val DataDir: ADir = rootDir </> dir("regression")
 
   /** Location on the (host) file system of the data file referred to from a
@@ -91,7 +93,9 @@ abstract class QueryRegressionTest[S[_]](
   def suiteName: String
 
   /** Return the results of evaluating the given query as a stream. */
-  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir): Process[CompExecM, Data]
+  def queryResults(expr: Fix[Sql],
+                   vars: Variables,
+                   basePath: ADir): Process[CompExecM, Data]
 
   ////
 
@@ -107,10 +111,11 @@ abstract class QueryRegressionTest[S[_]](
     suiteName should {
       step(print(s"Running $suiteName ["))
 
-      tests.toList foreach { case (f, t) =>
-        val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
-        regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
-        step(print("."))
+      tests.toList foreach {
+        case (f, t) =>
+          val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
+          regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
+          step(print("."))
       }
 
       step(println("]"))
@@ -122,40 +127,38 @@ abstract class QueryRegressionTest[S[_]](
 
   /** Returns an `Example` verifying the given `RegressionTest`. */
   def regressionExample(
-    loc: RFile,
-    test: RegressionTest,
-    backendName: BackendName,
-    setup: Run,
-    run: Run
+      loc: RFile,
+      test: RegressionTest,
+      backendName: BackendName,
+      setup: Run,
+      run: Run
   ): Fragment = {
     def runTest: execute.Result = {
-      val data = testQuery(
-        test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
-        test.query,
-        test.variables)
+      val data = testQuery(test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
+                           test.query,
+                           test.variables)
 
       (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
-       verifyResults(test.expected, data, run, backendName))
+        verifyResults(test.expected, data, run, backendName))
         .timed(5.minutes)
         .unsafePerformSync
     }
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
-        case Some(TestDirective.Skip)    => skipped
-        case Some(TestDirective.SkipCI)  =>
+        case Some(TestDirective.Skip) => skipped
+        case Some(TestDirective.SkipCI) =>
           BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
-        case Some(TestDirective.Timeout)  =>
+        case Some(TestDirective.Timeout) =>
           // NB: To locally skip tests that time out, make `Skipped` unconditional.
-          BuildInfo.isCIBuild.fold(
-            execute.Skipped("(skipped because it times out)"),
-            runTest)
+          BuildInfo.isCIBuild.fold(execute.Skipped("(skipped because it times out)"),
+                                   runTest)
         case Some(TestDirective.Pending) =>
           if (BuildInfo.coverageEnabled)
             execute.Skipped("(pending example skipped during coverage run)")
           else
             runTest.pendingUntilFixed
-        case _                           => runTest
+        case _ => runTest
       }
     }
   }
@@ -165,9 +168,8 @@ abstract class QueryRegressionTest[S[_]](
     */
   def ensureTestData(testLoc: RFile, test: RegressionTest, run: Run): Task[Boolean] = {
     def ensureTestFile(loc: RFile): Task[Boolean] =
-      run(query.fileExists(dataFile(loc))).ifM(
-        false.point[Task],
-        loadTestData(loc, run).as(true))
+      run(query.fileExists(dataFile(loc)))
+        .ifM(false.point[Task], loadTestData(loc, run).as(true))
 
     val locs: Set[RFile] = test.data.flatMap(resolveData(testLoc, _).toOption).toSet
 
@@ -179,9 +181,8 @@ abstract class QueryRegressionTest[S[_]](
     * we just work around it in the tests.
     */
   val promoteValue: Json => Option[Json] =
-    json => json.obj.fold(
-      json.some)(
-      _.toList match {
+    json =>
+      json.obj.fold(json.some)(_.toList match {
         case Nil                      => None
         case ("value", result) :: Nil => result.some
         case _                        => json.some
@@ -196,27 +197,31 @@ abstract class QueryRegressionTest[S[_]](
     λ[EndoK[ejson.Common]](ejson.dec.modify(_.round(TestContext))(_))
 
   val normalizeJson: Json => Option[Json] =
-    j => promoteValue(Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json])))
+    j =>
+      promoteValue(
+        Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json])))
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
-    exp: ExpectedResult,
-    act: Process[CompExecM, Data],
-    run: Run,
-    backendName: BackendName
+      exp: ExpectedResult,
+      act: Process[CompExecM, Data],
+      run: Run,
+      backendName: BackendName
   ): Task[execute.Result] = {
 
     type H1[A] = PhaseResultT[Task, A]
     type H2[A] = SemanticErrsT[H1, A]
     type H3[A] = FileSystemErrT[H2, A]
 
-    val h1: G ~> H1 = Hoist[PhaseResultT].hoist(run)
-    val h2: H ~> H2 = Hoist[SemanticErrsT].hoist(h1)
+    val h1: G ~> H1         = Hoist[PhaseResultT].hoist(run)
+    val h2: H ~> H2         = Hoist[SemanticErrsT].hoist(h1)
     val h3: CompExecM ~> H3 = Hoist[FileSystemErrT].hoist(h2)
 
-    val liftRun = λ[CompExecM ~> Task](fa =>
-      rethrow[H1, NonEmptyList[SemanticError]].apply(rethrow[H2, FileSystemError].apply(h3(fa))).value
-    )
+    val liftRun = λ[CompExecM ~> Task](
+      fa =>
+        rethrow[H1, NonEmptyList[SemanticError]]
+          .apply(rethrow[H2, FileSystemError].apply(h3(fa)))
+          .value)
 
     def deleteFields: Json => Json =
       _.withObject(obj => exp.ignoredFields.foldLeft(obj)(_ - _))
@@ -224,54 +229,70 @@ abstract class QueryRegressionTest[S[_]](
     val result =
       exp.predicate(
         exp.rows.toVector,
-        act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
+        act
+          .map(d => normalizeJson(d.asJson) ∘ deleteFields)
+          .unite
+          .translate[Task](liftRun),
         // TODO: Error if a backend ignores field order when the query already does.
         if (exp.ignoreFieldOrder) OrderIgnored
-        else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
-            OrderIgnored
-          case _ =>
-            OrderPreserved
-        },
+        else
+          exp.backends.get(backendName) match {
+            case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
+              OrderIgnored
+            case _ =>
+              OrderPreserved
+          },
         if (exp.ignoreResultOrder) OrderIgnored
-        else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
-            OrderIgnored
-          case _ =>
-            OrderPreserved
-        })
+        else
+          exp.backends.get(backendName) match {
+            case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+              OrderIgnored
+            case _ =>
+              OrderPreserved
+          }
+      )
 
     exp.backends.get(backendName) match {
-        case Some(TestDirective.Timeout) => result.map {
-          case execute.Success(_, _) =>
-            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
-          case execute.Failure(m, _, _, _) =>
-            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
-          case x => x
-        }.handle {
-          case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
-          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.") 
+      case Some(TestDirective.Timeout) =>
+        result
+          .map {
+            case execute.Success(_, _) =>
+              execute.Failure(s"Fixed now, you should remove the “timeout” status.")
+            case execute.Failure(m, _, _, _) =>
+              execute.Failure(
+                s"Failed with “$m”, you should change the “timeout” status.")
+            case x => x
+          }
+          .handle {
+            case e: java.util.concurrent.TimeoutException =>
+              execute.Pending(s"times out: ${e.getMessage}")
+            case e =>
+              execute.Failure(
+                s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
+          }
+      case _ =>
+        result.handle {
+          case e: java.util.concurrent.TimeoutException =>
+            execute.Failure(
+              s"Times out (${e.getMessage}), you should use the “timeout” status.")
         }
-      case _ => result.handle {
-        case e: java.util.concurrent.TimeoutException =>
-          execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
-      }
     }
   }
 
   /** Parse and execute the given query, returning a stream of results. */
   def testQuery(
-    loc: ADir,
-    qry: String,
-    vars: Map[String, String]
+      loc: ADir,
+      qry: String,
+      vars: Map[String, String]
   ): Process[CompExecM, Data] = {
     val f: Task ~> CompExecM =
       toCompExec compose injectTask
 
     val parseTask: Task[Fix[Sql]] =
-      sql.fixParser.parseExpr(Query(qry))
+      sql.fixParser
+        .parseExpr(Query(qry))
         .fold(e => Task.fail(new RuntimeException(e.message)),
-        _.mkPathsAbsolute(loc).point[Task])
+              _.mkPathsAbsolute(loc).point[Task])
 
     Process.await(f(parseTask))(queryResults(_, Variables.fromMap(vars), loc))
   }
@@ -284,14 +305,17 @@ abstract class QueryRegressionTest[S[_]](
   def loadTestData(dataLoc: RFile, run: Run): Task[Unit] = {
     val throwFsError = rethrow[Task, FileSystemError]
 
-    val load = write.createChunked(
-      dataFile(dataLoc),
-      testData(dataLoc).chunk(500).translate(injectTask)
-    ).translate[Task](throwFsError.compose[FsErr](runT(run)))
+    val load = write
+      .createChunked(
+        dataFile(dataLoc),
+        testData(dataLoc).chunk(500).translate(injectTask)
+      )
+      .translate[Task](throwFsError.compose[FsErr](runT(run)))
 
     throwFsError(EitherT(load.take(1).runLast map (_ <\/ (())))) handleWith {
       case err =>
-        val msg = s"Failed loading test data '${posixCodec.printPath(dataLoc)}': ${err.getMessage}"
+        val msg =
+          s"Failed loading test data '${posixCodec.printPath(dataLoc)}': ${err.getMessage}"
         Task.fail(new RuntimeException(msg, err))
     }
   }
@@ -299,24 +323,29 @@ abstract class QueryRegressionTest[S[_]](
   /** Returns a stream of `Data` representing the lines of the given data file. */
   def testData(file: RFile): Process[Task, Data] = {
     def parse(line: String): Process0[Data] =
-      DataCodec.parse(line)(DataCodec.Precise).fold(
-        err => Process.fail(new RuntimeException(
-                 s"Failed to parse `$line` as Data: ${err.message}"
-               )),
-        Process.emit(_))
+      DataCodec
+        .parse(line)(DataCodec.Precise)
+        .fold(err =>
+                Process.fail(
+                  new RuntimeException(
+                    s"Failed to parse `$line` as Data: ${err.message}"
+                  )),
+              Process.emit(_))
 
     val jf = jFile(TestsRoot </> file)
-    Task.delay(jf.exists).liftM[Process].ifM(
-      io.linesR(new FileInputStream(jf)) flatMap parse,
-      Process.fail(new java.io.FileNotFoundException(jf.getPath)))
+    Task
+      .delay(jf.exists)
+      .liftM[Process]
+      .ifM(io.linesR(new FileInputStream(jf)) flatMap parse,
+           Process.fail(new java.io.FileNotFoundException(jf.getPath)))
   }
 
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
   def regressionTests(
-    testDir: RDir,
-    knownBackends: Set[BackendName]
+      testDir: RDir,
+      knownBackends: Set[BackendName]
   ): Task[Map[RFile, RegressionTest]] =
     descendantsMatching(testDir, """^([^.].*)\.test""".r) // don't match file names with a leading .
       .map(f =>
@@ -327,11 +356,10 @@ abstract class QueryRegressionTest[S[_]](
       .map(_.toMap)
 
   /** Verifies there are no unknown backends specified in a `RegressionTest`. */
-  def verifyBackends(knownBackends: Set[BackendName])
-                    : RegressionTest => Task[RegressionTest] = { rt =>
-
+  def verifyBackends(
+      knownBackends: Set[BackendName]): RegressionTest => Task[RegressionTest] = { rt =>
     val unknown = rt.backends.keySet diff knownBackends
-    def errMsg = s"Unrecognized backend(s) in '${rt.name}': ${unknown.mkString(", ")}"
+    def errMsg  = s"Unrecognized backend(s) in '${rt.name}': ${unknown.mkString(", ")}"
 
     if (unknown.isEmpty) Task.now(rt)
     else Task.fail(new RuntimeException(errMsg))
@@ -340,22 +368,24 @@ abstract class QueryRegressionTest[S[_]](
   /** Loads a `RegressionTest` from the given file. */
   def loadRegressionTest(file: RFile): Task[RegressionTest] =
     textContents(file) flatMap { text =>
-      decodeJson[RegressionTest](text) fold (
-        err => Task.fail(new RuntimeException(file.shows + ": " + err)),
-        Task.now(_))
+      decodeJson[RegressionTest](text) fold (err =>
+        Task.fail(new RuntimeException(file.shows + ": " + err)),
+      Task.now(_))
     }
 
   /** Returns all descendant files in the given dir matching `pattern`. */
   def descendantsMatching(d: RDir, pattern: Regex): Process[Task, RFile] =
-    Process.eval(Task.delay(jFile(d).listFiles.toVector))
+    Process
+      .eval(Task.delay(jFile(d).listFiles.toVector))
       .flatMap(Process.emitAll(_))
-      .flatMap(f =>
-        if (f.isDirectory)
-          descendantsMatching(d </> dir(f.getName), pattern)
-        else if (pattern.findFirstIn(f.getName).isDefined)
-          Process.emit(d </> file(f.getName))
-        else
-          Process.halt)
+      .flatMap(
+        f =>
+          if (f.isDirectory)
+            descendantsMatching(d </> dir(f.getName), pattern)
+          else if (pattern.findFirstIn(f.getName).isDefined)
+            Process.emit(d </> file(f.getName))
+          else
+            Process.halt)
 
   /** Returns the contents of the file as a `String`. */
   def textContents(file: RFile): Task[String] =
@@ -370,26 +400,34 @@ object QueryRegressionTest {
 
   val externalFS: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
     for {
-      uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
-      mntDir =  rootDir </> dir("hfs-mnt")
-      hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
-                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: AnalyticalFileSystemIO ~> Task =>
-                    SupportedFs(
-                      sb.ref,
-                      ut.copy(testInterp = f)
-                        .contramapF(chroot.fileSystem[AnalyticalFileSystemIO](ut.testDir))
-                        .some,
-                      ut.some)
-                  }
-                ).getOrElse(sb.point[Task]))
+      uts <- (Functor[Task] compose Functor[IList])
+        .map(FileSystemTest.externalFsUT)(_.liftIO)
+      mntDir = rootDir </> dir("hfs-mnt")
+      hfsUts <- uts.traverse(
+        sb =>
+          sb.impl
+            .map(ut =>
+              hierarchicalFSIO(mntDir, ut.testInterp).map {
+                f: AnalyticalFileSystemIO ~> Task =>
+                  SupportedFs(
+                    sb.ref,
+                    ut.copy(testInterp = f)
+                      .contramapF(chroot.fileSystem[AnalyticalFileSystemIO](ut.testDir))
+                      .some,
+                    ut.some)
+            })
+            .getOrElse(sb.point[Task]))
     } yield hfsUts
 
-  private def hierarchicalFSIO(mnt: ADir, f: AnalyticalFileSystemIO ~> Task): Task[AnalyticalFileSystemIO ~> Task] =
+  private def hierarchicalFSIO(
+      mnt: ADir,
+      f: AnalyticalFileSystemIO ~> Task): Task[AnalyticalFileSystemIO ~> Task] =
     interpretHfsIO map { hfs =>
       val interpFS = f compose injectNT[AnalyticalFileSystem, AnalyticalFileSystemIO]
 
       val g: AnalyticalFileSystem ~> Free[HfsIO, ?] =
-        flatMapSNT(hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
+        flatMapSNT(
+          hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
           .compose(chroot.analyticalFileSystem[AnalyticalFileSystem](mnt))
 
       NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)

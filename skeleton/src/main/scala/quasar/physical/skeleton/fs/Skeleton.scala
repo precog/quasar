@@ -36,7 +36,8 @@ object Skeleton extends BackendModule {
   // default QS subset; change if you're cool/weird/unique!
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]
+    : Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   // make this your repr and monad
@@ -44,12 +45,15 @@ object Skeleton extends BackendModule {
   type M[A] = Nothing
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM = ??? // Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def QSCoreInject[T[_[_]]]               = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def MonadM                              = ??? // Monad[M]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   type Config = Unit
 
@@ -66,27 +70,29 @@ object Skeleton extends BackendModule {
     import QueryFile._
 
     def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
-    def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
-    def more(h: ResultHandle): Backend[Vector[Data]] = ???
-    def close(h: ResultHandle): Configured[Unit] = ???
-    def explain(repr: Repr): Backend[String] = ???
-    def listContents(dir: ADir): Backend[Set[PathSegment]] = ???
-    def fileExists(file: AFile): Configured[Boolean] = ???
+    def evaluatePlan(repr: Repr): Backend[ResultHandle]     = ???
+    def more(h: ResultHandle): Backend[Vector[Data]]        = ???
+    def close(h: ResultHandle): Configured[Unit]            = ???
+    def explain(repr: Repr): Backend[String]                = ???
+    def listContents(dir: ADir): Backend[Set[PathSegment]]  = ???
+    def fileExists(file: AFile): Configured[Boolean]        = ???
   }
 
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = ???
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
+      ???
     def read(h: ReadHandle): Backend[Vector[Data]] = ???
-    def close(h: ReadHandle): Configured[Unit] = ???
+    def close(h: ReadHandle): Configured[Unit]     = ???
   }
 
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
     def open(file: AFile): Backend[WriteHandle] = ???
-    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = ???
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
+      ???
     def close(h: WriteHandle): Configured[Unit] = ???
   }
 
@@ -94,7 +100,7 @@ object Skeleton extends BackendModule {
     import ManageFile._
 
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ???
-    def delete(path: APath): Backend[Unit] = ???
-    def tempFile(near: APath): Backend[AFile] = ???
+    def delete(path: APath): Backend[Unit]                                    = ???
+    def tempFile(near: APath): Backend[AFile]                                 = ???
   }
 }

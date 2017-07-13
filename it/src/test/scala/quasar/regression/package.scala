@@ -40,7 +40,7 @@ package object regression {
     import quasar.fs.mount.hierarchical._
 
     def handlesTask(
-      ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+        ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
     ): MountedResultH ~> Task =
       KeyValueStore.impl.fromTaskRef(ref)
 
@@ -48,6 +48,7 @@ package object regression {
       MonotonicSeq.fromTaskRef(ref)
 
     (TaskRef(Map.empty[ResultHandle, (ADir, ResultHandle)]) |@| TaskRef(0L))(
-      (handles, ct) => monoSeqTask(ct) :+: handlesTask(handles) :+: NaturalTransformation.refl)
+      (handles, ct) =>
+        monoSeqTask(ct) :+: handlesTask(handles) :+: NaturalTransformation.refl)
   }
 }

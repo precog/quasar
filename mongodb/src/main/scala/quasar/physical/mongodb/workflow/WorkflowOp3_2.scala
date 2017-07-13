@@ -27,49 +27,48 @@ import scalaz._, Scalaz._
 /** Ops that are provided by MongoDB since 3.2. */
 sealed abstract class WorkflowOp3_2F[+A]
 
-final case class $LookupF[A](
-  src: A,
-  from: CollectionName,
-  localField: BsonField,
-  foreignField: BsonField,
-  as: BsonField)
-  extends WorkflowOp3_2F[A] { self =>
+final case class $LookupF[A](src: A,
+                             from: CollectionName,
+                             localField: BsonField,
+                             foreignField: BsonField,
+                             as: BsonField)
+    extends WorkflowOp3_2F[A] { self =>
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOp3_2F, A] =
     new PipelineF[WorkflowOp3_2F, A] {
-      def wf = self
-      def src = self.src
+      def wf                     = self
+      def src                    = self.src
       def reparent[B](newSrc: B) = self.copy(src = newSrc).pipeline
 
       def op = "$lookup"
-      def rhs = Bson.Doc(ListMap(
-        "from" -> from.bson,
-        "localField" -> localField.bson,
-        "foreignField" -> foreignField.bson,
-        "as" -> as.bson
-      ))
+      def rhs =
+        Bson.Doc(
+          ListMap(
+            "from"         -> from.bson,
+            "localField"   -> localField.bson,
+            "foreignField" -> foreignField.bson,
+            "as"           -> as.bson
+          ))
     }
 }
 object $lookup {
-  def apply[F[_]: Coalesce](
-    from: CollectionName,
-    localField: BsonField,
-    foreignField: BsonField,
-    as: BsonField)
-    (implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
-      src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
+  def apply[F[_]: Coalesce](from: CollectionName,
+                            localField: BsonField,
+                            foreignField: BsonField,
+                            as: BsonField)(implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
+    src =>
+      Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
 }
 
-final case class $SampleF[A](src: A, size: Int)
-  extends WorkflowOp3_2F[A] { self =>
+final case class $SampleF[A](src: A, size: Int) extends WorkflowOp3_2F[A] { self =>
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOp3_2F, A] =
     new ShapePreservingF[WorkflowOp3_2F, A] {
-      def wf = self
-      def src = self.src
+      def wf                     = self
+      def src                    = self.src
       def reparent[B](newSrc: B) = copy(src = newSrc).shapePreserving
 
-      def op = "$sample"
+      def op  = "$sample"
       def rhs = Bson.Int32(size)
     }
 }
@@ -81,16 +80,16 @@ object $sample {
 object WorkflowOp3_2F {
   implicit val traverse: Traverse[WorkflowOp3_2F] =
     new Traverse[WorkflowOp3_2F] {
-      def traverseImpl[G[_], A, B](fa: WorkflowOp3_2F[A])(f: A => G[B])
-        (implicit G: Applicative[G]):
-          G[WorkflowOp3_2F[B]] = fa match {
+      def traverseImpl[G[_], A, B](fa: WorkflowOp3_2F[A])(f: A => G[B])(
+          implicit G: Applicative[G]): G[WorkflowOp3_2F[B]] = fa match {
         case $LookupF(src, from, localField, foreignField, as) =>
           G.apply(f(src))($LookupF(_, from, localField, foreignField, as))
-        case $SampleF(src, size)       => G.apply(f(src))($SampleF(_, size))
+        case $SampleF(src, size) => G.apply(f(src))($SampleF(_, size))
       }
     }
 
-  implicit val refs: Refs[WorkflowOp3_2F] = Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
+  implicit val refs: Refs[WorkflowOp3_2F] =
+    Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
 
   implicit lazy val coalesce: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
 
@@ -110,8 +109,8 @@ object WorkflowOp3_2F {
       }
 
       override def shapePreserving[A](op: WorkflowOp3_2F[A]) = op match {
-        case op @ $SampleF(_, _)          => op.shapePreserving.widen[A].some
-        case _ => None
+        case op @ $SampleF(_, _) => op.shapePreserving.widen[A].some
+        case _                   => None
       }
     }
 
@@ -121,7 +120,9 @@ object WorkflowOp3_2F {
 
       def render(v: WorkflowOp3_2F[Unit]) = v match {
         case $LookupF(_, from, localField, foreignField, as) =>
-          Terminal("$LookupF" :: wfType, s"from ${from.value} with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
+          Terminal(
+            "$LookupF" :: wfType,
+            s"from ${from.value} with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
         case $SampleF(_, size) =>
           Terminal("$SampleF" :: wfType, size.toString.some)
       }

@@ -27,59 +27,79 @@ import java.util.concurrent.atomic.AtomicInteger
 trait ArbitraryEventMessage {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
 
-  def genPath: Gen[Path] = Gen.resize(10, Gen.containerOf[List, String](alphaStr)) map { elements =>
-    Path(elements.filter(_.length > 0))
+  def genPath: Gen[Path] = Gen.resize(10, Gen.containerOf[List, String](alphaStr)) map {
+    elements =>
+      Path(elements.filter(_.length > 0))
   }
 
   def genWriteMode: Gen[WriteMode] =
-      Gen.oneOf(AccessMode.Create, AccessMode.Replace, AccessMode.Append)
+    Gen.oneOf(AccessMode.Create, AccessMode.Replace, AccessMode.Append)
 
   def genStreamRef: Gen[StreamRef] =
     for {
-      terminal <- arbitrary[Boolean]
+      terminal  <- arbitrary[Boolean]
       storeMode <- genWriteMode
     } yield StreamRef.forWriteMode(storeMode, terminal)
 
   def genEventId: Gen[EventId] =
     for {
-      producerId <- choose(0,1000000)
+      producerId <- choose(0, 1000000)
       sequenceId <- choose(0, 1000000)
     } yield EventId(producerId, sequenceId)
 
   def genRandomIngest: Gen[Ingest] =
     for {
-      apiKey <- alphaStr
-      path <- genPath
+      apiKey         <- alphaStr
+      path           <- genPath
       ownerAccountId <- alphaStr
-      content <- vectorOf(genJValue)
+      content        <- vectorOf(genJValue)
       if !content.isEmpty
-      jobId <- genIdentifier.optional
+      jobId     <- genIdentifier.optional
       streamRef <- genStreamRef
-    } yield Ingest(apiKey, path, Some(Authorities(ownerAccountId)), content, jobId, instant.now(), streamRef)
+    } yield
+      Ingest(apiKey,
+             path,
+             Some(Authorities(ownerAccountId)),
+             content,
+             jobId,
+             instant.now(),
+             streamRef)
 
   def genRandomArchive: Gen[Archive] =
     for {
       apiKey <- alphaStr
-      path <- genPath
-      jobId <- genIdentifier.optional
+      path   <- genPath
+      jobId  <- genIdentifier.optional
     } yield Archive(apiKey, path, jobId, instant.now())
 
   def genRandomIngestMessage: Gen[IngestMessage] =
     for {
       ingest <- genRandomIngest if ingest.writeAs.isDefined
-      eventIds <- containerOfN[List, EventId](ingest.data.size, genEventId).map(l => Vector(l: _*))
+      eventIds <- containerOfN[List, EventId](ingest.data.size, genEventId).map(l =>
+        Vector(l: _*))
       streamRef <- genStreamRef
     } yield {
       //TODO: Replace with IngestMessage.fromIngest when it's usable
       val data = (eventIds zip ingest.data) map { Function.tupled(IngestRecord.apply) }
-      IngestMessage(ingest.apiKey, ingest.path, ingest.writeAs.get, data, ingest.jobId, instant.now(), streamRef)
+      IngestMessage(ingest.apiKey,
+                    ingest.path,
+                    ingest.writeAs.get,
+                    data,
+                    ingest.jobId,
+                    instant.now(),
+                    streamRef)
     }
 
   def genRandomArchiveMessage: Gen[ArchiveMessage] =
     for {
       eventId <- genEventId
       archive <- genRandomArchive
-    } yield ArchiveMessage(archive.apiKey, archive.path, archive.jobId, eventId, archive.timestamp)
+    } yield
+      ArchiveMessage(archive.apiKey,
+                     archive.path,
+                     archive.jobId,
+                     eventId,
+                     archive.timestamp)
 
   def genRandomEventMessage: Gen[EventMessage] =
     frequency(
@@ -94,9 +114,10 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
 
   lazy val producers = 4
 
-  lazy val eventIds: Map[Int, AtomicInteger] = 0.until(producers).map(_ -> new AtomicInteger).toMap
+  lazy val eventIds: Map[Int, AtomicInteger] =
+    0.until(producers).map(_ -> new AtomicInteger).toMap
 
-  lazy val paths = buildBoundedPaths(3)
+  lazy val paths  = buildBoundedPaths(3)
   lazy val jpaths = buildBoundedJPaths(3)
 
   def buildBoundedPaths(depth: Int): List[String] = {
@@ -104,7 +125,10 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
   }
 
   def buildBoundedJPaths(depth: Int): List[JPath] = {
-    buildChildPaths(List.empty, depth).map(_.reverse.mkString(".")).filter(_.length > 0).map(JPath(_))
+    buildChildPaths(List.empty, depth)
+      .map(_.reverse.mkString("."))
+      .filter(_.length > 0)
+      .map(JPath(_))
   }
 
   def buildChildPaths(parent: List[String], depth: Int): List[List[String]] = {
@@ -112,7 +136,11 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
       List(parent)
     } else {
       parent ::
-      containerOfN[List, String](choose(2,4).sample.get, resize(10, alphaStr)).map(_.filter(_.length > 1).flatMap(child => buildChildPaths(child :: parent, depth - 1))).sample.get
+        containerOfN[List, String](choose(2, 4).sample.get, resize(10, alphaStr))
+        .map(_.filter(_.length > 1).flatMap(child =>
+          buildChildPaths(child :: parent, depth - 1)))
+        .sample
+        .get
     }
   }
 
@@ -122,26 +150,44 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
   def genStablePath: Gen[String] = oneOf(paths)
   def genStableJPath: Gen[JPath] = oneOf(jpaths)
 
-  def genIngestData: Gen[JValue] = for {
-    paths  <- containerOfN[Set, JPath](10, genStableJPath)
-    values <- containerOfN[Set, JValue](10, genSimple)
-  } yield {
-    (paths zip values).foldLeft[JValue](JObject(Nil)) {
-      case (obj, (path, value)) => obj.set(path, value)
+  def genIngestData: Gen[JValue] =
+    for {
+      paths  <- containerOfN[Set, JPath](10, genStableJPath)
+      values <- containerOfN[Set, JValue](10, genSimple)
+    } yield {
+      (paths zip values).foldLeft[JValue](JObject(Nil)) {
+        case (obj, (path, value)) => obj.set(path, value)
+      }
     }
-  }
 
-  def genIngest: Gen[Ingest] = for {
-    path <- genStablePath
-    ingestData <- containerOf[List, JValue](genIngestData).map(l => Vector(l: _*))
-    streamRef <- genStreamRef
-  } yield Ingest(ingestAPIKey, Path(path), Some(ingestOwnerAccountId), ingestData, None, instant.now(), streamRef)
+  def genIngest: Gen[Ingest] =
+    for {
+      path       <- genStablePath
+      ingestData <- containerOf[List, JValue](genIngestData).map(l => Vector(l: _*))
+      streamRef  <- genStreamRef
+    } yield
+      Ingest(ingestAPIKey,
+             Path(path),
+             Some(ingestOwnerAccountId),
+             ingestData,
+             None,
+             instant.now(),
+             streamRef)
 
-  def genIngestMessage: Gen[IngestMessage] = for {
-    producerId <- choose(0, producers-1)
-    ingest <- genIngest
-  } yield {
-    val records = ingest.data map { jv => IngestRecord(EventId(producerId, eventIds(producerId).getAndIncrement), jv) }
-    IngestMessage(ingest.apiKey, ingest.path, ingest.writeAs.get, records, ingest.jobId, ingest.timestamp, ingest.streamRef)
-  }
+  def genIngestMessage: Gen[IngestMessage] =
+    for {
+      producerId <- choose(0, producers - 1)
+      ingest     <- genIngest
+    } yield {
+      val records = ingest.data map { jv =>
+        IngestRecord(EventId(producerId, eventIds(producerId).getAndIncrement), jv)
+      }
+      IngestMessage(ingest.apiKey,
+                    ingest.path,
+                    ingest.writeAs.get,
+                    records,
+                    ingest.jobId,
+                    ingest.timestamp,
+                    ingest.streamRef)
+    }
 }

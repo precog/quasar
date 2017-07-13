@@ -35,11 +35,11 @@ object POSIXOp {
 
   final case class Ls(target: ADir) extends POSIXOp[List[RPath]]
 
-  final case class MkDir(target: ADir) extends POSIXOp[Unit]
-  final case class LinkDir(src: ADir, target: ADir) extends POSIXOp[Unit]
+  final case class MkDir(target: ADir)                 extends POSIXOp[Unit]
+  final case class LinkDir(src: ADir, target: ADir)    extends POSIXOp[Unit]
   final case class LinkFile(src: AFile, target: AFile) extends POSIXOp[Unit]
 
   final case class Move(src: AFile, target: AFile) extends POSIXOp[Unit]
-  final case class Exists(target: APath) extends POSIXOp[Boolean]
-  final case class Delete(target: APath) extends POSIXOp[Unit]
+  final case class Exists(target: APath)           extends POSIXOp[Boolean]
+  final case class Delete(target: APath)           extends POSIXOp[Unit]
 }

@@ -44,7 +44,8 @@ trait AggLib extends Library {
       case Sized(Type.Const(_))            => Type.Const(Data.Int(1))
       case Sized(_)                        => Type.Int
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Sum = UnaryFunc(
     Reduction,
@@ -74,7 +75,8 @@ trait AggLib extends Library {
       case Sized(t) =>
         success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val Min = UnaryFunc(
     Reduction,
@@ -90,7 +92,8 @@ trait AggLib extends Library {
       case Sized(t) =>
         success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val Max = UnaryFunc(
     Reduction,
@@ -106,7 +109,8 @@ trait AggLib extends Library {
       case Sized(t) =>
         success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val First = UnaryFunc(
     Reduction,
@@ -117,7 +121,8 @@ trait AggLib extends Library {
     partialTyperV[nat._1] {
       case Sized(t) => success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val Last = UnaryFunc(
     Reduction,
@@ -128,7 +133,8 @@ trait AggLib extends Library {
     partialTyperV[nat._1] {
       case Sized(t) => success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val Avg = UnaryFunc(
     Reduction,
@@ -148,7 +154,8 @@ trait AggLib extends Library {
       case Sized(t) =>
         success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   val Arbitrary = UnaryFunc(
     Reduction,
@@ -166,7 +173,8 @@ trait AggLib extends Library {
       case Sized(t) =>
         success(t)
     },
-    reflexiveUntyper)
+    reflexiveUntyper
+  )
 
   ////
 
@@ -176,21 +184,24 @@ trait AggLib extends Library {
     failureNel(SemanticError.DomainError(Data.Set(Nil), some("Expected non-empty Set")))
 
   private def reduceComparableSet(
-    f: (Data.Comparable, Data.Comparable) => Option[Data.Comparable]
+      f: (Data.Comparable, Data.Comparable) => Option[Data.Comparable]
   ): List[Data] => ValidationNel[SemanticError, Data.Comparable] =
-    _.toNel.fold(expectedNonEmptySet[Data.Comparable])(xs =>
-      xs.traverse(Data.Comparable(_))
-        .flatMap(ys => ys.tail.foldLeftM(ys.head)(f))
-        .toSuccessNel(SemanticError.DomainError(
-          Data.Set(xs.list.toList),
-          some("Expected Set of comparable values"))))
+    _.toNel.fold(expectedNonEmptySet[Data.Comparable])(
+      xs =>
+        xs.traverse(Data.Comparable(_))
+          .flatMap(ys => ys.tail.foldLeftM(ys.head)(f))
+          .toSuccessNel(
+            SemanticError.DomainError(Data.Set(xs.list.toList),
+                                      some("Expected Set of comparable values"))))
 
   private val numSet: List[Data] => SemanticError \/ List[BigDecimal] =
     set =>
-      errSetF.map(ivlSet(set))(d => BigDecimal(d.toMillis))
+      errSetF
+        .map(ivlSet(set))(d => BigDecimal(d.toMillis))
         .orElse(errSetF.map(intSet(set))(BigDecimal(_)))
         .orElse(decSet(set))
-        .leftAs(SemanticError.DomainError(Data.Set(set), some("Expected Set of numeric values")))
+        .leftAs(SemanticError.DomainError(Data.Set(set),
+                                          some("Expected Set of numeric values")))
 
   private val ivlSet: List[Data] => SemanticError \/ List[Duration] =
     homogenizedPF({ case Data.Interval(d) => d }, "Expected Set(Interval)")
@@ -201,10 +212,12 @@ trait AggLib extends Library {
   private val intSet: List[Data] => SemanticError \/ List[BigInt] =
     homogenizedPF({ case Data.Int(n) => n }, "Expected Set(Int)")
 
-  private def homogenizedPF[A](f: PartialFunction[Data, A], err: String): List[Data] => SemanticError \/ List[A] =
+  private def homogenizedPF[A](f: PartialFunction[Data, A],
+                               err: String): List[Data] => SemanticError \/ List[A] =
     homogenized(f.lift, err)
 
-  private def homogenized[A](f: Data => Option[A], err: String): List[Data] => SemanticError \/ List[A] =
+  private def homogenized[A](f: Data => Option[A],
+                             err: String): List[Data] => SemanticError \/ List[A] =
     set => set.traverse(f) \/> SemanticError.DomainError(Data.Set(set), some(err))
 }
 

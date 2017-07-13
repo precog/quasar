@@ -40,15 +40,15 @@ object WorkflowExecutionError {
 
   val invalidTask = Prism.partial[WorkflowExecutionError, (WorkflowTask, String)] {
     case InvalidTask(t, r) => (t, r)
-  } (InvalidTask.tupled)
+  }(InvalidTask.tupled)
 
   val insertFailed = Prism.partial[WorkflowExecutionError, (Bson, String)] {
     case InsertFailed(b, r) => (b, r)
-  } (InsertFailed.tupled)
+  }(InsertFailed.tupled)
 
   val noDatabase = Prism.partial[WorkflowExecutionError, Unit] {
     case NoDatabase => ()
-  } (κ(NoDatabase))
+  }(κ(NoDatabase))
 
   implicit val workflowExecutionErrorShow: Show[WorkflowExecutionError] =
     Show.shows { err =>

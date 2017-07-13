@@ -37,17 +37,18 @@ import scalaz._, Scalaz._
 
 /** Implementation class for a WorkflowExecutor in the `MongoDbIO` monad. */
 private[mongodb] final class MongoDbIOWorkflowExecutor
-  extends WorkflowExecutor[MongoDbIO, BsonCursor] {
+    extends WorkflowExecutor[MongoDbIO, BsonCursor] {
 
   private def foldS[F[_]: Foldable, S, A](fa: F[A])(f: (A, S) => S): State[S, Unit] =
-    fa.traverseS_[S, Unit](a => MonadState[State[S,?], S].modify(f(a, _)))
+    fa.traverseS_[S, Unit](a => MonadState[State[S, ?], S].modify(f(a, _)))
 
   protected def aggregate(src: Collection, pipeline: Pipeline) =
     MongoDbIO.aggregate(src, pipeline map (_.bson), true)
 
   protected def aggregateCursor(src: Collection, pipeline: Pipeline) =
     toCursor(
-      MongoDbIO.aggregateIterable(src, pipeline map (_.bson), true)
+      MongoDbIO
+        .aggregateIterable(src, pipeline map (_.bson), true)
         .map(_.useCursor(new JBoolean(true))))
 
   protected def count(src: Collection, cfg: Count) = {
@@ -59,7 +60,8 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
       foldS(cfg.limit)((n, opts: CountOptions) => opts.limit(n.toInt))
     ).sequenceS_[CountOptions, Unit].exec(new CountOptions)
 
-    MongoDbIO.collection(src)
+    MongoDbIO
+      .collection(src)
       .flatMap(c => MongoDbIO.async[java.lang.Long](c.count(qry, countOpts, _)))
       .map(_.longValue)
   }
@@ -106,7 +108,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
     toCursor(MongoDbIO.mapReduceIterable(src, mr))
 
   private def toCursor[I <: MongoIterable[BsonDocument]](
-    bcIO: MongoDbIO[I]
+      bcIO: MongoDbIO[I]
   ): MongoDbIO[BsonCursor] =
     bcIO flatMap (bc => MongoDbIO.async(bc.batchCursor))
 }
@@ -117,18 +119,20 @@ private[mongodb] object MongoDbIOWorkflowExecutor {
   /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =
     new (MongoDbIO ~> EnvErrT[MongoDbIO, ?]) {
-      def apply[A](m: MongoDbIO[A]) = EitherT(m.attemptMongo.run flatMap {
-        case -\/(UnhandledFSError(ex)) => ex match {
-          case _: MongoSocketOpenException =>
-            connectionFailed(ex).left.point[MongoDbIO]
-          case _: MongoSocketException =>
-            connectionFailed(ex).left.point[MongoDbIO]
-          case _ =>
-            if (ex.getMessage contains "Command failed with error 18: 'auth failed'")
-              invalidCredentials(ex.getMessage).left.point[MongoDbIO]
-            else MongoDbIO.fail(ex)
-        }
-        case \/-(a) => a.right.point[MongoDbIO]
-      })
+      def apply[A](m: MongoDbIO[A]) =
+        EitherT(m.attemptMongo.run flatMap {
+          case -\/(UnhandledFSError(ex)) =>
+            ex match {
+              case _: MongoSocketOpenException =>
+                connectionFailed(ex).left.point[MongoDbIO]
+              case _: MongoSocketException =>
+                connectionFailed(ex).left.point[MongoDbIO]
+              case _ =>
+                if (ex.getMessage contains "Command failed with error 18: 'auth failed'")
+                  invalidCredentials(ex.getMessage).left.point[MongoDbIO]
+                else MongoDbIO.fail(ex)
+            }
+          case \/-(a) => a.right.point[MongoDbIO]
+        })
     }
 }

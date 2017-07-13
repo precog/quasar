@@ -27,25 +27,26 @@ import scalaz._, Scalaz._
 object Schema {
   val schema = db.Schema[Int](
     MetaStoreAccess.tableExists("quasar_properties").flatMap {
-      case true  => sql"SELECT schema_version FROM quasar_properties".query[Int].unique.map(_.some)
+      case true =>
+        sql"SELECT schema_version FROM quasar_properties".query[Int].unique.map(_.some)
       case false => none[Int].point[ConnectionIO]
     },
     ver => sql"UPDATE quasar_properties SET schema_version = $ver".update.run.void,
     SortedMap(
       0 ->
-        sql"""DROP TABLE IF EXISTS properties""".update.run.void                           *>
-        sql"""CREATE TABLE IF NOT EXISTS quasar_properties (
+        sql"""DROP TABLE IF EXISTS properties""".update.run.void *>
+          sql"""CREATE TABLE IF NOT EXISTS quasar_properties (
               schema_version INT NOT NULL
-              )""".update.run.void                                                         *>
-        sql"""INSERT INTO quasar_properties (schema_version) VALUES (0)""".update.run.void *>
-        sql"""CREATE TABLE IF NOT EXISTS mounts (
+              )""".update.run.void *>
+          sql"""INSERT INTO quasar_properties (schema_version) VALUES (0)""".update.run.void *>
+          sql"""CREATE TABLE IF NOT EXISTS mounts (
               path          VARCHAR  NOT NULL  PRIMARY KEY,
               type          VARCHAR  NOT NULL,
               connectionUri VARCHAR  NOT NULL
-              )""".update.run.void                                                         *>
-        sql"""CREATE INDEX IF NOT EXISTS mounts_type ON mounts (type)""".update.run.void
+              )""".update.run.void *>
+          sql"""CREATE INDEX IF NOT EXISTS mounts_type ON mounts (type)""".update.run.void
 
-        /*
+      /*
         Important! Once a new schema version is added to this sequence and
         released, the particular update should never be changed. Instead, when
         a schema change is needed, a new update should be added that modifies
@@ -62,6 +63,7 @@ object Schema {
         changing the latest update during development.
         - The change is merely syntactic, and doesn't affect the behavior of
         any query _or_ any subsequent update.
-        */
-      ))
+     */
+    )
+  )
 }

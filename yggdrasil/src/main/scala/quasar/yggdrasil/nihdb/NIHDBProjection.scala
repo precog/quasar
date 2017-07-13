@@ -30,32 +30,42 @@ import org.slf4s.Logging
 
 import scalaz.Monad
 
-final class NIHDBProjection(snapshot: NIHDBSnapshot, val authorities: Authorities, projectionId: Int) extends ProjectionLike[Future, Slice] with Logging {
+final class NIHDBProjection(snapshot: NIHDBSnapshot,
+                            val authorities: Authorities,
+                            projectionId: Int)
+    extends ProjectionLike[Future, Slice]
+    with Logging {
   type Key = Long
 
   private[this] val readers = snapshot.readers
 
   val length = readers.map(_.length.toLong).sum
 
-  override def toString = "NIHDBProjection(id = %d, len = %d, authorities = %s)".format(projectionId, length, authorities)
+  override def toString =
+    "NIHDBProjection(id = %d, len = %d, authorities = %s)".format(projectionId,
+                                                                  length,
+                                                                  authorities)
 
-  def structure(implicit M: Monad[Future]) = M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
+  def structure(implicit M: Monad[Future]) =
+    M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
 
-  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] = MP.point {
-    val id = id0.map(_ + 1)
-    val index = id getOrElse 0L
-    getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
-      case Block(_, segments, _) =>
-        val slice = SegmentsWrapper(segments, projectionId, index)
-        BlockProjectionData(index, index, slice)
+  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(
+      implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] =
+    MP.point {
+      val id    = id0.map(_ + 1)
+      val index = id getOrElse 0L
+      getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
+        case Block(_, segments, _) =>
+          val slice = SegmentsWrapper(segments, projectionId, index)
+          BlockProjectionData(index, index, slice)
+      }
     }
-  }
 
   def reduce[A](reduction: Reduction[A], path: CPath): Map[CType, A] = {
     readers.foldLeft(Map.empty[CType, A]) { (acc, reader) =>
       reader.snapshot(Some(Set(path))).segments.foldLeft(acc) { (acc, segment) =>
         reduction.reduce(segment, None) map { a =>
-          val key = segment.ctype
+          val key   = segment.ctype
           val value = acc.get(key).map(reduction.semigroup.append(_, a)).getOrElse(a)
           acc + (key -> value)
         } getOrElse acc
@@ -63,7 +73,8 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, val authorities: Authoritie
     }
   }
 
-  private def getSnapshotBlock(id: Option[Long], columns: Option[Set[CPath]]): Option[Block] = {
+  private def getSnapshotBlock(id: Option[Long],
+                               columns: Option[Set[CPath]]): Option[Block] = {
     try {
       // We're limiting ourselves to 2 billion blocks total here
       val index = id.map(_.toInt).getOrElse(0)

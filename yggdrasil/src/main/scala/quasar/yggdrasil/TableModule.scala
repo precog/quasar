@@ -81,13 +81,13 @@ case class EstimateSize(minSize: Long, maxSize: Long) extends TableSize {
 }
 
 case object UnknownSize extends TableSize {
-  val maxSize = Long.MaxValue
+  val maxSize             = Long.MaxValue
   def +(other: TableSize) = UnknownSize
   def *(other: TableSize) = UnknownSize
 }
 
 case object InfiniteSize extends TableSize {
-  val maxSize = Long.MaxValue
+  val maxSize             = Long.MaxValue
   def +(other: TableSize) = InfiniteSize
   def *(other: TableSize) = InfiniteSize
 }
@@ -100,7 +100,7 @@ object TableModule {
     def isAscending: Boolean
   }
 
-  case object SortAscending  extends DesiredSortOrder { val isAscending = true }
+  case object SortAscending  extends DesiredSortOrder { val isAscending = true  }
   case object SortDescending extends DesiredSortOrder { val isAscending = false }
 
   sealed trait JoinOrder
@@ -149,8 +149,12 @@ trait TableModule[M[+ _]] extends TransSpecModule {
 
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
 
-    def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)]
+    def merge[N[+ _]](grouping: GroupingSpec)(
+        body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
+    def align(sourceLeft: Table,
+              alignOnL: TransSpec1,
+              sourceRight: Table,
+              alignOnR: TransSpec1): M[(Table, Table)]
 
     /**
       * Joins `left` and `right` together using their left/right key specs. The
@@ -158,9 +162,10 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * but must be a valid `JoinOrder`. This method should not assume any
       * particular order of the tables, unlike `cogroup`.
       */
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
-                                                                             rightKeySpec: TransSpec1,
-                                                                             joinSpec: TransSpec2): M[(JoinOrder, Table)]
+    def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(
+        leftKeySpec: TransSpec1,
+        rightKeySpec: TransSpec1,
+        joinSpec: TransSpec2): M[(JoinOrder, Table)]
 
     /**
       * Performs a back-end specific cross. Unlike Table#cross, this does not
@@ -168,7 +173,8 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * Hints can be provided on how we'd prefer the table to be crossed, but
       * the actual cross order is returned as part of the result.
       */
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[(CrossOrder, Table)]
+    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(
+        spec: TransSpec2): M[(CrossOrder, Table)]
   }
 
   trait TableLike {
@@ -209,7 +215,9 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * Cogroups this table with another table, using equality on the specified
       * transformation on rows of the table.
       */
-    def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
+    def cogroup(leftKey: TransSpec1,
+                rightKey: TransSpec1,
+                that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
 
     /**
       * Performs a full cartesian cross on this table with the specified table,
@@ -236,7 +244,9 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * we assign a unique row ID as part of the key so that multiple equal values are
       * preserved
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Table]
+    def sort(sortKey: TransSpec1,
+             sortOrder: DesiredSortOrder = SortAscending,
+             unique: Boolean = false): M[Table]
 
     def distinct(spec: TransSpec1): Table
 
@@ -257,7 +267,10 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * we assign a unique row ID as part of the key so that multiple equal values are
       * preserved
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]]
+    def groupByN(groupKeys: Seq[TransSpec1],
+                 valueSpec: TransSpec1,
+                 sortOrder: DesiredSortOrder = SortAscending,
+                 unique: Boolean = false): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
 
@@ -267,7 +280,9 @@ trait TableModule[M[+ _]] extends TransSpecModule {
 
     def schemas: M[Set[JType]]
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
+    def renderJson(prefix: String = "",
+                   delimiter: String = "\n",
+                   suffix: String = ""): StreamT[M, CharBuffer]
 
     def renderCsv(): StreamT[M, CharBuffer]
 
@@ -306,7 +321,8 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def sources: Vector[GroupingSource] = Vector(this)
     def sorted: M[GroupingSource] =
       for {
-        t <- table.sort(trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("key")))
+        t <- table.sort(
+          trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("key")))
       } yield {
         GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec)
       }

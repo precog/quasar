@@ -30,26 +30,27 @@ trait Library {
   import Func._
 
   protected val noSimplification: Simplifier = new Simplifier {
-    def apply[T]
-      (orig: LogicalPlan[T])
-      (implicit TR: Recursive.Aux[T, LogicalPlan], TC: Corecursive.Aux[T, LogicalPlan]) =
+    def apply[T](orig: LogicalPlan[T])(implicit TR: Recursive.Aux[T, LogicalPlan],
+                                       TC: Corecursive.Aux[T, LogicalPlan]) =
       None
   }
 
   protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
     _ => success(codomain)
 
-  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
-    f(args).getOrElse {
-      val msg: String = s"Unknown arguments: $args"
-      failure(NonEmptyList(SemanticError.GenericError(msg)))
-    }
+  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = {
+    args =>
+      f(args).getOrElse {
+        val msg: String = s"Unknown arguments: $args"
+        failure(NonEmptyList(SemanticError.GenericError(msg)))
+      }
   }
 
   def partialTyperV[N <: Nat](f: PartialFunction[Domain[N], VCodomain]): Typer[N] =
     partialTyperOV[N](f.lift)
 
-  protected def partialTyper[N <: Nat](f: PartialFunction[Domain[N], Codomain]): Typer[N] =
+  protected def partialTyper[N <: Nat](
+      f: PartialFunction[Domain[N], Codomain]): Typer[N] =
     partialTyperOV[N](g => f.lift(g).map(success))
 
   protected def basicUntyper[N <: Nat]: Untyper[N] = {
@@ -58,31 +59,33 @@ trait Library {
 
   protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] = {
     case ((funcDomain, funcCodomain), rez) =>
-      Type.typecheck(rez, funcCodomain).fold(
-        κ(f(rez)),
-        κ(success(funcDomain)))
+      Type.typecheck(rez, funcCodomain).fold(κ(f(rez)), κ(success(funcDomain)))
   }
 
   private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {
-    case ((funcDomain, funcCodomain), rez) => Type.typecheck(rez, funcCodomain).fold(
-      e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))),
-      κ(success(funcDomain)))
+    case ((funcDomain, funcCodomain), rez) =>
+      Type
+        .typecheck(rez, funcCodomain)
+        .fold(e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))),
+              κ(success(funcDomain)))
   }
 
-  protected def partialUntyperV[N <: Nat](f: PartialFunction[Codomain, VDomain[N]]): Untyper[N] =
+  protected def partialUntyperV[N <: Nat](
+      f: PartialFunction[Codomain, VDomain[N]]): Untyper[N] =
     partialUntyperOV(f.lift)
 
-  protected def partialUntyper[N <: Nat](f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
+  protected def partialUntyper[N <: Nat](
+      f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
     partialUntyperOV(f.lift(_).map(success))
 
   protected def numericWidening = {
     def mapFirst[A, B](f: A => A, p: PartialFunction[A, B]) = new PartialFunction[A, B] {
       def isDefinedAt(a: A) = p.isDefinedAt(f(a))
-      def apply(a: A) = p(f(a))
+      def apply(a: A)       = p(f(a))
     }
 
     val half: PartialFunction[Domain[nat._2], Codomain] = {
-      case Sized(t1, t2)       if t1 contains t2       => t1
+      case Sized(t1, t2) if t1 contains t2             => t1
       case Sized(Type.Dec, t2) if Type.Int contains t2 => Type.Dec
       case Sized(Type.Int, t2) if Type.Dec contains t2 => Type.Dec
     }
@@ -91,7 +94,7 @@ trait Library {
   }
 
   protected implicit class TyperW[N <: Nat](self: Typer[N]) {
-    def ||| (that: Typer[N]): Typer[N] = { args =>
+    def |||(that: Typer[N]): Typer[N] = { args =>
       self(args) ||| that(args)
     }
   }

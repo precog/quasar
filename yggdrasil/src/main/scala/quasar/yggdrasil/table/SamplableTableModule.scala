@@ -32,7 +32,8 @@ trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   }
 }
 
-trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { self: ColumnarTableModule[M] with SliceTransforms[M] =>
+trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] {
+  self: ColumnarTableModule[M] with SliceTransforms[M] =>
 
   import trans._
 
@@ -53,7 +54,9 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
       * sampling in that runs in O(m lg n) time.
       */
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = {
-      case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
+      case class SampleState(rowInserters: Option[RowInserter],
+                             length: Int,
+                             transform: SliceTransform1[_])
 
       def build(states: List[SampleState], slices: StreamT[M, Slice]): M[List[Table]] = {
         slices.uncons flatMap {
@@ -62,7 +65,9 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
               case SampleState(maybePrevInserters, len0, transform) =>
                 transform advance origSlice map {
                   case (nextTransform, slice) => {
-                    val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice)
+                    val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(
+                      sampleSize,
+                      slice)
 
                     val defined = slice.definedAt
 
@@ -99,7 +104,8 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
                 case SampleState(inserter, length, _) =>
                   val len = length min sampleSize
                   inserter map { _.toSlice(len) } map { slice =>
-                    Table(slice :: StreamT.empty[M, Slice], ExactSize(len)).paged(yggConfig.maxSliceSize)
+                    Table(slice :: StreamT.empty[M, Slice], ExactSize(len))
+                      .paged(yggConfig.maxSliceSize)
                   } getOrElse {
                     Table(StreamT.empty[M, Slice], ExactSize(0))
                   }
@@ -116,7 +122,10 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
     }
   }
 
-  private case class RowInserter(size: Int, slice: Slice, cols: mutable.Map[ColumnRef, ArrayColumn[_]] = mutable.Map.empty) {
+  private case class RowInserter(size: Int,
+                                 slice: Slice,
+                                 cols: mutable.Map[ColumnRef, ArrayColumn[_]] =
+                                   mutable.Map.empty) {
     import RowInserter._
 
     def toSlice(maxSize: Int): Slice = Slice(cols.toMap, size min maxSize)
@@ -136,20 +145,23 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
 
     // Creates array columns on demand.
     private def getOrCreateCol(ref: ColumnRef): ArrayColumn[_] = {
-      cols.getOrElseUpdate(ref, ref.ctype match {
-        case CBoolean             => ArrayBoolColumn.empty()
-        case CLong                => ArrayLongColumn.empty(size)
-        case CDouble              => ArrayDoubleColumn.empty(size)
-        case CNum                 => ArrayNumColumn.empty(size)
-        case CString              => ArrayStrColumn.empty(size)
-        case CDate                => ArrayDateColumn.empty(size)
-        case CPeriod              => ArrayPeriodColumn.empty(size)
-        case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(size)(elemType)
-        case CNull                => MutableNullColumn.empty()
-        case CEmptyObject         => MutableEmptyObjectColumn.empty()
-        case CEmptyArray          => MutableEmptyArrayColumn.empty()
-        case CUndefined           => sys.error("this shouldn't exist")
-      })
+      cols.getOrElseUpdate(
+        ref,
+        ref.ctype match {
+          case CBoolean             => ArrayBoolColumn.empty()
+          case CLong                => ArrayLongColumn.empty(size)
+          case CDouble              => ArrayDoubleColumn.empty(size)
+          case CNum                 => ArrayNumColumn.empty(size)
+          case CString              => ArrayStrColumn.empty(size)
+          case CDate                => ArrayDateColumn.empty(size)
+          case CPeriod              => ArrayPeriodColumn.empty(size)
+          case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(size)(elemType)
+          case CNull                => MutableNullColumn.empty()
+          case CEmptyObject         => MutableEmptyObjectColumn.empty()
+          case CEmptyArray          => MutableEmptyArrayColumn.empty()
+          case CUndefined           => sys.error("this shouldn't exist")
+        }
+      )
     }
 
     private def colOpsFor: ((ColumnRef, Column)) => ColumnOps = {
@@ -157,33 +169,39 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
         (col, getOrCreateCol(ref)) match {
           case (src: BoolColumn, dest: ArrayBoolColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: LongColumn, dest: ArrayLongColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: DoubleColumn, dest: ArrayDoubleColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: NumColumn, dest: ArrayNumColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: StrColumn, dest: ArrayStrColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: DateColumn, dest: ArrayDateColumn) =>
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src: NullColumn, dest: MutableNullColumn) =>
             new ColumnOps(src, dest) {
@@ -200,14 +218,17 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
               def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, true)
               def unsafeMove(from: Int, to: Int)          = dest.update(to, true)
             }
-          case (src: HomogeneousArrayColumn[a], dest0: ArrayHomogeneousArrayColumn[_]) if src.tpe == dest0.tpe =>
+          case (src: HomogeneousArrayColumn[a], dest0: ArrayHomogeneousArrayColumn[_])
+              if src.tpe == dest0.tpe =>
             val dest = dest0.asInstanceOf[ArrayHomogeneousArrayColumn[a]]
             new ColumnOps(src, dest) {
-              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
-              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+              def unsafeInsert(srcRow: Int, destRow: Int) =
+                dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int) = dest.update(to, dest(from))
             }
           case (src, dest) =>
-            sys.error("Slice lied about column type. Expected %s, but found %s." format (ref.ctype, src.tpe))
+            sys.error(
+              "Slice lied about column type. Expected %s, but found %s." format (ref.ctype, src.tpe))
         }
     }
   }

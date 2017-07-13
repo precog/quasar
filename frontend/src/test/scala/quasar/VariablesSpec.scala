@@ -28,20 +28,19 @@ class VariablesSpec extends quasar.Qspec {
       "list all missing variables" >> {
         "all are missing" >> {
           Variables.substVars(sqlE"select * from :foo where :baz", Variables.empty) must_===
-            NonEmptyList(
-              SemanticError.unboundVariable(VarName("foo")),
-              SemanticError.unboundVariable(VarName("baz"))).left
+            NonEmptyList(SemanticError.unboundVariable(VarName("foo")),
+                         SemanticError.unboundVariable(VarName("baz"))).left
         }
         "some are missing" >> {
           val vars = Variables.fromMap(Map("baz" -> "age = 7"))
           Variables.substVars(sqlE"select :biz from :foo where :baz", vars) must_===
-            NonEmptyList(
-              SemanticError.unboundVariable(VarName("foo")),
-              SemanticError.unboundVariable(VarName("biz"))).left
+            NonEmptyList(SemanticError.unboundVariable(VarName("foo")),
+                         SemanticError.unboundVariable(VarName("biz"))).left
         }
       }
       "succeedd when all variables are present" >> {
-        val vars = Variables.fromMap(Map("biz" -> "name", "foo" -> "people", "baz" -> "age = 7"))
+        val vars =
+          Variables.fromMap(Map("biz" -> "name", "foo" -> "people", "baz" -> "age = 7"))
         Variables.substVars(sqlE"select :biz from :foo where :baz", vars) must_===
           sqlE"select name from people where age = 7".right
       }

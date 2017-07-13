@@ -39,8 +39,9 @@ import org.specs2.execute._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
-  implicit SP: StructuralPlanner[F, FMT]
+abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+FMT](
+    implicit SP: StructuralPlanner[F, FMT]
 ) extends StdLibSpec {
   type RunT[X[_], A] = EitherT[X, Result, A]
 
@@ -48,8 +49,8 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
 
   def runner(contentSource: ContentSource) = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(
-      prg: FreeMapA[Fix, Nothing],
-      expected: Data
+        prg: FreeMapA[Fix, Nothing],
+        expected: Data
     ): Result = {
       val xqyPlan = planFreeMap(prg)(absurd)
 
@@ -57,9 +58,9 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
     }
 
     def unaryMapFunc(
-      prg: FreeMapA[Fix, UnaryArg],
-      arg: Data,
-      expected: Data
+        prg: FreeMapA[Fix, UnaryArg],
+        arg: Data,
+        expected: Data
     ): Result = {
       val xqyPlan = asXqy(arg) flatMap (a1 => planFreeMap(prg)(κ(a1)))
 
@@ -67,9 +68,10 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
     }
 
     def binaryMapFunc(
-      prg: FreeMapA[Fix, BinaryArg],
-      arg1: Data, arg2: Data,
-      expected: Data
+        prg: FreeMapA[Fix, BinaryArg],
+        arg1: Data,
+        arg2: Data,
+        expected: Data
     ): Result = {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2)).tupled flatMap {
         case (a1, a2) => planFreeMap(prg)(_.fold(a1, a2))
@@ -79,9 +81,11 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
     }
 
     def ternaryMapFunc(
-      prg: FreeMapA[Fix, TernaryArg],
-      arg1: Data, arg2: Data, arg3: Data,
-      expected: Data
+        prg: FreeMapA[Fix, TernaryArg],
+        arg1: Data,
+        arg2: Data,
+        arg3: Data,
+        expected: Data
     ): Result = {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2) |@| asXqy(arg3)).tupled flatMap {
         case (a1, a2, a3) => planFreeMap(prg)(_.fold(a1, a2, a3))
@@ -90,7 +94,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       run(xqyPlan, expected)
     }
 
-    def intDomain    = arbitrary[Long]   map (BigInt(_))
+    def intDomain    = arbitrary[Long] map (BigInt(_))
     def decDomain    = arbitrary[Double] map (BigDecimal(_))
     def stringDomain = gen.printableAsciiString
 
@@ -105,17 +109,19 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
 
     private val cpColl = Prolog.defColl(DefaultCollationDecl(Collation.codepoint))
 
-    private def planFreeMap[A](freeMap: FreeMapA[Fix, A])(recover: A => XQuery): F[XQuery] =
+    private def planFreeMap[A](freeMap: FreeMapA[Fix, A])(
+        recover: A => XQuery): F[XQuery] =
       planMapFunc[Fix, F, FMT, A](freeMap)(recover)
 
     private def run(plan: F[XQuery], expected: Data): Result = {
       val result = for {
         main <- toMain[Task](plan) map (MainModule.prologs.modify(_ insert cpColl))
-        mr   <- testing.moduleResults[ReaderT[RunT[Task, ?], ContentSource, ?]](main)
-                  .run(contentSource)
-        r    =  mr.toOption.join
-                  .fold(ko("No results found."))(_ must beCloseTo(expected))
-                  .toResult
+        mr <- testing
+          .moduleResults[ReaderT[RunT[Task, ?], ContentSource, ?]](main)
+          .run(contentSource)
+        r = mr.toOption.join
+          .fold(ko("No results found."))(_ must beCloseTo(expected))
+          .toResult
       } yield r
 
       result.run.unsafePerformSync.merge
@@ -124,7 +130,13 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
     private def asXqy(d: Data): F[XQuery] = DataPlanner[F, FMT](d)
   }
 
-  TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceConnection[Task](uri).map(cs => backend.name.shows >> tests(runner(cs))).void
-  }).unsafePerformSync
+  TestConfig
+    .fileSystemConfigs(FsType)
+    .flatMap(_ traverse_ {
+      case (backend, uri, _) =>
+        contentSourceConnection[Task](uri)
+          .map(cs => backend.name.shows >> tests(runner(cs)))
+          .void
+    })
+    .unsafePerformSync
 }

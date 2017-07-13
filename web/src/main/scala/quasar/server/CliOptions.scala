@@ -26,14 +26,13 @@ import scopt.OptionParser
 
 /** Command-line options supported by Quasar. */
 @Lenses
-final case class CliOptions(
-  cmd: Cmd,
-  config: Option[String],
-  contentLoc: Option[String],
-  contentPath: Option[String],
-  contentPathRelative: Boolean,
-  openClient: Boolean,
-  port: Option[Int])
+final case class CliOptions(cmd: Cmd,
+                            config: Option[String],
+                            contentLoc: Option[String],
+                            contentPath: Option[String],
+                            contentPathRelative: Boolean,
+                            openClient: Boolean,
+                            port: Option[Int])
 
 object CliOptions {
   val default: CliOptions =
@@ -41,42 +40,42 @@ object CliOptions {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
-      head("quasar", BuildInfo.version)
+    head("quasar", BuildInfo.version)
 
-      help("help") text("prints this usage text\n")
+    help("help") text ("prints this usage text\n")
 
-      cmd("initUpdateMetaStore")
-        .text("Initializes and updates the metastore.\n")
-        .action((_, c) =>
-          (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
-    }
+    cmd("initUpdateMetaStore")
+      .text("Initializes and updates the metastore.\n")
+      .action((_, c) =>
+        (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   class CliOptionsParser[C](l: Lens[C, CliOptions], cmdName: String)
-    extends OptionParser[C](cmdName) {
+      extends OptionParser[C](cmdName) {
 
     opt[String]('c', "config") action { (x, c) =>
       (l composeLens config).set(Some(x))(c)
-    } text("path to the config file to use")
+    } text ("path to the config file to use")
 
     opt[String]('L', "content-location") action { (x, c) =>
       (l composeLens contentLoc).set(Some(x))(c)
-    } text("location where static content is hosted")
+    } text ("location where static content is hosted")
 
     opt[String]('C', "content-path") action { (x, c) =>
       (l composeLens contentPath).set(Some(x))(c)
-    } text("path where static content lives")
+    } text ("path where static content lives")
 
     opt[Unit]('r', "content-path-relative") action { (_, c) =>
       (l composeLens contentPathRelative).set(true)(c)
-    } text("specifies that the content-path is relative to the install directory (not the current dir)")
+    } text ("specifies that the content-path is relative to the install directory (not the current dir)")
 
     opt[Unit]('o', "open-client") action { (_, c) =>
       (l composeLens openClient).set(true)(c)
-    } text("opens a browser window to the client on startup")
+    } text ("opens a browser window to the client on startup")
 
     opt[Int]('p', "port") action { (x, c) =>
       (l composeLens port).set(Some(x))(c)
-    } text("the port to run Quasar on")
+    } text ("the port to run Quasar on")
   }
 }

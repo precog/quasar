@@ -27,13 +27,13 @@ import matryoshka.implicits._
 sealed abstract class JoinDir(val name: String) {
   import structural.ObjectProject
 
-  val data: Data = Data.Str(name)
+  val data: Data                                      = Data.Str(name)
   def const[T](implicit T: Corecursive.Aux[T, LP]): T = constant[T](data).embed
   def projectFrom[T](lp: T)(implicit T: Corecursive.Aux[T, LP]): T =
     ObjectProject(lp, const).embed
 }
 
 object JoinDir {
-  final case object Left extends JoinDir("left")
+  final case object Left  extends JoinDir("left")
   final case object Right extends JoinDir("right")
 }

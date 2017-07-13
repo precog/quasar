@@ -31,7 +31,8 @@ import scalaz.concurrent.Task
 final case class StaticContent(loc: String, path: String)
 
 object StaticContent {
-  def fromCliOptions(defaultLoc: String, opts: CliOptions): MainTask[Option[StaticContent]] = {
+  def fromCliOptions(defaultLoc: String,
+                     opts: CliOptions): MainTask[Option[StaticContent]] = {
     def path(p: String): Task[String] =
       if (opts.contentPathRelative) jarPath.map(_ + p)
       else p.point[Task]
@@ -42,7 +43,9 @@ object StaticContent {
       case (Some(_), None) =>
         MainTask.raiseError("content-location specified but not content-path")
       case (loc, Some(cp)) =>
-        path(cp).map(p => some(StaticContent(loc getOrElse defaultLoc, p))).liftM[MainErrT]
+        path(cp)
+          .map(p => some(StaticContent(loc getOrElse defaultLoc, p)))
+          .liftM[MainErrT]
     }
   }
 
@@ -57,7 +60,8 @@ object StaticContent {
     def altPath(uri: URI) =
       uri.toURL.openConnection
         .asInstanceOf[JarURLConnection]
-        .getJarFileURL.getPath
+        .getJarFileURL
+        .getPath
 
     val uri  = getClass.getProtectionDomain.getCodeSource.getLocation.toURI
     val path = URLDecoder.decode(Option(uri.getPath) getOrElse altPath(uri), "UTF-8")

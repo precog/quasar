@@ -42,8 +42,11 @@ object PhaseResult {
 
   implicit def renderTree: RenderTree[PhaseResult] = new RenderTree[PhaseResult] {
     def render(v: PhaseResult) = v match {
-      case Tree(name, value)   => NonTerminal(List("PhaseResult"), Some(name), List(value))
-      case Detail(name, value) => NonTerminal(List("PhaseResult"), Some(name), List(Terminal(List("Detail"), Some(value))))
+      case Tree(name, value) => NonTerminal(List("PhaseResult"), Some(name), List(value))
+      case Detail(name, value) =>
+        NonTerminal(List("PhaseResult"),
+                    Some(name),
+                    List(Terminal(List("Detail"), Some(value))))
     }
   }
 

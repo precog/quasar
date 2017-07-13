@@ -50,82 +50,93 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   type M[A] = EitherT[F, PlannerError, A]
 
   def run[A](
-    fm: Free[MapFuncCore[Fix, ?], A],
-    args: A => QData,
-    expected: QData,
-    cfg: Config
+      fm: Free[MapFuncCore[Fix, ?], A],
+      args: A => QData,
+      expected: QData,
+      cfg: Config
   ): Result = {
 
     def argN1ql(d: QData): M[Fix[N1QL]] = Data[Fix[N1QL]](d).embed.η[M]
 
     val r: FileSystemError \/ (String, Vector[QData]) = (
       for {
-        q  <- ME.unattempt(
-                fm.cataM(interpretM(a =>
-                    argN1ql(args(a)), mapFuncPlanner[Fix, EitherT[F, PlannerError, ?]].plan))
-                  .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.liftB)
-        s  =  Select(
-                Value(false),
-                ResultExpr(q, Id("v").some).wrapNel,
-                keyspace = None,
-                join     = None,
-                unnest   = None,
-                let      = Nil,
-                filter   = None,
-                groupBy  = None,
-                orderBy  = Nil).embed
-        r  <- n1qlResults(s) ∘ (_ >>= {
-                case QData.Obj(v) => v.values.toVector
-                case v            => Vector(v)
-              })
+        q <- ME.unattempt(
+          fm.cataM(interpretM(a => argN1ql(args(a)),
+                              mapFuncPlanner[Fix, EitherT[F, PlannerError, ?]].plan))
+            .leftMap(FileSystemError.qscriptPlanningFailed(_))
+            .run
+            .liftB)
+        s = Select(Value(false),
+                   ResultExpr(q, Id("v").some).wrapNel,
+                   keyspace = None,
+                   join = None,
+                   unnest = None,
+                   let = Nil,
+                   filter = None,
+                   groupBy = None,
+                   orderBy = Nil).embed
+        r <- n1qlResults(s) ∘ (_ >>= {
+          case QData.Obj(v) => v.values.toVector
+          case v            => Vector(v)
+        })
         rq <- ME.unattempt(
-                RenderQuery.compact(s).leftMap(FileSystemError.qscriptPlanningFailed(_)).η[Backend])
+          RenderQuery
+            .compact(s)
+            .leftMap(FileSystemError.qscriptPlanningFailed(_))
+            .η[Backend])
       } yield (rq, r)
     ).run.run.run(cfg).foldMap(fs.interp.unsafePerformSync).unsafePerformSync._2
 
-    (r must beRightDisjunction.like { case (q, Vector(d)) =>
-      d must beCloseTo(expected).updateMessage(_ ⊹ s"\nquery: $q")
+    (r must beRightDisjunction.like {
+      case (q, Vector(d)) =>
+        d must beCloseTo(expected).updateMessage(_ ⊹ s"\nquery: $q")
     }).toResult
   }
 
   def runner(cfg: Config) = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(
-      prg: FreeMapA[Fix, Nothing],
-      expected: QData
+        prg: FreeMapA[Fix, Nothing],
+        expected: QData
     ): Result =
       skipped
 
     def unaryMapFunc(
-      prg: FreeMapA[Fix, UnaryArg],
-      arg: QData,
-      expected: QData
+        prg: FreeMapA[Fix, UnaryArg],
+        arg: QData,
+        expected: QData
     ): Result =
       run(prg, κ(arg), expected, cfg)
 
     def binaryMapFunc(
-      prg: FreeMapA[Fix, BinaryArg],
-      arg1: QData, arg2: QData,
-      expected: QData
+        prg: FreeMapA[Fix, BinaryArg],
+        arg1: QData,
+        arg2: QData,
+        expected: QData
     ): Result =
       run[BinaryArg](prg, _.fold(arg1, arg2), expected, cfg)
 
     def ternaryMapFunc(
-      prg: FreeMapA[Fix, TernaryArg],
-      arg1: QData, arg2: QData, arg3: QData,
-      expected: QData
+        prg: FreeMapA[Fix, TernaryArg],
+        arg1: QData,
+        arg2: QData,
+        arg3: QData,
+        expected: QData
     ): Result =
       run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected, cfg)
 
     // TODO: remove let once '\\' is fixed in N1QL
     val genPrintableAsciiSansBackslash: Gen[String] =
-      Gen.listOf(Gen.frequency(
-        (64, Gen.choose('\u0020', '\u005B')),
-        (36, Gen.choose('\u005D', '\u007e'))
-      )).map(_.mkString)
+      Gen
+        .listOf(
+          Gen.frequency(
+            (64, Gen.choose('\u0020', '\u005B')),
+            (36, Gen.choose('\u005D', '\u007e'))
+          ))
+        .map(_.mkString)
 
-    val intDomain: Gen[BigInt] = arbitrary[Int] map (BigInt(_))
+    val intDomain: Gen[BigInt]     = arbitrary[Int] map (BigInt(_))
     val decDomain: Gen[BigDecimal] = arbitrary[Double] map (BigDecimal(_))
-    val stringDomain: Gen[String] = genPrintableAsciiSansBackslash
+    val stringDomain: Gen[String]  = genPrintableAsciiSansBackslash
 
     val dateDomain: Gen[LocalDate] =
       Gen.choose(
@@ -135,11 +146,18 @@ class CouchbaseStdLibSpec extends StdLibSpec {
 
   }
 
-  TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    parseConfig(uri).fold(
-      err => Task.fail(new RuntimeException(err.shows)),
-      cfg => Task.now(backend.name.shows should tests(runner(cfg)))
-    ).join.void
-  }).unsafePerformSync
+  TestConfig
+    .fileSystemConfigs(FsType)
+    .flatMap(_ traverse_ {
+      case (backend, uri, _) =>
+        parseConfig(uri)
+          .fold(
+            err => Task.fail(new RuntimeException(err.shows)),
+            cfg => Task.now(backend.name.shows should tests(runner(cfg)))
+          )
+          .join
+          .void
+    })
+    .unsafePerformSync
 
 }

@@ -40,11 +40,11 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import hierarchical.MountedResultH
   import QueryFile.ResultHandle
 
-  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
+  val lpf        = new LogicalPlanR[Fix[LogicalPlan]]
   val transforms = QueryFile.Transforms[FreeFS]
-  val unsafeq = QueryFile.Unsafe[FileSystem]
+  val unsafeq    = QueryFile.Unsafe[FileSystem]
 
-  type ExecM[A] = transforms.ExecM[A]
+  type ExecM[A]     = transforms.ExecM[A]
   type MountedFs[A] = State[MountedState, A]
 
   type HEff0[A] = Coproduct[MountedResultH, MountedFs, A]
@@ -53,12 +53,11 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
 
   type RHandles = Map[ResultHandle, (ADir, ResultHandle)]
 
-  case class MountedState(
-    n: Long,
-    h: RHandles,
-    a: InMemState,
-    b: InMemState,
-    c: InMemState)
+  case class MountedState(n: Long,
+                          h: RHandles,
+                          a: InMemState,
+                          b: InMemState,
+                          c: InMemState)
 
   def emptyMS: MountedState =
     MountedState(0, Map.empty, InMemState.empty, InMemState.empty, InMemState.empty)
@@ -67,11 +66,15 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   val mntB: ADir = rootDir </> dir("bar") </> dir("mntB")
   val mntC: ADir = rootDir </> dir("foo") </> dir("mntC")
 
-  val seq: Lens[MountedState, Long]         = Lens((_: MountedState).n)(x => ms => ms.copy(n = x))
-  val handles: Lens[MountedState, RHandles] = Lens((_: MountedState).h)(m => ms => ms.copy(h = m))
-  val aMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).a)(s => ms => ms.copy(a = s))
-  val bMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).b)(s => ms => ms.copy(b = s))
-  val cMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).c)(s => ms => ms.copy(c = s))
+  val seq: Lens[MountedState, Long] = Lens((_: MountedState).n)(x => ms => ms.copy(n = x))
+  val handles: Lens[MountedState, RHandles] =
+    Lens((_: MountedState).h)(m => ms => ms.copy(h = m))
+  val aMem: Lens[MountedState, InMemState] =
+    Lens((_: MountedState).a)(s => ms => ms.copy(a = s))
+  val bMem: Lens[MountedState, InMemState] =
+    Lens((_: MountedState).b)(s => ms => ms.copy(b = s))
+  val cMem: Lens[MountedState, InMemState] =
+    Lens((_: MountedState).c)(s => ms => ms.copy(c = s))
 
   val interpHEff: HEff ~> MountedFs = {
     val seqNT: MonotonicSeq ~> MountedFs =
@@ -84,11 +87,16 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   }
 
   val interpretMnted: FileSystem ~> HEffM =
-    hierarchical.fileSystem[MountedFs, HEff](Mounts.fromFoldable(List(
-      (mntA, zoomNT[Id](aMem) compose Mem.interpretTerm),
-      (mntB, zoomNT[Id](bMem) compose Mem.interpretTerm),
-      (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
-    )).toOption.get)
+    hierarchical.fileSystem[MountedFs, HEff](
+      Mounts
+        .fromFoldable(
+          List(
+            (mntA, zoomNT[Id](aMem) compose Mem.interpretTerm),
+            (mntB, zoomNT[Id](bMem) compose Mem.interpretTerm),
+            (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
+          ))
+        .toOption
+        .get)
 
   val runMntd: FreeFS ~> MountedFs =
     foldMapNT(foldMapNT(interpHEff).compose[FileSystem](interpretMnted))
@@ -125,11 +133,16 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       val joinQry =
         "select f.x, q.y from `/bar/mntA/foo` as f inner join `/foo/mntC/quux` as q on f.id = q.id"
 
-      val lp = fixParser.parseExpr(Query(joinQry)).toOption
-        .flatMap(expr => queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
+      val lp = fixParser
+        .parseExpr(Query(joinQry))
+        .toOption
+        .flatMap(expr =>
+          queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
         .get
 
-      runMntd(f(lp.valueOr(_ => scala.sys.error("impossible constant plan")), mntA </> file("out0")).run.value)
+      runMntd(
+        f(lp.valueOr(_ => scala.sys.error("impossible constant plan")),
+          mntA </> file("out0")).run.value)
         .eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 
@@ -144,13 +157,12 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       val local = dir("d1") </> file("f1")
       val mnted = mntB </> local
 
-      val lp = lpf.invoke(Take, Func.Input2(
-        lpf.invoke(Squash, Func.Input1(lpf.read(mnted))),
-        lpf.constant(Data.Int(5))))
+      val lp = lpf.invoke(Take,
+                          Func.Input2(lpf.invoke(Squash, Func.Input1(lpf.read(mnted))),
+                                      lpf.constant(Data.Int(5))))
 
       val fss = bMem.set(
-        InMemState.fromFiles(Map((rootDir </> local) -> Vector(Data.Int(1)))))(
-        emptyMS)
+        InMemState.fromFiles(Map((rootDir </> local) -> Vector(Data.Int(1)))))(emptyMS)
 
       runMntd(f(lp).run.value).eval(fss) must succeedH
     }
@@ -167,14 +179,15 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         failsForDifferentFs((lp, out) => query.execute(lp, out))
 
         "should fail when output path and plan paths refer to different filesystems" >> {
-          val rd = mntB </> file("f1")
+          val rd  = mntB </> file("f1")
           val out = mntC </> file("outf")
 
-          val lp = lpf.invoke(Take, Func.Input2(
-            lpf.invoke(Squash, Func.Input1(lpf.read(rd))),
-            lpf.constant(Data.Int(5))))
+          val lp = lpf.invoke(Take,
+                              Func.Input2(lpf.invoke(Squash, Func.Input1(lpf.read(rd))),
+                                          lpf.constant(Data.Int(5))))
 
-          val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)
+          val fss =
+            bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)
 
           runMntd(query.execute(lp, out).run.value)
             .eval(fss) must failDueToInvalidPath(mntB)
@@ -182,8 +195,13 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
 
         "containing no paths succeeds" >> {
           val out = mntC </> file("outfile")
-          runMntd(query.execute(lpf.constant(Data.Obj(ListMap("0" -> Data.Int(3)))), out).run.value)
-            .eval(emptyMS).toEither must beRight(out)
+          runMntd(
+            query
+              .execute(lpf.constant(Data.Obj(ListMap("0" -> Data.Int(3)))), out)
+              .run
+              .value)
+            .eval(emptyMS)
+            .toEither must beRight(out)
         }
       }
 
@@ -229,8 +247,8 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       "move dir should fail when dst not in same filesystem" >> {
         val src = mntA </> dir("srcdir")
         val dst = mntC </> dir("dstdir")
-        val fss = emptyMS.copy(a = InMemState.fromFiles(Map(
-          (src </> file("f1")) -> Vector(Data.Str("contents")))))
+        val fss = emptyMS.copy(a =
+          InMemState.fromFiles(Map((src </> file("f1")) -> Vector(Data.Str("contents")))))
 
         runMntd(manage.moveDir(src, dst, MoveSemantics.Overwrite).run)
           .eval(fss) must failDueToInvalidPath(dst)
@@ -239,8 +257,8 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       "move file should fail when dst not in same filesystem" >> {
         val src = mntA </> dir("srcdir") </> file("f1")
         val dst = mntC </> dir("dstdir") </> file("f2")
-        val fss = emptyMS.copy(a = InMemState.fromFiles(Map(
-          src -> Vector(Data.Str("contents")))))
+        val fss =
+          emptyMS.copy(a = InMemState.fromFiles(Map(src -> Vector(Data.Str("contents")))))
 
         runMntd(manage.moveFile(src, dst, MoveSemantics.Overwrite).run)
           .eval(fss) must failDueToInvalidPath(dst)
@@ -250,9 +268,9 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         val f1 = mntB </> dir("d1") </> file("f1")
         val f2 = mntB </> file("f2")
 
-        val fss = emptyMS.copy(b = InMemState.fromFiles(Map(
-          f1 -> Vector(Data.Str("conts1")),
-          f2 -> Vector(Data.Int(42)))))
+        val fss = emptyMS.copy(
+          b = InMemState.fromFiles(
+            Map(f1 -> Vector(Data.Str("conts1")), f2 -> Vector(Data.Int(42)))))
 
         runMntd(manage.delete(mntB).run)
           .exec(fss) must_=== emptyMS
@@ -265,12 +283,11 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         val f4 = mntA </> dir("d2") </> file("f4")
 
         val fss = emptyMS.copy(
-          b = InMemState.fromFiles(Map(
-            f1 -> Vector(Data.Str("file1")),
-            f2 -> Vector(Data.Str("file2")))),
-          a = InMemState.fromFiles(Map(
-            f3 -> Vector(Data.Str("file3")),
-            f4 -> Vector(Data.Str("file4")))))
+          b = InMemState.fromFiles(
+            Map(f1 -> Vector(Data.Str("file1")), f2 -> Vector(Data.Str("file2")))),
+          a = InMemState.fromFiles(
+            Map(f3 -> Vector(Data.Str("file3")), f4 -> Vector(Data.Str("file4"))))
+        )
 
         runMntd(manage.delete(rootDir </> dir("bar")).run)
           .exec(fss) must_=== emptyMS

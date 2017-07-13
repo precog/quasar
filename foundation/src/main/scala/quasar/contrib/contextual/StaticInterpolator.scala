@@ -26,13 +26,13 @@ trait StaticInterpolator[A] extends Interpolator {
 
   def contextualize(interpolation: StaticInterpolation) = {
     interpolation.parts.foreach {
-      case lit@Literal(_, string) =>
+      case lit @ Literal(_, string) =>
         parse(string) match {
           case -\/(msg) => interpolation.abort(lit, 0, msg)
           case _        => ()
         }
 
-      case hole@Hole(_, _) =>
+      case hole @ Hole(_, _) =>
         interpolation.abort(hole, "substitutions are not supported")
     }
 
@@ -42,5 +42,6 @@ trait StaticInterpolator[A] extends Interpolator {
   // A String that would not parse should not have made it past compile time
   def evaluate(interpolation: RuntimeInterpolation): A =
     parse(interpolation.parts.mkString).valueOr(errMsg =>
-      scala.sys.error(s"Something terribly wrong happened. Failed to parse something at runtime that we checked at compile time. Reason: $errMsg. This is either because the `parse` function of this `StaticInterpolator` is not pure or could (less likely) be a bug with `StaticInterpolator`"))
+      scala.sys.error(
+        s"Something terribly wrong happened. Failed to parse something at runtime that we checked at compile time. Reason: $errMsg. This is either because the `parse` function of this `StaticInterpolator` is not pure or could (less likely) be a bug with `StaticInterpolator`"))
 }

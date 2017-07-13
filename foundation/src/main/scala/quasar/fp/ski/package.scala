@@ -23,7 +23,6 @@ package object ski extends Serializable {
   //     be more appropriate, but the code points are larger than 2 bytes, so
   //     Scala doesn't handle them.
 
-
   /** Probably not useful; implemented here mostly because it's amusing. */
   def σ[A, B, C](x: A => B => C, y: A => B, z: A): C = x(z)(y(z))
 

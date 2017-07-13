@@ -26,9 +26,8 @@ final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
 object CardinalExpr {
   implicit val traverse: Traverse[CardinalExpr] =
     new Traverse[CardinalExpr] {
-      def traverseImpl[G[_]: Applicative, A, B](
-        fa: CardinalExpr[A])(f: A => G[B]):
-          G[CardinalExpr[B]] =
+      def traverseImpl[G[_]: Applicative, A, B](fa: CardinalExpr[A])(
+          f: A => G[B]): G[CardinalExpr[B]] =
         fa match {
           case MapExpr(e)  => f(e).map(MapExpr(_))
           case FlatExpr(e) => f(e).map(FlatExpr(_))
@@ -43,11 +42,11 @@ object CardinalExpr {
           case FlatExpr(e) => FlatExpr(f(e))
         }
 
-      def cobind[A, B](fa: CardinalExpr[A])(f: CardinalExpr[A] => B):
-          CardinalExpr[B] = fa match {
-        case MapExpr(_)  => MapExpr(f(fa))
-        case FlatExpr(_) => FlatExpr(f(fa))
-      }
+      def cobind[A, B](fa: CardinalExpr[A])(f: CardinalExpr[A] => B): CardinalExpr[B] =
+        fa match {
+          case MapExpr(_)  => MapExpr(f(fa))
+          case FlatExpr(_) => FlatExpr(f(fa))
+        }
 
       def copoint[A](p: CardinalExpr[A]) = p match {
         case MapExpr(e)  => e
@@ -58,9 +57,9 @@ object CardinalExpr {
   implicit def equal[A: Equal]: Equal[CardinalExpr[A]] = new Equal[CardinalExpr[A]] {
 
     def equal(left: CardinalExpr[A], right: CardinalExpr[A]) = (left, right) match {
-      case (MapExpr(lfn), MapExpr(rfn)) => lfn === rfn
+      case (MapExpr(lfn), MapExpr(rfn))   => lfn === rfn
       case (FlatExpr(lfn), FlatExpr(rfn)) => lfn === rfn
-      case _ => false
+      case _                              => false
     }
 
     override def equalIsNatural = Equal[A].equalIsNatural

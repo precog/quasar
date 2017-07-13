@@ -33,20 +33,27 @@ object v1 {
                           createdAt: Instant,
                           expirationDate: Option[LocalDateTime]) {
     def isValidAt(timestamp: Instant) = {
-      createdAt.isBefore(timestamp) && expirationDate.forall(_ isAfter (dateTime fromMillis timestamp.getMillis))
+      createdAt.isBefore(timestamp) && expirationDate.forall(
+        _ isAfter (dateTime fromMillis timestamp.getMillis))
     }
   }
   object GrantDetails {
     val schema = "grantId" :: "name" :: "description" :: "permissions" :: ("createdAt" ||| instant.zero) :: "expirationDate" :: HNil
 
-    implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[GrantDetails](schema)
+    implicit val (decomposerV1, extractorV1) =
+      IsoSerialization.serialization[GrantDetails](schema)
   }
 
-  case class APIKeyDetails(apiKey: APIKey, name: Option[String], description: Option[String], grants: Set[GrantDetails], issuerChain: List[APIKey])
+  case class APIKeyDetails(apiKey: APIKey,
+                           name: Option[String],
+                           description: Option[String],
+                           grants: Set[GrantDetails],
+                           issuerChain: List[APIKey])
   object APIKeyDetails {
     val schema = "apiKey" :: "name" :: "description" :: "grants" :: "issuerChain" :: HNil
 
-    implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[APIKeyDetails](schema)
+    implicit val (decomposerV1, extractorV1) =
+      IsoSerialization.serialization[APIKeyDetails](schema)
   }
 
   case class NewGrantRequest(name: Option[String],
@@ -64,17 +71,21 @@ object v1 {
   object NewGrantRequest {
     private implicit val reqPermDecomposer = Permission.decomposerV1Base
 
-    val schemaV1 = "name" :: "description" :: ("parentIds" ||| Set.empty[GrantId]) :: "permissions" :: "expirationDate" :: HNil
+    val schemaV1 = "name" :: "description" :: ("parentIds" ||| Set
+      .empty[GrantId]) :: "permissions" :: "expirationDate" :: HNil
 
     implicit val decomposerV1 = IsoSerialization.decomposer[NewGrantRequest](schemaV1)
     implicit val extractorV1  = IsoSerialization.extractor[NewGrantRequest](schemaV1)
   }
 
-  case class NewAPIKeyRequest(name: Option[String], description: Option[String], grants: Set[NewGrantRequest])
+  case class NewAPIKeyRequest(name: Option[String],
+                              description: Option[String],
+                              grants: Set[NewGrantRequest])
 
   object NewAPIKeyRequest {
     val schemaV1 = "name" :: "description" :: "grants" :: HNil
 
-    implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[NewAPIKeyRequest](schemaV1)
+    implicit val (decomposerV1, extractorV1) =
+      IsoSerialization.serialization[NewAPIKeyRequest](schemaV1)
   }
 }

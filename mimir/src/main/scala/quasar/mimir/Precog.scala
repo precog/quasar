@@ -17,7 +17,13 @@
 package quasar.mimir
 
 import quasar.blueeyes.util.Clock
-import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
+import quasar.niflheim.{
+  Chef,
+  V1CookedBlockFormat,
+  V1SegmentFormat,
+  VersionedSegmentFormat,
+  VersionedCookedBlockFormat
+}
 import quasar.precog.common.accounts.AccountFinder
 
 import quasar.precog.common.security.{
@@ -69,17 +75,17 @@ final class Precog private (dataDir0: File)
   object Library extends StdLib
 
   object Config {
-    val howManyChefsInTheKitchen: Int = 4
+    val howManyChefsInTheKitchen: Int     = 4
     val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
-    val maxOpenPaths: Int = 500
-    val dataDir: File = dataDir0
+    val maxOpenPaths: Int                 = 500
+    val dataDir: File                     = dataDir0
   }
 
-  val CookThreshold: Int = 20000
+  val CookThreshold: Int             = 20000
   val StorageTimeout: FiniteDuration = 300.seconds
 
   private var _vfs: SerialVFS = _
-  def vfs = _vfs
+  def vfs                     = _vfs
 
   private val vfsLatch = new CountDownLatch(1)
 
@@ -97,7 +103,7 @@ final class Precog private (dataDir0: File)
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
     gated.run.unsafePerformAsync(_ => ())
-    vfsLatch.await()      // sigh....
+    vfsLatch.await() // sigh....
   }
 
   // for the time being, do everything with this key
@@ -118,9 +124,9 @@ final class Precog private (dataDir0: File)
   val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
-  private val props: Props = Props(Chef(
-    VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
+  private val props: Props = Props(
+    Chef(VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
+         VersionedSegmentFormat(Map(1     -> V1SegmentFormat))))
 
   private def chefs(system: ActorSystem): IndexedSeq[Routee] =
     (1 to Config.howManyChefsInTheKitchen).map { _ =>
@@ -143,7 +149,7 @@ final class Precog private (dataDir0: File)
 
   // Members declared in quasar.yggdrasil.TableModule
   sealed trait TableCompanion extends VFSColumnarTableCompanion
-  object Table extends TableCompanion
+  object Table                extends TableCompanion
 
   def shutdown: Future[Unit] = {
     for {

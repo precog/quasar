@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import slamdata.Predef.{ -> => _, _ }
+import slamdata.Predef.{-> => _, _}
 import quasar.api._
 import quasar.api.ApiError._
 import quasar.api.ToQResponse._
@@ -35,10 +35,10 @@ import scalaz.concurrent.Task
 object invoke {
 
   def service[S[_]](
-    implicit
-    I: Module.Ops[S],
-    S0: Task :<: S,
-    S1: Failure[Module.Error, ?] :<: S
+      implicit
+      I: Module.Ops[S],
+      S0: Task :<: S,
+      S1: Failure[Module.Error, ?] :<: S
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
@@ -49,7 +49,8 @@ object invoke {
             file => {
               val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
               invoke[S](requestedFormat, file, req.params, offset, limit)
-            })
+            }
+          )
         }
       }
   }
@@ -57,15 +58,14 @@ object invoke {
   ////
 
   private def invoke[S[_]](
-    format: MessageFormat,
-    filePath: AFile,
-    args: Map[String, String],
-    offset: Natural,
-    limit: Option[Positive]
+      format: MessageFormat,
+      filePath: AFile,
+      args: Map[String, String],
+      offset: Natural,
+      limit: Option[Positive]
   )(implicit
     I: Module.Ops[S],
     S0: Failure[Module.Error, ?] :<: S,
-    S1: Task :<: S
-  ): QResponse[S] =
-      formattedDataResponse(format, I.invokeFunction(filePath, args, offset, limit))
+    S1: Task :<: S): QResponse[S] =
+    formattedDataResponse(format, I.invokeFunction(filePath, args, offset, limit))
 }

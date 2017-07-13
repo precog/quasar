@@ -42,17 +42,17 @@ sealed abstract class XQuery {
   def fnapply(args: XQuery*): XQuery =
     XQuery(s"${this}${mkSeq(args)}")
 
-  def unary_- : XQuery = XQuery(s"-$this")
-  def -(other: XQuery): XQuery = XQuery(s"$this - $other")
-  def +(other: XQuery): XQuery = XQuery(s"$this + $other")
-  def *(other: XQuery): XQuery = XQuery(s"$this * $other")
-  def div(other: XQuery): XQuery = XQuery(s"$this div $other")
+  def unary_- : XQuery            = XQuery(s"-$this")
+  def -(other: XQuery): XQuery    = XQuery(s"$this - $other")
+  def +(other: XQuery): XQuery    = XQuery(s"$this + $other")
+  def *(other: XQuery): XQuery    = XQuery(s"$this * $other")
+  def div(other: XQuery): XQuery  = XQuery(s"$this div $other")
   def idiv(other: XQuery): XQuery = XQuery(s"$this idiv $other")
-  def mod(other: XQuery): XQuery = XQuery(s"$this mod $other")
-  def and(other: XQuery): XQuery = XQuery(s"$this and $other")
-  def or(other: XQuery): XQuery = XQuery(s"$this or $other")
-  def seq: XQuery = mkSeq_(this)
-  def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
+  def mod(other: XQuery): XQuery  = XQuery(s"$this mod $other")
+  def and(other: XQuery): XQuery  = XQuery(s"$this and $other")
+  def or(other: XQuery): XQuery   = XQuery(s"$this or $other")
+  def seq: XQuery                 = mkSeq_(this)
+  def to(upper: XQuery): XQuery   = XQuery(s"$this to $upper")
 
   def `/`(xqy: XQuery): XQuery = xqy match {
     case Step(s)      => XQuery(s"$this/$s")
@@ -83,10 +83,10 @@ sealed abstract class XQuery {
   }
 
   def =/=(other: XQuery): XQuery = XQuery(s"$this != $other")
-  def <(other: XQuery): XQuery = XQuery(s"$this < $other")
-  def <=(other: XQuery): XQuery = XQuery(s"$this <= $other")
-  def >(other: XQuery): XQuery = XQuery(s"$this > $other")
-  def >=(other: XQuery): XQuery = XQuery(s"$this >= $other")
+  def <(other: XQuery): XQuery   = XQuery(s"$this < $other")
+  def <=(other: XQuery): XQuery  = XQuery(s"$this <= $other")
+  def >(other: XQuery): XQuery   = XQuery(s"$this > $other")
+  def >=(other: XQuery): XQuery  = XQuery(s"$this >= $other")
 
   // Node Comparisons
   def is(other: XQuery): XQuery = XQuery(s"$this is $other")
@@ -114,11 +114,11 @@ object XQuery {
   final case class Step(val render: String) extends XQuery
 
   final case class Flwor(
-    bindingClauses: NonEmptyList[BindingClause],
-    filterExpr: Option[XQuery],
-    orderSpecs: IList[(XQuery, SortDirection)],
-    orderIsStable: Boolean,
-    resultExpr: XQuery
+      bindingClauses: NonEmptyList[BindingClause],
+      filterExpr: Option[XQuery],
+      orderSpecs: IList[(XQuery, SortDirection)],
+      orderIsStable: Boolean,
+      resultExpr: XQuery
   ) extends XQuery {
     def render: String = {
       val bindings =
@@ -148,15 +148,21 @@ object XQuery {
 
   val stringLit = Prism.partial[XQuery, String] {
     case StringLit(s) => s
-  } (StringLit)
+  }(StringLit)
 
   val step = Prism.partial[XQuery, String] {
     case Step(s) => s
-  } (Step)
+  }(Step)
 
-  val flwor = Prism.partial[XQuery, (NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] {
-    case Flwor(bindings, filter, order, isStable, result) => (bindings, filter, order, isStable, result)
-  } (Flwor.tupled)
+  val flwor = Prism.partial[XQuery,
+                            (NonEmptyList[BindingClause],
+                             Option[XQuery],
+                             IList[(XQuery, SortDirection)],
+                             Boolean,
+                             XQuery)] {
+    case Flwor(bindings, filter, order, isStable, result) =>
+      (bindings, filter, order, isStable, result)
+  }(Flwor.tupled)
 
   implicit val equal: Equal[XQuery] =
     Equal.equalBy(_.render)

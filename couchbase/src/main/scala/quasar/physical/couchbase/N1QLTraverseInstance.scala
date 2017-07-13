@@ -23,11 +23,11 @@ trait N1QLTraverseInstance {
 
   implicit val traverse: Traverse[N1QL] = new Traverse[N1QL] {
     def traverseImpl[G[_], A, B](
-      fa: N1QL[A]
+        fa: N1QL[A]
     )(
-      f: A => G[B]
+        f: A => G[B]
     )(
-      implicit G: Applicative[G]
+        implicit G: Applicative[G]
     ): G[N1QL[B]] = fa match {
       case Data(v)                 => G.point(Data(v))
       case Id(v)                   => G.point(Id(v))
@@ -105,23 +105,24 @@ trait N1QLTraverseInstance {
       case Union(a1, a2)           => (f(a1) ⊛ f(a2))(Union(_, _))
       case ArrFor(a1, a2, a3)      => (f(a1) ⊛ f(a2) ⊛ f(a3))(ArrFor(_, _, _))
       case Select(v, re, ks, jn, un, lt, fr, gb, ob) =>
-        (re.traverse(i => f(i.expr) ∘ (ResultExpr(_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
-         ks.traverse(i => f(i.expr) ∘ (Keyspace  (_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
-         jn.traverse(i => f(i.pred) ∘ (LookupJoin(Id[B](i.id.v), i.alias ∘ (a => Id[B](a.v)), _, i.joinType))) ⊛
-         un.traverse(i => f(i.expr) ∘ (Unnest    (_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
-         lt.traverse(i => f(i.expr) ∘ (Binding(Id[B](i.id.v), _)))                                             ⊛
-         fr.traverse(i => f(i.v)    ∘ (Filter(_)))                                                             ⊛
-         gb.traverse(i => f(i.v)    ∘ (GroupBy(_)))                                                            ⊛
-         ob.traverse(i => f(i.a)    ∘ (OrderBy   (_, i.sortDir)))
-        )(
+        (re.traverse(i => f(i.expr) ∘ (ResultExpr(_, i.alias ∘ (a => Id[B](a.v))))) ⊛
+          ks.traverse(i => f(i.expr) ∘ (Keyspace(_, i.alias ∘ (a => Id[B](a.v))))) ⊛
+          jn.traverse(
+            i =>
+              f(i.pred) ∘ (LookupJoin(Id[B](i.id.v),
+                                      i.alias ∘ (a => Id[B](a.v)),
+                                      _,
+                                      i.joinType))) ⊛
+          un.traverse(i => f(i.expr) ∘ (Unnest(_, i.alias ∘ (a => Id[B](a.v))))) ⊛
+          lt.traverse(i => f(i.expr) ∘ (Binding(Id[B](i.id.v), _))) ⊛
+          fr.traverse(i => f(i.v) ∘ (Filter(_))) ⊛
+          gb.traverse(i => f(i.v) ∘ (GroupBy(_))) ⊛
+          ob.traverse(i => f(i.a) ∘ (OrderBy(_, i.sortDir))))(
           Select(v, _, _, _, _, _, _, _, _)
         )
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
-         f(e)
-        )((wt, e) =>
-          Case(wt, Else(e))
-        )
+          f(e))((wt, e) => Case(wt, Else(e)))
     }
   }
 }

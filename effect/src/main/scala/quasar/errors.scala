@@ -29,8 +29,8 @@ object Errors {
 
   type ETask[E, X] = EitherT[Task, E, X]
 
-  def handle[E, A, B>:A](t: ETask[E, A])(f: PartialFunction[Throwable, B]):
-      ETask[E, B] = {
+  def handle[E, A, B >: A](t: ETask[E, A])(
+      f: PartialFunction[Throwable, B]): ETask[E, B] = {
     type G[F[_], X] = EitherT[F, E, X]
     Catchable[G[Task, ?]].attempt(t) flatMap {
       case -\/(t) => f.lift(t).cata(Task.now, Task.fail(t)).liftM[G]
@@ -38,8 +38,8 @@ object Errors {
     }
   }
 
-  def handleWith[E, A, B>:A](t: ETask[E, A])(f: PartialFunction[Throwable, ETask[E, B]]):
-      ETask[E, B] = {
+  def handleWith[E, A, B >: A](t: ETask[E, A])(
+      f: PartialFunction[Throwable, ETask[E, B]]): ETask[E, B] = {
     type G[F[_], X] = EitherT[F, E, X]
     Catchable[G[Task, ?]].attempt(t) flatMap {
       case -\/(t) => f.lift(t) getOrElse liftE(Task.fail(t))
@@ -64,7 +64,8 @@ object convertError {
     new Aux[F]
 
   final class Aux[F[_]] {
-    def apply[A, B](f: A => B)(implicit F: Functor[F]): EitherT[F, A, ?] ~> EitherT[F, B, ?] =
+    def apply[A, B](f: A => B)(
+        implicit F: Functor[F]): EitherT[F, A, ?] ~> EitherT[F, B, ?] =
       new (EitherT[F, A, ?] ~> EitherT[F, B, ?]) {
         def apply[C](ea: EitherT[F, A, C]) = ea.leftMap(f)
       }

@@ -36,30 +36,36 @@ import scalaz._, Scalaz._
 //       return expression to a variable as, if it is a sequence, the results will,
 //       in the best case, also be sequences and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-  FMT: SearchOptions,
-  T[_[_]]: BirecursiveT
+    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+    FMT: SearchOptions,
+    T[_[_]]: BirecursiveT
 ](implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
-  SP : StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, QScriptCore[T, ?]] {
+  SP: StructuralPlanner[F, FMT])
+    extends Planner[F, FMT, QScriptCore[T, ?]] {
 
   import expr.{func, for_, if_, let_}
   import ReduceFuncs._
 
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
+  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]])
+    : AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
     case Map(src0, f) =>
       for {
         src <- elimSearch[Q, V](src0)
         x   <- freshName[F]
         g   <- mapFuncXQuery[T, F, FMT](f, ~x)
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)), filter, order, isStable, g)
+      } yield
+        (src match {
+          case IterativeFlwor(bindings, filter, order, isStable, result) =>
+            XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)),
+                         filter,
+                         order,
+                         isStable,
+                         g)
 
-        case _ =>
-          for_(x in src) return_ g
-      }).right
+          case _ =>
+            for_(x in src) return_ g
+        }).right
 
     // TODO: Use type information from `Guard` when available to determine
     //       if `ext` is being treated as an array or an object.
@@ -75,30 +81,30 @@ private[qscript] final class QScriptCorePlanner[
         extract <- mapFuncXQuery[T, F, FMT](struct, ~l)
         lshift  <- SP.leftShift(~ext)
         chkArr  <- SP.isArray(~ext)
-        getId   =  if_ (~isArr) then_ ~i else_ fn.nodeName(~r0)
-        idExpr  <- id match {
-                     case IdOnly    => getId.point[F]
-                     case IncludeId => SP.seqToArray(mkSeq_(getId, ~r0))
-                     case ExcludeId => (~r0).point[F]
-                   }
-        merge   <- mergeXQuery[T, F, FMT](repair, ~l, ~r)
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          val addlBindings = IList(
-            BindingClause.let_(l := result, ext := extract, isArr := chkArr),
-            BindingClause.for_(r0 at i in lshift),
-            BindingClause.let_(r := idExpr))
+        getId = if_(~isArr) then_ ~i else_ fn.nodeName(~r0)
+        idExpr <- id match {
+          case IdOnly    => getId.point[F]
+          case IncludeId => SP.seqToArray(mkSeq_(getId, ~r0))
+          case ExcludeId => (~r0).point[F]
+        }
+        merge <- mergeXQuery[T, F, FMT](repair, ~l, ~r)
+      } yield
+        (src match {
+          case IterativeFlwor(bindings, filter, order, isStable, result) =>
+            val addlBindings = IList(
+              BindingClause.let_(l := result, ext := extract, isArr := chkArr),
+              BindingClause.for_(r0 at i in lshift),
+              BindingClause.let_(r := idExpr))
 
-          XQuery.Flwor(bindings :::> addlBindings, filter, order, isStable, merge)
+            XQuery.Flwor(bindings :::> addlBindings, filter, order, isStable, merge)
 
-        case _ =>
-          for_ (l in src)
-          .let_(ext   := extract,
-                isArr := chkArr)
-          .for_(r0 at i in lshift)
-          .let_(r     := idExpr)
-          .return_(merge)
-      }).right
+          case _ =>
+            for_(l in src)
+              .let_(ext := extract, isArr := chkArr)
+              .for_(r0 at i in lshift)
+              .let_(r := idExpr)
+              .return_(merge)
+        }).right
 
     // TODO: Start leveraging the cts:* aggregation functions when possible
     case Reduce(src0, bucket, reducers, repair) =>
@@ -112,36 +118,43 @@ private[qscript] final class QScriptCorePlanner[
         idfn  <- lib.identity[F] flatMap (_.ref[F])
         fnl   <- lib.zipApply[F] apply (mkSeq(idfn :: fnls))
         y     <- freshName[F]
-        rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(r => (~y)((r.idx.fold(1)(_ + 2)).xqy))
-        rfnl  <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
-        bckt  <- fx(mapFuncXQuery[T, F, FMT](bucket, _))
-        red   <- lib.reduceWith[F] apply (init, cmb, rfnl, bckt, src)
+        rpr <- planMapFunc[T, F, FMT, ReduceIndex](repair)(r =>
+          (~y)((r.idx.fold(1)(_ + 2)).xqy))
+        rfnl <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
+        bckt <- fx(mapFuncXQuery[T, F, FMT](bucket, _))
+        red  <- lib.reduceWith[F] apply (init, cmb, rfnl, bckt, src)
       } yield red.right
 
     // TODO: Add an order param to Search and leverage cts:index-order
     case Sort(src0, bucket, order) =>
       for {
-        src      <- elimSearch[Q, V](src0)
-        x        <- freshName[F]
-        xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
-                      mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
-                        SP.asSortKey(by) strengthR SortDirection.fromQScript(sortDir)
-                      }
-                    }
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, _, _, result) =>
-          XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)), filter, xqyOrder.list, false, ~x)
+        src <- elimSearch[Q, V](src0)
+        x   <- freshName[F]
+        xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse {
+          case (func, sortDir) =>
+            mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
+              SP.asSortKey(by) strengthR SortDirection.fromQScript(sortDir)
+            }
+        }
+      } yield
+        (src match {
+          case IterativeFlwor(bindings, filter, _, _, result) =>
+            XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)),
+                         filter,
+                         xqyOrder.list,
+                         false,
+                         ~x)
 
-        case _ =>
-          for_(x in src) orderBy (xqyOrder.head, xqyOrder.tail.toList: _*) return_ ~x
-      }).right
+          case _ =>
+            for_(x in src) orderBy (xqyOrder.head, xqyOrder.tail.toList: _*) return_ ~x
+        }).right
 
     case Union(src, lBranch, rBranch) =>
       for {
-        l0  <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
-        r0  <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
-        l   <- elimSearch[Q, V](l0)
-        r   <- elimSearch[Q, V](r0)
+        l0 <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
+        r0 <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
+        l  <- elimSearch[Q, V](l0)
+        r  <- elimSearch[Q, V](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
     case Filter(src0, f) =>
@@ -149,18 +162,18 @@ private[qscript] final class QScriptCorePlanner[
         src <- elimSearch[Q, V](src0)
         x   <- freshName[F]
         p   <- mapFuncXQuery[T, F, FMT](f, ~x) map (xs.boolean)
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          XQuery.Flwor(
-            bindings :::> IList(BindingClause.let_(x := result)),
-            Some(filter.fold(p)(_ and p)),
-            order,
-            isStable,
-            ~x)
+      } yield
+        (src match {
+          case IterativeFlwor(bindings, filter, order, isStable, result) =>
+            XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)),
+                         Some(filter.fold(p)(_ and p)),
+                         order,
+                         isStable,
+                         ~x)
 
-        case _ =>
-          for_(x in src) where_ p return_ ~x
-      }).right
+          case _ =>
+            for_(x in src) where_ p return_ ~x
+        }).right
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.
@@ -174,12 +187,13 @@ private[qscript] final class QScriptCorePlanner[
         ct0 <- rebaseXQuery[T, F, FMT, Q, V](count, (~s).right)
         fm  <- elimSearch[Q, V](fm0)
         ct  <- elimSearch[Q, V](ct0)
-      } yield (let_(s := src, f := fm, c := ct) return_ (sel match {
-        case Drop   => fn.subsequence(~f, ~c + 1.xqy)
-        case Take   => fn.subsequence(~f, 1.xqy, some(~c))
-        // TODO: Better sampling
-        case Sample => fn.subsequence(~f, 1.xqy, some(~c))
-      })).right
+      } yield
+        (let_(s := src, f := fm, c := ct) return_ (sel match {
+          case Drop => fn.subsequence(~f, ~c + 1.xqy)
+          case Take => fn.subsequence(~f, 1.xqy, some(~c))
+          // TODO: Better sampling
+          case Sample => fn.subsequence(~f, 1.xqy, some(~c))
+        })).right
 
     case Unreferenced() =>
       "Unreferenced".xs.right.point[F]
@@ -205,22 +219,27 @@ private[qscript] final class QScriptCorePlanner[
     combiner(fm)((acc, x) => SP.castIfNode(x) >>= (f(acc, _)))
 
   def reduceFuncInit(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              => fx(x => for {
-                                   v0 <- mapFuncXQuery[T, F, FMT](fm, x)
-                                   v  <- SP.castIfNode(v0)
-                                   st <- lib.incAvgState[F].apply(1.xqy, v)
-                                 } yield st)
-    case Count(_)             => fx(_ => 1.xqy.point[F])
-    case Max(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
-    case Min(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
-    case Sum(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
-    case Arbitrary(fm)        => fx(mapFuncXQuery[T, F, FMT](fm, _))
-    case First(fm)            => fx(mapFuncXQuery[T, F, FMT](fm, _))
-    case Last(fm)             => fx(mapFuncXQuery[T, F, FMT](fm, _))
-    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.singletonArray(_)))
-    case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F, FMT](kfm, x).tuple(mapFuncXQuery[T, F, FMT](vfm, x)).flatMap {
-                                   case (k, v) => SP.singletonObject(k, v)
-                                 })
+    case Avg(fm) =>
+      fx(x =>
+        for {
+          v0 <- mapFuncXQuery[T, F, FMT](fm, x)
+          v  <- SP.castIfNode(v0)
+          st <- lib.incAvgState[F].apply(1.xqy, v)
+        } yield st)
+    case Count(_)      => fx(_ => 1.xqy.point[F])
+    case Max(fm)       => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
+    case Min(fm)       => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
+    case Sum(fm)       => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
+    case Arbitrary(fm) => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case First(fm)     => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case Last(fm)      => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case UnshiftArray(fm) =>
+      fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.singletonArray(_)))
+    case UnshiftMap(kfm, vfm) =>
+      fx(x =>
+        mapFuncXQuery[T, F, FMT](kfm, x).tuple(mapFuncXQuery[T, F, FMT](vfm, x)).flatMap {
+          case (k, v) => SP.singletonObject(k, v)
+      })
   }
 
   def reduceFuncFinalize(rf: ReduceFunc[_]): F[XQuery] = {
@@ -232,15 +251,15 @@ private[qscript] final class QScriptCorePlanner[
   }
 
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              => castingCombiner(fm)(lib.incAvg[F].apply(_, _))
-    case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
-    case Max(fm)              => castingCombiner(fm)((x, y) => (if_ (y gt x) then_ y else_ x).point[F])
-    case Min(fm)              => castingCombiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
-    case Sum(fm)              => castingCombiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
-    case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
-    case First(fm)            => combiner(fm)((x, _) => x.point[F])
-    case Last(fm)             => combiner(fm)((_, y) => y.point[F])
-    case UnshiftArray(fm)     => combiner(fm)(SP.arrayAppend(_, _))
+    case Avg(fm)          => castingCombiner(fm)(lib.incAvg[F].apply(_, _))
+    case Count(fm)        => combiner(fm)((c, _) => (c + 1.xqy).point[F])
+    case Max(fm)          => castingCombiner(fm)((x, y) => (if_(y gt x) then_ y else_ x).point[F])
+    case Min(fm)          => castingCombiner(fm)((x, y) => (if_(y lt x) then_ y else_ x).point[F])
+    case Sum(fm)          => castingCombiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
+    case Arbitrary(fm)    => combiner(fm)((x, _) => x.point[F])
+    case First(fm)        => combiner(fm)((x, _) => x.point[F])
+    case Last(fm)         => combiner(fm)((_, y) => y.point[F])
+    case UnshiftArray(fm) => combiner(fm)(SP.arrayAppend(_, _))
     case UnshiftMap(kfm, vfm) =>
       val (m, x) = ($("m"), $("x"))
       mapFuncXQuery[T, F, FMT](kfm, ~x).tuple(mapFuncXQuery[T, F, FMT](vfm, ~x)).flatMap {

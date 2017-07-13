@@ -19,6 +19,7 @@ package quasar.precog
 import java.util.concurrent.atomic.AtomicInteger
 
 package object util {
+
   /**
     * Opaque symbolic identifier (like Int, but better!).
     */
@@ -28,7 +29,7 @@ package object util {
   object IdGen extends IdGen
   class IdGen {
     private[this] val currentId = new AtomicInteger(0)
-    def nextInt(): Int = currentId.getAndIncrement()
+    def nextInt(): Int          = currentId.getAndIncrement()
   }
 
 }

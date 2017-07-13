@@ -46,62 +46,72 @@ class queryfile(fileSystem: Task[FileSystem]) {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = for {
-    hdfs <- fileSystem
-    pathStr <- Task.delay {
-      val pathStr = posixCodec.unsafePrintPath(file)
-      val host = hdfs.getUri().getHost()
-      val port = hdfs.getUri().getPort()
-      s"hdfs://$host:$port$pathStr"
-    }
-    rdd <- readfile.fetchRdd(sc, pathStr)
-  } yield rdd
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] =
+    for {
+      hdfs <- fileSystem
+      pathStr <- Task.delay {
+        val pathStr = posixCodec.unsafePrintPath(file)
+        val host    = hdfs.getUri().getHost()
+        val port    = hdfs.getUri().getPort()
+        s"hdfs://$host:$port$pathStr"
+      }
+      rdd <- readfile.fetchRdd(sc, pathStr)
+    } yield rdd
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Unit] = lift(for {
-    path <- toPath(out)
-    hdfs <- fileSystem
-  } yield {
-    val os: OutputStream = hdfs.create(path, new Progressable() {
-      override def progress(): Unit = {}
-    })
-    val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
+                                              S: Task :<: S): Free[S, Unit] =
+    lift(for {
+      path <- toPath(out)
+      hdfs <- fileSystem
+    } yield {
+      val os: OutputStream = hdfs.create(path, new Progressable() {
+        override def progress(): Unit = {}
+      })
+      val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
 
-    rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => {
-        bw.write(v)
-        bw.newLine()
-    })
-    bw.close()
-    hdfs.close()
-  }).into[S]
+      rdd
+        .flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
+        .collect()
+        .foreach(v => {
+          bw.write(v)
+          bw.newLine()
+        })
+      bw.close()
+      hdfs.close()
+    }).into[S]
 
   def fileExists[S[_]](f: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Boolean] = lift(for {
-    path <- toPath(f)
-    hdfs <- fileSystem
-  } yield {
-    val exists = hdfs.exists(path)
-    hdfs.close()
-    exists
-  }).into[S]
+                                 S: Task :<: S): Free[S, Boolean] =
+    lift(for {
+      path <- toPath(f)
+      hdfs <- fileSystem
+    } yield {
+      val exists = hdfs.exists(path)
+      hdfs.close()
+      exists
+    }).into[S]
 
-  def listContents[S[_]](d: ADir)(implicit
-    S: Task :<: S
-  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT(lift(for {
-    path <- toPath(d)
-    hdfs <- fileSystem
-  } yield {
-    val result = if(hdfs.exists(path)) {
-      hdfs.listStatus(path).toSet.map {
-        case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
-        case directory => DirName(directory.getPath().getName()).left[FileName]
-      }.right[FileSystemError]
-    } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-    hdfs.close
-    result
-  }).into[S])
+  def listContents[S[_]](d: ADir)(
+      implicit
+      S: Task :<: S): FileSystemErrT[Free[S, ?], Set[PathSegment]] =
+    EitherT(lift(for {
+      path <- toPath(d)
+      hdfs <- fileSystem
+    } yield {
+      val result = if (hdfs.exists(path)) {
+        hdfs
+          .listStatus(path)
+          .toSet
+          .map {
+            case file if file.isFile() =>
+              FileName(file.getPath().getName()).right[DirName]
+            case directory => DirName(directory.getPath().getName()).left[FileName]
+          }
+          .right[FileSystemError]
+      } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
+      hdfs.close
+      result
+    }).into[S])
 
   def readChunkSize: Int = 5000
 
@@ -110,5 +120,6 @@ class queryfile(fileSystem: Task[FileSystem]) {
 }
 
 object queryfile {
-  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = new queryfile(fileSystem).input
+  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] =
+    new queryfile(fileSystem).input
 }

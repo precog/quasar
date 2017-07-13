@@ -39,7 +39,10 @@ case class AlphaAndSpecialCharacters(value: String)
 
 object AlphaAndSpecialCharacters {
   implicit val arb: Arbitrary[AlphaAndSpecialCharacters] =
-    Arbitrary(Gen.nonEmptyListOf(Gen.oneOf(Gen.alphaChar, Gen.const('/'), Gen.const('.'))).map(chars => AlphaAndSpecialCharacters(chars.mkString)))
+    Arbitrary(
+      Gen
+        .nonEmptyListOf(Gen.oneOf(Gen.alphaChar, Gen.const('/'), Gen.const('.')))
+        .map(chars => AlphaAndSpecialCharacters(chars.mkString)))
   implicit val show: Show[AlphaAndSpecialCharacters] = Show.shows(_.value)
 }
 
@@ -54,38 +57,46 @@ trait FileSystemFixture {
   val emptyMem = InMemState.empty
 
   case class SingleFileMemState(file: AFile, contents: Vector[Data]) {
-    def state = InMemState fromFiles Map(file -> contents)
-    def parent = fileParent(file)
+    def state    = InMemState fromFiles Map(file -> contents)
+    def parent   = fileParent(file)
     def filename = fileName(file)
   }
 
   case class NonEmptyDir(
-                          dir: ADir,
-                          filesInDir: NonEmptyList[(RFile, Vector[Data])]
-                        ) {
+      dir: ADir,
+      filesInDir: NonEmptyList[(RFile, Vector[Data])]
+  ) {
     def state = {
-      val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}
+      val fileMapping = filesInDir.map { case (relFile, data) => (dir </> relFile, data) }
       InMemState fromFiles fileMapping.toList.toMap
     }
     def relFiles: NonEmptyList[RFile] = filesInDir.unzip._1
-    def ls = relFiles.map(segAt(0,_)).list.toList.flatten.distinct
-      .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
+    def ls =
+      relFiles
+        .map(segAt(0, _))
+        .list
+        .toList
+        .flatten
+        .distinct
+        .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
   }
 
   // NB: scale down because `Vector[Data]` is `O(n^2)`
   implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(
     (Arbitrary.arbitrary[AFile] |@|
-      scaleSize(Arbitrary.arbitrary[Vector[Data]], scalePow(1/2.0)))(SingleFileMemState.apply))
+      scaleSize(Arbitrary.arbitrary[Vector[Data]], scalePow(1 / 2.0)))(
+      SingleFileMemState.apply))
 
   implicit val shrinkSingleFileMemSate: Shrink[SingleFileMemState] = Shrink { fs =>
     (shrink(fs.file).map(newFile => fs.copy(file = newFile))) append
-    (shrink(fs.contents).map(newContents => fs.copy(contents = newContents)))
+      (shrink(fs.contents).map(newContents => fs.copy(contents = newContents)))
   }
 
   // NB: scale down even more because `NonEmptyList[(..., Vector[Data])]` is `O(n^3)`
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
     (Arbitrary.arbitrary[ADir] |@|
-      scaleSize(Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]], scalePow(1/3.0)))(NonEmptyDir.apply))
+      scaleSize(Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]],
+                scalePow(1 / 3.0)))(NonEmptyDir.apply))
 
   type FreeFS[A] = Free[FileSystem, A]
 
@@ -95,15 +106,18 @@ trait FileSystemFixture {
   object Mem extends Interpreter[FileSystem, InMemoryFs](interpretTerm = fileSystem) {
     def interpretEmpty[A](program: Free[FileSystem, A]): A =
       interpret(program).eval(emptyMem)
-    def interpretInjectingWriteErrors[A](program: Free[FileSystem, A], errors: List[Vector[FileSystemError]]): InMemoryFs[A] =
+    def interpretInjectingWriteErrors[A](
+        program: Free[FileSystem, A],
+        errors: List[Vector[FileSystemError]]): InMemoryFs[A] =
       program.foldMap(alterResponses).eval((Nil, errors))
   }
 
-  val alterResponses: FileSystem ~> ReadWriteT[InMemoryFs, ?] = interpretFileSystem[ReadWriteT[InMemoryFs, ?]](
-    liftMT[InMemoryFs, ReadWriteT] compose queryFile,
-    interceptReads(readFile),
-    amendWrites(writeFile),
-    liftMT[InMemoryFs, ReadWriteT] compose manageFile)
+  val alterResponses: FileSystem ~> ReadWriteT[InMemoryFs, ?] =
+    interpretFileSystem[ReadWriteT[InMemoryFs, ?]](
+      liftMT[InMemoryFs, ReadWriteT] compose queryFile,
+      interceptReads(readFile),
+      amendWrites(writeFile),
+      liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 }
 
 object FileSystemFixture {
@@ -125,12 +139,13 @@ object FileSystemFixture {
   def interceptReads[F[_]: Monad](f: ReadFile ~> F): ReadFile ~> ReadWriteT[F, ?] =
     new (ReadFile ~> ReadWriteT[F, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
-        case Read(_) => for {
-          nr <- nextReadL.st.lift[F]
-          rs <- restReadsL.st.lift[F]
-          _  <- (readsL := rs.orZero).lift[F]
-          rd <- nr.cata(_.point[ReadWriteT[F, ?]], f(rf).liftM[ReadWriteT])
-        } yield rd
+        case Read(_) =>
+          for {
+            nr <- nextReadL.st.lift[F]
+            rs <- restReadsL.st.lift[F]
+            _  <- (readsL := rs.orZero).lift[F]
+            rd <- nr.cata(_.point[ReadWriteT[F, ?]], f(rf).liftM[ReadWriteT])
+          } yield rd
 
         case _ => f(rf).liftM[ReadWriteT]
       }
@@ -146,12 +161,13 @@ object FileSystemFixture {
   def amendWrites[F[_]: Monad](f: WriteFile ~> F): WriteFile ~> ReadWriteT[F, ?] =
     new (WriteFile ~> ReadWriteT[F, ?]) {
       def apply[A](wf: WriteFile[A]) = wf match {
-        case Write(h, d) => for {
-          nw <- nextWriteL.st.lift[F]
-          ws <- restWritesL.st.lift[F]
-          _  <- (writesL := ws.orZero).lift[F]
-          es <- nw.cata(_.point[ReadWriteT[F, ?]], f(Write(h, d)).liftM[ReadWriteT])
-        } yield es
+        case Write(h, d) =>
+          for {
+            nw <- nextWriteL.st.lift[F]
+            ws <- restWritesL.st.lift[F]
+            _  <- (writesL := ws.orZero).lift[F]
+            es <- nw.cata(_.point[ReadWriteT[F, ?]], f(Write(h, d)).liftM[ReadWriteT])
+          } yield es
 
         case _ => f(wf).liftM[ReadWriteT]
       }

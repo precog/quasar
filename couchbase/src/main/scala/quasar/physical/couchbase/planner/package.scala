@@ -31,21 +31,25 @@ package object planner {
   def genId[T, F[_]: Functor: NameGenerator]: F[Id[T]] =
     NameGenerator[F].prefixedName("_") ∘ (Id(_))
 
-  def selectOrElse[T]
-    (a: T, whenSelect: T, otherwise: T)
-    (implicit T: Recursive.Aux[T, N1QL])
-      : T =
+  def selectOrElse[T](a: T, whenSelect: T, otherwise: T)(
+      implicit T: Recursive.Aux[T, N1QL]): T =
     a.project match {
       case Select(_, _, _, _, _, _, _, _, _) => whenSelect
       case _                                 => otherwise
     }
 
   def wrapSelect[T[_[_]]: BirecursiveT](a: T[N1QL]): T[N1QL] =
-    selectOrElse[T[N1QL]](
-      a, a,
-      Select(
-        Value(true), ResultExpr(a, none).wrapNel, keyspace = none, join = none,
-        unnest = none, let = nil,  filter = none, groupBy = none, orderBy = Nil).embed)
+    selectOrElse[T[N1QL]](a,
+                          a,
+                          Select(Value(true),
+                                 ResultExpr(a, none).wrapNel,
+                                 keyspace = none,
+                                 join = none,
+                                 unnest = none,
+                                 let = nil,
+                                 filter = none,
+                                 groupBy = none,
+                                 orderBy = Nil).embed)
 
   def unexpected[F[_]: PlannerErrorME, A](name: String): F[A] =
     PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unexpected $name"))

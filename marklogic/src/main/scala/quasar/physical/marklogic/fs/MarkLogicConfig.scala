@@ -36,29 +36,41 @@ object MarkLogicConfig {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def fromUriString[F[_]: MonadErrMsgs](str: String): F[MarkLogicConfig] = {
     def ensureScheme(u: URI): ValidationNel[String, Unit] =
-      Option(u.getScheme).exists(_ === "xcc")
+      Option(u.getScheme)
+        .exists(_ === "xcc")
         .unlessM("Missing or unrecognized scheme, expected 'xcc'.".failureNel)
 
     def ensureHost(u: URI): ValidationNel[String, Unit] =
       Option(u.getHost).isDefined.unlessM("Missing host".failureNel)
 
     def ensurePort(u: URI): ValidationNel[String, Unit] =
-      Option(u.getPort).filter(_ > 0).isDefined
+      Option(u.getPort)
+        .filter(_ > 0)
+        .isDefined
         .unlessM("Missing port".failureNel)
 
     def validations(u: URI): ValidationNel[String, Unit] =
       ensureScheme(u) *> ensureHost(u) *> ensurePort(u)
 
     def dbAndRest(u: URI): ValidationNel[String, (String, ADir)] =
-      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(unsafeSandboxAbs).flatMap { d =>
-        firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
-          (db, stripPrefixA(rtDir </> dir(db))(d))
-        }
+      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(unsafeSandboxAbs).flatMap {
+        d =>
+          firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
+            (db, stripPrefixA(rtDir </> dir(db))(d))
+          }
       } toSuccessNel "No database specified."
 
     def xccUriAndRoot(u: URI): ValidationNel[String, (URI, ADir)] =
-      validations(u) *> dbAndRest(u) map { case (db, dir) =>
-        (new URI(u.getScheme, u.getUserInfo, u.getHost, u.getPort, "/" + db, null, null), dir)
+      validations(u) *> dbAndRest(u) map {
+        case (db, dir) =>
+          (new URI(u.getScheme,
+                   u.getUserInfo,
+                   u.getHost,
+                   u.getPort,
+                   "/" + db,
+                   null,
+                   null),
+           dir)
       }
 
     def docType(u: URI): ValidationNel[String, DocType] =
@@ -69,14 +81,17 @@ object MarkLogicConfig {
           case other       => List()
         })
         .find(_._1 === "format")
-        .fold(DocType.xml.successNel[String]) { case (_, fmt) =>
-          DocType.name.getOption(fmt)
-            .toSuccessNel(s"Unsupported document format: $fmt")
+        .fold(DocType.xml.successNel[String]) {
+          case (_, fmt) =>
+            DocType.name
+              .getOption(fmt)
+              .toSuccessNel(s"Unsupported document format: $fmt")
         }
 
     \/.fromTryCatchNonFatal(new URI(str))
       .leftMap(_.getMessage.wrapNel)
-      .flatMap(u => (xccUriAndRoot(u) |@| docType(u))((a, t) => MarkLogicConfig(a._1, a._2, t)).disjunction)
+      .flatMap(u =>
+        (xccUriAndRoot(u) |@| docType(u))((a, t) => MarkLogicConfig(a._1, a._2, t)).disjunction)
       .fold(_.raiseError[F, MarkLogicConfig], _.point[F])
   }
 

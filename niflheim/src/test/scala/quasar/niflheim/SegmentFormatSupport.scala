@@ -42,33 +42,38 @@ trait SegmentFormatSupport {
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_)))
 
-  def genCPath: Gen[CPath] = for {
-    len <- Gen.choose(0, 5)
-    parts <- Gen.listOfN(len, Gen.identifier)
-  } yield CPath(parts mkString ".")
+  def genCPath: Gen[CPath] =
+    for {
+      len   <- Gen.choose(0, 5)
+      parts <- Gen.listOfN(len, Gen.identifier)
+    } yield CPath(parts mkString ".")
 
-  def genBitSet(length: Int, density: Double): Gen[BitSet] = for {
-    seeds <- Gen.listOfN(length, arbitrary[Double])
-  } yield BitSetUtil.create(seeds.map(_ < density).zipWithIndex.map(_._2))
+  def genBitSet(length: Int, density: Double): Gen[BitSet] =
+    for {
+      seeds <- Gen.listOfN(length, arbitrary[Double])
+    } yield BitSetUtil.create(seeds.map(_ < density).zipWithIndex.map(_._2))
 
   def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {
-    case CPeriod => ??? // arbitrary[Long].map(new Period(_))
+    case CPeriod  => ??? // arbitrary[Long].map(new Period(_))
     case CBoolean => arbitrary[Boolean]
-    case CString => arbitrary[String]
-    case CLong => arbitrary[Long]
-    case CDouble => arbitrary[Double]
-    case CNum => arbitrary[BigDecimal]
+    case CString  => arbitrary[String]
+    case CLong    => arbitrary[Long]
+    case CDouble  => arbitrary[Double]
+    case CNum     => arbitrary[BigDecimal]
     case CDate =>
-      Gen.choose[Long](0, 1494284624296L).map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
+      Gen
+        .choose[Long](0, 1494284624296L)
+        .map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
     case CArrayType(elemType: CValueType[a]) =>
-      implicit val tag = elemType.classTag    // don't try to pass this explicitly!
-      val list: Gen[List[a]] = listOf(genForCType(elemType))
+      implicit val tag         = elemType.classTag // don't try to pass this explicitly!
+      val list: Gen[List[a]]   = listOf(genForCType(elemType))
       val array: Gen[Array[a]] = list map (_.toArray)
       array
   }
 
   def genCValueType(maxDepth: Int = 2): Gen[CValueType[_]] = {
-    val basic: Gen[CValueType[_]] = oneOf(Seq(CBoolean, CString, CLong, CDouble, CNum, CDate))
+    val basic: Gen[CValueType[_]] = oneOf(
+      Seq(CBoolean, CString, CLong, CDouble, CNum, CDate))
     if (maxDepth > 0) {
       frequency(6 -> basic, 1 -> (genCValueType(maxDepth - 1) map (CArrayType(_))))
     } else {
@@ -76,42 +81,48 @@ trait SegmentFormatSupport {
     }
   }
 
-  def genArray[A: ClassTag](length: Int, g: Gen[A]): Gen[Array[A]] = for {
-    values <- listOfN(length, g)
-  } yield values.toArray
+  def genArray[A: ClassTag](length: Int, g: Gen[A]): Gen[Array[A]] =
+    for {
+      values <- listOfN(length, g)
+    } yield values.toArray
 
-  def genArraySegmentForCType[A](ctype: CValueType[A], length: Int): Gen[ArraySegment[_]] = {
+  def genArraySegmentForCType[A](ctype: CValueType[A],
+                                 length: Int): Gen[ArraySegment[_]] = {
     val g = genForCType(ctype)
     for {
       blockId <- arbitrary[Long]
-      cpath <- genCPath
+      cpath   <- genCPath
       defined <- genBitSet(length, 0.5)
-      values <- genArray(length, g)(ctype.classTag) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
+      values  <- genArray(length, g)(ctype.classTag) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
     } yield ArraySegment(blockId, cpath, ctype, defined, values)
   }
 
-  def genArraySegment(length: Int): Gen[ArraySegment[_]] = for {
-    ctype <- genCValueType(2) filter (_ != CBoolean) // Note: CArrayType(CBoolean) is OK!
-    segment <- genArraySegmentForCType(ctype, length)
-  } yield segment
+  def genArraySegment(length: Int): Gen[ArraySegment[_]] =
+    for {
+      ctype   <- genCValueType(2) filter (_ != CBoolean) // Note: CArrayType(CBoolean) is OK!
+      segment <- genArraySegmentForCType(ctype, length)
+    } yield segment
 
-  def genBooleanSegment(length: Int): Gen[BooleanSegment] = for {
-    blockId <- arbitrary[Long]
-    cpath <- genCPath
-    defined <- genBitSet(length, 0.7)
-    values <- genBitSet(length, 0.5)
-  } yield BooleanSegment(blockId, cpath, defined, values, length)
+  def genBooleanSegment(length: Int): Gen[BooleanSegment] =
+    for {
+      blockId <- arbitrary[Long]
+      cpath   <- genCPath
+      defined <- genBitSet(length, 0.7)
+      values  <- genBitSet(length, 0.5)
+    } yield BooleanSegment(blockId, cpath, defined, values, length)
 
-  def genNullSegmentForCType(ctype: CNullType, length: Int): Gen[NullSegment] = for {
-    blockId <- arbitrary[Long]
-    cpath <- genCPath
-    defined <- genBitSet(length, 0.7)
-  } yield NullSegment(blockId, cpath, ctype, defined, length)
+  def genNullSegmentForCType(ctype: CNullType, length: Int): Gen[NullSegment] =
+    for {
+      blockId <- arbitrary[Long]
+      cpath   <- genCPath
+      defined <- genBitSet(length, 0.7)
+    } yield NullSegment(blockId, cpath, ctype, defined, length)
 
-  def genNullSegment(length: Int): Gen[NullSegment] = for {
-    ctype <- oneOf(CNull, CEmptyArray, CEmptyObject)
-    segment <- genNullSegmentForCType(ctype, length)
-  } yield segment
+  def genNullSegment(length: Int): Gen[NullSegment] =
+    for {
+      ctype   <- oneOf(CNull, CEmptyArray, CEmptyObject)
+      segment <- genNullSegmentForCType(ctype, length)
+    } yield segment
 
   def genSegment(length: Int): Gen[Segment] =
     oneOf(genArraySegment(length), genBooleanSegment(length), genNullSegment(length))
@@ -163,7 +174,8 @@ final class StubSegmentFormat extends SegmentFormat {
   }
 
   object writer extends SegmentWriter {
-    def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] =
+    def writeSegment(channel: WritableByteChannel,
+                     segment: Segment): Validation[IOException, Unit] =
       Success(())
   }
 }
@@ -173,15 +185,16 @@ final class InMemoryReadableByteChannel(bytes: Array[Byte]) extends ReadableByte
 
   var isOpen = true
   def close() { isOpen = false }
-  def read(dst: ByteBuffer): Int = if (buffer.remaining() == 0) {
-    -1
-  } else {
-    val written = math.min(dst.remaining(), buffer.remaining())
-    while (dst.remaining() > 0 && buffer.remaining() > 0) {
-      dst.put(buffer.get())
+  def read(dst: ByteBuffer): Int =
+    if (buffer.remaining() == 0) {
+      -1
+    } else {
+      val written = math.min(dst.remaining(), buffer.remaining())
+      while (dst.remaining() > 0 && buffer.remaining() > 0) {
+        dst.put(buffer.get())
+      }
+      written
     }
-    written
-  }
 }
 
 final class InMemoryWritableByteChannel extends WritableByteChannel {

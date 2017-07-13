@@ -37,11 +37,13 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+          case InvokeUnapply(
+              _,
+              Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))),
+                    Embed(Constant(Data.Int(n))))) =>
             Take(src, Constant[T](Data.Int(m.min(n))).embed).some
           case _ => None
         }
@@ -49,12 +51,12 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
         Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
+      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n))) if n.isValidInt =>
         Type.Const(Data.Set(s.take(n.intValue)))
       case Sized(t, _) => t
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Int)))
+  )
 
   val Sample: BinaryFunc = BinaryFunc(
     Sifting,
@@ -62,11 +64,13 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+          case InvokeUnapply(
+              _,
+              Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))),
+                    Embed(Constant(Data.Int(n))))) =>
             Take(src, Constant[T](Data.Int(m.min(n))).embed).some
           case _ => None
         }
@@ -74,12 +78,12 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
         Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
+      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n))) if n.isValidInt =>
         Type.Const(Data.Set(s.take(n.intValue)))
       case Sized(t, _) => t
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Int)))
+  )
 
   val Drop: BinaryFunc = BinaryFunc(
     Sifting,
@@ -87,25 +91,26 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Int(n)))))
-              if n == 0 =>
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Int(n))))) if n == 0 =>
             set.some
-          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Drop, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+          case InvokeUnapply(
+              _,
+              Sized(Embed(InvokeUnapply(Drop, Sized(src, Embed(Constant(Data.Int(m)))))),
+                    Embed(Constant(Data.Int(n))))) =>
             Drop(src, Constant[T](Data.Int(m + n)).embed).some
           case _ => None
         }
     },
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
+      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n))) if n.isValidInt =>
         Type.Const(Data.Set(s.drop(n.intValue)))
       case Sized(t, _) => t
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Int)))
+  )
 
   val Range = BinaryFunc(
     Expansion,
@@ -120,7 +125,8 @@ trait SetLib extends Library {
           else Data.Set(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
       case Sized(_, _) => Type.Int
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Filter = BinaryFunc(
     Sifting,
@@ -128,9 +134,8 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Bool),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(set), Embed(Constant(Data.True)))) =>
             set.some
@@ -138,16 +143,17 @@ trait SetLib extends Library {
         }
     },
     partialTyper[nat._2] {
-      case Sized(_ , Type.Const(Data.False)) => Type.Const(Data.Set(Nil))
-      case Sized(set, _) => set
+      case Sized(_, Type.Const(Data.False)) => Type.Const(Data.Set(Nil))
+      case Sized(set, _)                    => set
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Bool))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Bool)))
+  )
 
   object JoinFunc {
     def unapply(func: TernaryFunc): Option[TernaryFunc] =
       func match {
         case (InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin) => Some(func)
-        case _ => None
+        case _                                                            => None
       }
   }
 
@@ -160,13 +166,16 @@ trait SetLib extends Library {
     noSimplification,
     partialTyper[nat._3] {
       case Sized(_, _, Type.Const(Data.Bool(false))) => Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
-      case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
+      case Sized(Type.Const(Data.Set(Nil)), _, _)    => Type.Const(Data.Set(Nil))
+      case Sized(_, Type.Const(Data.Set(Nil)), _)    => Type.Const(Data.Set(Nil))
+      case Sized(s1, s2, _) =>
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
     },
-    untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
+    untyper[nat._3](
+      t =>
+        (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(
+          Type.Const(JoinDir.Right.data)))((l, r) => Func.Input3(l, r, Type.Bool)))
+  )
 
   // TODO: deprecated - delete when old mongo is deleted
   val LeftOuterJoin = TernaryFunc(
@@ -180,11 +189,14 @@ trait SetLib extends Library {
         Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> Type.Null), None)
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)),
+                 None)
     },
-    untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
+    untyper[nat._3](
+      t =>
+        (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(
+          Type.Const(JoinDir.Right.data)))((l, r) => Func.Input3(l, r, Type.Bool)))
+  )
 
   // TODO: deprecated - delete when old mongo is deleted
   val RightOuterJoin = TernaryFunc(
@@ -197,11 +209,15 @@ trait SetLib extends Library {
       case Sized(_, s2, Type.Const(Data.Bool(false))) =>
         Type.Obj(Map(JoinDir.Left.name -> Type.Null, JoinDir.Right.name -> s2), None)
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
+      case Sized(s1, s2, _) =>
+        Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2),
+                 None)
     },
-    untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
+    untyper[nat._3](
+      t =>
+        (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(
+          Type.Const(JoinDir.Right.data)))((l, r) => Func.Input3(l, r, Type.Bool)))
+  )
 
   // TODO: deprecated - delete when old mongo is deleted
   val FullOuterJoin = TernaryFunc(
@@ -214,11 +230,15 @@ trait SetLib extends Library {
       case Sized(Type.Const(Data.Set(Nil)), Type.Const(Data.Set(Nil)), _) =>
         Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name  -> (s1 ⨿ Type.Null),
+                     JoinDir.Right.name -> (s2 ⨿ Type.Null)),
+                 None)
     },
-    untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
+    untyper[nat._3](
+      t =>
+        (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(
+          Type.Const(JoinDir.Right.data)))((l, r) => Func.Input3(l, r, Type.Bool)))
+  )
 
   val GroupBy = BinaryFunc(
     Transformation,
@@ -229,7 +249,8 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(s1, _) => s1
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Top)))
+  )
 
   val Distinct = UnaryFunc(
     Sifting,
@@ -240,7 +261,8 @@ trait SetLib extends Library {
     partialTyper[nat._1] {
       case Sized(a) => a
     },
-    untyper[nat._1](t => success(Func.Input1(t))))
+    untyper[nat._1](t => success(Func.Input1(t)))
+  )
 
   val DistinctBy = BinaryFunc(
     Sifting,
@@ -251,7 +273,8 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(a, _) => a
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Top)))
+  )
 
   val Union = BinaryFunc(
     Transformation,
@@ -264,7 +287,8 @@ trait SetLib extends Library {
       case Sized(s1, Type.Const(Data.Set(Nil))) => s1
       case Sized(s1, s2)                        => s1 ⨿ s2
     },
-    untyper[nat._2](t => success(Func.Input2(t, t))))
+    untyper[nat._2](t => success(Func.Input2(t, t)))
+  )
 
   val Intersect = BinaryFunc(
     Transformation,
@@ -275,7 +299,8 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(s1, s2) => if (s1 == s2) s1 else Type.Const(Data.Set(Nil))
     },
-    untyper[nat._2](t => success(Func.Input2(t, t))))
+    untyper[nat._2](t => success(Func.Input2(t, t)))
+  )
 
   val Except = BinaryFunc(
     Transformation,
@@ -283,9 +308,8 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Set(Nil))))) =>
             set.some
@@ -295,7 +319,8 @@ trait SetLib extends Library {
     partialTyper[nat._2] {
       case Sized(s1, _) => s1
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Top)))
+  )
 
   // TODO: Handle “normal” functions without creating Funcs. They should be in
   //       a separate functor and inlined prior to getting this far. It will
@@ -307,15 +332,16 @@ trait SetLib extends Library {
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
+                                TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case Invoke(_, Sized(item, set)) => set.project match {
-            case Constant(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
-            case Constant(_)           => RelationsLib.Eq(item, set).some
-            case lp                     => Within(item, StructuralLib.UnshiftArray(set).embed).some
-          }
+          case Invoke(_, Sized(item, set)) =>
+            set.project match {
+              case Constant(Data.Set(_)) =>
+                Within(item, StructuralLib.UnshiftArray(set).embed).some
+              case Constant(_) => RelationsLib.Eq(item, set).some
+              case lp          => Within(item, StructuralLib.UnshiftArray(set).embed).some
+            }
           case _ => None
         }
     },
@@ -328,7 +354,8 @@ trait SetLib extends Library {
         Type.Const(Data.Bool(x == y))
       case Sized(_, _) => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Within = BinaryFunc(
     Mapping,
@@ -343,7 +370,8 @@ trait SetLib extends Library {
         Type.Const(Data.Bool(arr.contains(x)))
       case Sized(_, _) => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Constantly = BinaryFunc(
     Transformation,
@@ -356,7 +384,8 @@ trait SetLib extends Library {
         Type.Const(Data.Set(s.map(κ(const))))
       case Sized(const, _) => const
     },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
+    untyper[nat._2](t => success(Func.Input2(t, Type.Top)))
+  )
 }
 
 object SetLib extends SetLib

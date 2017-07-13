@@ -32,7 +32,10 @@ case class VersionedCookedBlockFormatSpecs() extends CookedBlockFormatSpecs {
   val format = VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat))
 }
 
-trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentFormatSupport {
+trait CookedBlockFormatSpecs
+    extends Specification
+    with ScalaCheck
+    with SegmentFormatSupport {
   def format: CookedBlockFormat
 
   implicit val arbFile = Arbitrary(for {
@@ -45,13 +48,16 @@ trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentF
 
   "cooked block format" should {
     "round trip empty segments" in {
-      surviveRoundTrip(format)(CookedBlockMetadata(999L, 0, new Array[(SegmentId, File)](0)))
+      surviveRoundTrip(format)(
+        CookedBlockMetadata(999L, 0, new Array[(SegmentId, File)](0)))
     }
 
     "round trip simple segments" in {
-      surviveRoundTrip(format)(CookedBlockMetadata(999L, 1,
-          Array(SegmentId(1234L, CPath("a.b.c"), CLong) -> new File("/hello/there/abc.cooked"))
-      ))
+      surviveRoundTrip(format)(
+        CookedBlockMetadata(999L,
+                            1,
+                            Array(SegmentId(1234L, CPath("a.b.c"), CLong) -> new File(
+                              "/hello/there/abc.cooked"))))
     }
 
     // this test seems to run forever?

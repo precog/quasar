@@ -47,24 +47,27 @@ package object query {
         Query(x).right
 
       case Seq() =>
-        ApiError.fromStatus(
-          BadRequest withReason "No SQL^2 query found in URL."
-        ).left
+        ApiError
+          .fromStatus(
+            BadRequest withReason "No SQL^2 query found in URL."
+          )
+          .left
 
       case xs =>
         val ct = xs.size
-        ApiError.fromMsg(
-          BadRequest withReason "Multiple SQL^2 queries submitted.",
-          s"The request may only contain a single SQL^2 query, found $ct.",
-          "queryCount" := ct
-        ).left
+        ApiError
+          .fromMsg(
+            BadRequest withReason "Multiple SQL^2 queries submitted.",
+            s"The request may only contain a single SQL^2 query, found $ct.",
+            "queryCount" := ct
+          )
+          .left
     }
 
-  def parsedQueryRequest(
-    req: Request,
-    offset: Option[ValidationNel[ParseFailure, Natural]],
-    limit: Option[ValidationNel[ParseFailure, Positive]]):
-      ApiError \/ (ScopedExpr[Fix[Sql]], ADir, Natural, Option[Positive]) =
+  def parsedQueryRequest(req: Request,
+                         offset: Option[ValidationNel[ParseFailure, Natural]],
+                         limit: Option[ValidationNel[ParseFailure, Positive]])
+    : ApiError \/ (ScopedExpr[Fix[Sql]], ADir, Natural, Option[Positive]) =
     for {
       r   <- requestQuery[Fix](req)
       off <- offsetOrInvalid(offset)
@@ -75,7 +78,8 @@ package object query {
     ApiError.fromStatus(BadRequest withReason "No SQL^2 query found in message body.")
 
   // TODO: Use Recusive/Corecursive constraints instead.
-  def requestQuery[T[_[_]]: BirecursiveT](req: Request): ApiError \/ (ScopedExpr[T[Sql]], ADir) =
+  def requestQuery[T[_[_]]: BirecursiveT](
+      req: Request): ApiError \/ (ScopedExpr[T[Sql]], ADir) =
     for {
       qry  <- queryParam(req.multiParams)
       expr <- sql.parser[T].parse(qry) leftMap (_.toApiError)

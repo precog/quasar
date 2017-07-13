@@ -18,19 +18,21 @@ package quasar.blueeyes.json
 
 import quasar.blueeyes._
 
-import scala.annotation.{ switch, tailrec }
+import scala.annotation.{switch, tailrec}
 import java.lang.Integer.parseInt
 
 // underlying parser code adapted from jawn under MIT license.
 // (https://github.com/non/jawn)
 
-case class ParseException(msg: String, index: Int, line: Int, col: Int) extends Exception(msg)
-case class IncompleteParseException(msg: String)                        extends Exception(msg)
+case class ParseException(msg: String, index: Int, line: Int, col: Int)
+    extends Exception(msg)
+case class IncompleteParseException(msg: String) extends Exception(msg)
 
 /**
   * Parser contains the state machine that does all the work. The only
   */
 private[json] trait Parser {
+
   /**
     * Read the byte/char at 'i' as a Char.
     *
@@ -296,7 +298,9 @@ private[json] trait Parser {
     * constructed if/else statements or something else.
     */
   @tailrec
-  protected[this] final def rparse(state: Int, j: Int, stack: List[Context]): (JValue, Int) = {
+  protected[this] final def rparse(state: Int,
+                                   j: Int,
+                                   stack: List[Context]): (JValue, Int) = {
     val i = reset(j)
     checkpoint(state, i, stack)
     (state: @switch) match {

@@ -34,7 +34,9 @@ import org.specs2.matcher.TraversableMatchers._
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
+  type Eff[A] =
+    (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[
+      A]
 
   "OPTIONS" should {
     val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
@@ -44,50 +46,54 @@ class RestApiSpecs extends quasar.Qspec {
     type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
     val eff: Task[Eff ~> Task] = runFs(InMemState.empty) map { fs =>
-      NaturalTransformation.refl[Task]                   :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch]     :+:
-      Failure.toRuntimeError[Task, MountingError]        :+:
-      Failure.toRuntimeError[Task, FileSystemError]      :+:
-      Failure.toRuntimeError[Task, Module.Error]         :+:
-      (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
-      mount :+:
-      analyze :+:
-      fs
+      NaturalTransformation.refl[Task] :+:
+        Failure.toRuntimeError[Task, PathTypeMismatch] :+:
+        Failure.toRuntimeError[Task, MountingError] :+:
+        Failure.toRuntimeError[Task, FileSystemError] :+:
+        Failure.toRuntimeError[Task, Module.Error] :+:
+        (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
+        mount :+:
+        analyze :+:
+        fs
     }
 
     val service = eff map { runEff =>
-      RestApi.finalizeServices(RestApi.toHttpServices(
-        liftMT[Task, ResponseT] compose runEff,
-        RestApi.coreServices[Eff]))
+      RestApi.finalizeServices(
+        RestApi.toHttpServices(liftMT[Task, ResponseT] compose runEff,
+                               RestApi.coreServices[Eff]))
     }
 
     def testAdvertise(
-      path: String,
-      additionalHeaders: List[Header],
-      resultHeaderKey: HeaderKey.Extractable,
-      expected: List[String]
+        path: String,
+        additionalHeaders: List[Header],
+        resultHeaderKey: HeaderKey.Extractable,
+        expected: List[String]
     ) = {
-      val req = Request(
-        uri = Uri(path = path),
-        method = OPTIONS,
-        headers = Headers(Header("Origin", "") :: additionalHeaders))
+      val req = Request(uri = Uri(path = path),
+                        method = OPTIONS,
+                        headers = Headers(Header("Origin", "") :: additionalHeaders))
 
-      service.flatMap(_(req)).map { response =>
-        response.headers.get(resultHeaderKey)
-          .get.value.split(", ")
-          .toList must contain(allOf(expected: _*))
-      }.unsafePerformSync
+      service
+        .flatMap(_(req))
+        .map { response =>
+          response.headers.get(resultHeaderKey).get.value.split(", ").toList must contain(
+            allOf(expected: _*))
+        }
+        .unsafePerformSync
     }
 
     def advertisesMethodsCorrectly(path: String, expected: List[Method]) =
       testAdvertise(path, Nil, `Access-Control-Allow-Methods`, expected.map(_.name))
 
-    def advertisesHeadersCorrectly(path: String, method: Method, expected: List[HeaderKey]) =
+    def advertisesHeadersCorrectly(path: String,
+                                   method: Method,
+                                   expected: List[HeaderKey]) =
       testAdvertise(
         path = path,
         additionalHeaders = List(Header("Access-Control-Request-Method", method.name)),
         resultHeaderKey = `Access-Control-Allow-Headers`,
-        expected = expected.map(_.name.value))
+        expected = expected.map(_.name.value)
+      )
 
     "advertise GET and POST for /query path" >> {
       advertisesMethodsCorrectly("/query/fs", List(GET, POST))

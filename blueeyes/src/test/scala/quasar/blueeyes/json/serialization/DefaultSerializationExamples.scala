@@ -44,11 +44,13 @@ class DefaultSerializationExamplesSpec extends Specification {
   "Map of String to something is decomposed to object" in {
     val map = Map("foo" -> "bar")
 
-    StringMapDecomposer(StringDecomposer).decompose(map) mustEqual JObject(JField("foo", JString("bar")) :: Nil)
+    StringMapDecomposer(StringDecomposer).decompose(map) mustEqual JObject(
+      JField("foo", JString("bar")) :: Nil)
   }
 
   "Map of String to something can be extracted from object" in {
-    StringMapExtractor(StringExtractor).extract(JObject(JField("foo", JString("bar")) :: Nil)) mustEqual Map("foo" -> "bar")
+    StringMapExtractor(StringExtractor).extract(
+      JObject(JField("foo", JString("bar")) :: Nil)) mustEqual Map("foo" -> "bar")
   }
 
   "Order of elements in List is not changed" in {

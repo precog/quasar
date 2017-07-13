@@ -86,7 +86,7 @@ object RealPOSIX {
           Task.delay(canonicalize(target).mkdirs()).void
 
         case LinkDir(src, target) =>
-          val psrc = canonicalize(src).toPath()
+          val psrc    = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
@@ -96,7 +96,7 @@ object RealPOSIX {
           }
 
         case LinkFile(src, target) =>
-          val psrc = canonicalize(src).toPath()
+          val psrc    = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
@@ -106,7 +106,7 @@ object RealPOSIX {
           }
 
         case Move(src, target) =>
-          val psrc = canonicalize(src).toPath()
+          val psrc    = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
@@ -145,7 +145,8 @@ object RealPOSIX {
       def pure[A](a: A): POSIXWithTask[A] =
         Free.pure(a)
 
-      def flatMap[A, B](fa: POSIXWithTask[A])(f: A => POSIXWithTask[B]): POSIXWithTask[B] =
+      def flatMap[A, B](fa: POSIXWithTask[A])(
+          f: A => POSIXWithTask[B]): POSIXWithTask[B] =
         fa.flatMap(f)
 
       def suspend[A](fa: => POSIXWithTask[A]): POSIXWithTask[A] =

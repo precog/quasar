@@ -24,9 +24,9 @@ trait MountTypeArbitrary {
   import MountType._
 
   implicit val mountTypeArbitrary: Arbitrary[MountType] =
-    Arbitrary(Gen.oneOf(
-      Gen.const(viewMount()),
-      Arbitrary.arbitrary[FileSystemType] map (fileSystemMount(_))))
+    Arbitrary(
+      Gen.oneOf(Gen.const(viewMount()),
+                Arbitrary.arbitrary[FileSystemType] map (fileSystemMount(_))))
 }
 
 object MountTypeArbitrary extends MountTypeArbitrary

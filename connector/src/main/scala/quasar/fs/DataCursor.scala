@@ -28,6 +28,7 @@ import scalaz.stream.Process
   *   1. close(c) *> nextChunk(c) must return an empty `Vector`.
   */
 trait DataCursor[F[_], C] {
+
   /** Returns the next chunk of data from the cursor. An empty `Vector` signals
     * no more data is available.
     */
@@ -56,7 +57,8 @@ object DataCursor {
   def apply[F[_], C](implicit DC: DataCursor[F, C]): DataCursor[F, C] = DC
 
   implicit def eitherDataCursor[F[_], A, B](
-    implicit A: DataCursor[F, A], B: DataCursor[F, B]
+      implicit A: DataCursor[F, A],
+      B: DataCursor[F, B]
   ): DataCursor[F, A \/ B] =
     new DataCursor[F, A \/ B] {
       def nextChunk(ab: A \/ B) =
@@ -66,7 +68,8 @@ object DataCursor {
         ab fold (A.close, B.close)
     }
 
-  implicit def optionDataCursor[F[_]: Applicative, A](implicit C: DataCursor[F, A]): DataCursor[F, Option[A]] =
+  implicit def optionDataCursor[F[_]: Applicative, A](
+      implicit C: DataCursor[F, A]): DataCursor[F, Option[A]] =
     new DataCursor[F, Option[A]] {
       def nextChunk(oa: Option[A]) =
         oa.cata(C.nextChunk, Vector[Data]().point[F])

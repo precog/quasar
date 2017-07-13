@@ -45,20 +45,20 @@ class DataReadSupportSpec extends Qspec {
       val data = readAll(path("/test-data-1.parquet")).unsafePerformSync
       data must_= Vector(
         Data.Obj(
-          "score" -> Data.Dec(13.9),
-          "age" -> Data.Int(11),
-          "id" -> Data.Int(1),
+          "score"  -> Data.Dec(13.9),
+          "age"    -> Data.Int(11),
+          "id"     -> Data.Int(1),
           "active" -> Data.Bool(false),
           "height" -> Data.Dec(101.19999694824219),
-          "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](1, 1, 1, 1)))
+          "key"    -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](1, 1, 1, 1)))
         ),
-         Data.Obj(
-           "score" -> Data.Dec(14.9),
-           "age" -> Data.Int(12),
-           "id" -> Data.Int(2),
-           "active" -> Data.Bool(true),
-           "height" -> Data.Dec(102.19999694824219),
-           "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](2, 2, 2, 2)))
+        Data.Obj(
+          "score"  -> Data.Dec(14.9),
+          "age"    -> Data.Int(12),
+          "id"     -> Data.Int(2),
+          "active" -> Data.Bool(true),
+          "height" -> Data.Dec(102.19999694824219),
+          "key"    -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](2, 2, 2, 2)))
         )
       )
     }
@@ -67,12 +67,13 @@ class DataReadSupportSpec extends Qspec {
       val data = readAll(path("/test-data-2.parquet")).unsafePerformSync
       data must_= Vector(
         Data.Obj(
-          "description" -> Data.Str("this is a description"),
-          "creation" -> Data.Date(LocalDate.of(2017,2,17)),
+          "description"   -> Data.Str("this is a description"),
+          "creation"      -> Data.Date(LocalDate.of(2017, 2, 17)),
           "creationStamp" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
-          "meetingTime" -> Data.Time(LocalTime.of(0,0,4,0)),
-          "creationStampMicros" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
-          "meetingTimeMicros" -> Data.Time(LocalTime.of(0,0,4,0))
+          "meetingTime"   -> Data.Time(LocalTime.of(0, 0, 4, 0)),
+          "creationStampMicros" -> Data.Timestamp(
+            Instant.parse("2017-02-17T13:42:05.017Z")),
+          "meetingTimeMicros" -> Data.Time(LocalTime.of(0, 0, 4, 0))
         )
       )
     }
@@ -83,7 +84,7 @@ class DataReadSupportSpec extends Qspec {
         Data.Obj(
           "document" -> Data.Obj(
             "name" -> Data.Str("hello"),
-            "a" -> Data.Int(10)
+            "a"    -> Data.Int(10)
           ),
           "invalid_document" -> Data.NA
         )
@@ -95,11 +96,12 @@ class DataReadSupportSpec extends Qspec {
         val data = readAll(path("/test-data-5.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
-            "skills" -> Data.Arr(List(
-              Data.Str("scala"),
-              Data.Str("FP"),
-              Data.Str("spillikins")
-            ))
+            "skills" -> Data.Arr(
+              List(
+                Data.Str("scala"),
+                Data.Str("FP"),
+                Data.Str("spillikins")
+              ))
           )
         )
       }
@@ -108,14 +110,15 @@ class DataReadSupportSpec extends Qspec {
         val data = readAll(path("/test-data-4.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
-            "skills" -> Data.Arr(List(
-              Data.Str("scala"),
-              Data.Str("FP"),
-              Data.Str("spillikins")
-            ))
+            "skills" -> Data.Arr(
+              List(
+                Data.Str("scala"),
+                Data.Str("FP"),
+                Data.Str("spillikins")
+              ))
           )
         )
-      }      
+      }
     }
 
     "map" should {
@@ -123,11 +126,12 @@ class DataReadSupportSpec extends Qspec {
         val data = readAll(path("/test-data-6.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
-            "skills" -> Data.Obj(ListMap(
-              "scala" -> Data.Str("good"),
-              "FP" -> Data.Str("very good"),
-              "spillikins" -> Data.Str("bad")
-            ))
+            "skills" -> Data.Obj(
+              ListMap(
+                "scala"      -> Data.Str("good"),
+                "FP"         -> Data.Str("very good"),
+                "spillikins" -> Data.Str("bad")
+              ))
           )
         )
       }
@@ -136,15 +140,15 @@ class DataReadSupportSpec extends Qspec {
         val data = readAll(path("/test-data-7.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
-            "skills" -> Data.Obj(ListMap(
-              "scala" -> Data.Str("good"),
-              "FP" -> Data.Str("very good"),
-              "spillikins" -> Data.Str("bad")
-            ))
+            "skills" -> Data.Obj(
+              ListMap(
+                "scala"      -> Data.Str("good"),
+                "FP"         -> Data.Str("very good"),
+                "spillikins" -> Data.Str("bad")
+              ))
           )
         )
       }
-
 
       "be read even if data is not following MAP spec - has extrac entries beside 'key' & 'value'" in {
         val data = readAll(path("/test-data-10.parquet")).unsafePerformSync
@@ -152,16 +156,16 @@ class DataReadSupportSpec extends Qspec {
           Data.Obj(
             "skills" -> Data.Arr(List(
               Data.Obj(
-                "key" -> Data.Str("scala"),
+                "key"   -> Data.Str("scala"),
                 "value" -> Data.Str("good"),
-                "desc" -> Data.Str("some description")
+                "desc"  -> Data.Str("some description")
               ),
               Data.Obj(
-                "key" -> Data.Str("FP"),
+                "key"   -> Data.Str("FP"),
                 "value" -> Data.Str("very good")
               ),
               Data.Obj(
-                "key" -> Data.Str("spillikins"),
+                "key"   -> Data.Str("spillikins"),
                 "value" -> Data.Str("bad")
               )
             ))
@@ -173,11 +177,12 @@ class DataReadSupportSpec extends Qspec {
         val data = readAll(path("/test-data-8.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
-            "skills" -> Data.Obj(ListMap(
-              "scala" -> Data.Str("good"),
-              "FP" -> Data.Str("very good"),
-              "spillikins" -> Data.Str("bad")
-            ))
+            "skills" -> Data.Obj(
+              ListMap(
+                "scala"      -> Data.Str("good"),
+                "FP"         -> Data.Str("very good"),
+                "spillikins" -> Data.Str("bad")
+              ))
           )
         )
       }

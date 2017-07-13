@@ -70,15 +70,17 @@ sealed trait FunctionLike[T] {
 }
 
 trait Morphism1Like extends FunctionLike[UnaryOperationType] {
+
   /** This specifies how identities are returned by the Morphism1. */
   val idPolicy: IdentityPolicy = IdentityPolicy.Strip // TODO remove this default
 }
 trait Morphism2Like extends FunctionLike[BinaryOperationType] {
+
   /** This specifies how identities are returned by the Morphism2. */
   val idPolicy: IdentityPolicy = IdentityPolicy.Strip // TODO remove this default
 }
-trait Op1Like extends FunctionLike[UnaryOperationType]
-trait Op2Like extends FunctionLike[BinaryOperationType]
+trait Op1Like       extends FunctionLike[UnaryOperationType]
+trait Op2Like       extends FunctionLike[BinaryOperationType]
 trait ReductionLike extends FunctionLike[UnaryOperationType]
 
 trait Library {

@@ -50,13 +50,13 @@ object ContentEncoding {
 }
 
 object RawUTF8Encoding extends ContentEncoding {
-  val id = "uncompressed"
+  val id                         = "uncompressed"
   def encode(raw: Array[Byte])   = new String(raw, "UTF-8")
   def decode(compressed: String) = compressed.getBytes("UTF-8")
 }
 
 object Base64Encoding extends ContentEncoding {
-  val id = "base64"
+  val id                         = "base64"
   def encode(raw: Array[Byte])   = new String(Base64.getEncoder.encode(raw), "UTF-8")
   def decode(compressed: String) = Base64.getDecoder.decode(compressed)
 }
@@ -95,15 +95,24 @@ object FileContent {
     def validated(jv: JValue) = {
       jv match {
         case JObject(fields) =>
-          (fields.get("encoding").toSuccess(Invalid("File data object missing encoding field.")).flatMap(_.validated[ContentEncoding]) |@|
-                fields.get("mimeType").toSuccess(Invalid("File data object missing MIME type.")).flatMap(_.validated[MimeType]) |@|
-                fields.get("data").toSuccess(Invalid("File data object missing data field.")).flatMap(_.validated[String])) {
-            (encoding, mimeType, contentString) =>
-              FileContent(encoding.decode(contentString), mimeType, encoding)
+          (fields
+            .get("encoding")
+            .toSuccess(Invalid("File data object missing encoding field."))
+            .flatMap(_.validated[ContentEncoding]) |@|
+            fields
+              .get("mimeType")
+              .toSuccess(Invalid("File data object missing MIME type."))
+              .flatMap(_.validated[MimeType]) |@|
+            fields
+              .get("data")
+              .toSuccess(Invalid("File data object missing data field."))
+              .flatMap(_.validated[String])) { (encoding, mimeType, contentString) =>
+            FileContent(encoding.decode(contentString), mimeType, encoding)
           }
 
         case _ =>
-          Failure(Invalid("File contents " + jv.renderCompact + " was not properly encoded as a JSON object."))
+          Failure(Invalid(
+            "File contents " + jv.renderCompact + " was not properly encoded as a JSON object."))
       }
     }
   }

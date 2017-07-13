@@ -36,9 +36,9 @@ trait N1QLRenderTreeInstance {
         case Id(v) =>
           Terminal("Id" :: Nil, v.some)
         case Obj(m) =>
-          NonTerminal("Obj" :: Nil, none, m.map { case (k, v) =>
-            NonTerminal("K → V" :: Nil, none,
-              List(r.render(k), r.render(v)))
+          NonTerminal("Obj" :: Nil, none, m.map {
+            case (k, v) =>
+              NonTerminal("K → V" :: Nil, none, List(r.render(k), r.render(v)))
           }.toList)
         case Arr(l) =>
           nonTerminal("Arr", l: _*)
@@ -186,27 +186,27 @@ trait N1QLRenderTreeInstance {
           nonTerminal("ArrFor", a1, a2, a3)
         case Select(v, re, ks, jn, un, lt, ft, gb, ob) =>
           def nt(tpe: String, label: Option[String], child: A) =
-            NonTerminal(
-              tpe :: Nil,
-              label,
-              List(r.render(child)))
+            NonTerminal(tpe :: Nil, label, List(r.render(child)))
 
-          NonTerminal("Select" :: Nil, none,
-            Terminal("value" :: Nil, v.v .shows.some)                           ::
-            (re ∘ (i => nt("resultExpr", i.alias ∘ (_.v), i.expr))).toList      :::
-            (ks ∘ (i => nt("keyspace", i.alias ∘ (_.v), i.expr))).toList        :::
-            (jn ∘ (j => nt(
-                          "join", (j.id.v ⊹ ", " ⊹ j.alias.cata(_.v, "")).some,
-                          j.pred))).toList                                      :::
-            (un ∘ (i => nt("unnest", i.alias ∘ (_.v), i.expr))).toList          :::
-            (lt ∘ (i => nt("let", i.id.v.some, i.expr))).toList                 :::
-            (ft ∘ (f => nonTerminal("filter", f.v))).toList                     :::
-            (gb ∘ (g => nonTerminal("groupBy", g.v))).toList                    :::
-            (ob ∘ (i => nt("orderBy", i.sortDir.shows.some, i.a))).toList)
+          NonTerminal(
+            "Select" :: Nil,
+            none,
+            Terminal("value" :: Nil, v.v.shows.some) ::
+              (re ∘ (i => nt("resultExpr", i.alias ∘ (_.v), i.expr))).toList :::
+              (ks ∘ (i => nt("keyspace", i.alias ∘ (_.v), i.expr))).toList :::
+              (jn ∘ (j =>
+              nt("join", (j.id.v ⊹ ", " ⊹ j.alias.cata(_.v, "")).some, j.pred))).toList :::
+              (un ∘ (i => nt("unnest", i.alias ∘ (_.v), i.expr))).toList :::
+              (lt ∘ (i => nt("let", i.id.v.some, i.expr))).toList :::
+              (ft ∘ (f => nonTerminal("filter", f.v))).toList :::
+              (gb ∘ (g => nonTerminal("groupBy", g.v))).toList :::
+              (ob ∘ (i => nt("orderBy", i.sortDir.shows.some, i.a))).toList
+          )
         case Case(wt, e) =>
-          NonTerminal("Case" :: Nil, none,
-            (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
-            nonTerminal("else", e.v))
+          NonTerminal("Case" :: Nil,
+                      none,
+                      (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
+                        nonTerminal("else", e.v))
       }
     }
   }

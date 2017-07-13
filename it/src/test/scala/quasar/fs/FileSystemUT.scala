@@ -24,11 +24,10 @@ import quasar.fp.free, free._
 import scalaz._
 import scalaz.concurrent.Task
 
-
 final case class SupportedFs[S[_]](
-  ref: BackendRef,
-  impl: Option[FileSystemUT[S]],
-  implNonChrooted: Option[FileSystemUT[S]] = None
+    ref: BackendRef,
+    impl: Option[FileSystemUT[S]],
+    implNonChrooted: Option[FileSystemUT[S]] = None
 ) {
   def liftIO: SupportedFs[Coproduct[Task, S, ?]] =
     this.copy(impl = impl.map(_.liftIO), implNonChrooted = implNonChrooted.map(_.liftIO))
@@ -46,11 +45,11 @@ final case class SupportedFs[S[_]](
   *   ever run, but it's safe to call it either way.
   */
 final case class FileSystemUT[S[_]](
-  ref:         BackendRef,
-  testInterp:  S ~> Task,
-  setupInterp: S ~> Task,
-  testDir:     ADir,
-  close:       Task[Unit]
+    ref: BackendRef,
+    testInterp: S ~> Task,
+    setupInterp: S ~> Task,
+    testDir: ADir,
+    close: Task[Unit]
 ) {
 
   type F[A] = Free[S, A]
@@ -59,24 +58,22 @@ final case class FileSystemUT[S[_]](
     ref supports bc
 
   def liftIO: FileSystemUT[Coproduct[Task, S, ?]] =
-    FileSystemUT(
-      ref,
-      NaturalTransformation.refl[Task] :+: testInterp,
-      NaturalTransformation.refl[Task] :+: setupInterp,
-      testDir,
-      close)
+    FileSystemUT(ref,
+                 NaturalTransformation.refl[Task] :+: testInterp,
+                 NaturalTransformation.refl[Task] :+: setupInterp,
+                 testDir,
+                 close)
 
   def contramap[T[_]](f: T ~> S): FileSystemUT[T] =
     FileSystemUT(ref, testInterp compose f, setupInterp compose f, testDir, close)
 
   def contramapF[T[_]](f: T ~> Free[S, ?]): FileSystemUT[T] =
-    FileSystemUT(
-      ref,
-      foldMapNT(testInterp) compose f,
-      foldMapNT(setupInterp) compose f,
-      testDir,
-      close)
+    FileSystemUT(ref,
+                 foldMapNT(testInterp) compose f,
+                 foldMapNT(setupInterp) compose f,
+                 testDir,
+                 close)
 
-  val testInterpM: F ~> Task = foldMapNT(testInterp)
+  val testInterpM: F ~> Task  = foldMapNT(testInterp)
   val setupInterpM: F ~> Task = foldMapNT(setupInterp)
 }

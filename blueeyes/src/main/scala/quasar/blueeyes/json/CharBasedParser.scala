@@ -61,7 +61,7 @@ private[json] trait CharBasedParser extends Parser {
       return k
     }
 
-    var j = i + 1
+    var j  = i + 1
     val sb = new CharBuilder
 
     var c = at(j)

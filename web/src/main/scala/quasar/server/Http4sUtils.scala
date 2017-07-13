@@ -46,15 +46,17 @@ object Http4sUtils {
   def waitForInput: Task[Unit] = {
     import java.lang.System
 
-    val inputPresent = Task.delay(Option(System.console).nonEmpty && System.in.available() > 0)
-                           .handle { case _ => false }
+    val inputPresent = Task
+      .delay(Option(System.console).nonEmpty && System.in.available() > 0)
+      .handle { case _ => false }
 
     Process.eval(inputPresent.after(250.milliseconds)).repeat.takeWhile(!_).run
   }
 
   def openBrowser(port: Int): Task[Unit] = {
     val url = s"http://localhost:$port/"
-    Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
+    Task
+      .delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
       .or(stderr(s"Failed to open browser, please navigate to $url"))
   }
 
@@ -72,25 +74,36 @@ object Http4sUtils {
   /** Available port numbers. */
   def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Int], N]] = Task.delay {
     Sized.wrap(
-      List.tabulate(toInt[N]){_ => val s = new java.net.ServerSocket(0); (s, s.getLocalPort)}
-          .map { case (s, p) => s.close; p})
+      List
+        .tabulate(toInt[N]) { _ =>
+          val s = new java.net.ServerSocket(0); (s, s.getLocalPort)
+        }
+        .map { case (s, p) => s.close; p })
   }
 
   /** Returns the requested port if available, or the next available port. */
   def choosePort(requested: Int): Task[Int] =
     unavailableReason(requested)
-      .flatMapF(rsn => stderr(s"Requested port not available: $requested; $rsn") *>
-        anyAvailablePort)
+      .flatMapF(
+        rsn =>
+          stderr(s"Requested port not available: $requested; $rsn") *>
+          anyAvailablePort)
       .getOrElse(requested)
 
   /** Start `Server` with supplied [[ServerBlueprint]]
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+  def startServer(blueprint: ServerBlueprint,
+                  flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
-      actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0").mountService(blueprint.svc).start
+      actualPort <- if (flexibleOnPort) choosePort(blueprint.port)
+      else Task.now(blueprint.port)
+      server <- BlazeBuilder
+        .withIdleTimeout(blueprint.idleTimeout)
+        .bindHttp(actualPort, "0.0.0.0")
+        .mountService(blueprint.svc)
+        .start
     } yield (server, actualPort)
   }
 
@@ -104,20 +117,31 @@ object Http4sUtils {
     * process of servers will terminate.
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     */
-  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
+  def servers(configurations: Process[Task, ServerBlueprint],
+              flexibleOnPort: Boolean): Process[Task, (Http4sServer, Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout(s"Server started listening on port $port") })
+      startServer(conf, flexibleOnPort).onSuccess {
+        case (_, port) =>
+          stdout(s"Server started listening on port $port")
+    })
 
-    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
-      oldServer.shutdown.flatMap(_ => stdout(s"Stopped server listening on port $oldPort")) *>
-        Task.now(newServerAndPort)
-    }.cleanUpWithA{ server =>
-      server.map { case (lastServer, lastPort) =>
-        lastServer.shutdown.flatMap(_ => stdout(s"Stopped last server listening on port $lastPort"))
-      }.getOrElse(Task.now(()))
-    }
+    serversAndPort
+      .evalScan1 {
+        case ((oldServer, oldPort), newServerAndPort) =>
+          oldServer.shutdown.flatMap(_ =>
+            stdout(s"Stopped server listening on port $oldPort")) *>
+            Task.now(newServerAndPort)
+      }
+      .cleanUpWithA { server =>
+        server
+          .map {
+            case (lastServer, lastPort) =>
+              lastServer.shutdown.flatMap(_ =>
+                stdout(s"Stopped last server listening on port $lastPort"))
+          }
+          .getOrElse(Task.now(()))
+      }
   }
 
   /** Produce a stream of servers that can be restarted on a supplied port
@@ -132,27 +156,33 @@ object Http4sUtils {
     */
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def startServers(
-    initialPort: Int,
-    produceService: (Int => Task[Unit]) => HttpService
-  ): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
+      initialPort: Int,
+      produceService: (Int => Task[Unit]) => HttpService
+  ): Task[(Process[Task, (Http4sServer, Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
+      val conf =
+        ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)
     }
     startNew(initialPort) >> (servers(configQ.dequeue, false).unconsOption.map {
-      case None => throw new java.lang.AssertionError("should never happen")
+      case None               => throw new java.lang.AssertionError("should never happen")
       case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
     })
   }
 
-  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] =
+  def startAndWait(port: Int,
+                   service: (Int => Task[Unit]) => HttpService,
+                   openClient: Boolean): Task[Unit] =
     startServers(port, service) >>= {
       case (servers, shutdown) =>
         (openBrowser(port).whenM(openClient) *>
           stdout("Press Enter to stop.") <*
-          Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdown.unsafePerformSync)) <*
+          Task.delay(
+            Task
+              .fork(waitForInput)
+              .unsafePerformAsync(_ => shutdown.unsafePerformSync)) <*
           servers.run) // We need to run the servers in order to make sure everything is cleaned up properly
     }
 }

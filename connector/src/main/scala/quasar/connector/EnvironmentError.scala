@@ -25,30 +25,28 @@ import scalaz._, Scalaz._
 sealed abstract class EnvironmentError
 
 object EnvironmentError {
-  final case class ConnectionFailed(error: Throwable)
-    extends EnvironmentError
-  final case class InvalidCredentials(message: String)
-    extends EnvironmentError
+  final case class ConnectionFailed(error: Throwable)  extends EnvironmentError
+  final case class InvalidCredentials(message: String) extends EnvironmentError
   final case class UnsupportedVersion(backendName: String, version: String)
-    extends EnvironmentError
+      extends EnvironmentError
 
   val connectionFailed: Prism[EnvironmentError, Throwable] =
     Prism[EnvironmentError, Throwable] {
       case ConnectionFailed(err) => Some(err)
-      case _ => None
-    } (ConnectionFailed(_))
+      case _                     => None
+    }(ConnectionFailed(_))
 
   val invalidCredentials: Prism[EnvironmentError, String] =
     Prism[EnvironmentError, String] {
       case InvalidCredentials(msg) => Some(msg)
-      case _ => None
-    } (InvalidCredentials(_))
+      case _                       => None
+    }(InvalidCredentials(_))
 
   val unsupportedVersion: Prism[EnvironmentError, (String, String)] =
     Prism[EnvironmentError, (String, String)] {
       case UnsupportedVersion(name, version) => Some((name, version))
-      case _ => None
-    } ((UnsupportedVersion(_, _)).tupled)
+      case _                                 => None
+    }((UnsupportedVersion(_, _)).tupled)
 
   implicit val environmentErrorShow: Show[EnvironmentError] =
     Show.shows {

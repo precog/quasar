@@ -28,7 +28,13 @@ import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
-import com.couchbase.client.java.view.{DefaultView, DesignDocument, View, ViewQuery, Stale}
+import com.couchbase.client.java.view.{
+  DefaultView,
+  DesignDocument,
+  View,
+  ViewQuery,
+  Stale
+}
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -45,7 +51,9 @@ object common {
 
   final case class Config(ctx: ClientContext, cluster: Cluster)
 
-  final case class ClientContext(bucket: Bucket, docTypeKey: DocTypeKey, lcView: ListContentsView)
+  final case class ClientContext(bucket: Bucket,
+                                 docTypeKey: DocTypeKey,
+                                 lcView: ListContentsView)
 
   final case class Context(bucket: BucketName, docTypeKey: DocTypeKey)
 
@@ -58,7 +66,7 @@ object common {
 
   final case class ListContentsView(docTypeKey: DocTypeKey) {
     val designDocName: String = s"quasar_${docTypeKey.v}"
-    val viewName: String = s"lc_${docTypeKey.v}"
+    val viewName: String      = s"lc_${docTypeKey.v}"
 
     val view: View =
       DefaultView.create(
@@ -79,7 +87,8 @@ object common {
           |  });
           |
           |  return o;
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
     val designDoc: DesignDocument =
       DesignDocument.create(designDocName, List(view).asJava)
@@ -93,20 +102,22 @@ object common {
   val CBDataCodec = DataCodec.Precise
 
   def docTypeValueFromPath(p: APath): DocTypeValue =
-    DocTypeValue(Path.flatten(None, None, None, Some(_), Some(_), p).toIList.unite.intercalate("/"))
+    DocTypeValue(
+      Path.flatten(None, None, None, Some(_), Some(_), p).toIList.unite.intercalate("/"))
 
   def deleteHavingPrefix(
-    ctx: ClientContext,
-    prefix: String
+      ctx: ClientContext,
+      prefix: String
   ): Task[FileSystemError \/ Unit] = {
-    val qStr = s"""DELETE FROM `${ctx.bucket.name}` WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
+    val qStr =
+      s"""DELETE FROM `${ctx.bucket.name}` WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
 
     query(ctx.bucket, qStr).map(_.void)
   }
 
   def docTypeValuesFromPrefix(
-    ctx: ClientContext,
-    prefix: String
+      ctx: ClientContext,
+      prefix: String
   ): Task[FileSystemError \/ List[DocTypeValue]] = Task.delay {
     ctx.bucket.query(ctx.lcView.query).allRows.asScala.toList.traverseM {
       _.value match {
@@ -121,8 +132,8 @@ object common {
   }
 
   def existsWithPrefix(
-    ctx: ClientContext,
-    prefix: String
+      ctx: ClientContext,
+      prefix: String
   ): Task[FileSystemError \/ Boolean] =
     docTypeValuesFromPrefix(ctx, prefix) ∘ (_ ∘ (_.nonEmpty))
 
@@ -132,16 +143,21 @@ object common {
       case h :: _   => DirName(h).left
     }.toSet
 
-  def pathSegmentsFromPrefixDocTypeValues(prefix: String, types: List[DocTypeValue]): Set[PathSegment] =
+  def pathSegmentsFromPrefixDocTypeValues(prefix: String,
+                                          types: List[DocTypeValue]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
-  def query(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[N1qlQueryRow]] =
+  def query(bucket: Bucket,
+            query: String): Task[FileSystemError \/ Vector[N1qlQueryRow]] =
     Task.delay {
-      val qr = bucket.query(N1qlQuery.simple(
-        query, N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS)))
+      val qr = bucket.query(
+        N1qlQuery.simple(query,
+                         N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS)))
       qr.errors.asScala.toVector.toNel.cata(
-        errors => FileSystemError.readFailed(
-          query,"[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
+        errors =>
+          FileSystemError
+            .readFailed(query, "[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]")
+            .left,
         qr.allRows.asScala.toVector.right)
     }
 
@@ -154,7 +170,8 @@ object common {
   def rowToData(row: N1qlQueryRow): FileSystemError \/ Data = {
     val rowStr = new String(row.byteValue)
 
-    DataCodec.parse(rowStr)(DataCodec.Precise).leftMap(err =>
-      FileSystemError.readFailed(rowStr, err.shows))
+    DataCodec
+      .parse(rowStr)(DataCodec.Precise)
+      .leftMap(err => FileSystemError.readFailed(rowStr, err.shows))
   }
 }

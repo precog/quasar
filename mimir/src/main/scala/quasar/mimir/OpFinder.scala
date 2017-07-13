@@ -19,7 +19,10 @@ package quasar.mimir
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 
-trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with TableLibModule[M] {
+trait OpFinderModule[M[+ _]]
+    extends Instructions
+    with TableModule[M]
+    with TableLibModule[M] {
   import instructions._
 
   trait OpFinder {
@@ -28,7 +31,10 @@ trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with Table
   }
 }
 
-trait StdLibOpFinderModule[M[+ _]] extends Instructions with StdLibModule[M] with OpFinderModule[M] {
+trait StdLibOpFinderModule[M[+ _]]
+    extends Instructions
+    with StdLibModule[M]
+    with OpFinderModule[M] {
   import instructions._
   import library._
 
@@ -45,22 +51,24 @@ trait StdLibOpFinderModule[M[+ _]] extends Instructions with StdLibModule[M] wit
       import instructions._
 
       op match {
-        case BuiltInFunction2Op(op2)                                                                    => Some(op2)
-        case Add                                                                                        => Some(Infix.Add)
-        case Sub                                                                                        => Some(Infix.Sub)
-        case Mul                                                                                        => Some(Infix.Mul)
-        case Div                                                                                        => Some(Infix.Div)
-        case Mod                                                                                        => Some(Infix.Mod)
-        case Pow                                                                                        => Some(Infix.Pow)
-        case Lt                                                                                         => Some(Infix.Lt)
-        case LtEq                                                                                       => Some(Infix.LtEq)
-        case Gt                                                                                         => Some(Infix.Gt)
-        case GtEq                                                                                       => Some(Infix.GtEq)
-        case Eq | instructions.NotEq                                                                    => None
-        case Or                                                                                         => Some(Infix.Or)
-        case And                                                                                        => Some(Infix.And)
-        case WrapObject | JoinObject | JoinArray | ArraySwap | DerefMetadata | DerefObject | DerefArray => None
-        case _                                                                                          => sys.error(s"Unexpected op $op")
+        case BuiltInFunction2Op(op2) => Some(op2)
+        case Add                     => Some(Infix.Add)
+        case Sub                     => Some(Infix.Sub)
+        case Mul                     => Some(Infix.Mul)
+        case Div                     => Some(Infix.Div)
+        case Mod                     => Some(Infix.Mod)
+        case Pow                     => Some(Infix.Pow)
+        case Lt                      => Some(Infix.Lt)
+        case LtEq                    => Some(Infix.LtEq)
+        case Gt                      => Some(Infix.Gt)
+        case GtEq                    => Some(Infix.GtEq)
+        case Eq | instructions.NotEq => None
+        case Or                      => Some(Infix.Or)
+        case And                     => Some(Infix.And)
+        case WrapObject | JoinObject | JoinArray | ArraySwap | DerefMetadata |
+            DerefObject | DerefArray =>
+          None
+        case _ => sys.error(s"Unexpected op $op")
       }
     }
   }

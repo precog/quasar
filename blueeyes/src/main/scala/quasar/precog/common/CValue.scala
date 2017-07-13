@@ -92,10 +92,13 @@ object RValue {
           case obj @ RObject(fields) =>
             path.nodes match {
               case CPathField(name) :: nodes =>
-                val (child, rest) = (fields.get(name).getOrElse(CUndefined), fields - name)
+                val (child, rest) =
+                  (fields.get(name).getOrElse(CUndefined), fields - name)
                 RObject(rest + (name -> rec(child, CPath(nodes), value)))
 
-              case CPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathIndex(_) :: _ =>
+                sys.error(
+                  "Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
                 sys.error(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
@@ -104,8 +107,11 @@ object RValue {
 
           case arr @ RArray(elements) =>
             path.nodes match {
-              case CPathIndex(index) :: nodes => RArray(arrayInsert(elements, index, CPath(nodes), value))
-              case CPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathIndex(index) :: nodes =>
+                RArray(arrayInsert(elements, index, CPath(nodes), value))
+              case CPathField(_) :: _ =>
+                sys.error(
+                  "Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
                 sys.error(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
@@ -122,9 +128,8 @@ object RValue {
             }
 
           case x =>
-            sys.error(
-              "RValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
-                " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+            sys.error("RValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
+              " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
         }
       }
     }
@@ -139,7 +144,7 @@ case class RObject(fields: Map[String, RValue]) extends RValue {
 }
 
 object RObject {
-  val empty = new RObject(Map.empty)
+  val empty                                    = new RObject(Map.empty)
   def apply(fields: (String, RValue)*): RValue = new RObject(Map(fields: _*))
 }
 
@@ -149,7 +154,7 @@ case class RArray(elements: List[RValue]) extends RValue {
 }
 
 object RArray {
-  val empty = new RArray(Nil)
+  val empty                            = new RArray(Nil)
   def apply(elements: RValue*): RValue = new RArray(elements.toList)
 }
 
@@ -176,16 +181,17 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 
 object CValue {
   implicit val CValueOrder: scalaz.Order[CValue] = Order order {
-    case (CString(as), CString(bs))                                                   => as ?|? bs
-    case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
-    case (CLong(al), CLong(bl))                                                       => al ?|? bl
-    case (CDouble(ad), CDouble(bd))                                                   => ad ?|? bd
-    case (CNum(an), CNum(bn))                                                         => fromInt(an compare bn)
-    case (CDate(ad), CDate(bd))                                                       => fromInt(ad compareTo bd)
-    case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
-    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
-    case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
-    case (a, b)                                                                       => a.cType ?|? b.cType
+    case (CString(as), CString(bs))   => as ?|? bs
+    case (CBoolean(ab), CBoolean(bb)) => ab ?|? bb
+    case (CLong(al), CLong(bl))       => al ?|? bl
+    case (CDouble(ad), CDouble(bd))   => ad ?|? bd
+    case (CNum(an), CNum(bn))         => fromInt(an compare bn)
+    case (CDate(ad), CDate(bd))       => fromInt(ad compareTo bd)
+    case (CPeriod(ad), CPeriod(bd))   => ad.toDuration ?|? bd.toDuration
+    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe =>
+      as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
+    case (a: CNumericValue[_], b: CNumericValue[_]) => (a.toCNum: CValue) ?|? b.toCNum
+    case (a, b)                                     => a.cType ?|? b.cType
   }
 }
 
@@ -244,18 +250,19 @@ object CType {
   val ArrayName = """Array[(.*)]""".r
 
   def fromName(n: String): Option[CType] = n match {
-    case "String"        => Some(CString)
-    case "Boolean"       => Some(CBoolean)
-    case "Long"          => Some(CLong)
-    case "Double"        => Some(CDouble)
-    case "Decimal"       => Some(CNum)
-    case "Null"          => Some(CNull)
-    case "EmptyObject"   => Some(CEmptyObject)
-    case "EmptyArray"    => Some(CEmptyArray)
-    case "Timestamp"     => Some(CDate)
-    case "Period"        => Some(CPeriod)
-    case ArrayName(elem) => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
-    case _               => None
+    case "String"      => Some(CString)
+    case "Boolean"     => Some(CBoolean)
+    case "Long"        => Some(CLong)
+    case "Double"      => Some(CDouble)
+    case "Decimal"     => Some(CNum)
+    case "Null"        => Some(CNull)
+    case "EmptyObject" => Some(CEmptyObject)
+    case "EmptyArray"  => Some(CEmptyArray)
+    case "Timestamp"   => Some(CDate)
+    case "Period"      => Some(CPeriod)
+    case ArrayName(elem) =>
+      fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
+    case _ => None
   }
 
   implicit val decomposer: Decomposer[CType] = new Decomposer[CType] {
@@ -281,8 +288,9 @@ object CType {
   def unify(t1: CType, t2: CType): Option[CType] = (t1, t2) match {
     case _ if t1 == t2                                    => Some(t1)
     case (CLong | CDouble | CNum, CLong | CDouble | CNum) => Some(CNum)
-    case (CArrayType(et1), CArrayType(et2))               => unify(et1, et2) collect { case t: CValueType[_] => CArrayType(t) }
-    case _                                                => None
+    case (CArrayType(et1), CArrayType(et2)) =>
+      unify(et1, et2) collect { case t: CValueType[_] => CArrayType(t) }
+    case _ => None
   }
 
   // TODO Should return Option[CValue]... is this even used?
@@ -294,7 +302,7 @@ object CType {
     case JNull         => CNull
     case JObject.empty => CEmptyObject
     case JArray.empty  => CEmptyArray
-    case JNum(d)       =>
+    case JNum(d) =>
       forJValue(jval) match {
         case Some(CLong)   => CLong(d.toLong)
         case Some(CDouble) => CDouble(d.toDouble)
@@ -351,7 +359,7 @@ object CValueType {
   implicit def long: CValueType[Long]                     = CLong
   implicit def double: CValueType[Double]                 = CDouble
   implicit def bigDecimal: CValueType[BigDecimal]         = CNum
-  implicit def dateTime: CValueType[LocalDateTime]             = CDate
+  implicit def dateTime: CValueType[LocalDateTime]        = CDate
   implicit def period: CValueType[Period]                 = CPeriod
   implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
@@ -359,7 +367,8 @@ object CValueType {
 //
 // Homogeneous arrays
 //
-case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
+case class CArray[A](value: Array[A], cType: CArrayType[A])
+    extends CWrappedValue[Array[A]] {
   private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = {
     var i      = 0
     var result = as.length == bs.length
@@ -370,30 +379,31 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
     result
   }
 
-  private final def equiv(a: Any, b: Any, elemType: CValueType[_]): Boolean = elemType match {
-    case CBoolean =>
-      leafEquiv(a.asInstanceOf[Array[Boolean]], b.asInstanceOf[Array[Boolean]])
+  private final def equiv(a: Any, b: Any, elemType: CValueType[_]): Boolean =
+    elemType match {
+      case CBoolean =>
+        leafEquiv(a.asInstanceOf[Array[Boolean]], b.asInstanceOf[Array[Boolean]])
 
-    case CLong =>
-      leafEquiv(a.asInstanceOf[Array[Long]], b.asInstanceOf[Array[Long]])
+      case CLong =>
+        leafEquiv(a.asInstanceOf[Array[Long]], b.asInstanceOf[Array[Long]])
 
-    case CDouble =>
-      leafEquiv(a.asInstanceOf[Array[Double]], b.asInstanceOf[Array[Double]])
+      case CDouble =>
+        leafEquiv(a.asInstanceOf[Array[Double]], b.asInstanceOf[Array[Double]])
 
-    case CArrayType(elemType) =>
-      val as = a.asInstanceOf[Array[Array[_]]]
-      val bs = b.asInstanceOf[Array[Array[_]]]
-      var i      = 0
-      var result = as.length == bs.length
-      while (result && i < as.length) {
-        result = equiv(as(i), bs(i), elemType)
-        i += 1
-      }
-      result
+      case CArrayType(elemType) =>
+        val as     = a.asInstanceOf[Array[Array[_]]]
+        val bs     = b.asInstanceOf[Array[Array[_]]]
+        var i      = 0
+        var result = as.length == bs.length
+        while (result && i < as.length) {
+          result = equiv(as(i), bs(i), elemType)
+          i += 1
+        }
+        result
 
-    case _ =>
-      leafEquiv(a.asInstanceOf[Array[AnyRef]], b.asInstanceOf[Array[AnyRef]])
-  }
+      case _ =>
+        leafEquiv(a.asInstanceOf[Array[AnyRef]], b.asInstanceOf[Array[AnyRef]])
+    }
 
   override def equals(that: Any): Boolean = that match {
     case v @ CArray(_, thatCType) if cType == thatCType =>
@@ -402,7 +412,8 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
     case _ => false
   }
 
-  override def toString: String = value.mkString("CArray(Array(", ", ", "), " + cType.toString + ")")
+  override def toString: String =
+    value.mkString("CArray(Array(", ", ", "), " + cType.toString + ")")
 }
 
 case object CArray {
@@ -438,7 +449,7 @@ case class CString(value: String) extends CWrappedValue[String] {
 }
 
 case object CString extends CValueType[String] {
-  val classTag: CTag[String] = implicitly[CTag[String]]
+  val classTag: CTag[String]        = implicitly[CTag[String]]
   def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
   def jValueFor(s: String)          = JString(s)
@@ -455,9 +466,9 @@ case object CTrue  extends CBoolean(true)
 case object CFalse extends CBoolean(false)
 
 object CBoolean extends CValueType[Boolean] {
-  def apply(value: Boolean)    = if (value) CTrue else CFalse
-  def unapply(cbool: CBoolean) = Some(cbool.value)
-  val classTag: CTag[Boolean] = implicitly[CTag[Boolean]]
+  def apply(value: Boolean)           = if (value) CTrue else CFalse
+  def unapply(cbool: CBoolean)        = Some(cbool.value)
+  val classTag: CTag[Boolean]         = implicitly[CTag[Boolean]]
   def readResolve()                   = CBoolean
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)
   def jValueFor(v: Boolean)           = JBool(v)
@@ -471,7 +482,7 @@ case class CLong(value: Long) extends CNumericValue[Long] {
 }
 
 case object CLong extends CNumericType[Long] {
-  val classTag: CTag[Long] = implicitly[CTag[Long]]
+  val classTag: CTag[Long]       = implicitly[CTag[Long]]
   def readResolve()              = CLong
   def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
   def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
@@ -483,7 +494,7 @@ case class CDouble(value: Double) extends CNumericValue[Double] {
 }
 
 case object CDouble extends CNumericType[Double] {
-  val classTag: CTag[Double] = implicitly[CTag[Double]]
+  val classTag: CTag[Double]        = implicitly[CTag[Double]]
   def readResolve()                 = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
   def jValueFor(v: Double)          = JNum(BigDecimal(v.toString, UNLIMITED))
@@ -495,7 +506,7 @@ case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
 }
 
 case object CNum extends CNumericType[BigDecimal] {
-  val classTag: CTag[BigDecimal] = implicitly[CTag[BigDecimal]]
+  val classTag: CTag[BigDecimal]            = implicitly[CTag[BigDecimal]]
   def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def jValueFor(v: BigDecimal)              = JNum(v)
@@ -510,10 +521,10 @@ case class CDate(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
 }
 
 case object CDate extends CValueType[LocalDateTime] {
-  val classTag: CTag[LocalDateTime]      = implicitly[CTag[LocalDateTime]]
-  def readResolve()                     = CDate
+  val classTag: CTag[LocalDateTime]               = implicitly[CTag[LocalDateTime]]
+  def readResolve()                               = CDate
   def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
-  def jValueFor(v: LocalDateTime)            = JString(v.toString)
+  def jValueFor(v: LocalDateTime)                 = JString(v.toString)
 }
 
 case class CPeriod(value: Period) extends CWrappedValue[Period] {
@@ -521,7 +532,7 @@ case class CPeriod(value: Period) extends CWrappedValue[Period] {
 }
 
 case object CPeriod extends CValueType[Period] {
-  val classTag: CTag[Period]    = implicitly[CTag[Period]]
+  val classTag: CTag[Period]        = implicitly[CTag[Period]]
   def readResolve()                 = CPeriod
   def order(v1: Period, v2: Period) = sys.error("todo")
   def jValueFor(v: Period)          = JString(v.toString)

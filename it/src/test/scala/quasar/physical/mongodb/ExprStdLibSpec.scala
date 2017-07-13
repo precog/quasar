@@ -43,7 +43,9 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+  def shortCircuit[N <: Nat](backend: BackendName,
+                             func: GenericFunc[N],
+                             args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.Length, _)   => notHandled.left
     case (string.Integer, _)  => notHandled.left
     case (string.Decimal, _)  => notHandled.left
@@ -53,34 +55,40 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
 
     case (date.StartOfDay, _) => notHandled.left
-    case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
+    case (date.TimeOfDay, _) if is2_6(backend) =>
+      Skipped("not implemented in aggregation on MongoDB 2.6").left
 
-    case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.Power, _) if !is3_2(backend) =>
+      Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
-    case (structural.ConcatOp, _)   => notHandled.left
+    case (structural.ConcatOp, _) => notHandled.left
 
-    case _                  => ().right
+    case _ => ().right
   }
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def compile(
+      queryModel: MongoQueryModel,
+      coll: Collection,
+      lp: Fix[LogicalPlan]): PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     val wrapped =
-      Fix(structural.MakeObject(
-        lpf.constant(Data.Str("result")),
-        lp))
+      Fix(structural.MakeObject(lpf.constant(Data.Str("result")), lp))
 
     val ctx = QueryContext(queryModel, κ(None), κ(None), listContents)
 
-    MongoDbPlanner.plan(wrapped, ctx).run.value
+    MongoDbPlanner
+      .plan(wrapped, ctx)
+      .run
+      .value
       .flatMap { wf =>
         val singlePipeline = wf.op.cata[Boolean] {
           case IsSource(_)   => true
           case IsPipeline(p) => p.src
           case _             => false
         }
-        if (singlePipeline) wf.right else InternalError.fromMsg("compiled to map-reduce").left
+        if (singlePipeline) wf.right
+        else InternalError.fromMsg("compiled to map-reduce").left
       }
       .strengthR(BsonField.Name("result"))
   }

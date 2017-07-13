@@ -37,12 +37,12 @@ object DocType {
   type Xml  = XmlDoc.type
 
   val json: DocType = JsonDoc
-  val xml:  DocType = XmlDoc
+  val xml: DocType  = XmlDoc
 
   val name: Prism[String, DocType] =
     Prism.partial[String, DocType] {
-      case "json"  => json
-      case "xml"   => xml
+      case "json" => json
+      case "xml"  => xml
     } {
       case JsonDoc => "json"
       case XmlDoc  => "xml"

@@ -29,6 +29,7 @@ import scalaz._, Scalaz._
 /** A WorkflowTask approximately represents one request to MongoDB. */
 sealed abstract class WorkflowTaskF[A]
 object WorkflowTaskF {
+
   /** A task that returns a necessarily small amount of raw data. */
   final case class PureTaskF[A](value: Bson) extends WorkflowTaskF[A]
 
@@ -36,8 +37,10 @@ object WorkflowTaskF {
   final case class ReadTaskF[A](value: Collection) extends WorkflowTaskF[A]
 
   /** A task that executes a Mongo read query. */
-  final case class QueryTaskF[A](
-    source: A, query: Selector, skip: Option[Int], limit: Option[Int])
+  final case class QueryTaskF[A](source: A,
+                                 query: Selector,
+                                 skip: Option[Int],
+                                 limit: Option[Int])
       extends WorkflowTaskF[A]
 
   /** A task that executes a Mongo pipeline aggregation. */
@@ -45,7 +48,9 @@ object WorkflowTaskF {
       extends WorkflowTaskF[A]
 
   /** A task that executes a Mongo map/reduce job. */
-  final case class MapReduceTaskF[A](source: A, mapReduce: MapReduce, outAct: Option[Action])
+  final case class MapReduceTaskF[A](source: A,
+                                     mapReduce: MapReduce,
+                                     outAct: Option[Action])
       extends WorkflowTaskF[A]
 
   /** A task that executes a sequence of other tasks, one at a time, collecting
@@ -65,14 +70,14 @@ object WorkflowTaskF {
 
   implicit def traverse: Traverse[WorkflowTaskF] =
     new Traverse[WorkflowTaskF] {
-      def traverseImpl[G[_], A, B](fa: WorkflowTaskF[A])(f: A => G[B])(implicit G: Applicative[G]):
-          G[WorkflowTaskF[B]] =
+      def traverseImpl[G[_], A, B](fa: WorkflowTaskF[A])(f: A => G[B])(
+          implicit G: Applicative[G]): G[WorkflowTaskF[B]] =
         fa match {
           case PureTaskF(bson) => G.point(PureTaskF[B](bson))
           case ReadTaskF(coll) => G.point(ReadTaskF[B](coll))
           case QueryTaskF(src, query, skip, limit) =>
             f(src).map(QueryTaskF(_, query, skip, limit))
-          case PipelineTaskF(src, pipe) => f(src).map(PipelineTaskF(_, pipe))
+          case PipelineTaskF(src, pipe)    => f(src).map(PipelineTaskF(_, pipe))
           case MapReduceTaskF(src, mr, oa) => f(src).map(MapReduceTaskF(_, mr, oa))
           case FoldLeftTaskF(h, t) =>
             (f(h) |@| t.traverse(f))(FoldLeftTaskF(_, _))
@@ -90,43 +95,67 @@ object WorkflowTaskF {
         val WorkflowTaskNodeType = "WorkflowTask" :: "Workflow" :: Nil
 
         def render(task: WorkflowTaskF[A]) = task match {
-          case PureTaskF(bson) => Terminal("PureTask" :: WorkflowTaskNodeType,
-            Some(bson.shows))
-          case ReadTaskF(value) => RC.render(value).copy(nodeType = "ReadTask" :: WorkflowTaskNodeType)
+          case PureTaskF(bson) =>
+            Terminal("PureTask" :: WorkflowTaskNodeType, Some(bson.shows))
+          case ReadTaskF(value) =>
+            RC.render(value).copy(nodeType = "ReadTask" :: WorkflowTaskNodeType)
 
           case QueryTaskF(source, query, skip, limit) =>
             val nt = "PipelineTask" :: WorkflowTaskNodeType
-            NonTerminal(nt, (skip.shows + ", " + limit.shows).some,
-              ra.render(source) ::
-                Terminal("Selector" :: nt, query.shows.some) ::
-                Nil)
+            NonTerminal(nt,
+                        (skip.shows + ", " + limit.shows).some,
+                        ra.render(source) ::
+                          Terminal("Selector" :: nt, query.shows.some) ::
+                          Nil)
 
           case PipelineTaskF(source, pipeline) =>
             val nt = "PipelineTask" :: WorkflowTaskNodeType
-            NonTerminal(nt, None,
+            NonTerminal(
+              nt,
+              None,
               ra.render(source) ::
-              NonTerminal("Pipeline" :: nt, None, pipeline.map(p => RO.render(p.op))) ::
+                NonTerminal("Pipeline" :: nt, None, pipeline.map(p => RO.render(p.op))) ::
                 Nil)
 
-          case MapReduceTaskF(source, MapReduce(map, reduce, selectorOpt, sortOpt, limitOpt, finalizerOpt, scopeOpt, jsModeOpt, verboseOpt), outAct) =>
+          case MapReduceTaskF(source,
+                              MapReduce(map,
+                                        reduce,
+                                        selectorOpt,
+                                        sortOpt,
+                                        limitOpt,
+                                        finalizerOpt,
+                                        scopeOpt,
+                                        jsModeOpt,
+                                        verboseOpt),
+                              outAct) =>
             val nt = "MapReduceTask" :: WorkflowTaskNodeType
-            NonTerminal(nt, None, List(
-              ra.render(source),
-              RJ.render(map),
-              RJ.render(reduce),
-              selectorOpt.fold(Terminal("None" :: Nil, None))(RS.render(_)),
-              sortOpt.fold(Terminal("None" :: Nil, None))(keys =>
-                NonTerminal("Sort" :: nt, None, keys.list.toList map { case (expr, ot) =>
-                  Terminal("Key" :: "Sort" :: nt, Some(expr.shows + " -> " + ot.shows))
-                })),
-              Terminal("Limit" :: nt, limitOpt ∘ (_.shows)),
-              finalizerOpt.fold(Terminal("None" :: Nil, None))(RJ.render(_)),
-              Terminal("Scope" :: nt, Some(scopeOpt.toString)),
-              Terminal("JsMode" :: nt, jsModeOpt ∘ (_.shows))
-            ) ::: outAct.map(act => Terminal("Out" :: nt, Some(Action.bsonFieldName(act)))).toList)
+            NonTerminal(
+              nt,
+              None,
+              List(
+                ra.render(source),
+                RJ.render(map),
+                RJ.render(reduce),
+                selectorOpt.fold(Terminal("None" :: Nil, None))(RS.render(_)),
+                sortOpt.fold(Terminal("None" :: Nil, None))(keys =>
+                  NonTerminal("Sort" :: nt, None, keys.list.toList map {
+                    case (expr, ot) =>
+                      Terminal("Key" :: "Sort" :: nt,
+                               Some(expr.shows + " -> " + ot.shows))
+                  })),
+                Terminal("Limit" :: nt, limitOpt ∘ (_.shows)),
+                finalizerOpt.fold(Terminal("None" :: Nil, None))(RJ.render(_)),
+                Terminal("Scope" :: nt, Some(scopeOpt.toString)),
+                Terminal("JsMode" :: nt, jsModeOpt ∘ (_.shows))
+              ) ::: outAct
+                .map(act => Terminal("Out" :: nt, Some(Action.bsonFieldName(act))))
+                .toList
+            )
 
           case FoldLeftTaskF(head, tail) =>
-            NonTerminal("FoldLeftTask" :: WorkflowTaskNodeType, None, ra.render(head) :: tail.toList.map(ra.render))
+            NonTerminal("FoldLeftTask" :: WorkflowTaskNodeType,
+                        None,
+                        ra.render(head) :: tail.toList.map(ra.render))
         }
       }
     }
@@ -150,12 +179,12 @@ object ReadTaskF {
 }
 
 object QueryTaskF {
-  def apply[A](
-    source: A, query: Selector, skip: Option[Int], limit: Option[Int]):
-      WorkflowTaskF[A] =
+  def apply[A](source: A,
+               query: Selector,
+               skip: Option[Int],
+               limit: Option[Int]): WorkflowTaskF[A] =
     WorkflowTaskF.QueryTaskF[A](source, query, skip, limit)
-  def unapply[A](obj: WorkflowTaskF[A]):
-      Option[(A, Selector, Option[Int], Option[Int])] =
+  def unapply[A](obj: WorkflowTaskF[A]): Option[(A, Selector, Option[Int], Option[Int])] =
     obj match {
       case WorkflowTaskF.QueryTaskF(source, query, skip, limit) =>
         Some((source, query, skip, limit))
@@ -175,13 +204,16 @@ object PipelineTaskF {
 
 object MapReduceTaskF {
   import MapReduce._
-  def apply[A](source: A, mapReduce: MapReduce, outAct: Option[Action]): WorkflowTaskF[A] =
+  def apply[A](source: A,
+               mapReduce: MapReduce,
+               outAct: Option[Action]): WorkflowTaskF[A] =
     WorkflowTaskF.MapReduceTaskF[A](source, mapReduce, outAct)
-  def unapply[A](obj: WorkflowTaskF[A]): Option[(A, MapReduce, Option[Action])] = obj match {
-    case WorkflowTaskF.MapReduceTaskF(source, mapReduce, outAct) =>
-      Some((source, mapReduce, outAct))
-    case _ => None
-  }
+  def unapply[A](obj: WorkflowTaskF[A]): Option[(A, MapReduce, Option[Action])] =
+    obj match {
+      case WorkflowTaskF.MapReduceTaskF(source, mapReduce, outAct) =>
+        Some((source, mapReduce, outAct))
+      case _ => None
+    }
 }
 
 object FoldLeftTaskF {

@@ -31,8 +31,9 @@ class Z85Specs extends org.specs2.mutable.SpecificationLike with Discipline { //
   implicit val shrinkByteVector: Shrink[ByteVector] =
     Shrink[ByteVector] { b =>
       if (b.nonEmpty)
-        Stream.iterate(b.take(b.size / 2))(b2 => b2.take(b2.size / 2))
-              .takeWhile(_.nonEmpty) ++ Stream(ByteVector.empty)
+        Stream
+          .iterate(b.take(b.size / 2))(b2 => b2.take(b2.size / 2))
+          .takeWhile(_.nonEmpty) ++ Stream(ByteVector.empty)
       else Stream.empty
     }
 

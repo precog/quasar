@@ -40,7 +40,7 @@ object VersionLogSpecs extends Specification {
   import StreamTestUtils._
 
   "version log manager" should {
-    val H = Harness[POSIXOp, Task]
+    val H   = Harness[POSIXOp, Task]
     val HWT = Harness[Coproduct[POSIXOp, Task, ?], Task]
 
     val BaseDir = Path.rootDir </> Path.dir("foo")
@@ -156,8 +156,8 @@ object VersionLogSpecs extends Specification {
 
     "read and return non-empty log with uncommitted versions" in {
       val uncommitted = List.fill(2)(UUID.randomUUID()).map(Version)
-      val committed = List.fill(2)(UUID.randomUUID()).map(Version)
-      val versions = uncommitted ++ committed
+      val committed   = List.fill(2)(UUID.randomUUID()).map(Version)
+      val versions    = uncommitted ++ committed
 
       val members =
         Path.file("versions.json") :: versions.map(v => Path.dir(v.value.toString))
@@ -176,7 +176,8 @@ object VersionLogSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("versions.json"))
 
-              Stream(ByteVector(s"""["${committed(0).value.toString}","${committed(1).value.toString}"]""".getBytes))
+              Stream(ByteVector(
+                s"""["${committed(0).value.toString}","${committed(1).value.toString}"]""".getBytes))
             }
         }
 
@@ -215,7 +216,7 @@ object VersionLogSpecs extends Specification {
     }
 
     "re-generate version upon collision with existing version" in {
-      val uuid = UUID.randomUUID()
+      val uuid      = UUID.randomUUID()
       val collision = UUID.randomUUID()
 
       val init = VersionLog(BaseDir, Nil, Set(Version(collision)))
@@ -244,9 +245,9 @@ object VersionLogSpecs extends Specification {
     }
 
     "commit version to head" in {
-      val v = Version(UUID.randomUUID())
+      val v     = Version(UUID.randomUUID())
       val other = Version(UUID.randomUUID())
-      val init = VersionLog(BaseDir, List(other), Set(v, other))
+      val init  = VersionLog(BaseDir, List(other), Set(v, other))
 
       val interp = for {
         _ <- HWT.pattern[Sink[POSIXWithTask, ByteVector]] {
@@ -254,7 +255,8 @@ object VersionLogSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("versions.json.new"))
 
-              assertionSink(_ mustEqual s"""["${v.value.toString}","${other.value.toString}"]""")
+              assertionSink(
+                _ mustEqual s"""["${v.value.toString}","${other.value.toString}"]""")
             }
         }
 
@@ -293,9 +295,9 @@ object VersionLogSpecs extends Specification {
     }
 
     "silently ignore invalid commits" in {
-      val v = Version(UUID.randomUUID())
+      val v     = Version(UUID.randomUUID())
       val other = Version(UUID.randomUUID())
-      val init = VersionLog(BaseDir, List(other), Set(other))
+      val init  = VersionLog(BaseDir, List(other), Set(other))
 
       val interp = ().point[Harness[Coproduct[POSIXOp, Task, ?], Task, ?]]
 
@@ -307,10 +309,10 @@ object VersionLogSpecs extends Specification {
 
     "purge old versions beyond the limit" in {
       val front = List.fill(5)(UUID.randomUUID())
-      val back = List.fill(2)(UUID.randomUUID())
+      val back  = List.fill(2)(UUID.randomUUID())
 
       val uuids = front ++ back
-      val init = VersionLog(BaseDir, uuids.map(Version), uuids.map(Version).toSet)
+      val init  = VersionLog(BaseDir, uuids.map(Version), uuids.map(Version).toSet)
 
       val interp = for {
         _ <- H.pattern[Unit] {

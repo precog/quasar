@@ -32,10 +32,12 @@ object POSIX {
   def genUUID[S[_]](implicit S: POSIXOp :<: S): Free[S, UUID] =
     Free.liftF(S.inj(GenUUID))
 
-  def openW[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
+  def openW[S[_]](target: AFile)(
+      implicit S: POSIXOp :<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenW(target)))
 
-  def openR[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
+  def openR[S[_]](target: AFile)(
+      implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenR(target)))
 
   def ls[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, List[RPath]] =
@@ -47,7 +49,8 @@ object POSIX {
   def linkDir[S[_]](src: ADir, target: ADir)(implicit S: POSIXOp :<: S): Free[S, Unit] =
     Free.liftF(S.inj(LinkDir(src, target)))
 
-  def linkFile[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def linkFile[S[_]](src: AFile, target: AFile)(
+      implicit S: POSIXOp :<: S): Free[S, Unit] =
     Free.liftF(S.inj(LinkFile(src, target)))
 
   def move[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Unit] =

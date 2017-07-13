@@ -38,25 +38,24 @@ object writefile {
   val interpret: WriteFile ~> MongoWrite = new (WriteFile ~> MongoWrite) {
     def apply[A](wf: WriteFile[A]) = wf match {
       case Open(file) =>
-        Collection.fromFile(file) fold (
-          err => pathErr(err).left.point[MongoWrite],
-          col => ensureCollection(col).liftM[WriteStateT] *>
-                 recordCollection(file, col) map \/.right)
+        Collection.fromFile(file) fold (err => pathErr(err).left.point[MongoWrite],
+        col =>
+          ensureCollection(col).liftM[WriteStateT] *>
+            recordCollection(file, col) map \/.right)
 
       case Write(h, data) =>
         val (errs, docs) = data foldMap { d =>
-          dataToDocument(d).fold(
-            e => (Vector(e), Vector()),
-            d => (Vector(), Vector(d)))
+          dataToDocument(d).fold(e => (Vector(e), Vector()), d => (Vector(), Vector(d)))
         }
 
-        lookupCollection(h) flatMap (_ cata (
-          c => insertAny(c, docs.map(_.repr))
-                 .filter(_ < docs.size)
-                 .map(n => partialWrite(docs.size - n))
-                 .run.map(errs ++ _.toList)
-                 .liftM[WriteStateT],
-          (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
+        lookupCollection(h) flatMap (_ cata (c =>
+          insertAny(c, docs.map(_.repr))
+            .filter(_ < docs.size)
+            .map(n => partialWrite(docs.size - n))
+            .run
+            .map(errs ++ _.toList)
+            .liftM[WriteStateT],
+        (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
 
       case Close(h) =>
         MongoWrite(collectionL(h) := None).void
@@ -65,11 +64,10 @@ object writefile {
 
   /** Run [[MongoWrite]] using the given `MongoClient`. */
   def run[S[_]](
-    client: MongoClient
+      client: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): Task[MongoWrite ~> Free[S, ?]] =
+    S1: PhysErr :<: S): Task[MongoWrite ~> Free[S, ?]] =
     TaskRef[WriteState]((0, Map.empty)) map { ref =>
       new (MongoWrite ~> Free[S, ?]) {
         def apply[A](wm: MongoWrite[A]) = wm.run(ref).runF(client)
@@ -106,7 +104,8 @@ object writefile {
     writeState map (collectionL(h).get)
 
   private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
-    BsonCodec.fromData(d)
+    BsonCodec
+      .fromData(d)
       .leftMap(err => writeFailed(d, err.shows))
       .flatMap {
         case doc @ Bson.Doc(_) => doc.right

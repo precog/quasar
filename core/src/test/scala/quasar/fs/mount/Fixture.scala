@@ -31,7 +31,7 @@ object Fixture {
   def constant: Mounting ~> State[Map[APath, MountConfig], ?] = {
     type F[A] = State[Map[APath, MountConfig], A]
     val mntr = Mounter.trivial[MountConfigs]
-    val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
+    val kvf  = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
     mntr andThen foldMapNT(kvf)
   }
 

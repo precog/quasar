@@ -31,12 +31,12 @@ import spire.implicits._
 
 /** Statistics based on a sample from a population. */
 final class SampleStats[A] private (
-  val size: A,
-  // Sums of powers (1-4) of differences from the mean.
-  val m1: A,
-  val m2: A,
-  val m3: A,
-  val m4: A
+    val size: A,
+    // Sums of powers (1-4) of differences from the mean.
+    val m1: A,
+    val m2: A,
+    val m3: A,
+    val m4: A
 ) {
 
   // Sample Statistics
@@ -57,7 +57,6 @@ final class SampleStats[A] private (
 
   def excessKurtosis(implicit E: Equal[A], F: Field[A]): Option[A] =
     kurtosis map (_ - ℤ(3))
-
 
   // Population Estimates
 
@@ -84,7 +83,6 @@ final class SampleStats[A] private (
   def populationExcessKurtosis(implicit E: Equal[A], F: Field[A]): Option[A] =
     populationKurtosis map (_ - ℤ(3))
 
-
   // Operations
 
   /** Returns new stats that include the given observation.
@@ -101,17 +99,13 @@ final class SampleStats[A] private (
 
     new SampleStats(
       n,
-
       m1 + `δ/n`,
-
       m2 + t1,
-
       m3 + (t1 * `δ/n` * (n - ℤ(2))) -
-           (ℤ(3) * `δ/n` * m2),
-
+        (ℤ(3) * `δ/n` * m2),
       m4 + (t1 * `δ²/n²` * ((n * n) - (ℤ(3) * n) + ℤ(3))) +
-           (ℤ(6) * `δ²/n²` * m2) -
-           (ℤ(4) * `δ/n` * m3)
+        (ℤ(6) * `δ²/n²` * m2) -
+        (ℤ(4) * `δ/n` * m3)
     )
   }
 
@@ -131,52 +125,49 @@ final class SampleStats[A] private (
 
       val `n₁₂` = `n₁` * `n₂`
 
-      val  n    = `n₁` + `n₂`
-      val `n²`  =  n   * n
-      val `n³`  = `n²` * n
+      val n    = `n₁` + `n₂`
+      val `n²` = n * n
+      val `n³` = `n²` * n
 
-      val  δ    = b.m1 - m1
-      val `δ²`  =  δ   *  δ
-      val `δ³`  = `δ²` *  δ
-      val `δ⁴`  = `δ²` * `δ²`
+      val δ    = b.m1 - m1
+      val `δ²` = δ * δ
+      val `δ³` = `δ²` * δ
+      val `δ⁴` = `δ²` * `δ²`
 
       new SampleStats(
         n,
-
         ((`n₁` * m1) + (`n₂` * b.m1)) / n,
-
         m2 + b.m2 + ((`δ²` * `n₁₂`) / n),
-
         m3 + b.m3 + ((`δ³` * `n₁₂` * (`n₁` - `n₂`)) / `n²`) +
-                    ((ℤ(3) * δ * ((`n₁` * b.m2) - (`n₂` * m2))) / n),
-
+          ((ℤ(3) * δ * ((`n₁` * b.m2) - (`n₂` * m2))) / n),
         m4 + b.m4 + ((`δ⁴` * `n₁₂` * (`n₁²` - `n₁₂` + `n₂²`)) / `n³`) +
-                    ((ℤ(6) * `δ²` * ((`n₁²` * b.m2) + (`n₂²` * m2))) / `n²`) +
-                    ((ℤ(4) * δ * ((`n₁` * b.m3) - (`n₂` * m3))) / n)
+          ((ℤ(6) * `δ²` * ((`n₁²` * b.m2) + (`n₂²` * m2))) / `n²`) +
+          ((ℤ(4) * δ * ((`n₁` * b.m3) - (`n₂` * m3))) / n)
       )
     }
 
-         if (b.size ≟ F.zero) this
-    else if (size   ≟ F.zero) b
-    else if (b.size ≟  F.one) observe(b.mean)
-    else if (size   ≟  F.one) b.observe(mean)
-    else    doMerge
+    if (b.size ≟ F.zero) this
+    else if (size ≟ F.zero) b
+    else if (b.size ≟ F.one) observe(b.mean)
+    else if (size ≟ F.one) b.observe(mean)
+    else doMerge
   }
 
   /** Alias for `merge`. */
-  def + (b: SampleStats[A])(implicit E: Equal[A], F: Field[A]): SampleStats[A] =
+  def +(b: SampleStats[A])(implicit E: Equal[A], F: Field[A]): SampleStats[A] =
     merge(b)
 
   ////
 
-  private def ℝ (d: Double)(implicit F: Field[A]): A =
+  private def ℝ(d: Double)(implicit F: Field[A]): A =
     F.fromDouble(d)
 
-  private def ℤ (i: Int)(implicit F: Field[A]): A =
+  private def ℤ(i: Int)(implicit F: Field[A]): A =
     F.fromInt(i)
 }
 
 object SampleStats extends SampleStatsInstances {
+
   /** Stats over zero observations. */
   def empty[A](implicit A: AdditiveMonoid[A]): SampleStats[A] =
     freq(A.zero, A.zero)
@@ -203,10 +194,12 @@ sealed abstract class SampleStatsInstances {
     Monoid.instance((a, b) => a + b, SampleStats.empty[A])
 
   implicit def show[A: Show: Equal: Field: NRoot]: Show[SampleStats[A]] =
-    Show.shows(ss => "SampleStats" + IList(
-        s"n = ${ss.size.shows}"
-      , s"μ = ${ss.mean.shows}"
-      , s"σ² = ${ss.populationVariance.map(_.shows) | "?"}"
-      , s"σ = ${ss.populationStddev.map(_.shows) | "?"}"
-    ).shows)
+    Show.shows(
+      ss =>
+        "SampleStats" + IList(
+          s"n = ${ss.size.shows}",
+          s"μ = ${ss.mean.shows}",
+          s"σ² = ${ss.populationVariance.map(_.shows) | "?"}",
+          s"σ = ${ss.populationStddev.map(_.shows) | "?"}"
+        ).shows)
 }

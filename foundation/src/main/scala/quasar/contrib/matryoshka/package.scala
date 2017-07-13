@@ -24,14 +24,13 @@ import _root_.matryoshka.patterns.EnvT
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
+
   /** Chains multiple transformations together, each of which can fail to change
     * anything.
     */
-  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*)
-      : A => Option[A] =
-    rest.foldLeft(
-      first)(
-      (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
+  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*): A => Option[A] =
+    rest.foldLeft(first)((prev, next) =>
+      x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 
   def envT[E, W[_], A](e: E, wa: W[A]): EnvT[E, W, A] =
     EnvT((e, wa))
@@ -47,7 +46,8 @@ package object matryoshka {
     orOriginal(pf.lift)
 
   /** Derive a recursive instance over the functor transformed by EnvT by forgetting the annotation. */
-  def forgetRecursive[T, E, F[_]](implicit T: Recursive.Aux[T, EnvT[E, F, ?]]): Recursive.Aux[T, F] =
+  def forgetRecursive[T, E, F[_]](
+      implicit T: Recursive.Aux[T, EnvT[E, F, ?]]): Recursive.Aux[T, F] =
     new Recursive[T] {
       type Base[B] = F[B]
 
@@ -56,7 +56,8 @@ package object matryoshka {
     }
 
   /** Derive a corecursive instance over the functor transformed by EnvT using the zero of the annotation monoid. */
-  def rememberCorecursive[T, E: Monoid, F[_]](implicit T: Corecursive.Aux[T, EnvT[E, F, ?]]): Corecursive.Aux[T, F] =
+  def rememberCorecursive[T, E: Monoid, F[_]](
+      implicit T: Corecursive.Aux[T, EnvT[E, F, ?]]): Corecursive.Aux[T, F] =
     new Corecursive[T] {
       type Base[B] = F[B]
 
@@ -64,10 +65,13 @@ package object matryoshka {
         T.embed(envT(∅[E], ft))
     }
 
-  implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
+  implicit def delayOrder[F[_], A](implicit F: Delay[Order, F],
+                                   A: Order[A]): Order[F[A]] =
     F(A)
 
-  implicit def coproductOrder[F[_], G[_]](implicit F: Delay[Order, F], G: Delay[Order, G]): Delay[Order, Coproduct[F, G, ?]] =
+  implicit def coproductOrder[F[_], G[_]](
+      implicit F: Delay[Order, F],
+      G: Delay[Order, G]): Delay[Order, Coproduct[F, G, ?]] =
     new Delay[Order, Coproduct[F, G, ?]] {
       def apply[A](ord: Order[A]): Order[Coproduct[F, G, A]] = {
         implicit val ordA: Order[A] = ord

@@ -39,37 +39,38 @@ object readfile {
 
   def fetchRdd(sc: SparkContext, pathStr: String): Task[RDD[Data]] = Task.delay {
     // TODO add magic number support to distinguish
-    if(pathStr.endsWith(".parquet"))
+    if (pathStr.endsWith(".parquet"))
       sc.parquet(pathStr)
     else
       sc.textFile(pathStr)
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => Task[String])(implicit
-    read: Read.Ops[SparkContext, S],
-    s1: Task :<: S
-  ): Free[S, RDD[(Data, Long)]] = {
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(
+      hdfsPathStr: AFile => Task[String])(implicit
+                                          read: Read.Ops[SparkContext, S],
+                                          s1: Task :<: S): Free[S, RDD[(Data, Long)]] = {
     for {
       pathStr <- lift(hdfsPathStr(f)).into[S]
-      sc <- read.asks(ι)
-      rdd <- lift(fetchRdd(sc, pathStr)).into[S]
+      sc      <- read.asks(ι)
+      rdd     <- lift(fetchRdd(sc, pathStr)).into[S]
     } yield {
       rdd
         .zipWithIndex()
         .filter {
-        case (value, index) =>
-          maybeLimit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
-      }
+          case (value, index) =>
+            maybeLimit.fold(
+              index >= offset.value
+            )(
+              limit => index >= offset.value && index < limit.value + offset.value
+            )
+        }
     }
   }
 
-  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(
-    implicit s0: Task :<: S): Free[S, Boolean] =
+  def fileExists[S[_]](f: AFile)(
+      hdfsPathStr: AFile => Task[String],
+      fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Free[S, Boolean] =
     lift(hdfsPathStr(f).flatMap { pathStr =>
       fileSystem.map(fs => fs.exists(new Path(pathStr)))
     }).into[S]
@@ -78,10 +79,12 @@ object readfile {
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(implicit
-    read: Read.Ops[SparkContext, S], s0: Task :<: S) =
+  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(
+      implicit
+      read: Read.Ops[SparkContext, S],
+      s0: Task :<: S) =
     Input(
-      (f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr),
+      (f, off, lim) => rddFrom(f, off, lim)(hdfsPathStr),
       f => fileExists(f)(hdfsPathStr, fileSystem),
       readChunkSize _
     )

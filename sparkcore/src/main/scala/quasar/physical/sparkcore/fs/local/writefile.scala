@@ -31,52 +31,48 @@ import scalaz.concurrent.Task
 
 object writefile {
 
-
   def chrooted[S[_]](prefix: ADir)(implicit
-    s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,
-    s1: MonotonicSeq :<: S,
-    s2: Task :<: S
-  ) : WriteFile ~> Free[S, ?] =
+                                   s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,
+                                   s1: MonotonicSeq :<: S,
+                                   s2: Task :<: S): WriteFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.writeFile[WriteFile](prefix)
 
   def interpret[S[_]](implicit
-    s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,
-    s1: MonotonicSeq :<: S,
-    s2: Task :<: S
-  ) : WriteFile ~> Free[S, ?] =
+                      s0: KeyValueStore[WriteHandle, PrintWriter, ?] :<: S,
+                      s1: MonotonicSeq :<: S,
+                      s2: Task :<: S): WriteFile ~> Free[S, ?] =
     new (WriteFile ~> Free[S, ?]) {
-      def apply[A](wr: WriteFile[A]): Free[S, A] = wr  match {
-        case Open(f) => open(f)
+      def apply[A](wr: WriteFile[A]): Free[S, A] = wr match {
+        case Open(f)      => open(f)
         case Write(h, ch) => write(h, ch)
-        case Close(h) => close(h)
+        case Close(h)     => close(h)
       }
     }
 
-  def open[S[_]](f: AFile) (implicit
-    writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S],
-    sequence: MonotonicSeq.Ops[S],
-    s2: Task :<: S
-  ): Free[S, FileSystemError \/ WriteHandle] = {
+  def open[S[_]](f: AFile)(implicit
+                           writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S],
+                           sequence: MonotonicSeq.Ops[S],
+                           s2: Task :<: S): Free[S, FileSystemError \/ WriteHandle] = {
 
     def _open: FileSystemErrT[Free[S, ?], PrintWriter] = {
 
-      def mkParents: FileSystemErrT[Task, Unit] = EitherT(Task.delay {
-        val parent = fileParent(f)
-        val dir = new File(posixCodec.unsafePrintPath(parent))
-        if(!dir.exists()) {
-          \/.fromTryCatchNonFatal(dir.mkdirs())
-            .leftMap { e =>
-            pathErr(invalidPath(parent, "Could not create directories"))
-          }.void
-        }
-        else ().right[FileSystemError]
-      })
+      def mkParents: FileSystemErrT[Task, Unit] =
+        EitherT(Task.delay {
+          val parent = fileParent(f)
+          val dir    = new File(posixCodec.unsafePrintPath(parent))
+          if (!dir.exists()) {
+            \/.fromTryCatchNonFatal(dir.mkdirs()).leftMap { e =>
+              pathErr(invalidPath(parent, "Could not create directories"))
+            }.void
+          } else ().right[FileSystemError]
+        })
 
-      def printWriter: FileSystemErrT[Task, PrintWriter] = EitherT(Task.delay {
-        val file = new File(posixCodec.unsafePrintPath(f))
+      def printWriter: FileSystemErrT[Task, PrintWriter] =
+        EitherT(Task.delay {
+          val file = new File(posixCodec.unsafePrintPath(f))
           \/.fromTryCatchNonFatal(new PrintWriter(new FileOutputStream(file, true)))
             .leftMap(e => pathErr(pathNotFound(f)))
-      })
+        })
 
       val pwProgram: Free[S, FileSystemError \/ PrintWriter] =
         injectFT[Task, S].apply((mkParents *> printWriter).run)
@@ -92,10 +88,10 @@ object writefile {
     } yield h).run
   }
 
-  def write[S[_]](h: WriteHandle, chunks: Vector[Data])(implicit
-    writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S],
-    s2: Task :<: S
-  ): Free[S, Vector[FileSystemError]] = {
+  def write[S[_]](h: WriteHandle, chunks: Vector[Data])(
+      implicit
+      writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S],
+      s2: Task :<: S): Free[S, Vector[FileSystemError]] = {
 
     implicit val codec: DataCodec = DataCodec.Precise
 
@@ -113,20 +109,18 @@ object writefile {
       })
     }
 
-    val findAndWrite: OptionT[Free[S,?], Vector[FileSystemError]] = for {
-      pw <- writers.get(h)
+    val findAndWrite: OptionT[Free[S, ?], Vector[FileSystemError]] = for {
+      pw     <- writers.get(h)
       errors <- injectFT[Task, S].apply(_write(pw)).liftM[OptionT]
     } yield errors
 
-    findAndWrite.fold (
+    findAndWrite.fold(
       errs => errs,
       Vector[FileSystemError](unknownWriteHandle(h))
     )
   }
 
-  def close[S[_]]
-    (h: WriteHandle)
-    (implicit writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S])
-      : Free[S, Unit] =
+  def close[S[_]](h: WriteHandle)(
+      implicit writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S]): Free[S, Unit] =
     ((writers.get(h) <* writers.delete(h).liftM[OptionT]) ∘ (_.close)).run.void
 }

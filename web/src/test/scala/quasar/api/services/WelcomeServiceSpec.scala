@@ -24,12 +24,12 @@ import org.http4s.Request
 class WelcomeServiceSpec extends quasar.Qspec {
   "Welcome service" should {
     "show a welcome message" in {
-      val req = Request()
+      val req  = Request()
       val resp = welcome.service(req).unsafePerformSync
       resp.as[String].unsafePerformSync must contain("quasar-logo-vector.png")
     }
     "show the current version" in {
-      val req = Request()
+      val req  = Request()
       val resp = welcome.service(req).unsafePerformSync
       resp.as[String].unsafePerformSync must contain("Quasar " + build.BuildInfo.version)
     }

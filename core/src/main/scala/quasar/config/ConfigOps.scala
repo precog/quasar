@@ -42,12 +42,15 @@ import simulacrum.typeclass
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] =
     for {
       cfgText <- textFromFile(path.some)
-      config  <- EitherT.fromDisjunction[Task](fromString(cfgText.text))
-                   .leftMap(malformedRsn.modify(rsn =>
-                      s"Failed to parse ${cfgText.displayPath}: $rsn"))
-      _       <- Task.delay(
-                   println(s"Read $name config from ${cfgText.displayPath}")
-                 ).liftM[CfgErrT]
+      config <- EitherT
+        .fromDisjunction[Task](fromString(cfgText.text))
+        .leftMap(malformedRsn.modify(rsn =>
+          s"Failed to parse ${cfgText.displayPath}: $rsn"))
+      _ <- Task
+        .delay(
+          println(s"Read $name config from ${cfgText.displayPath}")
+        )
+        .liftM[CfgErrT]
     } yield config
 
   /** Loads configuration from one of the OS-specific default paths. */
@@ -86,12 +89,11 @@ object ConfigOps {
       OptionT(Task.delay(propOrNone("user.home")))
         .flatMap(s => OptionT(parseAbsAsDir(os, s).point[Task]))
 
-    val dirPath: RDir = os.fold(
-      currentDir,
-      dir("Library") </> dir("Application Support"),
-      dir(".config"))
+    val dirPath: RDir =
+      os.fold(currentDir, dir("Library") </> dir("Application Support"), dir(".config"))
 
-    val baseDir = OptionT.some[Task, Boolean](os.isWin)
+    val baseDir = OptionT
+      .some[Task, Boolean](os.isWin)
       .ifM(localAppData, OptionT.none)
       .orElse(homeDir)
       .map(_.forgetBase)
@@ -113,28 +115,30 @@ object ConfigOps {
     }
 
     for {
-      codec   <- systemCodec.liftM[CfgErrT]
-      f       <- file.fold(defaultPath)(Task.now).liftM[CfgErrT]
-      strPath =  printFsPath(codec, f)
-      text    <- attemptReadFile(f, strPath)
+      codec <- systemCodec.liftM[CfgErrT]
+      f     <- file.fold(defaultPath)(Task.now).liftM[CfgErrT]
+      strPath = printFsPath(codec, f)
+      text <- attemptReadFile(f, strPath)
     } yield ConfigText(text, strPath)
   }
 
   def jsonFromFile(path: Option[FsFile]): CfgTask[Json] =
     textFromFile(path) >>= (cfgText =>
-      EitherT.fromDisjunction[Task](fromString[Json](cfgText.text))
-        .leftMap(malformedRsn.modify(rsn => s"Failed to parse ${cfgText.displayPath}: $rsn")))
+      EitherT
+        .fromDisjunction[Task](fromString[Json](cfgText.text))
+        .leftMap(malformedRsn.modify(rsn =>
+          s"Failed to parse ${cfgText.displayPath}: $rsn")))
 
   def textToFile(text: String, path: Option[FsFile]): Task[Unit] =
-     for {
-       codec <- systemCodec
-       pStr  <- path.fold(defaultPath)(Task.now)
-       jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
-       _     <- Task.delay {
-                  Option(jPath.getParent) foreach (Files.createDirectories(_))
-                  Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
-                }
-     } yield ()
+    for {
+      codec <- systemCodec
+      pStr  <- path.fold(defaultPath)(Task.now)
+      jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
+      _ <- Task.delay {
+        Option(jPath.getParent) foreach (Files.createDirectories(_))
+        Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
+      }
+    } yield ()
 
   def jsonToFile(json: Json, path: Option[FsFile]): Task[Unit] =
     textToFile(asString(json), path)
@@ -147,7 +151,7 @@ object ConfigOps {
 
   ////
 
-  private def merr = MonadError[ETask[ConfigError,?], ConfigError]
+  private def merr         = MonadError[ETask[ConfigError, ?], ConfigError]
   private val malformedRsn = malformedConfig composeLens _2
 
   /** The default path to the configuration file for the current operating system. */
@@ -155,9 +159,9 @@ object ConfigOps {
     OS.currentOS >>= defaultPathForOS(dir("quasar") </> file("quasar-config.json"))
 
   /**
-   * The default path in a previous version of the software, used to ease the
-   * transition to the new location.
-   */
+    * The default path in a previous version of the software, used to ease the
+    * transition to the new location.
+    */
   private def legacyDefaultPath: Task[FsFile] =
     OS.currentOS >>= defaultPathForOS(dir("SlamData") </> file("slamengine-config.json"))
 

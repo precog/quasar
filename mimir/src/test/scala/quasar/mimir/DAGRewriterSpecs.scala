@@ -22,7 +22,7 @@ import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction
 import scalaz.std.option.optionFirst
 
-trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
+trait DAGRewriterSpecs[M[+ _]] extends EvaluatorSpecification[M] {
 
   import dag._
   import instructions._
@@ -39,7 +39,7 @@ trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       val input = dag.AbsoluteLoad(Const(CString("/numbers"))(line))(line)
 
-      val ctx = defaultEvaluationContext
+      val ctx    = defaultEvaluationContext
       val result = fullRewriteDAG(true, ctx)(input)
 
       result.identities mustEqual Identities.Specs(Vector(LoadIds("/numbers")))
@@ -56,37 +56,36 @@ trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val t1 = dag.AbsoluteLoad(Const(CString("/hom/pairs"))(line))(line)
 
       val input =
-        Join(Add, IdentitySort,
-          Join(Add, Cross(None),
-            Join(DerefObject, Cross(None),
-              t1,
-              Const(CString("first"))(line))(line),
-            dag.Reduce(Count, t1)(line))(line),
-          Join(DerefObject, Cross(None),
-            t1,
-            Const(CString("second"))(line))(line))(line)
+        Join(
+          Add,
+          IdentitySort,
+          Join(Add,
+               Cross(None),
+               Join(DerefObject, Cross(None), t1, Const(CString("first"))(line))(line),
+               dag.Reduce(Count, t1)(line))(line),
+          Join(DerefObject, Cross(None), t1, Const(CString("second"))(line))(line)
+        )(line)
 
-      val ctx = defaultEvaluationContext
+      val ctx      = defaultEvaluationContext
       val optimize = true
 
       // The should be a MegaReduce for the Count reduction
       val optimizedDAG = fullRewriteDAG(optimize, ctx)(input)
       val megaReduce = optimizedDAG.foldDown(true) {
-        case m@MegaReduce(_, _) => Tag(Some(m)): FirstOption[DepGraph]
+        case m @ MegaReduce(_, _) => Tag(Some(m)): FirstOption[DepGraph]
       }
 
       megaReduce.getClass must_== classOf[scala.Some[_]]
 
-      val rewritten = inlineNodeValue(
-        optimizedDAG,
-        megaReduce.asInstanceOf[Option[DepGraph]].get,
-        CNum(42))
+      val rewritten = inlineNodeValue(optimizedDAG,
+                                      megaReduce.asInstanceOf[Option[DepGraph]].get,
+                                      CNum(42))
 
       val hasMegaReduce = rewritten.foldDown(false) {
-        case m@MegaReduce(_, _) => true
+        case m @ MegaReduce(_, _) => true
       }(disjunction)
       val hasConst = rewritten.foldDown(false) {
-        case m@Const(CNum(n)) if n == 42 => true
+        case m @ Const(CNum(n)) if n == 42 => true
       }(disjunction)
 
       // Must be turned into a Const node

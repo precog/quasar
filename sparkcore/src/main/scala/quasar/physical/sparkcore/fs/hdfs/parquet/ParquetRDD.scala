@@ -58,11 +58,11 @@ class ParquetRDD[T: ClassTag](
   }
 
   override protected def getPartitions: Array[Partition] = {
-    val path       = new Path(pathStr)
-    val conf       = _sc.hadoopConfiguration
-    val fs         = path.getFileSystem(conf)
-    val fileStatus = fs.getFileStatus(path)
-    val blocks     = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen())
+    val path        = new Path(pathStr)
+    val conf        = _sc.hadoopConfiguration
+    val fs          = path.getFileSystem(conf)
+    val fileStatus  = fs.getFileStatus(path)
+    val blocks      = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen())
     val readSupport = new DataReadSupport
     blocks.zipWithIndex.map {
       case (b, i) =>

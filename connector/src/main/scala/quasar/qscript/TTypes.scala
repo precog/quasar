@@ -21,10 +21,9 @@ import quasar.fp._
 import scalaz._
 
 /** Centralizes the knowledge of T[_[_]] as well as certain
- *  type classes required for many operations. This is for
- *  compilation performance.
- */
-
+  *  type classes required for many operations. This is for
+  *  compilation performance.
+  */
 trait TTypes[T[_[_]]] {
   // Partially applying types with the known T.
   // In this context we shouldn't often need to refer to the original type
@@ -54,13 +53,16 @@ object TTypes {
 class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
   import SimplifyProjection._
 
-  private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
+  private lazy val simplify: EndoK[QScriptTotal] =
+    simplifyQScriptTotal[T].simplifyProjection
   private def applyToBranch(branch: FreeQS): FreeQS = branch mapSuspension simplify
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
-      case BucketField(src, value, field) => QC inj Map(src, Free roll MapFuncsCore.ProjectField(value, field))
-      case BucketIndex(src, value, index) => QC inj Map(src, Free roll MapFuncsCore.ProjectIndex(value, index))
+      case BucketField(src, value, field) =>
+        QC inj Map(src, Free roll MapFuncsCore.ProjectField(value, field))
+      case BucketIndex(src, value, index) =>
+        QC inj Map(src, Free roll MapFuncsCore.ProjectIndex(value, index))
     }
   )
 
@@ -72,32 +74,31 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
         case Subset(src, lb, sel, rb) =>
           Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
         case _ => fa
-      })
-    )
+      }))
   )
   def ThetaJoin[G[_]](implicit TJ: ThetaJoin :<: G) = make(
-    λ[ThetaJoin ~> G](tj =>
-      TJ inj quasar.qscript.ThetaJoin(
-        tj.src,
-        applyToBranch(tj.lBranch),
-        applyToBranch(tj.rBranch),
-        tj.on,
-        tj.f,
-        tj.combine
-      )
-    )
+    λ[ThetaJoin ~> G](
+      tj =>
+        TJ inj quasar.qscript.ThetaJoin(
+          tj.src,
+          applyToBranch(tj.lBranch),
+          applyToBranch(tj.rBranch),
+          tj.on,
+          tj.f,
+          tj.combine
+      ))
   )
   def EquiJoin[G[_]](implicit EJ: EquiJoin :<: G) = make(
-    λ[EquiJoin ~> G](ej =>
-      EJ inj quasar.qscript.EquiJoin(
-        ej.src,
-        applyToBranch(ej.lBranch),
-        applyToBranch(ej.rBranch),
-        ej.lKey,
-        ej.rKey,
-        ej.f,
-        ej.combine
-      )
-    )
+    λ[EquiJoin ~> G](
+      ej =>
+        EJ inj quasar.qscript.EquiJoin(
+          ej.src,
+          applyToBranch(ej.lBranch),
+          applyToBranch(ej.rBranch),
+          ej.lKey,
+          ej.rKey,
+          ej.f,
+          ej.combine
+      ))
   )
 }

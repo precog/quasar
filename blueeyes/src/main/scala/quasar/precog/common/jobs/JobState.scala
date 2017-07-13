@@ -16,8 +16,8 @@
 
 package quasar.precog.common.jobs
 
-import quasar.blueeyes.json.{ jfield, jobject, JObject, JValue }
-import quasar.blueeyes.json.serialization.{ Decomposer, Extractor }
+import quasar.blueeyes.json.{jfield, jobject, JObject, JValue}
+import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 
 import java.time.LocalDateTime
@@ -25,30 +25,33 @@ import java.time.LocalDateTime
 import scalaz._
 
 /**
- * The Job state is used to keep track of the overall state of a Job. A Job is
- * put in a special initial state (`NotStarted`) when it is first created, and
- * is moved to the `Started` state once it gets its first status update. From
- * here it can either be `Cancelled` or put into one of several terminal
- * states. Once a job is in a terminal state, it can no longer be moved to a
- * new state.
- */
+  * The Job state is used to keep track of the overall state of a Job. A Job is
+  * put in a special initial state (`NotStarted`) when it is first created, and
+  * is moved to the `Started` state once it gets its first status update. From
+  * here it can either be `Cancelled` or put into one of several terminal
+  * states. Once a job is in a terminal state, it can no longer be moved to a
+  * new state.
+  */
 sealed abstract class JobState(val isTerminal: Boolean)
 
 object JobState extends JobStateSerialization {
-  case object NotStarted extends JobState(false)
+  case object NotStarted                                       extends JobState(false)
   case class Started(timestamp: LocalDateTime, prev: JobState) extends JobState(false)
-  case class Cancelled(reason: String, timestamp: LocalDateTime, prev: JobState) extends JobState(false)
-  case class Aborted(reason: String, timestamp: LocalDateTime, prev: JobState) extends JobState(true)
-  case class Expired(timestamp: LocalDateTime, prev: JobState) extends JobState(true)
+  case class Cancelled(reason: String, timestamp: LocalDateTime, prev: JobState)
+      extends JobState(false)
+  case class Aborted(reason: String, timestamp: LocalDateTime, prev: JobState)
+      extends JobState(true)
+  case class Expired(timestamp: LocalDateTime, prev: JobState)  extends JobState(true)
   case class Finished(timestamp: LocalDateTime, prev: JobState) extends JobState(true)
 
   def describe(state: JobState): String = state match {
-    case NotStarted => "The job has not yet been started."
+    case NotStarted          => "The job has not yet been started."
     case Started(started, _) => "The job was started at %s." format started
-    case Cancelled(reason, _, _) => "The job has been cancelled due to '%s'." format reason
-    case Aborted(reason, _, _) => "The job was aborted early due to '%s'." format reason
+    case Cancelled(reason, _, _) =>
+      "The job has been cancelled due to '%s'." format reason
+    case Aborted(reason, _, _)  => "The job was aborted early due to '%s'." format reason
     case Expired(expiration, _) => "The job expired at %s." format expiration
-    case Finished(_, _) => "The job has finished successfully."
+    case Finished(_, _)         => "The job has finished successfully."
   }
 }
 
@@ -62,12 +65,15 @@ trait JobStateSerialization {
   import quasar.blueeyes.json.serialization.DefaultDecomposers._
 
   implicit object JobStateDecomposer extends Decomposer[JobState] {
-    private def base(state: String, timestamp: LocalDateTime, previous: JobState, reason: Option[String] = None): JObject = {
+    private def base(state: String,
+                     timestamp: LocalDateTime,
+                     previous: JobState,
+                     reason: Option[String] = None): JObject = {
       JObject(
         jfield("state", state) ::
-        jfield("timestamp", timestamp) ::
-        jfield("previous", decompose(previous)) ::
-        (reason map { jfield("reason", _) :: Nil } getOrElse Nil)
+          jfield("timestamp", timestamp) ::
+          jfield("previous", decompose(previous)) ::
+          (reason map { jfield("reason", _) :: Nil } getOrElse Nil)
       )
     }
 
@@ -94,7 +100,8 @@ trait JobStateSerialization {
 
   implicit object JobStateExtractor extends Extractor[JobState] {
     def extractBase(obj: JValue): Validation[Error, (LocalDateTime, JobState)] = {
-      ((obj \ "timestamp").validated[LocalDateTime] |@| (obj \ "previous").validated[JobState]).tupled
+      ((obj \ "timestamp").validated[LocalDateTime] |@| (obj \ "previous")
+        .validated[JobState]).tupled
     }
 
     override def validated(obj: JValue) = {
@@ -106,21 +113,24 @@ trait JobStateSerialization {
           extractBase(obj) map (Started(_, _)).tupled
 
         case "cancelled" =>
-          ((obj \ "reason").validated[String] |@| extractBase(obj)) { case (reason, (timestamp, previous)) =>
-            Cancelled(reason, timestamp, previous)
+          ((obj \ "reason").validated[String] |@| extractBase(obj)) {
+            case (reason, (timestamp, previous)) =>
+              Cancelled(reason, timestamp, previous)
           }
 
         case "aborted" =>
-          ((obj \ "reason").validated[String] |@| extractBase(obj)) { case (reason, (timestamp, previous)) =>
-            Aborted(reason, timestamp, previous)
+          ((obj \ "reason").validated[String] |@| extractBase(obj)) {
+            case (reason, (timestamp, previous)) =>
+              Aborted(reason, timestamp, previous)
           }
 
         case "expired" =>
           extractBase(obj) map (Expired(_, _)).tupled
 
         case "finished" =>
-          extractBase(obj) flatMap { case (timestamp, previous) =>
-            success(Finished(timestamp, previous))
+          extractBase(obj) flatMap {
+            case (timestamp, previous) =>
+              success(Finished(timestamp, previous))
           }
       }
     }

@@ -27,11 +27,12 @@ object contentsource {
     newSession[F](None)
 
   def newSession[F[_]: Bind: Capture: CSourceReader](
-    defaultRequestOptions: Option[RequestOptions]
+      defaultRequestOptions: Option[RequestOptions]
   ): F[Session] =
-    CSourceReader[F].ask >>= (cs => Capture[F].capture {
-      val session = cs.newSession
-      defaultRequestOptions foreach session.setDefaultRequestOptions
-      session
-    })
+    CSourceReader[F].ask >>= (cs =>
+      Capture[F].capture {
+        val session = cs.newSession
+        defaultRequestOptions foreach session.setDefaultRequestOptions
+        session
+      })
 }

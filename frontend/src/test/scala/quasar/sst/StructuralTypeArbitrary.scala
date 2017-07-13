@@ -29,9 +29,9 @@ import scalaz.scalacheck.ScalazArbitrary._
 
 trait StructuralTypeArbitrary {
   implicit def structuralTypeArbitrary[J: Arbitrary: Order, V: Arbitrary](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): Arbitrary[StructuralType[J, V]] =
     Arbitrary(arbitrary[NonEmptyList[J]] flatMap { js =>
       js.foldMap1(StructuralType.fromEJsonK[J]((), _)).traverse1(κ(arbitrary[V]))

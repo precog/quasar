@@ -36,29 +36,30 @@ import scalaz.concurrent.Task
 class WriteFileSpec extends quasar.Qspec {
 
   type Eff0[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Task, A]
-  type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
+  type Eff[A]  = Coproduct[MonotonicSeq, Eff0, A]
 
   "writefile" should {
 
     "open -> write chunks -> close -> assert file with results" in {
       // given
       val chunks = (user("john", 31) :: user("anna", 21) :: Nil).toVector
-      val program = (path: AFile) => define { writeUnsafe =>
-        for {
-          wh <- writeUnsafe.open(path)
-          errors <- writeUnsafe.write(wh, chunks).liftM[FileSystemErrT]
-          _ <- writeUnsafe.close(wh).liftM[FileSystemErrT]
-        } yield (errors)
+      val program = (path: AFile) =>
+        define { writeUnsafe =>
+          for {
+            wh     <- writeUnsafe.open(path)
+            errors <- writeUnsafe.write(wh, chunks).liftM[FileSystemErrT]
+            _      <- writeUnsafe.close(wh).liftM[FileSystemErrT]
+          } yield (errors)
       }
       // when
       withTempFile { path =>
         for {
-          result <- execute[Vector[FileSystemError]](program(path))
+          result  <- execute[Vector[FileSystemError]](program(path))
           content <- getContent(path)
-        } yield{
+        } yield {
           // then
           result must_= \/-(Vector.empty[FileSystemError])
-          content  must_= List(
+          content must_= List(
             """{ "login": "john", "age": 31 }""",
             """{ "login": "anna", "age": 21 }"""
           )
@@ -71,21 +72,22 @@ class WriteFileSpec extends quasar.Qspec {
       val chunks1 = (user("john", 31) :: user("anna", 21) :: Nil).toVector
       val chunks2 = (user("kate", 22) :: Nil).toVector
 
-      val program = (path: AFile) => define { writeUnsafe =>
-        for {
-          wh1 <- writeUnsafe.open(path)
-          errors1 <- writeUnsafe.write(wh1, chunks1).liftM[FileSystemErrT]
-          _ <- writeUnsafe.close(wh1).liftM[FileSystemErrT]
-          wh2 <- writeUnsafe.open(path)
-          errors2 <- writeUnsafe.write(wh2, chunks2).liftM[FileSystemErrT]
-          _ <- writeUnsafe.close(wh2).liftM[FileSystemErrT]
+      val program = (path: AFile) =>
+        define { writeUnsafe =>
+          for {
+            wh1     <- writeUnsafe.open(path)
+            errors1 <- writeUnsafe.write(wh1, chunks1).liftM[FileSystemErrT]
+            _       <- writeUnsafe.close(wh1).liftM[FileSystemErrT]
+            wh2     <- writeUnsafe.open(path)
+            errors2 <- writeUnsafe.write(wh2, chunks2).liftM[FileSystemErrT]
+            _       <- writeUnsafe.close(wh2).liftM[FileSystemErrT]
 
-        } yield (errors1 ++ errors2)
+          } yield (errors1 ++ errors2)
       }
       // when
       withTempFile { path =>
         for {
-          result <- execute[Vector[FileSystemError]](program(path))
+          result  <- execute[Vector[FileSystemError]](program(path))
           content <- getContent(path)
         } yield {
           // then
@@ -101,19 +103,20 @@ class WriteFileSpec extends quasar.Qspec {
 
     "should create dir if parent dir and file does not exist" in {
       // given
-      val program = (path: AFile) => define { unsafe =>
-        for {
-          wh <- unsafe.open(path)
-          _ <- unsafe.close(wh).liftM[FileSystemErrT]
-        } yield ()
+      val program = (path: AFile) =>
+        define { unsafe =>
+          for {
+            wh <- unsafe.open(path)
+            _  <- unsafe.close(wh).liftM[FileSystemErrT]
+          } yield ()
       }
       // when
       withTempDir(createIt = false) { dirPath =>
         for {
           dirExisted <- exists(dirPath)
           filePath = dirPath </> file("some_file.tmp")
-          result <- execute[Unit](program(filePath))
-          dirExists <- exists(dirPath)
+          result     <- execute[Unit](program(filePath))
+          dirExists  <- exists(dirPath)
           fileExists <- exists(filePath)
         } yield {
           // then
@@ -126,26 +129,27 @@ class WriteFileSpec extends quasar.Qspec {
 
     "should create dirs if parent dirs and file does not exist" in {
       // given
-      val program = (path: AFile) => define { unsafe =>
-        for {
-          wh <- unsafe.open(path)
-          _ <- unsafe.close(wh).liftM[FileSystemErrT]
-        } yield ()
+      val program = (path: AFile) =>
+        define { unsafe =>
+          for {
+            wh <- unsafe.open(path)
+            _  <- unsafe.close(wh).liftM[FileSystemErrT]
+          } yield ()
       }
       // when
       withTempDir(createIt = false, withTailDir = List("foo", "bar")) { dirPath =>
-          for {
-            dirsExisted <- exists(dirPath)
-            filePath = dirPath </> file("some_file.tmp")
-            result <- execute[Unit](program(filePath))
-            dirsExists <- exists(dirPath)
-            fileExists <- exists(filePath)
-          } yield {
-            // then
-            dirsExisted must_= false
-            dirsExists must_= true
-            fileExists must_= true
-          }
+        for {
+          dirsExisted <- exists(dirPath)
+          filePath = dirPath </> file("some_file.tmp")
+          result     <- execute[Unit](program(filePath))
+          dirsExists <- exists(dirPath)
+          fileExists <- exists(filePath)
+        } yield {
+          // then
+          dirsExisted must_= false
+          dirsExists must_= true
+          fileExists must_= true
+        }
       }
     }
   }
@@ -154,16 +158,18 @@ class WriteFileSpec extends quasar.Qspec {
     Files.exists(Paths.get(posixCodec.unsafePrintPath(path)))
   }
 
-  private def execute[C](program: FileSystemErrT[Free[WriteFile, ?], C]):
-      Task[FileSystemError \/ C] = interpreter.flatMap(program.run.foldMap(_))
+  private def execute[C](
+      program: FileSystemErrT[Free[WriteFile, ?], C]): Task[FileSystemError \/ C] =
+    interpreter.flatMap(program.run.foldMap(_))
 
   private def interpreter: Task[WriteFile ~> Task] = {
 
-    def innerInterpreter: Task[Eff ~> Task] =  {
-      (TaskRef(0L) |@| TaskRef(Map.empty[WriteHandle, PrintWriter])) { (genState, kvsState) =>
-        MonotonicSeq.fromTaskRef(genState) :+:
-        KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](kvsState) :+:
-        NaturalTransformation.refl[Task]
+    def innerInterpreter: Task[Eff ~> Task] = {
+      (TaskRef(0L) |@| TaskRef(Map.empty[WriteHandle, PrintWriter])) {
+        (genState, kvsState) =>
+          MonotonicSeq.fromTaskRef(genState) :+:
+            KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](kvsState) :+:
+            NaturalTransformation.refl[Task]
       }
     }
 
@@ -172,43 +178,44 @@ class WriteFileSpec extends quasar.Qspec {
     }
   }
 
-  private def withTempDir[C](createIt: Boolean, withTailDir: List[String] = Nil)
-    (run: ADir => Task[C]): C = {
+  private def withTempDir[C](createIt: Boolean, withTailDir: List[String] = Nil)(
+      run: ADir => Task[C]): C = {
 
     def genDirPath: Task[ADir] = Task.delay {
-      val root = System.getProperty("java.io.tmpdir")
-      val prefix = "tempDir"
+      val root    = System.getProperty("java.io.tmpdir")
+      val prefix  = "tempDir"
       val tailStr = withTailDir.mkString("/") + "/"
-      val random = scala.util.Random.nextInt().toString
-      val path = s"$root/$prefix-$random/$tailStr"
+      val random  = scala.util.Random.nextInt().toString
+      val path    = s"$root/$prefix-$random/$tailStr"
       unsafeSandboxAbs(posixCodec.parseAbsDir(path).get)
     }
 
     def createDir(dirPath: ADir): Task[Unit] = Task.delay {
-      if(createIt) {
+      if (createIt) {
         Files.createDirectory(Paths.get(posixCodec.unsafePrintPath(dirPath)))
         ()
       } else ()
     }
 
-    def deleteDir(dirPath: ADir): Task[Unit] = for {
-      root <- Task.delay{ System.getProperty("java.io.tmpdir") }
-      _ <- {
-        if(parseDir(root) == dirPath) {
-          Task.now(())
-        } else {
-          toNioPath(dirPath).toFile.listFiles().foreach(_.delete())
-          Files.delete(toNioPath(dirPath))
-          parentDir(dirPath).fold(Task.now(()))(p => deleteDir(p))
+    def deleteDir(dirPath: ADir): Task[Unit] =
+      for {
+        root <- Task.delay { System.getProperty("java.io.tmpdir") }
+        _ <- {
+          if (parseDir(root) == dirPath) {
+            Task.now(())
+          } else {
+            toNioPath(dirPath).toFile.listFiles().foreach(_.delete())
+            Files.delete(toNioPath(dirPath))
+            parentDir(dirPath).fold(Task.now(()))(p => deleteDir(p))
+          }
         }
-      }
-    } yield ()
+      } yield ()
 
     (for {
       dirPath <- genDirPath
-      _  <- createDir(dirPath)
-      result <- run(dirPath).onFinish {
-        _ => deleteDir(dirPath)
+      _       <- createDir(dirPath)
+      result <- run(dirPath).onFinish { _ =>
+        deleteDir(dirPath)
       }
     } yield result).unsafePerformSync
   }
@@ -217,7 +224,7 @@ class WriteFileSpec extends quasar.Qspec {
 
     def genTempFilePath: Task[AFile] = Task.delay {
       val path = System.getProperty("java.io.tmpdir") +
-      "/" + scala.util.Random.nextInt().toString + ".tmp"
+        "/" + scala.util.Random.nextInt().toString + ".tmp"
       unsafeSandboxAbs(posixCodec.parseAbsFile(path).get)
     }
 
@@ -227,8 +234,8 @@ class WriteFileSpec extends quasar.Qspec {
 
     val execution: Task[C] = for {
       filePath <- genTempFilePath
-      result <- run(filePath).onFinish {
-        _ => deleteFile(filePath)
+      result <- run(filePath).onFinish { _ =>
+        deleteFile(filePath)
       }
     } yield result
 
@@ -241,10 +248,10 @@ class WriteFileSpec extends quasar.Qspec {
   private def parseDir(dirStr: String): ADir =
     unsafeSandboxAbs(posixCodec.parseAbsDir(dirStr).get)
 
-  private def define[C]
-    (defined: WriteFile.Unsafe[WriteFile] => FileSystemErrT[Free[WriteFile, ?], C])
-    (implicit writeUnsafe: WriteFile.Unsafe[WriteFile])
-      : FileSystemErrT[Free[WriteFile, ?], C] =
+  private def define[C](
+      defined: WriteFile.Unsafe[WriteFile] => FileSystemErrT[Free[WriteFile, ?], C])(
+      implicit writeUnsafe: WriteFile.Unsafe[WriteFile])
+    : FileSystemErrT[Free[WriteFile, ?], C] =
     defined(writeUnsafe)
 
   private def user(login: String, age: Int) =

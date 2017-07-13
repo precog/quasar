@@ -39,8 +39,10 @@ class ExamplesSpec extends Specification {
   }
 
   "Transformation example" in {
-    val uppercased = parseUnsafe(person).transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
-    val rendered   = uppercased.renderCompact
+    val uppercased = parseUnsafe(person).transform(JField.liftCollect {
+      case JField(n, v) => JField(n.toUpperCase, v)
+    })
+    val rendered = uppercased.renderCompact
     rendered.contains(""""NAME":"Joe"""") mustEqual true
     rendered.contains(""""AGE":35.0""") mustEqual true
     //rendered mustEqual
@@ -65,19 +67,24 @@ class ExamplesSpec extends Specification {
   }
 
   "Unicode example" in {
-    parseUnsafe("[\" \\u00e4\\u00e4li\\u00f6t\"]") mustEqual JArray(List(JString(" \u00e4\u00e4li\u00f6t")))
+    parseUnsafe("[\" \\u00e4\\u00e4li\\u00f6t\"]") mustEqual JArray(
+      List(JString(" \u00e4\u00e4li\u00f6t")))
   }
 
   "Exponent example" in {
     parseUnsafe("""{"num": 2e5 }""") mustEqual JObject(List(JField("num", JNum("2e5"))))
     parseUnsafe("""{"num": -2E5 }""") mustEqual JObject(List(JField("num", JNum("-2E5"))))
-    parseUnsafe("""{"num": 2.5e5 }""") mustEqual JObject(List(JField("num", JNum("2.5e5"))))
-    parseUnsafe("""{"num": 2.5e-5 }""") mustEqual JObject(List(JField("num", JNum("2.5e-5"))))
+    parseUnsafe("""{"num": 2.5e5 }""") mustEqual JObject(
+      List(JField("num", JNum("2.5e5"))))
+    parseUnsafe("""{"num": 2.5e-5 }""") mustEqual JObject(
+      List(JField("num", JNum("2.5e-5"))))
   }
 
   "JSON building example" in {
-    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++
-        JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
+    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(
+      JField("age", JNum(34)) :: Nil) ++
+      JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(
+      JField("age", JNum(31)) :: Nil)
 
     json.renderCompact mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
   }
@@ -171,17 +178,16 @@ object Examples {
         JObject(
           JField("name", JString("Joe")) ::
             JField("age", JNum(35)) ::
-              JField(
-                "spouse",
-                JObject(
-                  JField(
-                    "person",
-                    JObject(
-                      JField("name", JString("Marilyn")) ::
-                        JField("age", JNum(33)) :: Nil
-                    )) :: Nil
-                )) :: Nil
-        )) :: Nil
+            JField("spouse",
+                   JObject(
+                     JField("person",
+                            JObject(
+                              JField("name", JString("Marilyn")) ::
+                                JField("age", JNum(33)) :: Nil
+                            )) :: Nil
+                   )) :: Nil
+        )
+      ) :: Nil
     )
 
   val objArray = """
@@ -203,6 +209,7 @@ object Examples {
 }
 """
 
-  val quoted  = """["foo \" \n \t \r bar"]"""
-  val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
+  val quoted = """["foo \" \n \t \r bar"]"""
+  val symbols = JObject(
+    JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
 }

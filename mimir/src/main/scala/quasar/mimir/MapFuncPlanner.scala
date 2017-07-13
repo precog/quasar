@@ -39,7 +39,7 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
 
       case MapFuncsCore.Constant(ejson) =>
         // EJson => Data => JValue => RValue => Table
-        val data: Data = ejson.cata(Data.fromEJson)
+        val data: Data     = ejson.cata(Data.fromEJson)
         val jvalue: JValue = JValue.fromData(data)
         val rvalue: RValue = RValue.fromJValue(jvalue)
         transRValue(rvalue, TransSpec1.Id).point[F]
@@ -48,36 +48,36 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
 
       case MapFuncsCore.Length(a1) => ???
 
-      case MapFuncsCore.ExtractCentury(a1) => ???
-      case MapFuncsCore.ExtractDayOfMonth(a1) => ???
-      case MapFuncsCore.ExtractDecade(a1) => ???
-      case MapFuncsCore.ExtractDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractDayOfYear(a1) => ???
-      case MapFuncsCore.ExtractEpoch(a1) => ???
-      case MapFuncsCore.ExtractHour(a1) => ???
-      case MapFuncsCore.ExtractIsoDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractIsoYear(a1) => ???
-      case MapFuncsCore.ExtractMicroseconds(a1) => ???
-      case MapFuncsCore.ExtractMillennium(a1) => ???
-      case MapFuncsCore.ExtractMilliseconds(a1) => ???
-      case MapFuncsCore.ExtractMinute(a1) => ???
-      case MapFuncsCore.ExtractMonth(a1) => ???
-      case MapFuncsCore.ExtractQuarter(a1) => ???
-      case MapFuncsCore.ExtractSecond(a1) => ???
-      case MapFuncsCore.ExtractTimezone(a1) => ???
-      case MapFuncsCore.ExtractTimezoneHour(a1) => ???
+      case MapFuncsCore.ExtractCentury(a1)        => ???
+      case MapFuncsCore.ExtractDayOfMonth(a1)     => ???
+      case MapFuncsCore.ExtractDecade(a1)         => ???
+      case MapFuncsCore.ExtractDayOfWeek(a1)      => ???
+      case MapFuncsCore.ExtractDayOfYear(a1)      => ???
+      case MapFuncsCore.ExtractEpoch(a1)          => ???
+      case MapFuncsCore.ExtractHour(a1)           => ???
+      case MapFuncsCore.ExtractIsoDayOfWeek(a1)   => ???
+      case MapFuncsCore.ExtractIsoYear(a1)        => ???
+      case MapFuncsCore.ExtractMicroseconds(a1)   => ???
+      case MapFuncsCore.ExtractMillennium(a1)     => ???
+      case MapFuncsCore.ExtractMilliseconds(a1)   => ???
+      case MapFuncsCore.ExtractMinute(a1)         => ???
+      case MapFuncsCore.ExtractMonth(a1)          => ???
+      case MapFuncsCore.ExtractQuarter(a1)        => ???
+      case MapFuncsCore.ExtractSecond(a1)         => ???
+      case MapFuncsCore.ExtractTimezone(a1)       => ???
+      case MapFuncsCore.ExtractTimezoneHour(a1)   => ???
       case MapFuncsCore.ExtractTimezoneMinute(a1) => ???
-      case MapFuncsCore.ExtractWeek(a1) => ???
-      case MapFuncsCore.ExtractYear(a1) => ???
-      case MapFuncsCore.Date(a1) => ???
-      case MapFuncsCore.Time(a1) => ???
-      case MapFuncsCore.Timestamp(a1) => ???
-      case MapFuncsCore.Interval(a1) => ???
-      case MapFuncsCore.StartOfDay(a1) => ???
-      case MapFuncsCore.TemporalTrunc(part, a1) => ???
-      case MapFuncsCore.TimeOfDay(a1) => ???
-      case MapFuncsCore.ToTimestamp(a1) => ???
-      case MapFuncsCore.Now() => ???
+      case MapFuncsCore.ExtractWeek(a1)           => ???
+      case MapFuncsCore.ExtractYear(a1)           => ???
+      case MapFuncsCore.Date(a1)                  => ???
+      case MapFuncsCore.Time(a1)                  => ???
+      case MapFuncsCore.Timestamp(a1)             => ???
+      case MapFuncsCore.Interval(a1)              => ???
+      case MapFuncsCore.StartOfDay(a1)            => ???
+      case MapFuncsCore.TemporalTrunc(part, a1)   => ???
+      case MapFuncsCore.TimeOfDay(a1)             => ???
+      case MapFuncsCore.ToTimestamp(a1)           => ???
+      case MapFuncsCore.Now()                     => ???
 
       case MapFuncsCore.TypeOf(a1) => ???
 
@@ -115,7 +115,7 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
       case MapFuncsCore.Or(a1, a2) =>
         (Map2[Source1](a1, a2, cake.Library.Infix.Or.f2): TransSpec1).point[F]
       case MapFuncsCore.Between(a1, a2, a3) => ???
-      case MapFuncsCore.Cond(a1, a2, a3) => ???
+      case MapFuncsCore.Cond(a1, a2, a3)    => ???
 
       case MapFuncsCore.Within(a1, a2) => ???
 
@@ -123,12 +123,12 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
         (Map1[Source1](a1, cake.Library.toLowerCase.f1): TransSpec1).point[F]
       case MapFuncsCore.Upper(a1) =>
         (Map1[Source1](a1, cake.Library.toUpperCase.f1): TransSpec1).point[F]
-      case MapFuncsCore.Bool(a1) => ???
-      case MapFuncsCore.Integer(a1) => ???
-      case MapFuncsCore.Decimal(a1) => ???
-      case MapFuncsCore.Null(a1) => ???
-      case MapFuncsCore.ToString(a1) => ???
-      case MapFuncsCore.Search(a1, a2, a3) => ???
+      case MapFuncsCore.Bool(a1)                       => ???
+      case MapFuncsCore.Integer(a1)                    => ???
+      case MapFuncsCore.Decimal(a1)                    => ???
+      case MapFuncsCore.Null(a1)                       => ???
+      case MapFuncsCore.ToString(a1)                   => ???
+      case MapFuncsCore.Search(a1, a2, a3)             => ???
       case MapFuncsCore.Substring(string, from, count) => ???
 
       // FIXME detect constant cases so we don't have to always use the dynamic variants

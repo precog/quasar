@@ -32,9 +32,10 @@ package object tpe {
 
   object PrimaryType {
     val name: Prism[String, PrimaryType] =
-      Prism((s: String) =>
-        SimpleType.name.getOption(s).map(_.left) orElse
-        CompositeType.name.getOption(s).map(_.right))(
+      Prism(
+        (s: String) =>
+          SimpleType.name.getOption(s).map(_.left) orElse
+            CompositeType.name.getOption(s).map(_.right))(
         _.fold(SimpleType.name(_), CompositeType.name(_)))
   }
 
@@ -45,7 +46,7 @@ package object tpe {
 
   /** Returns the primary type of the given EJson value, if it is composite. */
   def compositeTypeOf[J](ejs: J)(
-    implicit J: Recursive.Aux[J, EJson]
+      implicit J: Recursive.Aux[J, EJson]
   ): Option[CompositeType] =
     primaryTypeOf(ejs).toOption
 
@@ -57,37 +58,38 @@ package object tpe {
   val primaryTypeOfƒ: Algebra[EJson, PrimaryType] = {
     case E(ejs.Meta(v, _)) => v
     // Simple
-    case C(ejs.Null() )    => SimpleType.Null.left
-    case C(ejs.Bool(_))    => SimpleType.Bool.left
-    case E(ejs.Byte(_))    => SimpleType.Byte.left
-    case E(ejs.Char(_))    => SimpleType.Char.left
-    case E( ejs.Int(_))    => SimpleType.Int.left
-    case C( ejs.Dec(_))    => SimpleType.Dec.left
+    case C(ejs.Null())  => SimpleType.Null.left
+    case C(ejs.Bool(_)) => SimpleType.Bool.left
+    case E(ejs.Byte(_)) => SimpleType.Byte.left
+    case E(ejs.Char(_)) => SimpleType.Char.left
+    case E(ejs.Int(_))  => SimpleType.Int.left
+    case C(ejs.Dec(_))  => SimpleType.Dec.left
     // Composite
-    case C(ejs.Arr(_))     => CompositeType.Arr.right
-    case E(ejs.Map(_))     => CompositeType.Map.right
-    case C(ejs.Str(_))     => CompositeType.Arr.right
+    case C(ejs.Arr(_)) => CompositeType.Arr.right
+    case E(ejs.Map(_)) => CompositeType.Map.right
+    case C(ejs.Str(_)) => CompositeType.Arr.right
   }
 
   /** Returns the primary type of the given EJson value, if it is simple. */
   def simpleTypeOf[J](ejs: J)(
-    implicit J: Recursive.Aux[J, EJson]
+      implicit J: Recursive.Aux[J, EJson]
   ): Option[SimpleType] =
     primaryTypeOf(ejs).swap.toOption
 
   // Instances
 
   implicit def birecursiveTTypePartialOrder[T[_[_]]: BirecursiveT, J: Order](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): PartialOrder[T[TypeF[J, ?]]] =
     TypeF.subtypingPartialOrder[J, T[TypeF[J, ?]]]
 
-  implicit def birecursiveTTypeBoundedDistributiveLattice[T[_[_]]: BirecursiveT, J: Order](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
+  implicit def birecursiveTTypeBoundedDistributiveLattice[T[_[_]]: BirecursiveT,
+                                                          J: Order](
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
   ): BoundedDistributiveLattice[T[TypeF[J, ?]]] =
     TypeF.boundedDistributiveLattice[J, T[TypeF[J, ?]]]
 }

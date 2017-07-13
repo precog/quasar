@@ -18,7 +18,6 @@ package quasar.api
 
 import slamdata.Predef._
 
-
 import scalaz.{\/-, -\/}
 
 class HeaderParamSpec extends quasar.Qspec {
@@ -63,9 +62,9 @@ class HeaderParamSpec extends quasar.Qspec {
     import org.http4s.headers._
 
     "overwrite conflicting header" in {
-      val headers = rewrite(
-        Headers(`Accept`(MediaType.`text/csv`)),
-        Map(CaseInsensitiveString("accept") -> List("application/json")))
+      val headers =
+        rewrite(Headers(`Accept`(MediaType.`text/csv`)),
+                Map(CaseInsensitiveString("accept") -> List("application/json")))
 
       headers.get(`Accept`) must beSome(`Accept`(MediaType.`application/json`))
     }
@@ -76,7 +75,8 @@ class HeaderParamSpec extends quasar.Qspec {
         Map(CaseInsensitiveString("user-agent") -> List("some_phone_browser/0.0.1")))
 
       headers.get(`Accept`) must beSome(`Accept`(MediaType.`text/csv`))
-      headers.get(`User-Agent`) must beSome(`User-Agent`(AgentProduct("some_phone_browser", Some("0.0.1"))))
+      headers.get(`User-Agent`) must beSome(
+        `User-Agent`(AgentProduct("some_phone_browser", Some("0.0.1"))))
     }
   }
 }

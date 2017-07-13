@@ -34,7 +34,8 @@ trait AccountFinder[M[+ _]] extends Logging { self =>
   def withM[N[+ _]](implicit t: M ~> N) = new AccountFinder[N] {
     def findAccountByAPIKey(apiKey: APIKey) = t(self.findAccountByAPIKey(apiKey))
 
-    def findAccountDetailsById(accountId: AccountId) = t(self.findAccountDetailsById(accountId))
+    def findAccountDetailsById(accountId: AccountId) =
+      t(self.findAccountDetailsById(accountId))
   }
 }
 
@@ -46,21 +47,20 @@ object AccountFinder {
     def findAccountDetailsById(accountId: AccountId) = None.point[M]
   }
 
-  def Singleton[M[+_]: Monad](rootKeyM: M[APIKey]) = new AccountFinder[M] {
+  def Singleton[M[+ _]: Monad](rootKeyM: M[APIKey]) = new AccountFinder[M] {
     def findAccountByAPIKey(apiKey: APIKey) =
       Some(DefaultId).point[M]
 
     def findAccountDetailsById(accountId: AccountId) = {
       rootKeyM flatMap { rootKey =>
-        val back = AccountDetails(
-          DefaultId,
-          "kris.nuttycombe@gmail.com",
-          LocalDateTime.now(),
-          rootKey,
-          Path.Root,
-          AccountPlan.Root,
-          None,
-          None)
+        val back = AccountDetails(DefaultId,
+                                  "kris.nuttycombe@gmail.com",
+                                  LocalDateTime.now(),
+                                  rootKey,
+                                  Path.Root,
+                                  AccountPlan.Root,
+                                  None,
+                                  None)
 
         Some(back).point[M]
       }

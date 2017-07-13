@@ -18,7 +18,9 @@ package quasar
 package physical.marklogic
 
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.catchable._
+import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.writerT._
 import quasar.ejson.EJson
 import quasar.fp.numeric._
 import quasar.physical.marklogic.fs._

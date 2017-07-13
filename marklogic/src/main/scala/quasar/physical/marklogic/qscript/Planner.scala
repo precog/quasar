@@ -19,6 +19,7 @@ package quasar.physical.marklogic.qscript
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xcc._
 import quasar.ejson.EJson
 import quasar.qscript._
 
@@ -57,6 +58,7 @@ trait Planner[M[_], FMT, F[_], J] {
 }
 
 object Planner extends PlannerInstances {
+
   def apply[M[_], FMT, F[_], J](implicit ev: Planner[M, FMT, F, J]): Planner[M, FMT, F, J] = ev
 }
 
@@ -83,7 +85,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
   ): Planner[F, FMT, Const[ShiftedRead[ADir], ?], J] =
     new ShiftedReadDirPlanner[F, FMT, J]
 
-  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions, T[_[_]]: BirecursiveT](
+  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc, FMT: SearchOptions, T[_[_]]: BirecursiveT](
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?], T[EJson]]]

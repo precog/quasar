@@ -44,7 +44,6 @@ import quasar.qscript.{Read => QRead, _}
 
 import scala.Predef.implicitly
 
-import com.marklogic.xcc.{ContentSource, Session}
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path._
@@ -84,12 +83,6 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   def ResultKvsM = Kvs[M, QueryFile.ResultHandle, XccDataStream]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
   def ReadKvsM = Kvs[M, ReadFile.ReadHandle, XccDataStream]
-
-  implicit val xccSessionR  = quasar.effect.Read.monadReader_[Session, fs.XccEvalEff]
-  implicit val xccSourceR   = quasar.effect.Read.monadReader_[ContentSource, fs.XccEvalEff]
-  implicit val mlfsSessionR = quasar.effect.Read.monadReader_[Session, fs.MarkLogicFs]
-  implicit val mlfsCSourceR = quasar.effect.Read.monadReader_[ContentSource, fs.MarkLogicFs]
-  implicit val mlfsUuidR    = quasar.effect.Read.monadReader_[UUID, fs.MarkLogicFs]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import Kleisli.kleisliMonadReader

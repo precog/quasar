@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 package table
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {
   private[this] var row0          = -1
@@ -71,7 +71,7 @@ class MemoStrColumn(c: StrColumn) extends StrColumn {
 
 class MemoDateColumn(c: DateColumn) extends DateColumn {
   private[this] var row0           = -1
-  private[this] var memo: LocalDateTime = _
+  private[this] var memo: ZonedDateTime = _
   def isDefinedAt(row: Int) = c.isDefinedAt(row)
   def apply(row: Int) = {
     if (row != row0) { row0 = row; memo = c(row) }

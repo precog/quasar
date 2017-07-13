@@ -90,7 +90,7 @@ object mount {
     S0: MountingFailure :<: S,
     S1: PathMismatchFailure :<: S
   ): EitherT[Free[S, ?], ApiError, String] =
-    parse(dstStr).map(sandboxAbs).cata(dst =>
+    parse(dstStr).map(unsafeSandboxAbs).cata(dst =>
       M.remount[T](src, dst)
         .as(s"moved ${printPath(src)} to ${printPath(dst)}")
         .liftM[ApiErrT],

@@ -53,8 +53,8 @@ trait StatementArbitrary {
   // of path special characters
   val importGen: Gen[Import[Fix[Sql]]] =
     Gen.oneOf(
-      Arbitrary.arbitrary[PathOf[Abs, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](p.path)),
-      Arbitrary.arbitrary[PathOf[Rel, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](p.path)))
+      Arbitrary.arbitrary[PathOf[Abs, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](unsandbox(p.path))),
+      Arbitrary.arbitrary[PathOf[Rel, Dir, Sandboxed, AlphaCharacters]].map(p => Import[Fix[Sql]](unsandbox(p.path))))
 }
 
 object StatementArbitrary extends StatementArbitrary

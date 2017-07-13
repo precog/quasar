@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil
 
-import quasar.blueeyes._
+import quasar.precog.MimeType
 import quasar.precog.common._
 
 case class PathMetadata(path: Path, pathType: PathMetadata.PathType)

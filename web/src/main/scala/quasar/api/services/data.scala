@@ -40,7 +40,7 @@ import scalaz.stream.Process
 import scodec.bits.ByteVector
 
 object data {
-  import ManageFile.{MoveSemantics, MoveScenario}
+  import ManageFile.MoveScenario
 
   def service[S[_]](
     implicit
@@ -108,9 +108,9 @@ object data {
       "dstPath" := posixCodec.unsafePrintPath(rf)).left
     UriPathCodec.parsePath(
       absPathRequired,
-      sandboxAbs(_).right,
+      unsafeSandboxAbs(_).right,
       absPathRequired,
-      sandboxAbs(_).right
+      unsafeSandboxAbs(_).right
     )(dstString)
   }
 

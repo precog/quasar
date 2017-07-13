@@ -25,6 +25,8 @@ import IsoSerialization._, Iso8601Serialization._, Versioned._
 import Extractor._
 import scalaz._, Scalaz._, Validation._
 
+import shapeless.HNil
+
 import java.util.UUID
 
 sealed trait Event {

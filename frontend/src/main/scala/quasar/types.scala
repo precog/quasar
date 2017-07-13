@@ -41,6 +41,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     else if (AnyObject.contains(this)) common.Map.some
     else                               none
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def ⨯ (that: Type): Type =
     (this, that) match {
       case (t1, t2) if t1.contains(t2) => t2
@@ -70,6 +71,7 @@ sealed abstract class Type extends Product with Serializable { self =>
   final def contains(that: Type): Boolean =
     typecheck(self, that).fold(κ(false), κ(true))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def objectType: Option[Type] = this match {
     case Const(value) => value.dataType.objectType
     case Obj(value, uk) =>
@@ -79,6 +81,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case _ => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def objectLike: Boolean = this match {
     case Const(value)        => value.dataType.objectLike
     case Obj(_, _)           => true
@@ -86,6 +89,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case _                   => false
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayType: Option[Type] = this match {
     case Const(value) => value.dataType.arrayType
     case Arr(value) => Some(value.concatenate(TypeOrMonoid))
@@ -95,6 +99,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case _ => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayLike: Boolean = this match {
     case Const(value)        => value.dataType.arrayLike
     case Arr(_)              => true
@@ -103,6 +108,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case _                   => false
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayMinLength: Option[Int] = this match {
     case Const(Data.Arr(value)) => Some(value.length)
     case Arr(value)             => Some(value.length)
@@ -112,6 +118,8 @@ sealed abstract class Type extends Product with Serializable { self =>
         (a |@| n.arrayMinLength)(_ min _))
     case _ => None
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayMaxLength: Option[Int] = this match {
     case Const(Data.Arr(value)) => Some(value.length)
     case Arr(value)             => Some(value.length)
@@ -122,6 +130,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case _ => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def objectField(field: Type): SemanticResult[Type] = {
     if (Type.lub(field, Str) ≠ Str) failureNel(TypeError(Str, field, None))
     else (field, this) match {
@@ -154,6 +163,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayElem(index: Type): SemanticResult[Type] = {
     if (Type.lub(index, Int) ≠ Int) failureNel(TypeError(Int, index, None))
     else (index, this) match {
@@ -313,6 +323,7 @@ object Type extends TypeInstances {
 
   def glb(left: Type, right: Type): Type = left ⨯ right
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def lub(left: Type, right: Type): Type = (left, right) match {
     case _ if left contains right   => left
     case _ if right contains left   => right
@@ -324,6 +335,7 @@ object Type extends TypeInstances {
     case _                          => Top
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def typecheck(superType: Type, subType: Type):
       SemanticResult[Unit] =
     (superType, subType) match {
@@ -400,6 +412,7 @@ object Type extends TypeInstances {
     case x @ Coproduct(_, _) => x.flatten.toList
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def foldMap[Z: Monoid](f: Type => Z)(v: Type): Z =
     Monoid[Z].append(f(v), children(v).foldMap(foldMap(f)))
 
@@ -412,6 +425,7 @@ object Type extends TypeInstances {
   }
 
   def mapUpM[F[_]: Monad](v: Type)(f: Type => F[Type]): F[Type] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(v: Type): F[Type] = v match {
       case Const(value) =>
          for {
@@ -470,6 +484,7 @@ object Type extends TypeInstances {
       extends Type
 
   final case class Coproduct(left: Type, right: Type) extends Type {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flatten: NonEmptyList[Type] = {
       def flatten0(v: Type): NonEmptyList[Type] = v match {
         case left ⨿ right => flatten0(left) append flatten0(right)
@@ -481,6 +496,7 @@ object Type extends TypeInstances {
 
     override def hashCode = flatten.toSet.hashCode()
 
+    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     override def equals(that: Any) = that match {
       case that @ Coproduct(_, _) =>
         this.flatten.toSet.equals(that.flatten.toSet)
@@ -517,6 +533,7 @@ object Type extends TypeInstances {
   val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
   val Syntaxed = Type.Null ⨿ Type.Comparable
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
   implicit val equal: Equal[Type] = Equal.equal((a, b) => (a, b) match {
     case (Top,       Top)
        | (Bottom,    Bottom)

@@ -189,13 +189,13 @@ package object api {
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
-      UriPathCodec.parseAbsDir(pathString(p)) map sandboxAbs
+      UriPathCodec.parseAbsDir(pathString(p)) map unsafeSandboxAbs
     }
   }
 
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
-      UriPathCodec.parseAbsFile(pathString(p)) map sandboxAbs
+      UriPathCodec.parseAbsFile(pathString(p)) map unsafeSandboxAbs
     }
   }
 

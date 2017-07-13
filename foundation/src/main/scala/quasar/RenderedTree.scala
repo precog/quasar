@@ -58,6 +58,7 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
             prefixType(that, added) ::
             Nil)
         else {
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
             case (Nil, Nil)     => Nil
             case (x :: xs, Nil) => prefixType(x, deleted) :: matchChildren(xs, Nil)
@@ -82,6 +83,7 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
   nodes.
   */
   def draw: Stream[String] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def drawSubTrees(s: List[RenderedTree]): Stream[String] = s match {
       case Nil      => Stream.Empty
       case t :: Nil => shift("╰─ ", "   ", t.draw)

@@ -55,6 +55,7 @@ object KeyValueStore {
       * of applying the given function to the value currently associated with
       * the key, returning the second part of the result.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alterS[A](k: K, f: Option[V] => (V, A)): FreeS[A] =
       for {
         cur       <- get(k).run
@@ -94,6 +95,7 @@ object KeyValueStore {
     /** Atomically updates the value associated with the given key with the
       * result of applying the given function to the current value, if defined.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modify(k: K, f: V => V): FreeS[Unit] =
       get(k) flatMapF { v =>
         compareAndPut(k, Some(v), f(v)).ifM(().point[FreeS], modify(k, f))

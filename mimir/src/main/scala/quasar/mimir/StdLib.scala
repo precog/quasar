@@ -23,7 +23,7 @@ import quasar.yggdrasil.table._
 
 import scalaz._, Scalaz._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
@@ -301,7 +301,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => String) extends Map1Column(c) with StrColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -362,7 +362,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Long) extends Map1Column(c) with LongColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -738,7 +738,7 @@ object StdLib {
       def apply(row: Int) = f(c1(row), c2(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Boolean) extends Map1Column(c) with BoolColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Boolean) extends Map1Column(c) with BoolColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -746,7 +746,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class DtDt(c1: DateColumn, c2: DateColumn, defined: (LocalDateTime, LocalDateTime) => Boolean, f: (LocalDateTime, LocalDateTime) => Boolean)
+    class DtDt(c1: DateColumn, c2: DateColumn, defined: (ZonedDateTime, ZonedDateTime) => Boolean, f: (ZonedDateTime, ZonedDateTime) => Boolean)
         extends Map2Column(c1, c2)
         with BoolColumn {
 

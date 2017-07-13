@@ -16,6 +16,8 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
+
 import quasar.Data
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xquery._
@@ -28,6 +30,8 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] object DataPlanner {
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def apply[M[_]: Monad, FMT](data: Data)(implicit SP: StructuralPlanner[M, FMT]): M[XQuery] =
     data match {
       case Data.Binary(bytes) => xs.base64Binary(base64Bytes(bytes).xs).point[M]

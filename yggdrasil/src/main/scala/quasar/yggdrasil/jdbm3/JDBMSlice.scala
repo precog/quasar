@@ -17,10 +17,12 @@
 package quasar.yggdrasil
 package jdbm3
 
-import quasar.blueeyes._
 import quasar.precog.common._
-import org.slf4j.LoggerFactory
 import quasar.yggdrasil.table._
+
+import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
 
 object JDBMSlice {
   private lazy val log = LoggerFactory.getLogger("quasar.yggdrasil.jdbm3.JDBMSlice")

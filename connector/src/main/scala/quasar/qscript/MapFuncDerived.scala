@@ -56,6 +56,7 @@ object MapFuncDerived {
           }
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFuncDerived[T, ?]] =
     new Delay[Equal, MapFuncDerived[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFuncDerived[T, A]] = Equal.equal {

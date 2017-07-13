@@ -20,8 +20,11 @@ package table
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.util._
-import scala.collection.mutable
+
 import scalaz._, Scalaz._
+
+import scala.annotation.tailrec
+import scala.collection.mutable
 
 /**
   * Represents a way to traverse a list of CPaths in sorted order. This takes

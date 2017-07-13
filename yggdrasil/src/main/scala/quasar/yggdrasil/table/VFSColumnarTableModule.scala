@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
+import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.common.accounts.AccountFinder
@@ -199,6 +200,18 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield ()
   }
 
+  // note: this function should almost always be unnecessary, since nihdb includes the append log in snapshots
+  def flush(path: AFile): Task[Unit] = {
+    val ot = for {
+      blob <- OptionT(vfs.readPath(path))
+      head <- OptionT(vfs.headOfBlob(blob))
+      db <- OptionT(Task.delay(Option(dbs.get((blob, head)))))
+      _ <- db.cook.toTask.liftM[OptionT]
+    } yield ()
+
+    ot.getOrElse(Task.now(()))
+  }
+
   object fs {
     def listContents(dir: ADir): Task[Set[PathSegment]] = {
       vfs.ls(dir) map { paths =>
@@ -206,11 +219,13 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       }
     }
 
-    def fileExists(file: AFile): Task[Boolean] = vfs.exists(file)
+    def exists(path: APath): Task[Boolean] = vfs.exists(path)
 
-    def moveFile(from: AFile, to: AFile): Task[Boolean] = vfs.moveFile(from, to)
+    def moveFile(from: AFile, to: AFile, semantics: MoveSemantics): Task[Boolean] =
+      vfs.moveFile(from, to, semantics)
 
-    def moveDir(from: ADir, to: ADir): Task[Boolean] = vfs.moveDir(from, to)
+    def moveDir(from: ADir, to: ADir, semantics: MoveSemantics): Task[Boolean] =
+      vfs.moveDir(from, to, semantics)
 
     def delete(target: APath): Task[Boolean] = {
       def deleteFile(target: AFile) = {

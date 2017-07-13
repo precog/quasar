@@ -24,7 +24,7 @@ import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck._, Prop._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
@@ -72,7 +72,7 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[LocalDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[ZonedDateTime](0)))
     }
     "roundtrip simple boolean segment" in {
       val segment = BooleanSegment(1234L, CPath("a.b.c"),

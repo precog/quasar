@@ -136,6 +136,7 @@ object Http4sUtils {
     produceService: (Int => Task[Unit]) => HttpService
   ): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def startNew(port: Int): Task[Unit] = {
       val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)

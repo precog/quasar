@@ -17,7 +17,7 @@
 package quasar.precog.common.jobs
 
 import quasar.blueeyes.json._
-import quasar.blueeyes.MimeType
+import quasar.precog.MimeType
 import quasar.precog.common.security._
 
 import java.time.LocalDateTime

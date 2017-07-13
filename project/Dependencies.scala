@@ -5,7 +5,6 @@ import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
-import slamdata.CommonDependencies
 
 object Dependencies {
   private val algebraVersion      = "0.7.0"
@@ -22,13 +21,11 @@ object Dependencies {
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
-  // Staying on 0.8.0 version of refined due to latest version using scala 2.11.11 which
-  // causes duplicate libjansi libraries for linux, mac, and windows that in turn make assembly sbt task fail.
-  private val refinedVersion      = "0.8.0"
+  private val refinedVersion      = "0.8.2"
   private val scodecBitsVersion   = "1.1.0"
   private val http4sVersion       = "0.15.13a"
   private val scalacheckVersion   = "1.13.4"
-  private val scalazVersion       = "7.2.13"
+  private val scalazVersion       = "7.2.14"
   private val scalazStreamVersion = "0.8.6a"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"

@@ -544,6 +544,7 @@ object WorkflowBuilder {
 
   private val jsBase = jscore.Name("__val")
 
+  @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
   private def toCollectionBuilder[F[_]: Coalesce]
     (wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
@@ -836,6 +837,7 @@ object WorkflowBuilder {
     case _                                     => None
   }
 
+  @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
   private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : Option[M[(WorkflowBuilder[F], List[Fix[ExprOp]])]] =
@@ -1010,6 +1012,7 @@ object WorkflowBuilder {
     loop(src)
   }
 
+  @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion", "org.wartremover.warts.ToString"))
   private def merge[F[_]: Coalesce]
     (left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
     (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
@@ -1199,7 +1202,6 @@ object WorkflowBuilder {
               },
               {
                 // TODO: Find a way to print this without using toString
-                @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
                 val msg = "couldn’t merge unrecognized op: " + wf.toString
                 fail(InternalError.fromMsg(msg))
               })
@@ -1280,6 +1282,7 @@ object WorkflowBuilder {
             jsExpr1(wb, JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase))))))))
         })
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def makeObject(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
         case ValueBuilderF(value) =>
@@ -1299,6 +1302,7 @@ object WorkflowBuilder {
       case _ => ArrayBuilder(wb, List(\/-($$ROOT)))
     }
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def flattenMap(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
       wb.unFix match {
         case ShapePreservingBuilderF(src, inputs, op) =>
@@ -1308,6 +1312,7 @@ object WorkflowBuilder {
         case _ => FlatteningBuilder(wb, Set(StructureType.Object(DocVar.ROOT())))
       }
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def flattenArray(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
       wb.unFix match {
         case ShapePreservingBuilderF(src, inputs, op) =>
@@ -1317,6 +1322,7 @@ object WorkflowBuilder {
         case _ => FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
       }
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def projectField(wb: WorkflowBuilder[F], name: String): PlannerError \/ WorkflowBuilder[F] =
       wb.unFix match {
         case ShapePreservingBuilderF(src, inputs, op) =>
@@ -1374,6 +1380,7 @@ object WorkflowBuilder {
             jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.num(index.toLong))))).right
       }
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def deleteField(wb: WorkflowBuilder[F], name: String): PlannerError \/ WorkflowBuilder[F] =
       wb.unFix match {
         case ShapePreservingBuilderF(src, inputs, op) =>
@@ -1400,6 +1407,7 @@ object WorkflowBuilder {
       : WorkflowBuilder[F] =
       GroupBuilder(src, keys, Expr(\/-($$ROOT)))
 
+    @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
     def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]]): WorkflowBuilder[F] =
       wb.unFix match {
         case GroupBuilderF(wb0, keys, Expr(\/-(expr))) =>
@@ -1454,6 +1462,7 @@ object WorkflowBuilder {
     def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
       (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
+      @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine): M[WorkflowBuilder[F]] = {
         def delegate = impl(wb2, wb1, combine.flip)
 
@@ -1697,6 +1706,7 @@ object WorkflowBuilder {
     def arrayConcat(left: WorkflowBuilder[F], right: WorkflowBuilder[F])
       (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
+      @SuppressWarnings(scala.Array("org.wartremover.warts.Recursion"))
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine):
           M[WorkflowBuilder[F]] = {
         def delegate = impl(wb2, wb1, combine.flip)

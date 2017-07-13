@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.fs._, ManageFile.MoveSemantics
+import quasar.fs._
 
 import pathy.Path._
 import scalaz._, Scalaz._

@@ -61,7 +61,10 @@ import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
 
 // calling this constructor is a side-effect; you must always shutdown allocated instances
-final class Precog private (dataDir0: File) extends VFSColumnarTableModule with StdLibModule[Future] {
+final class Precog private (dataDir0: File)
+    extends VFSColumnarTableModule
+    with TablePagerModule
+    with StdLibModule[Future] {
 
   object Library extends StdLib
 

@@ -62,6 +62,7 @@ object AtomicRef {
     /** Atomically updates the ref with the first part of the result of applying
       * the given function to the current value, returning the second part.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modifyS[A](f: V => (V, A)): FreeS[A] =
       for {
         cur       <- get

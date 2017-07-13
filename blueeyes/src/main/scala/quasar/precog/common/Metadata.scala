@@ -25,6 +25,8 @@ import quasar.blueeyes.json.serialization.Versioned._
 import scalaz._
 import scalaz.std.string._
 
+import shapeless.HNil
+
 sealed trait MetadataType
 
 object MetadataType {

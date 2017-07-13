@@ -71,6 +71,7 @@ object MongoDbQScriptPlanner {
 
   type OutputM[A] = PlannerError \/ A
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
@@ -209,6 +210,7 @@ object MongoDbQScriptPlanner {
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def exprCheck: Type => Option[Fix[ExprOp] => Fix[ExprOp]] =
           generateTypeCheck[Fix[ExprOp], Fix[ExprOp]]($or(_, _)) {
             case Type.Null => check.isNull
@@ -829,7 +831,8 @@ object MongoDbQScriptPlanner {
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
 
-        override def plan
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+        def plan
           [M[_]: Monad,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
@@ -911,6 +914,7 @@ object MongoDbQScriptPlanner {
         }
       }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {

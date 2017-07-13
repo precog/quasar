@@ -73,14 +73,14 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
       // Load read-only data
       step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
 
-      "read unopened file handle returns UnknownReadHandle" >> pendingForF(fs)(Set("mimir")) {
+      "read unopened file handle returns UnknownReadHandle" >>* {
         val h = ReadHandle(rootDir </> file("f1"), 42)
         read.unsafe.read(h).run map { r =>
           r must_= unknownReadHandle(h).left
         }
       }
 
-      "read closed file handle returns UnknownReadHandle" >> pendingForF(fs)(Set("mimir")) {
+      "read closed file handle returns UnknownReadHandle" >>* {
         val r = for {
           h  <- read.unsafe.open(smallFile.file, 0L, None)
           _  <- read.unsafe.close(h).liftM[FileSystemErrT]
@@ -92,18 +92,18 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         }
       }
 
-      "scan an empty file succeeds, yielding no data" >> pendingFor(fs)(Set("mimir")) {
+      "scan an empty file succeeds, yielding no data" >> {
         val r = runLogT(run, read.scanAll(emptyFile.file))
         r.run_\/ must_= Vector.empty.right
       }
 
-      "scan with offset zero and no limit reads entire file" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, 0L, None))
 
         r.run_\/.map(_.toSet) must_= smallFile.data.toSet.right
       }
 
-      "scan with offset = |file| and no limit yields no data" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset = |file| and no limit yields no data" >> {
         val r = runLogT(run, read.scan(smallFile.file, smallFileSize, None))
         r.run_\/ must_= Vector.empty.right
       }
@@ -112,11 +112,12 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         *       the easiest to implement, however an argument could be made
         *       for erroring instead of returning nothing.
         */
-      "scan with offset k, where k > |file|, and no limit succeeds with empty result" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset k, where k > |file|, and no limit succeeds with empty result" >> {
         val r = runLogT(run, read.scan(smallFile.file, smallFileSize |+| 1L, None))
         r.run_\/ must_= Vector.empty.right
       }
 
+      // disabled for mimir, not because it doesn't work, but because it's absurdly slow
       "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(Set("mimir")) {
         prop { k: Int Refined RPositive =>
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
@@ -129,7 +130,7 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         }.set(minTestsOk = 10)
       }
 
-      "scan with offset zero and limit j stops after j data" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset zero and limit j stops after j data" >> {
         prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
           val limit = Positive(j.value.toLong).get // Not ideal, but simplest solution for now
 
@@ -143,7 +144,7 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         }.set(minTestsOk = 10)
       }
 
-      "scan with offset k and limit j takes j data, starting from k" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset k and limit j takes j data, starting from k" >> {
         Prop.forAll(
           chooseRefinedNum[Refined, Int, RPositive](1, 50),
           chooseRefinedNum[Refined, Int, NonNegative](0, 50))
@@ -158,7 +159,7 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         }.set(minTestsOk = 5)
       }
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
         prop { j: Int Refined Greater[SmallFileSize] =>
           val limit = Some(Positive(j.value.toLong).get) // Not ideal, but simplest solution for now
 
@@ -173,13 +174,13 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         }.set(minTestsOk = 10)
       }
 
-      "scan very long file is stack-safe" >> pendingFor(fs)(Set("mimir")) {
+      "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(largeFile.file).foldMap(_ => 1))
           .runEither must beRight(List(largeFile.data.length).toIndexedSeq)
       }
 
       // TODO: This was copied from existing tests, but what is being tested?
-      "scan very long file twice" >> pendingFor(fs)(Set("mimir")) {
+      "scan very long file twice" >> {
         val r = runLogT(run, read.scanAll(largeFile.file).foldMap(_ => 1))
         val l = Vector(largeFile.data.length)
 

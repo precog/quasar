@@ -36,6 +36,7 @@ import scalaz.{:+: => _, Divide => _, _},
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   def flattenArray[A: Show](array: ConcatArrays[T, FreeMapA[A]]): List[FreeMapA[A]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
       jf.resume match {
         case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
@@ -45,6 +46,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   }
 
   def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
       case Nil          => Free.roll(EmptyArray[T, FreeMapA[A]])
       case func :: Nil  => func

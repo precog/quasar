@@ -142,7 +142,7 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
     Free.roll(MapFuncsCore.Not(value))
 
   def lpRead(path: String): Fix[LP] =
-    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(unsafeSandboxAbs(posixCodec.parseAbsFile(path).get))
 
   val prov = new provenance.ProvenanceT[Fix]
 

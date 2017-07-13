@@ -29,7 +29,7 @@ import scalaz._
 import scalaz.syntax.monad._
 
 import java.nio.CharBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
@@ -140,7 +140,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def constLong(v: Set[Long]): Table
     def constDouble(v: Set[Double]): Table
     def constDecimal(v: Set[BigDecimal]): Table
-    def constDate(v: Set[LocalDateTime]): Table
+    def constDate(v: Set[ZonedDateTime]): Table
     def constBoolean(v: Set[Boolean]): Table
     def constNull: Table
 

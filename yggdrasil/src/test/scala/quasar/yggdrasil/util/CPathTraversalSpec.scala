@@ -16,23 +16,24 @@
 
 package quasar.yggdrasil
 
-import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.yggdrasil.table._
-import quasar.precog.util._
 import quasar.precog._, TestSupport._
+import quasar.precog.util._
+import quasar.yggdrasil.table._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
+
+import scala.specialized
 
 class CPathTraversalSpec extends Specification {
   import CPathTraversal._
 
-  sealed trait ColBuilder[@spec(Boolean, Long, Double) A] {
+  sealed trait ColBuilder[@specialized(Boolean, Long, Double) A] {
     def apply(defined: BitSet, items: Array[A]): Column
   }
 
   object ColBuilder {
-    private def builder[@spec(Boolean, Long, Double) A](f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
+    private def builder[@specialized(Boolean, Long, Double) A](f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
       new ColBuilder[A] {
         def apply(defined: BitSet, items: Array[A]): Column = f(defined, items)
       }
@@ -43,8 +44,8 @@ class CPathTraversalSpec extends Specification {
     implicit val BoolColBuilder   = builder[Boolean](ArrayBoolColumn(_, _))
     implicit val DoubleColBuilder = builder[Double](ArrayDoubleColumn(_, _))
     implicit val NumColBuilder    = builder[BigDecimal](ArrayNumColumn(_, _))
-    implicit val DateColBuilder   = builder[LocalDateTime](ArrayDateColumn(_, _))
-    implicit def HomogeneousArrayColBuilder[@spec(Boolean, Long, Double) A: CValueType] =
+    implicit val DateColBuilder   = builder[ZonedDateTime](ArrayDateColumn(_, _))
+    implicit def HomogeneousArrayColBuilder[@specialized(Boolean, Long, Double) A: CValueType] =
       builder[Array[A]](ArrayHomogeneousArrayColumn(_, _))
   }
 
@@ -62,7 +63,7 @@ class CPathTraversalSpec extends Specification {
       )))
     }
   }
-  def col[@spec(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
+  def col[@specialized(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
     val max = defined.max + 1
     val column = m.newArray(max)
     (defined zip values) foreach { case (i, x) =>

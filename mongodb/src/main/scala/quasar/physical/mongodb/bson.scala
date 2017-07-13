@@ -311,6 +311,7 @@ sealed abstract class BsonField {
         case Name(v)  => JsFn(JsFn.defaultName, jscore.Access(acc(jscore.Ident(JsFn.defaultName)), jscore.Literal(Js.Str(v))))
       })
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   override def hashCode = this match {
     case Name(v) => v.hashCode
     case Path(v) if (v.tail.length ≟ 0) => v.head.hashCode

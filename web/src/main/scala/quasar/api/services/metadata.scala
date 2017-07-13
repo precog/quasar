@@ -20,6 +20,8 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
+import quasar.contrib.std._
+import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._, MountConfig.moduleConfig
 import quasar.sql.FunctionDecl
@@ -29,9 +31,7 @@ import scala.math.Ordering
 import argonaut._, Argonaut._
 import org.http4s.dsl._
 import pathy.Path._
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.boolean._
+import scalaz._, Scalaz._
 
 object metadata {
 
@@ -92,19 +92,26 @@ object metadata {
         }
       }.liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(
-      Q.ls(d)
-        .flatMap(mkNodes(d, _))
-        .map(nodes => Json.obj("children" := nodes.toList.sorted))
-        .run)
+    def dirMetadata(d: ADir, offset: Natural, limit: Option[Positive]): Free[S, QResponse[S]] = respond(
+      (offset.value.toIntSafe.toRightDisjunction(ApiError.fromMsg(BadRequest, "offset value is too large")) |@|
+       limit.traverse(_.value.toIntSafe.toRightDisjunction(ApiError.fromMsg(BadRequest, "limit value is too large")))) { (off, lim) =>
+        Q.ls(d)
+          .flatMap(mkNodes(d, _))
+          .map { nodes =>
+            val withOffset = nodes.toList.sorted.drop(off)
+            Json.obj("children" := lim.fold(withOffset)(l => withOffset.take(l)))
+          }.run
+      }.sequence)
 
     def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
       Q.fileExists(f)
         .map(_ either Json() or PathError.pathNotFound(f)))
 
     QHttpService {
-      case GET -> AsPath(path) =>
-        refineType(path).fold(dirMetadata, fileMetadata)
+      case GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
+        respond((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
+          refineType(path).fold(dirMetadata(_, offset, limit), fileMetadata)
+        }.sequence)
     }
   }
 }

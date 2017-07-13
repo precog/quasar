@@ -16,7 +16,7 @@
 
 package quasar.blueeyes.json
 
-import quasar.blueeyes._
+import scala.annotation.switch
 
 /**
   * Trait used when the data to be parsed is in UTF-8.

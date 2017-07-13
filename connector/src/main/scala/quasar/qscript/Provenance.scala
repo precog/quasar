@@ -45,6 +45,7 @@ sealed abstract class Provenance[T[_[_]]]
 object Provenance {
   // TODO: This might not be the proper notion of equality – this just tells us
   //       which things align properly for autojoins.
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Provenance[T]] =
     Equal.equal {
       case (Nada(),        Nada())        => true
@@ -59,6 +60,7 @@ object Provenance {
       case (_,             _)             => false
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[T[_[_]]: ShowT]: Show[Provenance[T]] = Show.show {
     case Nada() => Cord("Nada")
     case Value(expr) => Cord("Value(") ++ expr.show ++ Cord(")")
@@ -78,6 +80,7 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
       case h :: t => t.foldLeft(h)((a, e) => Free.roll(And(a, e)))
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def genComparison(lp: Provenance, rp: Provenance): Option[JoinFunc] =
     (lp, rp) match {
       case (Value(v1), Value(v2)) => Free.roll(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), v2.as(RightSide))).some
@@ -98,6 +101,7 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
       case (_, _) => None
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def rebase0(newBase: FreeMap): Provenance => Option[Provenance] = {
     case Value(expr) => Value(expr >> newBase).some
     case Both(l, r)  => (rebase0(newBase)(l), rebase0(newBase)(r)) match {
@@ -173,6 +177,7 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
       case _              => buckets
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def squashProvenances(buckets: List[Provenance]): List[Provenance] =
     buckets match {
       case a :: b :: tail => squashProvenances(Then(a, b) :: tail)

@@ -16,7 +16,7 @@
 
 package quasar.fp
 
-import slamdata.Predef.{Unit, Boolean}
+import slamdata.Predef._
 
 import java.util.concurrent.atomic.AtomicReference
 import scalaz.syntax.id._
@@ -45,6 +45,8 @@ object TaskRef {
       def write(a: A) = Task.delay(ref.set(a))
       def compareAndSet(oldA: A, newA: A) =
         Task.delay(ref.compareAndSet(oldA, newA))
+
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def modifyS[B](f: A => (A, B)) = for {
         a0 <- read
         (a1, b) = f(a0)

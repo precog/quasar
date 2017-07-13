@@ -213,7 +213,7 @@ object V1SegmentFormat extends SegmentFormat {
     case CLong => Codec.PackedLongCodec
     case CDouble => Codec.DoubleCodec
     case CNum => Codec.BigDecimalCodec
-    case CDate => Codec.DateCodec
+    case CDate => Codec.ZonedDateTimeCodec
     case CArrayType(elemType) =>
       Codec.ArrayCodec(getCodecFor(elemType))(elemType.classTag)
   }

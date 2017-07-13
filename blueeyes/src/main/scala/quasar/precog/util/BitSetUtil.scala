@@ -17,6 +17,9 @@
 package quasar.precog.util
 
 import quasar.blueeyes._
+import quasar.precog.BitSet
+
+import scala.annotation.tailrec
 
 object BitSetUtil {
   class BitSetOperations(private val bs: BitSet) extends AnyVal {

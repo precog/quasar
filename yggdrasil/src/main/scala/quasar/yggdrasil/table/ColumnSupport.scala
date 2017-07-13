@@ -18,9 +18,12 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
+
+import scala.annotation.tailrec
 
 class BitsetColumn(definedAt: BitSet) {
   this: Column =>
@@ -257,7 +260,7 @@ object ArraySetColumn {
 
       case CDate =>
         new ArraySetColumn[DateColumn](ctype, columnSet.map(_.asInstanceOf[DateColumn])) with DateColumn {
-          def apply(row: Int): LocalDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[DateColumn].apply(row)
+          def apply(row: Int): ZonedDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[DateColumn].apply(row)
         }
 
       case CPeriod =>

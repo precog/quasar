@@ -438,6 +438,7 @@ object MongoDbIO {
     database(dbName) flatMap (db => async[BsonDocument](db.runCommand(cmd, classOf[BsonDocument], _)))
 
   private def iterableToProcess[A](it: MongoIterable[A]): Process[MongoDbIO, A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def go(c: AsyncBatchCursor[A]): Process[MongoDbIO, A] =
       Process.eval(async(c.next))
         .flatMap(r => Option(r).cata(

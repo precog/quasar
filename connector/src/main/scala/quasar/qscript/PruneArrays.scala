@@ -254,6 +254,7 @@ object PruneArrays {
         M.put(Ignore).as(state) // annotate computed state as environment
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def remap[M[_], A](env: RewriteState, in: ThetaJoin[A])(implicit M: MonadState[M, RewriteState]) =
         haltRemap(env match {
           case Ignore => in
@@ -294,6 +295,7 @@ object PruneArrays {
         M.put(Ignore).as(state) // annotate computed state as environment
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def remap[M[_], A](env: RewriteState, in: EquiJoin[A])(implicit M: MonadState[M, RewriteState]) =
         haltRemap(env match {
           case Ignore => in
@@ -398,6 +400,7 @@ object PruneArrays {
           case Unreferenced() => M.modify(ι).as(Ignore)
         }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def remap[M[_], A](env: RewriteState, in: QScriptCore[A])(implicit M: MonadState[M, RewriteState]) =
         // ignore `env` everywhere except for `LeftShift`
         in match {

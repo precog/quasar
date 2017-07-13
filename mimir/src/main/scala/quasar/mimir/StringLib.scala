@@ -16,7 +16,7 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 

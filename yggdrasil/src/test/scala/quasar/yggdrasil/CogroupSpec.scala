@@ -29,6 +29,8 @@ import scalaz.syntax.comonad._
 import org.specs2._
 import org.scalacheck._, Gen._
 
+import scala.annotation.tailrec
+
 trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._

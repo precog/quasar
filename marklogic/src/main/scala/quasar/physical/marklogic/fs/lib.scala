@@ -41,6 +41,7 @@ object lib {
     *
     * Appends the given nodes as children of `dst` in a format-appropriate manner.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def appendChildNodes[F[_]: PrologW: Monad, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     fs.declare[F]("append-child-nodes") flatMap (_(
       $("dst")   as ST("node()"),

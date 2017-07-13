@@ -16,14 +16,14 @@
 
 package quasar.niflheim
 
-import quasar.blueeyes._
 import quasar.blueeyes.json._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
 
 import scala.collection.mutable
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutable.ArrayBuffer[CTree], types: mutable.Map[CType, Int]) {
   def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
@@ -111,10 +111,10 @@ case class Segments(id: Long, var length: Int, t: CTree, a: mutable.ArrayBuffer[
     }
   }
 
-  def detectDateTime(s: String): LocalDateTime = {
+  def detectDateTime(s: String): ZonedDateTime = {
     if (!DateTimeUtil.looksLikeIso8601(s)) return null
     try {
-      DateTimeUtil.parseDateTime(s/*, true*/).toLocalDateTime // !!???
+      DateTimeUtil.parseDateTime(s)
     } catch {
       case e: IllegalArgumentException => null
     }
@@ -129,19 +129,19 @@ case class Segments(id: Long, var length: Int, t: CTree, a: mutable.ArrayBuffer[
     }
   }
 
-  def addRealDateTime(row: Int, tree: CTree, s: LocalDateTime) {
+  def addRealDateTime(row: Int, tree: CTree, s: ZonedDateTime) {
     val n = tree.getType(CDate)
     if (n >= 0) {
-      val seg = a(n).asInstanceOf[ArraySegment[LocalDateTime]]
+      val seg = a(n).asInstanceOf[ArraySegment[ZonedDateTime]]
       seg.defined.set(row)
       seg.values(row) = s
     } else {
       tree.setType(CDate, a.length)
       val d = new BitSet()
       d.set(row)
-      val v = new Array[LocalDateTime](length)
+      val v = new Array[ZonedDateTime](length)
       v(row) = s
-      a.append(ArraySegment[LocalDateTime](id, tree.path, CDate, d, v))
+      a.append(ArraySegment[ZonedDateTime](id, tree.path, CDate, d, v))
     }
   }
 

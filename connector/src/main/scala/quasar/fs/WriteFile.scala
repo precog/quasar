@@ -52,7 +52,6 @@ object WriteFile {
 
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     import FileSystemError._, PathError._
-    import ManageFile.MoveSemantics
 
     type F[A]    = unsafe.FreeS[A]
     type M[A]    = unsafe.M[A]

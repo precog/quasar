@@ -33,6 +33,7 @@ package object optimize {
   object pipeline {
     import fixExprOp._
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {
       def getRefs[A](op: F[_], prev: Option[Set[DocVar]]):
@@ -168,6 +169,7 @@ package object optimize {
 
         case I($MatchF(Embed(I($SimpleMapF(src0, exprs @ NonEmptyList(MapExpr(jsFn), INil()), scope))), sel)) => {
           import quasar.javascript._
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def defs(expr: JsCore): Map[DocVar, DocVar] =
             expr.simplify match {
               case Obj(values) =>
@@ -188,6 +190,7 @@ package object optimize {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def reorderOps[F[_]: Functor: Coalesce](wf: Fix[F])
       (implicit I: WorkflowOpCoreF :<: F)
       : Fix[F] = {
@@ -195,6 +198,7 @@ package object optimize {
       if (reordered == wf) wf else reorderOps(reordered)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def get0(leaves: List[BsonField.Name], rs: List[Reshape[ExprOp]]): Option[Reshape.Shape[ExprOp]] = {
       (leaves, rs) match {
         case (_, Nil) => $var(BsonField(leaves).map(DocVar.ROOT(_)).getOrElse(DocVar.ROOT())).right.some

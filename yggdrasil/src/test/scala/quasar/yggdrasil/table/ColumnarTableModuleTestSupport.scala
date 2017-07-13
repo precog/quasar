@@ -18,12 +18,14 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.util._
 
-import quasar.blueeyes.json._
 import scalaz._
 import scalaz.syntax.std.boolean._
+
+import scala.annotation.tailrec
 
 trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with TableModuleTestSupport[M] {
   def newGroupId: GroupId

@@ -16,7 +16,7 @@
 
 package quasar.precog.common.jobs
 
-import quasar.blueeyes.MimeType
+import quasar.precog.MimeType
 
 import scalaz.StreamT
 

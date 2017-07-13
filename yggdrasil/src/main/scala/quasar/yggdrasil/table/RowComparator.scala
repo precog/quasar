@@ -17,8 +17,9 @@
 package quasar.yggdrasil
 package table
 
-import quasar.blueeyes._
 import scalaz.Ordering._
+
+import scala.annotation.tailrec
 
 trait RowComparator { self =>
   def compare(i1: Int, i2: Int): scalaz.Ordering

@@ -36,6 +36,7 @@ private[qscript] final class MapFuncPlanner[
 ](implicit SP: StructuralPlanner[F, FMT]) {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => DataPlanner[F, FMT](ejson.cata(Data.fromEJson))
     case Undefined()                  => emptySeq.point[F]

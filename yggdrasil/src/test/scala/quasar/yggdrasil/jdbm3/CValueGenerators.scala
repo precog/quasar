@@ -21,6 +21,8 @@ import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.TestSupport._, Gen._
 
+import java.time.{Instant, ZoneOffset, ZonedDateTime}
+
 trait CValueGenerators {
   def maxArrayDepth = 3
 
@@ -36,6 +38,7 @@ trait CValueGenerators {
 
   def genCType: Gen[CType] = frequency(7 -> genCValueType(), 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
+  // TODO remove duplication with `SegmentFormatSupport#genForCType`
   def genValueForCValueType[A](cType: CValueType[A]): Gen[CWrappedValue[A]] = cType match {
     case CString  => genString map (CString(_))
     case CBoolean => genBool map (CBoolean(_))
@@ -45,7 +48,8 @@ trait CValueGenerators {
       scale  <- genInt
       bigInt <- genBigInt
     } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
-    case CDate                => genPosLong ^^ (n => CDate(dateTime fromMillis n))
+    case CDate =>
+      genPosLong ^^ (n => CDate(ZonedDateTime.ofInstant(Instant.ofEpochSecond(n % Instant.MAX.getEpochSecond), ZoneOffset.UTC)))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.classTag), CArrayType(elemType))

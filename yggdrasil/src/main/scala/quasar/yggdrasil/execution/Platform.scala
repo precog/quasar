@@ -17,7 +17,6 @@
 package quasar.yggdrasil.execution
 
 import quasar.precog.common.security._
-import quasar.yggdrasil.vfs._
 
 import scalaz._
 

@@ -16,14 +16,18 @@
 
 package quasar.precog.common
 
-import quasar.precog._
 import quasar.blueeyes._
-import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
+import quasar.precog._
+import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
 
 import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.charset.{ CharsetEncoder, CoderResult }
-import java.math.{ BigDecimal => BigDec }
-import java.time.LocalDateTime
+import java.nio.charset.{CharsetEncoder, CoderResult}
+import java.math.{BigDecimal => BigDec}
+import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.format.DateTimeFormatter
+
+import scala.annotation.tailrec
+import scala.specialized
 
 import scalaz._
 
@@ -34,7 +38,7 @@ import scalaz._
   * given to a `writeMore` method so it can finish the writing. It may take
   * several calls to `writeMore` before it all is finally written.
   */
-trait Codec[@spec(Boolean, Long, Double) A] { self =>
+trait Codec[@specialized(Boolean, Long, Double) A] { self =>
   type S
 
   /** Returns the exact encoded size of `a`. */
@@ -153,7 +157,7 @@ object Codec {
 
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]) = new IndexedSeqCodec(elemCodec)
 
-  implicit def arrayCodec[@spec(Boolean, Long, Double) A: Codec: CTag]: Codec[Array[A]] = ArrayCodec(Codec[A])
+  implicit def arrayCodec[@specialized(Boolean, Long, Double) A: Codec: CTag]: Codec[Array[A]] = ArrayCodec(Codec[A])
 
   /**
     * A utility method for getting the encoded version of `a` as an array of
@@ -236,7 +240,7 @@ object Codec {
     }
   }
 
-  trait FixedWidthCodec[@spec(Boolean, Long, Double) A] extends Codec[A] {
+  trait FixedWidthCodec[@specialized(Boolean, Long, Double) A] extends Codec[A] {
     type S = A
 
     def size: Int
@@ -361,8 +365,16 @@ object Codec {
     }
   }
 
-  implicit val DateCodec   = Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
-  implicit val PeriodCodec = Codec[Long].as[Period](_.getMillis, period.fromMillis)
+  implicit val LocalDateTimeCodec =
+    Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
+
+  implicit val ZonedDateTimeCodec = {
+    val formatter = DateTimeFormatter.ISO_ZONED_DATE_TIME
+    Utf8Codec.as[ZonedDateTime](_.format(formatter), ZonedDateTime.parse(_, formatter))
+  }
+
+  implicit val PeriodCodec =
+    Codec[Long].as[Period](_.getMillis, period.fromMillis)
 
   implicit case object DoubleCodec extends FixedWidthCodec[Double] {
     val size = 8
@@ -530,7 +542,7 @@ object Codec {
       }
     }
   }
-  case class ArrayCodec[@spec(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
+  case class ArrayCodec[@specialized(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
     type S = Either[Array[A], (elemCodec.S, Array[A], Int)]
 
     override def minSize(as: Array[A]): Int = 5
@@ -756,21 +768,21 @@ object Codec {
     }
   }
 
-  case class SparseRawBitSetCodec(size: Int) extends Codec[RawBitSet] {
+  case class SparseRawBitSetCodec(size: Int) extends Codec[Array[Int]] {
 
     // The maxBytes is max. bits / 8 = (highestOneBit(size) << 3) / 8
     private val maxBytes = java.lang.Integer.highestOneBit(size) max 1
 
     type S = (Array[Byte], Int)
 
-    def encodedSize(bs: RawBitSet)      = writeBitSet(bs).size
-    override def maxSize(bs: RawBitSet) = maxBytes
+    def encodedSize(bs: Array[Int])      = writeBitSet(bs).size
+    override def maxSize(bs: Array[Int]) = maxBytes
 
-    def writeUnsafe(bs: RawBitSet, sink: ByteBuffer) {
+    def writeUnsafe(bs: Array[Int], sink: ByteBuffer) {
       sink.put(writeBitSet(bs))
     }
 
-    def writeInit(bs: RawBitSet, sink: ByteBuffer): Option[S] = {
+    def writeInit(bs: Array[Int], sink: ByteBuffer): Option[S] = {
       val spaceLeft = sink.remaining()
       val bytes     = writeBitSet(bs)
 
@@ -797,7 +809,7 @@ object Codec {
       }
     }
 
-    def read(src: ByteBuffer): RawBitSet = readBitSet(src)
+    def read(src: ByteBuffer): Array[Int] = readBitSet(src)
 
     override def skip(buf: ByteBuffer) {
       var b = buf.get()
@@ -806,7 +818,7 @@ object Codec {
       }
     }
 
-    def writeBitSet(bs: RawBitSet): Array[Byte] = {
+    def writeBitSet(bs: Array[Int]): Array[Byte] = {
       val bytes = new Array[Byte](maxBytes)
 
       def set(offset: Int) {
@@ -881,7 +893,7 @@ object Codec {
       java.util.Arrays.copyOf(bytes, (len >>> 3) + 1) // The +1 covers the extra 2 '0' bits.
     }
 
-    def readBitSet(src: ByteBuffer): RawBitSet = {
+    def readBitSet(src: ByteBuffer): Array[Int] = {
       val pos = src.position()
       @inline def get(offset: Int): Boolean =
         (src.get(pos + (offset >>> 3)) & (1 << (offset & 7))) != 0

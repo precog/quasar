@@ -22,6 +22,7 @@ import scala.math.max
 
 import java.nio.ByteBuffer
 
+import scala.annotation.switch
 import scala.collection.mutable
 
 case class AsyncParse(errors: Seq[ParseException], values: Seq[JValue])

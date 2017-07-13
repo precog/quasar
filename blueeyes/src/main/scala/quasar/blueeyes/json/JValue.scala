@@ -22,6 +22,7 @@ import quasar.precog.ToString
 
 import scalaz._, Scalaz._
 
+import scala.annotation.{switch, tailrec}
 import scala.collection.immutable.ListMap
 import scala.util.Sorting.quickSort
 import scala.util.Try

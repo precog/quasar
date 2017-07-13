@@ -38,7 +38,7 @@ import shapeless.{Data => _, Coproduct => _, _}
 class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
-  import ManageFile.MoveSemantics, QueryFile.ResultHandle
+  import QueryFile.ResultHandle
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
   val transforms = QueryFile.Transforms[FreeFS]

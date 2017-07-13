@@ -21,7 +21,7 @@ import quasar.yggdrasil.vfs._
 
 import quasar.precog.common._
 
-import quasar.blueeyes.{ MimeType, MimeTypes }
+import quasar.precog.{MimeType, MimeTypes}
 
 import scala.concurrent.duration.Duration
 

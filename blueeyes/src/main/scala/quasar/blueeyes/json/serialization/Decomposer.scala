@@ -18,6 +18,7 @@ package quasar.blueeyes.json.serialization
 
 import quasar.blueeyes._
 import quasar.blueeyes.json._
+import quasar.precog.{MimeType, MimeTypes}
 
 import scalaz._, Scalaz._
 import ExtractorDecomposer.by

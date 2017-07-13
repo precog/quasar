@@ -22,6 +22,7 @@ import quasar.yggdrasil._
 
 import scalaz._, Scalaz._
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {

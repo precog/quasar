@@ -16,8 +16,7 @@
 
 package quasar.blueeyes.json
 
-import quasar.blueeyes._
-
+import scala.annotation.switch
 import scala.collection.mutable
 
 private[json] trait SyncParser extends Parser {

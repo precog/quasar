@@ -22,7 +22,7 @@ import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz._, Scalaz._, Ordering._
 import java.math.MathContext.UNLIMITED
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 sealed trait RValue { self =>
   def toJValue: JValue
@@ -342,7 +342,7 @@ object CType {
 }
 
 object CValueType {
-  def apply[A](implicit A: CValueType[A]): CValueType[A]          = A
+  def apply[A](implicit A: CValueType[A]): CValueType[A] = A
   def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
 
   // These let us do, def const[A: CValueType](a: A): CValue = CValueType[A](a)
@@ -351,7 +351,7 @@ object CValueType {
   implicit def long: CValueType[Long]                     = CLong
   implicit def double: CValueType[Double]                 = CDouble
   implicit def bigDecimal: CValueType[BigDecimal]         = CNum
-  implicit def dateTime: CValueType[LocalDateTime]             = CDate
+  implicit def dateTime: CValueType[ZonedDateTime]        = CDate
   implicit def period: CValueType[Period]                 = CPeriod
   implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
@@ -505,15 +505,15 @@ case object CNum extends CNumericType[BigDecimal] {
 //
 // Dates and Periods
 //
-case class CDate(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
+case class CDate(value: ZonedDateTime) extends CWrappedValue[ZonedDateTime] {
   val cType = CDate
 }
 
-case object CDate extends CValueType[LocalDateTime] {
-  val classTag: CTag[LocalDateTime]      = implicitly[CTag[LocalDateTime]]
+case object CDate extends CValueType[ZonedDateTime] {
+  val classTag: CTag[ZonedDateTime]      = implicitly[CTag[ZonedDateTime]]
   def readResolve()                     = CDate
-  def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
-  def jValueFor(v: LocalDateTime)            = JString(v.toString)
+  def order(v1: ZonedDateTime, v2: ZonedDateTime) = sys.error("todo")
+  def jValueFor(v: ZonedDateTime)            = JString(v.toString)
 }
 
 case class CPeriod(value: Period) extends CWrappedValue[Period] {

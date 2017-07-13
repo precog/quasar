@@ -17,11 +17,13 @@
 package quasar.yggdrasil
 package jdbm3
 
-import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.yggdrasil.table._
-import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
+import quasar.yggdrasil.table._
+
+import org.scalacheck.Shrink
+
+import scala.annotation.tailrec
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._
@@ -137,8 +139,6 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
         implicit val arbRows: Arbitrary[List[List[CValue]]] =
           Arbitrary(Gen.listOfN(10, genCValuesForColumnRefs(refs)))
 
-
-
         prop { (vals: List[List[CValue]]) =>
           val valueEncoded = vals map (valueRowFormat.encode(_))
           val sortEncoded = vals map (sortingKeyRowFormat.encode(_))
@@ -153,7 +153,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
           sortedA must_== sortedB
         }
       }
-    }.set(minTestsOk = 500, maxDiscardRatio = 5)
+    }.set(minTestsOk = 500, maxDiscardRatio = 5).pendingUntilFixed
   }
 
   def checkRoundTrips(toRowFormat: List[ColumnRef] => RowFormat) = {
@@ -168,6 +168,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
         }
       }
     }
+
     "survive rountrip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
       val size = 10
 
@@ -196,5 +197,3 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     }
   }
 }
-
-

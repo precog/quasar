@@ -72,6 +72,7 @@ object MongoDbPlanner {
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
@@ -570,6 +571,7 @@ object MongoDbPlanner {
       }
 
       def groupExpr0(f: AccumOp[Fix[ExprOp]]): Output = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def reduce0(wb: WorkflowBuilder[F])(fʹ: AccumOp[Fix[ExprOp]])
             : WorkflowBuilder[F] =
           wb.unFix match {
@@ -764,6 +766,7 @@ object MongoDbPlanner {
       })
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
       case InvokeUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
@@ -824,6 +827,7 @@ object MongoDbPlanner {
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def exprCheck: Type => Option[Fix[ExprOp] => Fix[ExprOp]] =
           generateTypeCheck[Fix[ExprOp], Fix[ExprOp]]($or(_, _)) {
             case Type.Null => check.isNull//((expr: Fix[ExprOp]) => $eq($literal(Bson.Null), expr))
@@ -900,6 +904,7 @@ object MongoDbPlanner {
       condA.contains(tableA) && condB.contains(tableB) &&
         condA.all(_ ≠ tableB) && condB.all(_ ≠ tableA)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alignCondition(lt: Fix[LP], rt: Fix[LP]):
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {

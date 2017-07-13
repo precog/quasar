@@ -58,7 +58,7 @@ package object local {
         posixCodec.parseAbsDir(rootPath)
           .map { prefix =>
           val sc = new SparkConf().setMaster(master).setAppName("quasar")
-          (sc, SparkFSConf(sc, sandboxAbs(prefix)))
+          (sc, SparkFSConf(sc, unsafeSandboxAbs(prefix)))
         }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
       forge("local[*]", uri.value)

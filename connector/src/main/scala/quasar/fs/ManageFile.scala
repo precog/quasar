@@ -30,48 +30,6 @@ import scalaz._, Scalaz._
 sealed abstract class ManageFile[A]
 
 object ManageFile {
-  sealed abstract class MoveSemantics
-
-  /** NB: Certain write operations' consistency is affected by faithful support
-    *     of these semantics, thus their consistency/atomicity is as good as the
-    *     support of these semantics by the interpreter.
-    *
-    *     Currently, this allows us to implement all the write scenarios in terms
-    *     of append and move, however if this proves too difficult to support by
-    *     backends, we may want to relax the move semantics and instead add
-    *     additional primitive operations for the conditional write operations.
-    */
-  object MoveSemantics {
-    /** Indicates the move operation should overwrite anything at the
-      * destination, creating it if it doesn't exist.
-      */
-    case object Overwrite extends MoveSemantics
-
-    /** Indicates the move should (atomically, if possible) fail if the
-      * destination exists.
-      */
-    case object FailIfExists extends MoveSemantics
-
-    /** Indicates the move should (atomically, if possible) fail unless
-      * the destination exists, overwriting it otherwise.
-      */
-    case object FailIfMissing extends MoveSemantics
-
-    val overwrite = Prism.partial[MoveSemantics, Unit] {
-      case Overwrite => ()
-    } (κ(Overwrite))
-
-    val failIfExists = Prism.partial[MoveSemantics, Unit] {
-      case FailIfExists => ()
-    } (κ(FailIfExists))
-
-    val failIfMissing = Prism.partial[MoveSemantics, Unit] {
-      case FailIfMissing => ()
-    } (κ(FailIfMissing))
-
-    implicit val show: Show[MoveSemantics] = Show.showFromToString
-  }
-
   sealed abstract class MoveScenario {
     import MoveScenario._
 

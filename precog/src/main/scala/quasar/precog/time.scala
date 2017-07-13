@@ -36,7 +36,7 @@ trait PackageTime {
     def getMillis: Long       = toDuration.getMillis
     def toDuration: Duration = java.time.Duration from x
   }
-  implicit class QuasarDateTimeOps(private val x: LocalDateTime) {
+  implicit class QuasarLocalDateTimeOps(private val x: LocalDateTime) {
     def until(end: LocalDateTime): Period = java.time.Period.between(x.toLocalDate, end.toLocalDate)
     def toUtcInstant: Instant        = x toInstant UTC
     def getMillis: Long              = toUtcInstant.toEpochMilli

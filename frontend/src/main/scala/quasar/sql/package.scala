@@ -28,7 +28,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import monocle.Prism
-import pathy.Path.posixCodec
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
@@ -85,6 +85,7 @@ package object sql {
     (projections: List[Proj[T]], relName: Option[String])
     (implicit T: Recursive.Aux[T, Sql])
       : SemanticError \/ List[(String, T)] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def extractName(expr: T): Option[String] = expr.project match {
       case Ident(name) if name.some ≠ relName            => name.some
       case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
@@ -126,6 +127,7 @@ package object sql {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
       q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def makeTables(bindings: List[String]): T[Sql] = q.project match {
       case sel @ Select(_, _, _, _, _, _) => {
         // perform all the appropriate recursions
@@ -180,22 +182,34 @@ package object sql {
   def resolveImportsImpl[M[_]: Monad, T[_[_]]: BirecursiveT](scopedExpr: ScopedExpr[T[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[T[Sql]]]])
   : EitherT[M, SemanticError, T[Sql]] = {
 
-    def absImport(i: Import[T[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
+    def absImport(i: Import[T[Sql]], from: ADir): SemanticError \/ ADir =
+      refineTypeAbs(i.path).fold(sandboxCurrent(_), r => sandboxCurrent(unsandbox(from) </> r))
+        .toRightDisjunction {
+          val invalidPathString = posixCodec.unsafePrintPath(i.path)
+          val fromString = posixCodec.printPath(from)
+          SemanticError.GenericError(s"$invalidPathString is invalid because it is located at $fromString")
+        }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def scopeFromHere(imports: List[Import[T[Sql]]], funcsHere: List[FunctionDecl[T[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[T[Sql]], ADir)]] = {
       case (name, arity) =>
-        // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
-        val funcsFromImports = imports.map(absImport(_, here)).traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
-        // All functions in "this" scope along with their own imports
-        val allFuncs         = funcsFromImports.map((funcsHere, imports, here) :: _)
-        EitherT.right(allFuncs).flatMap(_.traverse{ case (funcs, imports, from) =>
-          def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
-          funcs.filter(matchesSignature).traverse { decl =>
-            val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
-            val currentScope = scopeFromHere(imports, others, from)
-            decl.traverse(_.inlineInvokes(currentScope)).flattenLeft.strengthR(from)
+        imports.traverse(absImport(_, here)).fold(
+          err => EitherT(err.left.point[M]),
+          absImportPaths => {
+            // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
+            val funcsFromImports = absImportPaths.traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
+            // All functions in "this" scope along with their own imports
+            val allFuncs = funcsFromImports.map((funcsHere, imports, here) :: _)
+            EitherT.right(allFuncs).flatMap(_.traverse { case (funcs, imports, from) =>
+              def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
+              funcs.filter(matchesSignature).traverse { decl =>
+                val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
+              val currentScope = scopeFromHere(imports, others, from)
+                decl.traverse(_.inlineInvokes(currentScope)).flattenLeft.strengthR(from)
+              }
+            }).map(_.join)
           }
-        }).map(_.join)
+        )
     }
 
     scopedExpr.expr.inlineInvokes(scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir)).flattenLeft
@@ -223,6 +237,7 @@ package object sql {
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\" + delimiter) + delimiter
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def pprintRelationƒ[T]
     (r: SqlRelation[(T, String)])
     (implicit T: Recursive.Aux[T, Sql])
@@ -353,6 +368,7 @@ package object sql {
     case _ => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def traverseRelation[G[_], A, B](r: SqlRelation[A], f: A => G[B])(
     implicit G: Applicative[G]):
       G[SqlRelation[B]] =

@@ -29,7 +29,6 @@ import scalaz.stream._
 
 class ManageFilesSpec extends FileSystemTest[AnalyticalFileSystem](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
   import FileSystemTest._, FileSystemError._, PathError._
-  import ManageFile._
 
   val query  = QueryFile.Ops[AnalyticalFileSystem]
   val read   = ReadFile.Ops[AnalyticalFileSystem]

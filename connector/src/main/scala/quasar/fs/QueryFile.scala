@@ -267,6 +267,7 @@ object QueryFile {
       */
     def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def moreUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h): M[Vector[Data]]) { data =>
           if (data.isEmpty)
@@ -327,6 +328,7 @@ object QueryFile {
     def descendantFiles(dir: ADir): M[Set[RFile]] = {
       type S[A] = StreamT[M, A]
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def lsR(desc: RDir): StreamT[M, RFile] =
         StreamT.fromStream[M, PathSegment](ls(dir </> desc) map (_.toStream))
           .flatMap(_.fold(

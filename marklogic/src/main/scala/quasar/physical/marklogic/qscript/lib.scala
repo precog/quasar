@@ -173,6 +173,7 @@ object lib {
     })
 
   // qscript:delete-field($src as element()?, $field as xs:string) as element()?
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def deleteField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
       $("src")   as ST("element()?"),
@@ -191,6 +192,7 @@ object lib {
     })
 
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def isoyearFromDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
       $("dt") as ST("xs:dateTime?")

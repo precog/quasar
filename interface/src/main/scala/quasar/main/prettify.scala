@@ -76,6 +76,7 @@ object Prettify {
   }
 
   def flatten(data: Data): ListMap[Path, Data] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(data: Data): Data \/ List[(Path, Data)] = {
       def prepend(name: Segment, data: Data): List[(Path, Data)] =
         loop(data) match {
@@ -98,6 +99,7 @@ object Prettify {
   def unflatten(values: ListMap[Path, Data]): Data = {
     val init = Data.Obj()
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def append(v: Data, p: Path, d: Data): Data = (v, p) match {
       case (Data.Obj(values), Path(FieldSeg(s) :: Nil)) =>
         Data.Obj(values + (s -> d))

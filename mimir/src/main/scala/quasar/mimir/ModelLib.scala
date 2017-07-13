@@ -16,10 +16,11 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
+import quasar.precog.BitSet
+import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil._, table._
-import quasar.precog.common._
+
 import scalaz._, Scalaz._
 
 trait ModelLibModule[M[+ _]] {

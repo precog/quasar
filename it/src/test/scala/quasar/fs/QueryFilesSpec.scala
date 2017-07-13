@@ -60,7 +60,7 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
 
       "executing query to an existing file overwrites with results" >> ifSupports(fs,
         BackendCapability.query(),
-        BackendCapability.write()) {
+        BackendCapability.write()) { pendingFor(fs)(Set("mimir")) {
 
         val d = queryPrefix </> dir("execappends")
         val a = d </> file("afile")
@@ -79,7 +79,7 @@ class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest
 
         runLogT(fs.testInterpM, p).runEither must beRight(containTheSameElementsAs(Vector[Data](
           Data.Obj("c" -> Data._int(2)))))
-      }
+      } }
 
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lschildren")

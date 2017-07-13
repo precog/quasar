@@ -77,10 +77,12 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit def delay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
     F(RenderTree[A])
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def free[F[_]: Functor](implicit F: Delay[RenderTree, F]): Delay[RenderTree, Free[F, ?]] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Free[F, ?])#λ](rt =>
       make(_.resume.fold(F(free[F].apply(rt)).render, rt.render))))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def cofree[F[_]](implicit F: Delay[RenderTree, F]): Delay[RenderTree, Cofree[F, ?]] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Cofree[F, ?])#λ](rt =>
       make(t => NonTerminal(List("Cofree"), None, List(rt.render(t.head), F(cofree(F)(rt)).render(t.tail))))))

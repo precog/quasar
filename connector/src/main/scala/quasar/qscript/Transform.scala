@@ -327,6 +327,7 @@ class Transform
       PB.inj(BucketField(prefix.value, values, Free.roll(Constant[T, FreeMap](field)))).embed)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def pathToProj(path: pathy.Path[_, _, _]): Target[F] =
     pathy.Path.peel(path).fold[Target[F]](
       Target(EmptyAnn[T], DE.inj(Const[DeadEnd, T[F]](Root)).embed)) {

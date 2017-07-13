@@ -23,9 +23,11 @@ import quasar.precog.util._
 
 import scalaz.Semigroup
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.specialized
 
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean
@@ -48,7 +50,7 @@ sealed trait Column {
 
 private[yggdrasil] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
 
-trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
+trait HomogeneousArrayColumn[@specialized(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]
   def apply(row: Int): Array[A]
   def isDefinedAt(row: Int): Boolean
@@ -138,7 +140,7 @@ object HomogeneousArrayColumn {
       new DateColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
-        def apply(row: Int): LocalDateTime = col(row)(i)
+        def apply(row: Int): ZonedDateTime = col(row)(i)
       }
     case col @ HomogeneousArrayColumn(CPeriod) =>
       new PeriodColumn {
@@ -247,8 +249,8 @@ trait StrColumn extends Column with (Int => String) {
   override def toString                   = "StrColumn"
 }
 
-trait DateColumn extends Column with (Int => LocalDateTime) {
-  def apply(row: Int): LocalDateTime
+trait DateColumn extends Column with (Int => ZonedDateTime) {
+  def apply(row: Int): ZonedDateTime
   def rowEq(row1: Int, row2: Int): Boolean = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
@@ -424,7 +426,7 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const(v: LocalDateTime) = new InfiniteColumn with DateColumn {
+  @inline def const(v: ZonedDateTime) = new InfiniteColumn with DateColumn {
     def apply(row: Int) = v
   }
 
@@ -432,7 +434,7 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const[@spec(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
+  @inline def const[@specialized(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
     val tpe = CArrayType(CValueType[A])
     def apply(row: Int) = v
   }

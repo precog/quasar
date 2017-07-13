@@ -27,4 +27,12 @@ package object std {
       a.groupBy1(ι).values.filter(_.size > 1).toList
     }
   }
+
+  implicit class AugmentedLong(val l: Long) extends scala.AnyVal {
+    /** A safe version of `Long.toInt` which returns a `None` if the Long value is too large for an Int */
+    // TODO: Find and remove instances of `toInt` which have crept their way into the code base
+    // TODO: Enable some code linting tool to catch usages of `Long.toInt`
+    def toIntSafe: Option[Int] =
+      if (l > Int.MaxValue || l < Int.MinValue) None else Some(l.toInt)
+  }
 }

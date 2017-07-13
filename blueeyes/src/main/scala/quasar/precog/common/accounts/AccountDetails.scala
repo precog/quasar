@@ -22,6 +22,8 @@ import quasar.precog.common.security.APIKey
 import quasar.blueeyes._, json._, serialization._
 import Iso8601Serialization._, Versioned._
 
+import shapeless.HNil
+
 import java.time.LocalDateTime
 
 case class AccountDetails(accountId: AccountId,

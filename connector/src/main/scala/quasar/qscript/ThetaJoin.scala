@@ -49,6 +49,7 @@ import scalaz._, Scalaz._
 object ThetaJoin {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ThetaJoin[T, ?]] =
     new Delay[Equal, ThetaJoin[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (ThetaJoin(a1, l1, r1, o1, f1, c1), ThetaJoin(a2, l2, r2, o2, f2, c2)) =>
@@ -66,6 +67,7 @@ object ThetaJoin {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
           Cord("ThetaJoin(") ++
@@ -81,6 +83,7 @@ object ThetaJoin {
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
     new Delay[RenderTree, ThetaJoin[T, ?]] {
       val nt = List("ThetaJoin")
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {
           case ThetaJoin(src, lBr, rBr, on, f, combine) =>
             NonTerminal(nt, None, List(

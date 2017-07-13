@@ -169,6 +169,7 @@ final class LogicalPlanR[T]
   type SemValidation[A] = ValidationNel[SemanticError, A]
   type SemDisj[A] = NonEmptyList[SemanticError] \/ A
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def inferTypes(typ: Type, term: T):
       SemValidation[Typed[LP]] = {
 
@@ -431,6 +432,7 @@ final class LogicalPlanR[T]
     f: LP[(T, B)] => B,
       g: LP[Cofree[LP, (B, A)]] => M[A]):
       M[A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: T, bind: Map[Symbol, Cofree[LP, (B, A)]]):
         M[Cofree[LP, (B, A)]] = {
       lazy val default: M[Cofree[LP, (B, A)]] = for {

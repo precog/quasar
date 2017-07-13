@@ -85,6 +85,7 @@ package object analysis {
 
         val I = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, QScriptCore[T, ?], Int] = {
           case Map(card, f) => card.point[M]
           case Reduce(card, bucket, reducers, repair) =>
@@ -123,6 +124,7 @@ package object analysis {
 
     implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cardinality[EquiJoin[T, ?]] =
       new Cardinality[EquiJoin[T, ?]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, EquiJoin[T, ?], Int] = {
           case EquiJoin(card, lBranch, rBranch, _, _, _, _) =>
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
@@ -132,6 +134,7 @@ package object analysis {
 
     implicit def thetaJoin[T[_[_]] : RecursiveT : ShowT]: Cardinality[ThetaJoin[T, ?]] =
       new Cardinality[ThetaJoin[T, ?]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, ThetaJoin[T, ?], Int] = {
           case ThetaJoin(card, lBranch, rBranch, _, _, _) =>
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
@@ -177,6 +180,7 @@ package object analysis {
 
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cost[QScriptCore[T, ?]] =
       new Cost[QScriptCore[T, ?]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, QScriptCore[T, ?], Int] = {
           case Map((card, cost), f) => (card + cost).point[M]
           case Reduce((card, cost), bucket, reducers, repair) => (card + cost).point[M]
@@ -205,6 +209,7 @@ package object analysis {
 
     implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cost[EquiJoin[T, ?]] =
       new Cost[EquiJoin[T, ?]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, EquiJoin[T, ?], Int] = {
           case EquiJoin((card, cost), lBranch, rBranch, lKey, rKey, jt, combine) =>
             val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
@@ -215,6 +220,7 @@ package object analysis {
       }
     implicit def thetaJoin[T[_[_]] : RecursiveT : ShowT]: Cost[ThetaJoin[T, ?]] =
       new Cost[ThetaJoin[T, ?]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, ThetaJoin[T, ?], Int] = {
           case ThetaJoin((card, cost), lBranch, rBranch, _, _, _) => {
             val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)

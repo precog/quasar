@@ -26,6 +26,8 @@ import quasar.blueeyes.json.serialization.Versioned._
 
 import scalaz.syntax.plus._
 
+import shapeless.HNil
+
 import java.time.LocalDateTime
 
 case class AccountPlan(planType: String)

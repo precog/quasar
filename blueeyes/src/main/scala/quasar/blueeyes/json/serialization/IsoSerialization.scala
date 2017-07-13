@@ -16,7 +16,7 @@
 
 package quasar.blueeyes.json.serialization
 
-import quasar.blueeyes.{HNil => _, _}, json._, Extractor._
+import quasar.blueeyes._, json._, Extractor._
 
 import scalaz._
 import shapeless._

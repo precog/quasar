@@ -16,15 +16,15 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
-
 import org.slf4j.LoggerFactory
 
 import scalaz._
 import scalaz.syntax.monad._
 
-import scala.collection.JavaConverters._
 import java.util.concurrent.ConcurrentHashMap
+
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
 
 trait QueryLogger[M[+ _], -P] { self =>
   def contramap[P0](f: P0 => P): QueryLogger[M, P0] = new QueryLogger[M, P0] {

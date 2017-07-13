@@ -2,9 +2,7 @@
     "name": "largest zips",
     "backends": {
         "mimir":"pending",
-        "postgresql": "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select city, pop from zips where pop > 90000 order by city, pop desc",

@@ -22,6 +22,9 @@ import security._
 
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._
+
+import shapeless.HNil
+
 import scalaz._, Scalaz._, Validation._
 
 sealed trait EventMessage {

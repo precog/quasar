@@ -72,6 +72,7 @@ trait StringLib extends Library {
       case Nil      => Nil
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def escape(pat: List[Char]): List[Char] =
       escapeChar match {
         case None => sansEscape(pat)

@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.precog.BitSet
 import quasar.precog.util._
 
 import scalaz._
@@ -28,36 +29,15 @@ import java.nio.charset.Charset
 import java.util.UUID
 
 package object blueeyes extends precog.PackageTime {
-  type spec    = scala.specialized
-  type switch  = scala.annotation.switch
-  type tailrec = scala.annotation.tailrec
-
-  type MimeType = quasar.precog.MimeType
-  val MimeType  = quasar.precog.MimeType
-  val MimeTypes = quasar.precog.MimeTypes
-
-  // Temporary
-  type BitSet             = quasar.precog.BitSet
-  type RawBitSet          = Array[Int]
-  val RawBitSet           = quasar.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
-  val HNil = shapeless.HNil
-  val Iso  = shapeless.Generic
-
   def Utf8Charset: Charset                                               = Charset forName "UTF-8"
-  def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
   def uuid(s: String): UUID                                              = UUID fromString s
   def randomUuid(): UUID                                                 = UUID.randomUUID
-  def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
   def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
-  def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
-  def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
-
-  def doto[A](x: A)(f: A => Unit): A = { f(x) ; x }
 
   implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
@@ -74,6 +54,7 @@ package object blueeyes extends precog.PackageTime {
     def sortMe(implicit z: scalaz.Order[A]): Vector[A] =
       xs sortWith ((a, b) => z.order(a, b) == Ordering.LT) toVector
   }
+
   def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
     val len = a1.length
     if (len != a2.length) return false

@@ -33,7 +33,7 @@ import scala.reflect.ClassTag
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels._
-import java.time.{LocalDateTime, ZoneOffset}
+import java.time.{Instant, ZonedDateTime, ZoneOffset}
 
 trait SegmentFormatSupport {
   import Gen._
@@ -59,7 +59,8 @@ trait SegmentFormatSupport {
     case CDouble => arbitrary[Double]
     case CNum => arbitrary[BigDecimal]
     case CDate =>
-      Gen.choose[Long](0, 1494284624296L).map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
+      Gen.choose[Long](0, 1494284624296L).map(t =>
+        ZonedDateTime.ofInstant(Instant.ofEpochSecond(t % Instant.MAX.getEpochSecond), ZoneOffset.UTC))
     case CArrayType(elemType: CValueType[a]) =>
       implicit val tag = elemType.classTag    // don't try to pass this explicitly!
       val list: Gen[List[a]] = listOf(genForCType(elemType))

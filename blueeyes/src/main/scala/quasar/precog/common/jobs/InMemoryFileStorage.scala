@@ -18,7 +18,7 @@ package quasar.precog.common.jobs
 
 import scala.collection.mutable
 
-import quasar.blueeyes.MimeType
+import quasar.precog.MimeType
 
 import scalaz._
 

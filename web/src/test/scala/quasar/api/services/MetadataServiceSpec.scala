@@ -30,6 +30,8 @@ import quasar.sql._
 import quasar.sql.Arbitraries._
 
 import argonaut._, Argonaut._
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
 import org.http4s.argonaut._
@@ -38,6 +40,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task
+import shapeless.tag.@@
 
 object MetadataFixture {
 
@@ -139,7 +142,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
           ).sorted)
       }}
 
-      "and functions as files on a module mount with additionnal info about functions parameters" >> prop { dir: ADir =>
+      "and functions as files on a module mount with additional info about functions parameters" >> prop { dir: ADir =>
         val moduleConfig: List[Statement[Fix[Sql]]] = List(
           FunctionDecl(CIName("FOO"), List(CIName("BAR")), Fix(boolLiteral(true))),
           FunctionDecl(CIName("BAR"), List(CIName("BAR"), CIName("BAZ")), Fix(boolLiteral(false))))
@@ -153,6 +156,13 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
           FsNode("BAR", "file", mount = None, args = Some(List("BAR", "BAZ")))
         ).sorted)
       }
+
+      "support offset and limit" >> prop { (dir: NonEmptyDir, offset: Int @@ NonNegative, limit: Int @@ RPositive) =>
+        val childNodes = dir.ls.map(FsNode(_, None))
+
+        service(dir.state, Map())(Request(uri = pathUri(dir.dir).+?("offset", offset.toString).+?("limit", limit.toString)))
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted.drop(offset).take(limit))
+      }.set(minTestsOk = 10) // NB: this test is slow because NonEmptyDir instances are still relatively large
 
       "and empty object for existing file" >> prop { s: SingleFileMemState =>
         service(s.state, Map())(Request(uri = pathUri(s.file)))

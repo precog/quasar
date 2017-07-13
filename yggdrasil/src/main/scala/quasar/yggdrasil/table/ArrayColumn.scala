@@ -21,18 +21,20 @@ import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
+
+import scala.specialized
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet
   def isDefinedAt(row: Int) = defined(row)
 }
 
-trait ArrayColumn[@spec(Boolean, Long, Double) A] extends DefinedAtIndex with ExtensibleColumn {
+trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends DefinedAtIndex with ExtensibleColumn {
   def update(row: Int, value: A): Unit
 }
 
-class ArrayHomogeneousArrayColumn[@spec(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(val tpe: CArrayType[A])
+class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(val tpe: CArrayType[A])
     extends HomogeneousArrayColumn[A]
     with ArrayColumn[Array[A]] {
   def apply(row: Int) = values(row)
@@ -44,11 +46,11 @@ class ArrayHomogeneousArrayColumn[@spec(Boolean, Long, Double) A](val defined: B
 }
 
 object ArrayHomogeneousArrayColumn {
-  def apply[@spec(Boolean, Long, Double) A: CValueType](values: Array[Array[A]]) =
+  def apply[@specialized(Boolean, Long, Double) A: CValueType](values: Array[Array[A]]) =
     new ArrayHomogeneousArrayColumn(BitSetUtil.range(0, values.length), values)(CArrayType(CValueType[A]))
-  def apply[@spec(Boolean, Long, Double) A: CValueType](defined: BitSet, values: Array[Array[A]]) =
+  def apply[@specialized(Boolean, Long, Double) A: CValueType](defined: BitSet, values: Array[Array[A]]) =
     new ArrayHomogeneousArrayColumn(defined.copy, values)(CArrayType(CValueType[A]))
-  def empty[@spec(Boolean, Long, Double) A](size: Int)(implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
+  def empty[@specialized(Boolean, Long, Double) A](size: Int)(implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
     implicit val m: CTag[A] = elemType.classTag
 
     new ArrayHomogeneousArrayColumn(new BitSet, new Array[Array[A]](size))(CArrayType(elemType))
@@ -151,22 +153,22 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayDateColumn(val defined: BitSet, values: Array[LocalDateTime]) extends ArrayColumn[LocalDateTime] with DateColumn {
+class ArrayDateColumn(val defined: BitSet, values: Array[ZonedDateTime]) extends ArrayColumn[ZonedDateTime] with DateColumn {
   def apply(row: Int) = values(row)
 
-  def update(row: Int, value: LocalDateTime) = {
+  def update(row: Int, value: ZonedDateTime) = {
     defined.set(row)
     values(row) = value
   }
 }
 
 object ArrayDateColumn {
-  def apply(values: Array[LocalDateTime]) =
+  def apply(values: Array[ZonedDateTime]) =
     new ArrayDateColumn(BitSetUtil.range(0, values.length), values)
-  def apply(defined: BitSet, values: Array[LocalDateTime]) =
+  def apply(defined: BitSet, values: Array[ZonedDateTime]) =
     new ArrayDateColumn(defined.copy, values)
   def empty(size: Int): ArrayDateColumn =
-    new ArrayDateColumn(new BitSet, new Array[LocalDateTime](size))
+    new ArrayDateColumn(new BitSet, new Array[ZonedDateTime](size))
 }
 
 class ArrayPeriodColumn(val defined: BitSet, values: Array[Period]) extends ArrayColumn[Period] with PeriodColumn {

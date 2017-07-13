@@ -17,11 +17,13 @@
 package quasar.yggdrasil
 package table
 
+import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.common.security.APIKey
 
-import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
+
+import scala.annotation.tailrec
 
 trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   implicit def M: Monad[M] with Comonad[M]

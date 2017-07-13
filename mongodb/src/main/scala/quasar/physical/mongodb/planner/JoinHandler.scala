@@ -347,6 +347,7 @@ object JoinHandler {
     (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def checkTask(wt: workflowtask.WorkflowTask): Boolean = wt match {
       case workflowtask.FoldLeftTask(_, _)     => true
       case workflowtask.MapReduceTask(_, _, _) => true

@@ -16,8 +16,8 @@
 
 package quasar.precog.common.jobs
 
-import quasar.blueeyes._
-import quasar.blueeyes.MimeTypes.{html, plain}
+import quasar.precog.MimeTypes
+import quasar.precog.MimeTypes.{html, plain}
 
 import org.specs2.mutable._
 

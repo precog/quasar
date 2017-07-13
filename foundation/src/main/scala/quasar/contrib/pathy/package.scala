@@ -122,16 +122,19 @@ package object pathy {
         // Remove the `./` from the beginning of the string representation of a relative path
         rel => posixCodec.unsafePrintPath(rel).drop(2)))
 
-  /** Sandboxes an absolute path, needed due to parsing functions producing
-    * unsandboxed paths.
-    *
-    * TODO[pathy]: We know this can't fail, remove once Pathy is refactored to be more precise
+  /** This is completely unsafe and should be phased out.
+    * Sandboxing is meant to prevent ending up with paths such as `/foo/../../..` and by
+    * calling get on the `Option` we are wishful thinking this problem away
     */
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def sandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
+  def unsafeSandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
     root </> apath.relativeTo(root).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
+  // We have to use `asInstanceOf` because there is no easy way to prove
+  // to the compiler that we are returning a T even though we know that we are
+  // since T can only be one of `Abs` or `Rel` and we used `refineTypeAbs`
+  // to check which one it is
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(

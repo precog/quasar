@@ -17,7 +17,7 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{ADir, AFile, APath, sandboxAbs}
+import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
 import quasar.fs.mount.{MountConfig, MountType}
@@ -57,9 +57,9 @@ package object metastore {
     Meta[String].xmap[APath](
       str => posixCodec.parsePath[APath](
         _ => unexpectedValue(s"absolute path required; found: $str"),
-        sandboxAbs,
+        unsafeSandboxAbs,
         _ => unexpectedValue(s"absolute path required; found: $str"),
-        sandboxAbs
+        unsafeSandboxAbs
       )(str),
       posixCodec.printPath(_))
 
@@ -68,15 +68,15 @@ package object metastore {
     Meta[String].xmap[ADir \/ AFile](
       str => posixCodec.parsePath[ADir \/ AFile](
         _ => unexpectedValue(s"absolute path required; found: $str"),
-        sandboxAbs(_).right,
+        unsafeSandboxAbs(_).right,
         _ => unexpectedValue(s"absolute path required; found: $str"),
-        sandboxAbs(_).left
+        unsafeSandboxAbs(_).left
       )(str),
       p => posixCodec.printPath(p.merge[APath]))
 
   implicit val aDirMeta: Meta[ADir] =
     Meta[String].xmap[ADir](
-      str => sandboxAbs(
+      str => unsafeSandboxAbs(
         posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
 

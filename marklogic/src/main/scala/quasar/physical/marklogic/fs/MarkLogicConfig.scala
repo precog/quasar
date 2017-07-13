@@ -50,7 +50,7 @@ object MarkLogicConfig {
       ensureScheme(u) *> ensureHost(u) *> ensurePort(u)
 
     def dbAndRest(u: URI): ValidationNel[String, (String, ADir)] =
-      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(sandboxAbs).flatMap { d =>
+      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(unsafeSandboxAbs).flatMap { d =>
         firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
           (db, stripPrefixA(rtDir </> dir(db))(d))
         }

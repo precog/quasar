@@ -181,7 +181,7 @@ class WriteFileSpec extends quasar.Qspec {
       val tailStr = withTailDir.mkString("/") + "/"
       val random = scala.util.Random.nextInt().toString
       val path = s"$root/$prefix-$random/$tailStr"
-      sandboxAbs(posixCodec.parseAbsDir(path).get)
+      unsafeSandboxAbs(posixCodec.parseAbsDir(path).get)
     }
 
     def createDir(dirPath: ADir): Task[Unit] = Task.delay {
@@ -218,7 +218,7 @@ class WriteFileSpec extends quasar.Qspec {
     def genTempFilePath: Task[AFile] = Task.delay {
       val path = System.getProperty("java.io.tmpdir") +
       "/" + scala.util.Random.nextInt().toString + ".tmp"
-      sandboxAbs(posixCodec.parseAbsFile(path).get)
+      unsafeSandboxAbs(posixCodec.parseAbsFile(path).get)
     }
 
     def deleteFile(file: AFile): Task[Unit] = Task.delay {
@@ -239,7 +239,7 @@ class WriteFileSpec extends quasar.Qspec {
     Paths.get(posixCodec.unsafePrintPath(path))
 
   private def parseDir(dirStr: String): ADir =
-    sandboxAbs(posixCodec.parseAbsDir(dirStr).get)
+    unsafeSandboxAbs(posixCodec.parseAbsDir(dirStr).get)
 
   private def define[C]
     (defined: WriteFile.Unsafe[WriteFile] => FileSystemErrT[Free[WriteFile, ?], C])

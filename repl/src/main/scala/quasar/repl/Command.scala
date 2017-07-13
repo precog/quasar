@@ -92,7 +92,7 @@ object Command {
         .map(s => if (s.endsWith("/")) s else s + "/")
         .flatMap { s =>
           posixCodec.parseRelDir(s).map(_.left) orElse
-            posixCodec.parseAbsDir(s).map(sandboxAbs(_).right)
+            posixCodec.parseAbsDir(s).map(unsafeSandboxAbs(_).right)
         }
   }
   type XFile = RelFile[Unsandboxed] \/ AFile
@@ -102,7 +102,7 @@ object Command {
         .filter(_ ≠ "")
         .flatMap { s =>
           posixCodec.parseRelFile(s).map(_.left) orElse
-            posixCodec.parseAbsFile(s).map(sandboxAbs(_).right)
+            posixCodec.parseAbsFile(s).map(unsafeSandboxAbs(_).right)
         }
   }
 }

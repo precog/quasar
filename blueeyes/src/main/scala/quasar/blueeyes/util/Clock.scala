@@ -61,16 +61,16 @@ object Clock {
 
 trait ClockSystem {
   implicit val realtimeClock = new Clock {
-    def now(): LocalDateTime    = dateTime.now()
+    def now(): LocalDateTime = dateTime.now()
     def instant(): Instant = quasar.blueeyes.instant.now()
-    def nanoTime(): Long   = System.nanoTime()
+    def nanoTime(): Long = System.nanoTime()
   }
 }
 object ClockSystem extends ClockSystem
 
 trait ClockMock {
   protected class MockClock extends Clock {
-    private var _now: LocalDateTime  = dateTime.zero
+    private var _now: LocalDateTime = dateTime.zero
     private var _nanoTime: Long = 0
 
     def now() = _now

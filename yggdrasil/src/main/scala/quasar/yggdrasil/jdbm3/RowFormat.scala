@@ -20,12 +20,14 @@ package jdbm3
 import table._
 import quasar.blueeyes._
 import quasar.precog.common._
+import quasar.precog.util.RawBitSet
 import scalaz._, Scalaz._
 import quasar.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._
 
 import java.nio.ByteBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait ColumnEncoder {
@@ -178,8 +180,8 @@ trait RowFormatSupport { self: StdCodecs =>
       }
 
     case (CDate, col: DateColumn) =>
-      new SimpleColumnValueEncoder[LocalDateTime] {
-        val codec = Codec[LocalDateTime]
+      new SimpleColumnValueEncoder[ZonedDateTime] {
+        val codec = Codec[ZonedDateTime]
 
         def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
           codec.writeInit(col(row), buffer) match {
@@ -246,7 +248,7 @@ trait RowFormatSupport { self: StdCodecs =>
       }
     case (CDate, col: ArrayDateColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDateTime].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[ZonedDateTime].read(buf))
       }
     case (CPeriod, col: ArrayPeriodColumn) =>
       new ColumnValueDecoder {
@@ -267,7 +269,7 @@ trait RowFormatSupport { self: StdCodecs =>
     case _ => sys.error("Cannot create column decoder, columns of wrong type.")
   }
 
-  protected def encodeRow(row: Int, undefined: RawBitSet, encoders: Array[ColumnValueEncoder], init: ByteBuffer, pool: ByteBufferPool): Array[Byte] = {
+  protected def encodeRow(row: Int, undefined: Array[Int], encoders: Array[ColumnValueEncoder], init: ByteBuffer, pool: ByteBufferPool): Array[Byte] = {
 
     var buffer = init
     var filled: mutable.ListBuffer[ByteBuffer] = null
@@ -341,7 +343,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
         definedCols(colsArray.length - 1)
 
         val init = pool.acquire
-        Codec[RawBitSet].writeUnsafe(undefined, init)
+        Codec[Array[Int]].writeUnsafe(undefined, init)
         encodeRow(row, undefined, colValueEncoders, init, pool)
       }
     }
@@ -359,7 +361,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
         val buf       = ByteBufferWrap(src, offset, src.length - offset)
-        val undefined = Codec[RawBitSet].read(buf)
+        val undefined = Codec[Array[Int]].read(buf)
         @tailrec
         def helper(i: Int, decs: List[ColumnValueDecoder]) {
           decs match {
@@ -377,7 +379,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
   case object RowCodec extends Codec[List[CValue]] {
     import Codec.{ StatefulCodec, wrappedWriteInit }
 
-    @transient lazy val rawBitSetCodec = Codec[RawBitSet]
+    @transient lazy val rawBitSetCodec = Codec[Array[Int]]
 
     @transient private lazy val codecs: List[Codec[_ <: CValue]] = columnRefs.toList map {
       case ColumnRef(_, cType: CValueType[_]) => Codec.CValueCodec(cType)(codecForCValueType(cType))
@@ -386,7 +388,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
 
     type S = (Either[rawBitSetCodec.S, StatefulCodec#State], List[CValue])
 
-    private def undefineds(xs: List[CValue]): RawBitSet = {
+    private def undefineds(xs: List[CValue]): Array[Int] = {
       val bits = RawBitSet.create(xs.size)
 
       @inline
@@ -429,7 +431,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
         (x match {
           case CBoolean(x)      => wrappedWriteInit[Boolean](x, sink)
           case CString(x)       => wrappedWriteInit[String](x, sink)
-          case CDate(x)         => wrappedWriteInit[LocalDateTime](x, sink)
+          case CDate(x)         => wrappedWriteInit[ZonedDateTime](x, sink)
           case CPeriod(x)       => wrappedWriteInit[Period](x, sink)
           case CLong(x)         => wrappedWriteInit[Long](x, sink)
           case CDouble(x)       => wrappedWriteInit[Double](x, sink)

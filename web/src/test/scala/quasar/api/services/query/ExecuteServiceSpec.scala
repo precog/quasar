@@ -220,20 +220,70 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         response = (a: String) => a.trim must_= "5")
     }
     "execute a query with imported functions" >> {
-      val sampleFile = rootDir </> file("foo")
-      val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
-      val query =
-        """
-          |import `/mymodule/`;
-          |TRIVIAL(`/foo`)
-        """.stripMargin
-      get(executeService)(
-        path = rootDir,
-        query = Some(Query(query)),
-        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
-        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
-        status = Status.Ok,
-        response = (a: String) => a.trim must_= "5")
+      "imported with an absolute path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `/mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir,
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "imported with a relative path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("foo") </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "imported with a backtracking relative path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `../../mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo") </> dir("bar"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "if the argument to the function is a relative path, it should be relative to the calling context as opposed to the location of the module definning the function" >> {
+        val sampleFile = rootDir </> dir("foo") </> file("bar")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `/baz/mymodule/`;
+            |TRIVIAL(`bar`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("baz") </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
     }
     "fail on a query that has ambiguous imports" >> {
       val funcDec = {

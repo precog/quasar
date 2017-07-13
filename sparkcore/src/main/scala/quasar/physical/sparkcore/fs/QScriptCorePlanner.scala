@@ -43,6 +43,7 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
   type Count = Long
 
   // TODO consider moving to data.scala (conflicts with existing code)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
     def order(d1: Data, d2: Data) = (d1, d2) match {
       case Data.Null -> Data.Null                 => Ordering.EQ
@@ -210,11 +211,28 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
 
       val maybeBucket = CoreMap.changeFreeMap(bucket)
 
+      case class KO(keys: List[(Data, SortDir)], main: SortDir)
+
+      object KO {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+        implicit val KOOrdering: SOrdering[KO] = new SOrdering[KO] {
+          override def compare(ko1: KO, ko2: KO): Int = (ko1, ko2) match {
+            case (KO((d1, sd1) :: tail1, _), KO((d2, sd2) :: tail2, _)) if ord.compare(d1, d2) === 0 =>
+              compare(ko1.copy(keys = tail1), ko2.copy(keys = tail2))
+            case (KO((d1, sd1) :: tail1, main), KO((d2, sd2) :: tail2, _)) if sd1 === main =>
+              ord.compare(d1, d2)
+            case (KO((d1, _) :: tail1, _), KO((d2, _) :: tail2, _)) =>
+              (- ord.compare(d1, d2))
+            case (KO(Nil, _), KO(_, _)) => 0
+          }
+        }
+      }
+
       EitherT((maybeBucket |@| maybeSortBys) {
         case (bucket, sortBys) =>
-          val asc  = sortBys.head._2 === SortDir.Ascending
-          val keys = bucket :: sortBys.map(_._1).toList
-          src.sortBy(d => keys.map(_(d)), asc)
+          val main = sortBys.head._2
+          val keys = (bucket, main) :: sortBys.toList
+          src.sortBy(d => KO(keys.map(p => p.leftMap(_(d))), main), main === SortDir.Ascending)
       }.point[Task]).liftM[SparkStateT]
 
     case Filter(src, f) =>

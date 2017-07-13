@@ -18,7 +18,6 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar.common.JoinType
-import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp._
 
@@ -29,7 +28,8 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._
 import matryoshka.implicits._
-import pathy.Path.posixCodec
+import pathy.Path
+import pathy.Path._
 import scalaz._, Scalaz._
 
 sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
@@ -110,6 +110,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
       '/' ~ '*' ~ failure("unclosed comment"))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override protected def comment: Parser[scala.Any] = (
       '*' ~ '/'  ^^ κ(' ') |
       chrExcept(EofCh) ~ comment)
@@ -159,7 +160,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def import_ : Parser[Import[T[Sql]]] =
     keyword("import") ~> ident >> {
-      case i => posixCodec.parsePath[Option[DPath]](κ(none), κ(none), sandboxCurrent(_), sandboxAbs(_).some)(i).cata(
+      case i => posixCodec.parsePath[Option[Path[Any, Dir, Unsandboxed]]](κ(none), κ(none), Some(_), Some(_))(i).cata(
         path => success(Import(path)),
         failure("Import must identify a directory"))
     }
@@ -373,6 +374,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def function_expr: Parser[T[Sql]] =
     ident ~ paren_list ^^ { case a ~ xs => invokeFunction(CIName(a), xs).embed }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def primary_expr: Parser[T[Sql]] =
     case_expr |
     unshift_expr |

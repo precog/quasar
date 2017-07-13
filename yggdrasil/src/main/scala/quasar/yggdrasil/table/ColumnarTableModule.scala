@@ -18,8 +18,10 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
+import quasar.precog.{MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
+import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -32,8 +34,9 @@ import scalaz._, Scalaz._, Ordering._
 
 import java.io.File
 import java.nio.CharBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait ColumnarTableTypes[M[+ _]] {
@@ -386,7 +389,7 @@ trait ColumnarTableModule[M[+ _]]
       Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDate(v: collection.Set[LocalDateTime]): Table = {
+    def constDate(v: collection.Set[ZonedDateTime]): Table = {
       val column = ArrayDateColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }

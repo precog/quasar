@@ -311,7 +311,7 @@ class MongoDbFileSystemSpec
           def check(src: ADir, dst: ADir)(implicit X: Apply[X]) = {
             val f1 = src </> file("movdb1")
             val f2 = src </> file("movdb2")
-            val ovr = ManageFile.MoveSemantics.Overwrite
+            val ovr = MoveSemantics.Overwrite
 
             (
               write.save(f1, oneDoc.toProcess).terminated |@|

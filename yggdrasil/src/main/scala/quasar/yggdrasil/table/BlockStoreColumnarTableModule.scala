@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
@@ -34,6 +35,7 @@ import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {

@@ -22,8 +22,7 @@ import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fs.PathError._
-import quasar.fs.ManageFile._
-import quasar.fs.ManageFile.MoveSemantics._
+import quasar.fs.MoveSemantics._
 import quasar.fp.numeric._
 import quasar.frontend.logicalplan.LogicalPlan
 

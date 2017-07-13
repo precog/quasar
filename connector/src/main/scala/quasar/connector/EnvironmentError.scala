@@ -74,6 +74,7 @@ object EnvironmentError {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def summarize(err: Throwable): String =
     err.toString +
       Option(err.getCause)

@@ -23,6 +23,8 @@ import quasar.blueeyes.json.serialization.Iso8601Serialization._
 
 import quasar.precog.common.security._
 
+import shapeless.HNil
+
 import java.time.LocalDateTime
 
 object v1 {

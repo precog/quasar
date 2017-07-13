@@ -26,8 +26,11 @@ import quasar.yggdrasil.vfs._
 import quasar.precog.util._
 
 import org.slf4j.LoggerFactory
-import scala.collection.immutable.Queue
+
 import scalaz._, Scalaz._, StateT._
+
+import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
     extends CrossOrdering

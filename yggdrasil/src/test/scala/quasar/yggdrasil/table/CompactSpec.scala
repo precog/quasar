@@ -16,13 +16,14 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
-import quasar.blueeyes._
-import quasar.precog.util._
+import quasar.precog.BitSet
+import quasar.precog.TestSupport._
 import quasar.precog.common._
+import quasar.precog.util._
+import quasar.yggdrasil._
+
 import scala.util.Random
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
 
 trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._

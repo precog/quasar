@@ -156,6 +156,7 @@ final class Optimizer[T: Equal]
     prefix: String, plans: F[T]):
       Symbol = {
     val existingNames = plans.map(_.cata(namesƒ)).fold
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(pre: String): Symbol =
       if (existingNames.contains(Symbol(prefix)))
         loop(pre + "_")
@@ -242,6 +243,7 @@ final class Optimizer[T: Equal]
   val rewriteCrossJoinsƒ: LP[(T, T)] => State[NameGen, T] = { node =>
     def preserveFree(x: (T, T)) = preserveFree0(x)(ι)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flattenAnd: T => List[T] = {
       case Embed(InvokeUnapply(relations.And, ts)) => ts.unsized.flatMap(flattenAnd)
       case t                                       => List(t)

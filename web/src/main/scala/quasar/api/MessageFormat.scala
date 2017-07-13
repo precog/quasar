@@ -95,7 +95,7 @@ object MessageFormat {
   ) extends MessageFormat {
     val LineSep = "\r\n"
     def mediaType = {
-      val extensions = Map("mode" -> mode.name) ++ dispositionExtension
+      val extensions = Map("mode" -> mode.name)
       format.mediaType.withExtensions(extensions)
     }
     override def encode[F[_]](data: Process[F, Data]): Process[F, String] = {

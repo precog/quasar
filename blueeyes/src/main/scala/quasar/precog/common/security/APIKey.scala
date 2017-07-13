@@ -19,6 +19,9 @@ package security
 
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
+
+import shapeless.HNil
+
 import scalaz._, Scalaz._
 
 case class APIKeyRecord(apiKey: APIKey, name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId], isRoot: Boolean)

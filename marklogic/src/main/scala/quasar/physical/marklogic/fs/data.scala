@@ -120,6 +120,7 @@ object data {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner: QName => Data => Validation[ErrorMessages, Elem] =
       name => encodeXml0(innerElem, inner)(name)
 
@@ -127,6 +128,7 @@ object data {
       .fold(_.raiseError[F, Elem], _.point[F])
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def decodeJson[F[_]: MonadErrMsgs](json: Json): F[Data] = {
     val error: String => F[Data] = _.wrapNel.raiseError[F, Data]
 
@@ -204,6 +206,7 @@ object data {
         .toSuccessNel(s"Expected a ${ejsonEncodedAttr.shows} for an ${ejsonEncodedName.shows} element")
         .point[F]
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def decodeXml0: Node => G[Data] = {
       case DataNode(DT.Array, children) =>
         elements(children).toList traverse decodeXml0 map (Data._arr(_))

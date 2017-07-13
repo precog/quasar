@@ -18,6 +18,8 @@ package quasar.precog.common
 package ingest
 
 import quasar.blueeyes._, json._, serialization._
+import quasar.precog.{MimeType, MimeTypes}
+
 import DefaultSerialization._
 import Versioned._
 import Extractor._

@@ -224,6 +224,7 @@ package object qscript {
       (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
 
   /** A variant of `repeatedly` that works with `Inject` instances. */
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def injectRepeatedly[F [_], G[_], A]
     (op: F[A] => Option[G[A]])
     (implicit F: F :<: G)

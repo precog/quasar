@@ -28,9 +28,9 @@ import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 
-case class Prepare(blockid: Long, seqId: Long, root: File, source: StorageReader)
-case class Spoilt(blockid: Long, seqId: Long)
-case class Cooked(blockid: Long, seqId: Long, root: File, metadata: File)
+final case class Prepare(blockid: Long, seqId: Long, root: File, source: StorageReader, onComplete: () => Unit)
+final case class Spoilt(blockid: Long, seqId: Long, onComplete: () => Unit)
+final case class Cooked(blockid: Long, seqId: Long, root: File, metadata: File, onComplete: () => Unit)
 
 final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) extends Actor {
   private def typeCode(ctype: CType): String = CType.nameOf(ctype)
@@ -72,12 +72,12 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
   }
 
   def receive = {
-    case Prepare(blockid, seqId, root, source) =>
+    case Prepare(blockid, seqId, root, source, onComplete) =>
       cook(root, source) match {
         case Success(file) =>
-          sender ! Cooked(blockid, seqId, root, file)
+          sender ! Cooked(blockid, seqId, root, file, onComplete)
         case Failure(_) =>
-          sender ! Spoilt(blockid, seqId)
+          sender ! Spoilt(blockid, seqId, onComplete)
       }
   }
 }

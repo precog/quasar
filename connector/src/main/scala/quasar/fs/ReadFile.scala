@@ -70,7 +70,7 @@ object ReadFile {
       // TODO: use DataCursor.process for the appropriate cursor type
       def closeHandle(h: ReadHandle): Process[M, Nothing] =
         Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])
-
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def readUntilEmpty(h: ReadHandle): Process[M, Data] =
         Process.await(unsafe.read(h)) { data =>
           if (data.isEmpty)

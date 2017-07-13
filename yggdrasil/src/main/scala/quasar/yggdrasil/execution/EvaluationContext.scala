@@ -20,6 +20,8 @@ import quasar.blueeyes._, json._, serialization._
 import Iso8601Serialization._, Versioned._
 import quasar.precog.common._, security._, accounts._
 
+import shapeless.HNil
+
 import java.time.LocalDateTime
 
 final case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: LocalDateTime)

@@ -65,6 +65,7 @@ sealed trait InsertResult
 case class Inserted(offset: Long, size: Int) extends InsertResult
 case object Skipped extends InsertResult
 
+case object Cook
 case object Quiesce
 
 object NIHDB {
@@ -74,13 +75,11 @@ object NIHDB {
 
   final val projectionIdGen = new AtomicInteger()
 
-  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] = {
+  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] =
     NIHDBActor.create(chef, authorities, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { actor => new NIHDBImpl(actor, timeout, authorities) } }
-  }
 
-  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) = {
+  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) =
     NIHDBActor.open(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { _ map { case (authorities, actor) => new NIHDBImpl(actor, timeout, authorities) } } }
-  }
 
   final def hasProjection(dir: File) = NIHDBActor.hasProjection(dir)
 }
@@ -114,7 +113,16 @@ trait NIHDB {
    */
   def count(paths0: Option[Set[CPath]]): Future[Long]
 
-  def quiesce: IO[Unit]
+  /**
+   * Forces the chef to cook the current outstanding commit log.  This should only
+   * be called in the event that an ingestion is believed to be 100% complete, since
+   * it will result in a "partial" block (i.e. a block that is not of maximal length).
+   * Note that the append log is visible to snapshots, meaning that this function
+   * should be unnecessary in nearly all circumstances.
+   */
+  def cook: Future[Unit]
+
+  def quiesce: Future[Unit]
 
   def close(implicit actorSystem: ActorSystem): Future[Unit]
 }
@@ -151,8 +159,11 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   def count(paths0: Option[Set[CPath]]): Future[Long] =
     getSnapshot().map(_.count(paths0))
 
-  def quiesce: IO[Unit] =
-    IO(actor ! Quiesce)
+  def cook: Future[Unit] =
+    (actor ? Cook).mapTo[Unit]
+
+  def quiesce: Future[Unit] =
+    (actor ? Quiesce).mapTo[Unit]
 
   def close(implicit actorSystem: ActorSystem): Future[Unit] =
     gracefulStop(actor, timeout.duration).map(_ => ())
@@ -284,7 +295,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     blockState.pending.foreach {
       case (id, reader) =>
         log.debug("Restarting pending cook on block %s:%d".format(baseDir, id))
-        chef ! Prepare(id, cookSequence.getAndIncrement, cookedDir, reader)
+        chef ! Prepare(id, cookSequence.getAndIncrement, cookedDir, reader, () => ())
     }
 
     new State(txLog, blockState, currentBlocks)
@@ -296,6 +307,23 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
       _ <- initDirs(rawDir)
       state <- initActorState
     } yield state
+  }
+
+  private def cook(responseRequested: Boolean) = IO {
+    state.blockState.rawLog.close
+    val toCook = state.blockState.rawLog
+    val newRaw = RawHandler.empty(toCook.id + 1, rawFileFor(toCook.id + 1))
+
+    state.blockState = state.blockState.copy(pending = state.blockState.pending + (toCook.id -> toCook), rawLog = newRaw)
+    state.txLog.startCook(toCook.id)
+
+    val target = sender
+    val onComplete = if (responseRequested)
+      () => target ! (())
+    else
+      () => ()
+
+    chef ! Prepare(toCook.id, cookSequence.getAndIncrement, cookedDir, toCook, onComplete)
   }
 
   private def quiesce = IO {
@@ -339,7 +367,10 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     case GetSnapshot =>
       sender ! getSnapshot()
 
-    case Cooked(id, _, _, file) =>
+    case Spoilt(_, _, onComplete) =>
+      onComplete()
+
+    case Cooked(id, _, _, file, onComplete) =>
       // This could be a replacement for an existing id, so we
       // ned to remove/close any existing cooked block with the same
       // ID
@@ -359,6 +390,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
       ProjectionState.toFile(currentState, descriptorFile).unsafePerformIO
       state.txLog.completeCook(id)
+      onComplete()
 
     case Insert(batch, responseRequested) =>
       if (batch.isEmpty) {
@@ -381,13 +413,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
           if (state.blockState.rawLog.length >= cookThreshold) {
             log.debug("Starting cook on %s after threshold exceeded".format(baseDir.getCanonicalPath))
-            state.blockState.rawLog.close
-            val toCook = state.blockState.rawLog
-            val newRaw = RawHandler.empty(toCook.id + 1, rawFileFor(toCook.id + 1))
-
-            state.blockState = state.blockState.copy(pending = state.blockState.pending + (toCook.id -> toCook), rawLog = newRaw)
-            state.txLog.startCook(toCook.id)
-            chef ! Prepare(toCook.id, cookSequence.getAndIncrement, cookedDir, toCook)
+            cook(false).unsafePerformIO
           }
 
           log.debug("Insert complete on %d rows at offset %d for %s".format(values.length, offset, baseDir.getCanonicalPath))
@@ -395,11 +421,15 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
         }
       }
 
+    case Cook =>
+      cook(true).unsafePerformIO
+
     case GetStatus =>
       sender ! Status(state.blockState.cooked.length, state.blockState.pending.size, state.blockState.rawLog.length)
 
     case Quiesce =>
       quiesce.unsafePerformIO
+      sender ! (())
   }
 }
 

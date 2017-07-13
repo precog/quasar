@@ -87,7 +87,7 @@ object execute {
 
               val absDestination: ApiError \/ AFile =
                 destinationFile(destination.value) map (res =>
-                  sandboxAbs(res.map(unsandbox(path) </> _).merge))
+                  unsafeSandboxAbs(res.map(unsandbox(path) </> _).merge))
 
               val basePath: ApiError \/ ADir =
                 decodedDir(req.uri.path)

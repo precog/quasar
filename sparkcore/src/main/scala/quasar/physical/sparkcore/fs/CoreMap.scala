@@ -371,6 +371,8 @@ object CoreMap extends Serializable {
   }
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (_, Data.Dec(b)) if b === BigDecimal(0) => Data.NA
+    case (_, Data.Int(b)) if b === 0 => Data.NA
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / BigDecimal(b))

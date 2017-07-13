@@ -39,7 +39,7 @@ trait MountConfigArbitrary {
   private def genViewConfig: Gen[MountConfig] =
     for {
       scopedExpr <- Arbitrary.arbitrary[ScopedExpr[Fix[Sql]]]
-      vars       <- Arbitrary.arbitrary[Variables]
+      vars <- Arbitrary.arbitrary[Variables]
     } yield viewConfig(scopedExpr, vars)
 }
 

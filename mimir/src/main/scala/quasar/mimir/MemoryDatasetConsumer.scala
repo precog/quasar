@@ -34,9 +34,7 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
 
   def extractIds(jv: JValue): Seq[IdType]
 
-  def consumeEval(graph: DepGraph,
-                  ctx: EvaluationContext,
-                  optimize: Boolean = true): Validation[X, Set[SEvent]] = {
+  def consumeEval(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean = true): Validation[X, Set[SEvent]] = {
     Validation.fromTryCatchNonFatal {
       implicit val nt = NaturalTransformation.refl[M]
       val evaluator   = Evaluator(M)
@@ -71,6 +69,5 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
 
 trait LongIdMemoryDatasetConsumer[M[+ _]] extends MemoryDatasetConsumer[M] {
   type IdType = SValue
-  def extractIds(jv: JValue): Seq[SValue] =
-    (jv --> classOf[JArray]).elements map jvalueToSValue
+  def extractIds(jv: JValue): Seq[SValue] = (jv --> classOf[JArray]).elements map jvalueToSValue
 }

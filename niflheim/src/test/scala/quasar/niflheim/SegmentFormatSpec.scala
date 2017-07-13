@@ -30,11 +30,7 @@ class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
 }
 
-class VersionedSegmentFormatSpec
-    extends Specification
-    with ScalaCheck
-    with SegmentFormatSupport
-    with SegmentFormatMatchers {
+class VersionedSegmentFormatSpec extends Specification with ScalaCheck with SegmentFormatSupport with SegmentFormatMatchers {
   val format = VersionedSegmentFormat(Map(
     1 -> V1SegmentFormat,
     2 -> new StubSegmentFormat)) // Much faster version of segment formats.
@@ -42,28 +38,22 @@ class VersionedSegmentFormatSpec
   "versioned segment formats" should {
     "read older versions" in {
       implicit val arbSegment = Arbitrary(genSegment(100))
-      val old                 = VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
+      val old = VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
 
       forAll { (segment0: Segment) =>
         val out = new InMemoryWritableByteChannel
-        old.writer.writeSegment(out, segment0) must beLike {
-          case _root_.scalaz.Success(_) =>
-            val in = new InMemoryReadableByteChannel(out.toArray)
-            format.reader.readSegment(in) must beLike {
-              case _root_.scalaz.Success(segment1) =>
-                areEqual(segment0, segment1)
-            }
+        old.writer.writeSegment(out, segment0) must beLike { case _root_.scalaz.Success(_) =>
+          val in = new InMemoryReadableByteChannel(out.toArray)
+          format.reader.readSegment(in) must beLike { case _root_.scalaz.Success(segment1) =>
+            areEqual(segment0, segment1)
+          }
         }
       }
     }
   }
 }
 
-trait SegmentFormatSpec
-    extends Specification
-    with ScalaCheck
-    with SegmentFormatSupport
-    with SegmentFormatMatchers {
+trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormatSupport with SegmentFormatMatchers {
   def format: SegmentFormat
 
   def surviveRoundTrip(segment: Segment) = surviveRoundTripWithFormat(format)(segment)
@@ -76,47 +66,32 @@ trait SegmentFormatSpec
       surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CEmptyObject, EmptyBitSet, 0))
       surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CEmptyArray, EmptyBitSet, 0))
     }
-    "roundtrip trivial boolean segments" in surviveRoundTrip(
-      BooleanSegment(1234L, CPath("a.b.c"), EmptyBitSet, EmptyBitSet, 0))
+    "roundtrip trivial boolean segments" in surviveRoundTrip(BooleanSegment(1234L, CPath("a.b.c"), EmptyBitSet, EmptyBitSet, 0))
     "roundtrip trivial array segments" in {
-      surviveRoundTrip(
-        ArraySegment(1234L, CPath("a.b.c"), CLong, EmptyBitSet, new Array[Long](0)))
-      surviveRoundTrip(
-        ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
-      surviveRoundTrip(
-        ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
-      surviveRoundTrip(
-        ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
-      surviveRoundTrip(
-        ArraySegment(1234L,
-                     CPath("a.b.c"),
-                     CDate,
-                     EmptyBitSet,
-                     new Array[LocalDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLong, EmptyBitSet, new Array[Long](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[LocalDateTime](0)))
     }
     "roundtrip simple boolean segment" in {
-      val segment = BooleanSegment(1234L,
-                                   CPath("a.b.c"),
-                                   BitSetUtil.create(Seq(0)),
-                                   BitSetUtil.create(Seq(0)),
-                                   1)
+      val segment = BooleanSegment(1234L, CPath("a.b.c"),
+        BitSetUtil.create(Seq(0)), BitSetUtil.create(Seq(0)), 1)
       surviveRoundTrip(segment)
     }
     "roundtrip undefined boolean segment" in {
-      val segment = BooleanSegment(1234L, CPath("a.b.c"), EmptyBitSet, EmptyBitSet, 10)
+      val segment = BooleanSegment(1234L, CPath("a.b.c"),
+        EmptyBitSet, EmptyBitSet, 10)
       surviveRoundTrip(segment)
     }
     "roundtrip simple array segment" in {
-      val segment = ArraySegment(1234L,
-                                 CPath("a.b.c"),
-                                 CDouble,
-                                 BitSetUtil.create(Seq(0)),
-                                 Array(4.2))
+      val segment = ArraySegment(1234L, CPath("a.b.c"), CDouble,
+        BitSetUtil.create(Seq(0)), Array(4.2))
       surviveRoundTrip(segment)
     }
     "roundtrip undefined array segment" in {
-      val segment =
-        ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](100))
+      val segment = ArraySegment(1234L, CPath("a.b.c"), CDouble,
+        EmptyBitSet, new Array[Double](100))
       surviveRoundTrip(segment)
     }
     "roundtrip arbitrary small segments" in {
@@ -135,3 +110,4 @@ trait SegmentFormatSpec
     }*/
   }
 }
+

@@ -23,10 +23,7 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
-trait TransSpecableModule[M[+ _]]
-    extends TransSpecModule
-    with TableModule[M]
-    with EvaluatorMethodsModule[M] {
+trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] with EvaluatorMethodsModule[M] {
   import dag._
   import library._
   import instructions._
@@ -60,78 +57,46 @@ trait TransSpecableModule[M[+ _]]
 
     def isTransSpecable(to: DepGraph, from: DepGraph): Boolean =
       foldDownTransSpecable(to, Some(from))(new TransSpecableFold[Boolean] {
-        def EqualLiteral(node: Join)(parent: Boolean, value: RValue, invert: Boolean) =
-          parent
-        def WrapObject(node: Join)(parent: Boolean, field: String)          = parent
-        def DerefObjectStatic(node: Join)(parent: Boolean, field: String)   = parent
-        def DerefMetadataStatic(node: Join)(parent: Boolean, field: String) = parent
-        def DerefArrayStatic(node: Join)(parent: Boolean, index: Int)       = parent
-        def ArraySwap(node: Join)(parent: Boolean, index: Int)              = parent
-        def InnerObjectConcat(node: Join)(parent: Boolean)                  = parent
-        def InnerArrayConcat(node: Join)(parent: Boolean)                   = parent
-        def Map1Left(
-            node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue) =
-          parent
-        def Map1Right(
-            node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue) =
-          parent
-        def binOp(node: Join)(leftParent: Boolean,
-                              rightParent: => Boolean,
-                              op: BinaryOperation) = leftParent && rightParent
-        def Filter(node: dag.Filter)(leftParent: Boolean, rightParent: => Boolean) =
-          leftParent && rightParent
-        def WrapArray(node: Operate)(parent: Boolean)               = parent
-        def Op1(node: Operate)(parent: Boolean, op: UnaryOperation) = parent
-        def Cond(node: dag.Cond)(pred: Boolean, left: Boolean, right: Boolean) =
-          pred && left && right
-        def Const(node: dag.Const)(under: Boolean) = under
-        def unmatched(node: DepGraph)              = false
-        def done(node: DepGraph)                   = true
+        def EqualLiteral(node: Join)(parent: Boolean, value: RValue, invert: Boolean)            = parent
+        def WrapObject(node: Join)(parent: Boolean, field: String)                               = parent
+        def DerefObjectStatic(node: Join)(parent: Boolean, field: String)                        = parent
+        def DerefMetadataStatic(node: Join)(parent: Boolean, field: String)                      = parent
+        def DerefArrayStatic(node: Join)(parent: Boolean, index: Int)                            = parent
+        def ArraySwap(node: Join)(parent: Boolean, index: Int)                                   = parent
+        def InnerObjectConcat(node: Join)(parent: Boolean)                                       = parent
+        def InnerArrayConcat(node: Join)(parent: Boolean)                                        = parent
+        def Map1Left(node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue)     = parent
+        def Map1Right(node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue)    = parent
+        def binOp(node: Join)(leftParent: Boolean, rightParent: => Boolean, op: BinaryOperation) = leftParent && rightParent
+        def Filter(node: dag.Filter)(leftParent: Boolean, rightParent: => Boolean)               = leftParent && rightParent
+        def WrapArray(node: Operate)(parent: Boolean)                                            = parent
+        def Op1(node: Operate)(parent: Boolean, op: UnaryOperation)                              = parent
+        def Cond(node: dag.Cond)(pred: Boolean, left: Boolean, right: Boolean)                   = pred && left && right
+        def Const(node: dag.Const)(under: Boolean)                                               = under
+        def unmatched(node: DepGraph)                                                            = false
+        def done(node: DepGraph)                                                                 = true
       })
 
     private[this] def snd[A, B](a: A, b: B): Option[B] = Some(b)
 
-    def mkTransSpec(to: DepGraph,
-                    from: DepGraph,
-                    ctx: EvaluationContext): Option[TransSpec1] =
-      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to,
-                                                           Some(from),
-                                                           ctx,
-                                                           identity,
-                                                           snd,
-                                                           some).map(_._1)
+    def mkTransSpec(to: DepGraph, from: DepGraph, ctx: EvaluationContext): Option[TransSpec1] =
+      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, Some(from), ctx, identity, snd, some).map(_._1)
 
     def findAncestor(to: DepGraph, ctx: EvaluationContext): Option[DepGraph] =
-      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to,
-                                                           None,
-                                                           ctx,
-                                                           identity,
-                                                           snd,
-                                                           some).map(_._2)
+      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some).map(_._2)
 
-    def findTransSpecAndAncestor(to: DepGraph,
-                                 ctx: EvaluationContext): Option[(TransSpec1, DepGraph)] =
-      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to,
-                                                           None,
-                                                           ctx,
-                                                           identity,
-                                                           snd,
-                                                           some)
+    def findTransSpecAndAncestor(to: DepGraph, ctx: EvaluationContext): Option[(TransSpec1, DepGraph)] =
+      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some)
 
     def findOrderAncestor(to: DepGraph, ctx: EvaluationContext): Option[DepGraph] =
-      mkTransSpecOrderWithState[Option, (TransSpec1, DepGraph)](to,
-                                                                None,
-                                                                ctx,
-                                                                identity,
-                                                                snd,
-                                                                some).map(_._2)
+      mkTransSpecOrderWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some).map(_._2)
 
     def transFold[N[_]: Monad, S](to: DepGraph,
-                                  from: Option[DepGraph],
-                                  ctx: EvaluationContext,
-                                  get: S => (TransSpec1, DepGraph),
-                                  set: (S, (TransSpec1, DepGraph)) => N[S],
-                                  init: ((TransSpec1, DepGraph)) => N[S]) = {
+                                    from: Option[DepGraph],
+                                    ctx: EvaluationContext,
+                                    get: S => (TransSpec1, DepGraph),
+                                    set: (S, (TransSpec1, DepGraph)) => N[S],
+                                    init: ((TransSpec1, DepGraph)) => N[S]) = {
 
       // Bifunctor leftMap would be better here if it existed in pimped type inferrable form
       def leftMap(parent: S)(f: TransSpec1 => TransSpec1) = get(parent) match {
@@ -169,8 +134,7 @@ trait TransSpecableModule[M[+ _]]
         def InnerArrayConcat(node: Join)(parent: N[S]) =
           parent.flatMap(leftMap(_)(trans.InnerArrayConcat(_)))
 
-        def Map1Left(
-            node: Join)(parent: N[S], op: Op2F2, graph: DepGraph, value: RValue) =
+        def Map1Left(node: Join)(parent: N[S], op: Op2F2, graph: DepGraph, value: RValue) =
           parent.flatMap(leftMap(_) { target =>
             value match {
               case cv: CValue =>
@@ -181,8 +145,7 @@ trait TransSpecableModule[M[+ _]]
             }
           })
 
-        def Map1Right(
-            node: Join)(parent: N[S], op: Op2F2, graph: DepGraph, value: RValue) =
+        def Map1Right(node: Join)(parent: N[S], op: Op2F2, graph: DepGraph, value: RValue) =
           parent.flatMap(leftMap(_) { target =>
             value match {
               case cv: CValue =>
@@ -193,18 +156,17 @@ trait TransSpecableModule[M[+ _]]
             }
           })
 
-        def binOp(
-            node: Join)(leftParent: N[S], rightParent: => N[S], op: BinaryOperation) = {
+        def binOp(node: Join)(leftParent: N[S], rightParent: => N[S], op: BinaryOperation) = {
           for {
             pl <- leftParent
             (l, al) = get(pl)
             pr <- rightParent
             (r, ar) = get(pr)
             result <- if (al == ar) {
-              set(pl, (transFromBinOp(op)(l, r), al))
-            } else {
-              init(Leaf(Source), node)
-            }
+                       set(pl, (transFromBinOp(op)(l, r), al))
+                     } else {
+                       init(Leaf(Source), node)
+                     }
           } yield result
         }
 
@@ -214,8 +176,7 @@ trait TransSpecableModule[M[+ _]]
             (l, al) = get(pl)
             pr <- rightParent
             (r, ar) = get(pr)
-            result <- if (al == ar) set(pl, (trans.Filter(l, r), al))
-            else init(Leaf(Source), node)
+            result <- if (al == ar) set(pl, (trans.Filter(l, r), al)) else init(Leaf(Source), node)
           } yield result
 
         def WrapArray(node: Operate)(parent: N[S]) =
@@ -234,9 +195,9 @@ trait TransSpecableModule[M[+ _]]
             (r, ar) = get(pr)
 
             result <- if (ap == al && al == ar)
-              set(pp, (trans.Cond(p, l, r), ap))
-            else
-              init(Leaf(Source), node)
+                       set(pp, (trans.Cond(p, l, r), ap))
+                     else
+                       init(Leaf(Source), node)
           } yield result
         }
 
@@ -256,24 +217,22 @@ trait TransSpecableModule[M[+ _]]
       }
     }
 
-    def mkTransSpecWithState[N[_]: Monad, S](
-        to: DepGraph,
-        from: Option[DepGraph],
-        ctx: EvaluationContext,
-        get: S => (TransSpec1, DepGraph),
-        set: (S, (TransSpec1, DepGraph)) => N[S],
-        init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
+    def mkTransSpecWithState[N[_]: Monad, S](to: DepGraph,
+                                               from: Option[DepGraph],
+                                               ctx: EvaluationContext,
+                                               get: S => (TransSpec1, DepGraph),
+                                               set: (S, (TransSpec1, DepGraph)) => N[S],
+                                               init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
 
       foldDownTransSpecable(to, from)(transFold[N, S](to, from, ctx, get, set, init))
     }
 
-    def mkTransSpecOrderWithState[N[+ _]: Monad, S](
-        to: DepGraph,
-        from: Option[DepGraph],
-        ctx: EvaluationContext,
-        get: S => (TransSpec1, DepGraph),
-        set: (S, (TransSpec1, DepGraph)) => N[S],
-        init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
+    def mkTransSpecOrderWithState[N[+ _]: Monad, S](to: DepGraph,
+                                                    from: Option[DepGraph],
+                                                    ctx: EvaluationContext,
+                                                    get: S => (TransSpec1, DepGraph),
+                                                    set: (S, (TransSpec1, DepGraph)) => N[S],
+                                                    init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
 
       foldDownTransSpecableOrder(to, from)(transFold[N, S](to, from, ctx, get, set, init))
     }
@@ -294,16 +253,12 @@ trait TransSpecableModule[M[+ _]]
       }
     }
 
-    def foldDownTransSpecableOrder[T](to: DepGraph, from: Option[DepGraph])(
-        alg: TransSpecableOrderFold[T]): T = {
+    def foldDownTransSpecableOrder[T](to: DepGraph, from: Option[DepGraph])(alg: TransSpecableOrderFold[T]): T = {
 
       def loop(graph: DepGraph): T = graph match {
         case node if from.map(_ == node).getOrElse(false) => alg.done(node)
 
-        case node @ Join(instructions.WrapObject,
-                         Cross(_),
-                         Const(CString(field)),
-                         right) =>
+        case node @ Join(instructions.WrapObject, Cross(_), Const(CString(field)), right) =>
           alg.WrapObject(node)(loop(right), field)
 
         case node @ Join(DerefObject, Cross(_), left, Const(CString(field))) =>
@@ -321,47 +276,30 @@ trait TransSpecableModule[M[+ _]]
       loop(to)
     }
 
-    def foldDownTransSpecable[T](to: DepGraph, from: Option[DepGraph])(
-        alg: TransSpecableFold[T]): T = {
+    def foldDownTransSpecable[T](to: DepGraph, from: Option[DepGraph])(alg: TransSpecableFold[T]): T = {
 
       def loop(graph: DepGraph): T = graph match {
         case node if from.map(_ == node).getOrElse(false) => alg.done(node)
 
-        case node @ dag.Cond(pred,
-                             left @ dag.Const(_: CValue),
-                             Cross(_),
-                             right,
-                             IdentitySort | ValueSort(_)) => {
+        case node @ dag.Cond(pred, left @ dag.Const(_: CValue), Cross(_), right, IdentitySort | ValueSort(_)) => {
           val predRes = loop(pred)
 
           alg.Cond(node)(predRes, alg.Const(left)(predRes), loop(right))
         }
 
-        case node @ dag.Cond(pred,
-                             left,
-                             IdentitySort | ValueSort(_),
-                             right @ dag.Const(_: CValue),
-                             Cross(_)) => {
+        case node @ dag.Cond(pred, left, IdentitySort | ValueSort(_), right @ dag.Const(_: CValue), Cross(_)) => {
           val predRes = loop(pred)
 
           alg.Cond(node)(predRes, loop(left), alg.Const(right)(predRes))
         }
 
-        case node @ dag.Cond(pred,
-                             left @ dag.Const(_: CValue),
-                             Cross(_),
-                             right @ dag.Const(_: CValue),
-                             Cross(_)) => {
+        case node @ dag.Cond(pred, left @ dag.Const(_: CValue), Cross(_), right @ dag.Const(_: CValue), Cross(_)) => {
           val predRes = loop(pred)
 
           alg.Cond(node)(predRes, alg.Const(left)(predRes), alg.Const(right)(predRes))
         }
 
-        case node @ dag.Cond(pred,
-                             left,
-                             IdentitySort | ValueSort(_),
-                             right,
-                             IdentitySort | ValueSort(_)) =>
+        case node @ dag.Cond(pred, left, IdentitySort | ValueSort(_), right, IdentitySort | ValueSort(_)) =>
           alg.Cond(node)(loop(pred), loop(left), loop(right))
 
         case node @ Join(Eq, Cross(_), left, Const(value)) =>
@@ -376,10 +314,7 @@ trait TransSpecableModule[M[+ _]]
         case node @ Join(NotEq, Cross(_), Const(value), right) =>
           alg.EqualLiteral(node)(loop(right), value, true)
 
-        case node @ Join(instructions.WrapObject,
-                         Cross(_),
-                         Const(CString(field)),
-                         right) =>
+        case node @ Join(instructions.WrapObject, Cross(_), Const(CString(field)), right) =>
           alg.WrapObject(node)(loop(right), field)
 
         case node @ Join(DerefObject, Cross(_), left, Const(CString(field))) =>

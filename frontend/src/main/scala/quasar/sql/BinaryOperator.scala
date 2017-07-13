@@ -22,7 +22,7 @@ import scalaz._
 
 sealed abstract class BinaryOperator(val sql: String) extends Product with Serializable {
   def apply[A](lhs: A, rhs: A): Sql[A] = binop(lhs, rhs, this)
-  val name                             = "(" + sql + ")"
+  val name = "(" + sql + ")"
 }
 
 final case object IfUndefined  extends BinaryOperator("??")
@@ -57,5 +57,5 @@ final case object UnshiftMap   extends BinaryOperator("{...}")
 
 object BinaryOperator {
   implicit val equal: Equal[BinaryOperator] = Equal.equalRef
-  implicit val show: Show[BinaryOperator]   = Show.show(_.sql)
+  implicit val show: Show[BinaryOperator] = Show.show(_.sql)
 }

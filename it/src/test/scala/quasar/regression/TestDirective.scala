@@ -34,15 +34,14 @@ object TestDirective {
   import DecodeResult.{ok, fail}
 
   implicit val TestDirectiveDecodeJson: DecodeJson[TestDirective] =
-    DecodeJson(c =>
-      c.as[String].flatMap {
-        case "skip"              => ok(Skip)
-        case "skipCI"            => ok(SkipCI)
-        case "timeout"           => ok(Timeout)
-        case "pending"           => ok(Pending)
-        case "ignoreAllOrder"    => ok(IgnoreAllOrder)
-        case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
-        case "ignoreResultOrder" => ok(IgnoreResultOrder)
-        case str                 => fail("\"" + str + "\" is not a valid backend directive.", c.history)
+    DecodeJson(c => c.as[String].flatMap {
+      case "skip"              => ok(Skip)
+      case "skipCI"            => ok(SkipCI)
+      case "timeout"           => ok(Timeout)
+      case "pending"           => ok(Pending)
+      case "ignoreAllOrder"    => ok(IgnoreAllOrder)
+      case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
+      case "ignoreResultOrder" => ok(IgnoreResultOrder)
+      case str => fail("\"" + str + "\" is not a valid backend directive.", c.history)
     })
 }

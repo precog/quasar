@@ -23,7 +23,7 @@ import matryoshka.data.Fix
 import scalaz._
 
 object PureTask {
-  def apply(bson: Bson): WorkflowTask          = Fix(PureTaskF(bson))
+  def apply(bson: Bson): WorkflowTask = Fix(PureTaskF(bson))
   def unapply(obj: WorkflowTask): Option[Bson] = PureTaskF.unapply(obj.unFix)
 }
 
@@ -34,13 +34,11 @@ object ReadTask {
 }
 
 object QueryTask {
-  def apply(source: WorkflowTask,
-            query: Selector,
-            skip: Option[Int],
-            limit: Option[Int]): WorkflowTask =
+  def apply(source: WorkflowTask, query: Selector, skip: Option[Int], limit: Option[Int]):
+      WorkflowTask =
     Fix(QueryTaskF(source, query, skip, limit))
-  def unapply(
-      obj: WorkflowTask): Option[(WorkflowTask, Selector, Option[Int], Option[Int])] =
+  def unapply(obj: WorkflowTask):
+      Option[(WorkflowTask, Selector, Option[Int], Option[Int])] =
     QueryTaskF.unapply(obj.unFix)
 }
 
@@ -53,17 +51,17 @@ object PipelineTask {
 
 object MapReduceTask {
   import MapReduce._
-  def apply(source: WorkflowTask,
-            mapReduce: MapReduce,
-            outAct: Option[Action]): WorkflowTask =
+  def apply(source: WorkflowTask, mapReduce: MapReduce, outAct: Option[Action]): WorkflowTask =
     Fix(MapReduceTaskF(source, mapReduce, outAct))
   def unapply(obj: WorkflowTask): Option[(WorkflowTask, MapReduce, Option[Action])] =
     MapReduceTaskF.unapply(obj.unFix)
 }
 
 object FoldLeftTask {
-  def apply(head: WorkflowTask, tail: NonEmptyList[WorkflowTask]): WorkflowTask =
+  def apply(head: WorkflowTask, tail: NonEmptyList[WorkflowTask]):
+      WorkflowTask =
     Fix(FoldLeftTaskF(head, tail))
-  def unapply(obj: WorkflowTask): Option[(WorkflowTask, NonEmptyList[WorkflowTask])] =
+  def unapply(obj: WorkflowTask):
+      Option[(WorkflowTask, NonEmptyList[WorkflowTask])] =
     FoldLeftTaskF.unapply(obj.unFix)
 }

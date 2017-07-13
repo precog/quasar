@@ -17,13 +17,7 @@
 package quasar.precog.common.accounts
 
 import quasar.precog.common.Path
-import quasar.precog.common.security.{
-  APIKey,
-  Permission,
-  ReadPermission,
-  WritePermission,
-  DeletePermission
-}
+import quasar.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
 import quasar.precog.common.security.Permission._
 
 import quasar.blueeyes._, json._
@@ -56,7 +50,7 @@ case class Account(accountId: AccountId,
                    profile: Option[JValue] = None)
 
 object Account {
-  val schemaV1 = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
+  val schemaV1     = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
 
   val extractorPreV             = extractorV[Account](schemaV1, None)
   val extractorV1               = extractorV[Account](schemaV1, Some("1.1".v))
@@ -88,6 +82,5 @@ case class WrappedAccountId(accountId: AccountId)
 object WrappedAccountId {
   val schema = "accountId" :: HNil
 
-  implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) =
-    serializationV[WrappedAccountId](schema, None)
+  implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) = serializationV[WrappedAccountId](schema, None)
 }

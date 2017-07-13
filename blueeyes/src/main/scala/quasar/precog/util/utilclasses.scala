@@ -32,11 +32,11 @@ import scalaz.Ordering.{LT, EQ, GT}
 import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
-import scala.{collection => sc}
+import scala.{ collection => sc }
 
 import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
-import java.nio.channels.{FileChannel, FileLock => JFileLock}
+import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.util.Arrays.fill
@@ -49,10 +49,7 @@ trait FileLock {
 class FileLockException(message: String) extends Exception(message)
 
 object FileLock {
-  private case class LockHolder(channel: FileChannel,
-                                lock: JFileLock,
-                                lockFile: Option[File])
-      extends FileLock {
+  private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File]) extends FileLock {
     def release = {
       lock.release
       channel.close
@@ -81,11 +78,12 @@ object FileLock {
   }
 }
 
+
+
 // Once we move to 2.10, we can abstract this to a specialized-list. In 2.9,
 // specialization is just too buggy to get it working (tried).
 
-sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, IntList] {
-  self =>
+sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, IntList] { self =>
   def head: Int
   def tail: IntList
 
@@ -119,7 +117,7 @@ sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, I
 
   override def iterator: Iterator[Int] = new Iterator[Int] {
     private var xs: IntList = self
-    def hasNext: Boolean    = xs != IntNil
+    def hasNext: Boolean = xs != IntNil
     def next(): Int = {
       val result = xs.head
       xs = xs.tail
@@ -138,8 +136,7 @@ sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, I
   override protected def newBuilder = new IntListBuilder
 }
 
-final case class IntCons(override val head: Int, override val tail: IntList)
-    extends IntList {
+final case class IntCons(override val head: Int, override val tail: IntList) extends IntList {
   override def isEmpty: Boolean = false
 }
 
@@ -151,7 +148,7 @@ final case object IntNil extends IntList {
 
 final class IntListBuilder extends Builder[Int, IntList] {
   private var xs: IntList = IntNil
-  def +=(x: Int)          = { xs = x :: xs; this }
+  def +=(x: Int) = { xs = x :: xs; this }
   def clear() { xs = IntNil }
   def result() = xs.reverse
 }
@@ -162,6 +159,8 @@ object IntList {
     def apply(from: IntList): Builder[Int, IntList] = apply()
   }
 }
+
+
 
 object IOUtils extends Logging {
   val dotDirs = "." :: ".." :: Nil
@@ -226,11 +225,10 @@ object IOUtils extends Logging {
     def del(): Unit = { file.delete(); () }
 
     if (!file.isDirectory) IO(del())
-    else
-      listFiles(file) flatMap {
-        case Array() => IO(del())
-        case xs      => recursiveDelete(xs).map(_ => del())
-      }
+    else listFiles(file) flatMap {
+      case Array() => IO(del())
+      case xs      => recursiveDelete(xs).map(_ => del())
+    }
   }
 
   /** Recursively deletes empty directories, stopping at the first
@@ -263,12 +261,14 @@ object IOUtils extends Logging {
   }
 }
 
+
+
+
 /**
   * Implicit container trait
   */
 trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](
-      self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
+  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
     new MapPimp(self)
 }
 
@@ -282,8 +282,7 @@ class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
     left foreach {
       case (key, leftValues) => {
         right get key map { rightValues =>
-          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C](
-            (leftValues, rightValues)))
+          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
         } getOrElse {
           leftValues foreach { b =>
             resultBuilder += (key -> Either3.left3[B, (CC[B], CC2[C]), C](b))
@@ -305,6 +304,8 @@ class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
     resultBuilder.result()
   }
 }
+
+
 
 object NumericComparisons {
 
@@ -349,7 +350,7 @@ object NumericComparisons {
     if (a + aError < b - bError) -1 else if (a - aError > b + bError) 1 else 0
   }
 
-  import scalaz.Ordering.{LT, GT, EQ}
+  import scalaz.Ordering.{ LT, GT, EQ }
 
   @inline def order(a: Long, b: Long): scalaz.Ordering =
     if (a < b) LT else if (a == b) EQ else GT
@@ -413,8 +414,8 @@ object RawBitSet {
   final def clear(bits: Array[Int]) = fill(bits, 0)
 
   final def toArray(bits: Array[Int]): Array[Int] = {
-    var n   = 0
-    var i   = 0
+    var n = 0
+    var i = 0
     val len = bits.length
     while (i < len) {
       n += java.lang.Integer.bitCount(bits(i))
@@ -478,6 +479,8 @@ object RawBitSet {
   }
 }
 
+
+
 /**
   * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
   * of the operations on this datastructure are checked for bounds.  You are
@@ -486,11 +489,10 @@ object RawBitSet {
   *
   * No objects were allocated in the making of this film.
   */
-final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](
-    _bound: Int) {
+final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
   val bound = _bound + 1
 
-  private val ring  = new Array[A](bound)
+  private val ring = new Array[A](bound)
   private var front = 0
   private var back  = rotate(front, 1)
 
@@ -555,6 +557,9 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
   }
 }
 
+
+
+
 case class VectorClock(map: Map[Int, Int]) {
   def get(producerId: Int): Option[Int] = map.get(producerId)
 
@@ -571,10 +576,9 @@ case class VectorClock(map: Map[Int, Int]) {
 }
 
 trait VectorClockSerialization {
-  implicit val VectorClockDecomposer: Decomposer[VectorClock] =
-    new Decomposer[VectorClock] {
-      override def decompose(clock: VectorClock): JValue = clock.map.serialize
-    }
+  implicit val VectorClockDecomposer: Decomposer[VectorClock] = new Decomposer[VectorClock] {
+    override def decompose(clock: VectorClock): JValue = clock.map.serialize
+  }
 
   implicit val VectorClockExtractor: Extractor[VectorClock] = new Extractor[VectorClock] {
     override def validated(obj: JValue): Validation[Error, VectorClock] =
@@ -603,3 +607,4 @@ object VectorClock extends VectorClockSerialization {
     }
   }
 }
+

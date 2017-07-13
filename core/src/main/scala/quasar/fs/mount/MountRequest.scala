@@ -45,32 +45,31 @@ sealed abstract class MountRequest {
 
 object MountRequest {
   final case class MountView private[mount] (
-      file: AFile,
-      scopedExpr: ScopedExpr[Fix[Sql]],
-      vars: Variables
+    file: AFile,
+    scopedExpr: ScopedExpr[Fix[Sql]],
+    vars: Variables
   ) extends MountRequest
 
   final case class MountFileSystem private[mount] (
-      dir: ADir,
-      typ: FileSystemType,
-      uri: ConnectionUri
+    dir: ADir,
+    typ: FileSystemType,
+    uri: ConnectionUri
   ) extends MountRequest
 
   final case class MountModule private[mount] (
-      dir: ADir,
-      statements: List[Statement[Fix[Sql]]]
+    dir: ADir,
+    statements: List[Statement[Fix[Sql]]]
   ) extends MountRequest
 
   val mountView = Prism.partial[MountRequest, (AFile, ScopedExpr[Fix[Sql]], Variables)] {
     case MountView(f, q, vs) => (f, q, vs)
-  }((MountView(_, _, _)).tupled)
+  } ((MountView(_, _, _)).tupled)
 
-  val mountFileSystem =
-    Prism.partial[MountRequest, (ADir, FileSystemType, ConnectionUri)] {
-      case MountFileSystem(d, t, u) => (d, t, u)
-    }((MountFileSystem(_, _, _)).tupled)
+  val mountFileSystem = Prism.partial[MountRequest, (ADir, FileSystemType, ConnectionUri)] {
+    case MountFileSystem(d, t, u) => (d, t, u)
+  } ((MountFileSystem(_, _, _)).tupled)
 
   val mountModule = Prism.partial[MountRequest, (ADir, List[Statement[Fix[Sql]]])] {
     case MountModule(d, s) => (d, s)
-  }((MountModule(_, _)).tupled)
+  } ((MountModule(_, _)).tupled)
 }

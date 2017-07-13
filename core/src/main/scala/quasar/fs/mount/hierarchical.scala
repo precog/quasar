@@ -43,35 +43,32 @@ object hierarchical {
     * @param rfs `ReadFileF` interpreters indexed by mount
     */
   def readFile[F[_], S[_]](
-      rfs: Mounts[ReadFile ~> F]
+    rfs: Mounts[ReadFile ~> F]
   )(implicit
-    S: F :<: S): ReadFile ~> Free[S, ?] = {
+    S: F :<: S
+  ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
     type M[A] = Free[S, A]
 
-    lazy val mountedRfs = rfs mapWithDir {
-      case (d, f) =>
-        flatMapSNT(injectFT[F, S] compose f) compose mounted.readFile[ReadFile](d)
+    lazy val mountedRfs = rfs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.readFile[ReadFile](d)
     }
 
     λ[ReadFile ~> M] {
       case Open(loc, off, lim) =>
-        lookupMounted(mountedRfs, loc) map {
-          case (_, g) =>
-            g(Open(loc, off, lim))
+        lookupMounted(mountedRfs, loc) map { case (_, g) =>
+          g(Open(loc, off, lim))
         } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
       case Read(h) =>
-        lookupMounted(mountedRfs, h.file) map {
-          case (_, g) =>
-            g(Read(h))
+        lookupMounted(mountedRfs, h.file) map { case (_, g) =>
+          g(Read(h))
         } getOrElse unknownReadHandle(h).left.point[M]
 
       case Close(h) =>
-        lookupMounted(mountedRfs, h.file) map {
-          case (_, g) =>
-            g(Close(h))
+        lookupMounted(mountedRfs, h.file) map { case (_, g) =>
+          g(Close(h))
         } getOrElse ().point[M]
     }
   }
@@ -83,35 +80,32 @@ object hierarchical {
     * @param wfs `WriteFileF` interpreters indexed by mount
     */
   def writeFile[F[_], S[_]](
-      wfs: Mounts[WriteFile ~> F]
+    wfs: Mounts[WriteFile ~> F]
   )(implicit
-    S: F :<: S): WriteFile ~> Free[S, ?] = {
+    S: F :<: S
+  ): WriteFile ~> Free[S, ?] = {
     import WriteFile._
 
     type M[A] = Free[S, A]
 
-    lazy val mountedWfs = wfs mapWithDir {
-      case (d, f) =>
-        flatMapSNT(injectFT[F, S] compose f) compose mounted.writeFile[WriteFile](d)
+    lazy val mountedWfs = wfs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.writeFile[WriteFile](d)
     }
 
     λ[WriteFile ~> M] {
       case Open(loc) =>
-        lookupMounted(mountedWfs, loc) map {
-          case (_, g) =>
-            g(Open(loc))
+        lookupMounted(mountedWfs, loc) map { case (_, g) =>
+          g(Open(loc))
         } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
       case Write(h, chunk) =>
-        lookupMounted(mountedWfs, h.file) map {
-          case (_, g) =>
-            g(Write(h, chunk))
+        lookupMounted(mountedWfs, h.file) map { case (_, g) =>
+          g(Write(h, chunk))
         } getOrElse Vector(unknownWriteHandle(h)).point[M]
 
       case Close(h) =>
-        lookupMounted(mountedWfs, h.file) map {
-          case (_, g) =>
-            g(Close(h))
+        lookupMounted(mountedWfs, h.file) map { case (_, g) =>
+          g(Close(h))
         } getOrElse ().point[M]
     }
   }
@@ -120,17 +114,17 @@ object hierarchical {
     * child interpreters based on the path of the incoming request.
     */
   def manageFile[F[_], S[_]](
-      mfs: Mounts[ManageFile ~> F]
+    mfs: Mounts[ManageFile ~> F]
   )(implicit
-    S: F :<: S): ManageFile ~> Free[S, ?] = {
+    S: F :<: S
+  ): ManageFile ~> Free[S, ?] = {
     import ManageFile._
 
-    type M[A]   = Free[S, A]
+    type M[A] = Free[S, A]
     type MES[A] = EitherT[M, FileSystemError, A]
 
-    val mountedMfs = mfs mapWithDir {
-      case (d, f) =>
-        flatMapSNT(injectFT[F, S] compose f) compose mounted.manageFile[ManageFile](d)
+    val mountedMfs = mfs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.manageFile[ManageFile](d)
     }
 
     val lookup = lookupMounted(mountedMfs, _: APath)
@@ -139,57 +133,48 @@ object hierarchical {
       pathErr(invalidPath(path, "does not refer to a mounted filesystem"))
 
     def deleteDir(d: ADir) =
-      lookup(d) cata ({ case (_, g) => g(Delete(d)) },
-      mountedMfs.toMap
-        .filterKeys(_.relativeTo(d).isDefined)
-        .toList
-        .traverse { case (mnt, g) => g(Delete(mnt)) }
-        .map(_.sequence_))
+      lookup(d) cata (
+        { case (_, g) => g(Delete(d)) },
+        mountedMfs.toMap.filterKeys(_.relativeTo(d).isDefined)
+          .toList
+          .traverse { case (mnt, g) => g(Delete(mnt)) }
+          .map(_.sequence_))
 
     def deleteFile(f: AFile) =
-      EitherT
-        .fromDisjunction[M](
-          lookup(f) toRightDisjunction pathErr(pathNotFound(f))
-        )
-        .flatMapF {
-          case (_, g) =>
-            g(Delete(f))
-        }
-        .run
+      EitherT.fromDisjunction[M](
+        lookup(f) toRightDisjunction pathErr(pathNotFound(f))
+      ).flatMapF { case (_, g) =>
+        g(Delete(f))
+      }.run
 
     λ[ManageFile ~> M] {
       case Move(scn, sem) =>
-        val src = lookup(scn.src).toRightDisjunction(pathErr(pathNotFound(scn.src)))
+        val src = lookup(scn.src).toRightDisjunction(
+          pathErr(pathNotFound(scn.src)))
 
-        val dst = lookup(scn.dst).toRightDisjunction(noMountError(scn.dst))
+        val dst = lookup(scn.dst).toRightDisjunction(
+          noMountError(scn.dst))
 
-        EitherT
-          .fromDisjunction[M](src tuple dst)
-          .flatMap {
-            case ((srcMnt, g), (dstMnt, _)) if srcMnt == dstMnt =>
-              EitherT(g(Move(scn, sem)))
+        EitherT.fromDisjunction[M](src tuple dst).flatMap {
+          case ((srcMnt, g), (dstMnt, _)) if srcMnt == dstMnt =>
+            EitherT(g(Move(scn, sem)))
 
-            case _ =>
-              pathErr(invalidPath(
-                scn.dst,
-                s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
-              )).raiseError[MES, Unit]
-          }
-          .run
+          case _ =>
+            pathErr(invalidPath(
+              scn.dst,
+              s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
+            )).raiseError[MES, Unit]
+        }.run
 
       case Delete(path) =>
         refineType(path).fold(deleteDir, deleteFile)
 
       case TempFile(near) =>
-        EitherT
-          .fromDisjunction[M](
-            lookup(near) toRightDisjunction noMountError(near)
-          )
-          .flatMapF {
-            case (_, g) =>
-              g(TempFile(near))
-          }
-          .run
+        EitherT.fromDisjunction[M](
+          lookup(near) toRightDisjunction noMountError(near)
+        ).flatMapF { case (_, g) =>
+          g(TempFile(near))
+        }.run
     }
   }
 
@@ -197,31 +182,30 @@ object hierarchical {
     * child interpreters based on the path of the incoming request.
     */
   def queryFile[F[_], S[_]](
-      qfs: Mounts[QueryFile ~> F]
+    qfs: Mounts[QueryFile ~> F]
   )(
-      implicit
-      S1: F :<: S,
-      S2: MonotonicSeq :<: S,
-      S3: MountedResultH :<: S
+    implicit
+    S1: F :<: S,
+    S2: MonotonicSeq :<: S,
+    S3: MountedResultH :<: S
   ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
     type M[A] = Free[S, A]
 
-    val seq        = MonotonicSeq.Ops[S]
-    val handles    = KeyValueStore.Ops[ResultHandle, (ADir, ResultHandle), S]
+    val seq = MonotonicSeq.Ops[S]
+    val handles = KeyValueStore.Ops[ResultHandle, (ADir, ResultHandle), S]
     val transforms = Transforms[M]
     import transforms._
 
-    lazy val mountedQfs = qfs mapWithDir {
-      case (d, f) =>
-        flatMapSNT(injectFT[F, S] compose f) compose mounted.queryFile[QueryFile](d)
+    lazy val mountedQfs = qfs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.queryFile[QueryFile](d)
     }
 
     def resultForPlan[A](
-        lp: Fix[LogicalPlan],
-        out: Option[AFile],
-        qf: QueryFile[(PhaseResults, FileSystemError \/ A)]
+      lp: Fix[LogicalPlan],
+      out: Option[AFile],
+      qf: QueryFile[(PhaseResults, FileSystemError \/ A)]
     ): ExecM[(ADir, A)] =
       mountForPlan(mountedQfs, lp, out) match {
         case -\/(err) =>
@@ -235,9 +219,7 @@ object hierarchical {
     λ[QueryFile ~> M] {
       case ExecutePlan(lp, out) =>
         resultForPlan(lp, some(out), ExecutePlan(lp, out))
-          .map(_._2)
-          .run
-          .run
+          .map(_._2).run.run
 
       case EvaluatePlan(lp) =>
         (for {
@@ -260,15 +242,14 @@ object hierarchical {
 
       case Explain(lp) =>
         resultForPlan(lp, none, Explain(lp))
-          .map(_._2)
-          .run
-          .run
+          .map(_._2).run.run
 
       case ListContents(d) =>
         lookupMounted(mountedQfs, d)
           .map { case (_, g) => g(ListContents(d)) }
-          .orElse(lsMounts(mountedQfs.toMap.keySet, d)
-            .map(_.right[FileSystemError].point[M]))
+          .orElse(
+            lsMounts(mountedQfs.toMap.keySet, d)
+              .map(_.right[FileSystemError].point[M]))
           .getOrElse(pathErr(pathNotFound(d)).left.point[M])
 
       case FileExists(f) =>
@@ -279,26 +260,24 @@ object hierarchical {
   }
 
   def analyze[F[_], S[_]](
-      afs: Mounts[Analyze ~> F]
+    afs: Mounts[Analyze ~> F]
   )(
-      implicit
-      S1: F :<: S,
-      S2: MonotonicSeq :<: S,
-      S3: MountedResultH :<: S
+    implicit
+    S1: F :<: S,
+    S2: MonotonicSeq :<: S,
+    S3: MountedResultH :<: S
   ): Analyze ~> Free[S, ?] = {
     import Analyze._
 
     type M[A] = Free[S, A]
 
-    lazy val mountedAfs = afs mapWithDir {
-      case (d, f) =>
-        flatMapSNT(injectFT[F, S] compose f) compose mounted.analyze[Analyze](d)
+    lazy val mountedAfs = afs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.analyze[Analyze](d)
     }
 
     λ[Analyze ~> M] {
       case a @ QueryCost(lp) =>
-        val forPlan: FileSystemError \/ (ADir, Analyze ~> M) =
-          mountForPlan(mountedAfs, lp, none)
+        val forPlan: FileSystemError \/ (ADir, Analyze ~> M) = mountForPlan(mountedAfs, lp, none)
         forPlan.fold(_.left[Int].point[M], {
           case (mnt, g) => g(a)
         })
@@ -306,12 +285,13 @@ object hierarchical {
   }
 
   def fileSystem[F[_], S[_]](
-      mounts: Mounts[FileSystem ~> F]
+    mounts: Mounts[FileSystem ~> F]
   )(implicit
     S1: F :<: S,
     S2: MountedResultH :<: S,
-    S3: MonotonicSeq :<: S): FileSystem ~> Free[S, ?] = {
-    type M[A]  = Free[S, A]
+    S3: MonotonicSeq :<: S
+  ): FileSystem ~> Free[S, ?] = {
+    type M[A] = Free[S, A]
     type FS[A] = FileSystem[A]
 
     def injFS[G[_]](implicit I: G :<: FS): G ~> FS = injectNT[G, FS]
@@ -325,13 +305,14 @@ object hierarchical {
   }
 
   def analyticalFileSystem[F[_], S[_]](
-      mounts: Mounts[AnalyticalFileSystem ~> F]
+    mounts: Mounts[AnalyticalFileSystem ~> F]
   )(implicit
     S1: F :<: S,
     S2: MountedResultH :<: S,
-    S3: MonotonicSeq :<: S): AnalyticalFileSystem ~> Free[S, ?] = {
+    S3: MonotonicSeq :<: S
+  ): AnalyticalFileSystem ~> Free[S, ?] = {
     analyze[F, S](mounts map (_ compose Inject[Analyze, AnalyticalFileSystem])) :+:
-      fileSystem[F, S](mounts.map(_ compose Inject[FileSystem, AnalyticalFileSystem]))
+    fileSystem[F,S](mounts.map(_  compose Inject[FileSystem, AnalyticalFileSystem]))
   }
 
   ////
@@ -344,9 +325,9 @@ object hierarchical {
     mounts.toMap find { case (d, a) => path.relativeTo(d).isDefined }
 
   private def mountForPlan[A](
-      mounts: Mounts[A],
-      plan: Fix[LogicalPlan],
-      out: Option[AFile]
+    mounts: Mounts[A],
+    plan: Fix[LogicalPlan],
+    out: Option[AFile]
   ): FileSystemError \/ (ADir, A) = {
 
     type MntA = (ADir, A)
@@ -360,32 +341,27 @@ object hierarchical {
 
     def compareToExisting(mnt: ADir): M[Unit] = {
       def errMsg(exMnt: ADir): FileSystemError =
-        pathErr(
-          invalidPath(
-            mnt,
-            s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'"))
+        pathErr(invalidPath(mnt,
+          s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'"))
 
-      EitherT[F, FileSystemError, Unit](
-        F.gets(exMnt => (exMnt map (_._1) filter (_ != mnt) map errMsg) <\/ (())))
+      EitherT[F, FileSystemError, Unit](F.gets(exMnt =>
+        (exMnt map (_._1) filter (_ != mnt) map errMsg) <\/ (())
+      ))
     }
 
-    def mountFor(p: APath): M[Unit] =
-      for {
-        mntA <- EitherT.fromDisjunction[F](lookupMnt(p))
-        (mnt, a) = mntA
-        _ <- compareToExisting(mnt)
-        _ <- F.put(some(mntA)).liftM[FileSystemErrT]
-      } yield ()
+    def mountFor(p: APath): M[Unit] = for {
+      mntA     <- EitherT.fromDisjunction[F](lookupMnt(p))
+      (mnt, a) =  mntA
+      _        <- compareToExisting(mnt)
+      _        <- F.put(some(mntA)).liftM[FileSystemErrT]
+    } yield ()
 
     out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
-      plan
-        .cataM[M, Unit] {
-          // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-          case lp.Read(p) => mountFor(mkAbsolute(rootDir, p))
-          case _          => ().point[M]
-        }
-        .run
-        .run(initMnt) match {
+      plan.cataM[M, Unit] {
+        // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+        case lp.Read(p) => mountFor(mkAbsolute(rootDir, p))
+        case _          => ().point[M]
+      }.run.run(initMnt) match {
         // NB: If mnt is empty, then there were no `Read`, so we should
         // be able to get a result without needing an actual filesystem,
         // and we just pass it to an arbitrary mount, if there is at
@@ -409,11 +385,11 @@ object hierarchical {
     final class Aux[S[_]] {
       type F[A] = Free[S, A]
 
-      def apply[A, B](a: A, mnts: Mounts[B])(
-          implicit I: KeyValueStore[A, (ADir, A), ?] :<: S): OptionT[F, (A, B)] = {
-        KeyValueStore.Ops[A, (ADir, A), S].get(a) flatMap {
-          case (d, a1) =>
-            OptionT(mnts.lookup(d).strengthL(a1).point[F])
+      def apply[A, B](a: A, mnts: Mounts[B])
+                     (implicit I: KeyValueStore[A, (ADir, A), ?] :<: S)
+                     : OptionT[F, (A, B)] = {
+        KeyValueStore.Ops[A, (ADir, A), S].get(a) flatMap { case (d, a1) =>
+          OptionT(mnts.lookup(d).strengthL(a1).point[F])
         }
       }
     }

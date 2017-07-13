@@ -43,8 +43,7 @@ final class JsonCodecSpec extends Qspec with EJsonArbitrary {
   val roundtrip: E => DecodingFailed[J] \/ E =
     _.cata(JsonCodec.encodeƒ[J]).anaM[E](decodeMƒ)
 
-  val soloKeys = JsonCodec.ExtKeys \\ ISet.fromList(
-    List(JsonCodec.KeyK, JsonCodec.ValueK, JsonCodec.MetaK))
+  val soloKeys = JsonCodec.ExtKeys \\ ISet.fromList(List(JsonCodec.KeyK, JsonCodec.ValueK, JsonCodec.MetaK))
 
   "faithfully roundtrip EJson" >> prop { e: E =>
     roundtrip(e).toEither must beRight(equal(e))
@@ -60,17 +59,14 @@ final class JsonCodecSpec extends Qspec with EJsonArbitrary {
     }
   }
 
-  "map keys beginning with the codec sigil are preserved" >> prop {
-    (k10: String, k20: String, v1: E, v2: E) =>
-      val (k1, k2) = (JsonCodec.Sigil.toString + k10, JsonCodec.Sigil.toString + k20)
-      val m = ExtEJson(
-        Map(
-          List(
-            CommonEJson(str[E](k1)).embed -> v1,
-            CommonEJson(str[E](k2)).embed -> v2
-          ))).embed
+  "map keys beginning with the codec sigil are preserved" >> prop { (k10: String, k20: String, v1: E, v2: E) =>
+    val (k1, k2) = (JsonCodec.Sigil.toString + k10, JsonCodec.Sigil.toString + k20)
+    val m = ExtEJson(Map(List(
+      CommonEJson(str[E](k1)).embed -> v1,
+      CommonEJson(str[E](k2)).embed -> v2
+    ))).embed
 
-      roundtrip(m).toEither must beRight(equal(m))
+    roundtrip(m).toEither must beRight(equal(m))
   }
 
   "map keys equal to one of the codec keys are preserved" >> prop { v: E =>
@@ -81,12 +77,11 @@ final class JsonCodecSpec extends Qspec with EJsonArbitrary {
     roundtrip(m).toEither must beRight(equal(m))
   }
 
-  "map keys equal to one of the codec keys with additional sigil prefix are preserved" >> prop {
-    v: E =>
-      val m = ExtEJson(Map(JsonCodec.ExtKeys.toList map { k =>
-        CommonEJson(str[E](JsonCodec.Sigil.toString + k)).embed -> v
-      })).embed
+  "map keys equal to one of the codec keys with additional sigil prefix are preserved" >> prop { v: E =>
+    val m = ExtEJson(Map(JsonCodec.ExtKeys.toList map { k =>
+      CommonEJson(str[E](JsonCodec.Sigil.toString + k)).embed -> v
+    })).embed
 
-      roundtrip(m).toEither must beRight(equal(m))
+    roundtrip(m).toEither must beRight(equal(m))
   }
 }

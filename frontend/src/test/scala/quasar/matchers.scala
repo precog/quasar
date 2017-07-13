@@ -26,17 +26,19 @@ import org.specs2.matcher._
 import scalaz._, Scalaz._
 
 trait TermLogicalPlanMatchers {
-  case class equalToPlan(expected: Fix[LogicalPlan]) extends Matcher[Fix[LogicalPlan]] {
+  case class equalToPlan(expected: Fix[LogicalPlan])
+      extends Matcher[Fix[LogicalPlan]] {
     val optimizer = new Optimizer[Fix[LogicalPlan]]
 
     def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
       val normed = optimizer.simplify(s.value)
-      val diff   = (normed.render diff expected.render).shows
-      result(expected ≟ normed,
-             "\ntrees are equal:\n" + diff,
-             "\ntrees are not equal:\n" + diff +
-               "\noriginal was:\n" + normed.render.shows,
-             s)
+      val diff = (normed.render diff expected.render).shows
+      result(
+        expected ≟ normed,
+        "\ntrees are equal:\n" + diff,
+        "\ntrees are not equal:\n" + diff +
+          "\noriginal was:\n" + normed.render.shows,
+        s)
     }
   }
 }

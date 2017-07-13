@@ -24,7 +24,6 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 sealed abstract class TaskResource[A] {
-
   /** Get an instance of the resource, first acquiring it if necessary. */
   def get: Task[A]
 
@@ -33,7 +32,6 @@ sealed abstract class TaskResource[A] {
 }
 
 object TaskResource {
-
   /** "Memo-ized" resource, given an effect to create it and an effect to
     * dispose of it. Effects are processed asynchronously using the provided
     * Strategy.
@@ -42,21 +40,19 @@ object TaskResource {
     * @param release0 Executed exactly once for any number of `release`
     *   calls as long as `get` is not called.
     */
-  def apply[A](acquire: Task[A], execStrat: Strategy)(
-      release0: A => Task[Unit]): Task[TaskResource[A]] = Task delay {
-    val counter            = new AtomicLong(0)
+  def apply[A](acquire: Task[A], execStrat: Strategy)(release0: A => Task[Unit]): Task[TaskResource[A]] = Task delay {
+    val counter = new AtomicLong(0)
     def nextId: Task[Long] = Task.delay(counter.getAndIncrement)
 
     sealed abstract class RsrcState
-    case object Start               extends RsrcState
-    case class Acquiring(id: Long)  extends RsrcState
-    case class Acquired(a: A)       extends RsrcState
+    case object Start extends RsrcState
+    case class Acquiring(id: Long) extends RsrcState
+    case class Acquired(a: A) extends RsrcState
     case class Failed(t: Throwable) extends RsrcState
 
     val signal = async.signalOf[RsrcState](Start)
 
-    def orFail[B]: Option[B] => Task[B] =
-      _.cata(Task.now, Task.fail(Cause.Terminated(Cause.End)))
+    def orFail[B]: Option[B] => Task[B] = _.cata(Task.now, Task.fail(Cause.Terminated(Cause.End)))
 
     /** The current value of the signal, or fail if it hasn't been initialized
       * (and ours is initialized when it's created.) This is the behavior you
@@ -71,18 +67,10 @@ object TaskResource {
       */
     val awaitAcquired: Task[A] =
       // NB: something effectful is hiding in the `discrete` process
-      Task
-        .delay(
-          signal.discrete
-            .collect {
-              case Acquired(a) => Task.now(a)
-              case Failed(t)   => Task.fail(t)
-            }
-            .take(1)
-            .runLast)
-        .join
-        .flatMap(orFail)
-        .join
+      Task.delay(signal.discrete.collect {
+        case Acquired(a) => Task.now(a)
+        case Failed(t)   => Task.fail(t)
+      }.take(1).runLast).join.flatMap(orFail).join
 
     new TaskResource[A] {
       def get = {
@@ -92,10 +80,10 @@ object TaskResource {
             case otherwise   => otherwise
           } flatMap {
             case Some(Acquiring(`id`)) =>
-              acquire.attempt.flatMap(
-                _.fold(e => signal.set(Failed(e)) *> Task.fail(e),
-                       a => signal.set(Acquired(a)).as(a)))
-            case _ => awaitAcquired
+              acquire.attempt.flatMap(_.fold(
+                e => signal.set(Failed(e)) *> Task.fail(e),
+                a => signal.set(Acquired(a)).as(a)))
+            case _                     => awaitAcquired
           }
 
         getCurrent flatMap {
@@ -106,10 +94,10 @@ object TaskResource {
 
       def release =
         signal.getAndSet(Start).attempt flatMap {
-          case \/-(Some(Acquired(a)))           => signal.close *> release0(a)
-          case \/-(_)                           => Task.now(())
-          case -\/(Cause.Terminated(Cause.End)) => Task.now(())
-          case -\/(t)                           => Task.fail(t)
+          case  \/-(Some(Acquired(a)))           => signal.close *> release0(a)
+          case  \/-(_)                           => Task.now(())
+          case -\/ (Cause.Terminated(Cause.End)) => Task.now(())
+          case -\/ (t)                           => Task.fail(t)
         }
     }
   }

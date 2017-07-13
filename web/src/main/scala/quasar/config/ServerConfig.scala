@@ -23,8 +23,8 @@ import argonaut._, Argonaut._
 final case class ServerConfig(port: Int)
 
 object ServerConfig {
-  val DefaultPort = 20223
+   val DefaultPort = 20223
 
-  implicit def Codec: CodecJson[ServerConfig] =
-    casecodec1(ServerConfig.apply, ServerConfig.unapply)("port")
+   implicit def Codec: CodecJson[ServerConfig] =
+     casecodec1(ServerConfig.apply, ServerConfig.unapply)("port")
 }

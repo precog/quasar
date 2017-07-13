@@ -28,15 +28,13 @@ import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 class ResultFileQueryRegressionSpec
-    extends QueryRegressionTest[AnalyticalFileSystemIO](
-      QueryRegressionTest.externalFS.map(
-        _.filter(
-          fs =>
-            fs.ref.supports(BackendCapability.query()) &&
-              fs.ref.supports(BackendCapability.write()) &&
-              // NB: These are prohibitively slow on Couchbase
-              !TestConfig.isCouchbase(fs.ref)))
-    ) {
+  extends QueryRegressionTest[AnalyticalFileSystemIO](
+    QueryRegressionTest.externalFS.map(_.filter(fs =>
+      fs.ref.supports(BackendCapability.query()) &&
+      fs.ref.supports(BackendCapability.write()) &&
+      // NB: These are prohibitively slow on Couchbase
+      !TestConfig.isCouchbase(fs.ref)))
+  ) {
 
   val read = ReadFile.Ops[AnalyticalFileSystemIO]
 
@@ -48,22 +46,19 @@ class ResultFileQueryRegressionSpec
     type M[A] = FileSystemErrT[F, A]
 
     val hoistM: M ~> CompExecM =
-      execToCompExec compose [M] Hoist[FileSystemErrT].hoist[F, G](
-        liftMT[F, PhaseResultT])
+      execToCompExec compose[M] Hoist[FileSystemErrT].hoist[F, G](liftMT[F, PhaseResultT])
 
     for {
       tmpFile <- hoistM(manage.tempFile(DataDir)).liftM[Process]
       outFile <- fsQ.executeQuery(expr, vars, basePath, tmpFile).liftM[Process]
-      cleanup = hoistM(
-        query
-          .fileExists(tmpFile)
-          .liftM[FileSystemErrT]
-          .ifM(manage.delete(tmpFile), ().point[M])
-      ).whenM(outFile ≟ tmpFile)
-      data <- read
-        .scanAll(outFile)
-        .translate(hoistM)
-        .onComplete(Process.eval_(cleanup))
+      cleanup =  hoistM(
+                   query.fileExists(tmpFile).liftM[FileSystemErrT].ifM(
+                     manage.delete(tmpFile),
+                     ().point[M])
+                 ).whenM(outFile ≟ tmpFile)
+      data    <- read.scanAll(outFile)
+                   .translate(hoistM)
+                   .onComplete(Process.eval_(cleanup))
     } yield data
   }
 }

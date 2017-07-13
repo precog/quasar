@@ -29,26 +29,20 @@ import shapeless.syntax.sized._
 import shapeless.ops.nat.ToInt
 
 sealed abstract class DimensionalEffect
-
 /** Describes a function that reduces a set of values to a single value. */
 final case object Reduction extends DimensionalEffect
-
 /** Describes a function that expands a compound value into a set of values for
   * an operation.
   */
 final case object Expansion extends DimensionalEffect
-
 /** Describes a function that maps each individual value. */
 final case object Mapping extends DimensionalEffect
-
 /** Describes a function that compresses the identity information. */
 final case object Squashing extends DimensionalEffect
-
 /** Describes a function that operates on the set containing values, not
   * modifying individual values. (EG, filter, sort, take)
   */
 final case object Sifting extends DimensionalEffect
-
 /** Describes a function that operates on the set containing values, potentially
   * modifying individual values. (EG, joins).
   */
@@ -58,12 +52,13 @@ object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
 }
 
-final case class NullaryFunc(val effect: DimensionalEffect,
-                             val help: String,
-                             val codomain: Func.Codomain,
-                             val simplify: Func.Simplifier)
+final case class NullaryFunc
+  (val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val simplify: Func.Simplifier)
     extends GenericFunc[nat._0] {
-  val domain                     = Sized[List]()
+  val domain = Sized[List]()
   val typer0: Func.Typer[nat._0] = _ => Validation.success(codomain)
   val untyper0: Func.Untyper[nat._0] = {
     case ((funcDomain, _), _) => Validation.success(funcDomain)
@@ -73,40 +68,40 @@ final case class NullaryFunc(val effect: DimensionalEffect,
     applyGeneric(Sized[List]())
 }
 
-final case class UnaryFunc(val effect: DimensionalEffect,
-                           val help: String,
-                           val codomain: Func.Codomain,
-                           val domain: Func.Domain[nat._1],
-                           val simplify: Func.Simplifier,
-                           val typer0: Func.Typer[nat._1],
-                           val untyper0: Func.Untyper[nat._1])
-    extends GenericFunc[nat._1] {
+final case class UnaryFunc(
+    val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._1],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._1],
+    val untyper0: Func.Untyper[nat._1]) extends GenericFunc[nat._1] {
 
   def apply[A](a1: A): LP[A] =
     applyGeneric(Func.Input1[A](a1))
 }
 
-final case class BinaryFunc(val effect: DimensionalEffect,
-                            val help: String,
-                            val codomain: Func.Codomain,
-                            val domain: Func.Domain[nat._2],
-                            val simplify: Func.Simplifier,
-                            val typer0: Func.Typer[nat._2],
-                            val untyper0: Func.Untyper[nat._2])
-    extends GenericFunc[nat._2] {
+final case class BinaryFunc(
+    val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._2],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._2],
+    val untyper0: Func.Untyper[nat._2]) extends GenericFunc[nat._2] {
 
   def apply[A](a1: A, a2: A): LP[A] =
     applyGeneric(Func.Input2[A](a1, a2))
 }
 
-final case class TernaryFunc(val effect: DimensionalEffect,
-                             val help: String,
-                             val codomain: Func.Codomain,
-                             val domain: Func.Domain[nat._3],
-                             val simplify: Func.Simplifier,
-                             val typer0: Func.Typer[nat._3],
-                             val untyper0: Func.Untyper[nat._3])
-    extends GenericFunc[nat._3] {
+final case class TernaryFunc(
+    val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val domain: Func.Domain[nat._3],
+    val simplify: Func.Simplifier,
+    val typer0: Func.Typer[nat._3],
+    val untyper0: Func.Untyper[nat._3]) extends GenericFunc[nat._3] {
 
   def apply[A](a1: A, a2: A, a3: A): LP[A] =
     applyGeneric(Func.Input3[A](a1, a2, a3))
@@ -136,7 +131,7 @@ sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
   final def arity: Int = domain.length
 
   def toFunction[A]: HomomorphicFunction[A, LP[A]] = new HomomorphicFunction[A, LP[A]] {
-    def arity                = self.arity
+    def arity = self.arity
     def apply(args: List[A]) = self.applyUnsized(args)
   }
 }
@@ -265,7 +260,6 @@ trait GenericFuncInstances {
 object GenericFunc extends GenericFuncInstances
 
 object Func {
-
   /** This handles rewrites that constant-folding (handled by the typers) can’t.
     * I.e., any rewrite where either the result or one of the relevant arguments
     * is a non-Constant expression. It _could_ cover all the rewrites, but
@@ -273,22 +267,24 @@ object Func {
     * typer.
     */
   trait Simplifier {
-    def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
-                              TC: Corecursive.Aux[T, LP]): Option[LP[T]]
+    def apply[T]
+      (orig: LP[T])
+      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+        : Option[LP[T]]
   }
 
   type Input[A, N <: Nat] = Sized[List[A], N]
 
   type Domain[N <: Nat] = Input[Type, N]
-  type Codomain         = Type
+  type Codomain = Type
 
   type VDomain[N <: Nat] = ValidationNel[SemanticError, Domain[N]]
-  type VCodomain         = ValidationNel[SemanticError, Codomain]
+  type VCodomain = ValidationNel[SemanticError, Codomain]
 
-  type Typer[N <: Nat]   = Domain[N] => VCodomain
+  type Typer[N <: Nat] = Domain[N] => VCodomain
   type Untyper[N <: Nat] = ((Domain[N], Codomain), Codomain) => VDomain[N]
 
-  def Input1[A](a1: A): Input[A, nat._1]               = Sized[List](a1)
-  def Input2[A](a1: A, a2: A): Input[A, nat._2]        = Sized[List](a1, a2)
+  def Input1[A](a1: A): Input[A, nat._1] = Sized[List](a1)
+  def Input2[A](a1: A, a2: A): Input[A, nat._2] = Sized[List](a1, a2)
   def Input3[A](a1: A, a2: A, a3: A): Input[A, nat._3] = Sized[List](a1, a2, a3)
 }

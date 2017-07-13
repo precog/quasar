@@ -42,56 +42,55 @@ object writefile {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def chrooted[S[_]](prefix: ADir, fileSystem: Task[FileSystem])(
-      implicit
-      s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
-      s1: MonotonicSeq :<: S,
-      s2: Task :<: S): WriteFile ~> Free[S, ?] =
+  def chrooted[S[_]](prefix: ADir, fileSystem: Task[FileSystem])(implicit
+    s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
+    s1: MonotonicSeq :<: S,
+    s2: Task :<: S
+  ) : WriteFile ~> Free[S, ?] =
     flatMapSNT(interpret(fileSystem)) compose chroot.writeFile[WriteFile](prefix)
 
-  def interpret[S[_]](fileSystem: Task[FileSystem])(
-      implicit
-      s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
-      s1: MonotonicSeq :<: S,
-      s2: Task :<: S): WriteFile ~> Free[S, ?] =
+  def interpret[S[_]](fileSystem: Task[FileSystem])(implicit
+    s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
+    s1: MonotonicSeq :<: S,
+    s2: Task :<: S
+  ) : WriteFile ~> Free[S, ?] =
     new (WriteFile ~> Free[S, ?]) {
-      def apply[A](wr: WriteFile[A]): Free[S, A] = wr match {
-        case Open(f)      => open(f, fileSystem)
+      def apply[A](wr: WriteFile[A]): Free[S, A] = wr  match {
+        case Open(f) => open(f, fileSystem)
         case Write(h, ch) => write(h, ch)
-        case Close(h)     => close(h)
+        case Close(h) => close(h)
       }
     }
 
-  def open[S[_]](f: AFile, fileSystem: Task[FileSystem])(
-      implicit
-      writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
-      sequence: MonotonicSeq.Ops[S],
-      s2: Task :<: S): Free[S, FileSystemError \/ WriteHandle] = {
+  def open[S[_]](f: AFile, fileSystem: Task[FileSystem]) (implicit
+    writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
+    sequence: MonotonicSeq.Ops[S],
+    s2: Task :<: S
+  ): Free[S, FileSystemError \/ WriteHandle] = {
 
-    def createCursor: Free[S, HdfsWriteCursor] =
-      lift(for {
-        path <- toPath(f)
-        hdfs <- fileSystem
-      } yield {
-        val os: OutputStream = hdfs.create(path, new Progressable() {
-          override def progress(): Unit = {}
-        })
-        val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
-        HdfsWriteCursor(hdfs, bw)
-      }).into[S]
+    def createCursor: Free[S, HdfsWriteCursor] = lift(for {
+      path <- toPath(f)
+      hdfs <- fileSystem
+    } yield {
+      val os: OutputStream = hdfs.create(path, new Progressable() {
+        override def progress(): Unit = {}
+      })
+      val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
+      HdfsWriteCursor(hdfs, bw)
+    }).into[S]
 
     for {
       hwc <- createCursor
-      id  <- sequence.next
+      id <- sequence.next
       h = WriteHandle(f, id)
       _ <- writers.put(h, hwc)
     } yield h.right[FileSystemError]
   }
 
-  def write[S[_]](h: WriteHandle, chunks: Vector[Data])(
-      implicit
-      writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
-      s2: Task :<: S): Free[S, Vector[FileSystemError]] = {
+  def write[S[_]](h: WriteHandle, chunks: Vector[Data])(implicit
+    writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
+    s2: Task :<: S
+  ): Free[S, Vector[FileSystemError]] = {
 
     implicit val codec: DataCodec = DataCodec.Precise
 
@@ -102,7 +101,7 @@ object writefile {
 
       lift(Task.delay(lines.flatMap {
         case (line, data) =>
-          \/.fromTryCatchNonFatal {
+          \/.fromTryCatchNonFatal{
             bw.write(line)
             bw.newLine()
           }.fold(
@@ -112,25 +111,24 @@ object writefile {
       })).into[S]
     }
 
-    val findAndWrite: OptionT[Free[S, ?], Vector[FileSystemError]] = for {
+    val findAndWrite: OptionT[Free[S,?], Vector[FileSystemError]] = for {
       HdfsWriteCursor(_, bw) <- writers.get(h)
-      errors                 <- _write(bw).liftM[OptionT]
+      errors <- _write(bw).liftM[OptionT]
     } yield errors
 
-    findAndWrite.fold(
+    findAndWrite.fold (
       errs => errs,
       Vector[FileSystemError](unknownWriteHandle(h))
     )
   }
 
-  def close[S[_]](h: WriteHandle)(
-      implicit
-      writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S]): Free[S, Unit] =
-    (for {
-      HdfsWriteCursor(hdfs, br) <- writers.get(h)
-      _                         <- writers.delete(h).liftM[OptionT]
-    } yield {
-      br.close()
-      hdfs.close()
-    }).run.void
+  def close[S[_]](h: WriteHandle)(implicit
+    writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S]
+  ): Free[S, Unit] = (for {
+    HdfsWriteCursor(hdfs, br) <- writers.get(h)
+    _ <- writers.delete(h).liftM[OptionT]
+  } yield {
+    br.close()
+    hdfs.close()
+  }).run.void
 }

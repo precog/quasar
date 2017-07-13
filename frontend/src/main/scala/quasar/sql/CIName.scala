@@ -31,7 +31,7 @@ final case class CIName(value: String) {
 }
 
 object CIName {
-  implicit val equal: Equal[CIName]      = Equal.equalA
-  implicit val shows: Show[CIName]       = Show.shows(s => s.value)
+  implicit val equal: Equal[CIName] = Equal.equalA
+  implicit val shows: Show[CIName] = Show.shows(s => s.value)
   implicit val codec: EncodeJson[CIName] = EncodeJson.jencode1(_.value)
 }

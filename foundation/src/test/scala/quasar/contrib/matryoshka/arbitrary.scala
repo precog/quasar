@@ -23,21 +23,18 @@ import scalaz.syntax.either._
 
 object arbitrary extends CorecursiveArbitrary {
   implicit def delayArbitrary[F[_], A](
-      implicit
-      A: Arbitrary[A],
-      F: Delay[Arbitrary, F]
+    implicit
+    A: Arbitrary[A],
+    F: Delay[Arbitrary, F]
   ): Arbitrary[F[A]] =
     F(A)
 
-  implicit def coproductDelayArbitrary[F[_], G[_]](
-      implicit F: Delay[Arbitrary, F],
-      G: Delay[Arbitrary, G]): Delay[Arbitrary, Coproduct[F, G, ?]] =
+  implicit def coproductDelayArbitrary[F[_], G[_]](implicit F: Delay[Arbitrary, F], G: Delay[Arbitrary, G]): Delay[Arbitrary, Coproduct[F, G, ?]] =
     new Delay[Arbitrary, Coproduct[F, G, ?]] {
       def apply[A](arb: Arbitrary[A]): Arbitrary[Coproduct[F, G, A]] =
-        Arbitrary(
-          Gen.oneOf(
-            F(arb).arbitrary map (_.left),
-            G(arb).arbitrary map (_.right)
-          ) map (Coproduct(_)))
+        Arbitrary(Gen.oneOf(
+          F(arb).arbitrary map (_.left),
+          G(arb).arbitrary map (_.right)
+        ) map (Coproduct(_)))
     }
 }

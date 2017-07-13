@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import slamdata.Predef.{-> => _, _}
+import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
@@ -39,32 +39,33 @@ object analysis {
   type QST[A] = QScriptTotal[Fix, A]
 
   def service[S[_]](implicit
-                    A: Analyze.Ops[S],
-                    S0: Mounting :<: S,
-                    S1: FileSystemFailure :<: S): QHttpService[S] = {
+      A: Analyze.Ops[S],
+      S0: Mounting :<: S,
+      S1: FileSystemFailure :<: S
+  ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
-      Json("type" := "constant", "value" := data.map(DataCodec.Precise.encode).unite)
+      Json(
+        "type"  := "constant",
+        "value" := data.map(DataCodec.Precise.encode).unite)
 
     def analyzeQuery(
-        scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
-        vars: Variables,
-        basePath: ADir,
-        offset: Natural,
-        limit: Option[Positive]
+      scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
+      vars: Variables,
+      basePath: ADir,
+      offset: Natural,
+      limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      quasar
-        .resolveImports(scopedExpr, basePath)
-        .run
-        .flatMap(block =>
-          block.fold(
-            semErr => semErr.toApiError.left.point[Free[S, ?]],
-            block =>
-              queryPlan(block, vars, basePath, offset, limit).run.value
-                .traverse(
-                  _.fold(data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-                         lp => A.queryCost(lp).bimap(_.toApiError, _.asJson).run))
-                .map(_.valueOr(_.toApiError.left[Json]))
-        ))
+      quasar.resolveImports(scopedExpr, basePath).run.flatMap(block =>
+        block.fold(
+          semErr => semErr.toApiError.left.point[Free[S, ?]],
+          block => queryPlan(block, vars, basePath, offset, limit)
+                    .run.value
+                    .traverse(_.fold(
+                      data => constantResponse(data).right[ApiError].point[Free[S, ?]],
+                      lp   => A.queryCost(lp).bimap(_.toApiError, _.asJson).run))
+                    .map(_.valueOr(_.toApiError.left[Json]))))
+
+
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>

@@ -40,7 +40,7 @@ import scalaz._, Scalaz._
   SQLException so that these errors will be easy to trace when they occur at
   runtime. That should only happen in the case of bugs or admins tampering with
   the database.
- */
+  */
 package object metastore {
 
   def verifyMetaStoreSchema[A](schema: Schema[A]): EitherT[ConnectionIO, String, Unit] =
@@ -55,53 +55,46 @@ package object metastore {
 
   implicit val aPathMeta: Meta[APath] =
     Meta[String].xmap[APath](
-      str =>
-        posixCodec.parsePath[APath](
-          _ => unexpectedValue(s"absolute path required; found: $str"),
-          unsafeSandboxAbs,
-          _ => unexpectedValue(s"absolute path required; found: $str"),
-          unsafeSandboxAbs
-        )(str),
-      posixCodec.printPath(_)
-    )
+      str => posixCodec.parsePath[APath](
+        _ => unexpectedValue(s"absolute path required; found: $str"),
+        unsafeSandboxAbs,
+        _ => unexpectedValue(s"absolute path required; found: $str"),
+        unsafeSandboxAbs
+      )(str),
+      posixCodec.printPath(_))
 
   // The `APath` existential type seems to confuse doobie, so here's an alternative:
   implicit val refinedAPathMeta: Meta[ADir \/ AFile] =
     Meta[String].xmap[ADir \/ AFile](
-      str =>
-        posixCodec.parsePath[ADir \/ AFile](
-          _ => unexpectedValue(s"absolute path required; found: $str"),
-          unsafeSandboxAbs(_).right,
-          _ => unexpectedValue(s"absolute path required; found: $str"),
-          unsafeSandboxAbs(_).left
-        )(str),
-      p => posixCodec.printPath(p.merge[APath])
-    )
+      str => posixCodec.parsePath[ADir \/ AFile](
+        _ => unexpectedValue(s"absolute path required; found: $str"),
+        unsafeSandboxAbs(_).right,
+        _ => unexpectedValue(s"absolute path required; found: $str"),
+        unsafeSandboxAbs(_).left
+      )(str),
+      p => posixCodec.printPath(p.merge[APath]))
 
   implicit val aDirMeta: Meta[ADir] =
     Meta[String].xmap[ADir](
-      str =>
-        unsafeSandboxAbs(
-          posixCodec
-            .parseAbsDir(str)
-            .getOrElse(unexpectedValue("not an absolute dir path: " + str))),
+      str => unsafeSandboxAbs(
+        posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
 
   implicit val mountTypeMeta: Meta[MountType] = {
     import MountType._
     Meta[String].xmap[MountType](
       str => (str === "view") ? viewMount() | fileSystemMount(FileSystemType(str)),
-      mt => fileSystemMount.getOption(mt).fold("view")(_.value))
+      mt  => fileSystemMount.getOption(mt).fold("view")(_.value))
   }
 
   implicit val mountConfigComposite: Composite[MountConfig] =
-    Composite[(String, String)].xmap({
-      case (typ, uri) =>
-        MountConfig
-          .fromConfigPair(typ, uri)
+    Composite[(String, String)].xmap(
+      { case (typ, uri) =>
+        MountConfig.fromConfigPair(typ, uri)
           .leftMap(unexpectedValue(_))
           .merge
-    }, MountConfig.toConfigPair)
+      },
+      MountConfig.toConfigPair)
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))

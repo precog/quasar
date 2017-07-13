@@ -22,7 +22,7 @@ import scalaz._
 
 sealed abstract class UnaryOperator(val sql: String) extends Product with Serializable {
   def apply[A](expr: A): Sql[A] = unop(expr, this)
-  val name                      = sql
+  val name = sql
 }
 
 final case object Not                 extends UnaryOperator("not")
@@ -42,5 +42,5 @@ final case object UnshiftArray        extends UnaryOperator("[...]")
 
 object UnaryOperator {
   implicit val equal: Equal[UnaryOperator] = Equal.equalRef
-  implicit val show: Show[UnaryOperator]   = Show.show(_.sql)
+  implicit val show: Show[UnaryOperator] = Show.show(_.sql)
 }

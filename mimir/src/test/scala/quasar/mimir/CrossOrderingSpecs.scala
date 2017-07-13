@@ -34,10 +34,10 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
       "left" >> {
         val line = Line(1, 1, "")
 
-        val left  = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
+        val left = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
         val right = Const(CLong(42))(line)
 
-        val input    = Join(Eq, Cross(None), left, right)(line)
+        val input = Join(Eq, Cross(None), left, right)(line)
         val expected = Join(Eq, Cross(Some(CrossLeft)), left, right)(line)
 
         orderCrosses(input) mustEqual expected
@@ -46,10 +46,10 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
       "right" >> {
         val line = Line(1, 1, "")
 
-        val left  = Const(CLong(42))(line)
+        val left = Const(CLong(42))(line)
         val right = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
 
-        val input    = Join(Eq, Cross(None), left, right)(line)
+        val input = Join(Eq, Cross(None), left, right)(line)
         val expected = Join(Eq, Cross(Some(CrossRight)), left, right)(line)
 
         orderCrosses(input) mustEqual expected
@@ -59,15 +59,11 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
     "refrain from sorting when sets are already aligned in match" in {
       val line = Line(1, 1, "")
 
-      val left  = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
+      val left = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
       val right = Const(CLong(42))(line)
 
-      val input =
-        Join(Or, IdentitySort, Join(Eq, Cross(None), left, right)(line), left)(line)
-      val expected = Join(Or,
-                          IdentitySort,
-                          Join(Eq, Cross(Some(CrossLeft)), left, right)(line),
-                          left)(line)
+      val input = Join(Or, IdentitySort, Join(Eq, Cross(None), left, right)(line), left)(line)
+      val expected = Join(Or, IdentitySort, Join(Eq, Cross(Some(CrossLeft)), left, right)(line), left)(line)
 
       orderCrosses(input) mustEqual expected
     }
@@ -75,14 +71,11 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
     "refrain from sorting when sets are already aligned in filter" in {
       val line = Line(1, 1, "")
 
-      val left  = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
+      val left = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
       val right = Const(CLong(42))(line)
 
-      val input =
-        Filter(IdentitySort, Join(Eq, Cross(None), left, right)(line), left)(line)
-      val expected = Filter(IdentitySort,
-                            Join(Eq, Cross(Some(CrossLeft)), left, right)(line),
-                            left)(line)
+      val input = Filter(IdentitySort, Join(Eq, Cross(None), left, right)(line), left)(line)
+      val expected = Filter(IdentitySort, Join(Eq, Cross(Some(CrossLeft)), left, right)(line), left)(line)
 
       orderCrosses(input) mustEqual expected
     }
@@ -119,10 +112,11 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
       val foo = dag.AbsoluteLoad(Const(CString("/foo"))(line), JTextT)(line)
 
       val input =
-        Join(Add,
-             IdentitySort,
-             Join(Add, Cross(Some(CrossLeft)), foo, Const(CLong(42))(line))(line),
-             foo)(line)
+        Join(Add, IdentitySort,
+          Join(Add, Cross(Some(CrossLeft)),
+            foo,
+            Const(CLong(42))(line))(line),
+          foo)(line)
 
       orderCrosses(input) mustEqual input
     }
@@ -133,13 +127,11 @@ object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyM
       val foo = dag.AbsoluteLoad(Const(CString("/foo"))(line), JTextT)(line)
 
       val input =
-        Join(Add,
-             ValueSort(0),
-             Join(Add,
-                  Cross(Some(CrossLeft)),
-                  AddSortKey(foo, "a", "b", 0),
-                  Const(CLong(42))(line))(line),
-             AddSortKey(foo, "a", "b", 0))(line)
+        Join(Add, ValueSort(0),
+          Join(Add, Cross(Some(CrossLeft)),
+            AddSortKey(foo, "a", "b", 0),
+            Const(CLong(42))(line))(line),
+          AddSortKey(foo, "a", "b", 0))(line)
 
       orderCrosses(input) mustEqual input
     }

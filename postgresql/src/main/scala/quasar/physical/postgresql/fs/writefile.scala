@@ -36,45 +36,46 @@ object writefile {
   final case class TableName(v: String)
 
   def interpret[S[_]](
-      implicit
-      S0: KeyValueStore[WriteHandle, TableName, ?] :<: S,
-      S1: MonotonicSeq :<: S,
-      S2: ConnectionIO :<: S
+    implicit
+    S0: KeyValueStore[WriteHandle, TableName, ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: ConnectionIO :<: S
   ): WriteFile ~> Free[S, ?] =
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wf: WriteFile[A]) = wf match {
-        case Open(file)     => open(file)
+        case Open(file) => open(file)
         case Write(h, data) => write(h, data)
-        case Close(h)       => close(h)
+        case Close(h) => close(h)
       }
     }
 
   def writeHandles[S[_]](
-      implicit
-      S0: KeyValueStore[WriteHandle, TableName, ?] :<: S
+    implicit
+    S0: KeyValueStore[WriteHandle, TableName, ?] :<: S
   ) = KeyValueStore.Ops[WriteHandle, TableName, S]
 
   def open[S[_]](
-      file: AFile
+    file: AFile
   )(implicit
     S0: KeyValueStore[WriteHandle, TableName, ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S2: ConnectionIO :<: S): Free[S, FileSystemError \/ WriteHandle] =
+    S2: ConnectionIO :<: S
+  ): Free[S, FileSystemError \/ WriteHandle] =
     (for {
       dt   <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
       tbEx <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
-      _ <- (
-        if (tbEx)
-          ().point[Free[S, ?]]
-        else {
-          // TODO: Issue error if table name length is too long
-          val qStr = s"""CREATE TABLE "${dt.table}" (v json)"""
-          lift(Update[HNil](qStr, none).toUpdate0(HNil).run.void).into
-        }
-      ).liftM[FileSystemErrT]
-      i <- MonotonicSeq.Ops[S].next.liftM[FileSystemErrT]
-      h = WriteHandle(file, i)
-      _ <- writeHandles.put(h, TableName(dt.table)).liftM[FileSystemErrT]
+      _    <- (
+                if (tbEx)
+                  ().point[Free[S, ?]]
+                else {
+                  // TODO: Issue error if table name length is too long
+                  val qStr = s"""CREATE TABLE "${dt.table}" (v json)"""
+                  lift(Update[HNil](qStr, none).toUpdate0(HNil).run.void).into
+                }
+              ).liftM[FileSystemErrT]
+      i    <- MonotonicSeq.Ops[S].next.liftM[FileSystemErrT]
+      h    =  WriteHandle(file, i)
+      _    <- writeHandles.put(h, TableName(dt.table)).liftM[FileSystemErrT]
     } yield h).run
 
   def escape(json: String) = json.replace("'", "''")
@@ -87,23 +88,26 @@ object writefile {
        |""".stripMargin
 
   def write[S[_]](
-      h: WriteHandle,
-      chunk: Vector[Data]
+    h: WriteHandle,
+    chunk: Vector[Data]
   )(implicit
     S0: KeyValueStore[WriteHandle, TableName, ?] :<: S,
-    S1: ConnectionIO :<: S): Free[S, Vector[FileSystemError]] =
+    S1: ConnectionIO :<: S
+  ): Free[S, Vector[FileSystemError]] =
     (for {
-      tbl <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
-      data = chunk.map(DataCodec.render).unite
-      qry  = insertQueryStr(tbl.v) _
-      _ <- lift(data.traverse(d => Update[HNil](qry(d), none).toUpdate0(HNil).run.void)).into
-        .liftM[EitherT[?[_], Vector[FileSystemError], ?]]
+      tbl  <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
+      data =  chunk.map(DataCodec.render).unite
+      qry  =  insertQueryStr(tbl.v) _
+      _    <- lift(data.traverse(d =>
+                Update[HNil](qry(d), none).toUpdate0(HNil).run.void
+              )).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
     } yield Vector.empty).merge
 
   def close[S[_]](
-      h: WriteHandle
+    h: WriteHandle
   )(implicit
-    S0: KeyValueStore[WriteHandle, TableName, ?] :<: S): Free[S, Unit] =
+    S0: KeyValueStore[WriteHandle, TableName, ?] :<: S
+  ): Free[S, Unit] =
     writeHandles.delete(h).liftM[OptionT].run.void
 
 }

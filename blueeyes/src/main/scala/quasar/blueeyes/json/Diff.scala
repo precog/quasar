@@ -26,8 +26,7 @@ case class Diff(changed: JValue, added: JValue, deleted: JValue) {
     }
     Diff(applyTo(changed), applyTo(added), applyTo(deleted))
   }
-  def merge(that: Diff) =
-    Diff(changed merge that.changed, added merge that.added, deleted merge that.deleted)
+  def merge(that: Diff) = Diff(changed merge that.changed, added merge that.added, deleted merge that.deleted)
 }
 
 /** Computes a diff between two JSONs.
@@ -48,8 +47,7 @@ object Diff {
 
   private def diffFields(vs1: Map[String, JValue], vs2: Map[String, JValue]): Diff = {
     def diffRec(xleft: Map[String, JValue], yleft: Map[String, JValue]): Diff = {
-      if (xleft.isEmpty)
-        Diff(JUndefined, if (yleft.isEmpty) JUndefined else JObject(yleft), JUndefined)
+      if (xleft.isEmpty) Diff(JUndefined, if (yleft.isEmpty) JUndefined else JObject(yleft), JUndefined)
       else {
         val x  = xleft.head
         val xs = xleft.tail
@@ -73,10 +71,8 @@ object Diff {
 
   private def diffVals(vs1: List[JValue], vs2: List[JValue]) = {
     def diffRec(xleft: List[JValue], yleft: List[JValue]): Diff = (xleft, yleft) match {
-      case (xs, Nil) =>
-        Diff(JUndefined, JUndefined, if (xs.isEmpty) JUndefined else JArray(xs))
-      case (Nil, ys) =>
-        Diff(JUndefined, if (ys.isEmpty) JUndefined else JArray(ys), JUndefined)
+      case (xs, Nil) => Diff(JUndefined, JUndefined, if (xs.isEmpty) JUndefined else JArray(xs))
+      case (Nil, ys) => Diff(JUndefined, if (ys.isEmpty) JUndefined else JArray(ys), JUndefined)
       case (x :: xs, y :: ys) =>
         val Diff(c1, a1, d1) = diff(x, y)
         val Diff(c2, a2, d2) = diffRec(xs, ys)

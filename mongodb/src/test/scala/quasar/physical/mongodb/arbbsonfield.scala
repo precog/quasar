@@ -32,6 +32,7 @@ trait ArbBsonField {
     list <- Gen.nonEmptyListOf(Gen.oneOf(genBsonFieldName, genBsonFieldIndex))
 
     f = BsonField(list)
+
     if (!f.isEmpty)
   } yield f.get)
 }

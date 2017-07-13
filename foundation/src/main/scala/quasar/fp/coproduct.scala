@@ -17,22 +17,19 @@
 package quasar.fp
 
 /** Builds nested scalaz Coproducts.
-  *  Use like:
-  *     *    type MarkLogicFs[A] = (
-  *          Task
-  *      :\: SessionIO
-  *      :\: ContentSourceIO
-  *      :\: GenUUID
-  *      :\: MonotonicSeq
-  *      :\: MLReadHandles
-  *      :\: MLWriteHandles
-  *      :/: MLResultHandles
-  *    )#M[A]
-  */
-sealed abstract class CoM { type M[A] }
-sealed abstract class :/:[F[_], G[_]] extends CoM {
-  type M[A] = scalaz.Coproduct[F, G, A]
-}
-sealed abstract class :\:[F[_], T <: CoM] extends CoM {
-  type M[A] = scalaz.Coproduct[F, T#M, A]
-}
+ *  Use like:
+ *     *    type MarkLogicFs[A] = (
+ *          Task
+ *      :\: SessionIO
+ *      :\: ContentSourceIO
+ *      :\: GenUUID
+ *      :\: MonotonicSeq
+ *      :\: MLReadHandles
+ *      :\: MLWriteHandles
+ *      :/: MLResultHandles
+ *    )#M[A]
+ */
+
+sealed abstract class CoM                             { type M[A]                               }
+sealed abstract class :/:[F[_], G[_]]     extends CoM { type M[A] = scalaz.Coproduct[F, G, A]   }
+sealed abstract class :\:[F[_], T <: CoM] extends CoM { type M[A] = scalaz.Coproduct[F, T#M, A] }

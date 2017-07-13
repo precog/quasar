@@ -27,8 +27,7 @@ import pathy._, Path._
 sealed abstract class FsPath[T, S] {
   type Base
 
-  def fold[X](uni: Path[Base, T, S] => X,
-              inv: (String, Path[Base, T, S], Base === Abs) => X): X
+  def fold[X](uni: Path[Base, T, S] => X, inv: (String, Path[Base, T, S], Base === Abs) => X): X
 
   def forgetBase: FsPath[T, S] = this
 
@@ -41,16 +40,13 @@ object FsPath {
 
   private final case class Uni[B, T, S](p: Path[B, T, S]) extends FsPath[T, S] {
     type Base = B
-    def fold[X](uni: Path[Base, T, S] => X,
-                inv: (String, Path[Base, T, S], Base === Abs) => X): X =
+    def fold[X](uni: Path[Base, T, S] => X, inv: (String, Path[Base, T, S], Base === Abs) => X): X =
       uni(p)
   }
 
-  private final case class InV[B, T, S](vol: String, p: Path[B, T, S], ev: B === Abs)
-      extends FsPath[T, S] {
+  private final case class InV[B, T, S](vol: String, p: Path[B, T, S], ev: B === Abs) extends FsPath[T, S] {
     type Base = B
-    def fold[X](uni: Path[Base, T, S] => X,
-                inv: (String, Path[Base, T, S], Base === Abs) => X): X =
+    def fold[X](uni: Path[Base, T, S] => X, inv: (String, Path[Base, T, S], Base === Abs) => X): X =
       inv(vol, p, ev)
   }
 
@@ -60,8 +56,7 @@ object FsPath {
   }
 
   object InVolume {
-    def apply[B, T, S](vol: String, path: Path[B, T, S])(
-        implicit ev: B === Abs): Aux[B, T, S] =
+    def apply[B, T, S](vol: String, path: Path[B, T, S])(implicit ev: B === Abs): Aux[B, T, S] =
       InV[B, T, S](vol, path, ev)
   }
 
@@ -74,16 +69,14 @@ object FsPath {
   def printFsPath[T](codec: PathCodec, fp: FsPath[T, Sandboxed]): String =
     fp.fold(codec.printPath, (v, p, _) => v + codec.printPath(p))
 
-  def sandboxFsPathIn[B, T, S](dir: Path[B, Dir, Sandboxed],
-                               fp: Aux[B, T, S]): Option[Aux[B, T, Sandboxed]] =
+  def sandboxFsPathIn[B, T, S](dir: Path[B, Dir, Sandboxed], fp: Aux[B, T, S]): Option[Aux[B, T, Sandboxed]] =
     fp.fold(
-      p => sandbox(dir, p) map (p1 => Uniform(dir </> p1)),
+      p          => sandbox(dir, p) map (p1 => Uniform(dir </> p1)),
       (v, p, ev) => sandbox(dir, p) map (p1 => InVolume(v, dir </> p1)(ev))
     )
 
   private def winVolAndPath(s: String): (String, String) = {
-    val (prefix, s1): (String, String) =
-      if (s.startsWith("\\\\")) ("\\\\", s.drop(2)) else ("", s)
+    val (prefix, s1): (String, String) = if (s.startsWith("\\\\")) ("\\\\", s.drop(2)) else ("", s)
     val (vol, rest) = s1.splitAt(s1.indexOf('\\'))
     (prefix + vol.toString, rest.toString)
   }
@@ -143,7 +136,7 @@ object FsPath {
   implicit class FsDirOps[B, S](fd: Aux[B, Dir, S]) {
     def </>[T](rel: Path[Rel, T, S]): Aux[B, T, S] =
       fd.fold(
-        p => Uniform(p </> rel),
+        p          => Uniform(p </> rel),
         (v, p, ev) => InVolume(v, p </> rel)(ev)
       )
   }

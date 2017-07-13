@@ -26,10 +26,10 @@ trait EJsonArbitrary {
     new Delay[Arbitrary, Common] {
       def apply[α](arb: Arbitrary[α]) = Arbitrary(
         Gen.oneOf(
-          arb.list ^^ Arr[α],
-          const(Null[α]()),
-          genBool ^^ Bool[α],
-          genString ^^ Str[α],
+          arb.list      ^^ Arr[α],
+          const(           Null[α]()),
+          genBool       ^^ Bool[α],
+          genString     ^^ Str[α],
           genBigDecimal ^^ Dec[α]
         )
       )
@@ -45,11 +45,11 @@ trait EJsonArbitrary {
     new Delay[Arbitrary, Extension] {
       def apply[α](arb: Arbitrary[α]) = Arbitrary(
         Gen.oneOf(
-          (arb.gen, arb.gen).zip ^^ (Meta[α] _).tupled,
+          (arb.gen, arb.gen).zip      ^^ (Meta[α] _).tupled,
           (arb.gen, arb.gen).zip.list ^^ Map[α],
-          genByte ^^ Byte[α],
-          genChar ^^ Char[α],
-          genBigInt ^^ Int[α]
+          genByte                     ^^ Byte[α],
+          genChar                     ^^ Char[α],
+          genBigInt                   ^^ Int[α]
         )
       )
     }

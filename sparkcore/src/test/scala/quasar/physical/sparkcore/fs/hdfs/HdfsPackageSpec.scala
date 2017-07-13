@@ -33,10 +33,9 @@ class HdfsPackageSpec extends quasar.Qspec {
 
     "fail if URL is not valid" in {
       val url = "blabalbab"
-      hdfsUri(url).attempt.map(_.leftMap(_.getMessage)).unsafePerformSync must_== -\/(
-        "Provided URL is not valid HDFS URL")
+      hdfsUri(url).attempt.map(_.leftMap(_.getMessage)).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")
     }
-
+    
   }
 
   private def hdfsUri(url: String): Task[URI] =

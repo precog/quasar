@@ -29,10 +29,14 @@ class BsonSpecs extends quasar.Qspec {
 
   "fromRepr" should {
     "handle partially invalid object" in {
-      val native = Doc(ListMap("a" -> Int32(0), "b" -> JavaScript(Js.Null))).repr
+      val native = Doc(ListMap(
+        "a" -> Int32(0),
+        "b" -> JavaScript(Js.Null))).repr
 
       fromRepr(native) must_==
-        Doc(ListMap("a" -> Int32(0), "b" -> Undefined))
+        Doc(ListMap(
+          "a" -> Int32(0),
+          "b" -> Undefined))
     }
 
     "preserve NA" in {
@@ -48,7 +52,7 @@ class BsonSpecs extends quasar.Qspec {
         case JavaScript(_)         => false
         case JavaScriptScope(_, _) => false
         case Undefined             => false
-        case _                     => true
+        case _ => true
       }
 
       val wrapped = Doc(ListMap("value" -> bson))
@@ -76,17 +80,12 @@ class BsonSpecs extends quasar.Qspec {
         data match {
           case Data.Int(x) =>
             // NB: encoding int as Data loses size info
-            (bson.toJs must_== jscore
-              .Call(jscore.ident("NumberInt"), List(jscore.Literal(Js.Str(x.shows))))
-              .toJs) or
-              (bson.toJs must_== jscore
-                .Call(jscore.ident("NumberLong"), List(jscore.Literal(Js.Str(x.shows))))
-                .toJs)
+            (bson.toJs must_== jscore.Call(jscore.ident("NumberInt"), List(jscore.Literal(Js.Str(x.shows)))).toJs) or
+            (bson.toJs must_== jscore.Call(jscore.ident("NumberLong"), List(jscore.Literal(Js.Str(x.shows)))).toJs)
           case _ =>
-            BsonCodec
-              .fromData(data)
-              .fold(_ => scala.sys.error("failed to convert data to BSON: " + data.shows),
-                    _.toJs.some must_== data.toJs.map(_.toJs))
+            BsonCodec.fromData(data).fold(
+              _ => scala.sys.error("failed to convert data to BSON: " + data.shows),
+              _.toJs.some must_== data.toJs.map(_.toJs))
         }
       }
     }.setGen(simpleGen)
@@ -100,8 +99,10 @@ object BsonGen {
 
   import Bson._
 
-  implicit val arbBson: Arbitrary[Bson] = Arbitrary(
-    Gen.oneOf(simpleGen, resize(5, objGen), resize(5, arrGen)))
+  implicit val arbBson: Arbitrary[Bson] = Arbitrary(Gen.oneOf(
+    simpleGen,
+    resize(5, objGen),
+    resize(5, arrGen)))
 
   val simpleGen = oneOf(
     const(Null),
@@ -121,8 +122,7 @@ object BsonGen {
     resize(5, arbitrary[String]).map(Symbol.apply),
     const(MinKey),
     const(MaxKey),
-    const(Undefined)
-  )
+    const(Undefined))
 
   val objGen = for {
     pairs <- listOf(for {

@@ -29,14 +29,11 @@ import scalaz.syntax.monadError._
 
 import FileSystemDef._
 
-final case class FileSystemDef[F[_]](
-    run: FsCfg => Option[DefErrT[F, DefinitionResult[F]]]) {
-  def apply(typ: FileSystemType, uri: ConnectionUri)(
-      implicit F: Monad[F]): DefErrT[F, DefinitionResult[F]] =
-    run((typ, uri)).getOrElse(
-      NonEmptyList(
-        s"Unsupported filesystem type: ${typ.value}"
-      ).left[EnvironmentError].raiseError[DefErrT[F, ?], DefinitionResult[F]])
+final case class FileSystemDef[F[_]](run: FsCfg => Option[DefErrT[F, DefinitionResult[F]]]) {
+  def apply(typ: FileSystemType, uri: ConnectionUri)(implicit F: Monad[F]): DefErrT[F, DefinitionResult[F]] =
+    run((typ, uri)).getOrElse(NonEmptyList(
+      s"Unsupported filesystem type: ${typ.value}"
+    ).left[EnvironmentError].raiseError[DefErrT[F, ?], DefinitionResult[F]])
 
   def orElse(other: => FileSystemDef[F]): FileSystemDef[F] =
     FileSystemDef(cfg => run(cfg) orElse other.run(cfg))
@@ -46,8 +43,7 @@ final case class FileSystemDef[F[_]](
 }
 
 object FileSystemDef {
-  type FsCfg = (FileSystemType, ConnectionUri)
-
+  type FsCfg            = (FileSystemType, ConnectionUri)
   /** Reasons why the configuration is invalid or an environment error. */
   type DefinitionError  = NonEmptyList[String] \/ EnvironmentError
   type DefErrT[F[_], A] = EitherT[F, DefinitionError, A]
@@ -58,13 +54,13 @@ object FileSystemDef {
   }
 
   def fromPF[F[_]](
-      pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
+    pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
   ): FileSystemDef[F] =
     FileSystemDef(pf.lift)
 
   implicit def fileSystemDefMonoid[F[_]]: Monoid[FileSystemDef[F]] =
     new Monoid[FileSystemDef[F]] {
-      def zero                                                  = FileSystemDef(κ(None))
+      def zero = FileSystemDef(κ(None))
       def append(d1: FileSystemDef[F], d2: => FileSystemDef[F]) = d1 orElse d2
     }
 }

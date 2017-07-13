@@ -61,9 +61,9 @@ trait ManagedQueryFile[C] { self: BackendModule =>
     def evaluatePlan(repr: Repr): Backend[ResultHandle] =
       for {
         id <- MonoSeqM.next.liftB
-        h = ResultHandle(id)
-        c <- ManagedQueryFileModule.resultsCursor(repr)
-        _ <- ResultKvsM.put(h, c).liftB
+        h  =  ResultHandle(id)
+        c  <- ManagedQueryFileModule.resultsCursor(repr)
+        _  <- ResultKvsM.put(h, c).liftB
       } yield h
 
     def more(h: ResultHandle): Backend[Vector[Data]] =
@@ -72,14 +72,14 @@ trait ManagedQueryFile[C] { self: BackendModule =>
         c  <- c0 getOrElseF unknownResultHandle(h).raiseError[Backend, C]
         r  <- ManagedQueryFileModule.nextChunk(c)
         (c1, data) = r
-        _ <- ResultKvsM.put(h, c1).liftB
+        _  <- ResultKvsM.put(h, c1).liftB
       } yield data
 
     def close(h: ResultHandle): Configured[Unit] =
       OptionT(ResultKvsM.get(h).liftM[ConfiguredT])
         .flatMapF(c =>
           ManagedQueryFileModule.closeCursor(c) *>
-            ResultKvsM.delete(h).liftM[ConfiguredT])
+          ResultKvsM.delete(h).liftM[ConfiguredT])
         .orZero
   }
 }

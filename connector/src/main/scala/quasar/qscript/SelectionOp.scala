@@ -31,5 +31,5 @@ final case object Sample extends SelectionOp
 
 object SelectionOp {
   implicit val equal: Equal[SelectionOp] = Equal.equalRef
-  implicit val show: Show[SelectionOp]   = Show.showFromToString
+  implicit val show: Show[SelectionOp] = Show.showFromToString
 }

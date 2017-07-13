@@ -25,8 +25,7 @@ import xml.name._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
-  val ns =
-    Namespace(NSPrefix(NCName("fn")), NSUri("http://www.w3.org/2005/xpath-functions"))
+  val ns = Namespace(NSPrefix(NCName("fn")), NSUri("http://www.w3.org/2005/xpath-functions"))
 
   def abs(num: XQuery): XQuery =
     XQuery(s"fn:abs($num)")
@@ -80,9 +79,7 @@ object fn {
   def empty(seq: XQuery): XQuery =
     XQuery(s"fn:empty($seq)")
 
-  def error(err: XQuery,
-            desc: Option[XQuery] = None,
-            errObj: Option[XQuery] = None): XQuery =
+  def error(err: XQuery, desc: Option[XQuery] = None, errObj: Option[XQuery] = None): XQuery =
     XQuery(s"fn:error(${err}${asArg(desc)}${asArg(errObj)})")
 
   def exists(seq: XQuery): XQuery =
@@ -188,9 +185,7 @@ object fn {
   def substringBefore(input: XQuery, after: XQuery): XQuery =
     XQuery(s"fn:substring-before($input, $after)")
 
-  def subsequence(srcSeq: XQuery,
-                  startLoc: XQuery,
-                  length: Option[XQuery] = None): XQuery =
+  def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")
 
   def sum(seq: XQuery): XQuery =

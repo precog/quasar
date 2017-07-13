@@ -47,39 +47,32 @@ package quasar.blueeyes.json {
 
   trait JsonGenerators {
     def badPath(jv: JValue, p: JPath): Boolean = (jv, p.nodes) match {
-      case (JArray(_), JPathField(_) :: _)  => true
-      case (JObject(_), JPathIndex(_) :: _) => true
-      case (_, Nil)                         => false
-      case (_, JPathField(name) :: xs)      => badPath(jv \ name, JPath(xs))
-      case (JArray(ns), JPathIndex(i) :: xs) =>
-        (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(
-          JArray(Nil),
-          JPath(xs))
-      case (_, JPathIndex(i) :: xs) => (i != 0) || badPath(JArray(Nil), JPath(xs))
+      case (JArray(_), JPathField(_) :: _)   => true
+      case (JObject(_), JPathIndex(_) :: _)  => true
+      case (_, Nil)                          => false
+      case (_, JPathField(name) :: xs)       => badPath(jv \ name, JPath(xs))
+      case (JArray(ns), JPathIndex(i) :: xs) => (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(JArray(Nil), JPath(xs))
+      case (_, JPathIndex(i) :: xs)          => (i != 0) || badPath(JArray(Nil), JPath(xs))
     }
 
     def genJPathNode: Gen[JPathNode] = frequency(
       1 -> (choose(0, 10) ^^ JPathIndex),
       9 -> (genIdent ^^ JPathField)
     )
-    def genJPath: Gen[JPath] =
-      choose(0, 10) >> (len => listOfN(len, genJPathNode) ^^ (JPath(_)))
+    def genJPath: Gen[JPath] = choose(0, 10) >> (len => listOfN(len, genJPathNode) ^^ (JPath(_)))
     def genJValue: Gen[JValue] = frequency(
       5 -> genSimple,
       1 -> delay(genJArray),
       1 -> delay(genJObject)
     )
 
-    def genIdent: Gen[String] =
-      choose(3, 8) >> (len => arrayOfN(len, alphaLowerChar) ^^ (new String(_)))
+    def genIdent: Gen[String]    = choose(3, 8) >> (len => arrayOfN(len, alphaLowerChar) ^^ (new String(_)))
     def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
     def genSmallInt: Gen[Int]    = choose(0, 5)
     def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
     def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
     def genJString: Gen[JString] = genIdent ^^ (s => JString(s))
-    def genJField: Gen[JField] =
-      genIdent >> (name =>
-        genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
+    def genJField: Gen[JField]   = genIdent >> (name => genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
     def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs: _*))
     def genJArray: Gen[JArray]   = genSmallInt >> genJList ^^ JArray
 

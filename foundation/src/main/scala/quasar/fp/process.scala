@@ -28,7 +28,7 @@ trait ProcessOps {
   implicit class PrOps[F[_], O](self: Process[F, O]) {
     final def evalScan1(f: (O, O) => F[O])(implicit monad: Monad[F]): Process[F, O] = {
       self.zipWithPrevious.evalMap {
-        case (None, next)       => monad.point(next)
+        case (None, next) => monad.point(next)
         case (Some(prev), next) => f(prev, next)
       }
     }
@@ -36,8 +36,7 @@ trait ProcessOps {
     /** Exposes the effect from the first `Await` encountered, the inner process
       * emits the same values, in the same order as this process.
       */
-    final def firstStep[F2[x] >: F[x], O2 >: O](implicit F: Monad[F2],
-                                                C: Catchable[F2]): F2[Process[F2, O2]] = {
+    final def firstStep[F2[x] >: F[x], O2 >: O](implicit F: Monad[F2], C: Catchable[F2]): F2[Process[F2, O2]] = {
       val (hd, tl) = self.unemit
       tl.unconsOption[F2, O2] map {
         case Some((x, xs)) => Process.emitAll(hd :+ x) ++ xs
@@ -50,9 +49,7 @@ trait ProcessOps {
       * `Process` emits the same values, in the same order as this process.
       */
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    final def stepUntil[F2[x] >: F[x], O2 >: O](p: SSeq[O2] => Boolean)(
-        implicit F: Monad[F2],
-        C: Catchable[F2]): F2[Process[F2, O2]] =
+    final def stepUntil[F2[x] >: F[x], O2 >: O](p: SSeq[O2] => Boolean)(implicit F: Monad[F2], C: Catchable[F2]): F2[Process[F2, O2]] =
       firstStep[F2, O2] flatMap { next =>
         val (hd, tl) = next.unemit
 
@@ -63,17 +60,16 @@ trait ProcessOps {
       }
   }
 
-  implicit class ProcessOfTaskOps[O](self: Process[Task, O]) {
+  implicit class ProcessOfTaskOps[O](self: Process[Task,O]) {
     // Is there a better way to implement this?
-    def onHaltWithLastElement(
-        f: (Option[O], Cause) => Process[Task, O]): Process[Task, O] = {
-      Process.await(TaskRef[Option[O]](None)) { lastA =>
-        self.observe(Process.constant((a: O) => lastA.write(Some(a)))).onHalt { cause =>
-          Process.await(lastA.read)(a => f(a, cause))
+    def onHaltWithLastElement(f: (Option[O], Cause) => Process[Task,O]): Process[Task,O] = {
+      Process.await(TaskRef[Option[O]](None)){ lastA =>
+        self.observe(Process.constant((a:O) => lastA.write(Some(a)))).onHalt{ cause =>
+          Process.await(lastA.read)( a => f(a,cause))
         }
       }
     }
-    def cleanUpWithA(f: Option[O] => Task[Unit]): Process[Task, O] = {
+    def cleanUpWithA(f: Option[O] => Task[Unit]): Process[Task,O] = {
       self.onHaltWithLastElement((a, cause) => Process.eval_(f(a)).causedBy(cause))
     }
   }

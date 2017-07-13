@@ -38,27 +38,29 @@ object Mounting {
     * operations (like determining which paths in a directory refer to
     * mounts) to be implemented more efficiently.
     */
-  final case class HavingPrefix(dir: ADir) extends Mounting[Map[APath, MountType]]
+  final case class HavingPrefix(dir: ADir)
+    extends Mounting[Map[APath, MountType]]
 
-  final case class LookupType(path: APath) extends Mounting[Option[MountType]]
+  final case class LookupType(path: APath)
+    extends Mounting[Option[MountType]]
 
-  final case class LookupConfig(path: APath) extends Mounting[Option[MountConfig]]
+  final case class LookupConfig(path: APath)
+    extends Mounting[Option[MountConfig]]
 
-  final case class MountView(loc: AFile,
-                             scopedExpr: ScopedExpr[Fix[Sql]],
-                             vars: Variables)
-      extends Mounting[MountingError \/ Unit]
+  final case class MountView(loc: AFile, scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables)
+    extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
-      extends Mounting[MountingError \/ Unit]
+    extends Mounting[MountingError \/ Unit]
 
   final case class MountModule(loc: ADir, statements: List[Statement[Fix[Sql]]])
-      extends Mounting[MountingError \/ Unit]
+    extends Mounting[MountingError \/ Unit]
 
-  final case class Unmount(path: APath) extends Mounting[MountingError \/ Unit]
+  final case class Unmount(path: APath)
+    extends Mounting[MountingError \/ Unit]
 
-  final case class Remount[T](from: Path[Abs, T, Sandboxed], to: Path[Abs, T, Sandboxed])
-      extends Mounting[MountingError \/ Unit]
+  final case class Remount[T](from: Path[Abs,T,Sandboxed], to: Path[Abs,T,Sandboxed])
+    extends Mounting[MountingError \/ Unit]
 
   /** Indicates the wrong type of path (file vs. dir) was supplied to the `mount`
     * convenience function.
@@ -73,7 +75,8 @@ object Mounting {
       }
   }
 
-  final class Ops[S[_]](implicit S: Mounting :<: S) extends LiftedOps[Mounting, S] {
+  final class Ops[S[_]](implicit S: Mounting :<: S)
+    extends LiftedOps[Mounting, S] {
 
     import MountConfig._
 
@@ -89,9 +92,8 @@ object Mounting {
       viewsHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
 
     def modulesHavingPrefix(dir: ADir): FreeS[Set[ADir]] =
-      havingPrefix(dir).map(
-        _.collect { case (k, v) if v === MountType.ModuleMount => k }.toSet
-          .foldMap(p => refineType(p).swap.toSet))
+      havingPrefix(dir).map(_.collect { case (k, v) if v === MountType.ModuleMount => k }.toSet
+        .foldMap(p => refineType(p).swap.toSet))
 
     def modulesHavingPrefix_(dir: ADir): FreeS[Set[RDir]] =
       modulesHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
@@ -105,14 +107,10 @@ object Mounting {
       OptionT(lift(LookupConfig(path)))
 
     def lookupViewConfig(path: AFile): OptionT[FreeS, ViewConfig] =
-      OptionT(
-        lookupConfig(path).run
-          .map(_.flatMap(viewConfig.getOption).map(ViewConfig.tupled)))
+      OptionT(lookupConfig(path).run.map(_.flatMap(viewConfig.getOption).map(ViewConfig.tupled)))
 
     def lookupModuleConfig(path: ADir): OptionT[FreeS, ModuleConfig] =
-      OptionT(
-        lookupConfig(path).run
-          .map(_.flatMap(moduleConfig.getOption).map(ModuleConfig(_))))
+      OptionT(lookupConfig(path).run.map(_.flatMap(moduleConfig.getOption).map(ModuleConfig(_))))
 
     /** Returns the type of mount the path refers to, if any. */
     def lookupType(path: APath): OptionT[FreeS, MountType] =
@@ -120,52 +118,59 @@ object Mounting {
 
     /** Create a view mount at the given location. */
     def mountView(
-        loc: AFile,
-        scopedExpr: ScopedExpr[Fix[Sql]],
-        vars: Variables
+      loc: AFile,
+      scopedExpr: ScopedExpr[Fix[Sql]],
+      vars: Variables
     )(implicit
-      S0: MountingFailure :<: S): FreeS[Unit] =
+      S0: MountingFailure :<: S
+    ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountView(loc, scopedExpr, vars)))
 
     /** Create a filesystem mount at the given location. */
     def mountFileSystem(
-        loc: ADir,
-        typ: FileSystemType,
-        uri: ConnectionUri
+      loc: ADir,
+      typ: FileSystemType,
+      uri: ConnectionUri
     )(implicit
-      S0: MountingFailure :<: S): FreeS[Unit] =
+      S0: MountingFailure :<: S
+    ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountFileSystem(loc, typ, uri)))
 
     def mountModule(
-        loc: ADir,
-        statements: List[Statement[Fix[Sql]]]
+      loc: ADir,
+      statements: List[Statement[Fix[Sql]]]
     )(implicit
-      SO: MountingFailure :<: S): FreeS[Unit] =
+      SO: MountingFailure :<: S
+    ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountModule(loc, statements)))
 
     /** Attempt to create a mount described by the given configuration at the
       * given location.
       */
     def mount(
-        loc: APath,
-        config: MountConfig
+      loc: APath,
+      config: MountConfig
     )(implicit
       S0: MountingFailure :<: S,
-      S1: PathMismatchFailure :<: S): FreeS[Unit] = {
+      S1: PathMismatchFailure :<: S
+    ): FreeS[Unit] = {
       val mmErr = PathMismatchFailure.Ops[S]
 
       config match {
         case ViewConfig(query, vars) =>
-          D.right.getOption(refineType(loc)) cata (file => mountView(file, query, vars),
-          mmErr.fail(PathTypeMismatch(loc)))
+          D.right.getOption(refineType(loc)) cata (
+            file => mountView(file, query, vars),
+            mmErr.fail(PathTypeMismatch(loc)))
 
         case FileSystemConfig(typ, uri) =>
-          D.left.getOption(refineType(loc)) cata (dir => mountFileSystem(dir, typ, uri),
-          mmErr.fail(PathTypeMismatch(loc)))
+          D.left.getOption(refineType(loc)) cata (
+            dir => mountFileSystem(dir, typ, uri),
+            mmErr.fail(PathTypeMismatch(loc)))
 
         case ModuleConfig(statements) =>
-          D.left.getOption(refineType(loc)) cata (dir => mountModule(dir, statements),
-          mmErr.fail(PathTypeMismatch(loc)))
+          D.left.getOption(refineType(loc)) cata (
+            dir => mountModule(dir, statements),
+            mmErr.fail(PathTypeMismatch(loc)))
       }
     }
 
@@ -173,11 +178,12 @@ object Mounting {
       * provided config.
       */
     def replace(
-        loc: APath,
-        config: MountConfig
+      loc: APath,
+      config: MountConfig
     )(implicit
       S0: MountingFailure :<: S,
-      S1: PathMismatchFailure :<: S): FreeS[Unit] =
+      S1: PathMismatchFailure :<: S
+    ): FreeS[Unit] =
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
@@ -188,8 +194,8 @@ object Mounting {
       * `src`.
       */
     def remount[T](
-        src: Path[Abs, T, Sandboxed],
-        dst: Path[Abs, T, Sandboxed]
+      src: Path[Abs,T,Sandboxed],
+      dst: Path[Abs,T,Sandboxed]
     )(implicit S0: MountingFailure :<: S): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Remount(src, dst)))
 
@@ -199,22 +205,23 @@ object Mounting {
       MountingError.pathError composePrism PathError.pathNotFound
 
     private def modify[T](
-        src: Path[Abs, T, Sandboxed],
-        dst: Path[Abs, T, Sandboxed],
-        f: MountConfig => MountConfig
+      src: Path[Abs,T,Sandboxed],
+      dst: Path[Abs,T,Sandboxed],
+      f: MountConfig => MountConfig
     )(implicit
       S0: MountingFailure :<: S,
-      S1: PathMismatchFailure :<: S): FreeS[Unit] = {
+      S1: PathMismatchFailure :<: S
+    ): FreeS[Unit] = {
       val mntErr = MountingFailure.Ops[S]
-      val mmErr  = PathMismatchFailure.Ops[S]
+      val mmErr = PathMismatchFailure.Ops[S]
 
       for {
-        cfg <- lookupConfig(src) getOrElseF mntErr.fail(notFound(src))
-        _   <- unmount(src)
-        mod     = mount(dst, f(cfg))
-        restore = mount(src, cfg)
-        res1    = mntErr.onFail(mod, err => restore *> mntErr.fail(err))
-        _ <- mmErr.onFail(res1, err => restore *> mmErr.fail(err))
+        cfg     <- lookupConfig(src) getOrElseF mntErr.fail(notFound(src))
+        _       <- unmount(src)
+        mod     =  mount(dst, f(cfg))
+        restore =  mount(src, cfg)
+        res1    =  mntErr.onFail(mod, err => restore *> mntErr.fail(err))
+        _       <- mmErr.onFail(res1, err => restore *> mmErr.fail(err))
       } yield ()
     }
 

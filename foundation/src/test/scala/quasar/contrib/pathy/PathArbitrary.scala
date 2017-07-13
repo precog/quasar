@@ -52,13 +52,10 @@ trait PathArbitrary {
     if (index <= 0) (rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get)
     else {
       val (dir, filename) = peel(file)
-      peel(dir)
-        .map {
-          case (parent, dirname) =>
-            val (dir, file) = split(parent </> file1(filename), index - 1)
-            (dir </> dir1(dirname), file)
-        }
-        .getOrElse((rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get))
+      peel(dir).map { case (parent, dirname) =>
+        val (dir, file) = split(parent </> file1(filename), index - 1)
+        (dir </> dir1(dirname), file)
+      }.getOrElse((rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get))
     }
   }
 

@@ -25,8 +25,7 @@ import scalaz.syntax.std.boolean._
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
 
-  def parent: Option[CPath] =
-    if (nodes.isEmpty) None else Some(CPath(nodes.take(nodes.length - 1): _*))
+  def parent: Option[CPath] = if (nodes.isEmpty) None else Some(CPath(nodes.take(nodes.length - 1): _*))
 
   def ancestors: List[CPath] = {
     def ancestors0(path: CPath, acc: List[CPath]): List[CPath] = {
@@ -101,13 +100,10 @@ sealed trait CPath { self =>
   def expand(jvalue: JValue): List[CPath] = {
     def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
 
-    def expand0(current: List[CPathNode],
-                right: List[CPathNode],
-                d: JValue): List[CPath] = right match {
-      case Nil                             => CPath(current) :: Nil
-      case (x @ CPathIndex(index)) :: tail => expand0(current :+ x, tail, jvalue(index))
-      case (x @ CPathField(name)) :: tail if !isRegex(name) =>
-        expand0(current :+ x, tail, jvalue \ name)
+    def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] = right match {
+      case Nil                                              => CPath(current) :: Nil
+      case (x @ CPathIndex(index)) :: tail                  => expand0(current :+ x, tail, jvalue(index))
+      case (x @ CPathField(name)) :: tail if !isRegex(name) => expand0(current :+ x, tail, jvalue \ name)
       case (x @ CPathField(name)) :: tail =>
         val R = name.r
         val fields = jvalue match {
@@ -152,10 +148,9 @@ object CPathNode {
       case (CPathArray, _)          => GT
       case (_, CPathArray)          => LT
 
-      case (CPathIndex(i1), CPathIndex(i2)) =>
-        if (i1 < i2) LT else if (i1 == i2) EQ else GT
-      case (CPathIndex(_), _) => GT
-      case (_, CPathIndex(_)) => LT
+      case (CPathIndex(i1), CPathIndex(i2)) => if (i1 < i2) LT else if (i1 == i2) EQ else GT
+      case (CPathIndex(_), _)               => GT
+      case (_, CPathIndex(_))               => LT
 
       case (CPathMeta(m1), CPathMeta(m2)) => scalaz.Ordering.fromInt(m1.compare(m2))
     }
@@ -217,20 +212,19 @@ object CPath {
   def unapplySeq(path: String): Option[List[CPathNode]] = Some(apply(path).nodes)
 
   implicit def apply(path: String): CPath = {
-    def parse0(segments: List[String], acc: List[CPathNode]): List[CPathNode] =
-      segments match {
-        case Nil => acc
+    def parse0(segments: List[String], acc: List[CPathNode]): List[CPathNode] = segments match {
+      case Nil => acc
 
-        case head :: tail =>
-          if (head.trim.length == 0) parse0(tail, acc)
-          else
-            parse0(tail, (head match {
-              case "[*]"               => CPathArray
-              case IndexPattern(index) => CPathIndex(index.toInt)
+      case head :: tail =>
+        if (head.trim.length == 0) parse0(tail, acc)
+        else
+          parse0(tail, (head match {
+            case "[*]"               => CPathArray
+            case IndexPattern(index) => CPathIndex(index.toInt)
 
-              case name => CPathField(name)
-            }) :: acc)
-      }
+            case name => CPathField(name)
+          }) :: acc)
+    }
 
     val properPath = if (path.startsWith(".")) path else "." + path
 
@@ -238,12 +232,10 @@ object CPath {
   }
 
   trait CPathTree[A]
-  case class RootNode[A](children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]])
-      extends CPathTree[A]
-  case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]])
-      extends CPathTree[A]
-  case class LeafNode[A](value: A) extends CPathTree[A]
+  case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
+  case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
+  case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
+  case class LeafNode[A](value: A)                                        extends CPathTree[A]
 
   case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
     val size: Int = path.length
@@ -293,15 +285,14 @@ object CPath {
 
   implicit object CPathOrder extends scalaz.Order[CPath] {
     def order(v1: CPath, v2: CPath): scalaz.Ordering = {
-      def compare0(n1: List[CPathNode], n2: List[CPathNode]): scalaz.Ordering =
-        (n1, n2) match {
-          case (Nil, Nil) => EQ
-          case (Nil, _)   => LT
-          case (_, Nil)   => GT
-          case (n1 :: ns1, n2 :: ns2) =>
-            val ncomp = scalaz.Order[CPathNode].order(n1, n2)
-            if (ncomp != EQ) ncomp else compare0(ns1, ns2)
-        }
+      def compare0(n1: List[CPathNode], n2: List[CPathNode]): scalaz.Ordering = (n1, n2) match {
+        case (Nil, Nil) => EQ
+        case (Nil, _)   => LT
+        case (_, Nil)   => GT
+        case (n1 :: ns1, n2 :: ns2) =>
+          val ncomp = scalaz.Order[CPathNode].order(n1, n2)
+          if (ncomp != EQ) ncomp else compare0(ns1, ns2)
+      }
 
       compare0(v1.nodes, v2.nodes)
     }

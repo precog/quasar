@@ -20,8 +20,8 @@ import slamdata.Predef._
 
 sealed abstract class DebugLevel
 object DebugLevel {
-  final case object Silent  extends DebugLevel
-  final case object Normal  extends DebugLevel
+  final case object Silent extends DebugLevel
+  final case object Normal extends DebugLevel
   final case object Verbose extends DebugLevel
 
   def fromInt(code: Int): Option[DebugLevel] = code match {

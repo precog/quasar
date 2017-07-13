@@ -22,7 +22,7 @@ import scala.collection.mutable.Builder
 
 import java.io.File
 
-object TestSupport        extends TestSupport
+object TestSupport extends TestSupport
 object TestSupportWithArb extends TestSupport with ArbitrarySupport
 
 trait TestSupport extends ScalacheckSupport with SpecsSupport
@@ -34,8 +34,8 @@ trait ArbitrarySupport {
 trait SpecsSupport {
   import org.specs2._, matcher._
 
-  type ScalaCheck = org.specs2.ScalaCheck
-  val SpecsFailure = org.specs2.execute.Failure
+  type ScalaCheck         = org.specs2.ScalaCheck
+  val SpecsFailure        = org.specs2.execute.Failure
   type MatchResult[+A]    = org.specs2.matcher.MatchResult[A]
   type SpecsFailure       = org.specs2.execute.Failure
   type SpecsResult        = org.specs2.execute.Result
@@ -44,16 +44,15 @@ trait SpecsSupport {
   type ThrownExpectations = org.specs2.matcher.ThrownExpectations
 
   trait SpecificationHelp extends SpecificationLike with ThrownMessages {
-    def haveAllElementsLike[A](pf: PartialFunction[A, Boolean]): ContainWithResult[A] =
-      contain(like[A]({ case x if pf.isDefinedAt(x) && pf(x) => ok })).forall
+    def haveAllElementsLike[A](pf: PartialFunction[A, Boolean]): ContainWithResult[A] = contain(like[A]({ case x if pf.isDefinedAt(x) && pf(x) => ok })).forall
   }
 }
 
 trait ScalacheckSupport {
-  val Arbitrary = org.scalacheck.Arbitrary
-  val Gen       = org.scalacheck.Gen
-  val Pretty    = org.scalacheck.util.Pretty
-  val Prop      = org.scalacheck.Prop
+  val Arbitrary                = org.scalacheck.Arbitrary
+  val Gen                      = org.scalacheck.Gen
+  val Pretty                   = org.scalacheck.util.Pretty
+  val Prop                     = org.scalacheck.Prop
 
   type Arbitrary[A]            = org.scalacheck.Arbitrary[A]
   type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
@@ -69,32 +68,23 @@ trait ScalacheckSupport {
 
   implicit def liftGenerator[A](g: Gen[A]): Arbitrary[A] = Arbitrary(g)
 
-  implicit def buildableVector[A]: Buildable[A, Vector[A]] = new Buildable[A, Vector[A]] {
+  implicit def buildableVector[A] : Buildable[A, Vector[A]] = new Buildable[A, Vector[A]] {
     def builder: Builder[A, Vector[A]] = Vector.newBuilder[A]
   }
 
-  def genFile: Gen[File] =
-    listOfN(3, identifier map (_ take 5)) map (xs =>
-      new File(xs.mkString("/", "/", ".cooked")))
+  def genFile: Gen[File] = listOfN(3, identifier map (_ take 5)) map (xs => new File(xs.mkString("/", "/", ".cooked")))
 
-  def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(
-      implicit b: Buildable[A, C[A]]): Gen[C[A]] =
-    sized(size =>
-      for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
+  def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
+    sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
-  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]] =
-    containerOfAtMostN[Vector, A](maxSequenceLength, gen)
-  def listOf[A](gen: Gen[A]): Gen[List[A]] =
-    containerOfAtMostN[List, A](maxSequenceLength, gen)
-  def setOf[A](gen: Gen[A]): Gen[Set[A]] =
-    containerOfAtMostN[Set, A](maxSequenceLength, gen)
+  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]              = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
+  def listOf[A](gen: Gen[A]): Gen[List[A]]                  = containerOfAtMostN[List, A](maxSequenceLength, gen)
+  def setOf[A](gen: Gen[A]): Gen[Set[A]]                    = containerOfAtMostN[Set, A](maxSequenceLength, gen)
 
-  def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] =
-    vectorOfN(len, gen) ^^ (_.toArray)
-  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]] =
-    containerOfN[Vector, A](len, gen)
-  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]] = containerOfN[Set, A](len, gen)
+  def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
+  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]              = containerOfN[Vector, A](len, gen)
+  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]                    = containerOfN[Set, A](len, gen)
 
   def genIndex(size: Int): Gen[Int] = Gen.choose(0, size - 1)
   def genBool: Gen[Boolean]         = Arbitrary.arbBool.arbitrary
@@ -107,8 +97,7 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
-  def genBigDecimal: Gen[BigDecimal] =
-    Arbitrary.arbBigDecimal.arbitrary map (d => BigDecimal(d.bigDecimal, d.mc))
+  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary map (d => BigDecimal(d.bigDecimal, d.mc))
 
   implicit class ArbitraryOps[A](arb: Arbitrary[A]) {
     def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(arb.arbitrary map f)
@@ -118,13 +107,13 @@ trait ScalacheckSupport {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
 
-    def list: Gen[List[A]] = listOf(gen)
+    def list: Gen[List[A]]       = listOf(gen)
     def optional: Gen[Option[A]] = frequency(
       1  -> None,
       10 -> (gen map (x => Some(x)))
     )
   }
   implicit class ScalacheckGen2Ops[A, B](gen: (Gen[A], Gen[B])) {
-    def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1; b <- gen._2) yield f(a, b)
+    def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1 ; b <- gen._2) yield f(a, b)
   }
 }

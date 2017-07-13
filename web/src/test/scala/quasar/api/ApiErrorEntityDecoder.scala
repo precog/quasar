@@ -30,24 +30,18 @@ object ApiErrorEntityDecoder {
     EntityDecoder.decodeBy(MediaType.`application/json`) {
       case res @ Response(status, _, _, _, _) =>
         res.attemptAs[Json] flatMap { json =>
-          EitherT
-            .fromDisjunction[Task](fromJson(status, json.hcursor).toEither.disjunction)
-            .leftMap {
-              case (msg, _) =>
-                InvalidMessageBodyFailure(
-                  s"Failed to decode JSON as an ApiError. JSON: $json, reason: $msg")
+          EitherT.fromDisjunction[Task](fromJson(status, json.hcursor).toEither.disjunction)
+            .leftMap { case (msg, _) => InvalidMessageBodyFailure(
+              s"Failed to decode JSON as an ApiError. JSON: $json, reason: $msg")
             }
         }
 
       case Request(_, _, _, _, _, _) =>
-        EitherT.left(
-          MalformedMessageBodyFailure("ApiError is only decodable from a Response.")
-            .point[Task])
+        EitherT.left(MalformedMessageBodyFailure("ApiError is only decodable from a Response.").point[Task])
     }
 
   private def fromJson(status: Status, hc: HCursor): DecodeResult[ApiError] =
-    (hc --\ "error" --\ "detail")
-      .as[Option[Json]]
+    (hc --\ "error" --\ "detail").as[Option[Json]]
       .map(_.flatMap(_.obj) getOrElse JsonObject.empty)
       .tuple((hc --\ "error" --\ "status").as[String])
       .map { case (o, s) => ApiError(status withReason s, o) }

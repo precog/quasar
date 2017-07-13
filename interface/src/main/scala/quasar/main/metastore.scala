@@ -62,16 +62,17 @@ object metastore {
       val f: QErrsTCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(
           (liftMT[ConnectionIO, MainErrT] compose taskToConnectionIO) :+:
-            liftMT[ConnectionIO, MainErrT] :+:
-            QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
+          liftMT[ConnectionIO, MainErrT]                              :+:
+          QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
 
       Hoist[MainErrT].hoist(transactor.trans) compose f
     }
   }
 
-  final case class MetaStoreCtx(metastore: StatefulTransactor,
-                                interp: CoreEff ~> QErrsTCnxIOM,
-                                closeMnts: Task[Unit])
+  final case class MetaStoreCtx(
+    metastore: StatefulTransactor,
+    interp: CoreEff ~> QErrsTCnxIOM,
+    closeMnts: Task[Unit])
 
   val taskToConnectionIO: Task ~> ConnectionIO =
     λ[Task ~> ConnectionIO](t => HC.delay(t.unsafePerformSync))
@@ -84,20 +85,19 @@ object metastore {
 
     val statefulTransactor =
       stdout(s"Using metastore: ${connInfo.url}") *>
-        db.poolingTransactor(connInfo, db.DefaultConfig)
+      db.poolingTransactor(connInfo, db.DefaultConfig)
 
     EitherT(statefulTransactor.attempt)
-      .leftMap(t => {
-        t.printStackTrace; s"While initializing the MetaStore: ${t.getMessage}"
-      })
+      .leftMap(t => {t.printStackTrace ; s"While initializing the MetaStore: ${t.getMessage}"})
   }
 
   def jdbcMounter[S[_]](
-      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
-      mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
+    hfsRef: TaskRef[AnalyticalFileSystem~> HierarchicalFsEffM],
+    mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,
-    S1: PhysErr :<: S): Mounting ~> Free[S, ?] = {
+    S1: PhysErr :<: S
+  ): Mounting ~> Free[S, ?] = {
     type M[A] = Free[MountEff, A]
     type G[A] = Coproduct[ConnectionIO, M, A]
     type T[A] = Coproduct[Task, S, A]
@@ -107,19 +107,18 @@ object metastore {
 
     val g: G ~> Free[S, ?] =
       injectFT[ConnectionIO, S] :+:
-        foldMapNT(mapSNT(t) compose MountEff.interpreter[T](hfsRef, mntdRef))
+      foldMapNT(mapSNT(t) compose MountEff.interpreter[T](hfsRef, mntdRef))
 
-    val mounter = MetaStoreMounter[M, G](mountHandler.mount[MountEff](_),
-                                         mountHandler.unmount[MountEff](_))
+    val mounter = MetaStoreMounter[M, G](
+      mountHandler.mount[MountEff](_),
+      mountHandler.unmount[MountEff](_))
 
     foldMapNT(g) compose mounter
   }
 
   private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
     val transform: PhysFsEffM ~> Task =
-      foldMapNT(
-        reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure
-          .mapError[PhysicalError, Exception](_.cause)))
+      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
 
     dr.translate(transform).close
   }
@@ -127,19 +126,15 @@ object metastore {
   private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] =
     mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
 
-  def verifySchema[A](schema: db.Schema[A],
-                      transactor: Transactor[Task]): MainTask[Unit] = {
-    val verifyMS = Hoist[MainErrT]
-      .hoist(transactor.trans)
+  def verifySchema[A](schema: db.Schema[A], transactor: Transactor[Task]): MainTask[Unit] = {
+    val verifyMS = Hoist[MainErrT].hoist(transactor.trans)
       .apply(verifyMetaStoreSchema(schema))
     EitherT(verifyMS.run.attempt.map(_.valueOr(t =>
       s"While verifying MetaStore schema: ${t.getMessage}. $metastorePrompt".left)))
   }
 
   def initUpdateMetaStore[A](
-      schema: db.Schema[A],
-      transactor: Transactor[Task],
-      jCfg: Option[Json]
+    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Option[Json]
   ): MainTask[Option[Json]] = {
     val mntsFieldName = "mountings"
 
@@ -148,14 +143,11 @@ object metastore {
 
     val mountingsConfig: ConnectionIO[Option[MountingsConfig]] =
       taskToConnectionIO(jCfg.traverse(
-        mountingsConfigDecodeJson
-          .decodeJson(_)
-          .fold({
-            case (e, _) =>
-              Task.fail(new RuntimeException(
-                s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))
-          }, Task.now)
-      ) ∘ (_.unite))
+        mountingsConfigDecodeJson.decodeJson(_).fold({
+          case (e, _) => Task.fail(new RuntimeException(
+            s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))},
+          Task.now)
+        ) ∘ (_.unite))
 
     def migrateMounts(cfg: Option[MountingsConfig]): ConnectionIO[Unit] =
       cfg.traverse_(_.toMap.toList.traverse_((MetaStoreAccess.insertMount _).tupled))
@@ -166,43 +158,44 @@ object metastore {
         ver <- schema.readVersion
         _   <- schema.updateToLatest
         _   <- ver.isEmpty.whenM(migrateMounts(cfg))
-      } yield ver.isEmpty.fold(jCfg ∘ (_.withObject(_ - mntsFieldName)), jCfg)
+      } yield ver.isEmpty.fold(
+        jCfg ∘ (_.withObject(_ - mntsFieldName)),
+        jCfg)
 
-    EitherT(transactor.trans(op).attempt ∘ (_.leftMap(t =>
-      s"While initializing and updating MetaStore: ${t.getMessage}. $metastorePrompt")))
+    EitherT(transactor.trans(op).attempt ∘ (
+      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}. $metastorePrompt")))
   }
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {
-      hfsRef  <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
-      ephmralMnt = KvsMounter.interpreter[Task, QErrsTCnxIO](
-        KvsMounter.ephemeralMountConfigs[Task],
-        hfsRef,
-        mntdRef) andThen
-        mapSNT(absorbTask) andThen
-        QErrsCnxIO.toMainTask(metastore.transactor)
+      ephmralMnt   =  KvsMounter.interpreter[Task, QErrsTCnxIO](
+                        KvsMounter.ephemeralMountConfigs[Task], hfsRef, mntdRef) andThen
+                      mapSNT(absorbTask)                                         andThen
+                      QErrsCnxIO.toMainTask(metastore.transactor)
 
-      mountsCfg <- MetaStoreAccess.fsMounts
-        .map(MountingsConfig(_))
-        .transact(metastore.transactor)
-        .liftM[MainErrT]
+      mountsCfg    <- MetaStoreAccess.fsMounts
+                        .map(MountingsConfig(_))
+                        .transact(metastore.transactor)
+                        .liftM[MainErrT]
 
       // TODO: Still need to expose these in the HTTP API, see SD-1131
-      failedMnts <- attemptMountAll[Mounting](mountsCfg) foldMap ephmralMnt
-      _          <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
+      failedMnts   <- attemptMountAll[Mounting](mountsCfg) foldMap ephmralMnt
+      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
 
-      runCore <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
+      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
     } yield {
       val f: QEffIO ~> QErrsTCnxIOM =
-        injectFT[Task, QErrsTCnxIO] :+:
-          jdbcMounter[QErrsTCnxIO](hfsRef, mntdRef) :+:
-          injectFT[QErrs, QErrsTCnxIO]
+        injectFT[Task, QErrsTCnxIO]               :+:
+        jdbcMounter[QErrsTCnxIO](hfsRef, mntdRef) :+:
+        injectFT[QErrs, QErrsTCnxIO]
 
-      MetaStoreCtx(metastore,
-                   foldMapNT(f) compose runCore,
-                   mntdRef.read >>= closeAllMounts _)
+      MetaStoreCtx(
+        metastore,
+        foldMapNT(f) compose runCore,
+        mntdRef.read >>= closeAllMounts _)
     }
   }
 }

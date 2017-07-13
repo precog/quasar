@@ -35,54 +35,55 @@ object impl {
 
   type DataStream[F[_]] = PWriter[F, FileSystemError, Vector[Data]]
 
-  def dataStreamRead[F[_]: Monad: Catchable](
-      s: DataStream[F]): F[FileSystemError \/ (DataStream[F], Vector[Data])] =
+  def dataStreamRead[F[_]: Monad: Catchable](s: DataStream[F]): F[FileSystemError \/ (DataStream[F], Vector[Data])] =
     s.unconsOption map {
       case Some((chunk, next)) => chunk strengthL next
-      case None =>
-        (Process.empty: DataStream[F], Vector.empty[Data]).right[FileSystemError]
+      case None                => (Process.empty: DataStream[F], Vector.empty[Data]).right[FileSystemError]
     }
 
   def dataStreamClose[F[_]: Monad: Catchable](s: DataStream[F]): F[Unit] =
     s.kill.run
 
-  def ensureMoveSemantics[F[_]: Monad](
-      src: APath,
-      dst: APath,
-      fExists: APath => F[Boolean],
-      semantics: MoveSemantics
+  def ensureMoveSemantics[F[_]: Monad] (
+    src: APath,
+    dst: APath,
+    fExists: APath => F[Boolean],
+    semantics: MoveSemantics
   ): OptionT[F, FileSystemError] =
-    OptionT[F, FileSystemError](fExists(src).flatMap { srcExists =>
-      if (srcExists) {
-        semantics match {
-          case Overwrite => none.point[F]
-          case FailIfExists =>
-            fExists(dst).map { dstExists =>
-              if (dstExists) Some(PathErr(pathExists(dst))) else None
-            }
-          case FailIfMissing =>
-            fExists(dst).map { dstExists =>
-              if (!dstExists) Some(PathErr(pathNotFound(dst))) else None
-            }
+    OptionT[F, FileSystemError](
+      fExists(src).flatMap { srcExists =>
+        if(srcExists) {
+          semantics match {
+            case Overwrite => none.point[F]
+            case FailIfExists =>
+              fExists(dst).map { dstExists =>
+                if(dstExists) Some(PathErr(pathExists(dst))) else None
+              }
+            case FailIfMissing =>
+              fExists(dst).map { dstExists =>
+                if(!dstExists) Some(PathErr(pathNotFound(dst))) else None
+              }
+          }
         }
-      } else some(pathErr(pathNotFound(src))).point[F]
-    })
+        else some(pathErr(pathNotFound(src))).point[F]
+      })
 
   final case class ReadOpts(offset: Natural, limit: Option[Positive])
 
   def read[C, F[_]: Monad](
-      open: (AFile, ReadOpts) => F[FileSystemError \/ C],
-      read: C => F[FileSystemError \/ (C, Vector[Data])],
-      close: C => F[Unit]
+    open: (AFile, ReadOpts) => F[FileSystemError \/ C],
+    read: C => F[FileSystemError \/ (C, Vector[Data])],
+    close: C => F[Unit]
   )(implicit
     cursors: Kvs[F, ReadFile.ReadHandle, C],
-    idSeq: MonoSeq[F]) = λ[ReadFile ~> F] {
+    idSeq: MonoSeq[F]
+  ) = λ[ReadFile ~> F] {
     case ReadFile.Open(file, offset, limit) =>
       (for {
         cursor <- EitherT(open(file, ReadOpts(offset, limit)))
         id     <- idSeq.next.liftM[FileSystemErrT]
-        handle = ReadFile.ReadHandle(file, id)
-        _ <- cursors.put(handle, cursor).liftM[FileSystemErrT]
+        handle =  ReadFile.ReadHandle(file, id)
+        _      <- cursors.put(handle, cursor).liftM[FileSystemErrT]
       } yield handle).run
 
     case ReadFile.Read(handle) =>
@@ -90,7 +91,7 @@ object impl {
         cursor <- OptionT(cursors.get(handle)).toRight(unknownReadHandle(handle))
         result <- EitherT(read(cursor))
         (newCursor, data) = result
-        _ <- cursors.put(handle, newCursor).liftM[FileSystemErrT]
+        _      <- cursors.put(handle, newCursor).liftM[FileSystemErrT]
       } yield data).run
 
     case ReadFile.Close(handle) =>
@@ -102,48 +103,48 @@ object impl {
   }
 
   def readFromDataCursor[C, F[_]: Monad: Kvs[?[_], ReadFile.ReadHandle, C]: MonoSeq](
-      open: (AFile, ReadOpts) => F[FileSystemError \/ C]
+    open: (AFile, ReadOpts) => F[FileSystemError \/ C]
   )(implicit
-    C: DataCursor[F, C]): ReadFile ~> F =
-    read[C, F](open,
-               c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c),
-               C.close)
+    C: DataCursor[F, C]
+  ): ReadFile ~> F =
+    read[C, F](open, c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c), C.close)
 
   def readFromProcess[
-      F[_]: Monad: Catchable,
-      G[_]: Monad: Kvs[?[_], ReadFile.ReadHandle, DataStream[F]]: MonoSeq
-  ](fToG: F ~> G)(
-      f: (AFile, ReadOpts) => G[FileSystemError \/ DataStream[F]]
+    F[_]: Monad: Catchable,
+    G[_]: Monad: Kvs[?[_], ReadFile.ReadHandle, DataStream[F]]: MonoSeq
+  ](
+    fToG: F ~> G)(
+    f: (AFile, ReadOpts) => G[FileSystemError \/ DataStream[F]]
   ): ReadFile ~> G =
     read[DataStream[F], G](f, s => fToG(dataStreamRead(s)), s => fToG(dataStreamClose(s)))
 
   def queryFile[C, F[_]: Monad](
-      execute: (Fix[LogicalPlan], AFile) => F[(PhaseResults, FileSystemError \/ AFile)],
-      evaluate: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ C)],
-      more: C => F[FileSystemError \/ (C, Vector[Data])],
-      close: C => F[Unit],
-      explain: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ ExecutionPlan)],
-      listContents: ADir => F[FileSystemError \/ Set[PathSegment]],
-      fileExists: AFile => F[Boolean]
+    execute: (Fix[LogicalPlan], AFile) => F[(PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ C)],
+    more: C => F[FileSystemError \/ (C, Vector[Data])],
+    close: C => F[Unit],
+    explain: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => F[FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => F[Boolean]
   )(implicit
     cursors: Kvs[F, QueryFile.ResultHandle, C],
-    idSeq: MonoSeq[F]) = λ[QueryFile ~> F] {
+    idSeq: MonoSeq[F]
+  ) = λ[QueryFile ~> F] {
     case QueryFile.ExecutePlan(lp, out) => execute(lp, out)
     case QueryFile.Explain(lp)          => explain(lp)
     case QueryFile.ListContents(dir)    => listContents(dir)
     case QueryFile.FileExists(file)     => fileExists(file)
 
     case QueryFile.EvaluatePlan(lp) =>
-      evaluate(lp) flatMap {
-        case (phaseResults, orCursor) =>
-          val handle = for {
-            cursor <- EitherT.fromDisjunction[F](orCursor)
-            id     <- idSeq.next.liftM[FileSystemErrT]
-            h = QueryFile.ResultHandle(id)
-            _ <- cursors.put(h, cursor).liftM[FileSystemErrT]
-          } yield h
+      evaluate(lp) flatMap { case (phaseResults, orCursor) =>
+        val handle = for {
+          cursor <- EitherT.fromDisjunction[F](orCursor)
+          id     <- idSeq.next.liftM[FileSystemErrT]
+          h      =  QueryFile.ResultHandle(id)
+          _      <- cursors.put(h, cursor).liftM[FileSystemErrT]
+        } yield h
 
-          handle.run strengthL phaseResults
+        handle.run strengthL phaseResults
       }
 
     case QueryFile.More(h) =>
@@ -151,7 +152,7 @@ object impl {
         cursor <- OptionT(cursors.get(h)).toRight(unknownResultHandle(h))
         result <- EitherT(more(cursor))
         (nextCursor, data) = result
-        _ <- cursors.put(h, nextCursor).liftM[FileSystemErrT]
+        _      <- cursors.put(h, nextCursor).liftM[FileSystemErrT]
       } yield data).run
 
     case QueryFile.Close(h) =>
@@ -160,39 +161,41 @@ object impl {
         .orZero
   }
 
-  def queryFileFromDataCursor[C,
-                              F[_]: Monad: Kvs[?[_], QueryFile.ResultHandle, C]: MonoSeq](
-      execute: (Fix[LogicalPlan], AFile) => F[(PhaseResults, FileSystemError \/ AFile)],
-      evaluate: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ C)],
-      explain: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ ExecutionPlan)],
-      listContents: ADir => F[FileSystemError \/ Set[PathSegment]],
-      fileExists: AFile => F[Boolean]
+  def queryFileFromDataCursor[C, F[_]: Monad: Kvs[?[_], QueryFile.ResultHandle, C]: MonoSeq](
+    execute: (Fix[LogicalPlan], AFile) => F[(PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ C)],
+    explain: Fix[LogicalPlan] => F[(PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => F[FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => F[Boolean]
   )(implicit
-    C: DataCursor[F, C]): QueryFile ~> F =
-    queryFile[C, F](execute,
-                    evaluate,
-                    c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c),
-                    C.close,
-                    explain,
-                    listContents,
-                    fileExists)
+    C: DataCursor[F, C]
+  ): QueryFile ~> F =
+    queryFile[C, F](
+      execute,
+      evaluate,
+      c => C.nextChunk(c) map (_.right[FileSystemError] strengthL c),
+      C.close,
+      explain,
+      listContents,
+      fileExists)
 
   def queryFileFromProcess[
-      F[_]: Monad: Catchable,
-      G[_]: Monad: Kvs[?[_], QueryFile.ResultHandle, DataStream[F]]: MonoSeq
+    F[_]: Monad: Catchable,
+    G[_]: Monad: Kvs[?[_], QueryFile.ResultHandle, DataStream[F]]: MonoSeq
   ](
-      fToG: F ~> G,
-      execute: (Fix[LogicalPlan], AFile) => G[(PhaseResults, FileSystemError \/ AFile)],
-      evaluate: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ DataStream[F])],
-      explain: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ ExecutionPlan)],
-      listContents: ADir => G[FileSystemError \/ Set[PathSegment]],
-      fileExists: AFile => G[Boolean]
+    fToG: F ~> G,
+    execute: (Fix[LogicalPlan], AFile) => G[(PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ DataStream[F])],
+    explain: Fix[LogicalPlan] => G[(PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => G[FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => G[Boolean]
   ): QueryFile ~> G =
-    queryFile[DataStream[F], G](execute,
-                                evaluate,
-                                s => fToG(dataStreamRead(s)),
-                                s => fToG(dataStreamClose(s)),
-                                explain,
-                                listContents,
-                                fileExists)
+    queryFile[DataStream[F], G](
+      execute,
+      evaluate,
+      s => fToG(dataStreamRead(s)),
+      s => fToG(dataStreamClose(s)),
+      explain,
+      listContents,
+      fileExists)
 }

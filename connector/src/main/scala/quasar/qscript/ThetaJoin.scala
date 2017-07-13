@@ -38,12 +38,13 @@ import scalaz._, Scalaz._
   *     Filter(_, EquiJoin(...))
   * to simplify behavior for the backend.
   */
-@Lenses final case class ThetaJoin[T[_[_]], A](src: A,
-                                               lBranch: FreeQS[T],
-                                               rBranch: FreeQS[T],
-                                               on: JoinFunc[T],
-                                               f: JoinType,
-                                               combine: JoinFunc[T])
+@Lenses final case class ThetaJoin[T[_[_]], A](
+  src: A,
+  lBranch: FreeQS[T],
+  rBranch: FreeQS[T],
+  on: JoinFunc[T],
+  f: JoinType,
+  combine: JoinFunc[T])
 
 object ThetaJoin {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ThetaJoin[T, ?]] =
@@ -58,7 +59,9 @@ object ThetaJoin {
 
   implicit def traverse[T[_[_]]]: Traverse[ThetaJoin[T, ?]] =
     new Traverse[ThetaJoin[T, ?]] {
-      def traverseImpl[G[_]: Applicative, A, B](fa: ThetaJoin[T, A])(f: A => G[B]) =
+      def traverseImpl[G[_]: Applicative, A, B](
+        fa: ThetaJoin[T, A])(
+        f: A => G[B]) =
         f(fa.src) ∘ (ThetaJoin(_, fa.lBranch, fa.rBranch, fa.on, fa.f, fa.combine))
     }
 
@@ -68,58 +71,54 @@ object ThetaJoin {
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
           Cord("ThetaJoin(") ++
-            showA.show(src) ++ Cord(",") ++
-            lBr.show ++ Cord(",") ++
-            rBr.show ++ Cord(",") ++
-            on.show ++ Cord(",") ++
-            f.show ++ Cord(",") ++
-            combine.show ++ Cord(")")
+          showA.show(src) ++ Cord(",") ++
+          lBr.show ++ Cord(",") ++
+          rBr.show ++ Cord(",") ++
+          on.show ++ Cord(",") ++
+          f.show ++ Cord(",") ++
+          combine.show ++ Cord(")")
       }
     }
 
-  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
-    : Delay[RenderTree, ThetaJoin[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
     new Delay[RenderTree, ThetaJoin[T, ?]] {
       val nt = List("ThetaJoin")
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {
-        case ThetaJoin(src, lBr, rBr, on, f, combine) =>
-          NonTerminal(nt,
-                      None,
-                      List(r.render(src),
-                           lBr.render,
-                           rBr.render,
-                           on.render,
-                           f.render,
-                           combine.render))
+          case ThetaJoin(src, lBr, rBr, on, f, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              lBr.render,
+              rBr.render,
+              on.render,
+              f.render,
+              combine.render))
+        }
       }
-    }
 
   implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
-    : Mergeable.Aux[T, ThetaJoin[T, ?]] =
+      : Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
-      val merge   = new Merge[IT]
+      val merge = new Merge[IT]
       val rewrite = new Rewrite[IT]
 
-      def mergeSrcs(left: FreeMap[IT],
-                    right: FreeMap[IT],
-                    p1: ThetaJoin[IT, ExternallyManaged],
-                    p2: ThetaJoin[IT, ExternallyManaged]) =
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        p1: ThetaJoin[IT, ExternallyManaged],
+        p2: ThetaJoin[IT, ExternallyManaged]) =
         (p1, p2) match {
-          case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2))
-              if f1 ≟ f2 => {
-            val left1  = rebaseBranch(l1, left)
+          case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2)) if f1 ≟ f2 => {
+            val left1 = rebaseBranch(l1, left)
             val right1 = rebaseBranch(r1, left)
-            val left2  = rebaseBranch(l2, right)
+            val left2 = rebaseBranch(l2, right)
             val right2 = rebaseBranch(r2, right)
 
-            def updateJoin(func: JoinFunc[IT],
-                           left: FreeMap[IT],
-                           right: FreeMap[IT]): JoinFunc[IT] =
+            def updateJoin(func: JoinFunc[IT], left: FreeMap[IT], right: FreeMap[IT]): JoinFunc[IT] =
               func.flatMap {
-                case LeftSide  => left.as(LeftSide)
+                case LeftSide => left.as(LeftSide)
                 case RightSide => right.as(RightSide)
               }
 
@@ -131,11 +130,10 @@ object ThetaJoin {
                 // `(l join r on X) as lj inner join (l join r on Y) as rj on lj = rj`
                 // is equivalent to
                 // `l join r on X and Y`
-                val on: JoinFunc[IT] =
-                  (onL ≟ onR).fold(onL, Free.roll(MapFuncsCore.And(onL, onR)))
+                val on: JoinFunc[IT] = (onL ≟ onR).fold(onL, Free.roll(MapFuncsCore.And(onL, onR)))
 
-                val cL: JoinFunc[IT]    = updateJoin(c1, resL.lval, resR.lval)
-                val cR: JoinFunc[IT]    = updateJoin(c2, resL.rval, resR.rval)
+                val cL: JoinFunc[IT] = updateJoin(c1, resL.lval, resR.lval)
+                val cR: JoinFunc[IT] = updateJoin(c2, resL.rval, resR.rval)
                 val (cond, left, right) = concat(cL, cR)
 
                 SrcMerge(ThetaJoin(s1, resL.src, resR.src, on, f1, cond), left, right)
@@ -144,6 +142,6 @@ object ThetaJoin {
           }
 
           case (_, _) => None
-        }
     }
+  }
 }

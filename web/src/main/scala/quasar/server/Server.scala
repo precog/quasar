@@ -38,116 +38,108 @@ import scalaz.concurrent.Task
 object Server {
   type ServiceStarter = (Int => Task[Unit]) => HttpService
 
-  final case class QuasarConfig(cmd: Cmd,
-                                staticContent: List[StaticContent],
-                                redirect: Option[String],
-                                port: Option[Int],
-                                configPath: Option[FsFile],
-                                openClient: Boolean)
+  final case class QuasarConfig(
+    cmd: Cmd,
+    staticContent: List[StaticContent],
+    redirect: Option[String],
+    port: Option[Int],
+    configPath: Option[FsFile],
+    openClient: Boolean)
 
   object QuasarConfig {
     def fromArgs(args: Array[String]): MainTask[QuasarConfig] =
-      CliOptions.parser
-        .parse(args.toSeq, CliOptions.default)
+      CliOptions.parser.parse(args.toSeq, CliOptions.default)
         .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
         .flatMap(fromCliOptions)
 
     def fromCliOptions(opts: CliOptions): MainTask[QuasarConfig] =
       (StaticContent.fromCliOptions("/files", opts) ⊛
-        opts.config.fold(none[FsFile].point[MainTask])(
-          cfg =>
-            FsPath
-              .parseSystemFile(cfg)
-              .toRight(s"Invalid path to config file: $cfg")
-              .map(some)))(
-        (content, cfgPath) =>
-          QuasarConfig(opts.cmd,
-                       content.toList,
-                       content.map(_.loc),
-                       opts.port,
-                       cfgPath,
-                       opts.openClient))
+        opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+          FsPath.parseSystemFile(cfg)
+            .toRight(s"Invalid path to config file: $cfg")
+            .map(some))) ((content, cfgPath) =>
+        QuasarConfig(
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
   }
 
   def nonApiService(
-      initialPort: Int,
-      reload: Int => Task[Unit],
-      staticContent: List[StaticContent],
-      redirect: Option[String]
+    initialPort: Int,
+    reload: Int => Task[Unit],
+    staticContent: List[StaticContent],
+    redirect: Option[String]
   ): HttpService = {
     val staticRoutes = staticContent map {
       case StaticContent(loc, path) => loc -> staticFileService(path)
     }
 
-    Router(
-      staticRoutes ::: List(
-        "/"            -> redirectService(redirect getOrElse "/welcome"),
-        "/server/info" -> info.service,
-        "/server/port" -> control.service(initialPort, reload)
-      ): _*)
+    Router(staticRoutes ::: List(
+      "/"            -> redirectService(redirect getOrElse "/welcome"),
+      "/server/info" -> info.service,
+      "/server/port" -> control.service(initialPort, reload)
+    ): _*)
 
   }
 
   def service(
-      initialPort: Int,
-      staticContent: List[StaticContent],
-      redirect: Option[String],
-      eval: CoreEff ~> ResponseOr
+    initialPort: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String],
+    eval: CoreEff ~> ResponseOr
   ): ServiceStarter = {
     import RestApi._
 
     (reload: Int => Task[Unit]) =>
       finalizeServices(
         toHttpServices(liftMT[Task, ResponseT] :+: eval, coreServices[CoreEffIO]) ++
-          additionalServices
+        additionalServices
       ) orElse nonApiService(initialPort, reload, staticContent, redirect)
   }
 
   def durableService(
-      qConfig: QuasarConfig,
-      port: Int,
-      metastoreCtx: MetaStoreCtx
+    qConfig: QuasarConfig,
+    port: Int,
+    metastoreCtx: MetaStoreCtx
   ): (ServiceStarter, Task[Unit]) = {
     val f: QErrsTCnxIO ~> ResponseOr =
-      liftMT[Task, ResponseT] :+:
-        (liftMT[Task, ResponseT] compose metastoreCtx.metastore.transactor.trans) :+:
-        qErrsToResponseOr
+      liftMT[Task, ResponseT]                                                   :+:
+      (liftMT[Task, ResponseT] compose metastoreCtx.metastore.transactor.trans) :+:
+      qErrsToResponseOr
 
-    val serv = service(port,
-                       qConfig.staticContent,
-                       qConfig.redirect,
-                       foldMapNT(f) compose metastoreCtx.interp)
+    val serv = service(
+      port,
+      qConfig.staticContent,
+      qConfig.redirect,
+      foldMapNT(f) compose metastoreCtx.interp)
 
     (serv, metastoreCtx.closeMnts *> metastoreCtx.metastore.shutdown)
   }
 
   def launchServer(
-      args: Array[String],
-      builder: (QuasarConfig, Int, MetaStoreCtx) => (ServiceStarter, Task[Unit])
+    args: Array[String],
+    builder: (QuasarConfig, Int, MetaStoreCtx) => (ServiceStarter, Task[Unit])
   )(implicit
-    configOps: ConfigOps[WebConfig]): Task[Unit] = {
+    configOps: ConfigOps[WebConfig]
+  ): Task[Unit] = {
     def start(tx: StatefulTransactor, port: Int, qCfg: QuasarConfig) =
       for {
         _     <- verifySchema(Schema.schema, tx.transactor)
         msCtx <- metastoreCtx(tx)
         (srvc, sdown) = builder(qCfg, port, msCtx)
-        _ <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
-        _ <- sdown.liftM[MainErrT]
+        _     <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
+        _     <- sdown.liftM[MainErrT]
       } yield ()
 
     logErrors(for {
-      qCfg <- QuasarConfig.fromArgs(args)
-      wCfg <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
-      msCfg <- wCfg.metastore
-        .cata(Task.now, MetaStoreConfig.configOps.default)
-        .liftM[MainErrT]
-      tx <- metastoreTransactor(msCfg)
-      _ <- EitherT((qCfg.cmd match {
-        case Start =>
-          start(tx, qCfg.port | wCfg.server.port, qCfg)
-        case InitUpdateMetaStore =>
-          initUpdateMigrate(Schema.schema, tx.transactor, qCfg.configPath)
-      }).run.onFinish(κ(tx.shutdown)))
+      qCfg  <- QuasarConfig.fromArgs(args)
+      wCfg  <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
+      msCfg <- wCfg.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
+      tx    <- metastoreTransactor(msCfg)
+      _     <- EitherT((qCfg.cmd match {
+                 case Start =>
+                   start(tx, qCfg.port | wCfg.server.port, qCfg)
+                 case InitUpdateMetaStore =>
+                   initUpdateMigrate(Schema.schema, tx.transactor, qCfg.configPath)
+               }).run.onFinish(κ(tx.shutdown)))
     } yield ())
   }
 

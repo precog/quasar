@@ -29,48 +29,31 @@ import scalaz.syntax.monad._
 
 import java.time.LocalDateTime
 
-class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M])
-    extends APIKeyFinder[M]
-    with Logging { self =>
+class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging { self =>
   private val permissions = Set[Permission](
     ReadPermission(Path("/"), WrittenByAny),
     WritePermission(Path("/"), WriteAs.any),
     DeletePermission(Path("/"), WrittenByAny)
   )
 
-  val rootGrant = v1.GrantDetails(java.util.UUID.randomUUID.toString,
-                                  None,
-                                  None,
-                                  permissions,
-                                  instant.zero,
-                                  None)
-  val rootAPIKeyRecord =
-    v1.APIKeyDetails(apiKey, Some("Static api key"), None, Set(rootGrant), Nil)
+  val rootGrant        = v1.GrantDetails(java.util.UUID.randomUUID.toString, None, None, permissions, instant.zero, None)
+  val rootAPIKeyRecord = v1.APIKeyDetails(apiKey, Some("Static api key"), None, Set(rootGrant), Nil)
 
   val rootGrantId = M.point(rootGrant.grantId)
   val rootAPIKey  = M.point(rootAPIKeyRecord.apiKey)
 
-  def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]) =
-    M.point(if (apiKey == self.apiKey) Some(rootAPIKeyRecord) else None)
-  def findGrant(grantId: GrantId) =
-    M.point(if (rootGrant.grantId == grantId) Some(rootGrant) else None)
+  def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]) = M.point(if (apiKey == self.apiKey) Some(rootAPIKeyRecord) else None)
+  def findGrant(grantId: GrantId)                         = M.point(if (rootGrant.grantId == grantId) Some(rootGrant) else None)
 
-  def findAllAPIKeys(fromRoot: APIKey): M[Set[v1.APIKeyDetails]] =
-    findAPIKey(fromRoot, None) map { _.toSet }
+  def findAllAPIKeys(fromRoot: APIKey): M[Set[v1.APIKeyDetails]] = findAPIKey(fromRoot, None) map { _.toSet }
 
-  def createAPIKey(accountId: AccountId,
-                   keyName: Option[String] = None,
-                   keyDesc: Option[String] = None): M[v1.APIKeyDetails] = {
-    throw new UnsupportedOperationException(
-      "API key management unavailable for standalone system.")
+  def createAPIKey(accountId: AccountId, keyName: Option[String] = None, keyDesc: Option[String] = None): M[v1.APIKeyDetails] = {
+    throw new UnsupportedOperationException("API key management unavailable for standalone system.")
   }
 
   def addGrant(accountKey: APIKey, grantId: GrantId): M[Boolean] = {
-    throw new UnsupportedOperationException(
-      "Grant management unavailable for standalone system.")
+    throw new UnsupportedOperationException("Grant management unavailable for standalone system.")
   }
 
-  def hasCapability(apiKey: APIKey,
-                    perms: Set[Permission],
-                    at: Option[LocalDateTime]): M[Boolean] = M.point(true)
+  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = M.point(true)
 }

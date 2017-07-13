@@ -29,12 +29,9 @@ trait TreeMatchers {
   // uses `==`
   def beTree[A: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
     def apply[S <: A](ex: Expectable[S]) = {
-      val actual: A    = ex.value
+      val actual: A = ex.value
       val diff: String = (RenderTree[A].render(actual) diff expected.render).shows
-      result(actual == expected,
-             s"trees match:\n$diff",
-             s"trees do not match:\n$diff",
-             ex)
+      result(actual == expected, s"trees match:\n$diff", s"trees do not match:\n$diff", ex)
     }
   }
 

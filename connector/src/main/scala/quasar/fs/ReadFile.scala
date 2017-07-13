@@ -50,11 +50,13 @@ object ReadFile {
   }
 
   final case class Open(file: AFile, offset: Natural, limit: Option[Positive])
-      extends ReadFile[FileSystemError \/ ReadHandle]
+    extends ReadFile[FileSystemError \/ ReadHandle]
 
-  final case class Read(h: ReadHandle) extends ReadFile[FileSystemError \/ Vector[Data]]
+  final case class Read(h: ReadHandle)
+    extends ReadFile[FileSystemError \/ Vector[Data]]
 
-  final case class Close(h: ReadHandle) extends ReadFile[Unit]
+  final case class Close(h: ReadHandle)
+    extends ReadFile[Unit]
 
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     type F[A] = unsafe.FreeS[A]
@@ -95,7 +97,8 @@ object ReadFile {
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S: ReadFile :<: S) extends LiftedOps[ReadFile, S] {
+  final class Unsafe[S[_]](implicit S: ReadFile :<: S)
+    extends LiftedOps[ReadFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
 
@@ -130,13 +133,11 @@ object ReadFile {
   implicit def renderTree[A]: RenderTree[ReadFile[A]] =
     new RenderTree[ReadFile[A]] {
       def render(rf: ReadFile[A]) = rf match {
-        case Open(file, off, lim) =>
-          NonTerminal(List("Open"),
-                      None,
-                      file.render :: Terminal(List("Offset"), Some(off.toString)) ::
-                        lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
-        case Read(handle)  => Terminal(List("Read"), handle.shows.some)
-        case Close(handle) => Terminal(List("Close"), handle.shows.some)
+        case Open(file, off, lim) => NonTerminal(List("Open"), None,
+          file.render :: Terminal(List("Offset"), Some(off.toString)) ::
+            lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
+        case Read(handle)         => Terminal(List("Read"), handle.shows.some)
+        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
       }
     }
 }

@@ -48,9 +48,7 @@ sealed trait Column {
 
 private[yggdrasil] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
 
-trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A]
-    extends Column
-    with (Int => Array[A]) { self =>
+trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]
   def apply(row: Int): Array[A]
   def isDefinedAt(row: Int): Boolean
@@ -75,6 +73,7 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A]
     sys.error("...")
   }
 
+
   def leafTpe: CValueType[_] = {
     @tailrec def loop(a: CValueType[_]): CValueType[_] = a match {
       case CArrayType(elemType) => loop(elemType)
@@ -96,14 +95,12 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A]
 }
 
 object HomogeneousArrayColumn {
-  def apply[A: CValueType](f: Int =?> Array[A]): HomogeneousArrayColumn[A] =
-    new HomogeneousArrayColumn[A] {
-      val tpe: CArrayType[A]    = implicitly
-      def isDefinedAt(row: Int) = f isDefinedAt row
-      def apply(row: Int)       = f(row)
-    }
-  def unapply[A](col: HomogeneousArrayColumn[A]): Option[CValueType[A]] =
-    Some(col.tpe.elemType)
+  def apply[A: CValueType](f: Int =?> Array[A]): HomogeneousArrayColumn[A] = new HomogeneousArrayColumn[A] {
+    val tpe: CArrayType[A]    = implicitly
+    def isDefinedAt(row: Int) = f isDefinedAt row
+    def apply(row: Int)       = f(row)
+  }
+  def unapply[A](col: HomogeneousArrayColumn[A]): Option[CValueType[A]] = Some(col.tpe.elemType)
 
   @inline
   private[table] def select[A](col: HomogeneousArrayColumn[A], i: Int) = col match {
@@ -166,7 +163,7 @@ trait BoolColumn extends Column with (Int => Boolean) {
 
   def asBitSet(undefinedVal: Boolean, size: Int): BitSet = {
     val back = new BitSet(size)
-    var i    = 0
+    var i = 0
     while (i < size) {
       val b =
         if (!isDefinedAt(i))
@@ -180,7 +177,7 @@ trait BoolColumn extends Column with (Int => Boolean) {
     back
   }
 
-  override val tpe                        = CBoolean
+  override val tpe = CBoolean
   override def jValue(row: Int)           = JBool(this(row))
   override def cValue(row: Int)           = CBoolean(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -196,10 +193,9 @@ object BoolColumn {
     def apply(row: Int) = false
   }
 
-  def Either(definedAt: BitSet, values: BitSet) =
-    new BitsetColumn(definedAt) with BoolColumn {
-      def apply(row: Int) = values(row)
-    }
+  def Either(definedAt: BitSet, values: BitSet) = new BitsetColumn(definedAt) with BoolColumn {
+    def apply(row: Int) = values(row)
+  }
 }
 
 trait LongColumn extends Column with (Int => Long) {
@@ -207,7 +203,7 @@ trait LongColumn extends Column with (Int => Long) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe                        = CLong
+  override val tpe = CLong
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CLong(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -219,7 +215,7 @@ trait DoubleColumn extends Column with (Int => Double) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe                        = CDouble
+  override val tpe = CDouble
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CDouble(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -231,7 +227,7 @@ trait NumColumn extends Column with (Int => BigDecimal) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe                        = CNum
+  override val tpe = CNum
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CNum(this(row))
   override def strValue(row: Int): String = this(row).toString
@@ -244,7 +240,7 @@ trait StrColumn extends Column with (Int => String) {
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
 
-  override val tpe                        = CString
+  override val tpe = CString
   override def jValue(row: Int)           = JString(this(row))
   override def cValue(row: Int)           = CString(this(row))
   override def strValue(row: Int): String = this(row)
@@ -292,11 +288,11 @@ object EmptyArrayColumn {
 trait EmptyObjectColumn extends Column {
   def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
-  override val tpe                          = CEmptyObject
-  override def jValue(row: Int)             = JObject(Nil)
-  override def cValue(row: Int)             = CEmptyObject
-  override def strValue(row: Int): String   = "{}"
-  override def toString                     = "EmptyObjectColumn"
+  override val tpe = CEmptyObject
+  override def jValue(row: Int)           = JObject(Nil)
+  override def cValue(row: Int)           = CEmptyObject
+  override def strValue(row: Int): String = "{}"
+  override def toString                   = "EmptyObjectColumn"
 }
 
 object EmptyObjectColumn {
@@ -306,11 +302,11 @@ object EmptyObjectColumn {
 trait NullColumn extends Column {
   def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
-  override val tpe                          = CNull
-  override def jValue(row: Int)             = JNull
-  override def cValue(row: Int)             = CNull
-  override def strValue(row: Int): String   = "null"
-  override def toString                     = "NullColumn"
+  override val tpe = CNull
+  override def jValue(row: Int)           = JNull
+  override def cValue(row: Int)           = CNull
+  override def strValue(row: Int): String = "null"
+  override def toString                   = "NullColumn"
 }
 object NullColumn {
   def apply(definedAt: BitSet) = {
@@ -320,29 +316,23 @@ object NullColumn {
 
 object UndefinedColumn {
   def apply(col: Column) = new Column {
-    def rowEq(row1: Int, row2: Int): Boolean =
-      sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
-    def rowCompare(row1: Int, row2: Int): Int =
-      sys.error("Cannot compare undefined values.")
-    def isDefinedAt(row: Int) = false
-    val tpe                   = col.tpe
-    def jValue(row: Int)      = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
-    def cValue(row: Int)      = CUndefined
-    def strValue(row: Int) =
-      sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def rowEq(row1: Int, row2: Int): Boolean  = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare undefined values.")
+    def isDefinedAt(row: Int)                 = false
+    val tpe                                   = col.tpe
+    def jValue(row: Int)                      = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def cValue(row: Int)                      = CUndefined
+    def strValue(row: Int)                    = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
   }
 
   val raw = new Column {
-    def rowEq(row1: Int, row2: Int): Boolean =
-      sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
-    def rowCompare(row1: Int, row2: Int): Int =
-      sys.error("Cannot compare undefined values.")
-    def isDefinedAt(row: Int) = false
-    val tpe                   = CUndefined
-    def jValue(row: Int)      = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
-    def cValue(row: Int)      = CUndefined
-    def strValue(row: Int) =
-      sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def rowEq(row1: Int, row2: Int): Boolean  = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare undefined values.")
+    def isDefinedAt(row: Int)                 = false
+    val tpe                                   = CUndefined
+    def jValue(row: Int)                      = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
+    def cValue(row: Int)                      = CUndefined
+    def strValue(row: Int)                    = sys.error("Values in undefined columns SHOULD NOT BE ACCESSED")
   }
 }
 
@@ -442,30 +432,22 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const[@spec(Boolean, Long, Double) A: CValueType](v: Array[A]) =
-    new InfiniteColumn with HomogeneousArrayColumn[A] {
-      val tpe             = CArrayType(CValueType[A])
-      def apply(row: Int) = v
-    }
+  @inline def const[@spec(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
+    val tpe = CArrayType(CValueType[A])
+    def apply(row: Int) = v
+  }
 
   def lift(col: Column): HomogeneousArrayColumn[_] = col match {
-    case col: BoolColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: LongColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: DoubleColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: NumColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: StrColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: DateColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: PeriodColumn =>
-      HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: BoolColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: LongColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: DoubleColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: NumColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: StrColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: DateColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: PeriodColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: HomogeneousArrayColumn[a] =>
       new HomogeneousArrayColumn[Array[a]] {
-        val tpe                              = CArrayType(col.tpe)
+        val tpe = CArrayType(col.tpe)
         def isDefinedAt(row: Int)            = col.isDefinedAt(row)
         def apply(row: Int): Array[Array[a]] = Array(col(row))(col.tpe.classTag)
       }
@@ -475,8 +457,7 @@ object Column {
   object unionRightSemigroup extends Semigroup[Column] {
     def append(c1: Column, c2: => Column): Column = {
       cf.util.UnionRight(c1, c2) getOrElse {
-        sys.error(
-          "Illgal attempt to merge columns of dissimilar type: " + c1.tpe + "," + c2.tpe)
+        sys.error("Illgal attempt to merge columns of dissimilar type: " + c1.tpe + "," + c2.tpe)
       }
     }
   }

@@ -19,6 +19,6 @@ package quasar.physical.mongodb
 sealed abstract class RenameSemantics
 
 object RenameSemantics {
-  case object Overwrite    extends RenameSemantics
+  case object Overwrite extends RenameSemantics
   case object FailIfExists extends RenameSemantics
 }

@@ -43,80 +43,70 @@ final class OperationsSpec extends quasar.Qspec {
   def markLogicOpsShould(f: Op ~> Id): Unit = {
     "Appending to files consisting of a single Map" >> {
       def appendToMapTest[T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](
-          loc: AFile,
-          append: Data)(
-          check: (ListMap[String, Data], Data) => MatchResult[_]
+        loc: AFile, append: Data)(
+        check: (ListMap[String, Data], Data) => MatchResult[_]
       ): MatchResult[_] = {
         val initialMap: ListMap[String, Data] =
-          ListMap("foo"  -> Data._int(42),
-                  "bar"  -> Data._str("baz"),
-                  "quux" -> Data._arr(List(Data._dec(1.234), Data._dec(452.498347))))
+          ListMap(
+            "foo"  -> Data._int(42),
+            "bar"  -> Data._str("baz"),
+            "quux" -> Data._arr(List(Data._dec(1.234), Data._dec(452.498347))))
 
         val insertAndAppend =
           ops.insertFile[Op, T, Data](loc, Data._obj(initialMap)) *>
-            ops.appendToFile[Op, T, Data](loc, append) *>
-            fileContents[T](loc)
+          ops.appendToFile[Op, T, Data](loc, append)              *>
+          fileContents[T](loc)
 
         f(insertAndAppend map (check(initialMap, _)))
       }
 
       val toAppend: ListMap[String, Data] =
-        ListMap("blorp" -> Data.Obj("a" -> Data._int(1), "b" -> Data.Null),
-                "fizz"  -> Data.True,
-                "buzz"  -> Data.Id("ae453df234"))
+        ListMap(
+          "blorp" -> Data.Obj("a" -> Data._int(1), "b" -> Data.Null),
+          "fizz"  -> Data.True,
+          "buzz"  -> Data.Id("ae453df234"))
 
       def verifyAppended(initial: ListMap[String, Data], contents: Data): MatchResult[_] = {
-        val expValues = (initial ++ toAppend).values.toList
-        Data._obj.getOption(contents) map (_.values.toList) must beSome(equal(expValues))
+          val expValues = (initial ++ toAppend).values.toList
+          Data._obj.getOption(contents) map (_.values.toList) must beSome(equal(expValues))
       }
 
-      def appendArrayToMapTest[
-          T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](
-          loc: AFile): MatchResult[_] =
+      def appendArrayToMapTest[T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](loc: AFile): MatchResult[_] =
         appendToMapTest(loc, Data._arr(toAppend.values.toList))(verifyAppended)
 
-      def appendMapToMapTest[
-          T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](
-          loc: AFile): MatchResult[_] =
+      def appendMapToMapTest[T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](loc: AFile): MatchResult[_] =
         appendToMapTest(loc, Data._obj(toAppend))(verifyAppended)
 
       "appends array content to XML element" >>
-        appendArrayToMapTest[DocType.Xml](
-          rootDir </> dir("appendtest") </> file("xmlarr"))
+        appendArrayToMapTest[DocType.Xml](rootDir </> dir("appendtest") </> file("xmlarr"))
 
       "appends map content to XML element" >>
         appendMapToMapTest[DocType.Xml](rootDir </> dir("appendtest") </> file("xmlmap"))
 
       "appends array content to JSON object" >>
-        appendArrayToMapTest[DocType.Json](
-          rootDir </> dir("appendtest") </> file("jsonarr"))
+        appendArrayToMapTest[DocType.Json](rootDir </> dir("appendtest") </> file("jsonarr"))
 
       "appends map content to JSON object" >>
-        appendMapToMapTest[DocType.Json](
-          rootDir </> dir("appendtest") </> file("jsonmap"))
+        appendMapToMapTest[DocType.Json](rootDir </> dir("appendtest") </> file("jsonmap"))
     }; ()
   }
 
   /** Returns the root document of the file at the given path. */
   def fileContents[T: SearchOptions](path: AFile): Op[Data] =
-    Xcc[Op]
-      .queryResults(fileNode(path))
-      .map(
-        _.headOption flatMap (xdmitem
-          .toData[ErrorMessages \/ ?](_)
-          .toOption) getOrElse Data.NA)
+    Xcc[Op].queryResults(fileNode(path))
+      .map(_.headOption flatMap (xdmitem.toData[ErrorMessages \/ ?](_).toOption) getOrElse Data.NA)
 
   type SRT[F[_], A]  = Kleisli[F, Session, A]
   type SR[A]         = SRT[Task, A]
   type MLPlanFail[A] = Failure[MarkLogicPlannerError, A]
 
   type OpF[A] = (
-    Task
-      :\: GenUUID
-      :\: MonotonicSeq
-      :\: MLPlanFail
-      :\: XccSessionR
-      :/: XccContentSourceR
+        Task
+    :\: GenUUID
+    :\: MonotonicSeq
+    :\: MLPlanFail
+    :\: XccSessionR
+    :/: XccContentSourceR
   )#M[A]
 
   type Op[A] = PrologT[Free[OpF, ?], A]
@@ -125,8 +115,7 @@ final class OperationsSpec extends quasar.Qspec {
   private implicit val xccSourceR  = Read.monadReader_[ContentSource, OpF]
   private implicit val uuidR       = Read.monadReader_[UUID, OpF]
   private implicit val mlPlanE     = Failure.monadError_[MarkLogicPlannerError, OpF]
-  private implicit val listMapShow =
-    Show[Map[String, Data]].contramap[ListMap[String, Data]](x => x)
+  private implicit val listMapShow = Show[Map[String, Data]].contramap[ListMap[String, Data]](x => x)
 
   // Wraps the program in a transaction and forces a rollback, leaving the db untouched.
   val ephemerally: Op ~> Op = {
@@ -139,31 +128,27 @@ final class OperationsSpec extends quasar.Qspec {
   def interpOpF(cs: ContentSource): Task[OpF ~> SR] = {
     val lt = liftMT[Task, SRT]
     (GenUUID.type4[Task] |@| MonotonicSeq.fromZero) { (genUUID, monoSeq) =>
-      lt :+:
-        (lt compose genUUID) :+:
-        (lt compose monoSeq) :+:
-        Failure.toRuntimeError[SR, MarkLogicPlannerError] :+:
-        Read.toReader[SR, Session] :+:
-        Read.constant[SR, ContentSource](cs)
+      lt                                                :+:
+      (lt compose genUUID)                              :+:
+      (lt compose monoSeq)                              :+:
+      Failure.toRuntimeError[SR, MarkLogicPlannerError] :+:
+      Read.toReader[SR, Session]                        :+:
+      Read.constant[SR, ContentSource](cs)
     }
   }
 
   val dropWritten = λ[Op ~> Free[OpF, ?]](_.value)
   val performTask = λ[Task ~> Id](_.unsafePerformSync)
 
-  TestConfig
-    .fileSystemConfigs(FsType)
-    .flatMap(_.headOption traverse_ {
-      case (_, uri, _) =>
-        for {
-          cs      <- contentSourceConnection[Task](uri)
-          opFToSR <- interpOpF(cs)
-          run = performTask compose
-            provideSession[Task](cs) compose
-            foldMapNT(opFToSR) compose
-            dropWritten compose
-            ephemerally
-        } yield markLogicOpsShould(run)
-    })
-    .unsafePerformSync
+  TestConfig.fileSystemConfigs(FsType).flatMap(_.headOption traverse_ {
+    case (_, uri, _) => for {
+      cs       <- contentSourceConnection[Task](uri)
+      opFToSR  <- interpOpF(cs)
+      run      =  performTask              compose
+                  provideSession[Task](cs) compose
+                  foldMapNT(opFToSR)       compose
+                  dropWritten              compose
+                  ephemerally
+    } yield markLogicOpsShould(run)
+  }).unsafePerformSync
 }

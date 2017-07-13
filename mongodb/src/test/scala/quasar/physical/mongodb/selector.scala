@@ -18,9 +18,9 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 
-class SelectorSpec extends quasar.Qspec {
+class SelectorSpec extends quasar.Qspec  {
 
-  implicit def toBson(x: Int)        = Bson.Int32(x)
+  implicit def toBson(x: Int) = Bson.Int32(x)
   implicit def toField(name: String) = BsonField.Name(name)
 
   "Selector" should {
@@ -32,8 +32,7 @@ class SelectorSpec extends quasar.Qspec {
       }
 
       "render $not expr" in {
-        NotExpr(Lt(10)).bson must_== Bson.Doc(
-          ListMap("$not" -> Bson.Doc("$lt" -> Bson.Int32(10))))
+        NotExpr(Lt(10)).bson must_== Bson.Doc(ListMap("$not" -> Bson.Doc("$lt" -> Bson.Int32(10))))
       }
 
       "render simple selector" in {
@@ -59,10 +58,10 @@ class SelectorSpec extends quasar.Qspec {
           )
         )
         cs.bson must_==
-          Bson.Doc(
-            "$and" -> Bson.Arr(Bson.Doc("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))),
-                               Bson.Doc("foo" -> Bson.Doc("$lt" -> Bson.Int32(20))),
-                               Bson.Doc("foo" -> Bson.Doc("$ne" -> Bson.Int32(15)))))
+          Bson.Doc("$and" -> Bson.Arr(
+            Bson.Doc("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))),
+            Bson.Doc("foo" -> Bson.Doc("$lt" -> Bson.Int32(20))),
+            Bson.Doc("foo" -> Bson.Doc("$ne" -> Bson.Int32(15)))))
       }
 
       "render not(eq(...))" in {
@@ -72,41 +71,51 @@ class SelectorSpec extends quasar.Qspec {
 
       "render nested And within Or" in {
         val cs =
-          Or(And(Doc(BsonField.Name("foo") -> Gt(10)),
-                 Doc(BsonField.Name("foo") -> Lt(20))),
-             And(Doc(BsonField.Name("bar") -> Gte(1)),
-                 Doc(BsonField.Name("bar") -> Lte(5))))
+          Or(
+            And(
+              Doc(BsonField.Name("foo") -> Gt(10)),
+              Doc(BsonField.Name("foo") -> Lt(20))),
+            And(
+              Doc(BsonField.Name("bar") -> Gte(1)),
+              Doc(BsonField.Name("bar") -> Lte(5))))
 
-        cs.bson must_== Bson.Doc(
-          "$or" -> Bson.Arr(
-            Bson.Doc(
-              "$and" -> Bson.Arr(Bson.Doc("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))),
-                                 Bson.Doc("foo" -> Bson.Doc("$lt" -> Bson.Int32(20))))),
-            Bson.Doc(
-              "$and" -> Bson.Arr(Bson.Doc("bar" -> Bson.Doc("$gte" -> Bson.Int32(1))),
-                                 Bson.Doc("bar" -> Bson.Doc("$lte" -> Bson.Int32(5)))))
-          ))
+        cs.bson must_== Bson.Doc("$or" -> Bson.Arr(
+          Bson.Doc("$and" -> Bson.Arr(
+            Bson.Doc("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))),
+            Bson.Doc("foo" -> Bson.Doc("$lt" -> Bson.Int32(20))))),
+          Bson.Doc("$and" -> Bson.Arr(
+            Bson.Doc("bar" -> Bson.Doc("$gte" -> Bson.Int32(1))),
+            Bson.Doc("bar" -> Bson.Doc("$lte" -> Bson.Int32(5)))))))
       }
     }
 
     "negate" should {
       "rewrite singleton Doc" in {
-        val sel = Doc(BsonField.Name("x") -> Lt(10), BsonField.Name("y") -> Gt(10))
-        sel.negate must_== Or(Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-                              Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+        val sel = Doc(
+          BsonField.Name("x") -> Lt(10),
+          BsonField.Name("y") -> Gt(10))
+        sel.negate must_== Or(
+          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
       }
 
       "rewrite And" in {
         val sel =
-          And(Doc(BsonField.Name("x")                      -> Lt(10)), Doc(BsonField.Name("y") -> Gt(10)))
-        sel.negate must_== Or(Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-                              Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+          And(
+            Doc(BsonField.Name("x") -> Lt(10)),
+            Doc(BsonField.Name("y") -> Gt(10)))
+        sel.negate must_== Or(
+          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
       }
 
       "rewrite Doc" in {
-        val sel = Doc(BsonField.Name("x") -> Lt(10), BsonField.Name("y") -> Gt(10))
-        sel.negate must_== Or(Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-                              Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+        val sel = Doc(
+          BsonField.Name("x") -> Lt(10),
+          BsonField.Name("y") -> Gt(10))
+        sel.negate must_== Or(
+          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
       }
     }
   }

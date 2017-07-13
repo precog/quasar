@@ -44,13 +44,7 @@ object Event {
 /**
   * If writeAs is None, then the downstream
   */
-case class Ingest(apiKey: APIKey,
-                  path: Path,
-                  writeAs: Option[Authorities],
-                  data: Seq[JValue],
-                  jobId: Option[JobId],
-                  timestamp: Instant,
-                  streamRef: StreamRef)
+case class Ingest(apiKey: APIKey, path: Path, writeAs: Option[Authorities], data: Seq[JValue], jobId: Option[JobId], timestamp: Instant, streamRef: StreamRef)
     extends Event {
   def fold[A](ingest: Ingest => A, archive: Archive => A): A = ingest(this)
 
@@ -67,27 +61,26 @@ case class Ingest(apiKey: APIKey,
 
 object Ingest {
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: "streamRef" :: HNil
-  implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] =
-    implicitly[Extractor[List[A]]].map(_.toSeq)
+  implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
 
   val decomposerV1: Decomposer[Ingest] = decomposerV[Ingest](schemaV1, Some("1.1".v))
-  val extractorV1: Extractor[Ingest]   = extractorV[Ingest](schemaV1, Some("1.1".v))
+  val extractorV1: Extractor[Ingest] = extractorV[Ingest](schemaV1, Some("1.1".v))
 
   // A transitionary format similar to V1 structure, but lacks a version number and only carries a single data element
   val extractorV1a = new Extractor[Ingest] {
     def validated(obj: JValue): Validation[Error, Ingest] = {
       (obj.validated[APIKey]("apiKey") |@|
-        obj.validated[Path]("path") |@|
-        obj.validated[Option[AccountId]]("ownerAccountId")) {
-        (apiKey, path, ownerAccountId) =>
-          val jv = (obj \ "data")
-          Ingest(apiKey,
-                 path,
-                 ownerAccountId.map(Authorities(_)),
-                 if (jv == JUndefined) Vector() else Vector(jv),
-                 None,
-                 EventMessage.defaultTimestamp,
-                 StreamRef.Append)
+            obj.validated[Path]("path") |@|
+            obj.validated[Option[AccountId]]("ownerAccountId")) { (apiKey, path, ownerAccountId) =>
+        val jv = (obj \ "data")
+        Ingest(
+          apiKey,
+          path,
+          ownerAccountId.map(Authorities(_)),
+          if (jv == JUndefined) Vector() else Vector(jv),
+          None,
+          EventMessage.defaultTimestamp,
+          StreamRef.Append)
       }
     }
   }
@@ -95,28 +88,21 @@ object Ingest {
   val extractorV0 = new Extractor[Ingest] {
     def validated(obj: JValue): Validation[Error, Ingest] = {
       (obj.validated[String]("tokenId") |@|
-        obj.validated[Path]("path")) { (apiKey, path) =>
+            obj.validated[Path]("path")) { (apiKey, path) =>
         val jv = (obj \ "data")
-        Ingest(apiKey,
-               path,
-               None,
-               if (jv == JUndefined) Vector() else Vector(jv),
-               None,
-               EventMessage.defaultTimestamp,
-               StreamRef.Append)
+        Ingest(apiKey, path, None, if (jv == JUndefined) Vector() else Vector(jv), None, EventMessage.defaultTimestamp, StreamRef.Append)
       }
     }
   }
 
   implicit val decomposer: Decomposer[Ingest] = decomposerV1
-  implicit val extractor: Extractor[Ingest]   = extractorV1 <+> extractorV1a <+> extractorV0
+  implicit val extractor: Extractor[Ingest] = extractorV1 <+> extractorV1a <+> extractorV0
 }
 
-case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: Instant)
-    extends Event {
+case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: Instant) extends Event {
   def fold[A](ingest: Ingest => A, archive: Archive => A): A = archive(this)
-  def split(n: Int)                                          = List(this) // can't split an archive
-  def length                                                 = 1
+  def split(n: Int) = List(this) // can't split an archive
+  def length = 1
 }
 
 object Archive {
@@ -124,8 +110,7 @@ object Archive {
   val schemaV0 = "tokenId" :: "path" :: Omit :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
 
   val decomposerV1: Decomposer[Archive] = decomposerV[Archive](schemaV1, Some("1.0".v))
-  val extractorV1
-    : Extractor[Archive] = extractorV[Archive](schemaV1, Some("1.0".v)) <+> extractorV1a
+  val extractorV1: Extractor[Archive] = extractorV[Archive](schemaV1, Some("1.0".v)) <+> extractorV1a
 
   // Support un-versioned V1 schemas and out-of-order fields due to an earlier bug
   val extractorV1a: Extractor[Archive] = extractorV[Archive](schemaV1, None) map {
@@ -139,7 +124,7 @@ object Archive {
   val extractorV0: Extractor[Archive] = extractorV[Archive](schemaV0, None)
 
   implicit val decomposer: Decomposer[Archive] = decomposerV1
-  implicit val extractor: Extractor[Archive]   = extractorV1 <+> extractorV0
+  implicit val extractor: Extractor[Archive] = extractorV1 <+> extractorV0
 }
 
 sealed trait StreamRef {
@@ -150,35 +135,31 @@ sealed trait StreamRef {
 
 object StreamRef {
   def forWriteMode(mode: WriteMode, terminal: Boolean): StreamRef = mode match {
-    case AccessMode.Create  => StreamRef.Create(randomUuid, terminal)
+    case AccessMode.Create => StreamRef.Create(randomUuid, terminal)
     case AccessMode.Replace => StreamRef.Replace(randomUuid, terminal)
-    case AccessMode.Append  => StreamRef.Append
+    case AccessMode.Append => StreamRef.Append
   }
 
   case class Create(streamId: UUID, terminal: Boolean) extends StreamRef {
     def terminate = copy(terminal = true)
-    def split(n: Int): Seq[StreamRef] =
-      Vector.fill(n - 1) { copy(terminal = false) } :+ this
+    def split(n: Int): Seq[StreamRef] = Vector.fill(n - 1) { copy(terminal = false) } :+ this
   }
 
   case class Replace(streamId: UUID, terminal: Boolean) extends StreamRef {
     def terminate = copy(terminal = true)
-    def split(n: Int): Seq[StreamRef] =
-      Vector.fill(n - 1) { copy(terminal = false) } :+ this
+    def split(n: Int): Seq[StreamRef] = Vector.fill(n - 1) { copy(terminal = false) } :+ this
   }
 
   case object Append extends StreamRef {
-    val terminal                      = false
-    def terminate                     = this
+    val terminal = false
+    def terminate = this
     def split(n: Int): Seq[StreamRef] = Vector.fill(n) { this }
   }
 
   implicit val decomposer: Decomposer[StreamRef] = new Decomposer[StreamRef] {
     def decompose(streamRef: StreamRef) = streamRef match {
-      case Create(uuid, terminal) =>
-        JObject("create" -> JObject("uuid" -> uuid.jv, "terminal" -> terminal.jv))
-      case Replace(uuid, terminal) =>
-        JObject("replace" -> JObject("uuid" -> uuid.jv, "terminal" -> terminal.jv))
+      case Create(uuid, terminal) => JObject("create" -> JObject("uuid" -> uuid.jv, "terminal" -> terminal.jv))
+      case Replace(uuid, terminal) => JObject("replace" -> JObject("uuid" -> uuid.jv, "terminal" -> terminal.jv))
       case Append => JString("append")
     }
   }
@@ -188,12 +169,11 @@ object StreamRef {
       case JString("append") => Success(Append)
       case other =>
         ((other \? "create") map { jv =>
-          (jv, Create.apply _)
-        }) orElse ((other \? "replace") map { jv =>
-          (jv, Replace.apply _)
-        }) map {
-          case (jv, f) =>
-            (jv.validated[UUID]("uuid") |@| jv.validated[Boolean]("terminal")) { f }
+              (jv, Create.apply _)
+            }) orElse ((other \? "replace") map { jv =>
+              (jv, Replace.apply _)
+            }) map {
+          case (jv, f) => (jv.validated[UUID]("uuid") |@| jv.validated[Boolean]("terminal")) { f }
         } getOrElse {
           Failure(Invalid("Storage mode %s not recogized.".format(other)))
         }

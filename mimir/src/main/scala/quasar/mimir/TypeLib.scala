@@ -24,8 +24,7 @@ trait TypeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     val TypeNamespace = Vector("std", "type")
 
-    override def _lib1 =
-      super._lib1 ++ Set(isNumber, isBoolean, isNull, isString, isObject, isArray)
+    override def _lib1 = super._lib1 ++ Set(isNumber, isBoolean, isNull, isString, isObject, isArray)
 
     object isNumber extends Op1(TypeNamespace, "isNumber") {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)

@@ -40,8 +40,7 @@ final class DataEncodingSpec extends quasar.Qspec {
     }
 
     "roundtrip through serialization" >> prop { data: Data =>
-      val rt = encodeXml[Result](data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[
-        Result] _
+      val rt = encodeXml[Result](data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
       rt must_= data.some.right
     }
 
@@ -58,12 +57,11 @@ final class DataEncodingSpec extends quasar.Qspec {
         </ejson:ejson>
       """
 
-      val exp = Data._obj(
-        ListMap(
-          "foo" -> Data._int(34),
-          "bar" -> Data._id("123"),
-          "baz" -> Data._dec(42.0)
-        ))
+      val exp = Data._obj(ListMap(
+        "foo" -> Data._int(34),
+        "bar" -> Data._id("123"),
+        "baz" -> Data._dec(42.0)
+      ))
 
       (parseXML(orig) >>= decodeXml[Result](_ => Data._dec(42.0).right)) must_= exp.some.right
     }

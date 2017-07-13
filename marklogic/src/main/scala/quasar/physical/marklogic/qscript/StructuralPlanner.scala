@@ -146,29 +146,23 @@ trait StructuralPlanner[F[_], FMT] { self =>
   def transform[G[_]](f: F ~> G): StructuralPlanner[G, FMT] =
     new StructuralPlanner[G, FMT] {
       def null_ : G[XQuery] = f(self.null_)
-      def arrayAppend(array: XQuery, value: XQuery): G[XQuery] =
-        f(self.arrayAppend(array, value))
+      def arrayAppend(array: XQuery, value: XQuery): G[XQuery] = f(self.arrayAppend(array, value))
       def arrayConcat(a1: XQuery, a2: XQuery): G[XQuery] = f(self.arrayConcat(a1, a2))
-      def arrayElementAt(array: XQuery, index: XQuery): G[XQuery] =
-        f(self.arrayElementAt(array, index))
-      def asSortKey(item: XQuery): G[XQuery]   = f(self.asSortKey(item))
-      def isArray(item: XQuery): G[XQuery]     = f(self.isArray(item))
-      def leftShift(node: XQuery): G[XQuery]   = f(self.leftShift(node))
+      def arrayElementAt(array: XQuery, index: XQuery): G[XQuery] = f(self.arrayElementAt(array, index))
+      def asSortKey(item: XQuery): G[XQuery] = f(self.asSortKey(item))
+      def isArray(item: XQuery): G[XQuery] = f(self.isArray(item))
+      def leftShift(node: XQuery): G[XQuery] = f(self.leftShift(node))
       def mkArray(elements: XQuery): G[XQuery] = f(self.mkArray(elements))
-      def mkArrayElt(item: XQuery): G[XQuery]  = f(self.mkArrayElt(item))
+      def mkArrayElt(item: XQuery): G[XQuery] = f(self.mkArrayElt(item))
       def mkObject(entries: XQuery): G[XQuery] = f(self.mkObject(entries))
-      def mkObjectEntry(key: XQuery, value: XQuery): G[XQuery] =
-        f(self.mkObjectEntry(key, value))
-      def nodeCast(node: XQuery): G[XQuery]     = f(self.nodeCast(node))
+      def mkObjectEntry(key: XQuery, value: XQuery): G[XQuery] = f(self.mkObjectEntry(key, value))
+      def nodeCast(node: XQuery): G[XQuery] = f(self.nodeCast(node))
       def nodeMetadata(node: XQuery): G[XQuery] = f(self.nodeMetadata(node))
       def nodeToString(node: XQuery): G[XQuery] = f(self.nodeToString(node))
-      def nodeType(node: XQuery): G[XQuery]     = f(self.nodeType(node))
-      def objectDelete(obj: XQuery, key: XQuery): G[XQuery] =
-        f(self.objectDelete(obj, key))
-      def objectInsert(obj: XQuery, key: XQuery, value: XQuery): G[XQuery] =
-        f(self.objectInsert(obj, key, value))
-      def objectLookup(obj: XQuery, key: XQuery): G[XQuery] =
-        f(self.objectLookup(obj, key))
+      def nodeType(node: XQuery): G[XQuery] = f(self.nodeType(node))
+      def objectDelete(obj: XQuery, key: XQuery): G[XQuery] = f(self.objectDelete(obj, key))
+      def objectInsert(obj: XQuery, key: XQuery, value: XQuery): G[XQuery] = f(self.objectInsert(obj, key, value))
+      def objectLookup(obj: XQuery, key: XQuery): G[XQuery] = f(self.objectLookup(obj, key))
       def objectMerge(o1: XQuery, o2: XQuery): G[XQuery] = f(self.objectMerge(o1, o2))
     }
 
@@ -196,23 +190,21 @@ trait StructuralPlanner[F[_], FMT] { self =>
       (nodeToString(~n) |@| typeOf(item) |@| castIfNode(item))((nstr, tpe, castItem) =>
         let_(t := tpe) return_ {
           if_(fn.empty(item) or ~t eq "na".xs)
-            .then_(emptySeq)
-            .else_(
-              if_(~t eq "null".xs)
-                .then_("null".xs)
-                .else_(
-                  if_(tpe eq "date".xs)
-                    .then_(fn.formatDate(castItem, lib.dateFmt.xs))
-                    .else_(
-                      if_(tpe eq "time".xs)
-                        .then_(fn.formatTime(castItem, lib.timeFmt.xs))
-                        .else_(if_(tpe eq "timestamp".xs)
-                          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt.xs))
-                          .else_(typeswitch(item)(
-                            n as ST("node()") return_ κ(nstr)
-                          ) default fn.string(item))))))
-      })
+          .then_(emptySeq)
+          .else_(if_(~t eq "null".xs)
+          .then_("null".xs)
+          .else_(if_(tpe eq "date".xs)
+          .then_(fn.formatDate(castItem, lib.dateFmt.xs))
+          .else_(if_(tpe eq "time".xs)
+          .then_(fn.formatTime(castItem, lib.timeFmt.xs))
+          .else_(if_(tpe eq "timestamp".xs)
+          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt.xs))
+          .else_(typeswitch(item)(
+            n as ST("node()") return_ κ(nstr)
+          ) default fn.string(item))))))
+        })
     })
+
 
   // ejson:type-of($item as item()*) as xs:string?
   private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
@@ -220,29 +212,28 @@ trait StructuralPlanner[F[_], FMT] { self =>
       $("item") as ST.Top
     ).as(ST("xs:string?")) { item: XQuery =>
       val node = $("node")
-      nodeType(~node) map {
-        nType =>
-          if_(fn.empty(item))
-            .then_ { "na".xs }
-            .else_ {
-              typeswitch(item)(
-                node as ST("node()") return_ κ(nType),
-                ST("xs:boolean") return_ "boolean".xs,
-                ST("xs:dateTime") return_ "timestamp".xs,
-                ST("xs:date") return_ "date".xs,
-                ST("xs:time") return_ "time".xs,
-                ST("xs:duration") return_ "interval".xs,
-                ST("xs:integer") return_ "integer".xs,
-                ST("xs:decimal") return_ "decimal".xs,
-                ST("xs:double") return_ "decimal".xs,
-                ST("xs:float") return_ "decimal".xs,
-                ST("xs:base64Binary") return_ "binary".xs,
-                ST("xs:hexBinary") return_ "binary".xs,
-                ST("xs:QName") return_ "string".xs,
-                ST("xs:string") return_ "string".xs,
-                ST("xs:untypedAtomic") return_ "string".xs
-              ) default emptySeq
-            }
+      nodeType(~node) map { nType =>
+        if_(fn.empty(item))
+        .then_ { "na".xs }
+        .else_ {
+          typeswitch(item)(
+            node as ST("node()")   return_ κ(nType),
+            ST("xs:boolean")       return_ "boolean".xs,
+            ST("xs:dateTime")      return_ "timestamp".xs,
+            ST("xs:date")          return_ "date".xs,
+            ST("xs:time")          return_ "time".xs,
+            ST("xs:duration")      return_ "interval".xs,
+            ST("xs:integer")       return_ "integer".xs,
+            ST("xs:decimal")       return_ "decimal".xs,
+            ST("xs:double")        return_ "decimal".xs,
+            ST("xs:float")         return_ "decimal".xs,
+            ST("xs:base64Binary")  return_ "binary".xs,
+            ST("xs:hexBinary")     return_ "binary".xs,
+            ST("xs:QName")         return_ "string".xs,
+            ST("xs:string")        return_ "string".xs,
+            ST("xs:untypedAtomic") return_ "string".xs
+          ) default emptySeq
+        }
       }
     })
 
@@ -265,29 +256,27 @@ object StructuralPlanner extends StructuralPlannerInstances {
   def apply[F[_], T](implicit L: StructuralPlanner[F, T]): StructuralPlanner[F, T] = L
 
   def forTrans[F[_]: Monad, FMT, T[_[_], _]: MonadTrans](
-      implicit SP: StructuralPlanner[F, FMT]
+    implicit SP: StructuralPlanner[F, FMT]
   ): StructuralPlanner[T[F, ?], FMT] =
     SP.transform(liftMT[F, T])
 }
 
 sealed abstract class StructuralPlannerInstances extends StructuralPlannerInstances0 {
-  implicit def jsonStructuralPlanner[F[_]: Monad: PrologW: QNameGenerator]
-    : StructuralPlanner[F, DocType.Json] =
+  implicit def jsonStructuralPlanner[F[_]: Monad: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Json] =
     new JsonStructuralPlanner[F]
 
-  implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]
-    : StructuralPlanner[F, DocType.Xml] =
+  implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Xml] =
     new XmlStructuralPlanner[F]
 }
 
 sealed abstract class StructuralPlannerInstances0 {
   implicit def eitherTStructuralPlanner[F[_]: Monad, FMT, E](
-      implicit SP: StructuralPlanner[F, FMT]
+    implicit SP: StructuralPlanner[F, FMT]
   ): StructuralPlanner[EitherT[F, E, ?], FMT] =
     StructuralPlanner.forTrans[F, FMT, EitherT[?[_], E, ?]]
 
   implicit def writerTStructuralPlanner[F[_]: Monad, FMT, W: Monoid](
-      implicit SP: StructuralPlanner[F, FMT]
+    implicit SP: StructuralPlanner[F, FMT]
   ): StructuralPlanner[WriterT[F, W, ?], FMT] =
     StructuralPlanner.forTrans[F, FMT, WriterT[?[_], W, ?]]
 }

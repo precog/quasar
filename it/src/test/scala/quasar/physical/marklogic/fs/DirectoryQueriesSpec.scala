@@ -30,8 +30,7 @@ import scalaz.stream.Process
 
 final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
-  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task,
-                                  xml: AnalyticalFileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task, xml: AnalyticalFileSystem ~> Task) = {
     "Querying directory paths" >> {
       "results in a dataset comprised of immediate child documents" >> {
         val loc: ADir = rootDir </> dir("childdocs")
@@ -54,9 +53,7 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
         (setup.liftM[Process] *> eval)
           .translate(runFsE(js))
-          .runLog
-          .run
-          .map(_.toEither must beRight(contain(exactly(a, b, c))))
+          .runLog.run.map (_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
       }
 
@@ -91,8 +88,8 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
         val loadAndQueryJs =
           (saveJs.liftM[Process] *> eval).translate(runFsE(js)).runLog
 
-        (runFsE(xml)(saveXml) *> loadAndQueryJs).run
-          .map(_.toEither must beRight(contain(exactly(a, b, c))))
+        (runFsE(xml)(saveXml) *> loadAndQueryJs)
+          .run.map (_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
       }
     }

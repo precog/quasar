@@ -44,16 +44,12 @@ object Planner {
   final case class NonRepresentableData(data: Data) extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data.shows
   }
-  final case class NonRepresentableEJson(data: String) extends PlannerError {
+  final case class NonRepresentableEJson(data: String)
+      extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data
   }
-  final case class UnsupportedFunction[N <: Nat](func: GenericFunc[N],
-                                                 hint: Option[String])
-      extends PlannerError {
-    def message =
-      "The function '" + func.shows + "' is recognized but not supported by this back-end." + hint
-        .map(" (" + _ + ")")
-        .getOrElse("")
+  final case class UnsupportedFunction[N <: Nat](func: GenericFunc[N], hint: Option[String]) extends PlannerError {
+    def message = "The function '" + func.shows + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
   }
   final case class PlanPathError(error: PathError) extends PlannerError {
     def message = error.shows
@@ -62,19 +58,11 @@ object Planner {
     def message = s"Joining with ${cond.shows} is not currently supported"
   }
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String])
-      extends PlannerError {
-    def message =
-      "The back-end has no or no efficient means of implementing the plan" + hint
-        .map(" (" + _ + ")")
-        .getOrElse("") + ": " + plan.toString
+  final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
+    def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan.toString
   }
-  final case class FuncApply[N <: Nat](func: GenericFunc[N],
-                                       expected: String,
-                                       actual: String)
-      extends PlannerError {
-    def message =
-      "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual
+  final case class FuncApply[N <: Nat](func: GenericFunc[N], expected: String, actual: String) extends PlannerError {
+    def message = "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual
   }
   final case class ObjectIdFormatError(str: String) extends PlannerError {
     def message = "Invalid ObjectId string: " + str
@@ -94,19 +82,17 @@ object Planner {
   final case class NoFilesFound(dirs: List[ADir]) extends PlannerError {
     def message = dirs.map(posixCodec.printPath) match {
       case Nil => "No paths provided to read from."
-      case ds =>
+      case ds  =>
         "None of these directories contain any files to read from: " ++
           ds.mkString(", ")
-    }
+      }
   }
 
-  final case class CompilationFailed(semErrs: NonEmptyList[SemanticError])
-      extends PlannerError {
+  final case class CompilationFailed(semErrs: NonEmptyList[SemanticError]) extends PlannerError {
     def message = "Compilation failed: " + semErrs.list.toList.mkString(", ")
   }
 
-  final case class InternalError(msg: String, cause: Option[Exception])
-      extends PlannerError {
+  final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
     def message = msg + ~cause.map(ex => s" (caused by: $ex)")
   }
 
@@ -115,13 +101,11 @@ object Planner {
   }
 
   def UnexpectedJoinSide(n: Symbol): PlannerError =
-    InternalError.fromMsg(
-      s"Unexpected JoinSideName ${n.shows} should have been removed in qscript compilation.")
+    InternalError.fromMsg(s"Unexpected JoinSideName ${n.shows} should have been removed in qscript compilation.")
 
-  implicit val PlannerErrorRenderTree: RenderTree[PlannerError] =
-    new RenderTree[PlannerError] {
-      def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))
-    }
+  implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {
+    def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))
+  }
 
   implicit val plannerErrorShow: Show[PlannerError] =
     Show.show(_.message)
@@ -130,13 +114,16 @@ object Planner {
     def message: String
   }
   object CompilationError {
-    final case class CompilePathError(error: PathError) extends CompilationError {
+    final case class CompilePathError(error: PathError)
+        extends CompilationError {
       def message = error.shows
     }
-    final case class CSemanticError(error: SemanticError) extends CompilationError {
+    final case class CSemanticError(error: SemanticError)
+        extends CompilationError {
       def message = error.message
     }
-    final case class CPlannerError(error: PlannerError) extends CompilationError {
+    final case class CPlannerError(error: PlannerError)
+        extends CompilationError {
       def message = error.message
     }
     final case class ManyErrors(errors: NonEmptyList[SemanticError])
@@ -147,17 +134,17 @@ object Planner {
 
   val CompilePathError = Prism.partial[CompilationError, PathError] {
     case CompilationError.CompilePathError(error) => error
-  }(CompilationError.CompilePathError(_))
+  } (CompilationError.CompilePathError(_))
 
   val CSemanticError = Prism.partial[CompilationError, SemanticError] {
     case CompilationError.CSemanticError(error) => error
-  }(CompilationError.CSemanticError(_))
+  } (CompilationError.CSemanticError(_))
 
   val CPlannerError = Prism.partial[CompilationError, PlannerError] {
     case CompilationError.CPlannerError(error) => error
-  }(CompilationError.CPlannerError(_))
+  } (CompilationError.CPlannerError(_))
 
   val ManyErrors = Prism.partial[CompilationError, NonEmptyList[SemanticError]] {
     case CompilationError.ManyErrors(error) => error
-  }(CompilationError.ManyErrors(_))
+  } (CompilationError.ManyErrors(_))
 }

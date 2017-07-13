@@ -18,17 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.{
-  BinaryTag,
-  EJson,
-  CommonEJson => C,
-  ExtEJson => E,
-  EncodeEJson,
-  Meta,
-  Null,
-  SizedTypeTag,
-  Str
-}
+import quasar.ejson.{BinaryTag, EJson, CommonEJson => C, ExtEJson => E, EncodeEJson, Meta, Null, SizedTypeTag, Str}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -40,7 +30,6 @@ import spire.algebra.{AdditiveMonoid, Field, NRoot}
 import spire.math.ConvertableTo
 
 package object sst {
-
   /** Statistical Structural Type */
   type SSTF[J, A, B]       = EnvT[Option[TypeStat[A]], TypeF[J, ?], B]
   type SST[J, A]           = StructuralType[J, Option[TypeStat[A]]]
@@ -54,11 +43,12 @@ package object sst {
 
   object SST {
     def fromData[J: Order, A: ConvertableTo: Field: Order](
-        count: A,
-        data: Data
+      count: A,
+      data: Data
     )(implicit
       JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]): SST[J, A] = {
+      JR: Recursive.Aux[J, EJson]
+    ): SST[J, A] = {
       val ejs = data.hylo[CoEnv[Data, EJson, ?], J](
         interpret(κ(C(Null[J]()).embed), elideNonBinaryMetadata[J] >>> (_.embed)),
         Data.toEJson[EJson])
@@ -66,13 +56,15 @@ package object sst {
     }
 
     def fromEJson[J: Order, A: ConvertableTo: Field: Order](
-        count: A,
-        ejson: J
+      count: A,
+      ejson: J
     )(implicit
       JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]): SST[J, A] =
-      StructuralType.fromEJson[J](TypeStat.fromTypeFƒ(count),
-                                  ejson.transCata[J](elideNonBinaryMetadata[J]))
+      JR: Recursive.Aux[J, EJson]
+    ): SST[J, A] =
+      StructuralType.fromEJson[J](
+        TypeStat.fromTypeFƒ(count),
+        ejson.transCata[J](elideNonBinaryMetadata[J]))
 
     def size[J, A: AdditiveMonoid](sst: SST[J, A]): A =
       sst.copoint.fold(AdditiveMonoid[A].zero)(_.size)
@@ -80,7 +72,7 @@ package object sst {
     ////
 
     private def elideNonBinaryMetadata[J](
-        implicit J: Recursive.Aux[J, EJson]
+      implicit J: Recursive.Aux[J, EJson]
     ): EJson[J] => EJson[J] = {
       case ejs @ EncodedBinary(_) => ejs
       case other                  => EJson.elideMetadata[J] apply other
@@ -96,11 +88,9 @@ package object sst {
   }
 
   // NB: Defined here as adding the tag causes the compiler not to consider the TypeStat companion.
-  implicit def populationTypeStatEncodeEJson[A: EncodeEJson: Equal: Field: NRoot]
-    : EncodeEJson[TypeStat[A] @@ Population] =
+  implicit def populationTypeStatEncodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A] @@ Population] =
     new EncodeEJson[TypeStat[A] @@ Population] {
-      def encode[J](ts: TypeStat[A] @@ Population)(
-          implicit J: Corecursive.Aux[J, EJson]): J =
+      def encode[J](ts: TypeStat[A] @@ Population)(implicit J: Corecursive.Aux[J, EJson]): J =
         TypeStat.encodeEJson0(Population.unwrap(ts), isPopulation = true)
     }
 }

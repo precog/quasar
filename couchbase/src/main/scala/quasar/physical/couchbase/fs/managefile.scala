@@ -30,45 +30,43 @@ import scalaz._, Scalaz._
 abstract class managefile {
   def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] =
     for {
-      ctx <- MR.asks(_.ctx)
-      src = docTypeValueFromPath(scenario.src)
-      dst = docTypeValueFromPath(scenario.dst)
+      ctx       <- MR.asks(_.ctx)
+      src       =  docTypeValueFromPath(scenario.src)
+      dst       =  docTypeValueFromPath(scenario.dst)
       srcExists <- ME.unattempt(lift(existsWithPrefix(ctx, src.v)).into[Eff].liftB)
-      _ <- srcExists.unlessM(
-        ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.src))))
+      _         <- srcExists.unlessM(
+                     ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.src))))
       dstExists <- ME.unattempt(lift(existsWithPrefix(ctx, dst.v)).into[Eff].liftB)
-      _ <- semantics match {
-        case MoveSemantics.FailIfExists if dstExists =>
-          ME.raiseError(FileSystemError.pathErr(PathError.pathExists(scenario.dst)))
-        case MoveSemantics.FailIfMissing if !dstExists =>
-          ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)))
-        case _ =>
-          ().η[Backend]
-      }
-      _ <- dstExists.whenM(delete(scenario.dst))
-      qStr = s"""update `${ctx.bucket.name}`
+      _         <- semantics match {
+                    case MoveSemantics.FailIfExists if dstExists =>
+                      ME.raiseError(FileSystemError.pathErr(PathError.pathExists(scenario.dst)))
+                    case MoveSemantics.FailIfMissing if !dstExists =>
+                      ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)))
+                    case _ =>
+                      ().η[Backend]
+                   }
+      _         <- dstExists.whenM(delete(scenario.dst))
+      qStr      =  s"""update `${ctx.bucket.name}`
                        set `${ctx.docTypeKey.v}`=("${dst.v}" || REGEXP_REPLACE(`${ctx.docTypeKey.v}`, "^${src.v}", ""))
                        where `${ctx.docTypeKey.v}` like "${src.v}%""""
-      _ <- ME.unattempt(lift(query(ctx.bucket, qStr)).into[Eff].liftB)
+      _         <- ME.unattempt(lift(query(ctx.bucket, qStr)).into[Eff].liftB)
     } yield ()
 
   def delete(path: APath): Backend[Unit] =
     for {
-      ctx <- MR.asks(_.ctx)
-      col = docTypeValueFromPath(path)
+      ctx       <- MR.asks(_.ctx)
+      col       =  docTypeValueFromPath(path)
       docsExist <- ME.unattempt(lift(existsWithPrefix(ctx, col.v)).into[Eff].liftB)
-      _ <- docsExist.unlessM(
-        ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(path))))
-      _ <- ME.unattempt(lift(deleteHavingPrefix(ctx, col.v)).into[Eff].liftB)
+      _         <- docsExist.unlessM(
+                     ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(path))))
+      _         <- ME.unattempt(lift(deleteHavingPrefix(ctx, col.v)).into[Eff].liftB)
     } yield ()
 
   def tempFile(near: APath): Backend[AFile] =
-    MonotonicSeq
-      .Ops[Eff]
-      .next
-      .map { i =>
-        val tmpFilename = file(s"__quasar_tmp_$i")
-        refineType(near).fold(d => d </> tmpFilename, f => fileParent(f) </> tmpFilename)
-      }
-      .liftB
+    MonotonicSeq.Ops[Eff].next.map { i =>
+      val tmpFilename = file(s"__quasar_tmp_$i")
+      refineType(near).fold(
+        d => d </> tmpFilename,
+        f => fileParent(f) </> tmpFilename)
+    }.liftB
 }

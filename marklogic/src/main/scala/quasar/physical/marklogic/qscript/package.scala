@@ -49,13 +49,8 @@ package object qscript {
 
   /** Matches "iterative" FLWOR expressions, those involving at least one `for` clause. */
   object IterativeFlwor {
-    def unapply(xqy: XQuery): Option[(NonEmptyList[BindingClause],
-                                      Option[XQuery],
-                                      IList[(XQuery, SortDirection)],
-                                      Boolean,
-                                      XQuery)] = xqy match {
-      case XQuery.Flwor(clauses, filter, order, isStable, result)
-          if clauses.any(BindingClause.forClause.nonEmpty) =>
+    def unapply(xqy: XQuery): Option[(NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] = xqy match {
+      case XQuery.Flwor(clauses, filter, order, isStable, result) if clauses.any(BindingClause.forClause.nonEmpty) =>
         Some((clauses, filter, order, isStable, result))
 
       case _ => None
@@ -66,18 +61,18 @@ package object qscript {
   val EJsonValueKey = "_ejson.value"
 
   /** XQuery evaluating to the documents having the specified format in the directory. */
-  def directoryDocuments[FMT: SearchOptions](uri: XQuery,
-                                             includeDescendants: Boolean): XQuery =
-    ctsfn.search(expr = fn.doc(),
-                 query =
-                   ctsfn.directoryQuery(uri, (includeDescendants ? "infinity" | "1").xs),
-                 options = SearchOptions[FMT].searchOptions)
+  def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =
+    ctsfn.search(
+      expr    = fn.doc(),
+      query   = ctsfn.directoryQuery(uri, (includeDescendants ? "infinity" | "1").xs),
+      options = SearchOptions[FMT].searchOptions)
 
   /** XQuery evaluating to the document node at the given URI. */
   def documentNode[FMT: SearchOptions](uri: XQuery): XQuery =
-    ctsfn.search(expr = fn.doc(),
-                 query = ctsfn.documentQuery(uri),
-                 options = SearchOptions[FMT].searchOptions)
+    ctsfn.search(
+      expr    = fn.doc(),
+      query   = ctsfn.documentQuery(uri),
+      options = SearchOptions[FMT].searchOptions)
 
   /** XQuery evaluating to the document node at the given path. */
   def fileNode[FMT: SearchOptions](file: AFile): XQuery =
@@ -87,13 +82,12 @@ package object qscript {
   def fileRoot[FMT: SearchOptions](file: AFile): XQuery =
     fileNode[FMT](file) `/` axes.child.node()
 
-  def mapFuncXQuery[T[_[_]]: BirecursiveT,
-                    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-                    FMT](
-      fm: FreeMap[T],
-      src: XQuery
+  def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+    fm: FreeMap[T],
+    src: XQuery
   )(implicit
-    SP: StructuralPlanner[F, FMT]): F[XQuery] =
+    SP:  StructuralPlanner[F, FMT]
+  ): F[XQuery] =
     fm.project match {
       case MapFuncCore.StaticArray(elements) =>
         for {
@@ -104,43 +98,37 @@ package object qscript {
 
       case MapFuncCore.StaticMap(entries) =>
         for {
-          xqyKV <- entries.traverse(
-            _.bitraverse(
-              {
-                case Embed(MapFuncCore.EC(Str(s))) => s.xs.point[F]
-                case key                           => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
-              },
-              planMapFunc[T, F, FMT, Hole](_)(κ(src))
-            ))
-          elts <- xqyKV.traverse((SP.mkObjectEntry _).tupled)
-          map  <- SP.mkObject(mkSeq(elts))
+          xqyKV <- entries.traverse(_.bitraverse({
+                     case Embed(MapFuncCore.EC(Str(s))) => s.xs.point[F]
+                     case key                       => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
+                   },
+                   planMapFunc[T, F, FMT, Hole](_)(κ(src))))
+          elts  <- xqyKV.traverse((SP.mkObjectEntry _).tupled)
+          map   <- SP.mkObject(mkSeq(elts))
         } yield map
 
       case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mergeXQuery[T[_[_]]: BirecursiveT,
-                  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-                  FMT](
-      jf: JoinFunc[T],
-      l: XQuery,
-      r: XQuery
+  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+    jf: JoinFunc[T],
+    l: XQuery,
+    r: XQuery
   )(implicit
-    SP: StructuralPlanner[F, FMT]): F[XQuery] =
+    SP: StructuralPlanner[F, FMT]
+  ): F[XQuery] =
     planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: BirecursiveT,
-                  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-                  FMT,
-                  A](freeMap: FreeMapA[T, A])(
-      recover: A => XQuery
+  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, A](
+    freeMap: FreeMapA[T, A])(
+    recover: A => XQuery
   )(implicit
-    SP: StructuralPlanner[F, FMT]): F[XQuery] =
-    freeMap
-      .transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A])
+    SP: StructuralPlanner[F, FMT]
+  ): F[XQuery] =
+    freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A])
       .cataM(interpretM(recover(_).point[F], (new MapFuncPlanner[F, FMT, T]).plan))
 
   /** Returns whether the query is valid and can be executed.
@@ -148,26 +136,26 @@ package object qscript {
     * TODO: Return any missing indexes when invalid.
     */
   def queryIsValid[F[_]: Monad: Xcc, Q, V](query: Q)(
-      implicit Q: Recursive.Aux[Q, Query[V, ?]]
+    implicit Q: Recursive.Aux[Q, Query[V, ?]]
   ): F[Boolean] = {
     val err = axes.descendant.elementNamed("error:error")
-    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q =>
-      fn.empty(xdmp.plan(q) `//` err))
+    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q => fn.empty(xdmp.plan(q) `//` err))
 
     xqy >>= (Xcc[F].queryResults(_) map booleanResult)
   }
 
   def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](
-      fqs: FreeQS[T],
-      src: Search[Q] \/ XQuery
+    fqs: FreeQS[T],
+    src: Search[Q] \/ XQuery
   )(implicit
-    Q: Birecursive.Aux[Q, Query[V, ?]],
-    QTP: Planner[F, FMT, QScriptTotal[T, ?]]): F[Search[Q] \/ XQuery] =
+    Q  : Birecursive.Aux[Q, Query[V, ?]],
+    QTP: Planner[F, FMT, QScriptTotal[T, ?]]
+  ): F[Search[Q] \/ XQuery] =
     fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q, V]))
 
   def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
-      implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],
-      UC: Corecursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]]
+    implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],
+             UC: Corecursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]]
   ): CoEnv[E, MapFuncCore[T, ?], U] => CoEnv[E, MapFuncCore[T, ?], U] = {
     object NullLit {
       def unapply[T[_[_]]: RecursiveT, A](mfc: CoEnv[E, MapFuncCore[T, ?], A]): Boolean =
@@ -180,17 +168,12 @@ package object qscript {
     val nullString: U =
       UC.embed(CoEnv(Constant[T, U](EJson.fromCommon(Str[T[EJson]]("null"))).right))
 
-    fa =>
-      CoEnv(fa.run.map(totally {
-        case Eq(lhs, Embed(NullLit())) =>
-          Eq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
-        case Eq(Embed(NullLit()), rhs) =>
-          Eq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
-        case Neq(lhs, Embed(NullLit())) =>
-          Neq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
-        case Neq(Embed(NullLit()), rhs) =>
-          Neq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
-      }))
+    fa => CoEnv(fa.run.map (totally {
+      case Eq(lhs, Embed(NullLit()))  => Eq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
+      case Eq(Embed(NullLit()), rhs)  => Eq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
+      case Neq(lhs, Embed(NullLit())) => Neq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
+      case Neq(Embed(NullLit()), rhs) => Neq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
+    }))
   }
 
   ////

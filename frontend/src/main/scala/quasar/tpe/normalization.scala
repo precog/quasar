@@ -33,52 +33,51 @@ object normalization {
     def apply[J] = new PartiallyApplied[J]
     final class PartiallyApplied[J] {
       def apply[T](t: T)(
-          implicit
-          J: Order[J],
-          TC: Corecursive.Aux[T, TypeF[J, ?]],
-          TR: Recursive.Aux[T, TypeF[J, ?]],
-          JC: Corecursive.Aux[J, EJson],
-          JR: Recursive.Aux[J, EJson]
+        implicit
+        J : Order[J],
+        TC: Corecursive.Aux[T, TypeF[J, ?]],
+        TR: Recursive.Aux[T, TypeF[J, ?]],
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
       ): T =
         t.transCata[T](normalizeƒ[J, T])
     }
   }
 
   def normalizeƒ[J: Order, T](
-      implicit
-      TC: Corecursive.Aux[T, TypeF[J, ?]],
-      TR: Recursive.Aux[T, TypeF[J, ?]],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] =
     reduceToBottom[J, T] >>>
-      normalizeEJson[J, T] >>>
-      liftConst[J, T] >>>
-      coalesceUnion[J, T] >>>
-      simplifyUnion[J, T]
+    normalizeEJson[J, T] >>>
+    liftConst[J, T]      >>>
+    coalesceUnion[J, T]  >>>
+    simplifyUnion[J, T]
 
   // Normalizations
 
   /** Coalesce nested unions into a single union. */
   def coalesceUnion[J, T](
-      implicit
-      TC: Corecursive.Aux[T, TypeF[J, ?]],
-      TR: Recursive.Aux[T, TypeF[J, ?]]
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]]
   ): TypeF[J, T] => TypeF[J, T] = {
     val coalesceƒ: ElgotAlgebra[(T, ?), TypeF[J, ?], NonEmptyList[T]] = {
       case (_, Unioned(ts)) => ts.join
-      case (t, _)           => NonEmptyList(t)
+      case (t,           _) => NonEmptyList(t)
     }
 
-    tf =>
-      unionOf[J](tf.embed.elgotPara(coalesceƒ)).project
+    tf => unionOf[J](tf.embed.elgotPara(coalesceƒ)).project
   }
 
   /** Elide `bottom` values from unions. */
   def elideBottom[J, T](
-      implicit
-      TR: Recursive.Aux[T, TypeF[J, ?]],
-      TC: Corecursive.Aux[T, TypeF[J, ?]]
+    implicit
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    TC: Corecursive.Aux[T, TypeF[J, ?]]
   ): TypeF[J, T] => TypeF[J, T] = totally {
     case Unioned(ts) =>
       ts.list.filterNot(isBottom[J](_)).toNel.cata(unionOf[J](_).project, bottom())
@@ -86,10 +85,10 @@ object normalization {
 
   /** Lift arrays and maps of constants to constant types. */
   def liftConst[J, T](
-      implicit
-      TR: Recursive.Aux[T, TypeF[J, ?]],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+    implicit
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = totally {
     case a @ Arr(-\/(ts)) =>
       ts.traverse(t => const[J, T].getOption(t.project))
@@ -102,18 +101,17 @@ object normalization {
 
   /** Lower constant arrays and maps to types of constants. */
   def lowerConst[J: Order, T](
-      implicit
-      TC: Corecursive.Aux[T, TypeF[J, ?]],
-      TR: Recursive.Aux[T, TypeF[J, ?]],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = {
     val expandContainers: Coalgebra[TypeF[J, ?], J] =
-      j =>
-        j.project match {
-          case CommonEJson(JArr(js)) => arr[J, J](js.toIList.left[J])
-          case ExtEJson(JMap(tts))   => map[J, J](IMap fromFoldable tts, none)
-          case _                     => const[J, J](j)
+      j => j.project match {
+        case CommonEJson(JArr(js)) => arr[J, J](js.toIList.left[J])
+        case ExtEJson(JMap(tts))   => map[J, J](IMap fromFoldable tts, none)
+        case _                     => const[J, J](j)
       }
 
     totally { case Const(j) => j.ana[T](expandContainers).project }
@@ -124,10 +122,10 @@ object normalization {
     *   - Replacing `Meta` nodes with their value component.
     */
   def normalizeEJson[J: Order, T](
-      implicit
-      TC: Corecursive.Aux[T, TypeF[J, ?]],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = {
     val norm: J => J =
       _.transCata[J](EJson.replaceString[J] <<< EJson.elideMetadata[J])
@@ -140,35 +138,34 @@ object normalization {
 
   /** Reduce arrays and maps containing `bottom` values to `bottom`. */
   def reduceToBottom[J, T](
-      implicit TR: Recursive.Aux[T, TypeF[J, ?]]
+    implicit TR: Recursive.Aux[T, TypeF[J, ?]]
   ): TypeF[J, T] => TypeF[J, T] = totally {
     case Arr(-\/(ts)) if ts.any(isBottom[J](_)) => bottom[J, T]()
     case Arr(\/-(Embed(Bottom())))              => bottom[J, T]()
-    case Map(kn, _) if kn.any(isBottom[J](_))   => bottom[J, T]()
+    case Map(kn, _)   if kn.any(isBottom[J](_)) => bottom[J, T]()
     case Map(_, Some((Embed(Bottom()), _)))     => bottom[J, T]()
     case Map(_, Some((_, Embed(Bottom()))))     => bottom[J, T]()
   }
 
   /** Reduce unions containing `top` to `top`. */
   def reduceToTop[J, T](
-      implicit T: Recursive.Aux[T, TypeF[J, ?]]
+    implicit T: Recursive.Aux[T, TypeF[J, ?]]
   ): TypeF[J, T] => TypeF[J, T] =
-    orOriginal(
-      ts => Unioned.unapply(ts) flatMap (_.findLeft(isTop[J](_))) map (_.project))
+    orOriginal(ts => Unioned.unapply(ts) flatMap (_.findLeft(isTop[J](_))) map (_.project))
 
   /** Simplify unions by eliding subtypes. */
   def simplifyUnion[J: Order, T](
-      implicit
-      TC: Corecursive.Aux[T, TypeF[J, ?]],
-      TR: Recursive.Aux[T, TypeF[J, ?]],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = {
     // TODO: How to represent this as a fold?
     @tailrec
     def elideSubtypes(in: IList[T], disjoint: IList[T]): IList[T] =
       in match {
-        case INil() =>
+        case INil()       =>
           disjoint
         case ICons(t, ts) =>
           if (ts.any(isSubtypeOf[J](t, _)) || disjoint.any(isSubtypeOf[J](t, _)))
@@ -177,9 +174,8 @@ object normalization {
             elideSubtypes(ts, t :: disjoint)
       }
 
-    totally {
-      case Unioned(ts) =>
-        unionOf[J](elideSubtypes(ts.list, IList()).toNel | ts).project
+    totally { case Unioned(ts) =>
+      unionOf[J](elideSubtypes(ts.list, IList()).toNel | ts).project
     }
   }
 }

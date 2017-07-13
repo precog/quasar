@@ -36,14 +36,16 @@ sealed abstract class ProjectBucket[T[_[_]], A] {
   def src: A
 }
 
-@Lenses final case class BucketField[T[_[_]], A](src: A,
-                                                 value: FreeMap[T],
-                                                 name: FreeMap[T])
+@Lenses final case class BucketField[T[_[_]], A](
+  src: A,
+  value: FreeMap[T],
+  name: FreeMap[T])
     extends ProjectBucket[T, A]
 
-@Lenses final case class BucketIndex[T[_[_]], A](src: A,
-                                                 value: FreeMap[T],
-                                                 index: FreeMap[T])
+@Lenses final case class BucketIndex[T[_[_]], A](
+  src: A,
+  value: FreeMap[T],
+  index: FreeMap[T])
     extends ProjectBucket[T, A]
 
 object ProjectBucket {
@@ -61,8 +63,11 @@ object ProjectBucket {
 
   implicit def traverse[T[_[_]]]: Traverse[ProjectBucket[T, ?]] =
     new Traverse[ProjectBucket[T, ?]] {
-      def traverseImpl[G[_], A, B](fa: ProjectBucket[T, A])(f: A => G[B])(
-          implicit G: Applicative[G]): G[ProjectBucket[T, B]] = fa match {
+      def traverseImpl[G[_], A, B](
+        fa: ProjectBucket[T, A])(
+        f: A => G[B])(
+        implicit G: Applicative[G]):
+          G[ProjectBucket[T, B]] = fa match {
         case BucketField(src, values, name) =>
           f(src) ∘ (BucketField(_, values, name))
         case BucketIndex(src, values, index) =>
@@ -74,57 +79,53 @@ object ProjectBucket {
     new Delay[Show, ProjectBucket[T, ?]] {
       def apply[A](sh: Show[A]): Show[ProjectBucket[T, A]] =
         Show.show {
-          case BucketField(a, v, n) =>
-            Cord("BucketField(") ++
-              sh.show(a) ++ Cord(",") ++
-              v.show ++ Cord(",") ++
-              n.show ++ Cord(")")
-          case BucketIndex(a, v, i) =>
-            Cord("BucketIndex(") ++
-              sh.show(a) ++ Cord(",") ++
-              v.show ++ Cord(",") ++
-              i.show ++ Cord(")")
+          case BucketField(a, v, n) => Cord("BucketField(") ++
+            sh.show(a) ++ Cord(",") ++
+            v.show ++ Cord(",") ++
+            n.show ++ Cord(")")
+          case BucketIndex(a, v, i) => Cord("BucketIndex(") ++
+            sh.show(a) ++ Cord(",") ++
+            v.show ++ Cord(",") ++
+            i.show ++ Cord(")")
         }
     }
 
-  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
-    : Delay[RenderTree, ProjectBucket[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ProjectBucket[T, ?]] =
     new Delay[RenderTree, ProjectBucket[T, ?]] {
       def apply[A](RA: RenderTree[A]): RenderTree[ProjectBucket[T, A]] = RenderTree.make {
         case BucketField(src, value, name) =>
-          NonTerminal(List("BucketField"),
-                      None,
-                      List(RA.render(src), value.render, name.render))
+          NonTerminal(List("BucketField"), None, List(
+            RA.render(src),
+            value.render,
+            name.render))
         case BucketIndex(src, value, index) =>
-          NonTerminal(List("BucketIndex"),
-                      None,
-                      List(RA.render(src), value.render, index.render))
+          NonTerminal(List("BucketIndex"), None, List(
+            RA.render(src),
+            value.render,
+            index.render))
       }
     }
 
-  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]
-    : Mergeable.Aux[T, ProjectBucket[T, ?]] =
+  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]:
+      Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]
 
-      def mergeSrcs(left: FreeMap[IT],
-                    right: FreeMap[IT],
-                    p1: ProjectBucket[IT, ExternallyManaged],
-                    p2: ProjectBucket[IT, ExternallyManaged]) =
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        p1: ProjectBucket[IT, ExternallyManaged],
+        p2: ProjectBucket[IT, ExternallyManaged]) =
         (p1, p2) match {
           case (BucketField(s1, v1, n1), BucketField(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] =
-              BucketField(s1, v1 >> left, n1 >> left)
-            val new2: ProjectBucket[T, ExternallyManaged] =
-              BucketField(s2, v2 >> right, n2 >> right)
+            val new1: ProjectBucket[T, ExternallyManaged] = BucketField(s1, v1 >> left, n1 >> left)
+            val new2: ProjectBucket[T, ExternallyManaged] = BucketField(s2, v2 >> right, n2 >> right)
             (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
           case (BucketIndex(s1, v1, n1), BucketIndex(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] =
-              BucketIndex(s1, v1 >> left, n1 >> left)
-            val new2: ProjectBucket[T, ExternallyManaged] =
-              BucketIndex(s2, v2 >> right, n2 >> right)
+            val new1: ProjectBucket[T, ExternallyManaged] = BucketIndex(s1, v1 >> left, n1 >> left)
+            val new2: ProjectBucket[T, ExternallyManaged] = BucketIndex(s2, v2 >> right, n2 >> right)
             (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
           case (_, _) => None
-        }
+      }
     }
 }

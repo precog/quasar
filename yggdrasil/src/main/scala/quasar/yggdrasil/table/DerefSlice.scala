@@ -21,33 +21,28 @@ import quasar.precog.common._
 
 class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extends Slice {
 
-  private val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] =
-    source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {
-      case (acc, (ColumnRef(CPath(root, xs @ _*), ctype), col)) =>
-        val resultRef = ColumnRef(CPath(xs: _*), ctype)
-        // we know the combination of xs and ctype to be unique within root
-        acc + (root -> (acc.getOrElse(root, Map()) + (resultRef -> col)))
-    }
+  private val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] = source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {
+    case (acc, (ColumnRef(CPath(root, xs @ _ *), ctype), col)) =>
+      val resultRef = ColumnRef(CPath(xs: _*), ctype)
+      // we know the combination of xs and ctype to be unique within root
+      acc + (root -> (acc.getOrElse(root, Map()) + (resultRef -> col)))
+  }
 
-  private val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] =
-    source.columns.collect {
-      case (ColumnRef(CPath(CPathArray, xs @ _*), ctype),
-            col: HomogeneousArrayColumn[_]) =>
-        (ColumnRef(CPath(xs: _*), ctype), col)
-    }.toMap
+  private val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] = source.columns.collect {
+    case (ColumnRef(CPath(CPathArray, xs @ _ *), ctype), col: HomogeneousArrayColumn[_]) =>
+      (ColumnRef(CPath(xs: _*), ctype), col)
+  }.toMap
 
   private def derefColumns(node: CPathNode): Option[Map[ColumnRef, Column]] = node match {
     case CPathIndex(i) if !indexableArrays.isEmpty =>
-      Some(
-        (indexableArrays mapValues (_.select(i))) ++ forwardIndex.getOrElse(node,
-                                                                            Map.empty))
+      Some((indexableArrays mapValues (_.select(i))) ++ forwardIndex.getOrElse(node, Map.empty))
     case _ => forwardIndex get node
   }
 
   val size = source.size
 
   val columns = source.columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
-    case (acc, ColumnRef(CPath(_, xs @ _*), ctype)) =>
+    case (acc, ColumnRef(CPath(_, xs @ _ *), ctype)) =>
       val resultRef = ColumnRef(CPath(xs: _*), ctype)
 
       lazy val resultCol = ctype match {
@@ -56,10 +51,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int           = -1
             private var refCol0: BoolColumn = _
             @inline private def refCol(row: Int): BoolColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[BoolColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[BoolColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -76,10 +68,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int           = -1
             private var refCol0: LongColumn = _
             @inline private def refCol(row: Int): LongColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[LongColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[LongColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -96,10 +85,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int             = -1
             private var refCol0: DoubleColumn = _
             @inline private def refCol(row: Int): DoubleColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[DoubleColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[DoubleColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -116,10 +102,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int          = -1
             private var refCol0: NumColumn = _
             @inline private def refCol(row: Int): NumColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[NumColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[NumColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -136,10 +119,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int          = -1
             private var refCol0: StrColumn = _
             @inline private def refCol(row: Int): StrColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[StrColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[StrColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -156,10 +136,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int           = -1
             private var refCol0: DateColumn = _
             @inline private def refCol(row: Int): DateColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[DateColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[DateColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -176,10 +153,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             private var row0: Int             = -1
             private var refCol0: PeriodColumn = _
             @inline private def refCol(row: Int): PeriodColumn =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[PeriodColumn]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[PeriodColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -193,14 +167,11 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
 
         case cArrayType: CArrayType[a] =>
           new HomogeneousArrayColumn[a] {
-            val tpe                                        = cArrayType
+            val tpe = cArrayType
             private var row0: Int                          = -1
             private var refCol0: HomogeneousArrayColumn[a] = _
             @inline private def refCol(row: Int): HomogeneousArrayColumn[a] =
-              derefColumns(derefBy(row))
-                .flatMap(_.get(resultRef))
-                .orNull
-                .asInstanceOf[HomogeneousArrayColumn[a]]
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[HomogeneousArrayColumn[a]]
 
             def apply(row: Int) = refCol0(row)
 
@@ -216,23 +187,19 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
           new EmptyObjectColumn {
             def isDefinedAt(row: Int) =
               derefBy.isDefinedAt(row) &&
-                derefColumns(derefBy(row))
-                  .exists(_.get(resultRef).exists(_.isDefinedAt(row)))
+                derefColumns(derefBy(row)).exists(_.get(resultRef).exists(_.isDefinedAt(row)))
           }
 
         case CEmptyArray =>
           new EmptyArrayColumn {
             def isDefinedAt(row: Int) =
               derefBy.isDefinedAt(row) &&
-                derefColumns(derefBy(row))
-                  .exists(_.get(resultRef).exists(_.isDefinedAt(row)))
+                derefColumns(derefBy(row)).exists(_.get(resultRef).exists(_.isDefinedAt(row)))
           }
 
         case CNull =>
           new NullColumn {
-            def isDefinedAt(row: Int) =
-              derefBy.isDefinedAt(row) && derefColumns(derefBy(row)).exists(cols =>
-                cols(resultRef).isDefinedAt(row))
+            def isDefinedAt(row: Int) = derefBy.isDefinedAt(row) && derefColumns(derefBy(row)).exists(cols => cols(resultRef).isDefinedAt(row))
           }
 
         case CUndefined => UndefinedColumn.raw

@@ -52,7 +52,7 @@ object BitSetUtil {
       }
 
       val ns = bs.getBits
-      var i  = ns.length - 1
+      var i = ns.length - 1
       while (i >= 0) {
         if (ns(i) != 0) return findBit(i * 64, -1)
         i -= 1
@@ -82,8 +82,8 @@ object BitSetUtil {
   def create(): BitSet = new BitSet()
 
   def create(ns: Array[Int]): BitSet = {
-    val bs  = new BitSet()
-    var i   = 0
+    val bs = new BitSet()
+    var i = 0
     val len = ns.length
     while (i < len) {
       bs.set(ns(i))
@@ -114,7 +114,7 @@ object BitSetUtil {
         bits
       }
     } else {
-      var i    = from
+      var i = from
       val bits = new BitSet()
       while (i < to) {
         bits(i - from) = bitset(i)

@@ -55,14 +55,14 @@ object ExprOp3_2F {
           case ($truncF(v1), $truncF(v2))     => v1 ≟ v2
           case ($ceilF(v1), $ceilF(v2))       => v1 ≟ v2
           case ($floorF(v1), $floorF(v2))     => v1 ≟ v2
-          case _                              => false
+          case _ => false
         }
       }
     }
 
   implicit val traverse: Traverse[ExprOp3_2F] = new Traverse[ExprOp3_2F] {
-    def traverseImpl[G[_], A, B](fa: ExprOp3_2F[A])(f: A => G[B])(
-        implicit G: Applicative[G]): G[ExprOp3_2F[B]] =
+    def traverseImpl[G[_], A, B](fa: ExprOp3_2F[A])(f: A => G[B])(implicit G: Applicative[G]):
+        G[ExprOp3_2F[B]] =
       fa match {
         case $sqrtF(v)      => G.map(f(v))($sqrtF(_))
         case $absF(v)       => G.map(f(v))($absF(_))
@@ -77,46 +77,45 @@ object ExprOp3_2F {
       }
   }
 
-  implicit def ops[F[_]: Functor](
-      implicit I: ExprOp3_2F :<: F): ExprOpOps.Aux[ExprOp3_2F, F] =
-    new ExprOpOps[ExprOp3_2F] {
-      type OUT[A] = F[A]
+  implicit def ops[F[_]: Functor](implicit I: ExprOp3_2F :<: F): ExprOpOps.Aux[ExprOp3_2F, F] = new ExprOpOps[ExprOp3_2F] {
+    type OUT[A] = F[A]
 
-      val simplify: AlgebraM[Option, ExprOp3_2F, Fix[F]] = κ(None)
+    val simplify: AlgebraM[Option, ExprOp3_2F, Fix[F]] = κ(None)
 
-      def bson: Algebra[ExprOp3_2F, Bson] = {
-        case $sqrtF(value)      => Bson.Doc("$sqrt"  -> value)
-        case $absF(value)       => Bson.Doc("$abs"   -> value)
-        case $logF(value, base) => Bson.Doc("$log"   -> Bson.Arr(value, base))
-        case $log10F(value)     => Bson.Doc("$log10" -> value)
-        case $lnF(value)        => Bson.Doc("$ln"    -> value)
-        case $powF(value, exp)  => Bson.Doc("$pow"   -> Bson.Arr(value, exp))
-        case $truncF(value)     => Bson.Doc("$trunc" -> value)
-        case $ceilF(value)      => Bson.Doc("$ceil"  -> value)
-        case $floorF(value)     => Bson.Doc("$floor" -> value)
-      }
-
-      // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
-      @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-      def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_2F, JsFn] = {
-        import jscore._
-
-        def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
-          \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
-
-        {
-          case $truncF(a1) =>
-            expr1(a1)(x => Call(Select(ident("Math"), "trunc"), List(x)))
-
-          case expr => UnsupportedJS(expr.toString).left
-        }
-      }
-
-      def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
+    def bson: Algebra[ExprOp3_2F, Bson] = {
+      case $sqrtF(value)      => Bson.Doc("$sqrt" -> value)
+      case $absF(value)       => Bson.Doc("$abs" -> value)
+      case $logF(value, base) => Bson.Doc("$log" -> Bson.Arr(value, base))
+      case $log10F(value)     => Bson.Doc("$log10" -> value)
+      case $lnF(value)        => Bson.Doc("$ln" -> value)
+      case $powF(value, exp)  => Bson.Doc("$pow" -> Bson.Arr(value, exp))
+      case $truncF(value)     => Bson.Doc("$trunc" -> value)
+      case $ceilF(value)      => Bson.Doc("$ceil" -> value)
+      case $floorF(value)     => Bson.Doc("$floor" -> value)
     }
 
-  final class fixpoint[T, EX[_]: Functor](embed: EX[T] => T)(
-      implicit I: ExprOp3_2F :<: EX) {
+    // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+    def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_2F, JsFn] = {
+      import jscore._
+
+      def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
+        \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
+
+      {
+        case $truncF(a1) => expr1(a1)(x =>
+          Call(Select(ident("Math"), "trunc"), List(x)))
+
+        case expr => UnsupportedJS(expr.toString).left
+      }
+    }
+
+    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
+  }
+
+  final class fixpoint[T, EX[_]: Functor]
+    (embed: EX[T] => T)
+    (implicit I: ExprOp3_2F :<: EX) {
     @inline private def convert(expr: ExprOp3_2F[T]): T = embed(I.inj(expr))
 
     def $sqrt(value: T): T         = convert($sqrtF(value))

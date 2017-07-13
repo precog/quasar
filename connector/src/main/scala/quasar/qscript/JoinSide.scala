@@ -21,11 +21,11 @@ import quasar.RenderTree
 import scalaz._
 
 sealed abstract class JoinSide
-final case object LeftSide  extends JoinSide
+final case object LeftSide extends JoinSide
 final case object RightSide extends JoinSide
 
 object JoinSide {
-  implicit val equal: Equal[JoinSide]           = Equal.equalRef
-  implicit val show: Show[JoinSide]             = Show.showFromToString
+  implicit val equal: Equal[JoinSide] = Equal.equalRef
+  implicit val show: Show[JoinSide] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinSide] = RenderTree.fromShowAsType("JoinSide")
 }

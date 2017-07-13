@@ -25,14 +25,14 @@ import scalaz.scalacheck.ScalaCheckBinding._
 
 package object scalacheck {
   def nonEmptyListSmallerThan[A: Arbitrary](n: Int): Arbitrary[NonEmptyList[A]] = {
-    val listGen = Gen.containerOfN[List, A](n, Arbitrary.arbitrary[A])
-    Apply[Arbitrary].apply2[A, List[A], NonEmptyList[A]](
-      Arbitrary(Arbitrary.arbitrary[A]),
-      Arbitrary(listGen))((a, rest) => NonEmptyList.nel(a, IList.fromList(rest)))
+    val listGen = Gen.containerOfN[List,A](n, Arbitrary.arbitrary[A])
+    Apply[Arbitrary].apply2[A, List[A], NonEmptyList[A]](Arbitrary(Arbitrary.arbitrary[A]), Arbitrary(listGen))((a, rest) =>
+      NonEmptyList.nel(a, IList.fromList(rest)))
   }
 
   def listSmallerThan[A: Arbitrary](n: Int): Arbitrary[List[A]] =
-    Arbitrary(Gen.containerOfN[List, A](n, Arbitrary.arbitrary[A]))
+    Arbitrary(Gen.containerOfN[List,A](n, Arbitrary.arbitrary[A]))
+
 
   implicit def shrinkIList[A](implicit s: Shrink[List[A]]): Shrink[IList[A]] =
     Shrink(as => s.shrink(as.toList).map(IList.fromFoldable(_)))
@@ -57,7 +57,7 @@ package object scalacheck {
     * `desiredLimit`, assuming the default `maxSize` is in effect. */
   def scaleLinear(desiredLimit: Int): Int => Int = {
     val externalLimit = 200
-    val factor        = externalLimit / desiredLimit
-    _ / factor
+    val factor = externalLimit/desiredLimit
+    _/factor
   }
 }

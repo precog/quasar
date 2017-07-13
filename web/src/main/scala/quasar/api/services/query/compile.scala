@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import slamdata.Predef.{-> => _, _}
+import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
@@ -36,33 +36,34 @@ object compile {
   private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
   def service[S[_]](
-      implicit
-      Q: QueryFile.Ops[S],
-      M: ManageFile.Ops[S],
-      S0: Mounting :<: S,
-      S1: FileSystemFailure :<: S
+    implicit
+    Q: QueryFile.Ops[S],
+    M: ManageFile.Ops[S],
+    S0: Mounting :<: S,
+    S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
-      Json("type" := "constant", "value" := data.map(DataCodec.Precise.encode).unite)
+      Json(
+        "type"  := "constant",
+        "value" := data.map(DataCodec.Precise.encode).unite)
 
     def explainQuery(
-        scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
-        vars: Variables,
-        basePath: ADir,
-        offset: Natural,
-        limit: Option[Positive]
+      scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
+      vars: Variables,
+      basePath: ADir,
+      offset: Natural,
+      limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
       resolveImports(scopedExpr, basePath).run.flatMap { block =>
         block.fold(
           semErr => semErr.toApiError.left.point[Free[S, ?]],
           block =>
-            queryPlan(block, vars, basePath, offset, limit).run.value
-              .traverse(
-                _.fold(data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-                       lp =>
-                         Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson))))
-              .map(_.valueOr(_.toApiError.left[Json]))
-        )
+            queryPlan(block, vars, basePath, offset, limit)
+              .run.value
+              .traverse(_.fold(
+                data => constantResponse(data).right[ApiError].point[Free[S, ?]],
+                lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson))))
+              .map(_.valueOr(_.toApiError.left[Json])))
 
       }
 

@@ -29,6 +29,7 @@ import com.mongodb.MongoNamespace
 import scalaz._, Scalaz._
 import pathy.Path.{dir => pDir, file => pFile, _}
 
+
 // TODO: use Refined to constrain the value here
 final case class DatabaseName(value: String) extends AnyVal {
   def bson: Bson = Bson.Text(value)
@@ -89,23 +90,25 @@ object Collection {
     import PathError._
 
     val collResult = for {
-      tpl <- dbNameAndRest(path)
+      tpl  <- dbNameAndRest(path)
       (db, r) = tpl
       ss   <- r.toNel.toRightDisjunction("path names a database, but no collection")
       segs <- ss.traverse(CollectionSegmentParser(_))
-      coll = CollectionName(segs.toList mkString ".")
-      len  = utf8length(db.value) + 1 + utf8length(coll.value)
-      _ <- if (len > 120)
-        s"database+collection name too long ($len > 120 bytes): $db.$coll".left
-      else ().right
+      coll =  CollectionName(segs.toList mkString ".")
+      len  =  utf8length(db.value) + 1 + utf8length(coll.value)
+      _    <- if (len > 120)
+                s"database+collection name too long ($len > 120 bytes): $db.$coll".left
+              else ().right
     } yield Collection(db, coll)
 
     collResult leftMap (invalidPath(path, _))
   }
 
   private def dbNameAndRest(path: APath): String \/ (DatabaseName, IList[String]) =
-    flatten(None, None, None, Some(_), Some(_), path).toIList.unite
-      .uncons("no database specified".left, (h, t) => DatabaseNameParser(h) strengthR t)
+    flatten(None, None, None, Some(_), Some(_), path)
+      .toIList.unite.uncons(
+        "no database specified".left,
+        (h, t) => DatabaseNameParser(h) strengthR t)
 
   private trait PathParser extends RegexParsers {
     override def skipWhitespace = false
@@ -132,14 +135,11 @@ object Collection {
     ">"  -> "%gt",
     ":"  -> "%colon",
     "|"  -> "%bar",
-    "?"  -> "%qmark"
-  )
+    "?"  -> "%qmark")
 
   private object DatabaseNameParser extends PathParser {
     def name: Parser[DatabaseName] =
-      char.* ^^ { cs =>
-        DatabaseName(cs.mkString)
-      }
+      char.* ^^ { cs => DatabaseName(cs.mkString) }
 
     def char: Parser[String] = substitute(DatabaseNameEscapes) | "(?s).".r
 
@@ -148,7 +148,7 @@ object Collection {
         s"database name too long (> 64 bytes): ${name.value}".left
       case Success(name, _) =>
         name.right
-      case failure: NoSuccess =>
+      case failure : NoSuccess =>
         s"failed to parse ‘$input’: ${failure.msg}".left
     }
   }
@@ -160,11 +160,14 @@ object Collection {
 
     def apply(input: DatabaseName): String = parseAll(name, input.value) match {
       case Success(result, _) => result
-      case failure: NoSuccess => scala.sys.error("doesn't happen")
+      case failure : NoSuccess => scala.sys.error("doesn't happen")
     }
   }
 
-  val CollectionNameEscapes = List("." -> "\\.", "$" -> "\\d", "\\" -> "\\\\")
+  val CollectionNameEscapes = List(
+    "."  -> "\\.",
+    "$"  -> "\\d",
+    "\\" -> "\\\\")
 
   private object CollectionSegmentParser extends PathParser {
     def seg: Parser[String] =
@@ -178,7 +181,7 @@ object Collection {
     def apply(input: String): String \/ String = parseAll(seg, input) match {
       case Success(seg, _) =>
         seg.right
-      case failure: NoSuccess =>
+      case failure : NoSuccess =>
         s"failed to parse ‘$input’: ${failure.msg}".left
     }
   }
@@ -192,7 +195,7 @@ object Collection {
 
     def apply(input: CollectionName): List[String] = parseAll(name, input.value) match {
       case Success(result, _) => result
-      case failure: NoSuccess => scala.sys.error("doesn't happen")
+      case failure : NoSuccess => scala.sys.error("doesn't happen")
     }
   }
 

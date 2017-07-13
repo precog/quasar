@@ -25,17 +25,16 @@ import matryoshka._
 import scalaz._
 
 sealed trait Unicoalesce[T[_[_]], C <: CoM] {
-  def apply(C: Coalesce.Aux[T, C#M, C#M])(
-      implicit F: Functor[C#M]): C#M[T[C#M]] => Option[C#M[T[C#M]]]
+  def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]): C#M[T[C#M]] => Option[C#M[T[C#M]]]
 }
 
 object Unicoalesce {
 
   /**
-    * Provides a convenient way of capturing all of the Unicoalesce
-    * dependencies in a single implicit, which can then be passed
-    * along as a value (e.g. in BackendModule).
-    */
+   * Provides a convenient way of capturing all of the Unicoalesce
+   * dependencies in a single implicit, which can then be passed
+   * along as a value (e.g. in BackendModule).
+   */
   trait Capture[T[_[_]], C <: CoM] {
     val C: Coalesce.Aux[T, C#M, C#M]
     val F: Functor[C#M]
@@ -51,37 +50,44 @@ object Unicoalesce {
 
   object Capture {
 
-    implicit def materialize[T[_[_]], C <: CoM](implicit
-                                                _C: Coalesce.Aux[T, C#M, C#M],
-                                                _F: Functor[C#M],
-                                                _QC: UnicoalesceQC[T, C],
-                                                _SR: UnicoalesceSR[T, C],
-                                                _EJ: UnicoalesceEJ[T, C],
-                                                _TJ: UnicoalesceTJ[T, C],
-                                                _N: Normalizable[C#M]): Capture[T, C] =
-      new Capture[T, C] {
+    implicit def materialize[T[_[_]], C <: CoM](
+      implicit
+        _C: Coalesce.Aux[T, C#M, C#M],
+        _F: Functor[C#M],
+        _QC: UnicoalesceQC[T, C],
+        _SR: UnicoalesceSR[T, C],
+        _EJ: UnicoalesceEJ[T, C],
+        _TJ: UnicoalesceTJ[T, C],
+        _N: Normalizable[C#M]): Capture[T, C] = new Capture[T, C] {
 
-        val C  = _C
-        val F  = _F
-        val QC = _QC
-        val SR = _SR
-        val EJ = _EJ
-        val TJ = _TJ
-        val N  = _N
-      }
+      val C = _C
+      val F = _F
+      val QC = _QC
+      val SR = _SR
+      val EJ = _EJ
+      val TJ = _TJ
+      val N = _N
+    }
 
     def apply[T[_[_]], C <: CoM](implicit C: Capture[T, C]) = C
   }
 
-  def apply[T[_[_]], C <: CoM](implicit
-                               C: Coalesce.Aux[T, C#M, C#M],
-                               F: Functor[C#M],
-                               QC: UnicoalesceQC[T, C],
-                               SR: UnicoalesceSR[T, C],
-                               EJ: UnicoalesceEJ[T, C],
-                               TJ: UnicoalesceTJ[T, C],
-                               N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] =
-    repeatedly(applyTransforms(QC(C), SR(C), EJ(C), TJ(C), N.normalizeF(_: C#M[T[C#M]])))
+  def apply[T[_[_]], C <: CoM](
+    implicit
+      C: Coalesce.Aux[T, C#M, C#M],
+      F: Functor[C#M],
+      QC: UnicoalesceQC[T, C],
+      SR: UnicoalesceSR[T, C],
+      EJ: UnicoalesceEJ[T, C],
+      TJ: UnicoalesceTJ[T, C],
+      N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] =
+    repeatedly(
+      applyTransforms(
+        QC(C),
+        SR(C),
+        EJ(C),
+        TJ(C),
+        N.normalizeF(_: C#M[T[C#M]])))
 }
 
 sealed trait UnicoalesceQC[T[_[_]], C <: CoM] extends Unicoalesce[T, C]
@@ -95,7 +101,7 @@ private[qscript] trait UnicoalesceQCLowPriorityImplicits {
 object UnicoalesceQC extends UnicoalesceQCLowPriorityImplicits {
 
   implicit def member[T[_[_]], C <: CoM](
-      implicit
+    implicit
       QC: QScriptCore[T, ?] :<: C#M): UnicoalesceQC[T, C] = new UnicoalesceQC[T, C] {
 
     def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]) =
@@ -115,14 +121,13 @@ object UnicoalesceSR extends UnicoalesceSRLowPriorityImplicits {
 
   // TODO the A might not infer here
   implicit def member[T[_[_]], A, C <: CoM](
-      implicit
+    implicit
       QC: QScriptCore[T, ?] :<: C#M,
-      SR: Const[ShiftedRead[A], ?] :<: C#M): UnicoalesceSR[T, C] =
-    new UnicoalesceSR[T, C] {
+      SR: Const[ShiftedRead[A], ?] :<: C#M): UnicoalesceSR[T, C] = new UnicoalesceSR[T, C] {
 
-      def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]) =
-        C.coalesceSR[C#M, A](idPrism)
-    }
+    def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]) =
+      C.coalesceSR[C#M, A](idPrism)
+  }
 }
 
 sealed trait UnicoalesceEJ[T[_[_]], C <: CoM] extends Unicoalesce[T, C]
@@ -136,7 +141,7 @@ private[qscript] trait UnicoalesceEJLowPriorityImplicits {
 object UnicoalesceEJ extends UnicoalesceEJLowPriorityImplicits {
 
   implicit def member[T[_[_]], C <: CoM](
-      implicit
+    implicit
       QC: EquiJoin[T, ?] :<: C#M): UnicoalesceEJ[T, C] = new UnicoalesceEJ[T, C] {
 
     def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]) =
@@ -155,7 +160,7 @@ private[qscript] trait UnicoalesceTJLowPriorityImplicits {
 object UnicoalesceTJ extends UnicoalesceTJLowPriorityImplicits {
 
   implicit def member[T[_[_]], C <: CoM](
-      implicit
+    implicit
       QC: ThetaJoin[T, ?] :<: C#M): UnicoalesceTJ[T, C] = new UnicoalesceTJ[T, C] {
 
     def apply(C: Coalesce.Aux[T, C#M, C#M])(implicit F: Functor[C#M]) =

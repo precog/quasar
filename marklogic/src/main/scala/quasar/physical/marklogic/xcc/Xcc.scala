@@ -32,7 +32,6 @@ import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.stream.Process
 
 trait Xcc[F[_]] extends MonadError_[F, XccError] {
-
   /** Returns the most recent system commit timestamp. */
   def currentServerPointInTime: F[BigInt]
 
@@ -84,8 +83,7 @@ object Xcc extends XccInstances {
 }
 
 sealed abstract class XccInstances extends XccInstances0 {
-  implicit def defaultXcc[F[_]: Monad: Capture: Catchable: SessionReader: CSourceReader]
-    : Xcc[F] =
+  implicit def defaultXcc[F[_]: Monad: Capture: Catchable: SessionReader: CSourceReader]: Xcc[F] =
     new DefaultImpl[F]
 }
 
@@ -127,9 +125,7 @@ sealed abstract class XccInstances0 {
     }
 }
 
-private[xcc] final class DefaultImpl[
-    F[_]: Monad: Capture: Catchable: SessionReader: CSourceReader]
-    extends Xcc[F] {
+private[xcc] final class DefaultImpl[F[_]: Monad: Capture: Catchable: SessionReader: CSourceReader] extends Xcc[F] {
   import DefaultImpl.XccXQueryException, Executed.executed, Session.TransactionMode
 
   def raiseError[A](e: XccError): F[A] =
@@ -140,8 +136,8 @@ private[xcc] final class DefaultImpl[
 
   def handleError[A](fa: F[A])(f: XccError => F[A]): F[A] =
     fa handleWith {
-      case ex: RequestException     => f(XccError.requestError(ex))
-      case XccXQueryException(m, c) => f(XccError.xqueryError(m, c))
+      case ex: RequestException         => f(XccError.requestError(ex))
+      case     XccXQueryException(m, c) => f(XccError.xqueryError(m, c))
     }
 
   def currentServerPointInTime: F[BigInt] =
@@ -162,14 +158,13 @@ private[xcc] final class DefaultImpl[
 
     def sessionResults: F[(Session, ResultSequence)] =
       contentsource.defaultSession[F] flatMap { s =>
-        SessionReader[F]
-          .scope(s)(evaluate0(main, streamingOptions))
+        SessionReader[F].scope(s)(evaluate0(main, streamingOptions))
           .strengthL(s)
       }
 
-    Process.bracket(sessionResults)(srs =>
-      Process.eval_(Capture[F].capture(srs._1.close())))(srs =>
-      Process.unfoldEval(srs._2)(next))
+    Process.bracket(sessionResults)(
+      srs => Process.eval_(Capture[F].capture(srs._1.close())))(
+      srs => Process.unfoldEval(srs._2)(next))
   }
 
   def execute(main: MainModule): F[Executed] =
@@ -185,11 +180,10 @@ private[xcc] final class DefaultImpl[
 
   def results(main: MainModule): F[Vector[XdmItem]] =
     evaluate0(main, (new RequestOptions) <| (_.setCacheResult(true)))
-      .flatMap(rs =>
-        Capture[F] capture {
-          val items = rs.toArray.to[Vector]
-          rs.close()
-          items
+      .flatMap(rs => Capture[F] capture {
+        val items = rs.toArray.to[Vector]
+        rs.close()
+        items
       })
 
   def transact[A](fa: F[A]): F[A] = {
@@ -198,8 +192,9 @@ private[xcc] final class DefaultImpl[
       val txnComplete = restoreTo != TransactionMode.UPDATE
       val restoreMode = setTransactionMode(restoreTo)
 
-      res.cata(t => rollback *> restoreMode *> Catchable[F].fail(t),
-               txnComplete whenM (commit *> restoreMode))
+      res.cata(
+        t => rollback *> restoreMode *> Catchable[F].fail(t),
+        txnComplete whenM (commit *> restoreMode))
     }
 
     beginTransaction >>= (prevMode => fa.ensuring(completeTxn(prevMode)))
@@ -223,9 +218,8 @@ private[xcc] final class DefaultImpl[
     withSession { s =>
       s.submitRequest(s.newAdhocQuery(main.render, options))
     } handleWith {
-      case xex: XQueryException => Catchable[F].fail(XccXQueryException(main, xex.right))
-      case rex: RetryableXQueryException =>
-        Catchable[F].fail(XccXQueryException(main, rex.left))
+      case xex: XQueryException          => Catchable[F].fail(XccXQueryException(main, xex.right))
+      case rex: RetryableXQueryException => Catchable[F].fail(XccXQueryException(main, rex.left))
     }
 
   private def rollback: F[Executed] =
@@ -245,9 +239,8 @@ private[xcc] final class DefaultImpl[
 }
 
 private[xcc] object DefaultImpl {
-  final case class XccXQueryException(module: MainModule,
-                                      cause: RetryableXQueryException \/ XQueryException)
-      extends Exception(XccError.widenXQueryCause(cause)) {
+  final case class XccXQueryException(module: MainModule, cause: RetryableXQueryException \/ XQueryException)
+    extends Exception(XccError.widenXQueryCause(cause)) {
 
     def toXccError: XccError =
       XccError.xqueryError(module, cause)
@@ -257,8 +250,7 @@ private[xcc] object DefaultImpl {
   }
 }
 
-private[xcc] sealed abstract class TransXcc[F[_]: Monad: Xcc, T[_[_], _]: MonadTrans]
-    extends Xcc[T[F, ?]] {
+private[xcc] sealed abstract class TransXcc[F[_]: Monad: Xcc, T[_[_], _]: MonadTrans] extends Xcc[T[F, ?]] {
   def currentServerPointInTime =
     Xcc[F].currentServerPointInTime.liftM[T]
 

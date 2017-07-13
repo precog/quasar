@@ -37,7 +37,8 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object quasar {
-  private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A): CompileM[A] =
+  private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
+      CompileM[A] =
     EitherT(r.point[PhaseResultW]) flatMap { a =>
       (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
     }
@@ -46,16 +47,16 @@ package object quasar {
     * typechecked.
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
-  def precompile[T: Equal: RenderTree](query: Fix[Sql], vars: Variables, basePath: ADir)(
-      implicit TR: Recursive.Aux[T, LP],
-      TC: Corecursive.Aux[T, LP]): CompileM[T] = {
+  def precompile[T: Equal: RenderTree]
+    (query: Fix[Sql], vars: Variables, basePath: ADir)
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : CompileM[T] = {
     import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
       substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
       absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
-      normed <- phase("Normalized Projections",
-                      normalizeProjections[Fix[Sql]](absAst).right)
+      normed   <- phase("Normalized Projections", normalizeProjections[Fix[Sql]](absAst).right)
       sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](normed).right)
       annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
       logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
@@ -63,7 +64,7 @@ package object quasar {
   }
 
   private val optimizer = new Optimizer[Fix[LP]]
-  private val lpr       = optimizer.lpr
+  private val lpr = optimizer.lpr
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
     */
@@ -82,38 +83,34 @@ package object quasar {
       case _                           => lp.right
     }
 
-  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
-      implicit
-      mount: Mounting.Ops[S],
-      fsFail: Failure.Ops[FileSystemError, S])
-    : EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S],
+    fsFail: Failure.Ops[FileSystemError, S]
+  ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
     EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
 
-  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
-      implicit
-      mount: Mounting.Ops[S])
-    : EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
-    resolveImportsImpl(
-      scopedExpr,
-      baseDir,
-      d =>
-        mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S]
+  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
+    resolveImportsImpl(scopedExpr, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
     * results, if the query was foldable to a constant.
     */
-  def queryPlan(expr: Fix[Sql],
-                vars: Variables,
-                basePath: ADir,
-                off: Natural,
-                lim: Option[Positive]): CompileM[List[Data] \/ Fix[LP]] =
+  def queryPlan(
+    expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
+      CompileM[List[Data] \/ Fix[LP]] =
     precompile[Fix[LP]](expr, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 
-  def addOffsetLimit[T](lp: T, off: Natural, lim: Option[Positive])(
-      implicit T: Corecursive.Aux[T, LP]): T = {
+  def addOffsetLimit[T]
+    (lp: T, off: Natural, lim: Option[Positive])
+    (implicit T: Corecursive.Aux[T, LP])
+      : T = {
     val skipped = Drop(lp, constant[T](Data.Int(off.value)).embed).embed
-    lim.fold(skipped)(l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
+    lim.fold(
+      skipped)(
+      l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
   }
 }

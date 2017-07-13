@@ -23,7 +23,9 @@ import quasar.cli.Cmd, Cmd._
 import scopt.OptionParser
 
 /** Command-line options supported by the Quasar REPL. */
-final case class CliOptions(cmd: Cmd, config: Option[String])
+final case class CliOptions(
+  cmd: Cmd,
+  config: Option[String])
 
 object CliOptions {
   val default: CliOptions =
@@ -35,9 +37,9 @@ object CliOptions {
 
     opt[String]('c', "config") action { (x, c) =>
       c.copy(config = Some(x))
-    } text ("path to the config file to use")
+    } text("path to the config file to use")
 
-    help("help") text ("prints this usage text\n")
+    help("help") text("prints this usage text\n")
 
     cmd("initUpdateMetaStore")
       .text("Initializes and updates the metastore.\n")

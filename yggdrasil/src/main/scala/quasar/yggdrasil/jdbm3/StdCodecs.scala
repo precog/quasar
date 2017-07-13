@@ -41,34 +41,29 @@ trait StdCodecs {
   implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]]
 
   def codecForCValueType[A](cType: CValueType[A]): Codec[A] = cType match {
-    case CBoolean => BooleanCodec
-    case CString  => StringCodec
-    case CLong    => LongCodec
-    case CDouble  => DoubleCodec
-    case CNum     => BigDecimalCodec
-    case CDate    => DateTimeCodec
-    case CPeriod  => PeriodCodec
-    case CArrayType(elemType) =>
-      ArrayCodec(codecForCValueType(elemType), elemType.classTag)
+    case CBoolean             => BooleanCodec
+    case CString              => StringCodec
+    case CLong                => LongCodec
+    case CDouble              => DoubleCodec
+    case CNum                 => BigDecimalCodec
+    case CDate                => DateTimeCodec
+    case CPeriod              => PeriodCodec
+    case CArrayType(elemType) => ArrayCodec(codecForCValueType(elemType), elemType.classTag)
   }
 }
 
 trait RowFormatCodecs extends StdCodecs { self: RowFormat =>
-  implicit def LongCodec: Codec[Long]              = Codec.PackedLongCodec
-  implicit def DoubleCodec: Codec[Double]          = Codec.DoubleCodec
-  implicit def BigDecimalCodec: Codec[BigDecimal]  = Codec.BigDecimalCodec
-  implicit def StringCodec: Codec[String]          = Codec.Utf8Codec
-  implicit def BooleanCodec: Codec[Boolean]        = Codec.BooleanCodec
-  implicit def DateTimeCodec: Codec[LocalDateTime] = Codec.DateCodec
-  implicit def PeriodCodec: Codec[Period]          = Codec.PeriodCodec
+  implicit def LongCodec: Codec[Long]             = Codec.PackedLongCodec
+  implicit def DoubleCodec: Codec[Double]         = Codec.DoubleCodec
+  implicit def BigDecimalCodec: Codec[BigDecimal] = Codec.BigDecimalCodec
+  implicit def StringCodec: Codec[String]         = Codec.Utf8Codec
+  implicit def BooleanCodec: Codec[Boolean]       = Codec.BooleanCodec
+  implicit def DateTimeCodec: Codec[LocalDateTime]     = Codec.DateCodec
+  implicit def PeriodCodec: Codec[Period]         = Codec.PeriodCodec
   // implicit def BitSetCodec: Codec[BitSet] = Codec.BitSetCodec
   //@transient implicit lazy val BitSetCodec: Codec[BitSet] = Codec.SparseBitSetCodec(columnRefs.size)
-  @transient implicit lazy val BitSetCodec: Codec[BitSet] =
-    Codec.SparseBitSetCodec(columnRefs.size)
-  @transient implicit lazy val RawBitSetCodec: Codec[RawBitSet] =
-    Codec.SparseRawBitSetCodec(columnRefs.size)
-  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]] =
-    Codec.IndexedSeqCodec(elemCodec)
-  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]] =
-    Codec.ArrayCodec(elemCodec)(m)
+  @transient implicit lazy val BitSetCodec: Codec[BitSet]       = Codec.SparseBitSetCodec(columnRefs.size)
+  @transient implicit lazy val RawBitSetCodec: Codec[RawBitSet] = Codec.SparseRawBitSetCodec(columnRefs.size)
+  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]       = Codec.IndexedSeqCodec(elemCodec)
+  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]] = Codec.ArrayCodec(elemCodec)(m)
 }

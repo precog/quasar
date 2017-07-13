@@ -26,18 +26,13 @@ trait Extractor[A] { self =>
   import Extractor._
 
   def extract(jvalue: JValue): A = validated(jvalue) valueOr {
-    case Thrown(ex) =>
-      throw new IllegalArgumentException("Unable to deserialize " + jvalue, ex)
-    case other =>
-      throw new IllegalArgumentException(
-        "Unable to deserialize " + jvalue + ": " + other.message)
+    case Thrown(ex) => throw new IllegalArgumentException("Unable to deserialize " + jvalue, ex)
+    case other      => throw new IllegalArgumentException("Unable to deserialize " + jvalue + ": " + other.message)
   }
 
   def validated(jvalue: JValue): Validation[Error, A]
   def validated(jvalue: JValue, jpath: JPath): Validation[Error, A] =
-    ((cause: Extractor.Error) =>
-      Extractor.Invalid("Unable to deserialize property or child " + jpath, Some(cause))) <-: validated(
-      jvalue.get(jpath))
+    ((cause: Extractor.Error) => Extractor.Invalid("Unable to deserialize property or child " + jpath, Some(cause))) <-: validated(jvalue.get(jpath))
 
   def project(jpath: JPath): Extractor[A] = new Extractor[A] {
     override def extract(jvalue: JValue) = self.extract(jvalue(jpath))
@@ -96,19 +91,12 @@ object Extractor {
   }
 
   case class Errors(errors: NonEmptyList[Error]) extends Error {
-    def message =
-      "Multiple extraction errors occurred: " + errors
-        .map(_.message)
-        .list
-        .toList
-        .mkString(": ")
+    def message = "Multiple extraction errors occurred: " + errors.map(_.message).list.toList.mkString(": ")
   }
 
-  implicit val typeclass: Plus[Extractor] with Functor[Extractor] = new Plus[Extractor]
-  with Functor[Extractor] {
+  implicit val typeclass: Plus[Extractor] with Functor[Extractor] = new Plus[Extractor] with Functor[Extractor] {
     def plus[A](f1: Extractor[A], f2: => Extractor[A]) = new Extractor[A] {
-      def validated(jvalue: JValue) =
-        f1.validated(jvalue) findSuccess f2.validated(jvalue)
+      def validated(jvalue: JValue) = f1.validated(jvalue) findSuccess f2.validated(jvalue)
     }
 
     def map[A, B](e: Extractor[A])(f: A => B): Extractor[B] = e map f
@@ -117,11 +105,7 @@ object Extractor {
   def apply[A: CTag](f: PartialFunction[JValue, A]): Extractor[A] = new Extractor[A] {
     def validated(jvalue: JValue) = {
       if (f.isDefinedAt(jvalue)) Success(f(jvalue))
-      else
-        Failure(
-          Invalid(
-            "Extraction not defined from value " + jvalue + " to type " + implicitly[
-              CTag[A]].erasure.getName))
+      else Failure(Invalid("Extraction not defined from value " + jvalue + " to type " + implicitly[CTag[A]].erasure.getName))
     }
   }
 }

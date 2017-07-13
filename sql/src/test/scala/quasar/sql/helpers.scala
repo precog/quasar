@@ -38,49 +38,36 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   // TODO use `quasar.precompile`
   val compile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] = query => {
     for {
-      attr <- parseAndAnnotate(query)
-      cld  <- Compiler.compile[Fix[LP]](attr).leftMap(NonEmptyList(_))
+      attr   <- parseAndAnnotate(query)
+      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(NonEmptyList(_))
     } yield cld
   }
 
-  def unsafeParse(query: String) =
-    fixParser
-      .parseExpr(Query(query))
-      .valueOr(
-        err =>
-          scala.sys.error(
-            s"False assumption in test, could not parse due to underlying issue: $err"))
+  def unsafeParse(query: String) = fixParser.parseExpr(Query(query)).valueOr(err => scala.sys.error(s"False assumption in test, could not parse due to underlying issue: $err"))
 
-  val parseAndAnnotate
-    : Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql,
-                                                        SemanticAnalysis.Annotations] =
-    query => {
-      val normed = normalizeProjections(query)
-      val sorted = projectSortKeys(normed)
-      annotate(sorted)
-    }
+  val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    val normed = normalizeProjections(query)
+    val sorted   = projectSortKeys(normed)
+    annotate(sorted)
+  }
 
-  val parseAndAnnotateUnsafe: Fix[Sql] => Cofree[Sql, SemanticAnalysis.Annotations] =
-    query => {
-      parseAndAnnotate(query).valueOr(err =>
-        throw new RuntimeException(
-          s"False assumption in test, could not annotate due to underlying issue: $err"))
-    }
+  val parseAndAnnotateUnsafe: Fix[Sql] => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    parseAndAnnotate(query).valueOr(err => throw new RuntimeException(s"False assumption in test, could not annotate due to underlying issue: $err"))
+  }
 
   val optimizer = new Optimizer[Fix[LP]]
-  val lpr       = optimizer.lpr
+  val lpr = optimizer.lpr
 
   // Compile -> Optimize -> Typecheck -> Rewrite Joins
   val fullCompile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] =
-    q =>
-      compile(q).flatMap { lp =>
-        // TODO we should just call `quasar.preparePlan` here
-        // but we need to remove core's dependency on sql first
-        val optimized = optimizer.optimize(lp)
-        for {
-          typechecked <- lpr.ensureCorrectTypes(optimized).disjunction
-          rewritten   <- optimizer.rewriteJoins(typechecked).right
-        } yield rewritten
+    q => compile(q).flatMap { lp =>
+      // TODO we should just call `quasar.preparePlan` here
+      // but we need to remove core's dependency on sql first
+      val optimized = optimizer.optimize(lp)
+      for {
+        typechecked <- lpr.ensureCorrectTypes(optimized).disjunction
+        rewritten <- optimizer.rewriteJoins(typechecked).right
+      } yield rewritten
     }
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
@@ -89,17 +76,13 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   // `optimize` produces the same plan given a query in some more deviant form.
   def compileExp(query: Fix[Sql]): Fix[LP] =
     compile(query).fold(
-      e =>
-        throw new RuntimeException(
-          "could not compile query for expected value: " + pprint(query) + "; " + e),
+      e => throw new RuntimeException("could not compile query for expected value: " + pprint(query) + "; " + e),
       optimizer.optimize)
 
   // Compile the given query, including optimization and typechecking
   def fullCompileExp(query: Fix[Sql]): Fix[LP] =
-    fullCompile(query).valueOr(
-      e =>
-        throw new RuntimeException(
-          s"could not full-compile query for expected value '$query': $e"))
+    fullCompile(query).valueOr(e =>
+      throw new RuntimeException(s"could not full-compile query for expected value '$query': $e"))
 
   def testLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
@@ -107,10 +90,10 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
-  def renameJoinSides(result: Fix[LP])(oldLeft: Symbol,
-                                       newLeft: Symbol,
-                                       oldRight: Symbol,
-                                       newRight: Symbol): Fix[LP] = {
+  def renameJoinSides
+    (result: Fix[LP])
+    (oldLeft: Symbol, newLeft: Symbol, oldRight: Symbol, newRight: Symbol):
+      Fix[LP] = {
     val rename: Algebra[LP, Fix[LP]] = {
       case JoinSideName(name) if name ≟ oldLeft =>
         lpr.joinSideName(newLeft)
@@ -126,8 +109,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   }
 
   def read(file: String): Fix[LP] =
-    lpf.read(sandboxCurrent(
-      posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
+    lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
   def makeObj(ts: (String, Fix[LP])*): Fix[LP] =
     MakeObjectN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*).embed

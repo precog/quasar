@@ -21,7 +21,7 @@ import quasar.yggdrasil.vfs._
 
 import quasar.precog.common._
 
-import quasar.blueeyes.{MimeType, MimeTypes}
+import quasar.blueeyes.{ MimeType, MimeTypes }
 
 import scala.concurrent.duration.Duration
 
@@ -31,49 +31,38 @@ import scalaz.NonEmptyList.nels
 sealed trait EvaluationError
 case class InvalidStateError(message: String) extends EvaluationError
 case class StorageError(error: ResourceError) extends EvaluationError
-case class SystemError(error: Throwable)      extends EvaluationError
-case class AccumulatedErrors(errors: NonEmptyList[EvaluationError])
-    extends EvaluationError
+case class SystemError(error: Throwable) extends EvaluationError
+case class AccumulatedErrors(errors: NonEmptyList[EvaluationError]) extends EvaluationError
 
 object EvaluationError {
-  def invalidState(message: String): EvaluationError      = InvalidStateError(message)
+  def invalidState(message: String): EvaluationError = InvalidStateError(message)
   def storageError(error: ResourceError): EvaluationError = StorageError(error)
-  def systemError(error: Throwable): EvaluationError      = SystemError(error)
-  def acc(errors: NonEmptyList[EvaluationError]): EvaluationError =
-    AccumulatedErrors(errors)
+  def systemError(error: Throwable): EvaluationError = SystemError(error)
+  def acc(errors: NonEmptyList[EvaluationError]): EvaluationError = AccumulatedErrors(errors)
 
   implicit val semigroup: Semigroup[EvaluationError] = new Semigroup[EvaluationError] {
     def append(a: EvaluationError, b: => EvaluationError) = (a, b) match {
-      case (AccumulatedErrors(a0), AccumulatedErrors(b0)) =>
-        AccumulatedErrors(a0 append b0)
+      case (AccumulatedErrors(a0), AccumulatedErrors(b0)) => AccumulatedErrors(a0 append b0)
       case (a0, AccumulatedErrors(b0)) => AccumulatedErrors(a0 <:: b0)
       case (AccumulatedErrors(a0), b0) => AccumulatedErrors(b0 <:: a0)
-      case (a0, b0)                    => AccumulatedErrors(nels(a0, b0))
+      case (a0, b0) => AccumulatedErrors(nels(a0, b0))
     }
   }
 }
 
-case class QueryOptions(page: Option[(Long, Long)] = None,
-                        sortOn: List[CPath] = Nil,
-                        sortOrder: TableModule.DesiredSortOrder =
-                          TableModule.SortAscending,
-                        timeout: Option[Duration] = None,
-                        output: MimeType = MimeTypes.application / MimeTypes.json,
-                        cacheControl: CacheControl = CacheControl.NoCache)
+case class QueryOptions(
+  page: Option[(Long, Long)] = None,
+  sortOn: List[CPath] = Nil,
+  sortOrder: TableModule.DesiredSortOrder = TableModule.SortAscending,
+  timeout: Option[Duration] = None,
+  output: MimeType = MimeTypes.application/MimeTypes.json,
+  cacheControl: CacheControl = CacheControl.NoCache)
 
-case class CacheControl(maxAge: Option[Long],
-                        recacheAfter: Option[Long],
-                        cacheable: Boolean,
-                        onlyIfCached: Boolean)
+case class CacheControl(maxAge: Option[Long], recacheAfter: Option[Long], cacheable: Boolean, onlyIfCached: Boolean)
 
 object CacheControl {
   import quasar.blueeyes.CacheDirective
-  import quasar.blueeyes.CacheDirectives.{
-    `max-age`,
-    `no-cache`,
-    `only-if-cached`,
-    `max-stale`
-  }
+  import quasar.blueeyes.CacheDirectives.{ `max-age`, `no-cache`, `only-if-cached`, `max-stale` }
   import scalaz.syntax.semigroup._
   import scalaz.std.option._
   import scalaz.std.anyVal._
@@ -81,29 +70,20 @@ object CacheControl {
   val NoCache = CacheControl(None, None, false, false)
 
   def fromCacheDirectives(cacheDirectives: CacheDirective*) = {
-    val maxAge = cacheDirectives.collectFirst {
-      case `max-age`(Some(n)) => n.number * 1000
-    }
-    val maxStale = cacheDirectives.collectFirst {
-      case `max-stale`(Some(n)) => n.number * 1000
-    }
-    val cacheable    = cacheDirectives exists { _ != `no-cache` }
-    val onlyIfCached = cacheDirectives exists { _ == `only-if-cached` }
+    val maxAge = cacheDirectives.collectFirst { case `max-age`(Some(n)) => n.number * 1000 }
+    val maxStale = cacheDirectives.collectFirst { case `max-stale`(Some(n)) => n.number * 1000 }
+    val cacheable = cacheDirectives exists { _ != `no-cache`}
+    val onlyIfCached = cacheDirectives exists { _ == `only-if-cached`}
     CacheControl(maxAge |+| maxStale, maxAge, cacheable, onlyIfCached)
   }
 }
 
-trait QueryExecutor[M[+ _], A] { self =>
-  def execute(query: String,
-              context: EvaluationContext,
-              opts: QueryOptions): EitherT[M, EvaluationError, A]
+trait QueryExecutor[M[+_], A] { self =>
+  def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, A]
 
-  def map[B](f: A => B)(implicit M: Functor[M]): QueryExecutor[M, B] =
-    new QueryExecutor[M, B] {
-      def execute(query: String,
-                  context: EvaluationContext,
-                  opts: QueryOptions): EitherT[M, EvaluationError, B] = {
-        self.execute(query, context, opts) map f
-      }
+  def map[B](f: A => B)(implicit M: Functor[M]): QueryExecutor[M, B] = new QueryExecutor[M, B] {
+    def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, B] = {
+      self.execute(query, context, opts) map f
     }
+  }
 }

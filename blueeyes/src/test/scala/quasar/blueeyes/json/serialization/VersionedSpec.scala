@@ -33,8 +33,7 @@ object VersionedSpec extends Specification with ScalaCheck {
 
       val result = fooDecomp.decompose(foo)
 
-      result must_== JParser.parseUnsafe(
-        """{ "s": "Hello world", "i": 23, "b": true, "schemaVersion": "1.0" }""")
+      result must_== JParser.parseUnsafe("""{ "s": "Hello world", "i": 23, "b": true, "schemaVersion": "1.0" }""")
     }
   }
 
@@ -66,8 +65,7 @@ object VersionedSpec extends Specification with ScalaCheck {
       )
 
       result must beLike {
-        case Failure(Invalid(message, None)) =>
-          message must startWith(".schemaVersion property missing")
+        case Failure(Invalid(message, None)) => message must startWith(".schemaVersion property missing")
       }
     }
 
@@ -84,8 +82,7 @@ object VersionedSpec extends Specification with ScalaCheck {
       )
 
       result must beLike {
-        case Failure(Invalid(message, None)) =>
-          message must contain("was incompatible with desired version")
+        case Failure(Invalid(message, None)) => message must contain("was incompatible with desired version")
       }
     }
 

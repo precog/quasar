@@ -24,13 +24,13 @@ import scalaz._, Scalaz._
 sealed abstract class JoinType extends Product with Serializable
 
 object JoinType {
-  final case object Inner      extends JoinType
-  final case object FullOuter  extends JoinType
-  final case object LeftOuter  extends JoinType
+  final case object Inner extends JoinType
+  final case object FullOuter extends JoinType
+  final case object LeftOuter extends JoinType
   final case object RightOuter extends JoinType
 
   implicit val equal: Equal[JoinType] = Equal.equalRef
-  implicit val show: Show[JoinType]   = Show.showFromToString
+  implicit val show: Show[JoinType] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinType] =
     RenderTree.make(t => Terminal(List(t.shows, "JoinType"), None))
 }

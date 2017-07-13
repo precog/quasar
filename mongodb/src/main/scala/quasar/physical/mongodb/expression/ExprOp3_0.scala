@@ -32,7 +32,8 @@ trait ExprOp3_0F[A]
 object ExprOp3_0F {
   final case class $dateToStringF[A](format: FormatString, date: A) extends ExprOp3_0F[A]
 
-  implicit val equal: Delay[Equal, ExprOp3_0F] =
+  implicit val equal:
+      Delay[Equal, ExprOp3_0F] =
     new Delay[Equal, ExprOp3_0F] {
       def apply[A](eq: Equal[A]) = {
         implicit val A: Equal[A] = eq
@@ -44,42 +45,39 @@ object ExprOp3_0F {
     }
 
   implicit val traverse: Traverse[ExprOp3_0F] = new Traverse[ExprOp3_0F] {
-    def traverseImpl[G[_], A, B](fa: ExprOp3_0F[A])(f: A => G[B])(
-        implicit G: Applicative[G]): G[ExprOp3_0F[B]] =
+    def traverseImpl[G[_], A, B](fa: ExprOp3_0F[A])(f: A => G[B])(implicit G: Applicative[G]):
+        G[ExprOp3_0F[B]] =
       fa match {
         case $dateToStringF(fmt, v) => G.map(f(v))($dateToStringF(fmt, _))
       }
   }
 
-  implicit def ops[F[_]: Functor](
-      implicit I: ExprOp3_0F :<: F): ExprOpOps.Aux[ExprOp3_0F, F] =
-    new ExprOpOps[ExprOp3_0F] {
-      type OUT[A] = F[A]
+  implicit def ops[F[_]: Functor](implicit I: ExprOp3_0F :<: F): ExprOpOps.Aux[ExprOp3_0F, F] = new ExprOpOps[ExprOp3_0F] {
+    type OUT[A] = F[A]
 
-      def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
-        κ(None)
+    def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
+      κ(None)
 
-      def bson: Algebra[ExprOp3_0F, Bson] = {
-        case $dateToStringF(format, date) =>
-          Bson.Doc(
-            "$dateToString" -> Bson.Doc(
-              "format" -> Bson.Text(
-                format.components.foldMap(_.fold(_.replace("%", "%%"), _.str))),
-              "date" -> date))
-      }
-
-      // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
-      @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-      def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_0F, JsFn] =
-        // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
-        expr => UnsupportedJS(expr.toString).left
-
-      def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
-        κ(None)
+    def bson: Algebra[ExprOp3_0F, Bson] = {
+      case $dateToStringF(format, date) =>
+        Bson.Doc("$dateToString" -> Bson.Doc(
+          "format" -> Bson.Text(format.components.foldMap(_.fold(_.replace("%", "%%"), _.str))),
+          "date" -> date))
     }
 
-  final class fixpoint[T, EX[_]: Functor](embed: EX[T] => T)(
-      implicit I: ExprOp3_0F :<: EX) {
+    // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+    def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_0F, JsFn] =
+      // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
+      expr => UnsupportedJS(expr.toString).left
+
+    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
+      κ(None)
+  }
+
+  final class fixpoint[T, EX[_]: Functor]
+    (embed: EX[T] => T)
+    (implicit I: ExprOp3_0F :<: EX) {
     def $dateToString(format: FormatString, date: T): T =
       embed(I.inj($dateToStringF(format, date)))
   }
@@ -100,7 +98,7 @@ object FormatSpecifier {
 }
 
 final case class FormatString(components: List[String \/ FormatSpecifier]) {
-  def ::(str: String): FormatString           = FormatString(str.left :: components)
+  def ::(str: String): FormatString = FormatString(str.left :: components)
   def ::(spec: FormatSpecifier): FormatString = FormatString(spec.right :: components)
 }
 object FormatString {
@@ -110,7 +108,6 @@ object FormatString {
 }
 
 object $dateToStringF {
-  def apply[EX[_], A](format: FormatString, date: A)(
-      implicit I: ExprOp3_0F :<: EX): EX[A] =
+  def apply[EX[_], A](format: FormatString, date: A)(implicit I: ExprOp3_0F :<: EX): EX[A] =
     I.inj(ExprOp3_0F.$dateToStringF(format, date))
 }

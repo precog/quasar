@@ -22,8 +22,7 @@ import quasar.Planner.{PlannerErrorME, InternalError}
 
 import matryoshka._
 
-final class UnreachablePlanner[T[_[_]], F[_]: PlannerErrorME, QS[_]]
-    extends Planner[T, F, QS] {
+final class UnreachablePlanner[T[_[_]], F[_]: PlannerErrorME, QS[_]] extends Planner[T, F, QS] {
   def plan: AlgebraM[F, QS, T[N1QL]] =
     κ(PlannerErrorME[F].raiseError(InternalError.fromMsg("unreachable")))
 }

@@ -28,7 +28,7 @@ import scalaz.std.anyVal._
 sealed abstract class MatchDepth
 
 object MatchDepth {
-  final case object Children    extends MatchDepth
+  final case object Children extends MatchDepth
   final case object Descendants extends MatchDepth
 
   val toXQuery: MatchDepth => XQuery = {

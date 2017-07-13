@@ -22,7 +22,7 @@ import quasar.precog.util._
 import quasar.precog.common._
 
 import scala.util.Random
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{ Arbitrary, Gen }
 import Gen.listOfN
 import ArbitrarySlice._
 
@@ -43,12 +43,10 @@ class SliceSpec extends Specification with ScalaCheck {
     byCPath.mapValues(_.map(_._2).toList)
   }
 
-  def sortableCValues(slice: Slice,
-                      cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
+  def sortableCValues(slice: Slice, cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
     val byCPath = columnsByCPath(slice)
     (0 until slice.size).map({ row =>
-      (extractCValues(cpaths.map(byCPath).toList, row),
-       extractCValues(byCPath.values.toList, row))
+      (extractCValues(cpaths.map(byCPath).toList, row), extractCValues(byCPath.values.toList, row))
     })(collection.breakOut)
   }
 
@@ -151,7 +149,7 @@ class SliceSpec extends Specification with ScalaCheck {
     }
 
     val emptySlice = new Slice {
-      val size                            = 0
+      val size = 0
       val columns: Map[ColumnRef, Column] = Map.empty
     }
 
@@ -161,7 +159,7 @@ class SliceSpec extends Specification with ScalaCheck {
       prop { fullSlices: List[Slice] =>
         val slices = fullSlices collect {
           case slice if Random.nextBoolean => slice
-          case _                           => emptySlice
+          case _ => emptySlice
         }
         val slice = Slice.concat(slices)
         toCValues(slice) must_== fakeConcat(slices)
@@ -169,7 +167,7 @@ class SliceSpec extends Specification with ScalaCheck {
     }
 
     "concat heterogeneous slices" in {
-      val pds            = List.fill(25)(concatProjDesc filter (_ => Random.nextBoolean))
+      val pds = List.fill(25)(concatProjDesc filter (_ => Random.nextBoolean))
       val g1 :: g2 :: gs = pds.map(genSlice(_, 17))
 
       implicit val arbSlice = Arbitrary(Gen.oneOf(g1, g2, gs: _*))
@@ -178,36 +176,29 @@ class SliceSpec extends Specification with ScalaCheck {
         val slice = Slice.concat(slices)
         // This is terrible, but there isn't an immediately easy way to test
         // without duplicating concat.
-        toCValues(slice).map(stripUndefineds) must_== fakeConcat(slices).map(
-          stripUndefineds)
+        toCValues(slice).map(stripUndefineds) must_== fakeConcat(slices).map(stripUndefineds)
       }
     }
   }
 }
 
+
 object ArbitrarySlice {
-  private def genBitSet(size: Int): Gen[BitSet] =
-    listOfN(size, genBool) ^^ (BitsetColumn bitset _)
+  private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
 
   def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
     def bs = BitSetUtil.range(0, size)
     col.ctype match {
-      case CString  => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
-      case CBoolean => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
-      case CLong    => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
-      case CDouble  => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
-      case CDate =>
-        arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
-      case CPeriod =>
-        arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
-      case CNum =>
-        arrayOfN(size, genDouble) ^^ (ns =>
-          ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
-      case CNull => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
-      case CEmptyObject =>
-        genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
-      case CEmptyArray =>
-        genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
+      case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
+      case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
+      case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
+      case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
+      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
+      case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
+      case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
+      case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
+      case CEmptyObject  => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
+      case CEmptyArray   => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
       case CUndefined    => UndefinedColumn.raw
       case CArrayType(_) => abort("undefined")
     }

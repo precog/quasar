@@ -33,7 +33,7 @@ import java.lang.Double.isInfinite
   */
 sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int = this.typeIndex compare that.typeIndex
-  def to_s                       = this.renderPretty
+  def to_s = this.renderPretty
 }
 sealed trait JContainer extends JValue {
   assert(contained forall (_ != null), contained)
@@ -55,31 +55,31 @@ object JValue {
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
 
   def fromData(data: Data): JValue = data match {
-    case Data.Null             => JNull
-    case Data.Str(value)       => JString(value)
-    case Data.Bool(b)          => JBool(b)
-    case Data.Dec(value)       => JNumStr(value.toString)
-    case Data.Int(value)       => JNumStr(value.toString)
-    case Data.Obj(fields)      => JObject(fields.mapValues(fromData))
-    case Data.Arr(values)      => JArray(values.map(fromData))
-    case Data.Set(values)      => JArray(values.map(fromData))
+    case Data.Null => JNull
+    case Data.Str(value) => JString(value)
+    case Data.Bool(b) => JBool(b)
+    case Data.Dec(value) => JNumStr(value.toString)
+    case Data.Int(value) => JNumStr(value.toString)
+    case Data.Obj(fields) => JObject(fields.mapValues(fromData))
+    case Data.Arr(values) => JArray(values.map(fromData))
+    case Data.Set(values) => JArray(values.map(fromData))
     case Data.Timestamp(value) => JString(value.toString)
-    case Data.Date(value)      => JString(value.toString)
-    case Data.Time(value)      => JString(value.toString)
-    case Data.Interval(value)  => JString(value.toString)
-    case Data.Binary(values)   => JArray(values.map(JNumLong(_)): _*)
-    case Data.Id(value)        => JString(value)
-    case Data.NA               => JUndefined
+    case Data.Date(value) => JString(value.toString)
+    case Data.Time(value) => JString(value.toString)
+    case Data.Interval(value) => JString(value.toString)
+    case Data.Binary(values) => JArray(values.map(JNumLong(_)): _*)
+    case Data.Id(value) => JString(value)
+    case Data.NA => JUndefined
   }
 
   def toData(jv: JValue): Data = jv match {
-    case JUndefined      => Data.NA
-    case JNull           => Data.Null
-    case JBool(value)    => Data.Bool(value)
-    case num: JNum       => Data.Dec(num.toBigDecimal)
-    case JString(value)  => Data.Str(value)
+    case JUndefined => Data.NA
+    case JNull => Data.Null
+    case JBool(value) => Data.Bool(value)
+    case num: JNum => Data.Dec(num.toBigDecimal)
+    case JString(value) => Data.Str(value)
     case JObject(fields) => Data.Obj(ListMap(fields.mapValues(toData).toSeq: _*))
-    case JArray(values)  => Data.Arr(values.map(toData))
+    case JArray(values) => Data.Arr(values.map(toData))
   }
 
   private def unflattenArray(elements: Seq[(JPath, JValue)]): JArray = {
@@ -107,9 +107,8 @@ object JValue {
     }
   }
 
-  implicit val jvalueOrder
-    : Order[JValue]                     = Order order ((x, y) => Ordering fromInt (x compare y))
-  implicit val jvalueShow: Show[JValue] = Show.showFromToString
+  implicit val jvalueOrder: Order[JValue] = Order order ((x, y) => Ordering fromInt (x compare y))
+  implicit val jvalueShow: Show[JValue]   = Show.showFromToString
 
   def unsafeInsert(rootTarget: JValue, rootPath: JPath, rootValue: JValue): JValue = {
     // println(s"$rootTarget \\ $rootPath := $rootValue")
@@ -142,20 +141,15 @@ object JValue {
                 val (child, rest) = obj.partitionField(name)
                 rest + JField(name, rec(child, JPath(nodes), value))
 
-              case JPathIndex(_) :: _ =>
-                sys.error(
-                  "Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case Nil => fail()
+              case JPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case Nil                => fail()
             }
 
           case arr @ JArray(elements) =>
             path.nodes match {
-              case JPathIndex(index) :: nodes =>
-                JArray(arrayInsert(elements, index, JPath(nodes), value))
-              case JPathField(_) :: _ =>
-                sys.error(
-                  "Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case Nil => fail()
+              case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
+              case JPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case Nil                        => fail()
             }
 
           case JNull | JUndefined =>
@@ -177,7 +171,7 @@ object JValue {
 }
 
 case object JUndefined extends JValue
-case object JNull      extends JValue
+case object JNull extends JValue
 
 sealed abstract class JBool(val value: Boolean) extends JValue {
   override def compare(that: JValue) = that match {
@@ -185,7 +179,7 @@ sealed abstract class JBool(val value: Boolean) extends JValue {
     case _        => super.compare(that)
   }
 }
-final case object JTrue  extends JBool(true)
+final case object JTrue extends JBool(true)
 final case object JFalse extends JBool(false)
 
 object JBool {
@@ -316,7 +310,7 @@ object JString {
 
   protected[json] final def internalEscape(sb: StringBuilder, s: String) {
     sb.append('"')
-    var i   = 0
+    var i = 0
     val len = s.length
     while (i < len) {
       (s.charAt(i): @switch) match {
@@ -377,17 +371,14 @@ object JObjectFields {
 case class JObject(fields: Map[String, JValue]) extends JContainer {
   def contained = fields.values
 
-  def sortedFields: Vector[JField] =
-    fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
+  def sortedFields: Vector[JField] = fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
 
   def get(name: String): JValue = fields.getOrElse(name, JUndefined)
 
-  def +(field: JField): JObject = copy(fields = fields + field.toTuple)
-  def -(name: String): JObject  = copy(fields = fields - name)
-  def partitionField(field: String): (JValue, JObject) =
-    get(field) -> JObject(fields - field)
-  def partition(f: JField => Boolean): (JObject, JObject) =
-    fields partition (x => f(JField(x._1, x._2))) bimap (JObject(_), JObject(_))
+  def +(field: JField): JObject                           = copy(fields = fields + field.toTuple)
+  def -(name: String): JObject                            = copy(fields = fields - name)
+  def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)
+  def partition(f: JField => Boolean): (JObject, JObject) = fields partition (x => f(JField(x._1, x._2))) bimap (JObject(_), JObject(_))
 
   private def fieldsCmp(m1: Map[String, JValue], m2: Map[String, JValue]): Int = {
     @tailrec def rec(fields: Array[String], i: Int): Int = {
@@ -402,7 +393,8 @@ case class JObject(fields: Map[String, JValue]) extends JContainer {
           val cres = (v1 compare v2)
           if (cres == 0) rec(fields, i + 1) else cres
         }
-      } else 0
+      }
+      else 0
     }
     val arr: Array[String] = (m1.keySet ++ m2.keySet).toArray
     quickSort(arr)

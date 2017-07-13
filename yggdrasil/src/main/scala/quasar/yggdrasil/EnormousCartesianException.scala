@@ -16,8 +16,7 @@
 
 package quasar.yggdrasil
 
-case class EnormousCartesianException(left: TableSize, right: TableSize)
-    extends RuntimeException {
+case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
   override def getMessage =
     "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
 }

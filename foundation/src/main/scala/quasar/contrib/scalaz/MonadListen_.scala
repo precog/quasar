@@ -33,15 +33,13 @@ object MonadListen_ extends MonadListen_Instances {
 }
 
 sealed abstract class MonadListen_Instances extends MonadListen_Instances0 {
-  implicit def eitherTMonadListen[F[_]: Functor, W, E](
-      implicit L: MonadListen_[F, W]): MonadListen_[EitherT[F, E, ?], W] =
+  implicit def eitherTMonadListen[F[_]: Functor, W, E](implicit L: MonadListen_[F, W]): MonadListen_[EitherT[F, E, ?], W] =
     new MonadListen_[EitherT[F, E, ?], W] {
       def listen[A](fa: EitherT[F, E, A]) =
         EitherT(L.listen(fa.run) map { case (d, w) => d strengthR w })
     }
 
-  implicit def writerTMonadListen[F[_]: Functor, W1, W2](
-      implicit L: MonadListen_[F, W1]): MonadListen_[WriterT[F, W2, ?], W1] =
+  implicit def writerTMonadListen[F[_]: Functor, W1, W2](implicit L: MonadListen_[F, W1]): MonadListen_[WriterT[F, W2, ?], W1] =
     new MonadListen_[WriterT[F, W2, ?], W1] {
       def listen[A](fa: WriterT[F, W2, A]) =
         WriterT(L.listen(fa.run) map { case ((w2, a), w1) => (w2, (a, w1)) })
@@ -56,8 +54,7 @@ sealed abstract class MonadListen_Instances extends MonadListen_Instances0 {
 }
 
 sealed abstract class MonadListen_Instances0 {
-  implicit def monadListenNoMonad[F[_], W](
-      implicit L: MonadListen[F, W]): MonadListen_[F, W] =
+  implicit def monadListenNoMonad[F[_], W](implicit L: MonadListen[F, W]): MonadListen_[F, W] =
     new MonadListen_[F, W] {
       def listen[A](fa: F[A]) = L.listen(fa)
     }

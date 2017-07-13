@@ -28,7 +28,7 @@ package object fs extends PhysicalErrorPrisms {
 
   type AnalyticalFileSystem[A] = Coproduct[Analyze, FileSystem, A]
 
-  type FileSystemFailure[A]    = Failure[FileSystemError, A]
+  type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
   type MonadFsErr[F[_]] = MonadError_[F, FileSystemError]
@@ -40,19 +40,19 @@ package object fs extends PhysicalErrorPrisms {
   type PhysErr[A] = Failure[PhysicalError, A]
 
   def interpretFileSystem[M[_]](
-      q: QueryFile ~> M,
-      r: ReadFile ~> M,
-      w: WriteFile ~> M,
-      m: ManageFile ~> M
+    q: QueryFile ~> M,
+    r: ReadFile ~> M,
+    w: WriteFile ~> M,
+    m: ManageFile ~> M
   ): FileSystem ~> M =
     q :+: r :+: w :+: m
 
   def interpretAnalyticalFileSystem[M[_]](
-      a: Analyze ~> M,
-      q: QueryFile ~> M,
-      r: ReadFile ~> M,
-      w: WriteFile ~> M,
-      m: ManageFile ~> M
+    a: Analyze ~> M,
+    q: QueryFile ~> M,
+    r: ReadFile ~> M,
+    w: WriteFile ~> M,
+    m: ManageFile ~> M
   ): AnalyticalFileSystem ~> M =
     a :+: q :+: r :+: w :+: m
 

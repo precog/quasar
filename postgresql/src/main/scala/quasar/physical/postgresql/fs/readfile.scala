@@ -36,36 +36,30 @@ object readfile {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def interpret[S[_]](
-      implicit
-      S0: KeyValueStore[ReadFile.ReadHandle, impl.DataStream[ConnectionIO], ?] :<: S,
-      S1: MonotonicSeq :<: S,
-      S2: ConnectionIO :<: S
+    implicit
+    S0: KeyValueStore[ReadFile.ReadHandle, impl.DataStream[ConnectionIO], ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: ConnectionIO :<: S
   ): ReadFile ~> Free[S, ?] =
-    impl.readFromProcess(injectFT[ConnectionIO, S]) {
-      (file: AFile, readOpts: impl.ReadOpts) =>
-        (for {
-          dt <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
-          te <- lift(tableExists(dt.table)).into[S].liftM[FileSystemErrT]
-        } yield {
-          val lim = readOpts.limit.map(lim => s"limit ${lim.unwrap}").orZero
+    impl.readFromProcess(injectFT[ConnectionIO, S]) { (file: AFile, readOpts: impl.ReadOpts) =>
+      (for {
+        dt <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
+        te <- lift(tableExists(dt.table)).into[S].liftM[FileSystemErrT]
+      } yield {
+        val lim = readOpts.limit.map(lim => s"limit ${lim.unwrap}").orZero
 
-          if (te) {
-            // TODO: https://github.com/quasar-analytics/quasar/issues/1363
-            val qStr =
-              s"""select v from "${dt.table}" $lim offset ${readOpts.offset.unwrap}"""
-            Query[HNil, String](qStr, none)
-              .toQuery0(HNil)
-              .process
-              .chunk(1024) // arbitrary size for the moment
-              .map(
-                _.traverse(
-                  s =>
-                    DataCodec
-                      .parse(s)
-                      .leftMap(err => FileSystemError.readFailed(s, err.shows))))
-          } else {
-            Process.empty[ConnectionIO, FileSystemError \/ Vector[Data]]
-          }
-        }).run
+        if (te) {
+          // TODO: https://github.com/quasar-analytics/quasar/issues/1363
+          val qStr = s"""select v from "${dt.table}" $lim offset ${readOpts.offset.unwrap}"""
+          Query[HNil, String](qStr, none)
+            .toQuery0(HNil)
+            .process
+            .chunk(1024) // arbitrary size for the moment
+            .map(_.traverse(s => DataCodec.parse(s).leftMap(
+              err => FileSystemError.readFailed(s, err.shows))))
+        } else {
+          Process.empty[ConnectionIO, FileSystemError \/ Vector[Data]]
+        }
+      }).run
     }
 }

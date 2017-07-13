@@ -34,17 +34,16 @@ trait TypeFArbitrary {
     new Delay[Arbitrary, TypeF[J, ?]] {
       def apply[α](arb: Arbitrary[α]) = {
         implicit val arbA: Arbitrary[α] = arb
-        val x                           = arbitrary[IList[α]]
-        Arbitrary(
-          Gen.oneOf(
-            Gen.const(bottom[J, α]()),
-            Gen.const(top[J, α]()),
-            arbitrary[SimpleType] ^^ (simple[J, α](_)),
-            arbitrary[J] ^^ (const[J, α](_)),
-            arbitrary[IList[α] \/ α] ^^ (arr[J, α](_)),
-            arbitrary[(IMap[J, α], Option[(α, α)])] ^^ (map[J, α](_)),
-            arbitrary[(α, α)] ^^ (coproduct[J, α](_))
-          ))
+        val x = arbitrary[IList[α]]
+        Arbitrary(Gen.oneOf(
+          Gen.const(                                     bottom[J, α]() ),
+          Gen.const(                                        top[J, α]() ),
+          arbitrary[SimpleType]                   ^^ (   simple[J, α](_)),
+          arbitrary[J]                            ^^ (    const[J, α](_)),
+          arbitrary[IList[α] \/ α]                ^^ (      arr[J, α](_)),
+          arbitrary[(IMap[J, α], Option[(α, α)])] ^^ (      map[J, α](_)),
+          arbitrary[(α, α)]                       ^^ (coproduct[J, α](_))
+        ))
       }
     }
 }

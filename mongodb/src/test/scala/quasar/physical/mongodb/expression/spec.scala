@@ -42,16 +42,10 @@ object ArbitraryExprOp {
 
   implicit val formatSpecifierArbitrary: Arbitrary[FormatSpecifier] = Arbitrary {
     import FormatSpecifier._
-    Gen.oneOf(Year,
-              Month,
-              DayOfMonth,
-              Hour,
-              Minute,
-              Second,
-              Millisecond,
-              DayOfYear,
-              DayOfWeek,
-              WeekOfYear)
+    Gen.oneOf(
+      Year, Month, DayOfMonth,
+      Hour, Minute, Second, Millisecond,
+      DayOfYear, DayOfWeek, WeekOfYear)
   }
 
   implicit val formatStringArbitrary: Arbitrary[FormatString] = Arbitrary {
@@ -59,33 +53,38 @@ object ArbitraryExprOp {
   }
 
   lazy val genExpr: Gen[Fix[Expr2_6]] =
-    Gen.oneOf(arbitrary[Int].map(x => $literal(Bson.Int32(x))),
-              Gen.alphaChar.map(c => $var(DocField(BsonField.Name(c.toString)))))
+    Gen.oneOf(
+      arbitrary[Int].map(x => $literal(Bson.Int32(x))),
+      Gen.alphaChar.map(c => $var(DocField(BsonField.Name(c.toString)))))
 
   lazy val genExpr3_0: Gen[Fix[Expr3_0]] = {
     def inj(expr: Fix[Expr2_6]) = expr.transCata[Fix[Expr3_0]](Inject[Expr2_6, Expr3_0])
-    Gen.oneOf(genExpr.map(inj),
-              arbitrary[FormatString].map(fmt =>
-                $dateToString(fmt, inj($var(DocField(BsonField.Name("date")))))))
+    Gen.oneOf(
+      genExpr.map(inj),
+      arbitrary[FormatString].map(fmt =>
+        $dateToString(fmt, inj($var(DocField(BsonField.Name("date")))))))
   }
 
   lazy val genExpr3_2: Gen[Fix[Expr3_2]] = {
-    def inj(expr: Fix[Expr2_6]) = expr.transCata[Fix[Expr3_2]](Inject[Expr2_6, Expr3_2])
-    def inj3_0(expr: Fix[Expr3_0]) =
-      expr.transCata[Fix[Expr3_2]](Inject[Expr3_0, Expr3_2])
+    def inj(expr: Fix[Expr2_6])  = expr.transCata[Fix[Expr3_2]](Inject[Expr2_6, Expr3_2])
+    def inj3_0(expr: Fix[Expr3_0]) = expr.transCata[Fix[Expr3_2]](Inject[Expr3_0, Expr3_2])
     Gen.oneOf(
       genExpr3_0.map(inj3_0),
-      genExpr
-        .map(inj)
-        .flatMap(x =>
-          Gen
-            .oneOf($sqrt(x), $abs(x), $log10(x), $ln(x), $trunc(x), $ceil(x), $floor(x))),
+      genExpr.map(inj).flatMap(x => Gen.oneOf(
+        $sqrt(x),
+        $abs(x),
+        $log10(x),
+        $ln(x),
+        $trunc(x),
+        $ceil(x),
+        $floor(x))),
       for {
-        x    <- genExpr.map(inj)
-        y    <- genExpr.map(inj)
-        expr <- Gen.oneOf($log(x, y), $pow(x, y))
-      } yield expr
-    )
+        x <- genExpr.map(inj)
+        y <- genExpr.map(inj)
+        expr <- Gen.oneOf(
+          $log(x, y),
+          $pow(x, y))
+      } yield expr)
   }
 }
 
@@ -147,8 +146,7 @@ class ExpressionSpec extends quasar.Qspec {
     }
 
     "render $foo.bar under $$CURRENT" in {
-      DocVar.CURRENT(BsonField.Name("foo") \ BsonField.Name("bar")).bson must_== Bson
-        .Text("$$CURRENT.foo.bar")
+      DocVar.CURRENT(BsonField.Name("foo") \ BsonField.Name("bar")).bson must_== Bson.Text("$$CURRENT.foo.bar")
     }
   }
 
@@ -156,10 +154,10 @@ class ExpressionSpec extends quasar.Qspec {
     import quasar.jscore._
 
     "handle addition with epoch date literal" in {
-      $add($literal(Bson.Date(0)), $var(DocField(BsonField.Name("epoch"))))
-        .para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
-        JsFn(JsFn.defaultName,
-             New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
+      $add(
+        $literal(Bson.Date(0)),
+        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
+        JsFn(JsFn.defaultName, New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
     }
   }
 
@@ -171,9 +169,10 @@ class ExpressionSpec extends quasar.Qspec {
         .cata(ops.bson)
 
     def expected(str: String): Bson =
-      Bson.Doc(
-        ListMap("$dateToString" -> Bson.Doc(
-          ListMap("format" -> Bson.Text(str), "date" -> Bson.Text("$date")))))
+      Bson.Doc(ListMap(
+        "$dateToString" -> Bson.Doc(ListMap(
+          "format" -> Bson.Text(str),
+          "date" -> Bson.Text("$date")))))
 
     "match first example from mongodb docs" in {
       toBson(Year :: "-" :: Month :: "-" :: DayOfMonth :: FormatString.empty) must_==
@@ -181,8 +180,7 @@ class ExpressionSpec extends quasar.Qspec {
     }
 
     "match second example from mongodb docs" in {
-      toBson(
-        Hour :: ":" :: Minute :: ":" :: Second :: ":" :: Millisecond :: FormatString.empty) must_==
+      toBson(Hour :: ":" :: Minute :: ":" :: Second :: ":" :: Millisecond :: FormatString.empty) must_==
         expected("%H:%M:%S:%L")
     }
 

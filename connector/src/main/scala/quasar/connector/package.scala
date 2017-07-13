@@ -25,7 +25,7 @@ import scalaz._
 package object connector {
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
 
-  type EnvErr[A]        = Failure[EnvironmentError, A]
+  type EnvErr[A] = Failure[EnvironmentError, A]
   type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
 
   type PlannerErrT[F[_], A] = EitherT[F, Planner.PlannerError, A]

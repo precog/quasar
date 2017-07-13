@@ -41,19 +41,17 @@ trait EncodeEJsonK[F[_]] {
 
 object EncodeEJsonK extends EncodeEJsonKInstances {
   def envT[E: EncodeEJson, F[_]: EncodeEJsonK](
-      askLabel: String,
-      lowerLabel: String
+    askLabel: String,
+    lowerLabel: String
   ): EncodeEJsonK[EnvT[E, F, ?]] =
     new EncodeEJsonK[EnvT[E, F, ?]] {
       def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[EnvT[E, F, ?], J] = {
         case EnvT((ask, lower)) =>
           val fAlg = EncodeEJsonK[F].encodeK[J]
-          ExtEJson(
-            map[J](
-              List(
-                CommonEJson(str[J](askLabel)).embed   -> ask.asEJson[J],
-                CommonEJson(str[J](lowerLabel)).embed -> fAlg(lower)
-              ))).embed
+          ExtEJson(map[J](List(
+            CommonEJson(str[J](askLabel)).embed   -> ask.asEJson[J],
+            CommonEJson(str[J](lowerLabel)).embed -> fAlg(lower)
+          ))).embed
       }
     }
 }

@@ -33,8 +33,7 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       val tpe = UnaryOperationType(JArrayUnfixedT, JType.JUniverseT)
 
-      override val idPolicy =
-        IdentityPolicy.Product(IdentityPolicy.Retain.Merge, IdentityPolicy.Synthesize)
+      override val idPolicy = IdentityPolicy.Product(IdentityPolicy.Retain.Merge, IdentityPolicy.Synthesize)
 
       def apply(table: Table) = M point {
         val derefed = table transform trans.DerefObjectStatic(Leaf(Source), paths.Value)
@@ -45,7 +44,7 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           val values = slice.deref(paths.Value)
 
           val indices = values.columns.keys collect {
-            case ColumnRef(CPath(CPathIndex(i), _ @_*), _) => i
+            case ColumnRef(CPath(CPathIndex(i), _ @_ *), _) => i
           }
 
           if (indices.isEmpty) {
@@ -54,7 +53,7 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             val maxLength = indices.max + 1
 
             val columnTables = values.columns.foldLeft(Map[ColumnRef, Array[Column]]()) {
-              case (acc, (ColumnRef(CPath(CPathIndex(idx), ptail @ _*), tpe), col)) => {
+              case (acc, (ColumnRef(CPath(CPathIndex(idx), ptail @ _ *), tpe), col)) => {
                 // remap around the mod ring w.r.t. max length
                 // s.t. f(i) = f'(i * max + arrayI)
 
@@ -161,7 +160,7 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             val remap = cf.util.Remap(_ / maxLength)
             val keyCols = for {
               (ref, col) <- keys.columns
-              col0       <- remap(col)
+              col0 <- remap(col)
             } yield (ref -> col0)
 
             val sliceSize  = maxLength * slice.size
@@ -173,17 +172,16 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
         val size2          = UnknownSize
         val flattenedTable = Table(flattenedSlices, UnknownSize).compact(TransSpec1.Id)
-        val finalTable = flattenedTable.canonicalize(yggConfig.minIdealSliceSize,
-                                                     Some(yggConfig.maxSliceSize))
+        val finalTable     = flattenedTable.canonicalize(yggConfig.minIdealSliceSize, Some(yggConfig.maxSliceSize))
 
         val spec = InnerObjectConcat(
-          WrapObject(InnerArrayConcat(
-                       DerefObjectStatic(Leaf(Source), paths.Key),
-                       WrapArray(Scan(Leaf(Source), freshIdScanner))
-                     ),
-                     paths.Key.name),
-          WrapObject(DerefObjectStatic(Leaf(Source), paths.Value), paths.Value.name)
-        )
+          WrapObject(
+            InnerArrayConcat(
+              DerefObjectStatic(Leaf(Source), paths.Key),
+              WrapArray(Scan(Leaf(Source), freshIdScanner))
+            ),
+            paths.Key.name),
+          WrapObject(DerefObjectStatic(Leaf(Source), paths.Value), paths.Value.name))
 
         finalTable transform spec
       }

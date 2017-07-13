@@ -29,25 +29,14 @@ import scalaz.syntax.traverse._
 import scalaz.std.list._
 
 object CookedReader {
-  def load(baseDir: File,
-           metadataFile: File,
-           blockFormat: CookedBlockFormat = VersionedCookedBlockFormat(
-             Map(1 -> V1CookedBlockFormat)),
-           segmentFormat: SegmentFormat = VersionedSegmentFormat(
-             Map(1 -> V1SegmentFormat))): CookedReader =
+  def load(baseDir: File, metadataFile: File, blockFormat: CookedBlockFormat = VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)), segmentFormat: SegmentFormat = VersionedSegmentFormat(Map(1 -> V1SegmentFormat))): CookedReader =
     new CookedReader(baseDir, metadataFile, blockFormat, segmentFormat)
 }
 
-final class CookedReader(baseDir: File,
-                         metadataFile0: File,
-                         blockFormat: CookedBlockFormat,
-                         segmentFormat: SegmentFormat)
-    extends StorageReader {
-  private val metadataFile =
-    if (metadataFile0.isAbsolute) metadataFile0
-    else new File(baseDir, metadataFile0.getPath)
+final class CookedReader(baseDir: File, metadataFile0: File, blockFormat: CookedBlockFormat, segmentFormat: SegmentFormat) extends StorageReader {
+  private val metadataFile = if (metadataFile0.isAbsolute) metadataFile0 else new File(baseDir, metadataFile0.getPath)
 
-  private val lock = new AnyRef {}
+  private val lock = new AnyRef { }
 
   def isStable: Boolean = true
 
@@ -75,7 +64,7 @@ final class CookedReader(baseDir: File,
     }
   }
 
-  def id: Long    = metadata.valueOr(throw _).blockid
+  def id: Long = metadata.valueOr(throw _).blockid
   def length: Int = metadata.valueOr(throw _).length
 
   def snapshot(pathConstraints: Option[Set[CPath]]): Block = {
@@ -91,9 +80,7 @@ final class CookedReader(baseDir: File,
           Array.empty[CType]
         }
 
-        tpes.map { tpe =>
-          ColumnRef(path, tpe)
-        }.toSet
+        tpes.map { tpe => ColumnRef(path, tpe) }.toSet
       }
     }
 
@@ -102,20 +89,15 @@ final class CookedReader(baseDir: File,
 
   def snapshotRef(refConstraints: Option[Set[ColumnRef]]): Block = {
     val segments: Seq[Segment] = refConstraints map { refs =>
-      load(refs.toList)
-        .map({ segs =>
-          segs flatMap (_._2)
-        })
-        .valueOr { nel =>
-          throw nel.head
-        }
+      load(refs.toList).map({ segs =>
+        segs flatMap (_._2)
+      }).valueOr { nel => throw nel.head }
     } getOrElse {
-      metadata.valueOr(throw _).segments map {
-        case (segId, file0) =>
-          val file = if (file0.isAbsolute) file0 else new File(baseDir, file0.getPath)
-          read(file) { channel =>
-            segmentFormat.reader.readSegment(channel)
-          }.valueOr(throw _)
+      metadata.valueOr(throw _).segments map { case (segId, file0) =>
+        val file = if (file0.isAbsolute) file0 else new File(baseDir, file0.getPath)
+        read(file) { channel =>
+          segmentFormat.reader.readSegment(channel)
+        }.valueOr(throw _)
       }
     }
 
@@ -142,35 +124,23 @@ final class CookedReader(baseDir: File,
     }
   }
 
-  private def segmentsByRef: Validation[IOException, Map[ColumnRef, List[File]]] =
-    metadata map { md =>
-      md.segments
-        .groupBy(s => (s._1.cpath, s._1.ctype))
-        .map {
-          case ((cpath, ctype), segs) =>
-            (ColumnRef(cpath, ctype), segs.map(_._2).toList)
-        }
-        .toMap
-    }
+  private def segmentsByRef: Validation[IOException, Map[ColumnRef, List[File]]] = metadata map { md =>
+    md.segments.groupBy(s => (s._1.cpath, s._1.ctype)).map { case ((cpath, ctype), segs) =>
+      (ColumnRef(cpath, ctype), segs.map(_._2).toList)
+    }.toMap
+  }
 
-  def load(paths: List[ColumnRef])
-    : ValidationNel[IOException, List[(ColumnRef, List[Segment])]] = {
+  def load(paths: List[ColumnRef]): ValidationNel[IOException, List[(ColumnRef, List[Segment])]] = {
     segmentsByRef.toValidationNel flatMap { (segsByRef: Map[ColumnRef, List[File]]) =>
-      paths
-        .map { path =>
-          val v: ValidationNel[IOException, List[Segment]] = segsByRef
-            .getOrElse(path, Nil)
-            .map { file0 =>
-              val file = if (file0.isAbsolute) file0 else new File(baseDir, file0.getPath)
-              read(file) { channel =>
-                segmentFormat.reader.readSegment(channel).toValidationNel
-              }
-            }
-            .sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ, Segment]
-          v map (path -> _)
-        }
-        .sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ,
-                  (ColumnRef, List[Segment])]
+      paths.map { path =>
+        val v: ValidationNel[IOException, List[Segment]] = segsByRef.getOrElse(path, Nil).map { file0 =>
+          val file = if (file0.isAbsolute) file0 else new File(baseDir, file0.getPath)
+          read(file) { channel =>
+            segmentFormat.reader.readSegment(channel).toValidationNel
+          }
+        }.sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ, Segment]
+        v map (path -> _)
+      }.sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ, (ColumnRef, List[Segment])]
     }
   }
 }

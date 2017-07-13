@@ -23,7 +23,7 @@ trait IdSource {
 
 final class FreshAtomicIdSource extends IdSource {
   private val source = new java.util.concurrent.atomic.AtomicLong
-  def nextId()       = source.getAndIncrement
+  def nextId() = source.getAndIncrement
   def nextIdBlock(n: Int): Long = {
     var nextId = source.get()
     while (!source.compareAndSet(nextId, nextId + n)) {
@@ -32,3 +32,4 @@ final class FreshAtomicIdSource extends IdSource {
     nextId
   }
 }
+

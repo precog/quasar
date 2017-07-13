@@ -18,19 +18,19 @@ package quasar.precog.common
 
 package object jobs {
   type ChannelId = String
-  type JobId     = String
+  type JobId = String
   type MessageId = Long
-  type StatusId  = Long
+  type StatusId = Long
 
   trait IdExtractor {
     val NonNegInt = """(\d+)""".r
 
     def unapply(str: String): Option[Long] = str match {
       case NonNegInt(str) => Some(str.toLong)
-      case _              => None
+      case _ => None
     }
   }
 
-  object StatusId  extends IdExtractor
+  object StatusId extends IdExtractor
   object MessageId extends IdExtractor
 }

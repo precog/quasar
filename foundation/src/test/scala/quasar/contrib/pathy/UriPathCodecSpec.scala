@@ -46,17 +46,18 @@ class UriPathCodecSpec extends quasar.Qspec {
   )
 
   private def encodingFragments = Fragments(
-    fragmentFactory.section("encode special characters properly")
-      +: fragmentFactory.break
-      +: (encodings map checkEncoding)
-      :+ fragmentFactory.break: _*
+       fragmentFactory.section("encode special characters properly")
+    +: fragmentFactory.break
+    +: (encodings map checkEncoding)
+    :+ fragmentFactory.break
+    : _*
   )
 
   private def checkEncoding(pair: (String, String)): Fragment = {
     val (from, to) = pair
     val result = (
-      ((codec escape from) must_= to)
-        && ((codec unescape to) must_= from)
+         ((codec escape from) must_= to)
+      && ((codec unescape to) must_= from)
     )
     fragmentFactory.example(f"$from%-8s -> $to%-8s -> $from%-8s\n", result)
   }

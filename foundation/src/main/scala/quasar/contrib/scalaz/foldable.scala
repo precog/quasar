@@ -20,7 +20,6 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 
 final class FoldableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Foldable[F]) {
-
   /** The pure `Process` of the values in this `Foldable`. */
   final def toProcess: Process0[A] =
     self.foldRight[Process0[A]](Process.halt)((a, p) => Process.emit(a) ++ p)

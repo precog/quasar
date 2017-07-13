@@ -48,7 +48,7 @@ object RealPOSIXSpecs extends Specification {
     "produce distinct UUIDs" in setupDir { base =>
       val test = for {
         interp <- RealPOSIX(base)
-        first  <- interp(GenUUID)
+        first <- interp(GenUUID)
         second <- interp(GenUUID)
       } yield (first, second)
 
@@ -65,8 +65,8 @@ object RealPOSIXSpecs extends Specification {
       fos.close()
 
       val test = for {
-        interp   <- RealPOSIX(base)
-        results  <- interp(OpenR(Path.rootDir </> Path.file("test")))
+        interp <- RealPOSIX(base)
+        results <- interp(OpenR(Path.rootDir </> Path.file("test")))
         contents <- translate(results, interp).fold(ByteVector.empty)(_ ++ _).runLast
       } yield contents
 
@@ -78,14 +78,14 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        sink   <- interp(OpenW(Path.rootDir </> Path.file("test")))
+        sink <- interp(OpenW(Path.rootDir </> Path.file("test")))
         driver = Stream(ByteVector(1, 2, 3, 4, 5)).to(sink)
         _ <- translate(driver, interp).run
       } yield ()
 
       test.unsafePerformSync
 
-      val fis    = new FileInputStream(file)
+      val fis = new FileInputStream(file)
       val buffer = new Array[Byte](10)
       fis.read(buffer) mustEqual 5
       fis.close()
@@ -99,7 +99,7 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        files  <- interp(Ls(Path.rootDir))
+        files <- interp(Ls(Path.rootDir))
       } yield files
 
       test.unsafePerformSync must containTheSameElementsAs(targets.map(Path.file))
@@ -110,7 +110,7 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        _      <- interp(MkDir(Path.rootDir </> Path.dir(target)))
+        _ <- interp(MkDir(Path.rootDir </> Path.dir(target)))
       } yield ()
 
       test.unsafePerformSync
@@ -123,19 +123,18 @@ object RealPOSIXSpecs extends Specification {
 
     "link two directories" in setupDir { base =>
       val from = "foo"
-      val to   = "bar"
+      val to = "bar"
 
       val test = for {
         interp <- RealPOSIX(base)
-        _      <- interp(MkDir(Path.rootDir </> Path.dir(from)))
-        _ <- interp(
-          LinkDir(Path.rootDir </> Path.dir(from), Path.rootDir </> Path.dir(to)))
+        _ <- interp(MkDir(Path.rootDir </> Path.dir(from)))
+        _ <- interp(LinkDir(Path.rootDir </> Path.dir(from), Path.rootDir </> Path.dir(to)))
       } yield ()
 
       test.unsafePerformSync
 
       val ffrom = new File(base, from)
-      val fto   = new File(base, to)
+      val fto = new File(base, to)
 
       fto.exists() mustEqual true
       fto.isDirectory() mustEqual true
@@ -147,7 +146,7 @@ object RealPOSIXSpecs extends Specification {
 
     "link two files" in setupDir { base =>
       val from = "foo"
-      val to   = "bar"
+      val to = "bar"
 
       val test = for {
         interp <- RealPOSIX(base)
@@ -156,8 +155,7 @@ object RealPOSIXSpecs extends Specification {
         driver1 = Stream(ByteVector(1, 2, 3)).to(sink1)
         _ <- translate(driver1, interp).run
 
-        _ <- interp(
-          LinkFile(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
+        _ <- interp(LinkFile(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
 
         sink2 <- interp(OpenW(Path.rootDir </> Path.file(from)))
         driver2 = Stream(ByteVector(4, 5, 6)).to(sink2)
@@ -166,7 +164,7 @@ object RealPOSIXSpecs extends Specification {
 
       test.unsafePerformSync
 
-      val fis    = new FileInputStream(new File(base, to))
+      val fis = new FileInputStream(new File(base, to))
       val buffer = new Array[Byte](3)
       fis.read(buffer) mustEqual 3
       fis.close()
@@ -176,14 +174,13 @@ object RealPOSIXSpecs extends Specification {
 
     "move a file" in setupDir { base =>
       val from = "foo"
-      val to   = "bar"
+      val to = "bar"
 
       Files.createFile(new File(base, from).toPath())
 
       val test = for {
         interp <- RealPOSIX(base)
-        _ <- interp(
-          Move(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
+        _ <- interp(Move(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
       } yield ()
 
       test.unsafePerformSync
@@ -200,8 +197,8 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        fooEx  <- interp(Exists(Path.rootDir </> Path.file(foo)))
-        barEx  <- interp(Exists(Path.rootDir </> Path.file(bar)))
+        fooEx <- interp(Exists(Path.rootDir </> Path.file(foo)))
+        barEx <- interp(Exists(Path.rootDir </> Path.file(bar)))
       } yield (fooEx, barEx)
 
       val (fooEx, barEx) = test.unsafePerformSync
@@ -218,8 +215,8 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        fooEx  <- interp(Exists(Path.rootDir </> Path.dir(foo)))
-        barEx  <- interp(Exists(Path.rootDir </> Path.dir(bar)))
+        fooEx <- interp(Exists(Path.rootDir </> Path.dir(foo)))
+        barEx <- interp(Exists(Path.rootDir </> Path.dir(bar)))
       } yield (fooEx, barEx)
 
       val (fooEx, barEx) = test.unsafePerformSync
@@ -235,7 +232,7 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        _      <- interp(Delete(Path.rootDir </> Path.file(target)))
+        _ <- interp(Delete(Path.rootDir </> Path.file(target)))
       } yield ()
 
       test.unsafePerformSync
@@ -244,14 +241,14 @@ object RealPOSIXSpecs extends Specification {
     }
 
     "delete an empty directory" in setupDir { base =>
-      val target  = "foo"
+      val target = "foo"
       val ftarget = new File(base, target)
 
       ftarget.mkdir()
 
       val test = for {
         interp <- RealPOSIX(base)
-        _      <- interp(Delete(Path.rootDir </> Path.dir(target)))
+        _ <- interp(Delete(Path.rootDir </> Path.dir(target)))
       } yield ()
 
       test.unsafePerformSync
@@ -260,7 +257,7 @@ object RealPOSIXSpecs extends Specification {
     }
 
     "delete a non-empty directory" in setupDir { base =>
-      val target  = "foo"
+      val target = "foo"
       val ftarget = new File(base, target)
 
       ftarget.mkdir()
@@ -269,7 +266,7 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        _      <- interp(Delete(Path.rootDir </> Path.dir(target)))
+        _ <- interp(Delete(Path.rootDir </> Path.dir(target)))
       } yield ()
 
       test.unsafePerformSync
@@ -278,7 +275,7 @@ object RealPOSIXSpecs extends Specification {
     }
 
     "delete a non-empty dir symlink" in setupDir { base =>
-      val target  = "foo"
+      val target = "foo"
       val ftarget = new File(base, target)
 
       ftarget.mkdir()
@@ -287,8 +284,7 @@ object RealPOSIXSpecs extends Specification {
 
       val test = for {
         interp <- RealPOSIX(base)
-        _ <- interp(
-          LinkDir(Path.rootDir </> Path.dir("foo"), Path.rootDir </> Path.dir("bar")))
+        _ <- interp(LinkDir(Path.rootDir </> Path.dir("foo"), Path.rootDir </> Path.dir("bar")))
         _ <- interp(Delete(Path.rootDir </> Path.dir("bar")))
       } yield ()
 
@@ -301,14 +297,12 @@ object RealPOSIXSpecs extends Specification {
     }
   }
 
-  def translate[A](str: Stream[POSIXWithTask, A],
-                   interp: POSIXOp ~> Task): Stream[Task, A] = {
+  def translate[A](str: Stream[POSIXWithTask, A], interp: POSIXOp ~> Task): Stream[Task, A] = {
     import fs2.util.UF1
 
     val nt = λ[UF1[POSIXWithTask, Task]] { pwt =>
       val fullInt =
-        λ[Coproduct[POSIXOp, Task, ?] ~> Task](
-          _.fold(interp, NaturalTransformation.refl[Task]))
+        λ[Coproduct[POSIXOp, Task, ?] ~> Task](_.fold(interp, NaturalTransformation.refl[Task]))
 
       pwt.foldMap(fullInt)
     }

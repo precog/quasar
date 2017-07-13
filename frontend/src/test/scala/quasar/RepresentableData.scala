@@ -24,22 +24,21 @@ case class RepresentableData(data: Data)
 trait RepresentableDataArbitrary {
 
   // See DataCodec.representable for what needs to be avoided in this generator
-  val atomicData: Gen[Data] = Gen.oneOf[Data](Null,
-                                              True,
-                                              False,
-                                              Gen.alphaStr ^^ Str,
-                                              DataArbitrary.defaultInt ^^ Int,
-                                              DataArbitrary.defaultDec ^^ Dec,
-                                              DateArbitrary.genDate ^^ Date,
-                                              DateArbitrary.genTime ^^ Time)
+  val atomicData: Gen[Data] = Gen.oneOf[Data](
+    Null,
+    True,
+    False,
+    Gen.alphaStr                   ^^ Str,
+    DataArbitrary.defaultInt       ^^ Int,
+    DataArbitrary.defaultDec       ^^ Dec,
+    DateArbitrary.genDate          ^^ Date,
+    DateArbitrary.genTime          ^^ Time)
 
   implicit val representableDataArbitrary: Arbitrary[RepresentableData] = Arbitrary(
-    Gen
-      .oneOf(
-        atomicData,
-        DataArbitrary.genNested(DataArbitrary.genKey, atomicData)
-      )
-      .map(RepresentableData(_))
+    Gen.oneOf(
+      atomicData,
+      DataArbitrary.genNested(DataArbitrary.genKey, atomicData)
+    ).map(RepresentableData(_))
   )
 }
 

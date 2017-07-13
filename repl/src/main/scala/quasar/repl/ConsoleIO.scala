@@ -27,7 +27,8 @@ object ConsoleIO {
   final case class PrintLn(message: String) extends ConsoleIO[Unit]
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  final class Ops[S[_]](implicit S: ConsoleIO :<: S) extends LiftedOps[ConsoleIO, S] {
+  final class Ops[S[_]](implicit S: ConsoleIO :<: S)
+    extends LiftedOps[ConsoleIO, S] {
 
     def println(message: String): FreeS[Unit] =
       lift(PrintLn(message))

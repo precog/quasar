@@ -66,7 +66,10 @@ object FreeVFSSpecs extends Specification {
 
         _ <- vlogInit(BaseDir </> Path.dir("META"), None)
 
-        _ <- persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
+        _ <- persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual "{}",
+          _ mustEqual "{}")
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -81,12 +84,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir,
-                 VersionLog(vlogBase, committed, versions),
-                 paths,
-                 index,
-                 vlogs,
-                 blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -111,7 +109,10 @@ object FreeVFSSpecs extends Specification {
 
         _ <- vlogInit(BaseDir </> Path.dir("META"), None)
 
-        _ <- persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
+        _ <- persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual "{}",
+          _ mustEqual "{}")
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -126,12 +127,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir,
-                 VersionLog(vlogBase, committed, versions),
-                 paths,
-                 index,
-                 vlogs,
-                 blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -191,12 +187,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir,
-                 VersionLog(vlogBase, committed, versions),
-                 paths,
-                 index,
-                 vlogs,
-                 blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -210,7 +201,7 @@ object FreeVFSSpecs extends Specification {
 
     "initialize with pre-existing paths" in {
       val version = Version(UUID.randomUUID())
-      val blob    = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
 
       val interp = for {
         _ <- H.pattern[Boolean] {
@@ -257,12 +248,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir,
-                 VersionLog(vlogBase, committed, versions),
-                 paths,
-                 index,
-                 vlogs,
-                 blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -289,8 +275,8 @@ object FreeVFSSpecs extends Specification {
 
     "initialize with pre-existing paths and extra blobs" in {
       val version = Version(UUID.randomUUID())
-      val blob    = Blob(UUID.randomUUID())
-      val extra   = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
+      val extra = Blob(UUID.randomUUID())
 
       val interp = for {
         _ <- H.pattern[Boolean] {
@@ -329,9 +315,7 @@ object FreeVFSSpecs extends Specification {
             Task delay {
               target mustEqual BaseDir
 
-              List(Path.dir("META"),
-                   Path.dir(blob.value.toString),
-                   Path.dir(extra.value.toString))
+              List(Path.dir("META"), Path.dir(blob.value.toString), Path.dir(extra.value.toString))
             }
         }
       } yield ()
@@ -339,12 +323,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir,
-                 VersionLog(vlogBase, committed, versions),
-                 paths,
-                 index,
-                 vlogs,
-                 blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -370,12 +349,16 @@ object FreeVFSSpecs extends Specification {
     }
 
     val BlankVFS =
-      VFS(BaseDir,
-          VersionLog(BaseDir </> Path.dir("META"), Nil, Set()),
-          Map(),
-          Map(),
-          Map(),
-          Set())
+      VFS(
+        BaseDir,
+        VersionLog(
+          BaseDir </> Path.dir("META"),
+          Nil,
+          Set()),
+        Map(),
+        Map(),
+        Map(),
+        Set())
 
     "create scratch blob" in {
       val blob = Blob(UUID.randomUUID())
@@ -402,7 +385,7 @@ object FreeVFSSpecs extends Specification {
 
     "create scratch blob after gen conflict" in {
       val conflict = Blob(UUID.randomUUID())
-      val blob     = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
 
       val interp = for {
         _ <- H.pattern[UUID] {
@@ -423,22 +406,18 @@ object FreeVFSSpecs extends Specification {
         _ <- vlogInit(BaseDir </> Path.dir(blob.value.toString), None)
       } yield ()
 
-      val result =
-        interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafePerformSync
+      val result = interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafePerformSync
 
       result mustEqual blob
     }
 
     "exists fails with blank VFS" in {
-      FreeVFS
-        .exists[Need](Path.rootDir </> Path.file("foo"))
-        .eval(BlankVFS)
-        .value mustEqual false
+      FreeVFS.exists[Need](Path.rootDir </> Path.file("foo")).eval(BlankVFS).value mustEqual false
     }
 
     "exists finds file in VFS" in {
       val target = Path.rootDir </> Path.file("foo")
-      val vfs    = BlankVFS.copy(paths = Map(target -> Blob(UUID.randomUUID())))
+      val vfs = BlankVFS.copy(paths = Map(target -> Blob(UUID.randomUUID())))
       FreeVFS.exists[Need](target).eval(vfs).value mustEqual true
     }
 
@@ -447,15 +426,15 @@ object FreeVFSSpecs extends Specification {
     }
 
     "ls finds children in index" in {
-      val target   = Path.rootDir
+      val target = Path.rootDir
       val children = Vector(Path.file("foo"), Path.dir("bar"))
-      val vfs      = BlankVFS.copy(index = Map(target -> children))
+      val vfs = BlankVFS.copy(index = Map(target -> children))
 
       FreeVFS.ls[Need](Path.rootDir).eval(vfs).value mustEqual children.toList
     }
 
     "link fails with non-existent blob" in {
-      val blob   = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
       val interp = ().point[Harness[S, Task, ?]]
@@ -466,11 +445,13 @@ object FreeVFSSpecs extends Specification {
     }
 
     "link fails with duplicated target" in {
-      val blob   = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(paths = Map(target -> blob), blobs = Set(blob))
+        BlankVFS.copy(
+          paths = Map(target -> blob),
+          blobs = Set(blob))
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -480,30 +461,31 @@ object FreeVFSSpecs extends Specification {
     }
 
     "link updates paths and index" in {
-      val blob   = Blob(UUID.randomUUID())
-      val orig   = Path.rootDir </> Path.file("foo")
+      val blob = Blob(UUID.randomUUID())
+      val orig = Path.rootDir </> Path.file("foo")
       val target = Path.rootDir </> Path.file("bar")
 
       val blobJson = s""""${blob.value}""""
 
       val vfs =
-        BlankVFS.copy(paths = Map(orig         -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.file("foo"))),
-                      blobs = Set(blob))
+        BlankVFS.copy(
+          paths = Map(orig -> blob),
+          index = Map(Path.rootDir -> Vector(Path.file("foo"))),
+          blobs = Set(blob))
 
       val interp =
         persistMeta(
-          BaseDir </> Path.dir("META"), { pathsJson =>
+          BaseDir </> Path.dir("META"),
+          { pathsJson =>
             (pathsJson mustEqual s"""{"/foo":$blobJson,"/bar":$blobJson}""") or
               (pathsJson mustEqual s"""{"/bar":$blobJson,"/foo":$blobJson}""")
-          }, { indexJson =>
+          },
+          { indexJson =>
             (indexJson mustEqual """{"/":["./foo","./bar"]}""") or
               (indexJson mustEqual """{"/":["./bar","./foo"]}""")
-          }
-        )
+          })
 
-      val (vfs2, result) =
-        interp(FreeVFS.link[S](blob, target).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.link[S](blob, target).apply(vfs)).unsafePerformSync
 
       result mustEqual true
 
@@ -518,7 +500,7 @@ object FreeVFSSpecs extends Specification {
 
     "moveFile fails with non-existent source" in {
       val from = Path.rootDir </> Path.file("foo")
-      val to   = Path.rootDir </> Path.file("bar")
+      val to = Path.rootDir </> Path.file("bar")
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -531,7 +513,7 @@ object FreeVFSSpecs extends Specification {
     "moveFile fails with extant target (FailIfExists)" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
-      val to   = Path.rootDir </> Path.file("bar")
+      val to = Path.rootDir </> Path.file("bar")
 
       val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID()), to -> blob))
 
@@ -546,7 +528,7 @@ object FreeVFSSpecs extends Specification {
     "moveFile fails with non-existent target (FailIfMissing)" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
-      val to   = Path.rootDir </> Path.file("bar")
+      val to = Path.rootDir </> Path.file("bar")
 
       val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID())))
 
@@ -561,19 +543,20 @@ object FreeVFSSpecs extends Specification {
     "moveFile silently overwrites with extant target (Overwrite)" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
-      val to   = Path.rootDir </> Path.file("bar")
+      val to = Path.rootDir </> Path.file("bar")
 
       val blobJson = s""""${blob.value}""""
 
       val vfs =
-        BlankVFS.copy(paths = Map(from -> blob, to -> Blob(UUID.randomUUID())),
-                      index =
-                        Map(Path.rootDir -> Vector(Path.file("foo"), Path.file("bar"))))
+        BlankVFS.copy(
+          paths = Map(from -> blob, to -> Blob(UUID.randomUUID())),
+          index = Map(Path.rootDir -> Vector(Path.file("foo"), Path.file("bar"))))
 
       val interp =
-        persistMeta(BaseDir </> Path.dir("META"),
-                    _ mustEqual s"""{"/bar":$blobJson}""",
-                    _ mustEqual """{"/":["./bar"]}""")
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual s"""{"/bar":$blobJson}""",
+          _ mustEqual """{"/":["./bar"]}""")
 
       val (vfs2, result) =
         interp(FreeVFS.moveFile[S](from, to, MoveSemantics.Overwrite).apply(vfs)).unsafePerformSync
@@ -590,18 +573,20 @@ object FreeVFSSpecs extends Specification {
     "moveFile updates paths and index" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
-      val to   = Path.rootDir </> Path.file("bar")
+      val to = Path.rootDir </> Path.file("bar")
 
       val blobJson = s""""${blob.value}""""
 
       val vfs =
-        BlankVFS.copy(paths = Map(from         -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.file("foo"))))
+        BlankVFS.copy(
+          paths = Map(from -> blob),
+          index = Map(Path.rootDir -> Vector(Path.file("foo"))))
 
       val interp =
-        persistMeta(BaseDir </> Path.dir("META"),
-                    _ mustEqual s"""{"/bar":$blobJson}""",
-                    _ mustEqual """{"/":["./bar"]}""")
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual s"""{"/bar":$blobJson}""",
+          _ mustEqual """{"/":["./bar"]}""")
 
       val (vfs2, result) =
         interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).apply(vfs)).unsafePerformSync
@@ -619,39 +604,36 @@ object FreeVFSSpecs extends Specification {
       val blob = Blob(UUID.randomUUID())
 
       val source = Path.rootDir </> Path.dir("source")
-      val from   = source </> Path.file("foo")
+      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to     = target </> Path.file("foo")
+      val to = target </> Path.file("foo")
 
       val interp = ().point[Harness[S, Task, ?]]
 
       val result =
-        interp(
-          FreeVFS
-            .moveDir[S](source, target, MoveSemantics.FailIfExists)
-            .eval(BlankVFS)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).eval(BlankVFS)).unsafePerformSync
 
       result mustEqual false
     }
 
     "moveDir fails with an extant target (FailIfExisting)" in {
-      val blob  = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val blob2 = Blob(UUID.randomUUID())
 
       val source = Path.rootDir </> Path.dir("source")
-      val from   = source </> Path.file("foo")
+      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to     = target </> Path.file("foo")
+      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
-          paths = Map(from         -> blob, (target </> Path.file("bar")) -> blob2),
-          index = Map(Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
-                      source       -> Vector(Path.file("foo")),
-                      target       -> Vector(Path.file("bar")))
-        )
+          paths = Map(from -> blob, (target </> Path.file("bar")) -> blob2),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
+            source -> Vector(Path.file("foo")),
+            target -> Vector(Path.file("bar"))))
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -665,15 +647,17 @@ object FreeVFSSpecs extends Specification {
       val blob = Blob(UUID.randomUUID())
 
       val source = Path.rootDir </> Path.dir("source")
-      val from   = source </> Path.file("foo")
+      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to     = target </> Path.file("foo")
+      val to = target </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(paths = Map(from         -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.dir("source")),
-                                  source       -> Vector(Path.file("foo"))))
+        BlankVFS.copy(
+          paths = Map(from -> blob),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("source")),
+            source -> Vector(Path.file("foo"))))
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -684,33 +668,33 @@ object FreeVFSSpecs extends Specification {
     }
 
     "moveDir silently overwrites (without merge!) pre-existing target (Overwrite)" in {
-      val blob  = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val blob2 = Blob(UUID.randomUUID())
 
       val source = Path.rootDir </> Path.dir("source")
-      val from   = source </> Path.file("foo")
+      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to     = target </> Path.file("foo")
+      val to = target </> Path.file("foo")
 
       val blobJson = s""""${blob.value}""""
 
       val vfs =
         BlankVFS.copy(
-          paths = Map(from         -> blob, (target </> Path.file("bar")) -> blob2),
-          index = Map(Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
-                      source       -> Vector(Path.file("foo")),
-                      target       -> Vector(Path.file("bar")))
-        )
+          paths = Map(from -> blob, (target </> Path.file("bar")) -> blob2),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
+            source -> Vector(Path.file("foo")),
+            target -> Vector(Path.file("bar"))))
 
       val interp =
         persistMeta(
           BaseDir </> Path.dir("META"),
-          _ mustEqual s"""{"/target/foo":$blobJson}""", { json =>
+          _ mustEqual s"""{"/target/foo":$blobJson}""",
+          { json =>
             (json mustEqual """{"/":["./target/"],"/target/":["./foo"]}""") or
               (json mustEqual """{"/target/":["./foo"],"/":["./target/"]}""")
-          }
-        )
+          })
 
       val (vfs2, result) =
         interp(FreeVFS.moveDir[S](source, target, MoveSemantics.Overwrite).apply(vfs)).unsafePerformSync
@@ -721,33 +705,35 @@ object FreeVFSSpecs extends Specification {
       vfs2.paths(to) mustEqual blob
       vfs2.paths must not(haveKey(from))
 
-      vfs2.index(target) mustEqual Vector(Path.file("foo")) // no bar!
+      vfs2.index(target) mustEqual Vector(Path.file("foo"))   // no bar!
     }
 
     "moveDir moves a directory with a single element" in {
       val blob = Blob(UUID.randomUUID())
 
       val source = Path.rootDir </> Path.dir("source")
-      val from   = source </> Path.file("foo")
+      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to     = target </> Path.file("foo")
+      val to = target </> Path.file("foo")
 
       val blobJson = s""""${blob.value}""""
 
       val vfs =
-        BlankVFS.copy(paths = Map(from         -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.dir("source")),
-                                  source       -> Vector(Path.file("foo"))))
+        BlankVFS.copy(
+          paths = Map(from -> blob),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("source")),
+            source -> Vector(Path.file("foo"))))
 
       val interp =
         persistMeta(
           BaseDir </> Path.dir("META"),
-          _ mustEqual s"""{"/target/foo":$blobJson}""", { json =>
+          _ mustEqual s"""{"/target/foo":$blobJson}""",
+          { json =>
             (json mustEqual """{"/":["./target/"],"/target/":["./foo"]}""") or
               (json mustEqual """{"/target/":["./foo"],"/":["./target/"]}""")
-          }
-        )
+          })
 
       val (vfs2, result) =
         interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).apply(vfs)).unsafePerformSync
@@ -772,16 +758,20 @@ object FreeVFSSpecs extends Specification {
     }
 
     "delete updates paths and index for file" in {
-      val blob   = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(paths = Map(target       -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.file("foo"))),
-                      blobs = Set(blob))
+        BlankVFS.copy(
+          paths = Map(target -> blob),
+          index = Map(Path.rootDir -> Vector(Path.file("foo"))),
+          blobs = Set(blob))
 
       val interp =
-        persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual "{}",
+          _ mustEqual "{}")
 
       val (vfs2, result) = interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
 
@@ -796,16 +786,21 @@ object FreeVFSSpecs extends Specification {
       val blob = Blob(UUID.randomUUID())
 
       val target = Path.rootDir </> Path.dir("target")
-      val foo    = target </> Path.file("foo")
+      val foo = target </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(paths = Map(foo          -> blob),
-                      index = Map(Path.rootDir -> Vector(Path.dir("target")),
-                                  target       -> Vector(Path.file("foo"))),
-                      blobs = Set(blob))
+        BlankVFS.copy(
+          paths = Map(foo -> blob),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("target")),
+            target -> Vector(Path.file("foo"))),
+          blobs = Set(blob))
 
       val interp =
-        persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual "{}",
+          _ mustEqual "{}")
 
       val (vfs2, result) =
         interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
@@ -818,73 +813,76 @@ object FreeVFSSpecs extends Specification {
     }
 
     "readPath produces None for non-existent path" in {
-      FreeVFS
-        .readPath[Need](Path.rootDir </> Path.file("foo"))
-        .eval(BlankVFS)
-        .value mustEqual None
+      FreeVFS.readPath[Need](Path.rootDir </> Path.file("foo")).eval(BlankVFS).value mustEqual None
     }
 
     "readPath finds blob for extant path" in {
-      val blob   = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(paths = Map(target -> blob))
+        BlankVFS.copy(
+          paths = Map(target -> blob))
 
       FreeVFS.readPath[Need](target).eval(vfs).value must beSome(blob)
     }
 
     "determine the underlying dir for a non-existent blob/version pair" in {
-      val blob    = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
+        VersionLog(
+          BaseDir </> Path.dir(blob.value.toString),
+          List(version),
+          Set(version))
 
       val interp = ().point[Harness[S, Task, ?]]
 
-      val result =
-        interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafePerformSync
 
       result must beNone
     }
 
     "determine the underlying dir for a blob/version pair already cached" in {
-      val blob    = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
+        VersionLog(
+          BaseDir </> Path.dir(blob.value.toString),
+          List(version),
+          Set(version))
 
       val vfs =
-        BlankVFS.copy(versions = Map(blob -> blobVLog), blobs = Set(blob))
+        BlankVFS.copy(
+          versions = Map(blob -> blobVLog),
+          blobs = Set(blob))
 
       val interp = ().point[Harness[S, Task, ?]]
 
-      val result =
-        interp(FreeVFS.underlyingDir[S](blob, version).eval(vfs)).unsafePerformSync
+      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(vfs)).unsafePerformSync
 
-      result must beSome(
-        BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
+      result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
     }
 
     "determine the underlying dir for a blob/version pair not already cached" in {
-      val blob    = Blob(UUID.randomUUID())
+      val blob = Blob(UUID.randomUUID())
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
+        VersionLog(
+          BaseDir </> Path.dir(blob.value.toString),
+          List(version),
+          Set(version))
 
       val vfs = BlankVFS.copy(blobs = Set(blob))
 
-      val interp =
-        vlogInit(BaseDir </> Path.dir(blob.value.toString), Some(List(version)))
+      val interp = vlogInit(BaseDir </> Path.dir(blob.value.toString), Some(List(version)))
 
-      val (vfs2, result) =
-        interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafePerformSync
 
-      result must beSome(
-        BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
+      result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
 
       vfs2.versions must haveSize(1)
       vfs2.versions must haveKey(blob)
@@ -913,12 +911,7 @@ object FreeVFSSpecs extends Specification {
                 Task delay {
                   target mustEqual (baseDir </> Path.file("versions.json"))
 
-                  Stream(
-                    ByteVector(
-                      versions
-                        .map(v => s""""${v.value}"""")
-                        .mkString("[", ",", "]")
-                        .getBytes))
+                  Stream(ByteVector(versions.map(v => s""""${v.value}"""").mkString("[", ",", "]").getBytes))
                 }
             }
 
@@ -964,9 +957,10 @@ object FreeVFSSpecs extends Specification {
     } yield ()
   }
 
-  def persistMeta(baseDir: ADir,
-                  pathTest: String => Unit,
-                  indexTest: String => Unit): Harness[S, Task, Unit] = {
+  def persistMeta(
+      baseDir: ADir,
+      pathTest: String => Unit,
+      indexTest: String => Unit): Harness[S, Task, Unit] = {
 
     for {
       uuid <- H.patternWithState[UUID, UUID] {
@@ -988,8 +982,7 @@ object FreeVFSSpecs extends Specification {
       _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
         case CPL(OpenW(target)) =>
           Task delay {
-            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file(
-              "paths.json"))
+            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("paths.json"))
             assertionSink(pathTest)
           }
       }
@@ -1001,8 +994,7 @@ object FreeVFSSpecs extends Specification {
       _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
         case CPL(OpenW(target)) =>
           Task delay {
-            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file(
-              "index.json"))
+            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("index.json"))
             assertionSink(indexTest)
           }
       }

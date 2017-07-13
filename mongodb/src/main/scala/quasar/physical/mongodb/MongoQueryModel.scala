@@ -21,7 +21,6 @@ import scalaz.Scalaz._
 sealed abstract class MongoQueryModel
 
 object MongoQueryModel {
-
   /** The oldest supported version. */
   case object `2.6` extends MongoQueryModel
 
@@ -33,7 +32,7 @@ object MongoQueryModel {
   case object `3.2` extends MongoQueryModel
 
   def apply(version: ServerVersion): MongoQueryModel =
-    if (version >= ServerVersion.MongoDb3_2) MongoQueryModel.`3.2`
+    if (version >= ServerVersion.MongoDb3_2)      MongoQueryModel.`3.2`
     else if (version >= ServerVersion.MongoDb3_0) MongoQueryModel.`3.0`
-    else MongoQueryModel.`2.6`
+    else                                          MongoQueryModel.`2.6`
 }

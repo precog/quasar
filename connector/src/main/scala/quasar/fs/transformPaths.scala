@@ -39,10 +39,11 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def readFile[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
-    S: ReadFile :<: S): S ~> Free[S, ?] = {
+    S: ReadFile :<: S
+  ): S ~> Free[S, ?] = {
     import ReadFile._
 
     val R = ReadFile.Unsafe[S]
@@ -72,10 +73,11 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def writeFile[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
-    S: WriteFile :<: S): S ~> Free[S, ?] = {
+    S: WriteFile :<: S
+  ): S ~> Free[S, ?] = {
     import WriteFile._
 
     val W = WriteFile.Unsafe[S]
@@ -103,22 +105,22 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def manageFile[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
-    S: ManageFile :<: S): S ~> Free[S, ?] = {
+    S: ManageFile :<: S
+  ): S ~> Free[S, ?] = {
     import ManageFile._, MoveScenario._
 
     val M = ManageFile.Ops[S]
     val g = λ[ManageFile ~> Free[S, ?]] {
       case Move(scn, sem) =>
         M.move(
-            scn.fold((src, dst) => dirToDir(inPath(src), inPath(dst)),
-                     (src, dst) => fileToFile(inPath(src), inPath(dst))),
-            sem
-          )
-          .leftMap(transformErrorPath(outPath))
-          .run
+          scn.fold(
+            (src, dst) => dirToDir(inPath(src), inPath(dst)),
+            (src, dst) => fileToFile(inPath(src), inPath(dst))),
+          sem
+        ).leftMap(transformErrorPath(outPath)).run
 
       case Delete(p) =>
         M.delete(inPath(p))
@@ -145,11 +147,12 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def queryFile[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath],
-      outPathR: EndoK[RelPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: EndoK[RelPath]
   )(implicit
-    S: QueryFile :<: S): S ~> Free[S, ?] = {
+    S: QueryFile :<: S
+  ): S ~> Free[S, ?] = {
     import QueryFile._
 
     val Q = QueryFile.Ops[S]
@@ -159,14 +162,12 @@ object transformPaths {
       case ExecutePlan(lp, out) =>
         Q.execute(transformFile(inPath)(lp), inPath(out))
           .bimap(transformErrorPath(outPath), outPath(_))
-          .run
-          .run
+          .run.run
 
       case EvaluatePlan(lp) =>
         U.eval(transformFile(inPath)(lp))
           .leftMap(transformErrorPath(outPath))
-          .run
-          .run
+          .run.run
 
       case More(h) =>
         U.more(h)
@@ -179,8 +180,7 @@ object transformPaths {
       case Explain(lp) =>
         Q.explain(transformFile(inPath)(lp))
           .bimap(transformErrorPath(outPath), ExecutionPlan.inputs.modify(_ map outPath))
-          .run
-          .run
+          .run.run
 
       case ListContents(d) =>
         Q.ls(inPath(d))
@@ -194,11 +194,12 @@ object transformPaths {
   }
 
   def analyze[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath],
-      outPathR: EndoK[RelPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: EndoK[RelPath]
   )(implicit
-    S: Analyze :<: S): S ~> Free[S, ?] = {
+    S: Analyze :<: S
+  ): S ~> Free[S, ?] = {
     import Analyze._
 
     val O = Analyze.Ops[S]
@@ -218,18 +219,19 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def fileSystem[S[_]](
-      inPath: EndoK[AbsPath],
-      outPath: EndoK[AbsPath],
-      outPathR: RelPath ~> RelPath
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: RelPath ~> RelPath
   )(implicit
     S0: ReadFile :<: S,
     S1: WriteFile :<: S,
     S2: ManageFile :<: S,
-    S3: QueryFile :<: S): S ~> Free[S, ?] = {
-    flatMapSNT(readFile[S](inPath, outPath)) compose
-      flatMapSNT(writeFile[S](inPath, outPath)) compose
-      flatMapSNT(manageFile[S](inPath, outPath)) compose
-      queryFile[S](inPath, outPath, outPathR)
+    S3: QueryFile :<: S
+  ): S ~> Free[S, ?] = {
+    flatMapSNT(readFile[S](inPath, outPath))   compose
+    flatMapSNT(writeFile[S](inPath, outPath))  compose
+    flatMapSNT(manageFile[S](inPath, outPath)) compose
+    queryFile[S](inPath, outPath, outPathR)
   }
 
   ////
@@ -253,12 +255,12 @@ object transformPaths {
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
-      f: EndoK[AbsPath]
+    f: EndoK[AbsPath]
   ): FileSystemError => FileSystemError =
     fsPathError.modify(f(_)) compose
-      fsUnkRdError.modify(f(_)) compose
-      fsUnkWrError.modify(f(_)) compose
-      fsPlannerError.modify(transformFile(f))
+    fsUnkRdError.modify(f(_)) compose
+    fsUnkWrError.modify(f(_)) compose
+    fsPlannerError.modify(transformFile(f))
 
   private def transformLPPaths(f: AFile => AFile) = λ[LP ~> LP] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`

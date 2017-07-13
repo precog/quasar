@@ -27,6 +27,7 @@ import quasar.Data
 import quasar.qscript._
 import quasar.sql.JoinDir
 
+
 import java.math.MathContext
 
 import matryoshka.{Hole => _, _}
@@ -39,45 +40,30 @@ import pathy.Path._
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 
-class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+class PlannerSpec
+    extends quasar.Qspec
+    with QScriptHelpers
+    with DisjunctionMatchers {
 
   import Planner.SparkState
 
   sequential
 
-  val equi   = Planner.equiJoin[Fix]
-  val sr     = Planner.shiftedread
+  val equi = Planner.equiJoin[Fix]
+  val sr = Planner.shiftedread
   val qscore = Planner.qscriptCore[Fix]
 
   val data = List(
-    Data.Obj(
-      ListMap(("age"    -> Data.Int(24)),
-              "height"  -> Data.Dec(1.56),
-              "country" -> Data.Str("Poland"))),
-    Data.Obj(
-      ListMap(("age"    -> Data.Int(32)),
-              "height"  -> Data.Dec(1.56),
-              "country" -> Data.Str("Poland"))),
-    Data.Obj(
-      ListMap(("age"    -> Data.Int(28)),
-              "height"  -> Data.Dec(1.56),
-              "country" -> Data.Str("Poland"))),
-    Data.Obj(
-      ListMap(("age"    -> Data.Int(23)),
-              "height"  -> Data.Dec(1.56),
-              "country" -> Data.Str("US"))),
-    Data.Obj(
-      ListMap(("age"    -> Data.Int(34)),
-              "height"  -> Data.Dec(1.56),
-              "country" -> Data.Str("Austria")))
+    Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+    Data.Obj(ListMap(("age" -> Data.Int(32)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+    Data.Obj(ListMap(("age" -> Data.Int(28)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+    Data.Obj(ListMap(("age" -> Data.Int(23)), "height" -> Data.Dec(1.56), "country" -> Data.Str("US"))),
+    Data.Obj(ListMap(("age" -> Data.Int(34)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Austria")))
   )
 
   val data2 = List(
-    Data.Obj(
-      ListMap("age"       -> Data.Int(24),
-              "countries" -> Data.Arr(List(Data.Str("Poland"), Data.Str("US"))))),
-    Data.Obj(
-      ListMap("age" -> Data.Int(24), "countries" -> Data.Arr(List(Data.Str("UK")))))
+    Data.Obj(ListMap("age" -> Data.Int(24),"countries" -> Data.Arr(List(Data.Str("Poland"), Data.Str("US"))))),
+    Data.Obj(ListMap("age" -> Data.Int(24),"countries" -> Data.Arr(List(Data.Str("UK")))))
   )
 
   val data3 = List(
@@ -107,30 +93,23 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "shiftedReadFile" in {
       withSpark { sc =>
         val input: ListMap[String, Data] = ListMap(
-          "name" -> Data.Str("tom"),
-          "age"  -> Data.Int(28)
-        )
+              "name" -> Data.Str("tom"),
+              "age" -> Data.Int(28)
+            )
         val fromFile: (SparkContext, AFile) => Task[RDD[Data]] =
-          (sc: SparkContext, file: AFile) =>
-            Task.delay {
-              sc.parallelize(List(Data.Obj(input)))
+          (sc: SparkContext, file: AFile) => Task.delay {
+            sc.parallelize(List(Data.Obj(input)))
           }
-        val compile: AlgebraM[SparkState, Const[ShiftedRead[AFile], ?], RDD[Data]] =
-          sr.plan(fromFile)
-        val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file(
-          "test.json")
+        val compile: AlgebraM[SparkState, Const[ShiftedRead[AFile], ?], RDD[Data]] = sr.plan(fromFile)
+        val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
 
         val program: SparkState[RDD[Data]] = compile(Const(ShiftedRead(afile, ExcludeId)))
-        program
-          .eval(sc)
-          .run
-          .map(result =>
-            result must beRightDisjunction.like {
-              case rdd =>
-                val results = rdd.collect
-                results.size must_= 1
-                results(0) must_= Data.Obj(input)
-          })
+        program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          case rdd =>
+            val results = rdd.collect
+            results.size must_= 1
+            results(0) must_= Data.Obj(input)
+        })
       }
     }
 
@@ -138,141 +117,104 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       "map" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
           def func: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-          val map           = quasar.qscript.Map(src, func)
+          val map = quasar.qscript.Map(src, func)
 
           val program: SparkState[RDD[Data]] = compile(map)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  val results = rdd.collect
-                  results.toList must_= List(Data._str("Poland"),
-                                             Data._str("Poland"),
-                                             Data._str("Poland"),
-                                             Data._str("US"),
-                                             Data._str("Austria"))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              val results = rdd.collect
+              results.toList must_= List(
+                Data._str("Poland"),
+                Data._str("Poland"),
+                Data._str("Poland"),
+                Data._str("US"),
+                Data._str("Austria"))
+          })
         }
       }
 
       "sort" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
           def bucket = ProjectFieldR(HoleF, StrLit("country"))
-          def order  = (bucket, SortDir.asc).wrapNel
-          val sort   = quasar.qscript.Sort(src, bucket, order)
+          def order = (bucket, SortDir.asc).wrapNel
+          val sort = quasar.qscript.Sort(src, bucket, order)
 
           val program: SparkState[RDD[Data]] = compile(sort)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  val results = rdd.collect
-                  results must_== Array(
-                    Data.Obj(ListMap(("age"    -> Data.Int(34)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Austria"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(24)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(32)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(28)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(23)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("US")))
-                  )
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              val results = rdd.collect
+              results must_== Array(
+                Data.Obj(ListMap(("age" -> Data.Int(34)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Austria"))),
+                Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(32)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(28)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(23)), "height" -> Data.Dec(1.56), "country" -> Data.Str("US")))
+              )
+          })
         }
       }
 
       "reduce" should {
         "calculate count" in {
-          withSpark(sc => {
-            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-              qscore.plan(emptyFF)
+          withSpark( sc => {
+            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-            def reducers: List[ReduceFunc[FreeMap]] =
-              List(Count(ProjectFieldR(HoleF, StrLit("country"))))
+            def reducers: List[ReduceFunc[FreeMap]] = List(Count(ProjectFieldR(HoleF, StrLit("country"))))
             def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-            val reduce                                 = Reduce(src, bucket, reducers, repair)
+            val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
-            program
-              .eval(sc)
-              .run
-              .map(result =>
-                result must beRightDisjunction.like {
-                  case rdd =>
-                    val results = rdd.collect
-                    results.toList must contain(
-                      exactly(Data._int(1), Data._int(3), Data._int(1)))
-              })
+            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              case rdd =>
+                val results = rdd.collect
+                results.toList must contain(exactly(Data._int(1), Data._int(3), Data._int(1)))
+            })
           })
         }
 
         "calculate sum" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-              qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-            def reducers: List[ReduceFunc[FreeMap]] =
-              List(Sum(ProjectFieldR(HoleF, StrLit("age"))))
+            def reducers: List[ReduceFunc[FreeMap]] = List(Sum(ProjectFieldR(HoleF, StrLit("age"))))
             def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-            val reduce                                 = Reduce(src, bucket, reducers, repair)
+            val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
-            program
-              .eval(sc)
-              .run
-              .map(result =>
-                result must beRightDisjunction.like {
-                  case rdd =>
-                    val results = rdd.collect
-                    results.toList must contain(
-                      exactly(Data._int(23), Data._int(84), Data._int(34)))
-              })
+            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              case rdd =>
+                val results = rdd.collect
+                results.toList must contain(exactly(Data._int(23), Data._int(84), Data._int(34)))
+            })
           }
         }
 
         "extract bucket" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-              qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
             val src: RDD[Data] = sc.parallelize(data)
 
-            def bucket: FreeMap                        = ProjectFieldR(HoleF, StrLit("country"))
-            def reducers: List[ReduceFunc[FreeMap]]    = Nil
+            def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+            def reducers: List[ReduceFunc[FreeMap]] = Nil
             def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(None))
-            val reduce                                 = Reduce(src, bucket, reducers, repair)
+            val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
-            program
-              .eval(sc)
-              .run
-              .map(result =>
-                result must beRightDisjunction.like {
-                  case rdd =>
-                    val results = rdd.collect
-                    results.toList must contain(
-                      exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
-              })
+            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              case rdd =>
+                val results = rdd.collect
+                results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
+            })
           }
         }
 
@@ -299,123 +241,88 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
         "calculate max" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-              qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-            def reducers: List[ReduceFunc[FreeMap]] =
-              List(Max(ProjectFieldR(HoleF, StrLit("age"))))
+            def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
             def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-            val reduce                                 = Reduce(src, bucket, reducers, repair)
+            val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
-            program
-              .eval(sc)
-              .run
-              .map(result =>
-                result must beRightDisjunction.like {
-                  case rdd =>
-                    val results = rdd.collect
-                    results.toList must contain(
-                      exactly(Data._int(23), Data._int(32), Data._int(34)))
-              })
+            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              case rdd =>
+                val results = rdd.collect
+                results.toList must contain(exactly(Data._int(23), Data._int(32), Data._int(34)))
+            })
           }
         }
 
         "for avg" should {
           "calculate int values" in {
             withSpark { sc =>
-              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-                qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
               val src: RDD[Data] = sc.parallelize(List(
-                Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str(
-                  "Poland"))),
-                Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str(
-                  "Poland"))),
-                Data.Obj(ListMap() + ("age" -> Data.Int(28)) + ("country" -> Data.Str(
-                  "Poland"))),
-                Data.Obj(
-                  ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
+                Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap() + ("age" -> Data.Int(28)) + ("country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
               ))
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-              def reducers: List[ReduceFunc[FreeMap]] =
-                List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
+              def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
               def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-              val reduce                                 = Reduce(src, bucket, reducers, repair)
+              val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
-              program
-                .eval(sc)
-                .run
-                .map(result =>
-                  result must beRightDisjunction.like {
-                    case rdd =>
-                      val results = rdd.collect
-                      results.toList must contain(exactly(Data._dec(28), Data._dec(23)))
-                })
+              program.eval(sc).run.map(result => result must beRightDisjunction.like {
+                case rdd =>
+                  val results = rdd.collect
+                  results.toList must contain(exactly(Data._dec(28), Data._dec(23)))
+              })
             }
           }
 
           "calculate dec values" in {
             withSpark { sc =>
-              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-                qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
               val src: RDD[Data] = sc.parallelize(List(
-                Data.Obj(ListMap(("height"  -> Data.Dec(1.56)),
-                                 ("country" -> Data.Str("Poland")))),
-                Data.Obj(ListMap(("height"  -> Data.Dec(1.86)),
-                                 ("country" -> Data.Str("Poland")))),
-                Data.Obj(
-                  ListMap(("height" -> Data.Dec(1.23)), ("country" -> Data.Str("US"))))
+                Data.Obj(ListMap(("height" -> Data.Dec(1.56)),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(1.86)),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(1.23)),("country" -> Data.Str("US"))))
               ))
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-              def reducers: List[ReduceFunc[FreeMap]] =
-                List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
+              def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
               def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-              val reduce                                 = Reduce(src, bucket, reducers, repair)
+              val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
-              program
-                .eval(sc)
-                .run
-                .map(result =>
-                  result must beRightDisjunction.like {
-                    case rdd =>
-                      val results = rdd.collect
-                      results.toList must contain(
-                        exactly(Data._dec(1.71), Data._dec(1.23)))
-                })
+              program.eval(sc).run.map(result => result must beRightDisjunction.like {
+                case rdd =>
+                  val results = rdd.collect
+                  results.toList must contain(exactly(Data._dec(1.71), Data._dec(1.23)))
+              })
             }
           }
 
           "bugfix: calculate even if Data.Dec has BigDecimal with precision 0" in {
             withSpark { sc =>
               // given avg height is 10.(3)
-              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] =
-                qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
               val src: RDD[Data] = sc.parallelize(List(
-                Data.Obj(
-                  ListMap(("height"  -> Data.Dec(BigDecimal(3, MathContext.UNLIMITED))),
-                          ("country" -> Data.Str("Poland")))),
-                Data.Obj(
-                  ListMap(("height"  -> Data.Dec(BigDecimal(4, MathContext.UNLIMITED))),
-                          ("country" -> Data.Str("Poland")))),
-                Data.Obj(
-                  ListMap(("height"  -> Data.Dec(BigDecimal(3, MathContext.UNLIMITED))),
-                          ("country" -> Data.Str("Poland"))))
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(3,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(4,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(3,MathContext.UNLIMITED))),("country" -> Data.Str("Poland"))))
               ))
               // when avg is calcualted
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-              def reducers: List[ReduceFunc[FreeMap]] =
-                List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
+              def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
               def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
-              val reduce                                 = Reduce(src, bucket, reducers, repair)
-              val program: SparkState[RDD[Data]]         = compile(reduce)
+              val reduce = Reduce(src, bucket, reducers, repair)
+              val program: SparkState[RDD[Data]] = compile(reduce)
               program.eval(sc).run
               // then nof ArithmeticException is thrown
             }
@@ -427,154 +334,122 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       "filter" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
-          def func: FreeMap =
-            Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
+          def func: FreeMap = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
           val filter = quasar.qscript.Filter(src, func)
 
           val program: SparkState[RDD[Data]] = compile(filter)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  val results = rdd.collect
-                  results.size must_= 1
-                  results(0) must_= Data.Obj(
-                    ListMap(
-                      "age"     -> Data.Int(23),
-                      "height"  -> Data.Dec(1.56),
-                      "country" -> Data.Str("US")
-                    ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              val results = rdd.collect
+              results.size must_= 1
+              results(0) must_= Data.Obj(ListMap(
+                "age" -> Data.Int(23),
+                "height" -> Data.Dec(1.56),
+                "country" -> Data.Str("US")
+              ))
+          })
         }
       }
 
       "take" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
-          def from: FreeQS  = Free.point(SrcHole)
+          def from: FreeQS = Free.point(SrcHole)
           def count: FreeQS = constFreeQS(1)
 
           val take = quasar.qscript.Subset(src, from, Take, count)
 
           val program: SparkState[RDD[Data]] = compile(take)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  val results = rdd.collect
-                  results.size must_= 1
-                  results(0) must_= Data.Obj(
-                    ListMap(
-                      "age"     -> Data.Int(24),
-                      "height"  -> Data.Dec(1.56),
-                      "country" -> Data.Str("Poland")
-                    ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              val results = rdd.collect
+              results.size must_= 1
+              results(0) must_= Data.Obj(ListMap(
+                "age" -> Data.Int(24),
+                "height" -> Data.Dec(1.56),
+                "country" -> Data.Str("Poland")
+              ))
+          })
         }
       }
 
       "drop" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
-          def from: FreeQS  = Free.point(SrcHole)
+          def from: FreeQS = Free.point(SrcHole)
           def count: FreeQS = constFreeQS(4)
 
           val drop = quasar.qscript.Subset(src, from, Drop, count)
 
           val program: SparkState[RDD[Data]] = compile(drop)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  val results = rdd.collect
-                  results.size must_= 1
-                  results(0) must_= Data.Obj(
-                    ListMap(
-                      "age"     -> Data.Int(34),
-                      "height"  -> Data.Dec(1.56),
-                      "country" -> Data.Str("Austria")
-                    ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              val results = rdd.collect
+              results.size must_= 1
+              results(0) must_= Data.Obj(ListMap(
+                "age" -> Data.Int(34),
+                "height" -> Data.Dec(1.56),
+                "country" -> Data.Str("Austria")
+              ))
+          })
         }
       }
 
       "union" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data)
+          val src: RDD[Data] = sc.parallelize(data)
 
           def func(country: String): FreeMap =
-            Free.roll(
-              MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-          def left: FreeQS  = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+          def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
 
           val union = quasar.qscript.Union(src, left, right)
 
           val program: SparkState[RDD[Data]] = compile(union)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must_= List(
-                    Data.Obj(ListMap(("age"    -> Data.Int(24)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(32)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(28)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("Poland"))),
-                    Data.Obj(ListMap(("age"    -> Data.Int(23)),
-                                     "height"  -> Data.Dec(1.56),
-                                     "country" -> Data.Str("US")))
-                  )
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              rdd.collect.toList must_= List(
+                Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(32)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(28)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap(("age" -> Data.Int(23)), "height" -> Data.Dec(1.56), "country" -> Data.Str("US")))
+              )
+          })
         }
       }
 
       "leftshift" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
-          val src: RDD[Data]                                        = sc.parallelize(data2)
+          val src: RDD[Data] = sc.parallelize(data2)
 
-          def struct: FreeMap  = ProjectFieldR(HoleF, StrLit("countries"))
+          def struct: FreeMap = ProjectFieldR(HoleF, StrLit("countries"))
           def repair: JoinFunc = Free.point(RightSide)
 
           val leftShift = quasar.qscript.LeftShift(src, struct, ExcludeId, repair)
 
           val program: SparkState[RDD[Data]] = compile(leftShift)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must_= List(
-                    Data.Str("Poland"),
-                    Data.Str("US"),
-                    Data.Str("UK")
-                  )
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like{
+            case rdd =>
+              rdd.collect.toList must_= List(
+                Data.Str("Poland"),
+                Data.Str("US"),
+                Data.Str("UK")
+              )
+          })
         }
       }
     }
+
 
     "equiJoin" should {
 
@@ -582,95 +457,68 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
         withSpark { sc =>
           val compile: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
-          val src: RDD[Data]                                     = sc.parallelize(data3)
+          val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
-            Free.roll(
-              MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-          def left: FreeQS  = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+          def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-          def key: FreeMap  = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc =
-            Free.roll(
-              ConcatMaps(
-                Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-                Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-              ))
+          def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+          def combine: JoinFunc = Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
+          ))
 
-          val equiJoin =
-            quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must_= List(Data.Obj(ListMap(
-                    JoinDir.Left.name -> Data.Obj(
-                      ListMap(("age"     -> Data.Int(24)),
-                              ("country" -> Data.Str("Poland")))),
-                    JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)),
-                                                           ("country" -> Data.Str("US"))))
-                  )))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              rdd.collect.toList must_= List(
+                Data.Obj(ListMap(
+                  JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                )
+                ))
+          })
         }
       }
+
 
       "leftOuter" in {
 
         withSpark { sc =>
           val compile: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
-          val src: RDD[Data]                                     = sc.parallelize(data3)
+          val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
-            Free.roll(
-              MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-          def left: FreeQS  = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+          def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-          def key: FreeMap  = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc =
-            Free.roll(
-              ConcatMaps(
-                Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-                Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-              ))
+          def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+          def combine: JoinFunc = Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
+          ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src,
-                                                 left,
-                                                 right,
-                                                 key,
-                                                 key,
-                                                 JoinType.LeftOuter,
-                                                 combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.LeftOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must contain(exactly(
-                    Data._obj(
-                      ListMap(
-                        JoinDir.Left.name -> Data.Obj(
-                          ListMap(("age"     -> Data.Int(32)),
-                                  ("country" -> Data.Str("Poland")))),
-                        JoinDir.Right.name -> Data.NA
-                      )),
-                    Data._obj(ListMap(
-                      JoinDir.Left.name -> Data.Obj(
-                        ListMap(("age"     -> Data.Int(24)),
-                                ("country" -> Data.Str("Poland")))),
-                      JoinDir.Right.name -> Data.Obj(
-                        ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
-                    ))
-                  ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
+                  JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.NA
+                )),
+                Data._obj(ListMap(
+                  JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                ))
+              ))
+          })
         }
       }
 
@@ -682,110 +530,71 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           val src: RDD[Data] = sc.parallelize(data4)
 
           def func(country: String): FreeMap =
-            Free.roll(
-              MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-          def left: FreeQS  = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+          def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-          def key: FreeMap  = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc =
-            Free.roll(
-              ConcatMaps(
-                Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-                Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-              ))
+          def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+          def combine: JoinFunc = Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
+          ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src,
-                                                 left,
-                                                 right,
-                                                 key,
-                                                 key,
-                                                 JoinType.RightOuter,
-                                                 combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.RightOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must contain(exactly(
-                    Data._obj(
-                      ListMap(
-                        JoinDir.Left.name -> Data.NA,
-                        JoinDir.Right.name -> Data.Obj(
-                          ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
-                      )),
-                    Data._obj(ListMap(
-                      JoinDir.Left.name -> Data.Obj(
-                        ListMap(("age"     -> Data.Int(24)),
-                                ("country" -> Data.Str("Poland")))),
-                      JoinDir.Right.name -> Data.Obj(
-                        ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
-                    ))
-                  ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
+                  JoinDir.Left.name ->  Data.NA,
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+                )),
+                Data._obj(ListMap(
+                  JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                ))
+              ))
+          })
         }
       }
 
       "fullOuter" in {
         withSpark { sc =>
           val compile: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
-          val src: RDD[Data]                                     = sc.parallelize(data5)
+          val src: RDD[Data] = sc.parallelize(data5)
 
           def func(country: String): FreeMap =
-            Free.roll(
-              MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-          def left: FreeQS  = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+          def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-          def key: FreeMap  = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc =
-            Free.roll(
-              ConcatMaps(
-                Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-                Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-              ))
+          def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+          def combine: JoinFunc = Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
+          ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src,
-                                                 left,
-                                                 right,
-                                                 key,
-                                                 key,
-                                                 JoinType.FullOuter,
-                                                 combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.FullOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
-          program
-            .eval(sc)
-            .run
-            .map(result =>
-              result must beRightDisjunction.like {
-                case rdd =>
-                  rdd.collect.toList must contain(exactly(
-                    Data._obj(
-                      ListMap(
-                        JoinDir.Left.name -> Data.NA,
-                        JoinDir.Right.name -> Data.Obj(
-                          ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
-                      )),
-                    Data._obj(
-                      ListMap(
-                        JoinDir.Left.name -> Data.Obj(
-                          ListMap(("age"     -> Data.Int(27)),
-                                  ("country" -> Data.Str("Poland")))),
-                        JoinDir.Right.name -> Data.NA
-                      )),
-                    Data._obj(ListMap(
-                      JoinDir.Left.name -> Data.Obj(
-                        ListMap(("age"     -> Data.Int(24)),
-                                ("country" -> Data.Str("Poland")))),
-                      JoinDir.Right.name -> Data.Obj(
-                        ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
-                    ))
-                  ))
-            })
+          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            case rdd =>
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
+                  JoinDir.Left.name ->  Data.NA,
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+                )),
+                Data._obj(ListMap(
+                  JoinDir.Left.name ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.NA
+                )),
+                Data._obj(ListMap(
+                  JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                ))
+              ))
+          })
         }
       }
     }
@@ -803,8 +612,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
   private val emptyFF: (SparkContext, AFile) => Task[RDD[Data]] =
-    (sc: SparkContext, file: AFile) =>
-      Task.delay {
-        sc.parallelize(List())
+    (sc: SparkContext, file: AFile) => Task.delay {
+      sc.parallelize(List())
     }
 }

@@ -37,47 +37,47 @@ import scalaz.syntax.traverse._
 
 package object ejson {
   def arr[A] =
-    Prism.partial[Common[A], List[A]] { case Arr(a) => a }(Arr(_))
+    Prism.partial[Common[A], List[A]] { case Arr(a) => a } (Arr(_))
 
   def bool[A] =
-    Prism.partial[Common[A], Boolean] { case Bool(b) => b }(Bool(_))
+    Prism.partial[Common[A], Boolean] { case Bool(b) => b } (Bool(_))
 
   def dec[A] =
-    Prism.partial[Common[A], BigDecimal] { case Dec(bd) => bd }(Dec(_))
+    Prism.partial[Common[A], BigDecimal] { case Dec(bd) => bd } (Dec(_))
 
   def nul[A] =
-    Prism.partial[Common[A], Unit] { case Null() => () }(κ(Null()))
+    Prism.partial[Common[A], Unit] { case Null() => () } (κ(Null()))
 
   def str[A] =
-    Prism.partial[Common[A], String] { case Str(s) => s }(Str(_))
+    Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
 
   def obj[A] =
     Iso[Obj[A], ListMap[String, A]](_.value)(Obj(_))
 
   def byte[A] =
-    Prism.partial[Extension[A], scala.Byte] { case Byte(b) => b }(Byte(_))
+    Prism.partial[Extension[A], scala.Byte] { case Byte(b) => b } (Byte(_))
 
   def char[A] =
-    Prism.partial[Extension[A], scala.Char] { case Char(c) => c }(Char(_))
+    Prism.partial[Extension[A], scala.Char] { case Char(c) => c } (Char(_))
 
   def int[A] =
-    Prism.partial[Extension[A], BigInt] { case Int(i) => i }(Int(_))
+    Prism.partial[Extension[A], BigInt] { case Int(i) => i } (Int(_))
 
   def map[A] =
-    Prism.partial[Extension[A], List[(A, A)]] { case Map(m) => m }(Map(_))
+    Prism.partial[Extension[A], List[(A, A)]] { case Map(m) => m } (Map(_))
 
   def meta[A] =
     Prism.partial[Extension[A], (A, A)] {
       case Meta(v, m) => (v, m)
-    }((Meta(_: A, _: A)).tupled)
+    } ((Meta(_: A, _: A)).tupled)
 
   /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
     */
-  type Json[A] = Coproduct[Obj, Common, A]
-  val ObjJson    = implicitly[Obj :<: Json]
-  val CommonJson = implicitly[Common :<: Json]
+  type Json[A]    = Coproduct[Obj, Common, A]
+  val ObjJson     = implicitly[Obj :<: Json]
+  val CommonJson  = implicitly[Common :<: Json]
 
-  type EJson[A] = Coproduct[Extension, Common, A]
+  type EJson[A]   = Coproduct[Extension, Common, A]
   val ExtEJson    = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
@@ -100,28 +100,26 @@ package object ejson {
 
     /** Replaces `Meta` nodes with their value component. */
     def elideMetadata[T](
-        implicit T: Recursive.Aux[T, EJson]
+      implicit T: Recursive.Aux[T, EJson]
     ): EJson[T] => EJson[T] = totally {
       case ExtEJson(Meta(v, _)) => v.project
     }
 
     /** Replace a string with an array of characters. */
     def replaceString[T](
-        implicit T: Corecursive.Aux[T, EJson]
+      implicit T: Corecursive.Aux[T, EJson]
     ): EJson[T] => EJson[T] = totally {
-      case CommonEJson(Str(s)) =>
-        CommonEJson(arr[T](s.toList map (c => fromExt(char[T](c)))))
+      case CommonEJson(Str(s)) => CommonEJson(arr[T](s.toList map (c => fromExt(char[T](c)))))
     }
 
     /** Replace an array of characters with a string. */
     def restoreString[T](
-        implicit
-        TC: Corecursive.Aux[T, EJson],
-        TR: Recursive.Aux[T, EJson]
+      implicit
+      TC: Corecursive.Aux[T, EJson],
+      TR: Recursive.Aux[T, EJson]
     ): EJson[T] => EJson[T] = totally {
       case a @ CommonEJson(Arr(t :: ts)) =>
-        (t :: ts)
-          .traverse(t => ExtEJson.prj(t.project) >>= (char[T].getOption(_)))
+        (t :: ts).traverse(t => ExtEJson.prj(t.project) >>= (char[T].getOption(_)))
           .fold(a)(cs => CommonEJson(str[T](cs.mkString)))
     }
   }
@@ -134,11 +132,8 @@ package object ejson {
 
     def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[String] =
       ejs match {
-        case ExtEJson(
-            Map(
-              List((Embed(CommonEJson(Str(`TypeKey`))), Embed(CommonEJson(Str(s))))))) =>
-          some(s)
-        case _ => none
+        case ExtEJson(Map(List((Embed(CommonEJson(Str(`TypeKey`))), Embed(CommonEJson(Str(s))))))) => some(s)
+        case _                                                                                     => none
       }
   }
 
@@ -146,15 +141,12 @@ package object ejson {
     import EJson._
 
     def apply[T](tag: String, size: BigInt)(implicit T: Corecursive.Aux[T, EJson]): T =
-      fromExt(
-        Map(
-          List(
-            fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)),
-            fromCommon[T](Str(SizeKey)) -> fromExt[T](Int(size))
-          )))
+      fromExt(Map(List(
+        fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)),
+        fromCommon[T](Str(SizeKey)) -> fromExt[T](Int(size))
+      )))
 
-    def unapply[T](ejs: EJson[T])(
-        implicit T: Recursive.Aux[T, EJson]): Option[(String, BigInt)] =
+    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[(String, BigInt)] =
       ejs match {
         case ExtEJson(Map(xs)) =>
           val tpe = xs collectFirst {

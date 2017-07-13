@@ -25,23 +25,12 @@ import scalaz.syntax.monad._
 import quasar.blueeyes._
 import quasar.precog.common.security._
 
-class StaticAccountFinder[M[+ _]: Monad](accountId: AccountId,
-                                         apiKey: APIKey,
-                                         rootPath: Option[String] = None,
-                                         email: String = "static@precog.com")
+class StaticAccountFinder[M[+ _]: Monad](accountId: AccountId, apiKey: APIKey, rootPath: Option[String] = None, email: String = "static@precog.com")
     extends AccountFinder[M]
     with Logging {
-  private[this] val details = Some(
-    AccountDetails(accountId,
-                   email,
-                   dateTime.zero,
-                   apiKey,
-                   Path(rootPath.getOrElse("/" + accountId)),
-                   AccountPlan.Root))
+  private[this] val details = Some(AccountDetails(accountId, email, dateTime.zero, apiKey, Path(rootPath.getOrElse("/" + accountId)), AccountPlan.Root))
 
-  log.debug(
-    "Constructed new static account manager. All queries resolve to \"%s\"".format(
-      details.get))
+  log.debug("Constructed new static account manager. All queries resolve to \"%s\"".format(details.get))
 
   def findAccountByAPIKey(apiKey: APIKey) = Some(accountId).point[M]
 

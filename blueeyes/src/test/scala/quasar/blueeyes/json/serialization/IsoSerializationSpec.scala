@@ -128,8 +128,7 @@ class IsoSerializationSpec extends Specification {
 
       val result = barDecomp.decompose(bar)
 
-      result must_== JParser.parseUnsafe(
-        """{
+      result must_== JParser.parseUnsafe("""{
         "d": 2.3, "s": "Hello world", "i": 23, "b": true, "l": ["foo", "bar", "baz"]
       }""")
     }
@@ -140,8 +139,7 @@ class IsoSerializationSpec extends Specification {
 
       val result = bazDecomp.decompose(baz)
 
-      result must_== JParser.parseUnsafe(
-        """{
+      result must_== JParser.parseUnsafe("""{
         "s": "Hello world",
         "l": [{ "s": "Hello world", "i": 23, "b": true }, { "s": "Hello world", "b": true }]
       }""")
@@ -246,12 +244,13 @@ class IsoSerializationSpec extends Specification {
       val result = barExtract.extract(
         jobject(
           jfield("d", 2.3),
-          jfield("f",
-                 jobject(
-                   jfield("s", "Hello world"),
-                   jfield("i", 23),
-                   jfield("b", true)
-                 )),
+          jfield(
+            "f",
+            jobject(
+              jfield("s", "Hello world"),
+              jfield("i", 23),
+              jfield("b", true)
+            )),
           jfield("l", jarray(JString("foo"), JString("bar"), JString("baz")))
         )
       )
@@ -266,11 +265,12 @@ class IsoSerializationSpec extends Specification {
       val result = barExtract.extract(
         jobject(
           jfield("d", 2.3),
-          jfield("f",
-                 jobject(
-                   jfield("s", "Hello world"),
-                   jfield("b", true)
-                 )),
+          jfield(
+            "f",
+            jobject(
+              jfield("s", "Hello world"),
+              jfield("b", true)
+            )),
           jfield("l", jarray(JString("foo"), JString("bar"), JString("baz")))
         )
       )
@@ -302,15 +302,16 @@ class IsoSerializationSpec extends Specification {
       val result = bazExtract.extract(
         jobject(
           jfield("s", "Hello world"),
-          jfield("l",
-                 jarray(
-                   jobject(
-                     jfield("s", "Hello world"),
-                     jfield("i", 23),
-                     jfield("b", true)
-                   ),
-                   jobject(jfield("s", "Hello world"), jfield("b", true))
-                 ))
+          jfield(
+            "l",
+            jarray(
+              jobject(
+                jfield("s", "Hello world"),
+                jfield("i", 23),
+                jfield("b", true)
+              ),
+              jobject(jfield("s", "Hello world"), jfield("b", true))
+            ))
         )
       )
 

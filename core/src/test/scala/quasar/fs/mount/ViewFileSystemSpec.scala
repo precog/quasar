@@ -49,25 +49,21 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
-  val query    = QueryFile.Ops[FileSystem]
-  val read     = ReadFile.Ops[FileSystem]
-  val write    = WriteFile.Ops[FileSystem]
-  val manage   = ManageFile.Ops[FileSystem]
+  val query  = QueryFile.Ops[FileSystem]
+  val read   = ReadFile.Ops[FileSystem]
+  val write  = WriteFile.Ops[FileSystem]
+  val manage = ManageFile.Ops[FileSystem]
   val mounting = Mounting.Ops[ViewFileSystem]
 
   @Lenses
-  case class VS(seq: Long,
-                handles: ViewState.ViewHandles,
-                mountConfigs: Map[APath, MountConfig],
-                fs: InMemState)
+  case class VS(seq: Long, handles: ViewState.ViewHandles, mountConfigs: Map[APath, MountConfig], fs: InMemState)
 
   object VS {
     def empty = VS(0, Map.empty, Map.empty, InMemState.empty)
 
     def emptyWithViews(views: Map[AFile, Fix[Sql]]) =
-      mountConfigs.set(views.map {
-        case (p, expr) =>
-          p -> MountConfig.viewConfig(ScopedExpr(expr, Nil), Variables.empty)
+      mountConfigs.set(views.map { case (p, expr) =>
+        p -> MountConfig.viewConfig(ScopedExpr(expr, Nil), Variables.empty)
       })(empty)
   }
 
@@ -81,62 +77,52 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   type ErrsT[F[_], A] = EitherT[F, Errs, A]
   type Traced[A]      = ErrsT[VST, A]
 
-  type VSS[A] = State[VS, A]
-  type VFS[A] = ErrsT[VSS, A]
+  type VSS[A]         = State[VS, A]
+  type VFS[A]         = ErrsT[VSS, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
-    free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter
-      .trivial[MountConfigs]
+    free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
   def runViewFileSystem[F[_]](
-      runFileSystem: FileSystem ~> F
+    runFileSystem: FileSystem ~> F
   )(implicit
     F0: MonadState[F, VS],
-    F1: MonadError[F, Errs]): ViewFileSystem ~> F =
+    F1: MonadError[F, Errs]
+  ): ViewFileSystem ~> F =
     ViewFileSystem.interpret[F](
       runMounting[F],
       Failure.toError[F, Errs] compose Failure.mapError[PathTypeMismatch, Errs](_.right),
       Failure.toError[F, Errs] compose Failure.mapError[MountingError, Errs](_.left),
       KeyValueStore.impl.toState[F](VS.handles),
       MonotonicSeq.toState[F](VS.seq),
-      runFileSystem
-    )
+      runFileSystem)
 
   def traceViewFs(paths: Map[ADir, Set[PathSegment]]): ViewFileSystem ~> Traced =
     runViewFileSystem[Traced](
       liftMT[VST, ErrsT] compose
-        liftMT[Trace, VSF] compose
-        interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
+      liftMT[Trace, VSF] compose
+      interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
 
-  case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree],
-                                      vs: VS,
-                                      result: Errs \/ A)
+  case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: Errs \/ A)
 
-  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]],
-                         paths: Map[ADir, Set[PathSegment]],
-                         t: Free[FileSystem, A]): ViewInterpResultTrace[A] =
+
+  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    : ViewInterpResultTrace[A] =
     viewInterpTrace(views, List.empty[AFile], paths, t)
 
-  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]],
-                         files: List[AFile],
-                         paths: Map[ADir, Set[PathSegment]],
-                         t: Free[FileSystem, A]): ViewInterpResultTrace[A] = {
+  def viewInterpTrace[A](
+    views: Map[AFile, Fix[Sql]], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
-      views.toList.traverse_ {
-        case (loc, expr) =>
-          mounting.mountView(loc, ScopedExpr(expr, Nil), Variables.empty)
-      }
+      views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, ScopedExpr(expr, Nil), Variables.empty) }
 
     val toBeTraced: Free[ViewFileSystem, A] =
       mountViews *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
 
     val (renderedTrees, (vs, r)) =
-      toBeTraced
-        .foldMap(traceViewFs(paths))
-        .run
-        .run(VS(0, Map.empty, Map.empty, InMemState.empty))
-        .run
+      toBeTraced.foldMap(traceViewFs(paths))
+        .run.run(VS(0, Map.empty, Map.empty, InMemState.empty)).run
 
     ViewInterpResultTrace(renderedTrees, vs, r)
   }
@@ -144,21 +130,19 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   case class ViewInterpResult[A](vs: VS, result: Errs \/ A)
 
   def viewInterp[A](
-      views: Map[AFile, Fix[Sql]],
-      files: List[AFile],
-      f: Free[FileSystem, A]
-  ): ViewInterpResult[A] = {
+    views: Map[AFile, Fix[Sql]],
+    files: List[AFile],
+    f: Free[FileSystem, A]
+  ) : ViewInterpResult[A] = {
 
     val viewfs: ViewFileSystem ~> VFS =
-      runViewFileSystem[VFS](
-        liftMT[VSS, ErrsT] compose zoomNT[Id](VS.fs) compose InMemory.fileSystem)
+      runViewFileSystem[VFS](liftMT[VSS, ErrsT] compose zoomNT[Id](VS.fs) compose InMemory.fileSystem)
 
     val memState = InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)
 
     val (vs, r) =
       f.foldMap(free.foldMapNT(viewfs) compose view.fileSystem[ViewFileSystem])
-        .run
-        .run(VS.fs.set(memState)(VS.emptyWithViews(views)))
+        .run.run(VS.fs.set(memState)(VS.emptyWithViews(views)))
 
     ViewInterpResult(vs, r)
   }
@@ -172,9 +156,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "ReadFile.open" should {
     "translate simple read to query" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
-      val lp   = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 
@@ -185,18 +169,18 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       } yield ()).run
 
       val exp = (for {
-        h <- query.unsafe.eval(lp.valueOr(_ =>
-          scala.sys.error("impossible constant plan")))
-        _ <- query.transforms.fsErrToExec(query.unsafe.more(h))
-        _ <- query.transforms.fsErrToExec(EitherT.right(query.unsafe.close(h)))
+        h   <- query.unsafe.eval(lp.valueOr(_ => scala.sys.error("impossible constant plan")))
+        _   <- query.transforms.fsErrToExec(
+                query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(
+                EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
 
     "translate limited read to query" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
@@ -208,26 +192,29 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       } yield ()).run
 
       val expQ =
-        Fix(
-          Take(Fix(Drop(Fix(Squash(lpf.read(rootDir </> file("zips")))),
-                        lpf.constant(Data.Int(5)))),
-               lpf.constant(Data.Int(10))))
+        Fix(Take(
+          Fix(Drop(
+            Fix(Squash(lpf.read(rootDir </> file("zips")))),
+            lpf.constant(Data.Int(5)))),
+          lpf.constant(Data.Int(10))))
       val exp = (for {
-        h <- query.unsafe.eval(expQ)
-        _ <- query.transforms.fsErrToExec(query.unsafe.more(h))
-        _ <- query.transforms.fsErrToExec(EitherT.right(query.unsafe.close(h)))
+        h   <- query.unsafe.eval(expQ)
+        _   <- query.transforms.fsErrToExec(
+                query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(
+                EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
 
     "translate read with view-view reference" in {
       val p0 = rootDir[Sandboxed] </> dir("view") </> file("view0")
       val p1 = rootDir[Sandboxed] </> dir("view") </> file("view1")
 
-      val views = Map(p0 -> parseExpr("select * from `/zips`"),
-                      p1 -> parseExpr("select * from view0"))
+      val views = Map(
+        p0 -> parseExpr("select * from `/zips`"),
+        p1 -> parseExpr("select * from view0"))
 
       val f = (for {
         h <- read.unsafe.open(p1, 0L, None)
@@ -237,19 +224,21 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val expQ = Fix(Squash(lpf.read(rootDir </> file("zips"))))
       val exp = (for {
-        h <- query.unsafe.eval(expQ)
-        _ <- query.transforms.fsErrToExec(query.unsafe.more(h))
-        _ <- query.transforms.fsErrToExec(EitherT.right(query.unsafe.close(h)))
+        h   <- query.unsafe.eval(expQ)
+        _   <- query.transforms.fsErrToExec(
+                query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(
+                EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
 
     "translate read with constant" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("view0")
 
-      val views = Map(p -> parseExpr("1 + 2"))
+      val views = Map(
+        p -> parseExpr("1 + 2"))
 
       val f = (for {
         h <- read.unsafe.open(p, 0L, None)
@@ -259,12 +248,11 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val exp = ().point[Free[FileSystem, ?]]
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
 
     "read from closed handle (error)" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
@@ -275,12 +263,11 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _ <- read.unsafe.read(h)
       } yield ()).run
 
-      viewInterpTrace(views, Map(), f).result must_=== \/.right(
-        \/.left((unknownReadHandle(ReadFile.ReadHandle(p, 0)))))
+      viewInterpTrace(views, Map(), f).result must_=== \/.right(\/.left((unknownReadHandle(ReadFile.ReadHandle(p, 0)))))
     }
 
     "double close (no-op)" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
@@ -297,17 +284,16 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "WriteFile.open" should {
     "fail with view path" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
-      val f     = write.unsafe.open(p).run
+      val f = write.unsafe.open(p).run
 
       viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
         Vector.empty,
         VS.emptyWithViews(views),
-        \/.right(\/.left(
-          FileSystemError.pathErr(PathError.invalidPath(p, "Cannot write to a view.")))))
+        \/.right(\/.left(FileSystemError.pathErr(PathError.invalidPath(p, "Cannot write to a view.")))))
     }
   }
 
@@ -316,11 +302,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     val srcPath = rootDir </> dir("view") </> file("simpleZips")
     val dstPath = rootDir </> dir("foo") </> file("bar")
-    val expr    = parseExpr("select * from zips")
+    val expr = parseExpr("select * from zips")
 
-    def moveShouldSucceed(views: Map[AFile, Fix[Sql]],
-                          files: List[AFile],
-                          moveSemantic: MoveSemantics) = {
+    def moveShouldSucceed(views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
       viewInterp(views, files, f) must_=== ViewInterpResult(
@@ -328,17 +312,13 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         \/.right(\/.right(())))
     }
 
-    def moveShouldFail(views: Map[AFile, Fix[Sql]],
-                       files: List[AFile],
-                       moveSemantic: MoveSemantics,
-                       pathError: PathError) = {
+    def moveShouldFail
+      (views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics, pathError: PathError) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
       viewInterp(views, files, f) must_=== ViewInterpResult(
-        VS.fs.set(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap))(
-          VS.emptyWithViews(views)),
-        \/.right(\/.left(FileSystemError.pathErr(pathError)))
-      )
+        VS.fs.set(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap))(VS.emptyWithViews(views)),
+        \/.right(\/.left(FileSystemError.pathErr(pathError))))
     }
 
     "succeed when destination view exists and semantic is Overwrite" in
@@ -354,16 +334,10 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       moveShouldSucceed(Map(srcPath -> expr), Nil, FailIfExists)
 
     "fail when destination view exists and semantic is FailIfExists" in
-      moveShouldFail(Map(srcPath -> expr, dstPath -> expr),
-                     Nil,
-                     FailIfExists,
-                     PathError.pathExists(dstPath))
+      moveShouldFail(Map(srcPath -> expr, dstPath -> expr), Nil, FailIfExists, PathError.pathExists(dstPath))
 
     "fail when destination file exists and semantic is FailIfExists" in
-      moveShouldFail(Map(srcPath -> expr),
-                     List(dstPath),
-                     FailIfExists,
-                     PathError.pathExists(dstPath))
+      moveShouldFail(Map(srcPath -> expr), List(dstPath), FailIfExists, PathError.pathExists(dstPath))
 
     "succeed when destination view exists and semantic is FailIfMissing" in
       moveShouldSucceed(Map(srcPath -> expr, dstPath -> expr), Nil, FailIfMissing)
@@ -372,63 +346,52 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       moveShouldSucceed(Map(srcPath -> expr), List(dstPath), FailIfMissing)
 
     "fail when destination doesn't exist and semantic is FailIfMissing" in
-      moveShouldFail(Map(srcPath -> expr),
-                     Nil,
-                     FailIfMissing,
-                     PathError.pathNotFound(dstPath))
+      moveShouldFail(Map(srcPath -> expr), Nil, FailIfMissing, PathError.pathNotFound(dstPath))
 
     "succeed when src and dst directory is outside the underlying filesystem" >> {
-      val v1      = rootDir[Sandboxed] </> dir("view") </> file("viewA")
-      val v2      = rootDir[Sandboxed] </> dir("view") </> file("viewB")
+      val v1 = rootDir[Sandboxed] </> dir("view") </> file("viewA")
+      val v2 = rootDir[Sandboxed] </> dir("view") </> file("viewB")
       val destDir = rootDir[Sandboxed] </> dir("zoo")
-      val expr    = parseExpr("select * from zips")
+      val expr = parseExpr("select * from zips")
 
-      val f = manage
-        .move(dirToDir(rootDir </> dir("view"), destDir), MoveSemantics.FailIfExists)
-        .run
+      val f = manage.move(dirToDir(rootDir </> dir("view"), destDir), MoveSemantics.FailIfExists).run
 
       viewInterp(Map(v1 -> expr, v2 -> expr), Nil, f) must_=== ViewInterpResult(
-        VS.emptyWithViews(
-          Map((destDir </> file("viewA")) -> expr, (destDir </> file("viewB")) -> expr)),
+        VS.emptyWithViews(Map((destDir </> file("viewA")) -> expr, (destDir </> file("viewB")) -> expr)),
         \/.right(\/.right(())))
     }
 
     "move view and file subpaths" in {
-      val srcDir   = rootDir[Sandboxed] </> dir("view")
-      val destDir  = rootDir[Sandboxed] </> dir("zoo")
+      val srcDir = rootDir[Sandboxed] </> dir("view")
+      val destDir = rootDir[Sandboxed] </> dir("zoo")
       val viewFile = file("simpleZips")
       val dataFile = file("complexFile")
-      val expr     = parseExpr("select * from zips")
+      val expr = parseExpr("select * from zips")
 
       val f = manage.move(dirToDir(srcDir, destDir), MoveSemantics.FailIfExists).run
 
       viewInterp(Map((srcDir </> viewFile) -> expr), List(srcDir </> dataFile), f) must_=== ViewInterpResult(
         VS.emptyWithViews(Map((destDir </> viewFile) -> expr))
-          .copy(fs = InMemState.fromFiles(
-            List(destDir </> dataFile).map(_ -> Vector[Data]()).toMap)),
-        \/.right(\/.right(()))
-      )
+          .copy(fs = InMemState.fromFiles(List(destDir </> dataFile).map(_ -> Vector[Data]()).toMap)),
+        \/.right(\/.right(())))
     }
   }
 
   "ManageFile.delete" should {
     "delete with view path" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
 
       val f = manage.delete(p).run
 
-      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
-        Vector.empty,
-        VS.empty,
-        \/.right(\/.right(())))
+      viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(Vector.empty, VS.empty, \/.right(\/.right(())))
     }
 
     "delete with view subpath" in {
-      val vp   = rootDir[Sandboxed] </> dir("view")
-      val p    = vp </> file("simpleZips")
+      val vp = rootDir[Sandboxed] </> dir("view")
+      val p = vp </> file("simpleZips")
       val expr = parseExpr("select * from zips")
 
       val views = Map(p -> expr)
@@ -445,65 +408,58 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "QueryFile.exec" should {
     "handle simple query" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
-      val f = query
-        .execute(lpf.read(rootDir </> dir("view") </> file("simpleZips")),
-                 rootDir </> file("tmp"))
-        .run
-        .run
+      val f = query.execute(lpf.read(rootDir </> dir("view") </> file("simpleZips")), rootDir </> file("tmp")).run.run
 
-      val exp = query
-        .execute(Fix(Squash(lpf.read(rootDir </> file("zips")))), rootDir </> file("tmp"))
-        .run
-        .run
+      val exp = query.execute(Fix(Squash(lpf.read(rootDir </> file("zips")))), rootDir </> file("tmp")).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
   }
 
   "QueryFile.eval" should {
     "handle simple query" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
       val f = (for {
         h <- query.unsafe.eval(lpf.read(rootDir </> dir("view") </> file("simpleZips")))
-        _ <- query.transforms.fsErrToExec(query.unsafe.more(h))
-        _ <- query.transforms.toExec(query.unsafe.close(h))
+        _ <- query.transforms.fsErrToExec(
+              query.unsafe.more(h))
+        _ <- query.transforms.toExec(
+              query.unsafe.close(h))
       } yield ()).run.run
 
       val exp = (for {
         h <- query.unsafe.eval(Fix(Squash(lpf.read(rootDir </> file("zips")))))
-        _ <- query.transforms.fsErrToExec(query.unsafe.more(h))
-        _ <- query.transforms.toExec(query.unsafe.close(h))
+        _ <- query.transforms.fsErrToExec(
+              query.unsafe.more(h))
+        _ <- query.transforms.toExec(
+              query.unsafe.close(h))
       } yield ()).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
   }
 
   "QueryFile.explain" should {
     "handle simple query" in {
-      val p    = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
+      val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from `/zips`")
 
       val views = Map(p -> expr)
 
-      val f =
-        query.explain(lpf.read(rootDir </> dir("view") </> file("simpleZips"))).run.run
+      val f = query.explain(lpf.read(rootDir </> dir("view") </> file("simpleZips"))).run.run
 
       val exp = query.explain(Fix(Squash(lpf.read(rootDir </> file("zips"))))).run.run
 
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(
-        traceInterp(exp, Map())._1)
+      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
   }
 
@@ -511,41 +467,40 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def twoNodes(aDir: ADir) =
       Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
 
-    "preserve files and dirs in the presence of non-conflicting views" >> prop {
-      (aDir: ADir) =>
-        val expr = parseExpr("select * from zips")
-
-        val views = Map((aDir </> file("view1")) -> expr,
-                        (aDir </> dir("views") </> file("view2")) -> expr)
-
-        val f = query.ls(aDir).run
-
-        viewInterpTrace(views, twoNodes(aDir), f) must_=== ViewInterpResultTrace(
-          traceInterp(f, twoNodes(aDir))._1,
-          VS.emptyWithViews(views),
-          \/.right(
-            \/.right(
-              Set(FileName("afile").right,
-                  DirName("adir").left,
-                  FileName("view1").right,
-                  DirName("views").left)))
-        )
-    }
-
-    "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
+    "preserve files and dirs in the presence of non-conflicting views" >> prop { (aDir: ADir) =>
       val expr = parseExpr("select * from zips")
 
-      val views = Map((aDir </> file("afile")) -> expr,
-                      (aDir </> dir("adir") </> file("view1")) -> expr)
+      val views = Map(
+        (aDir </> file("view1")) -> expr,
+        (aDir </> dir("views") </> file("view2")) -> expr)
 
       val f = query.ls(aDir).run
 
       viewInterpTrace(views, twoNodes(aDir), f) must_=== ViewInterpResultTrace(
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
-        \/.right(\/.right(Set(FileName("afile").right, // hides the regular file
-                              DirName("adir").left)))
-      ) // no conflict with same dir
+        \/.right(\/.right(Set(
+          FileName("afile").right,
+          DirName("adir").left,
+          FileName("view1").right,
+          DirName("views").left))))
+    }
+
+    "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
+      val expr = parseExpr("select * from zips")
+
+      val views = Map(
+        (aDir </> file("afile")) -> expr,
+        (aDir </> dir("adir") </> file("view1")) -> expr)
+
+      val f = query.ls(aDir).run
+
+      viewInterpTrace(views, twoNodes(aDir), f) must_=== ViewInterpResultTrace(
+        traceInterp(f, twoNodes(aDir))._1,
+        VS.emptyWithViews(views),
+        \/.right(\/.right(Set(
+          FileName("afile").right, // hides the regular file
+          DirName("adir").left)))) // no conflict with same dir
     }
 
     "preserve empty dir result" >> prop { (aDir: ADir) =>
@@ -592,29 +547,22 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val hasFile = {
         val paths = Map(fileParent(file) -> Set(fileName(file).right[DirName]))
-        viewInterpTrace(Map(), paths, program) must_=== ViewInterpResultTrace(
-          ops,
-          VS.empty,
-          \/.right(true))
+        viewInterpTrace(Map(), paths, program) must_=== ViewInterpResultTrace(ops, VS.empty, \/.right(true))
       }
       val noFile = {
-        viewInterpTrace(Map(), Map(), program) must_=== ViewInterpResultTrace(
-          ops,
-          VS.empty,
-          \/.right(false))
+        viewInterpTrace(Map(), Map(), program) must_=== ViewInterpResultTrace(ops, VS.empty, \/.right(false))
       }
       hasFile and noFile
     }
 
-    "return true if there is a view at that path" >> prop {
-      (file: AFile, expr: Fix[Sql]) =>
-        val views = Map(file -> expr)
+    "return true if there is a view at that path" >> prop { (file: AFile, expr: Fix[Sql]) =>
+      val views = Map(file -> expr)
 
-        val program = query.fileExists(file)
+      val program = query.fileExists(file)
 
-        viewInterp(views, Nil, program) must_=== ViewInterpResult(
-          VS.emptyWithViews(views),
-          \/.right(true))
+      viewInterp(views, Nil, program) must_=== ViewInterpResult(
+        VS.emptyWithViews(views),
+        \/.right(true))
     }
   }
 
@@ -622,42 +570,35 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def unsafeParse(sqlQry: String): Fix[Sql] =
       sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
-    def resolvedRefs[A](views: Map[AFile, Fix[Sql]],
-                        lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
-      view
-        .resolveViewRefs[Mounting](lp)
-        .run
+    def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
+      view.resolveViewRefs[Mounting](lp).run
         .foldMap(runMounting[State[VS, ?]])
         .eval(VS.emptyWithViews(views))
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
-        beRightDisjunction.like {
-          case r => r must beTreeEqual(lpf.read(rootDir </> file("zips")))
-        }
+        beRightDisjunction.like { case r => r must beTreeEqual(lpf.read(rootDir </> file("zips"))) }
     }
 
     "trivial read" >> {
-      val p  = rootDir </> dir("view") </> file("justZips")
+      val p = rootDir </> dir("view") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from `/zips`"))
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
-        case r =>
-          r must beTreeEqual(
-            Fix(Squash(lpf.read(rootDir </> file("zips"))))
-          )
+        case r => r must beTreeEqual(
+          Fix(Squash(lpf.read(rootDir </> file("zips"))))
+        )
       }
     }
 
     "trivial read with relative path" >> {
-      val p  = rootDir </> dir("foo") </> file("justZips")
+      val p = rootDir </> dir("foo") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from zips"))
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
-        case r =>
-          r must beTreeEqual(
-            Fix(Squash(lpf.read(rootDir </> dir("foo") </> file("zips"))))
-          )
+        case r => r must beTreeEqual(
+          Fix(Squash(lpf.read(rootDir </> dir("foo") </> file("zips"))))
+        )
       }
     }
 
@@ -667,26 +608,22 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val p = rootDir </> dir("view") </> file("simpleZips")
 
       val outer =
-        Take(Drop(lpf.read(p), lpf.constant(Data.Int(5))).embed,
-             lpf.constant(Data.Int(10))).embed
+        Take(
+          Drop(
+            lpf.read(p),
+            lpf.constant(Data.Int(5))).embed,
+          lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar
-          .precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p))
-          .run
-          .value
-          .toOption
-          .get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
-      val exp = quasar
-        .preparePlan(Take(Drop(innerLP, lpf.constant(Data.Int(5))).embed,
-                          lpf.constant(Data.Int(10))).embed)
-        .run
-        .value
-        .toOption
-        .get
+      val exp = quasar.preparePlan(Take(
+          Drop(
+            innerLP,
+            lpf.constant(Data.Int(5))).embed,
+          lpf.constant(Data.Int(10))).embed).run.value.toOption.get
 
       resolvedRefs(vs, outer) must beRightDisjunction.like {
         case r => r must beTreeEqual(exp)
@@ -698,14 +635,14 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         (rootDir </> dir("view") </> file("view1")) ->
           unsafeParse("select * from `/zips`"),
         (rootDir </> dir("view") </> file("view2")) ->
-          unsafeParse("select * from view1")
-      )
+          unsafeParse("select * from view1"))
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
-        beRightDisjunction.like {
-          case r => r must beTreeEqual(Squash(lpf.read(rootDir </> file("zips"))).embed)
+        beRightDisjunction.like { case r => r must beTreeEqual(
+          Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
+
 
     // Several tests for edge cases with view references:
 
@@ -716,7 +653,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val vp = rootDir </> dir("view") </> file("view1")
       val zp = rootDir </> file("zips")
 
-      val vs = Map[AFile, Fix[Sql]](vp -> unsafeParse("select * from `/zips`"))
+      val vs = Map[AFile, Fix[Sql]](
+        vp -> unsafeParse("select * from `/zips`"))
 
       val q = lpf.join(
         lpf.read(vp),
@@ -730,9 +668,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         JoinType.Inner,
         JoinCondition('__leftJoin2, '__rightJoin3, lpf.constant(Data.Bool(true))))
 
-      resolvedRefs(vs, q) must beRightDisjunction.like {
-        case r => r must beTreeEqual(exp)
-      }
+      resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTreeEqual(exp) }
     }
 
     "self reference" >> {
@@ -744,19 +680,13 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar
-          .queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run
-          .value
-          .toOption
-          .get
+        quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
+          .run.value.toOption.get
           .valueOr(_ => scala.sys.error("impossible constant plan"))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
-        case r => r must beTreeEqual(qlp)
-      }
+      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like { case r => r must beTreeEqual(qlp) }
     }
 
     "circular reference" >> {
@@ -775,12 +705,13 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         v2p -> unsafeParse(s"select * from `${posixCodec.printPath(v1p)}` limit 10"))
 
       resolvedRefs(vs, lpf.read(v2p)) must beRightDisjunction.like {
-        case r =>
-          r must beTreeEqual(
-            Take(Squash(
-                   Drop(Squash(lpf.read(v2p)).embed, lpf.constant(Data.Int(5))).embed).embed,
-                 lpf.constant(Data.Int(10))).embed
-          )
+        case r => r must beTreeEqual(
+          Take(
+            Squash(Drop(
+              Squash(lpf.read(v2p)).embed,
+              lpf.constant(Data.Int(5))).embed).embed,
+            lpf.constant(Data.Int(10))).embed
+        )
       }
     }
   }

@@ -44,10 +44,8 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
   checkAll("Obj", order.laws[Obj[String]])
   checkAll("Obj", traverse.laws[Obj])
 
-  checkAll("Extension",
-           traverse.laws[Extension](implicitly, implicitly, Extension.order(Order[SInt])))
-  checkAll("Extension",
-           order.laws[Extension[SInt]](Extension.order(Order[SInt]), implicitly))
+  checkAll("Extension", traverse.laws[Extension](implicitly, implicitly, Extension.order(Order[SInt])))
+  checkAll("Extension", order.laws[Extension[SInt]](Extension.order(Order[SInt]), implicitly))
 
   checkAll("EJson", order.laws[J])
 

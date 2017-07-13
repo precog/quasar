@@ -42,65 +42,68 @@ object TraceFS {
     import QueryFile._
 
     def ls(dir: ADir) =
-      paths
-        .get(dir)
-        .cata(_.right,
-              if (dir === rootDir) Set[PathSegment]().right
-              else FileSystemError.pathErr(PathError.pathNotFound(dir)).left)
+      paths.get(dir).cata(
+        _.right,
+        if (dir === rootDir) Set[PathSegment]().right
+        else FileSystemError.pathErr(PathError.pathNotFound(dir)).left)
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
-      WriterT.writer((Vector(qf.render), qf match {
-        case ExecutePlan(lp, out) => (Vector.empty, \/-(out))
-        case EvaluatePlan(lp)     => (Vector.empty, \/-(ResultHandle(0)))
-        case More(handle)         => \/-(Vector.empty)
-        case Close(handle)        => ()
-        case Explain(lp) =>
-          (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString, ISet.empty)))
-        case ListContents(dir) => ls(dir)
-        case FileExists(file) =>
-          ls(fileParent(file)).fold(κ(false), _.contains(fileName(file).right))
-      }))
+      WriterT.writer((Vector(qf.render),
+        qf match {
+          case ExecutePlan(lp, out) => (Vector.empty, \/-(out))
+          case EvaluatePlan(lp)     => (Vector.empty, \/-(ResultHandle(0)))
+          case More(handle)         => \/-(Vector.empty)
+          case Close(handle)        => ()
+          case Explain(lp)          => (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString, ISet.empty)))
+          case ListContents(dir)    => ls(dir)
+          case FileExists(file)     =>
+            ls(fileParent(file)).fold(
+              κ(false),
+              _.contains(fileName(file).right))
+        }))
   }
 
   def rfTrace = new (ReadFile ~> Trace) {
     import ReadFile._
 
     def apply[A](rf: ReadFile[A]): Trace[A] =
-      WriterT.writer((Vector(rf.render), rf match {
-        case Open(file, off, lim) => \/-(ReadHandle(file, 0))
-        case Read(handle)         => \/-(Vector.empty)
-        case Close(handle)        => ()
-      }))
+      WriterT.writer((Vector(rf.render),
+        rf match {
+          case Open(file, off, lim) => \/-(ReadHandle(file, 0))
+          case Read(handle)         => \/-(Vector.empty)
+          case Close(handle)        => ()
+        }))
   }
 
   def wfTrace = new (WriteFile ~> Trace) {
     import WriteFile._
 
     def apply[A](wf: WriteFile[A]): Trace[A] =
-      WriterT.writer((Vector(wf.render), wf match {
-        case Open(file)           => \/-(WriteHandle(file, 0))
-        case Write(handle, chunk) => Vector.empty
-        case Close(handle)        => ()
-      }))
+      WriterT.writer((Vector(wf.render),
+        wf match {
+          case Open(file)           => \/-(WriteHandle(file, 0))
+          case Write(handle, chunk) => Vector.empty
+          case Close(handle)        => ()
+        }))
   }
 
   def mfTrace = new (ManageFile ~> Trace) {
     import ManageFile._
 
     def apply[A](mf: ManageFile[A]): Trace[A] =
-      WriterT.writer((Vector(mf.render), mf match {
-        case Move(scenario, semantics) => \/-(())
-        case Delete(path)              => \/-(())
-        case TempFile(near) =>
-          \/-(refineType(near).fold(ι, fileParent) </> file("tmp"))
-      }))
+      WriterT.writer((Vector(mf.render),
+        mf match {
+          case Move(scenario, semantics) => \/-(())
+          case Delete(path)              => \/-(())
+          case TempFile(near) =>
+            \/-(refineType(near).fold(ι, fileParent) </> file("tmp"))
+        }))
   }
 
   def traceFs(paths: Map[ADir, Set[PathSegment]]): FileSystem ~> Trace =
     interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace)
 
-  def traceInterp[A](t: Free[FileSystem, A],
-                     paths: Map[ADir, Set[PathSegment]]): (Vector[RenderedTree], A) = {
+  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathSegment]]): (Vector[RenderedTree], A) = {
     new free.Interpreter(traceFs(paths)).interpret(t).run
   }
 }

@@ -33,92 +33,87 @@ object managefile {
   import ManageFile._
 
   def interpret[S[_]](implicit
-                      S0: MonotonicSeq :<: S,
-                      S1: ConnectionIO :<: S): ManageFile ~> Free[S, ?] =
-    new (ManageFile ~> Free[S, ?]) {
-      def apply[A](fs: ManageFile[A]) = fs match {
-        case Move(scenario, semantics) => move(scenario, semantics)
-        case Delete(path)              => delete(path)
-        case TempFile(path)            => tempFile(path)
-      }
+    S0: MonotonicSeq :<: S,
+    S1: ConnectionIO :<: S
+  ): ManageFile ~> Free[S, ?] = new (ManageFile ~> Free[S, ?]) {
+    def apply[A](fs: ManageFile[A]) = fs match {
+      case Move(scenario, semantics) => move(scenario, semantics)
+      case Delete(path) => delete(path)
+      case TempFile(path) => tempFile(path)
     }
+  }
 
   def move[S[_]](
-      scenario: MoveScenario,
-      semantics: MoveSemantics
+    scenario: MoveScenario, semantics: MoveSemantics
   )(implicit
-    S0: ConnectionIO :<: S): Free[S, FileSystemError \/ Unit] =
+    S0: ConnectionIO :<: S
+  ): Free[S, FileSystemError \/ Unit] =
     (for {
-      src <- EitherT(dbTableFromPath(scenario.src).point[Free[S, ?]])
-      dst <- EitherT(dbTableFromPath(scenario.dst).point[Free[S, ?]])
-      _ <- EitherT(
-        (
-          if (src.db =/= dst.db)
-            FileSystemError
-              .pathErr(PathError.invalidPath(scenario.dst, "different db from src path"))
-              .left
-          else
-            ().right
-        ).point[Free[S, ?]])
+      src       <- EitherT(dbTableFromPath(scenario.src).point[Free[S, ?]])
+      dst       <- EitherT(dbTableFromPath(scenario.dst).point[Free[S, ?]])
+      _         <- EitherT((
+                     if (src.db =/= dst.db) FileSystemError.pathErr(
+                       PathError.invalidPath(scenario.dst, "different db from src path")).left
+                     else
+                       ().right
+                   ).point[Free[S, ?]])
       srcTables <- lift(tablesWithPrefix(src.table)).into.liftM[FileSystemErrT]
-      _ <- EitherT(
-        (
-          if (srcTables.isEmpty)
-            FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
-          else
-            ().right
-        ).point[Free[S, ?]])
+      _         <- EitherT((
+                     if (srcTables.isEmpty)
+                       FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
+                     else
+                       ().right
+                   ).point[Free[S, ?]])
       dstExists <- lift(tableExists(dst.table)).into.liftM[FileSystemErrT]
-      _ <- EitherT((semantics match {
-        case MoveSemantics.FailIfExists if dstExists =>
-          FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
-        case MoveSemantics.FailIfMissing if !dstExists =>
-          FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)).left
-        case _ =>
-          ().right[FileSystemError]
-      }).point[Free[S, ?]])
-      tblsToMv = scenario.fold(κ2(srcTables), κ2(List(src.table)))
-      _ <- lift(tblsToMv.traverse { srcTable =>
-        val dstTable = dst.table + srcTable.stripPrefix(src.table)
+      _         <- EitherT((semantics match {
+                     case MoveSemantics.FailIfExists if dstExists =>
+                       FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
+                     case MoveSemantics.FailIfMissing if !dstExists =>
+                       FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)).left
+                     case _ =>
+                       ().right[FileSystemError]
+                   }).point[Free[S, ?]])
+      tblsToMv  =  scenario.fold(κ2(srcTables), κ2(List(src.table)))
+      _         <- lift(tblsToMv.traverse { srcTable =>
+                     val dstTable = dst.table + srcTable.stripPrefix(src.table)
 
-        val dropQStr  = s"""DROP TABLE IF EXISTS "$dstTable""""
-        val alterQStr = s"""ALTER TABLE "$srcTable" RENAME TO "$dstTable" """
+                     val dropQStr  = s"""DROP TABLE IF EXISTS "$dstTable""""
+                     val alterQStr = s"""ALTER TABLE "$srcTable" RENAME TO "$dstTable" """
 
-        Update[HNil](dropQStr, none).toUpdate0(HNil).run *>
-          Update[HNil](alterQStr, none).toUpdate0(HNil).run
-      }).into.liftM[FileSystemErrT]
+                     Update[HNil](dropQStr, none).toUpdate0(HNil).run *>
+                     Update[HNil](alterQStr, none).toUpdate0(HNil).run
+                   }).into.liftM[FileSystemErrT]
     } yield ()).run
 
   def delete[S[_]](
-      path: APath
+    path: APath
   )(implicit
-    S0: ConnectionIO :<: S): Free[S, FileSystemError \/ Unit] =
+    S0: ConnectionIO :<: S
+  ): Free[S, FileSystemError \/ Unit] =
     (for {
       dt   <- EitherT(dbTableFromPath(path).point[Free[S, ?]])
       tbls <- lift(tablesWithPrefix(dt.table)).into.liftM[FileSystemErrT]
-      _ <- EitherT(
-        (
-          if (tbls.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(path)).left
-          else ().right
-        ).point[Free[S, ?]])
-      _ <- lift(tbls.traverse { tableName =>
-        val qStr = s"""DROP TABLE IF EXISTS "$tableName""""
-        Update[HNil](qStr, none).toUpdate0(HNil).run
-      }).into.liftM[FileSystemErrT]
+      _    <- EitherT((
+                if (tbls.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(path)).left
+                else ().right
+              ).point[Free[S, ?]])
+      _    <- lift(tbls.traverse { tableName =>
+                val qStr = s"""DROP TABLE IF EXISTS "$tableName""""
+                Update[HNil](qStr, none).toUpdate0(HNil).run
+              }).into.liftM[FileSystemErrT]
     } yield ()).run
 
   def tempFile[S[_]](
-      path: APath
+    path: APath
   )(implicit
-    S0: MonotonicSeq :<: S): Free[S, FileSystemError \/ AFile] =
+    S0: MonotonicSeq :<: S
+  ): Free[S, FileSystemError \/ AFile] =
     MonotonicSeq.Ops[S].next.map { i =>
       val tmpFilename = file(s"__quasar_tmp_$i")
-      refineType(path)
-        .fold(
-          d => d </> tmpFilename,
-          f => fileParent(f) </> tmpFilename
-        )
-        .right
+      refineType(path).fold(
+        d => d </> tmpFilename,
+        f => fileParent(f) </> tmpFilename
+      ).right
     }
 
 }

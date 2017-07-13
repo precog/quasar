@@ -32,9 +32,7 @@ object ChannelParser {
   * Given a file name this parser opens it, chunks the data 1M at a time, and
   * parses it.
   */
-private[json] final class ChannelParser(ch: ReadableByteChannel)
-    extends SyncParser
-    with ByteBasedParser {
+private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncParser with ByteBasedParser {
 
   // 256K buffers: arrived at via a bit of testing
   @inline final def bufsize = 262144

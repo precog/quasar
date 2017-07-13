@@ -34,8 +34,8 @@ object ManageFile {
     import MoveScenario._
 
     def fold[X](
-        d2d: (ADir, ADir) => X,
-        f2f: (AFile, AFile) => X
+      d2d: (ADir, ADir) => X,
+      f2f: (AFile, AFile) => X
     ): X =
       this match {
         case DirToDir(sd, dd)   => d2d(sd, dd)
@@ -48,8 +48,10 @@ object ManageFile {
   }
 
   object MoveScenario {
-    final case class DirToDir private (src: ADir, dst: ADir)     extends MoveScenario
-    final case class FileToFile private (src: AFile, dst: AFile) extends MoveScenario
+    final case class DirToDir private (src: ADir, dst: ADir)
+        extends MoveScenario
+    final case class FileToFile private (src: AFile, dst: AFile)
+        extends MoveScenario
 
     val dirToDir: Prism[MoveScenario, (ADir, ADir)] =
       Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ2(none)))(DirToDir.tupled)
@@ -59,13 +61,16 @@ object ManageFile {
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
-      extends ManageFile[FileSystemError \/ Unit]
+    extends ManageFile[FileSystemError \/ Unit]
 
-  final case class Delete(path: APath) extends ManageFile[FileSystemError \/ Unit]
+  final case class Delete(path: APath)
+    extends ManageFile[FileSystemError \/ Unit]
 
-  final case class TempFile(near: APath) extends ManageFile[FileSystemError \/ AFile]
+  final case class TempFile(near: APath)
+    extends ManageFile[FileSystemError \/ AFile]
 
-  final class Ops[S[_]](implicit S: ManageFile :<: S) extends LiftedOps[ManageFile, S] {
+  final class Ops[S[_]](implicit S: ManageFile :<: S)
+    extends LiftedOps[ManageFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
 
@@ -108,12 +113,11 @@ object ManageFile {
   implicit def renderTree[A]: RenderTree[ManageFile[A]] =
     new RenderTree[ManageFile[A]] {
       def render(mf: ManageFile[A]) = mf match {
-        case Move(scenario, semantics) =>
-          NonTerminal(List("Move"),
-                      semantics.shows.some,
-                      scenario.fold((from, to) => List(from.render, to.render),
-                                    (from, to) => List(from.render, to.render)))
-        case Delete(path)     => NonTerminal(List("Delete"), None, List(path.render))
+        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.shows.some,
+          scenario.fold(
+            (from, to) => List(from.render, to.render),
+            (from, to) => List(from.render, to.render)))
+        case Delete(path) => NonTerminal(List("Delete"), None, List(path.render))
         case TempFile(nearTo) => NonTerminal(List("TempFile"), None, List(nearTo.render))
       }
     }

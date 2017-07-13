@@ -46,7 +46,10 @@ import scalaz.concurrent.Task
 
 // TODO: Roll with N1QL AST and RenderN1QL tests instead
 
-class BasicQueryEnablementSpec extends Qspec with QScriptHelpers with CompilerHelpers {
+class BasicQueryEnablementSpec
+  extends Qspec
+  with QScriptHelpers
+  with CompilerHelpers {
   import common._, planner._
 
   sequential
@@ -64,15 +67,16 @@ class BasicQueryEnablementSpec extends Qspec with QScriptHelpers with CompilerHe
 
   val cfg =
     Config(
-      ClientContext(new CouchbaseBucket(cbEnv,
-                                        new CouchbaseCore(cbEnv),
-                                        "beer-sample",
-                                        "",
-                                        List[transcoder.Transcoder[_, _]]().asJava),
-                    docTypeKey,
-                    ListContentsView(docTypeKey)),
-      CouchbaseCluster.create(cbEnv)
-    )
+      ClientContext(
+        new CouchbaseBucket(
+          cbEnv,
+          new CouchbaseCore(cbEnv),
+          "beer-sample",
+          "",
+          List[transcoder.Transcoder[_, _]]().asJava),
+        docTypeKey,
+        ListContentsView(docTypeKey)),
+      CouchbaseCluster.create(cbEnv))
 
   def compileLogicalPlan(query: Fix[Sql]): Fix[LogicalPlan] =
     compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
@@ -80,17 +84,14 @@ class BasicQueryEnablementSpec extends Qspec with QScriptHelpers with CompilerHe
   def interp: CB.Eff ~> Task = fs.interp.unsafePerformSync
 
   def n1qlFromSql2(sql2: Fix[Sql]): String =
-    (CB.lpToRepr(compileLogicalPlan(sql2)) ∘ (_.repr) >>= (CB.QueryFileModule.explain)).run.value
-      .run(cfg)
+    (CB.lpToRepr(compileLogicalPlan(sql2)) ∘ (_.repr) >>= (CB.QueryFileModule.explain))
+      .run.value.run(cfg)
       .foldMap(interp)
       .flatMap(_.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now))
       .unsafePerformSync
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    qs.cataM(
-        Planner[Fix,
-                EitherT[Kleisli[Free[MonotonicSeq, ?], Context, ?], PlannerError, ?],
-                QST].plan)
+    qs.cataM(Planner[Fix, EitherT[Kleisli[Free[MonotonicSeq, ?], Context, ?], PlannerError, ?], QST].plan)
       .flatMapF(RenderQuery.compact(_).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]])
       .run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey))
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
@@ -106,38 +107,31 @@ class BasicQueryEnablementSpec extends Qspec with QScriptHelpers with CompilerHe
   "SQL² to N1QL" should {
     testSql2ToN1ql(
       sqlE"select * from `beer`",
-      """select v from (select value `_1` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v"""
-    )
+      """select v from (select value `_1` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
       sqlE"select name from `beer`",
-      """select v from (select value `_1`.['name'] from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v"""
-    )
+      """select v from (select value `_1`.['name'] from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
       sqlE"select name, type from `beer`",
-      """select v from (select value {'name': `_1`.['name'], 'type': `_1`.['type']} from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v"""
-    )
+      """select v from (select value {'name': `_1`.['name'], 'type': `_1`.['type']} from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
       sqlE"select name from `beer` offset 1",
-      """select v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5` where (`type` = 'beer')) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v"""
-    )
+      """select v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5` where (`type` = 'beer')) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
 
     testSql2ToN1ql(
       sqlE"select count(*) from `beer`",
-      """select v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v"""
-    )
+      """select v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
       sqlE"select count(name) from `beer`",
-      """select v from (select value `_2` from (select count(`_1`.['name']) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v"""
-    )
+      """select v from (select value `_2` from (select count(`_1`.['name']) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
       sqlE"select geo.lat + geo.lon from `brewery`",
-      """select v from (select value (`_1`.['geo'].['lat'] + `_1`.['geo'].['lon']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'brewery')) as `_1`) v"""
-    )
+      """select v from (select value (`_1`.['geo'].['lat'] + `_1`.['geo'].['lon']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'brewery')) as `_1`) v""")
   }
 
   "QScript to N1QL" should {
@@ -147,11 +141,10 @@ class BasicQueryEnablementSpec extends Qspec with QScriptHelpers with CompilerHe
       val qs =
         chain[Fix[QST], QST](
           SRTF.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(
-            qscript.Map((),
-                        Free.roll(Add(ProjectFieldR(HoleF, StrLit("a")),
-                                      ProjectFieldR(HoleF, StrLit("b"))))))
-        )
+          QCT.inj(qscript.Map((),
+            Free.roll(Add(
+              ProjectFieldR(HoleF, StrLit("a")),
+              ProjectFieldR(HoleF, StrLit("b")))))))
 
       val n1ql = n1qlFromQS(qs)
 

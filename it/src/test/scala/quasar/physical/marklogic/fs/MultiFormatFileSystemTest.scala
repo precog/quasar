@@ -31,8 +31,8 @@ import scalaz.concurrent.Task
 
 abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpers {
   def multiFormatFileSystemShould(
-      js: AnalyticalFileSystem ~> Task,
-      xml: AnalyticalFileSystem ~> Task
+    js:  AnalyticalFileSystem ~> Task,
+    xml: AnalyticalFileSystem ~> Task
   ): Fragment
 
   type Fs[A]  = Free[AnalyticalFileSystem, A]
@@ -51,33 +51,26 @@ abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpe
   def runFsE(fs: AnalyticalFileSystem ~> Task): FsE ~> FileSystemErrT[Task, ?] =
     Hoist[FileSystemErrT].hoist(runFs(fs))
 
-  TestConfig
-    .fileSystemConfigs(FsType)
-    .flatMap(cfgs =>
-      cfgs filter {
-        case (ref, _, _) =>
-          ref.supports(BackendCapability.write()) &&
-            ref.supports(BackendCapability.query())
-      } take 1 traverse {
-        case (_, uri, _) =>
-          (testing.multiFormatDef(uri, 10000L, 10000L) |@| testsRoot) {
-            (mfd, root) =>
-              val (js, xml, close) = mfd
-              val chrootJs = foldMapNT(js) compose chroot
-                .analyticalFileSystem[AnalyticalFileSystem](root)
-              val chrootXml = foldMapNT(xml) compose chroot
-                .analyticalFileSystem[AnalyticalFileSystem](root)
-              val cleanup = {
-                val delRoot = manage.delete(root).run.void
-                (delRoot foldMap js) *> (delRoot foldMap xml)
-              }
-
-              "Multi-format MarkLogic FileSystem" >> Fragments(
-                multiFormatFileSystemShould(chrootJs, chrootXml),
-                step((cleanup onFinish κ(close)).unsafePerformSync))
+  TestConfig.fileSystemConfigs(FsType).flatMap (cfgs =>
+    cfgs filter { case (ref, _, _) =>
+      ref.supports(BackendCapability.write()) &&
+      ref.supports(BackendCapability.query())
+    } take 1 traverse {
+      case (_, uri, _) =>
+        (testing.multiFormatDef(uri, 10000L, 10000L) |@| testsRoot) { (mfd, root) =>
+          val (js, xml, close) = mfd
+          val chrootJs  = foldMapNT(js) compose chroot.analyticalFileSystem[AnalyticalFileSystem](root)
+          val chrootXml = foldMapNT(xml) compose chroot.analyticalFileSystem[AnalyticalFileSystem](root)
+          val cleanup   = {
+            val delRoot = manage.delete(root).run.void
+            (delRoot foldMap js) *> (delRoot foldMap xml)
           }
-    })
-    .unsafePerformSync
+
+          "Multi-format MarkLogic FileSystem" >> Fragments(
+            multiFormatFileSystemShould(chrootJs, chrootXml),
+            step((cleanup onFinish κ(close)).unsafePerformSync))
+        }
+    }).unsafePerformSync
 
   ////
 

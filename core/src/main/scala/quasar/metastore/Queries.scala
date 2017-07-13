@@ -29,13 +29,12 @@ import pathy.Path, Path._
   */
 class Queries {
   val fsMounts: Query0[(APath, FileSystemConfig)] =
-    sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'"
-      .query[(APath, FileSystemConfig)]
+    sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'".query[(APath, FileSystemConfig)]
 
   def mountsHavingPrefix(dir: ADir): Query0[(APath, MountType)] = {
     val patternChars = List("\\\\", "_", "%") // NB: Order is important here to avoid double-escaping
     val patternEscaped = patternChars.foldLeft(posixCodec.printPath(dir))((s, c) =>
-      s.replaceAll(c, s"\\\\$c"))
+                           s.replaceAll(c, s"\\\\$c"))
     sql"SELECT path, type FROM Mounts WHERE path LIKE ${patternEscaped + "_%"}"
       .query[(APath, MountType)]
   }
@@ -44,8 +43,7 @@ class Queries {
     sql"SELECT type FROM Mounts WHERE path = ${refineType(path)}".query[MountType]
 
   def lookupMountConfig(path: APath): Query0[MountConfig] =
-    sql"SELECT type, connectionUri FROM Mounts WHERE path = ${refineType(path)}"
-      .query[MountConfig]
+    sql"SELECT type, connectionUri FROM Mounts WHERE path = ${refineType(path)}".query[MountConfig]
 
   def insertMount(path: APath, cfg: MountConfig): Update0 = {
     val (typ, uri) = MountConfig.toConfigPair(cfg)

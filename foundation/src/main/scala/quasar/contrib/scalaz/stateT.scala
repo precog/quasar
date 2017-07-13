@@ -28,7 +28,7 @@ trait StateTInstances {
           Catchable[F].attempt(fa.run(s)) map {
             case -\/(t)       => (s, t.left)
             case \/-((s1, a)) => (s1, a.right)
-        })
+          })
 
       def fail[A](t: Throwable) =
         StateT[F, S, A](_ => Catchable[F].fail(t))

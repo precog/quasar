@@ -30,40 +30,37 @@ class MongoDbIOSpec extends QuasarSpecification {
 
     backend.name should {
       "get mongo version" in {
-        implicit val ord: scala.math.Ordering[ServerVersion] =
-          Order[ServerVersion].toScalaOrdering
+        implicit val ord: scala.math.Ordering[ServerVersion] = Order[ServerVersion].toScalaOrdering
 
-        serverVersion.run(testClient).unsafePerformSync must beGreaterThan(
-          ServerVersion(2, 6, None, ""))
+        serverVersion.run(testClient).unsafePerformSync must beGreaterThan(ServerVersion(2, 6, None, ""))
       }
 
       "get stats" in {
         (for {
-          coll <- tempColl(prefix)
-          _ <- insert(coll, List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr))
-            .run(setupClient)
+          coll  <- tempColl(prefix)
+          _     <- insert(
+                    coll,
+                    List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)
           stats <- collectionStatistics(coll).run(testClient)
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          stats.count must_=== 1
+          stats.count    must_=== 1
           stats.dataSize must beGreaterThan(0L)
-          stats.sharded must beFalse
+          stats.sharded  must beFalse
         }).unsafePerformSync
       }
 
       "get the default index on _id" in {
         (for {
           coll <- tempColl(prefix)
-          _ <- insert(coll, List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr))
-            .run(setupClient)
+          _    <- insert(
+                    coll,
+                    List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)
           idxs <- indexes(coll).run(testClient)
           _    <- dropCollection(coll).run(setupClient)
         } yield {
           // NB: this index is not marked "unique", counter-intuitively
-          idxs must_=== Set(
-            Index("_id_",
-                  NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending),
-                  false))
+          idxs must_=== Set(Index("_id_", NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending), false))
         }).unsafePerformSync
       }
     }

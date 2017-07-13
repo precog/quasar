@@ -26,7 +26,6 @@ import matryoshka.data.Fix
 import scalaz._
 
 trait ExprOpOps[IN[_]] {
-
   /** Type to be emitted from algebras. */
   // TODO: break out the members that use this parameter in a separate typeclass?
   type OUT[_]
@@ -38,18 +37,14 @@ trait ExprOpOps[IN[_]] {
   /** "Literal" translation to JS. */
   def toJsSimple: AlgebraM[PlannerError \/ ?, IN, JsFn]
 
-  def rewriteRefs0(
-      applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]]
+  def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]]
 
-  final def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(
-      implicit I: IN :<: OUT): Algebra[IN, Fix[OUT]] = {
+  final def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit I: IN :<: OUT): Algebra[IN, Fix[OUT]] = {
     val r0 = rewriteRefs0(applyVar)
-    x =>
-      r0(x).getOrElse(Fix(I.inj(x)))
+    x => r0(x).getOrElse(Fix(I.inj(x)))
   }
 }
 object ExprOpOps {
-
   /** Useful in implementations, when you need to require an instance with a
     * certain "output" type. */
   type Aux[IN[_], F[_]] = ExprOpOps[IN] { type OUT[A] = F[A] }
@@ -59,10 +54,10 @@ object ExprOpOps {
 
   implicit def apply[F[_]](implicit ops: ExprOpOps.Aux[F, F]): ExprOpOps.Uni[F] = ops
 
-  implicit def coproduct[F[_], G[_], H[_]](
-      implicit
+  implicit def coproduct[F[_], G[_], H[_]](implicit
       F: ExprOpOps.Aux[F, H],
-      G: ExprOpOps.Aux[G, H]): ExprOpOps.Aux[Coproduct[F, G, ?], H] =
+      G: ExprOpOps.Aux[G, H])
+      : ExprOpOps.Aux[Coproduct[F, G, ?], H] =
     new ExprOpOps[Coproduct[F, G, ?]] {
       type OUT[A] = H[A]
 

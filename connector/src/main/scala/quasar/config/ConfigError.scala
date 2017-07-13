@@ -24,21 +24,22 @@ sealed abstract class ConfigError
 
 object ConfigError {
   final case class MalformedConfig private[config] (src: String, reason: String)
-      extends ConfigError
+    extends ConfigError
 
-  final case class FileNotFound private[config] (file: FsFile) extends ConfigError
+  final case class FileNotFound private[config] (file: FsFile)
+    extends ConfigError
 
   val malformedConfig: Prism[ConfigError, (String, String)] =
     Prism[ConfigError, (String, String)] {
       case MalformedConfig(src, rsn) => Some((src, rsn))
       case _                         => None
-    }((MalformedConfig(_, _)).tupled)
+    } ((MalformedConfig(_, _)).tupled)
 
   val fileNotFound: Prism[ConfigError, FsFile] =
     Prism[ConfigError, FsFile] {
       case FileNotFound(f) => Some(f)
       case _               => None
-    }(FileNotFound(_))
+    } (FileNotFound(_))
 
   implicit val configErrorShow: Show[ConfigError] = {
     def printFile(f: FsFile) =

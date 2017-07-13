@@ -29,7 +29,7 @@ private[json] sealed trait Context {
 }
 
 private[json] final class SingleContext extends Context {
-  var value: JValue        = null
+  var value: JValue = null
   def add(s: String): Unit = value = JString(s)
   def add(v: JValue): Unit = value = v
   def finish               = value

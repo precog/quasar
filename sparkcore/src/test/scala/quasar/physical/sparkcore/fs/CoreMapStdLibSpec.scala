@@ -21,8 +21,7 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA},
-MapFuncsCore._
+import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
 import quasar.std._
 
 import matryoshka._
@@ -47,63 +46,52 @@ class CoreMapStdLibSpec extends StdLibSpec {
 
   // TODO: figure out how to pass the args to shortCircuit so they can be inspected
   def check[A](fm: Free[MapFuncCore[Fix, ?], A], args: List[Data]): Option[Result] =
-    fm.cataM(
-        interpretM[Result \/ ?, MapFuncCore[Fix, ?], A, Unit](κ(().right), shortCircuit))
-      .swap
-      .toOption
+    fm.cataM(interpretM[Result \/ ?, MapFuncCore[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
 
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
   def run[A](fm: Free[MapFuncCore[Fix, ?], A], args: A => Data, expected: Data): Result = {
-    val run = fm.cataM(
-      interpretM[PlannerError \/ ?, MapFuncCore[Fix, ?], A, Data => Data](
-        a => κ(args(a)).right,
-        CoreMap.change))
-    (run.map(_(Data.NA)) must beRightDisjunction.like {
-      case d => d must beCloseTo(expected)
-    }).toResult
+    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFuncCore[Fix, ?], A, Data => Data](
+      a => κ(args(a)).right, CoreMap.change))
+    (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }
 
   val runner = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(
-        prg: FreeMapA[Fix, Nothing],
-        expected: Data
+      prg: FreeMapA[Fix, Nothing],
+      expected: Data
     ): Result =
       failure
 
     def unaryMapFunc(
-        prg: FreeMapA[Fix, UnaryArg],
-        arg: Data,
-        expected: Data
+      prg: FreeMapA[Fix, UnaryArg],
+      arg: Data,
+      expected: Data
     ): Result =
       check(prg, List(arg)) getOrElse
         run(prg, κ(arg), expected)
 
     def binaryMapFunc(
-        prg: FreeMapA[Fix, BinaryArg],
-        arg1: Data,
-        arg2: Data,
-        expected: Data
+      prg: FreeMapA[Fix, BinaryArg],
+      arg1: Data, arg2: Data,
+      expected: Data
     ): Result =
       check(prg, List(arg1, arg2)) getOrElse
-        run[BinaryArg](prg, _.fold(arg1, arg2), expected)
+       run[BinaryArg](prg, _.fold(arg1, arg2), expected)
 
     def ternaryMapFunc(
-        prg: FreeMapA[Fix, TernaryArg],
-        arg1: Data,
-        arg2: Data,
-        arg3: Data,
-        expected: Data
+      prg: FreeMapA[Fix, TernaryArg],
+      arg1: Data, arg2: Data, arg3: Data,
+      expected: Data
     ): Result =
       check(prg, List(arg1, arg2, arg3)) getOrElse
-        run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected)
+       run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected)
 
     def intDomain = arbitrary[BigInt]
 
     // NB: BigDecimal parsing cannot handle values that are too close to the
     // edges of its range.
-    def decDomain =
-      arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
+    def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
     def stringDomain = arbitrary[String]
 

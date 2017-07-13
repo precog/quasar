@@ -26,19 +26,20 @@ import _root_.scalaz._
 
 package object argonaut {
   private val CJ = Inject[ejson.Common, ejson.Json]
-  private val OJ = Inject[ejson.Obj, ejson.Json]
+  private val OJ = Inject[ejson.Obj,    ejson.Json]
 
   implicit def jsonRecursive: Recursive.Aux[Json, ejson.Json] =
     new Recursive[Json] {
       type Base[A] = ejson.Json[A]
 
       def project(t: Json)(implicit BF: Functor[Base]) =
-        t.fold(CJ(ejson.Null()),
-               b => CJ(ejson.Bool(b)),
-               d => CJ(ejson.Dec(d.toBigDecimal)),
-               s => CJ(ejson.Str(s)),
-               a => CJ(ejson.Arr(a)),
-               o => OJ(ejson.Obj(ListMap(o.toList: _*))))
+        t.fold(
+          CJ(ejson.Null()),
+          b => CJ(ejson.Bool(b)),
+          d => CJ(ejson.Dec(d.toBigDecimal)),
+          s => CJ(ejson.Str(s)),
+          a => CJ(ejson.Arr(a)),
+          o => OJ(ejson.Obj(ListMap(o.toList: _*))))
     }
 
   implicit def jsonCorecursive: Corecursive.Aux[Json, ejson.Json] =

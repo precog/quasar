@@ -33,24 +33,21 @@ package object module {
 
   /** Intercept and fail any read to a module path; all others are passed untouched. */
   def readFile[S[_]](
-      implicit
-      S0: ReadFile :<: S,
-      S4: Mounting :<: S
-  ): ReadFile ~> Free[S, ?] = {
+                      implicit
+                      S0: ReadFile :<: S,
+                      S4: Mounting :<: S
+                    ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
     val readUnsafe = ReadFile.Unsafe[S]
-    val mount      = Mounting.Ops[S]
+    val mount = Mounting.Ops[S]
 
     λ[ReadFile ~> Free[S, ?]] {
       case Open(file, off, lim) =>
         mount.havingPrefix(rootDir).flatMap { map =>
           val modules = map.filter { case (k, v) => v === ModuleMount }
-          if (modules.keys.exists { path =>
-                refineType(path).fold(dir => file.relativeTo(dir).isDefined, _ => false)
-              })
-            pathErr(invalidPath(file, "Cannot read file in a module.")).left
-              .point[Free[S, ?]]
+          if(modules.keys.exists { path => refineType(path).fold(dir => file.relativeTo(dir).isDefined, _ => false) })
+            pathErr(invalidPath(file, "Cannot read file in a module.")).left.point[Free[S, ?]]
           else readUnsafe.open(file, off, lim).run
         }
       case Read(handle)  => readUnsafe.read(handle).run
@@ -60,10 +57,10 @@ package object module {
 
   /** Intercept and fail any write to a module path; all others are passed untouched. */
   def writeFile[S[_]](
-      implicit
-      S0: WriteFile :<: S,
-      S1: Mounting :<: S
-  ): WriteFile ~> Free[S, ?] = {
+                       implicit
+                       S0: WriteFile :<: S,
+                       S1: Mounting :<: S
+                     ): WriteFile ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     nonFsMounts.failSomeWrites(
       on = file => mount.lookupType(file).run.map(_.filter(_ === ModuleMount).isDefined),
@@ -72,32 +69,25 @@ package object module {
 
   /** Overlay modules when enumerating files and directories. */
   def queryFile[S[_]](
-      implicit
-      S0: QueryFile :<: S,
-      S1: Mounting :<: S
-  ): QueryFile ~> Free[S, ?] = {
+                       implicit
+                       S0: QueryFile :<: S,
+                       S1: Mounting :<: S
+                     ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
-    val query       = QueryFile.Ops[S]
+    val query = QueryFile.Ops[S]
     val queryUnsafe = QueryFile.Unsafe[S]
-    val mount       = Mounting.Ops[S]
+    val mount = Mounting.Ops[S]
 
     def listModules(dir: ADir): Free[S, Set[PathSegment]] =
-      mount
-        .modulesHavingPrefix(dir)
-        .map(_ foldMap { d =>
-          d.relativeTo(dir).flatMap(firstSegmentName).toSet
-        })
+      mount.modulesHavingPrefix(dir).map(_ foldMap { d =>
+        d.relativeTo(dir).flatMap(firstSegmentName).toSet
+      })
 
     def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[PathSegment]] =
-      mount
-        .lookupConfig(dir)
-        .flatMap(c => OptionT(moduleConfig.getOption(c).point[Free[S, ?]]))
-        .map { statements =>
-          statements.collect {
-            case FunctionDecl(name, _, _) => liftFileName(FileName(name.value))
-          }.toSet
-        }
+      mount.lookupConfig(dir).flatMap(c => OptionT(moduleConfig.getOption(c).point[Free[S, ?]])).map { statements =>
+        statements.collect { case FunctionDecl(name, _, _) => liftFileName(FileName(name.value)) }.toSet
+      }
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
@@ -118,53 +108,51 @@ package object module {
       case ListContents(dir) =>
         // If this directory is a module, return the "files" within it, or else add modules to the underlying call to ls
         moduleFiles(dir).map(_.right[FileSystemError]).getOrElseF {
-          (listModules(dir) |@| query.ls(dir).run)((mls, qls) =>
-            qls match {
-              case \/-(ps) =>
-                (ps ++ mls).right
-              case -\/(err @ PathErr(PathNotFound(_))) =>
-                if (mls.nonEmpty) mls.right else err.left
-              case -\/(v) =>
-                v.left
+          (listModules(dir) |@| query.ls(dir).run) ((mls, qls) => qls match {
+            case \/-(ps) =>
+              (ps ++ mls).right
+            case -\/(err@PathErr(PathNotFound(_))) =>
+              if (mls.nonEmpty) mls.right else err.left
+            case -\/(v) =>
+              v.left
           })
         }
 
       case FileExists(file) =>
-        query.fileExists(file)
+          query.fileExists(file)
     }
   }
 
   def fileSystem[S[_]](
-      implicit
-      S0: ReadFile :<: S,
-      S1: WriteFile :<: S,
-      S2: ManageFile :<: S,
-      S3: QueryFile :<: S,
-      S4: MonotonicSeq :<: S,
-      S5: ViewState :<: S,
-      S6: Mounting :<: S,
-      S7: MountingFailure :<: S,
-      S8: PathMismatchFailure :<: S
-  ): FileSystem ~> Free[S, ?] = {
+                        implicit
+                        S0: ReadFile :<: S,
+                        S1: WriteFile :<: S,
+                        S2: ManageFile :<: S,
+                        S3: QueryFile :<: S,
+                        S4: MonotonicSeq :<: S,
+                        S5: ViewState :<: S,
+                        S6: Mounting :<: S,
+                        S7: MountingFailure :<: S,
+                        S8: PathMismatchFailure :<: S
+                      ): FileSystem ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
-    val manageFile = nonFsMounts.manageFile(dir =>
-      mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p: RPath))))
+    val manageFile = nonFsMounts.manageFile(dir => mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
   // FIX-ME
   def analyticalFileSystem[S[_]](
-      implicit
-      S0: ReadFile :<: S,
-      S1: WriteFile :<: S,
-      S2: ManageFile :<: S,
-      S3: QueryFile :<: S,
-      S4: MonotonicSeq :<: S,
-      S5: ViewState :<: S,
-      S6: Mounting :<: S,
-      S7: MountingFailure :<: S,
-      S8: PathMismatchFailure :<: S,
-      S9: Analyze :<: S
-  ): AnalyticalFileSystem ~> Free[S, ?] = {
+                        implicit
+                        S0: ReadFile :<: S,
+                        S1: WriteFile :<: S,
+                        S2: ManageFile :<: S,
+                        S3: QueryFile :<: S,
+                        S4: MonotonicSeq :<: S,
+                        S5: ViewState :<: S,
+                        S6: Mounting :<: S,
+                        S7: MountingFailure :<: S,
+                        S8: PathMismatchFailure :<: S,
+                        S9: Analyze :<: S
+                      ): AnalyticalFileSystem ~> Free[S, ?] = {
     (injectFT[Analyze, S]) :+: fileSystem[S]
   }
 }

@@ -28,26 +28,18 @@ object PermissionsFinder {
   def canWriteAs(permissions: Set[WritePermission], authorities: Authorities): Boolean = {
     val permWriteAs = permissions.map(_.writeAs)
     permWriteAs.exists(_ == WriteAsAny) || {
-      val writeAsAlls = permWriteAs.collect({
-        case WriteAsAll(s) if s.subsetOf(authorities.accountIds) => s
-      })
+      val writeAsAlls = permWriteAs.collect({ case WriteAsAll(s) if s.subsetOf(authorities.accountIds) => s })
 
       permWriteAs.nonEmpty &&
-      writeAsAlls
-        .foldLeft(authorities.accountIds)({ case (remaining, s) => remaining diff s })
-        .isEmpty
+      writeAsAlls.foldLeft(authorities.accountIds)({ case (remaining, s) => remaining diff s }).isEmpty
     }
   }
 }
 
-class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M],
-                                       val accountFinder: AccountFinder[M],
-                                       timestampRequiredAfter: Instant)
+class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant)
     extends org.slf4s.Logging {
 
-  private def filterWritePermissions(keyDetails: v1.APIKeyDetails,
-                                     path: Path,
-                                     at: Option[Instant]): Set[WritePermission] = {
+  private def filterWritePermissions(keyDetails: v1.APIKeyDetails, path: Path, at: Option[Instant]): Set[WritePermission] = {
     keyDetails.grants filter { g =>
       (at exists { g.isValidAt _ }) || g.createdAt.isBefore(timestampRequiredAfter)
     } flatMap {
@@ -64,9 +56,7 @@ class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M],
         filterWritePermissions(details, path, Some(at))
 
       case None =>
-        log.warn(
-          "No API key details found for %s %s at %s"
-            .format(apiKey, path.path, at.toString))
+        log.warn("No API key details found for %s %s at %s".format(apiKey, path.path, at.toString))
         Set()
     }
   }
@@ -74,16 +64,15 @@ class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M],
   def findBrowsableChildren(apiKey: APIKey, path: Path): M[Set[Path]] = {
     for {
       permissions <- apiKeyFinder.findAPIKey(apiKey, None) map { details =>
-        details.toSet.flatMap(_.grants).flatMap(_.permissions)
-      }
-      accountId   <- accountFinder.findAccountByAPIKey(apiKey)
+                      details.toSet.flatMap(_.grants).flatMap(_.permissions)
+                    }
+      accountId <- accountFinder.findAccountByAPIKey(apiKey)
       accountPath <- accountId.traverse(accountFinder.findAccountDetailsById)
     } yield {
       // FIXME: Not comprehensive/exhaustive in terms of finding all possible data you could read
       permissions flatMap {
         case perm @ WrittenByPermission(p0, _) if p0.isEqualOrParentOf(path) =>
-          if (perm.path == Path.Root) accountPath.flatten.map(_.rootPath)
-          else Some(perm.path)
+          if (perm.path == Path.Root) accountPath.flatten.map(_.rootPath) else Some(perm.path)
 
         case _ => None
       }

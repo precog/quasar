@@ -68,20 +68,16 @@ object expr {
     TypeswitchExpr(on, cases.toList)
 
   final case class FlworExpr(
-      bindingClauses: NonEmptyList[BindingClause],
-      filterExpr: Option[XQuery],
-      orderSpecs: IList[(XQuery, SortDirection)],
-      orderIsStable: Boolean
+    bindingClauses: NonEmptyList[BindingClause],
+    filterExpr: Option[XQuery],
+    orderSpecs: IList[(XQuery, SortDirection)],
+    orderIsStable: Boolean
   ) {
     def for_(b: PositionalBinding, bs: PositionalBinding*): FlworExpr =
-      copy(
-        bindingClauses = bindingClauses :::> IList(
-          BindingClause.forClause(NonEmptyList(b, bs: _*))))
+      copy(bindingClauses = bindingClauses :::> IList(BindingClause.forClause(NonEmptyList(b, bs: _*))))
 
     def let_(b: Binding, bs: Binding*): FlworExpr =
-      copy(
-        bindingClauses = bindingClauses :::> IList(
-          BindingClause.letClause(NonEmptyList(b, bs: _*))))
+      copy(bindingClauses = bindingClauses :::> IList(BindingClause.letClause(NonEmptyList(b, bs: _*))))
 
     def where_(expr: XQuery): FlworExpr =
       copy(filterExpr = Some(expr))
@@ -90,7 +86,12 @@ object expr {
       copy(orderSpecs = s :: IList.fromList(ss.toList))
 
     def return_(expr: XQuery): XQuery =
-      XQuery.Flwor(bindingClauses, filterExpr, orderSpecs, orderIsStable, expr)
+      XQuery.Flwor(
+        bindingClauses,
+        filterExpr,
+        orderSpecs,
+        orderIsStable,
+        expr)
   }
 
   object FlworExpr {
@@ -122,8 +123,7 @@ object expr {
     }
   }
 
-  final case class TypeswitchCaseClause(matching: TypedBindingName \/ SequenceType,
-                                        result: XQuery) {
+  final case class TypeswitchCaseClause(matching: TypedBindingName \/ SequenceType, result: XQuery) {
     def render: String =
       s"case ${matching.fold(_.render, _.toString)} return $result"
   }

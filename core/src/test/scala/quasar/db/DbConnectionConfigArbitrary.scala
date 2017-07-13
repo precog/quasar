@@ -36,13 +36,9 @@ trait DbConnectionConfigArbitrary {
           userName   <- arbitrary[String]
           password   <- arbitrary[String]
           parameters <- arbitrary[Map[String, String]]
-        } yield
-          PostgreSql(host.map(name => HostInfo(name, port)),
-                     database,
-                     userName,
-                     password,
-                     parameters)
-      ))
+        } yield PostgreSql(
+          host.map(name => HostInfo(name, port)),
+          database, userName, password, parameters)))
 }
 
 object DbConnectionConfigArbitrary extends DbConnectionConfigArbitrary

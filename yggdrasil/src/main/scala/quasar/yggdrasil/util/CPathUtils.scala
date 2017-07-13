@@ -20,25 +20,18 @@ import quasar.blueeyes.json._
 import quasar.precog.common._
 
 object CPathUtils {
-  def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] =
-    (cpath.nodes, value) match {
-      case (CPathField(name) :: tail, _) =>
-        addComponent(JPathField(name), cPathToJPaths(CPath(tail), value))
-      case (CPathIndex(i) :: tail, _) =>
-        addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))
-      case (CPathArray :: tail, es: CArray[_]) =>
-        val CArrayType(elemType) = es.cType
-        es.value.toList.zipWithIndex flatMap {
-          case (e, i) =>
-            addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e)))
-        }
-      // case (CPathMeta(_) :: _, _) => Nil
-      case (Nil, _)  => List((NoJPath, value))
-      case (path, _) => sys.error("Bad news, bob! " + path)
-    }
+  def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {
+    case (CPathField(name) :: tail, _) => addComponent(JPathField(name), cPathToJPaths(CPath(tail), value))
+    case (CPathIndex(i) :: tail, _)    => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))
+    case (CPathArray :: tail, es: CArray[_]) =>
+      val CArrayType(elemType) = es.cType
+      es.value.toList.zipWithIndex flatMap { case (e, i) => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
+    // case (CPathMeta(_) :: _, _) => Nil
+    case (Nil, _)  => List((NoJPath, value))
+    case (path, _) => sys.error("Bad news, bob! " + path)
+  }
 
-  private def addComponent(c: JPathNode,
-                           xs: List[(JPath, CValue)]): List[(JPath, CValue)] = xs map {
+  private def addComponent(c: JPathNode, xs: List[(JPath, CValue)]): List[(JPath, CValue)] = xs map {
     case (path, value) => (JPath(c :: path.nodes), value)
   }
 
@@ -55,9 +48,7 @@ object CPathUtils {
   def intersect(cPath1: CPath, cPath2: CPath): Option[CPath] = {
 
     @scala.annotation.tailrec
-    def loop(ps1: List[CPathNode],
-             ps2: List[CPathNode],
-             matches: List[CPathNode]): Option[CPath] = (ps1, ps2) match {
+    def loop(ps1: List[CPathNode], ps2: List[CPathNode], matches: List[CPathNode]): Option[CPath] = (ps1, ps2) match {
       case (Nil, Nil) =>
         Some(CPath(matches.reverse))
       case (p1 :: ps1, p2 :: ps2) if p1 == p2 =>
@@ -75,9 +66,7 @@ object CPathUtils {
 
   // TODO Not really a union.
   def union(cPath1: CPath, cPath2: CPath): Option[CPath] = {
-    def loop(ps1: List[CPathNode],
-             ps2: List[CPathNode],
-             acc: List[CPathNode]): Option[CPath] = (ps1, ps2) match {
+    def loop(ps1: List[CPathNode], ps2: List[CPathNode], acc: List[CPathNode]): Option[CPath] = (ps1, ps2) match {
       case (Nil, Nil) =>
         Some(CPath(acc.reverse))
       case (p1 :: ps1, p2 :: ps2) if p1 == p2 =>

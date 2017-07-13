@@ -31,18 +31,17 @@ object ReduceFunc {
   implicit val equal: Delay[Equal, ReduceFunc] =
     new Delay[Equal, ReduceFunc] {
       def apply[A](eq: Equal[A]) = Equal.equal {
-        case (Count(a), Count(b))               => eq.equal(a, b)
-        case (Sum(a), Sum(b))                   => eq.equal(a, b)
-        case (Min(a), Min(b))                   => eq.equal(a, b)
-        case (Max(a), Max(b))                   => eq.equal(a, b)
-        case (Avg(a), Avg(b))                   => eq.equal(a, b)
-        case (Arbitrary(a), Arbitrary(b))       => eq.equal(a, b)
-        case (First(a), First(b))               => eq.equal(a, b)
-        case (Last(a), Last(b))                 => eq.equal(a, b)
+        case (Count(a),        Count(b))        => eq.equal(a, b)
+        case (Sum(a),          Sum(b))          => eq.equal(a, b)
+        case (Min(a),          Min(b))          => eq.equal(a, b)
+        case (Max(a),          Max(b))          => eq.equal(a, b)
+        case (Avg(a),          Avg(b))          => eq.equal(a, b)
+        case (Arbitrary(a),    Arbitrary(b))    => eq.equal(a, b)
+        case (First(a),        First(b))        => eq.equal(a, b)
+        case (Last(a),         Last(b))         => eq.equal(a, b)
         case (UnshiftArray(a), UnshiftArray(b)) => eq.equal(a, b)
-        case (UnshiftMap(a1, a2), UnshiftMap(b1, b2)) =>
-          eq.equal(a1, b1) && eq.equal(a2, b2)
-        case (_, _) => false
+        case (UnshiftMap(a1, a2), UnshiftMap(b1, b2)) => eq.equal(a1, b1) && eq.equal(a2, b2)
+        case (_,               _)               => false
       }
     }
 
@@ -58,8 +57,7 @@ object ReduceFunc {
         case First(a)        => Cord("First(") ++ show.show(a) ++ Cord(")")
         case Last(a)         => Cord("Last(") ++ show.show(a) ++ Cord(")")
         case UnshiftArray(a) => Cord("UnshiftArray(") ++ show.show(a) ++ Cord(")")
-        case UnshiftMap(a1, a2) =>
-          Cord("UnshiftMap(") ++ show.show(a1) ++ Cord(", ") ++ show.show(a2) ++ Cord(")")
+        case UnshiftMap(a1, a2) => Cord("UnshiftMap(") ++ show.show(a1) ++ Cord(", ") ++ show.show(a2) ++ Cord(")")
       }
     }
 
@@ -89,29 +87,29 @@ object ReduceFunc {
   implicit val traverse1: Traverse1[ReduceFunc] = new Traverse1[ReduceFunc] {
     def foldMapRight1[A, B](fa: ReduceFunc[A])(z: (A) ⇒ B)(f: (A, ⇒ B) ⇒ B): B =
       fa match {
-        case Count(a)           => z(a)
-        case Sum(a)             => z(a)
-        case Min(a)             => z(a)
-        case Max(a)             => z(a)
-        case Avg(a)             => z(a)
-        case Arbitrary(a)       => z(a)
-        case First(a)           => z(a)
-        case Last(a)            => z(a)
-        case UnshiftArray(a)    => z(a)
+        case Count(a)        => z(a)
+        case Sum(a)          => z(a)
+        case Min(a)          => z(a)
+        case Max(a)          => z(a)
+        case Avg(a)          => z(a)
+        case Arbitrary(a)    => z(a)
+        case First(a)        => z(a)
+        case Last(a)         => z(a)
+        case UnshiftArray(a) => z(a)
         case UnshiftMap(a1, a2) => f(a1, z(a2))
       }
 
     def traverse1Impl[G[_]: Apply, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
       fa match {
-        case Count(a)           => f(a) ∘ (Count(_))
-        case Sum(a)             => f(a) ∘ (Sum(_))
-        case Min(a)             => f(a) ∘ (Min(_))
-        case Max(a)             => f(a) ∘ (Max(_))
-        case Avg(a)             => f(a) ∘ (Avg(_))
-        case Arbitrary(a)       => f(a) ∘ (Arbitrary(_))
-        case First(a)           => f(a) ∘ (First(_))
-        case Last(a)            => f(a) ∘ (Last(_))
-        case UnshiftArray(a)    => f(a) ∘ (UnshiftArray(_))
+        case Count(a)        => f(a) ∘ (Count(_))
+        case Sum(a)          => f(a) ∘ (Sum(_))
+        case Min(a)          => f(a) ∘ (Min(_))
+        case Max(a)          => f(a) ∘ (Max(_))
+        case Avg(a)          => f(a) ∘ (Avg(_))
+        case Arbitrary(a)    => f(a) ∘ (Arbitrary(_))
+        case First(a)        => f(a) ∘ (First(_))
+        case Last(a)         => f(a) ∘ (Last(_))
+        case UnshiftArray(a) => f(a) ∘ (UnshiftArray(_))
         case UnshiftMap(a1, a2) => (f(a1) ⊛ f(a2))(UnshiftMap(_, _))
       }
   }
@@ -149,12 +147,11 @@ object ReduceFunc {
 
 // TODO we should statically verify that these have a `DimensionalEffect` of `Reduction`
 object ReduceFuncs {
-  final case class Count[A](a: A) extends ReduceFunc[A]
-  final case class Sum[A](a: A)   extends ReduceFunc[A]
-  final case class Min[A](a: A)   extends ReduceFunc[A]
-  final case class Max[A](a: A)   extends ReduceFunc[A]
-  final case class Avg[A](a: A)   extends ReduceFunc[A]
-
+  final case class Count[A](a: A)        extends ReduceFunc[A]
+  final case class Sum[A](a: A)          extends ReduceFunc[A]
+  final case class Min[A](a: A)          extends ReduceFunc[A]
+  final case class Max[A](a: A)          extends ReduceFunc[A]
+  final case class Avg[A](a: A)          extends ReduceFunc[A]
   /** This is intended to be the “cheapest” way to get a single value out of a
     * set, where it doesn’t matter which one (usually used in the case where all
     * entries are known to be the same).

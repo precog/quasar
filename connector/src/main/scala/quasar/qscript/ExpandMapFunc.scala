@@ -37,29 +37,26 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
 
 sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 
-  implicit def mapFuncDerived[T[_[_]]: CorecursiveT, OUTʹ[_]](
-      implicit MFC: MapFuncCore[T, ?] :<: OUTʹ,
-      OUTʹ: Functor[OUTʹ]): ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
+  implicit def mapFuncDerived[T[_[_]]: CorecursiveT, OUTʹ[_]]
+    (implicit MFC: MapFuncCore[T, ?] :<: OUTʹ, OUTʹ: Functor[OUTʹ])
+      : ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
     new ExpandMapFunc[MapFuncDerived[T, ?]] {
       type OUT[A] = OUTʹ[A]
 
       val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
           case D.Abs(a) =>
-            MFC(
-              Cond(
-                Free.roll(
-                  MFC(Lt(a.point[Free[OUT, ?]],
-                         Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
-                Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
-                a.point[Free[OUT, ?]]
-              ))
+            MFC(Cond(
+              Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
+              Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
+              a.point[Free[OUT, ?]]
+            ))
         }
     }
 
-  implicit def coproduct[T[_[_]]: CorecursiveT, F[_], G[_], OUTʹ[_]](
-      implicit F: ExpandMapFunc.Aux[F, OUTʹ],
-      G: ExpandMapFunc.Aux[G, OUTʹ]): ExpandMapFunc.Aux[Coproduct[F, G, ?], OUTʹ] =
+  implicit def coproduct[T[_[_]]: CorecursiveT, F[_], G[_], OUTʹ[_]]
+    (implicit F: ExpandMapFunc.Aux[F, OUTʹ], G: ExpandMapFunc.Aux[G, OUTʹ])
+      : ExpandMapFunc.Aux[Coproduct[F, G, ?], OUTʹ] =
     new ExpandMapFunc[Coproduct[F, G, ?]] {
       type OUT[A] = OUTʹ[A]
 
@@ -72,15 +69,15 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 }
 
 sealed abstract class ExpandMapFuncInstancesʹ {
-  implicit def default[T[_[_]]: CorecursiveT, IN[_]: Functor, OUTʹ[_]](
-      implicit IN: IN :<: OUTʹ,
-      OUTʹ: Functor[OUTʹ]): ExpandMapFunc.Aux[IN, OUTʹ] =
+  implicit def default[T[_[_]]: CorecursiveT, IN[_]: Functor, OUTʹ[_]]
+    (implicit IN: IN :<: OUTʹ, OUTʹ: Functor[OUTʹ])
+      : ExpandMapFunc.Aux[IN, OUTʹ] =
     new ExpandMapFunc[IN] {
       type OUT[A] = OUTʹ[A]
 
       val expand: IN ~> ((OUT ∘ Free[OUT, ?])#λ) =
-        λ[IN ~> (OUT ∘ Free[OUT, ?])#λ] { f =>
-          IN(f.map(_.point[Free[OUT, ?]]))
+        λ[IN ~> (OUT ∘ Free[OUT, ?])#λ] {
+          f => IN(f.map(_.point[Free[OUT, ?]]))
         }
     }
 }

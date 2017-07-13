@@ -40,23 +40,22 @@ object data {
       jObjectFields(EJsonTypeKey -> jString(typ.shows), EJsonValueKey -> value.asJson)
 
     {
-      case Data.Binary(bytes) => typedObj(DT.Binary, base64Bytes(bytes))
+      case Data.Binary(bytes) => typedObj(DT.Binary   , base64Bytes(bytes))
       case Data.Bool(b)       => jBool(b)
-      case Data.Date(d)       => typedObj(DT.Date, isoLocalDate(d))
-      case Data.Dec(d)        => typedObj(DT.Decimal, d)
-      case Data.Id(id)        => typedObj(DT.Id, id)
-      case Data.Int(i)        => typedObj(DT.Integer, i)
-      case Data.Interval(d)   => typedObj(DT.Interval, isoDuration(d))
+      case Data.Date(d)       => typedObj(DT.Date     , isoLocalDate(d))
+      case Data.Dec(d)        => typedObj(DT.Decimal  , d)
+      case Data.Id(id)        => typedObj(DT.Id       , id)
+      case Data.Int(i)        => typedObj(DT.Integer  , i)
+      case Data.Interval(d)   => typedObj(DT.Interval , isoDuration(d))
       case Data.NA            => jSingleObject(EJsonTypeKey, jString((DT.NA: DataType).shows))
       case Data.Null          => jNull
       case Data.Str(s)        => jString(s)
-      case Data.Time(t)       => typedObj(DT.Time, isoLocalTime(t))
+      case Data.Time(t)       => typedObj(DT.Time     , isoLocalTime(t))
       case Data.Timestamp(ts) => typedObj(DT.Timestamp, isoInstant(ts))
 
       case Data.Arr(elements) => jArray(elements map encodeJson)
-      case Data.Obj(entries) =>
-        jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
-      case Data.Set(elements) => typedObj(DT.Set, encodeJson(Data.Arr(elements)))
+      case Data.Obj(entries)  => jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
+      case Data.Set(elements) => typedObj(DT.Set      , encodeJson(Data.Arr(elements)))
     }
   }
 
@@ -64,16 +63,8 @@ object data {
     def typeAttr(tpe: DataType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.localPart.shows, tpe.shows, Null)
 
-    def ejsElem(name: QName,
-                tpe: DataType,
-                ns: NamespaceBinding,
-                children: Seq[Node]): Elem =
-      Elem(name.prefix.map(_.shows).orNull,
-           name.localPart.shows,
-           typeAttr(tpe),
-           ns,
-           true,
-           children: _*)
+    def ejsElem(name: QName, tpe: DataType, ns: NamespaceBinding, children: Seq[Node]): Elem =
+      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, typeAttr(tpe), ns, true, children: _*)
 
     def keyElem(label: String): (QName, Option[Attribute]) =
       NCName.fromString(label).fold(κ(wrappedKey(label)), unwrappedKey(_))
@@ -82,11 +73,10 @@ object data {
       (QName.unprefixed(label), None)
 
     def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) = {
-      (ejsonEncodedName,
-       Attribute(ejsonNs.prefix.shows,
-                 ejsonEncodedAttr.localPart.shows,
-                 unwrappedLabel,
-                 Null).some)
+      (ejsonEncodedName, Attribute(
+        ejsonNs.prefix.shows,
+        ejsonEncodedAttr.localPart.shows,
+        unwrappedLabel, Null).some)
     }
 
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
@@ -96,8 +86,8 @@ object data {
       ejsElem(name, tpe, ejsBinding, children)
 
     def encodeXml0(
-        elem: (QName, DataType, Seq[Node]) => Elem,
-        loop: QName => Data => Validation[ErrorMessages, Elem]
+      elem: (QName, DataType, Seq[Node]) => Elem,
+      loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => {
@@ -106,36 +96,28 @@ object data {
         }
       }
 
-      elementName =>
-        {
-          case Data.Binary(bytes) =>
-            elem(elementName, DT.Binary, Text(base64Bytes(bytes))).success
-          case Data.Bool(b) =>
-            elem(elementName, DT.Boolean, Text(b.fold("true", "false"))).success
-          case Data.Date(d) => elem(elementName, DT.Date, Text(isoLocalDate(d))).success
-          case Data.Dec(d)  => elem(elementName, DT.Decimal, Text(d.toString)).success
-          case Data.Id(id)  => elem(elementName, DT.Id, Text(id)).success
-          case Data.Int(i)  => elem(elementName, DT.Integer, Text(i.toString)).success
-          case Data.Interval(d) =>
-            elem(elementName, DT.Interval, Text(isoDuration(d))).success
-          case Data.NA      => elem(elementName, DT.NA, Nil).success
-          case Data.Null    => elem(elementName, DT.Null, Nil).success
-          case Data.Str(s)  => elem(elementName, DT.String, Text(s)).success
-          case Data.Time(t) => elem(elementName, DT.Time, Text(isoLocalTime(t))).success
-          case Data.Timestamp(ts) =>
-            elem(elementName, DT.Timestamp, Text(isoInstant(ts))).success
+      elementName => {
+        case Data.Binary(bytes) => elem(elementName, DT.Binary   , Text(base64Bytes(bytes))     ).success
+        case Data.Bool(b)       => elem(elementName, DT.Boolean  , Text(b.fold("true", "false"))).success
+        case Data.Date(d)       => elem(elementName, DT.Date     , Text(isoLocalDate(d))        ).success
+        case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
+        case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
+        case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
+        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(isoDuration(d))         ).success
+        case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
+        case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
+        case Data.Str(s)        => elem(elementName, DT.String   , Text(s)                      ).success
+        case Data.Time(t)       => elem(elementName, DT.Time     , Text(isoLocalTime(t))        ).success
+        case Data.Timestamp(ts) => elem(elementName, DT.Timestamp, Text(isoInstant(ts))         ).success
 
-          case Data.Arr(elements) =>
-            elements traverse loop(ejsonArrayElt) map (elem(elementName, DT.Array, _))
+        case Data.Arr(elements) =>
+          elements traverse loop(ejsonArrayElt) map (elem(elementName, DT.Array, _))
 
-          case Data.Obj(entries) =>
-            entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(
-              elementName,
-              DT.Object,
-              _))
+        case Data.Obj(entries)  =>
+          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, DT.Object, _))
 
-          case other => s"No representation for '$other' in XML.".failureNel[Elem]
-        }
+        case other              => s"No representation for '$other' in XML.".failureNel[Elem]
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -157,53 +139,36 @@ object data {
 
     val decodeObject: JsonObject => F[Data] = {
       case EJsonTyped(DT.Binary, b64) =>
-        b64.string
-          .flatMap(base64Bytes.getOption(_))
-          .map(Data._binary(_))
-          .cata(_.point[F], error(s"Expected Base64-encoded binary data, found: $b64"))
+        b64.string.flatMap(base64Bytes.getOption(_)).map(Data._binary(_)).cata(
+          _.point[F], error(s"Expected Base64-encoded binary data, found: $b64"))
 
       case EJsonTyped(DT.Date, dt) =>
-        dt.string
-          .flatMap(isoLocalDate.getOption(_))
-          .map(Data._date(_))
-          .cata(_.point[F], error(s"Expected ISO-8601 formatted local date, found: $dt"))
+        dt.string.flatMap(isoLocalDate.getOption(_)).map(Data._date(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted local date, found: $dt"))
 
       case EJsonTyped(DT.Decimal, d) =>
-        d.as[BigDecimal]
-          .toOption
-          .map(Data._dec(_))
-          .cata(_.point[F], error(s"Expected a decimal number, found: $d"))
+        d.as[BigDecimal].toOption.map(Data._dec(_)).cata(
+          _.point[F], error(s"Expected a decimal number, found: $d"))
 
       case EJsonTyped(DT.Id, id) =>
-        id.string
-          .map(Data._id(_))
-          .cata(_.point[F], error(s"Expected an identifier string, found: $id"))
+        id.string.map(Data._id(_)).cata(
+          _.point[F], error(s"Expected an identifier string, found: $id"))
 
       case EJsonTyped(DT.Integer, i) =>
-        i.as[BigInt]
-          .toOption
-          .map(Data._int(_))
-          .cata(_.point[F], error(s"Expected an integer number, found: $i"))
+        i.as[BigInt].toOption.map(Data._int(_)).cata(
+          _.point[F], error(s"Expected an integer number, found: $i"))
 
       case EJsonTyped(DT.Interval, ivl) =>
-        ivl.string
-          .flatMap(isoDuration.getOption(_))
-          .map(Data._interval(_))
-          .cata(_.point[F],
-                error(s"Expected an ISO-8601 formatted duration, found: $ivl"))
+        ivl.string.flatMap(isoDuration.getOption(_)).map(Data._interval(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted duration, found: $ivl"))
 
       case EJsonTyped(DT.Time, t) =>
-        t.string
-          .flatMap(isoLocalTime.getOption(_))
-          .map(Data._time(_))
-          .cata(_.point[F],
-                error(s"Expected an ISO-8601 formatted local time, found: $t"))
+        t.string.flatMap(isoLocalTime.getOption(_)).map(Data._time(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted local time, found: $t"))
 
       case EJsonTyped(DT.Timestamp, ts) =>
-        ts.string
-          .flatMap(isoInstant.getOption(_))
-          .map(Data._timestamp(_))
-          .cata(_.point[F], error(s"Expected an ISO-8601 formatted datetime, found: $ts"))
+        ts.string.flatMap(isoInstant.getOption(_)).map(Data._timestamp(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted datetime, found: $ts"))
 
       case EJsType(DT.NA) => (Data.NA: Data).point[F]
 
@@ -212,8 +177,7 @@ object data {
       case EJsType(DT.Null) => (Data.Null: Data).point[F]
 
       case other =>
-        other.toList traverse { case (k, v) => decodeJson[F](v) strengthL k } map (Data
-          .Obj(_: _*))
+        other.toList traverse { case (k, v) => decodeJson[F](v) strengthL k } map (Data.Obj(_: _*))
     }
 
     json.fold(
@@ -222,8 +186,7 @@ object data {
       decodeNumber andThen (_.point[F]),
       s => Data._str(s).point[F],
       _.traverse(decodeJson[F](_)).map(Data.Arr(_)),
-      decodeObject
-    )
+      decodeObject)
   }
 
   /** Attempts to decode an XML `Elem` as `Data` using the provided `recover`
@@ -232,8 +195,7 @@ object data {
     * The computation fails when `Elem` purports to be encoded `Data` but is
     * malformed. `None` is returned when `Elem` does not purport to be `Data`.
     */
-  def decodeXml[F[_]: MonadErrMsgs](recover: Node => F[Data])(
-      elem: Elem): F[Option[Data]] = {
+  def decodeXml[F[_]: MonadErrMsgs](recover: Node => F[Data])(elem: Elem): F[Option[Data]] = {
     type V[A] = Validation[ErrorMessages, A]
     type G[A] = F[V[A]]
 
@@ -241,8 +203,7 @@ object data {
 
     def qname[A](e: Elem): G[String] =
       encodedQualifiedName(e)
-        .toSuccessNel(
-          s"Expected a ${ejsonEncodedAttr.shows} for an ${ejsonEncodedName.shows} element")
+        .toSuccessNel(s"Expected a ${ejsonEncodedAttr.shows} for an ${ejsonEncodedName.shows} element")
         .point[F]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -251,28 +212,25 @@ object data {
         elements(children).toList traverse decodeXml0 map (Data._arr(_))
 
       case DataNode(DT.Binary, LeafText(b64)) =>
-        base64Bytes
-          .getOption(b64)
+        base64Bytes.getOption(b64)
           .map(bytes => Data._binary(bytes))
           .toSuccessNel(s"Expected Base64-encoded binary data, found: $b64")
           .point[F]
 
-      case DataNode(DT.Binary, Seq()) =>
+      case DataNode(DT.Binary, Seq()   ) =>
         Data._binary(ImmutableArray.fromArray(Array())).success.point[F]
 
       case DataNode(DT.Boolean, LeafText("true"))  => Data._bool(true).success.point[F]
       case DataNode(DT.Boolean, LeafText("false")) => Data._bool(false).success.point[F]
 
       case DataNode(DT.Date, LeafText(d)) =>
-        isoLocalDate
-          .getOption(d)
+        isoLocalDate.getOption(d)
           .map(Data._date(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
           .point[F]
 
       case DataNode(DT.Decimal, LeafText(d)) =>
-        Validation
-          .fromTryCatchNonFatal(BigDecimal(d))
+        Validation.fromTryCatchNonFatal(BigDecimal(d))
           .map(Data._dec(_))
           .leftAs(s"Expected a decimal number, found: $d".wrapNel)
           .point[F]
@@ -280,15 +238,13 @@ object data {
       case DataNode(DT.Id, LeafText(id)) => Data._id(id).success.point[F]
 
       case DataNode(DT.Integer, LeafText(n)) =>
-        Validation
-          .fromTryCatchNonFatal(BigInt(n))
+        Validation.fromTryCatchNonFatal(BigInt(n))
           .map(Data._int(_))
           .leftAs(s"Expected an integral number, found: $n".wrapNel)
           .point[F]
 
       case DataNode(DT.Interval, LeafText(ivl)) =>
-        isoDuration
-          .getOption(ivl)
+        isoDuration.getOption(ivl)
           .map(Data._interval(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted duration, found: $ivl")
           .point[F]
@@ -305,15 +261,13 @@ object data {
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
 
       case DataNode(DT.Time, LeafText(t)) =>
-        isoLocalTime
-          .getOption(t)
+        isoLocalTime.getOption(t)
           .map(Data._time(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
           .point[F]
 
       case DataNode(DT.Timestamp, LeafText(ts)) =>
-        isoInstant
-          .getOption(ts)
+        isoInstant.getOption(ts)
           .map(Data._timestamp(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted datetime, found: $ts")
           .point[F]
@@ -323,10 +277,10 @@ object data {
     }
 
     elem match {
-      case DataNode(_, _) =>
-        (decodeXml0(elem): F[V[Data]]) flatMap (_.fold(_.raiseError[F, Option[Data]],
-                                                       _.some.point[F]))
-      case other => none.point[F]
+      case DataNode(_, _) => (decodeXml0(elem): F[V[Data]]) flatMap (_.fold(
+                               _.raiseError[F, Option[Data]],
+                               _.some.point[F]))
+      case other          => none.point[F]
     }
   }
 
@@ -376,21 +330,21 @@ object data {
       case "time"      => Time
       case "timestamp" => Timestamp
     } {
-      case Array     => "array"
-      case Binary    => "binary"
-      case Boolean   => "boolean"
-      case Date      => "date"
-      case Decimal   => "decimal"
-      case Id        => "id"
-      case Integer   => "integer"
-      case Interval  => "interval"
-      case NA        => "na"
-      case Null      => "null"
-      case Object    => "object"
-      case Set       => "set"
-      case String    => "string"
-      case Time      => "time"
-      case Timestamp => "timestamp"
+      case Array       => "array"
+      case Binary      => "binary"
+      case Boolean     => "boolean"
+      case Date        => "date"
+      case Decimal     => "decimal"
+      case Id          => "id"
+      case Integer     => "integer"
+      case Interval    => "interval"
+      case NA          => "na"
+      case Null        => "null"
+      case Object      => "object"
+      case Set         => "set"
+      case String      => "string"
+      case Time        => "time"
+      case Timestamp   => "timestamp"
     }
 
     implicit val show: Show[DataType] =
@@ -401,8 +355,7 @@ object data {
 
   private object DataNode {
     def unapply(node: Node): Option[(DataType, Seq[Node])] = {
-      attribute(node, ejsonType) flatMap (DataType.stringCodec
-        .getOption(_)) strengthR node.child
+      attribute(node, ejsonType) flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
     }
   }
 

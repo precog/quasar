@@ -34,23 +34,23 @@ abstract class readfile {
   // TODO: Streaming
   def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
     for {
-      ctx <- MR.asks(_.ctx)
-      col  = docTypeValueFromPath(file)
-      lmt  = limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
-      qStr = s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
+      ctx     <- MR.asks(_.ctx)
+      col     =  docTypeValueFromPath(file)
+      lmt     =  limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
+      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
                      WHERE `${ctx.docTypeKey.v}`="${col.v}"
                      $lmt OFFSET ${offset.unwrap.shows}"""
       qResult <- ME.unattempt(lift(queryData(ctx.bucket, qStr)).into[Eff].liftB)
       i       <- MonotonicSeq.Ops[Eff].next.liftB
-      handle = ReadHandle(file, i)
-      _ <- rh.put(handle, Cursor(qResult)).liftB
+      handle  =  ReadHandle(file, i)
+      _       <- rh.put(handle, Cursor(qResult)).liftB
     } yield handle
 
   def read(h: ReadHandle): Backend[Vector[Data]] =
     for {
-      c <- ME.unattempt(rh.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB)
-      (cʹ, r) = resultsFromCursor(c)
-      _ <- rh.put(h, cʹ).liftB
+      c       <- ME.unattempt(rh.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB)
+      (cʹ, r) =  resultsFromCursor(c)
+      _       <- rh.put(h, cʹ).liftB
     } yield r
 
   def close(h: ReadHandle): Configured[Unit] =

@@ -22,15 +22,13 @@ import argonaut._, Argonaut._
 import monocle._, macros.Lenses
 import scalaz._, Scalaz._
 
-@Lenses final case class WebConfig(server: ServerConfig,
-                                   metastore: Option[MetaStoreConfig])
+@Lenses final case class WebConfig(server: ServerConfig, metastore: Option[MetaStoreConfig])
 
 object WebConfig {
   implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
     val name = "web"
 
-    val default = MetaStoreConfig.configOps.default ∘ (ms =>
-      WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
+    val default = MetaStoreConfig.configOps.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
   }
 
   implicit val codecJson: CodecJson[WebConfig] =

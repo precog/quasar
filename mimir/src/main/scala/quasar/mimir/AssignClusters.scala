@@ -24,9 +24,7 @@ import quasar.precog.common._
 import scalaz._, Scalaz._
 import spire.implicits._
 
-trait AssignClusterModule[M[+ _]]
-    extends ColumnarTableLibModule[M]
-    with ModelLibModule[M] {
+trait AssignClusterModule[M[+ _]] extends ColumnarTableLibModule[M] with ModelLibModule[M] {
   import trans._
 
   trait AssignClusterSupport extends ColumnarTableLib with ModelSupport {
@@ -47,24 +45,14 @@ trait AssignClusterModule[M[+ _]]
           val rowIdentities = Model.createRowIdentities(schema)
 
           val rowModels: Int => Set[Model] = {
-            val modelTuples
-              : Map[ModelId, Set[(ModelId, ClusterId, CPath, DoubleColumn)]] = {
+            val modelTuples: Map[ModelId, Set[(ModelId, ClusterId, CPath, DoubleColumn)]] = {
               schema.columnRefs.flatMap {
-                case ref @ ColumnRef(CPath(TableModule.paths.Value,
-                                           CPathField(modelName),
-                                           CPathField(clusterName),
-                                           rest @ _*),
-                                     ctype) =>
+                case ref @ ColumnRef(CPath(TableModule.paths.Value, CPathField(modelName), CPathField(clusterName), rest @ _ *), ctype) =>
                   Schema.mkType(ref :: Nil) flatMap {
-                    case jType =>
-                      schema.columns(jType) collectFirst {
-                        case (col: DoubleColumn) => col
-                      }
+                    case jType                                                      =>
+                      schema.columns(jType) collectFirst { case (col: DoubleColumn) => col }
                   } map { col =>
-                    (modelName,
-                     clusterName,
-                     CPath((TableModule.paths.Value +: rest): _*),
-                     col)
+                    (modelName, clusterName, CPath((TableModule.paths.Value +: rest): _*), col)
                   }
 
                 case _ => None
@@ -116,9 +104,7 @@ trait AssignClusterModule[M[+ _]]
           type A = Unit
           def init: A = ()
 
-          def scan(a: A,
-                   cols: Map[ColumnRef, Column],
-                   range: Range): (A, Map[ColumnRef, Column]) = {
+          def scan(a: A, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
             def included(model: Model): Map[ColumnRef, Column] = {
               val featurePaths = (model.clusters).flatMap { _.featureValues.keys }.toSet
 
@@ -142,8 +128,7 @@ trait AssignClusterModule[M[+ _]]
               }
             }
 
-            def filteredRange(cols: Map[ColumnRef, Column]) =
-              range.filter(defined(cols).apply)
+            def filteredRange(cols: Map[ColumnRef, Column]) = range.filter(defined(cols).apply)
 
             val result: Set[Map[ColumnRef, Column]] = {
 
@@ -154,10 +139,7 @@ trait AssignClusterModule[M[+ _]]
 
                   val clusterIds: Array[String] = model.clusters map { _.name }
                   val clusterCenters: Array[Array[Double]] = (model.clusters).map {
-                    _.featureValues.toArray
-                      .sortBy { case (path, _) => path }
-                      .map { case (_, col) => col }
-                      .toArray
+                    _.featureValues.toArray.sortBy { case (path, _) => path }.map { case (_, col) => col }.toArray
                   }
 
                   val centerPaths: Array[CPath] = model.clusters collectFirst {
@@ -165,7 +147,7 @@ trait AssignClusterModule[M[+ _]]
                   } getOrElse Array.empty[CPath]
 
                   val featureColumns0 = includedModel.collect {
-                    case (ref, col: DoubleColumn) => (ref, col)
+                    case (ref, col: DoubleColumn)                 => (ref, col)
                   }.toArray sortBy { case (ColumnRef(path, _), _) => path }
                   val featureColumns = featureColumns0 map { case (_, col) => col }
 
@@ -175,14 +157,14 @@ trait AssignClusterModule[M[+ _]]
                   val len      = filtered.length
 
                   val resultArray = {
-                    var k   = range.start
+                    var k = range.start
                     val arr = new Array[String](range.end - range.start)
 
                     while (k < len) {
                       val row: Int = filtered(k)
 
                       val feature = new Array[Double](numFeatures)
-                      var i       = 0
+                      var i = 0
                       while (i < feature.length) {
                         feature(i) = featureColumns(i)(row)
                         i += 1
@@ -210,11 +192,11 @@ trait AssignClusterModule[M[+ _]]
                   }
 
                   def transposeResults(values: Array[Array[Double]]) = {
-                    var k   = 0
+                    var k = 0
                     val acc = Array.fill(centerPaths.length)(Array.empty[Double])
 
                     while (k < values.length) {
-                      var i  = 0
+                      var i = 0
                       val li = values(k)
 
                       while (i < li.length) {
@@ -243,18 +225,12 @@ trait AssignClusterModule[M[+ _]]
 
                   val centers: Map[ColumnRef, Column] = zipped.collect {
                     case (col, path) if path.hasPrefix(pref) =>
-                      val path0 = CPath(TableModule.paths.Value,
-                                        CPathField(model.name),
-                                        CPathField("clusterCenter"))
+                      val path0 = CPath(TableModule.paths.Value, CPathField(model.name), CPathField("clusterCenter"))
                       ColumnRef(path0 \ path.dropPrefix(pref).get, CDouble) -> col
                   }.toMap
 
-                  val idPath = CPath(TableModule.paths.Value,
-                                     CPathField(model.name),
-                                     CPathField("clusterId"))
-                  val centerId = Map(
-                    ColumnRef(idPath, CString) -> ArrayStrColumn(definedModel,
-                                                                 resultArray))
+                  val idPath   = CPath(TableModule.paths.Value, CPathField(model.name), CPathField("clusterId"))
+                  val centerId = Map(ColumnRef(idPath, CString) -> ArrayStrColumn(definedModel, resultArray))
 
                   centers ++ centerId
               }

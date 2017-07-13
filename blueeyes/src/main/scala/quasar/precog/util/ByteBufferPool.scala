@@ -20,7 +20,7 @@ import quasar.blueeyes._
 
 import java.lang.ref.SoftReference
 import java.nio.ByteBuffer
-import java.util.concurrent.{BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue}
+import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
 import java.util.concurrent.atomic.AtomicLong
 
 import scalaz.{Monad, State}
@@ -32,16 +32,12 @@ trait ByteBufferMonad[M[_]] extends Monad[M] {
   def getBuffer(min: Int): M[ByteBuffer]
 }
 
-final class ByteBufferPool(val capacity: Int = 16 * 1024,
-                           fixedBufferCount: Int = 8,
-                           direct: Boolean = false) {
+final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int = 8, direct: Boolean = false) {
   private val _hits   = new AtomicLong()
   private val _misses = new AtomicLong()
 
-  val fixedBufferQueue: BlockingQueue[ByteBuffer] = new ArrayBlockingQueue(
-    fixedBufferCount)
-  val flexBufferQueue: BlockingQueue[SoftReference[ByteBuffer]] =
-    new LinkedBlockingQueue()
+  val fixedBufferQueue: BlockingQueue[ByteBuffer]               = new ArrayBlockingQueue(fixedBufferCount)
+  val flexBufferQueue: BlockingQueue[SoftReference[ByteBuffer]] = new LinkedBlockingQueue()
 
   def hits   = _hits.get()
   def misses = _hits.get()
@@ -63,8 +59,7 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024,
 
     if (buffer == null) {
       _misses.incrementAndGet()
-      buffer =
-        if (direct) ByteBuffer.allocateDirect(capacity) else ByteBuffer.allocate(capacity)
+      buffer = if (direct) ByteBuffer.allocateDirect(capacity) else ByteBuffer.allocate(capacity)
     } else {
       _hits.incrementAndGet()
     }
@@ -90,16 +85,13 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024,
 }
 
 object ByteBufferPool {
-  implicit object ByteBufferPoolMonad
-      extends ByteBufferMonad[ByteBufferPoolS]
-      with Monad[ByteBufferPoolS] {
+  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
 
     def point[A](a: => A): ByteBufferPoolS[A] = State.state(a)
 
-    def bind[A, B](fa: ByteBufferPoolS[A])(
-        f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] =
+    def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] =
       State(s =>
-        fa(s) match {
+          fa(s) match {
           case (s, a) => f(a)(s)
       })
 

@@ -31,36 +31,32 @@ sealed abstract class MountConfig
 
 object MountConfig {
   final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])
-      extends MountConfig {
+    extends MountConfig
+  {
     def declarations: List[FunctionDecl[Fix[Sql]]] =
       statements.decls
     def imports: List[Import[Fix[Sql]]] =
       statements.imports
   }
 
-  final case class ViewConfig private[mount] (query: ScopedExpr[Fix[Sql]],
-                                              vars: Variables)
-      extends MountConfig
+  final case class ViewConfig private[mount] (query: ScopedExpr[Fix[Sql]], vars: Variables)
+    extends MountConfig
 
-  final case class FileSystemConfig private[mount] (typ: FileSystemType,
-                                                    uri: ConnectionUri)
-      extends MountConfig
+  final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
+    extends MountConfig
 
   val moduleConfig = Prism.partial[MountConfig, List[Statement[Fix[Sql]]]] {
     case ModuleConfig(statements) => statements
-  }(ModuleConfig)
+  } (ModuleConfig)
 
-  def viewConfig0(scopedExpr: ScopedExpr[Fix[Sql]],
-                  vars: (String, String)*): MountConfig = {
-    val vars0 = Variables(Map(vars.map {
-      case (n, v) => quasar.VarName(n) -> quasar.VarValue(v)
-    }: _*))
+  def viewConfig0(scopedExpr: ScopedExpr[Fix[Sql]], vars: (String, String)*): MountConfig = {
+    val vars0 = Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
     viewConfig.apply(scopedExpr, vars0)
   }
 
   val viewConfig = Prism.partial[MountConfig, (ScopedExpr[Fix[Sql]], Variables)] {
     case ViewConfig(query, vars) => (query, vars)
-  }((ViewConfig(_, _)).tupled)
+  } ((ViewConfig(_, _)).tupled)
 
   val viewConfigUri: Prism[String, (ScopedExpr[Fix[Sql]], Variables)] =
     Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
@@ -68,12 +64,12 @@ object MountConfig {
   val fileSystemConfig =
     Prism.partial[MountConfig, (FileSystemType, ConnectionUri)] {
       case FileSystemConfig(typ, uri) => (typ, uri)
-    }((FileSystemConfig(_, _)).tupled)
+    } ((FileSystemConfig(_, _)).tupled)
 
   implicit val show: Show[MountConfig] =
     Show.shows {
       case ModuleConfig(statements) =>
-        "Module Config" // TODO: Perhaps make this more descriptive
+        "Module Config"  // TODO: Perhaps make this more descriptive
       case ViewConfig(expr, vars) =>
         viewConfigUri.reverseGet((expr, vars))
       case FileSystemConfig(typ, uri) =>
@@ -81,8 +77,7 @@ object MountConfig {
     }
 
   implicit def equal: Equal[MountConfig] =
-    Equal.equalBy(m =>
-      (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
+    Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
   val toConfigPair: MountConfig => (String, String) = {
     case ViewConfig(query, vars) =>
@@ -97,45 +92,35 @@ object MountConfig {
     case ("view", uri) =>
       viewCfgFromUri(uri).map(i => viewConfig(i))
     case ("module", stmts) =>
-      sql.fixParser.parseModule(stmts).bimap(_.message, moduleConfig(_))
+      sql.fixParser.parseModule(stmts).bimap(
+        _.message,
+        moduleConfig(_))
     case (typ, uri) =>
       fileSystemConfig(FileSystemType(typ), ConnectionUri(uri)).right
   }
 
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
-    CodecJson(
-      {
-        case ModuleConfig(statements) =>
-          Json("module" := statements.pprint)
-        case ViewConfig(query, vars) =>
-          Json(
-            "view" := Json(
-              "connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
-        case FileSystemConfig(typ, uri) =>
-          Json(typ.value := Json("connectionUri" := uri.value))
-      },
-      json =>
-        json.fields match {
-          case Some(key :: Nil) =>
-            if (key === "module") (json --\ key).as[String].flatMap { statementsString =>
-              DecodeResult(
-                fromConfigPair(key, statementsString)
-                  .leftMap((_, (json --\ key).history))
-                  .toEither)
-            } else {
-              val uriCur = json --\ key --\ "connectionUri"
-              uriCur
-                .as[ConnectionUri]
-                .flatMap(uri =>
-                  DecodeResult(
-                    fromConfigPair(key, uri.value).leftMap((_, uriCur.history)).toEither))
-            }
-          case _ =>
-            DecodeResult.fail(
-              s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}",
-              json.history)
-      }
-    )
+    CodecJson({
+      case ModuleConfig(statements)   =>
+        Json("module" := statements.pprint)
+      case ViewConfig(query, vars)    =>
+        Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
+      case FileSystemConfig(typ, uri) =>
+        Json(typ.value := Json("connectionUri" := uri.value))
+    },
+    json => json.fields match {
+      case Some(key :: Nil) =>
+        if (key === "module") (json --\ key).as[String].flatMap { statementsString =>
+          DecodeResult(fromConfigPair(key, statementsString)
+            .leftMap((_, (json --\ key).history)).toEither)
+        } else {
+          val uriCur = json --\ key --\ "connectionUri"
+          uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
+            fromConfigPair(key, uri.value).leftMap((_, uriCur.history)).toEither))
+        }
+      case _ =>
+        DecodeResult.fail(s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}", json.history)
+    })
 
   ////
 
@@ -152,13 +137,12 @@ object MountConfig {
       _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
       sExpr    <- sql.fixParser.parseScopedExpr(queryStr).leftMap(_.message)
-      vars = Variables(parsed.multiParams collect {
-        case (n, vs) if n.startsWith(VarPrefix) =>
-          (
-            VarName(n.substring(VarPrefix.length)),
-            VarValue(vs.lastOption.getOrElse(""))
-          )
-      })
+      vars     =  Variables(parsed.multiParams collect {
+                    case (n, vs) if n.startsWith(VarPrefix) => (
+                      VarName(n.substring(VarPrefix.length)),
+                      VarValue(vs.lastOption.getOrElse(""))
+                    )
+                  })
     } yield (sExpr, vars)
   }
 
@@ -175,10 +159,10 @@ object MountConfig {
       * the host and path for now.
       */
     Uri(
-      scheme = Some("sql2".ci),
+      scheme    = Some("sql2".ci),
       authority = Some(Uri.Authority(host = Uri.RegName("".ci))),
-      path = "/",
-      query = Query.fromMap(qryMap)
+      path      = "/",
+      query     = Query.fromMap(qryMap)
     ).renderString
   }
 }

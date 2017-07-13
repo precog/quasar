@@ -53,10 +53,10 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
       KeyValueStore.impl.empty.unsafePerformSync
 
     val interpMEff: MEff ~> Task =
-      reflNT[Task] :+:
-        interpMnts :+:
-        Failure.toRuntimeError[Task, MountingError] :+:
-        Failure.toRuntimeError[Task, PathTypeMismatch]
+      reflNT[Task]                                   :+:
+      interpMnts                                     :+:
+      Failure.toRuntimeError[Task, MountingError]    :+:
+      Failure.toRuntimeError[Task, PathTypeMismatch]
 
     free.foldMapNT(interpMEff) compose interpEff
   }
@@ -66,11 +66,9 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
       val loc = rootDir </> dir("fs")
       val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
-      mntErr
-        .attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
+      mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
         .tuple(mnt.lookupConfig(loc).run)
-        .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left,
-                          None)))
+        .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
     }
   }
 }

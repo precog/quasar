@@ -23,7 +23,7 @@ class FsPathSpec extends quasar.Qspec {
   import windowsCodec.printPath
   import FsPath._
 
-  def printWin[T](fp: FsPath[T, Sandboxed])   = printFsPath[T](windowsCodec, fp)
+  def printWin[T](fp: FsPath[T, Sandboxed]) = printFsPath[T](windowsCodec, fp)
   def printPosix[T](fp: FsPath[T, Sandboxed]) = printFsPath[T](posixCodec, fp)
 
   "printFsPath" should {
@@ -33,8 +33,7 @@ class FsPathSpec extends quasar.Qspec {
     }
 
     "include volume when in volume" in {
-      val p = InVolume("c:", rootDir[Sandboxed]) </> dir("bat") </> dir("quux") </> file(
-        "blaat.png")
+      val p = InVolume("c:", rootDir[Sandboxed]) </> dir("bat") </> dir("quux") </> file("blaat.png")
       printWin(p) ==== s"c:${printPath(p.path)}"
     }
   }
@@ -44,31 +43,31 @@ class FsPathSpec extends quasar.Qspec {
     def pRel[S] = dir[S]("bar") </> dir("quux") </> dir("foo")
 
     "sandbox uniform abs path when dir is a prefix" in {
-      val uni  = Uniform(pAbs[Unsandboxed])
+      val uni = Uniform(pAbs[Unsandboxed])
       val base = rootDir[Sandboxed] </> dir("foo")
       sandboxFsPathIn(base, uni).map(printWin) ==== Some(printPath(pAbs))
     }
 
     "sandbox uniform rel path when dir is a prefix" in {
-      val uni  = Uniform(pRel[Unsandboxed])
+      val uni = Uniform(pRel[Unsandboxed])
       val base = dir[Sandboxed]("bar") </> dir("quux")
       sandboxFsPathIn(base, uni).map(printWin) ==== Some(printPath(pRel))
     }
 
     "fail when sandbox dir not a prefix" in {
-      val uni  = Uniform(dir[Unsandboxed]("bar") </> dir("foo"))
+      val uni = Uniform(dir[Unsandboxed]("bar") </> dir("foo"))
       val base = dir[Sandboxed]("sbox")
       sandboxFsPathIn(base, uni) must beNone
     }
 
     "sandbox volume path in given dir" in {
-      val vol  = InVolume("e:", pAbs[Unsandboxed])
+      val vol = InVolume("e:", pAbs[Unsandboxed])
       val base = rootDir[Sandboxed] </> dir("foo") </> dir("bar")
       sandboxFsPathIn(base, vol).map(printWin) ==== Some("e:\\foo\\bar\\baz.txt")
     }
 
     "fail for volume path when sandbox dir not a prefix" in {
-      val vol  = InVolume("f:", rootDir[Unsandboxed] </> file("foo.txt"))
+      val vol = InVolume("f:", rootDir[Unsandboxed] </> file("foo.txt"))
       val base = rootDir[Sandboxed] </> dir("quux")
       sandboxFsPathIn(base, vol) must beNone
     }
@@ -122,13 +121,11 @@ class FsPathSpec extends quasar.Qspec {
 
   "parseFile" should {
     "windows relative" in {
-      parseFile(OS.windows, ".\\foo\\bar.txt").map(printWin(_)) must beSome(
-        ".\\foo\\bar.txt")
+      parseFile(OS.windows, ".\\foo\\bar.txt").map(printWin(_)) must beSome(".\\foo\\bar.txt")
     }
 
     "windows absolute" in {
-      parseFile(OS.windows, "d:\\foo\\bar.txt").map(printWin(_)) must beSome(
-        "d:\\foo\\bar.txt")
+      parseFile(OS.windows, "d:\\foo\\bar.txt").map(printWin(_)) must beSome("d:\\foo\\bar.txt")
     }
 
     "windows dir" in {

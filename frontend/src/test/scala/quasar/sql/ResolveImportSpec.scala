@@ -29,8 +29,7 @@ class ResolveImportSpec extends quasar.Qspec {
   "Import resolution" >> {
     "simple case" >> {
       val scopedExpr = sqlB"import `/mymodule/`; TRIVIAL(`/foo`)"
-      val trivial =
-        FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
+      val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
       val mymodule = rootDir </> dir("mymodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
         case `mymodule` => List(trivial)
@@ -39,9 +38,9 @@ class ResolveImportSpec extends quasar.Qspec {
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/foo`".right
     }
     "multiple imports" >> {
-      val scopedExpr  = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
-      val foo         = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
-      val bar         = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
+      val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
+      val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
+      val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
       val mymodule    = rootDir </> dir("mymodule")
       val otherModule = rootDir </> dir("othermodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
@@ -53,9 +52,9 @@ class ResolveImportSpec extends quasar.Qspec {
     }
     "multiple functions within one import" >> {
       val scopedExpr = sqlB"import `/mymodule/`; FOO(1) + Bar(2)"
-      val foo        = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
-      val bar        = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
-      val mymodule   = rootDir </> dir("mymodule")
+      val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
+      val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
+      val mymodule    = rootDir </> dir("mymodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
         case `mymodule` => List(foo, bar)
         case _          => Nil
@@ -63,9 +62,9 @@ class ResolveImportSpec extends quasar.Qspec {
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
     "multiple functions within one import and unused imports" >> {
-      val scopedExpr  = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
-      val foo         = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
-      val bar         = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
+      val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
+      val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
+      val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
       val mymodule    = rootDir </> dir("mymodule")
       val otherModule = rootDir </> dir("othermodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
@@ -127,14 +126,12 @@ class ResolveImportSpec extends quasar.Qspec {
       // Besides, this is the kind of thing that should be caught when compiling to LogicalPlan once
       // importing resolution is done at that layer
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
-        AmbiguousFunctionInvoke(
-          CIName("foo"),
-          List((CIName("foo"), rootDir), (CIName("foo"), rootDir))).left
+        AmbiguousFunctionInvoke(CIName("foo"), List((CIName("foo"), rootDir), (CIName("foo"), rootDir))).left
     }
     // This should not be the kind of thing caught by import resolution,
     // but it's a stop gap solution until LogicalPlan has user functions
     "error out if same var name appears multiple times in function signature" >> {
-      val func       = FunctionDecl(CIName("FOO"), List(CIName("a"), CIName("a")), sqlE"1")
+      val func = FunctionDecl(CIName("FOO"), List(CIName("a"), CIName("a")), sqlE"1")
       val scopedExpr = ScopedExpr(sqlE"FOO(1,2)", List(func))
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
         InvalidFunctionDefinition(func, "parameter :a is defined multiple times").left

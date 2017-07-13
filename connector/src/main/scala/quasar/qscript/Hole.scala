@@ -31,7 +31,6 @@ object Hole {
   def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
 
   implicit val equal: Equal[Hole] = Equal.equalRef
-  implicit val show: Show[Hole]   = Show.showFromToString
-  implicit val renderTree: RenderTree[Hole] =
-    RenderTree.make(κ(Terminal(List("○"), None)))
+  implicit val show: Show[Hole] = Show.showFromToString
+  implicit val renderTree: RenderTree[Hole] = RenderTree.make(κ(Terminal(List("○"), None)))
 }

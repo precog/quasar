@@ -31,14 +31,12 @@ final case class MainModule(version: Version, prologs: Prologs, queryBody: XQuer
   def render: String = {
     val (funcs, decls) = prologs.partition(Prolog.funcDecl.nonEmpty)
 
-    val declBlock = decls.toIList.map(d => s"${d.render}${Prolog.Separator}").toNel map {
-      ls =>
-        "\n\n" + ls.intercalate("\n")
+    val declBlock = decls.toIList.map(d => s"${d.render}${Prolog.Separator}").toNel map { ls =>
+      "\n\n" + ls.intercalate("\n")
     }
 
-    val funcBlock = funcs.toIList.map(f => s"${f.render}${Prolog.Separator}").toNel map {
-      ls =>
-        "\n\n" + ls.intercalate("\n\n")
+    val funcBlock = funcs.toIList.map(f => s"${f.render}${Prolog.Separator}").toNel map { ls =>
+      "\n\n" + ls.intercalate("\n\n")
     }
 
     s"${version.render}${Prolog.Separator}${~declBlock}${~funcBlock}\n\n${queryBody}"

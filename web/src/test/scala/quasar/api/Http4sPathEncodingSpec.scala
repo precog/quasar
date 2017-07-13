@@ -29,13 +29,13 @@ class Http4sPathEncodingSpec extends quasar.Qspec {
 
   "print and parse through http4s should produce same Path" >> {
     "absolute file with plus" >> {
-      val path  = rootDir </> file("a+b/c")
+      val path = rootDir </> file("a+b/c")
       val hpath = HPath(codec.printPath(path))
       AsFilePath.unapply(hpath) must_= Some(path)
     }
 
     "absolute dir with plus" >> {
-      val path  = rootDir </> dir("a+b/c")
+      val path = rootDir </> dir("a+b/c")
       val hpath = HPath(codec.printPath(path))
       AsDirPath.unapply(hpath) must_= Some(path)
     }

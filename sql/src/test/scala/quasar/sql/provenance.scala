@@ -49,8 +49,7 @@ class ProvenanceSpec extends quasar.Qspec {
 
   "simplify" should {
     "simplify 3-way twice duplicated coproduct" in {
-      (Value | Value | Empty | Empty | Rel1 | Rel1).simplify.flatten must_=== (Set(Value,
-                                                                                   Rel1))
+      (Value | Value | Empty | Empty | Rel1 | Rel1).simplify.flatten must_=== (Set(Value, Rel1))
     }
   }
 

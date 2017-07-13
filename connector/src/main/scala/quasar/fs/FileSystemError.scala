@@ -38,71 +38,74 @@ object FileSystemError {
   import WriteFile.WriteHandle
 
   final case class ExecutionFailed private (
-      lp: Fix[LogicalPlan],
-      reason: String,
-      detail: JsonObject,
-      cause: Option[PhysicalError]
+    lp: Fix[LogicalPlan],
+    reason: String,
+    detail: JsonObject,
+    cause: Option[PhysicalError]
   ) extends FileSystemError
-  final case class PathErr private (e: PathError) extends FileSystemError
+  final case class PathErr private (e: PathError)
+      extends FileSystemError
   final case class PlanningFailed private (
-      lp: Fix[LogicalPlan],
-      err: PlannerError
+    lp: Fix[LogicalPlan],
+    err: PlannerError
   ) extends FileSystemError
   final case class QScriptPlanningFailed private (err: PlannerError)
-      extends FileSystemError
-  final case class UnknownResultHandle private (h: ResultHandle) extends FileSystemError
-  final case class UnknownReadHandle private (h: ReadHandle)     extends FileSystemError
-  final case class UnknownWriteHandle private (h: WriteHandle)   extends FileSystemError
+    extends FileSystemError
+  final case class UnknownResultHandle private (h: ResultHandle)
+    extends FileSystemError
+  final case class UnknownReadHandle private (h: ReadHandle)
+    extends FileSystemError
+  final case class UnknownWriteHandle private (h: WriteHandle)
+    extends FileSystemError
   final case class ReadFailed private (data: String, reason: String)
-      extends FileSystemError
-  final case class PartialWrite private (numFailed: Int) extends FileSystemError
+    extends FileSystemError
+  final case class PartialWrite private (numFailed: Int)
+    extends FileSystemError
   final case class WriteFailed private (data: Data, reason: String)
-      extends FileSystemError
+    extends FileSystemError
 
-  val executionFailed =
-    Prism.partial[FileSystemError,
-                  (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
-      case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
-    }(ExecutionFailed.tupled)
+  val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
+    case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
+  } (ExecutionFailed.tupled)
 
   def executionFailed_(lp: Fix[LogicalPlan], reason: String): FileSystemError =
     executionFailed(lp, reason, JsonObject.empty, None)
 
   val pathErr = Prism.partial[FileSystemError, PathError] {
     case PathErr(err) => err
-  }(PathErr)
+  } (PathErr)
 
   val planningFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], PlannerError)] {
     case PlanningFailed(lp, e) => (lp, e)
-  }(PlanningFailed.tupled)
+  } (PlanningFailed.tupled)
 
   val qscriptPlanningFailed = Prism.partial[FileSystemError, PlannerError] {
     case QScriptPlanningFailed(e) => e
-  }(QScriptPlanningFailed)
+  } (QScriptPlanningFailed)
 
   val unknownResultHandle = Prism.partial[FileSystemError, ResultHandle] {
     case UnknownResultHandle(h) => h
-  }(UnknownResultHandle)
+  } (UnknownResultHandle)
 
   val unknownReadHandle = Prism.partial[FileSystemError, ReadHandle] {
     case UnknownReadHandle(h) => h
-  }(UnknownReadHandle)
+  } (UnknownReadHandle)
 
   val unknownWriteHandle = Prism.partial[FileSystemError, WriteHandle] {
     case UnknownWriteHandle(h) => h
-  }(UnknownWriteHandle)
+  } (UnknownWriteHandle)
 
   val readFailed = Prism.partial[FileSystemError, (String, String)] {
     case ReadFailed(d, r) => (d, r)
-  }(ReadFailed.tupled)
+  } (ReadFailed.tupled)
 
   val partialWrite = Prism.partial[FileSystemError, Int] {
     case PartialWrite(n) => n
-  }(PartialWrite)
+  } (PartialWrite)
 
   val writeFailed = Prism.partial[FileSystemError, (Data, String)] {
     case WriteFailed(d, r) => (d, r)
-  }(WriteFailed.tupled)
+  } (WriteFailed.tupled)
 
   implicit val fileSystemErrorEqual: Equal[FileSystemError] = Equal.equalA
 

@@ -28,7 +28,7 @@ import org.bson.BsonDocument
 import scalaz._
 
 package object mongodb {
-  type BsonCursor = AsyncBatchCursor[BsonDocument]
+  type BsonCursor         = AsyncBatchCursor[BsonDocument]
 
   type MongoErrT[F[_], A] = EitherT[F, PhysicalError, A]
 
@@ -46,7 +46,7 @@ package object mongodb {
 
   // TODO use implicit class
   def sortDirToBson(sort: SortDir): Bson = sort match {
-    case SortDir.Ascending  => Bson.Int32(1)
+    case SortDir.Ascending => Bson.Int32(1)
     case SortDir.Descending => Bson.Int32(-1)
   }
 }

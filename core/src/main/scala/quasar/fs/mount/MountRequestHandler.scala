@@ -32,11 +32,12 @@ import scalaz._, Scalaz._
   * @tparam S the composite effect, supporting the base and hierarchical effects
   */
 final class MountRequestHandler[F[_], S[_]](
-    fsDef: FileSystemDef[F]
+  fsDef: FileSystemDef[F]
 )(implicit
   S0: F :<: S,
   S1: MountedResultH :<: S,
-  S2: MonotonicSeq :<: S) {
+  S2: MonotonicSeq :<: S
+) {
   import MountRequest._
 
   type HierarchicalFsRef[A] = AtomicRef[AnalyticalFileSystem ~> Free[S, ?], A]
@@ -47,12 +48,13 @@ final class MountRequestHandler[F[_], S[_]](
   }
 
   def mount[T[_]](
-      req: MountRequest
+    req: MountRequest
   )(implicit
     T0: F :<: T,
     T1: fsm.MountedFsRef :<: T,
     T2: HierarchicalFsRef :<: T,
-    F: Monad[F]): Free[T, MountingError \/ Unit] = {
+    F: Monad[F]
+  ): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
         case MountFileSystem(d, typ, uri) => fsm.mount[T](d, typ, uri)
@@ -68,16 +70,17 @@ final class MountRequestHandler[F[_], S[_]](
   }
 
   def unmount[T[_]](
-      req: MountRequest
+    req: MountRequest
   )(implicit
     T0: F :<: T,
     T1: fsm.MountedFsRef :<: T,
-    T2: HierarchicalFsRef :<: T): Free[T, Unit] =
+    T2: HierarchicalFsRef :<: T
+  ): Free[T, Unit] =
     fsDir.getOption(req).traverse_(fsm.unmount[T]) *> updateHierarchy[T]
 
   ////
 
-  private val fsm   = FileSystemMountHandler[F](fsDef)
+  private val fsm = FileSystemMountHandler[F](fsDef)
   private val fsDir = mountFileSystem composeLens Field1.first
 
   /** Builds the hierarchical interpreter from the currently mounted filesystems,
@@ -96,24 +99,25 @@ final class MountRequestHandler[F[_], S[_]](
     *   4. Store the result of (3) in `HierarchicalFsRef`.
     */
   private def updateHierarchy[T[_]](
-      implicit
-      T0: F :<: T,
-      T1: fsm.MountedFsRef :<: T,
-      T2: HierarchicalFsRef :<: T
+    implicit
+    T0: F :<: T,
+    T1: fsm.MountedFsRef :<: T,
+    T2: HierarchicalFsRef :<: T
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-        (mnts => hierarchical.analyticalFileSystem[F, S](mnts.map(_.run)))
-      _ <- HierarchicalFsRef.Ops[T].set(mnted)
+                 (mnts => hierarchical.analyticalFileSystem[F, S](mnts.map(_.run)))
+      _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }
 
 object MountRequestHandler {
   def apply[F[_], S[_]](
-      fsDef: FileSystemDef[F]
+    fsDef: FileSystemDef[F]
   )(implicit
     S0: F :<: S,
     S1: MountedResultH :<: S,
-    S2: MonotonicSeq :<: S): MountRequestHandler[F, S] =
+    S2: MonotonicSeq :<: S
+  ): MountRequestHandler[F, S] =
     new MountRequestHandler[F, S](fsDef)
 }

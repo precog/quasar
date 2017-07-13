@@ -22,9 +22,7 @@ import java.nio.ByteBuffer
 /**
   * Basic ByteBuffer parser.
   */
-private[json] final class ByteBufferParser(src: ByteBuffer)
-    extends SyncParser
-    with ByteBasedParser {
+private[json] final class ByteBufferParser(src: ByteBuffer) extends SyncParser with ByteBasedParser {
   final val start = src.position
   final val limit = src.limit - start
 

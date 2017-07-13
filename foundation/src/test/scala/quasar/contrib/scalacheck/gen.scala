@@ -22,6 +22,6 @@ import org.scalacheck.Gen
 
 /** Common generators shared across modules. */
 object gen {
-  val printableAsciiChar: Gen[Char]     = Gen.choose('\u0020', '\u007e')
+  val printableAsciiChar: Gen[Char] = Gen.choose('\u0020', '\u007e')
   val printableAsciiString: Gen[String] = Gen.listOf(printableAsciiChar) map (_.mkString)
 }

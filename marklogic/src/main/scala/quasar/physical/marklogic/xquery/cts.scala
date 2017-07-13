@@ -56,21 +56,13 @@ object cts {
   def elementWordQuery(elements: XQuery, words: XQuery): XQuery =
     XQuery(s"cts:element-word-query($elements, $words)")
 
-  def elementAttributeRangeQuery(elements: XQuery,
-                                 attributes: XQuery,
-                                 operator: XQuery,
-                                 values: XQuery): XQuery =
-    XQuery(
-      s"cts:element-attribute-range-query($elements, $attributes, $operator, $values)")
+  def elementAttributeRangeQuery(elements: XQuery, attributes: XQuery, operator: XQuery, values: XQuery): XQuery =
+    XQuery(s"cts:element-attribute-range-query($elements, $attributes, $operator, $values)")
 
-  def elementAttributeValueQuery(elements: XQuery,
-                                 attributes: XQuery,
-                                 values: XQuery): XQuery =
+  def elementAttributeValueQuery(elements: XQuery, attributes: XQuery, values: XQuery): XQuery =
     XQuery(s"cts:element-attribute-value-query($elements, $attributes, $values)")
 
-  def elementAttributeWordQuery(elements: XQuery,
-                                attributes: XQuery,
-                                words: XQuery): XQuery =
+  def elementAttributeWordQuery(elements: XQuery, attributes: XQuery, words: XQuery): XQuery =
     XQuery(s"cts:element-attribute-word-query($elements, $attributes, $words)")
 
   def jsonPropertyRangeQuery(properties: XQuery, op: XQuery, values: XQuery): XQuery =
@@ -104,19 +96,18 @@ object cts {
     XQuery(s"cts:or-query($queries)")
 
   def search(
-      expr: XQuery,
-      query: XQuery,
-      options: IList[XQuery] = IList.empty,
-      qualityWeight: Option[XQuery] = None,
-      forestIds: IList[XQuery] = IList.empty
+    expr: XQuery,
+    query: XQuery,
+    options: IList[XQuery] = IList.empty,
+    qualityWeight: Option[XQuery] = None,
+    forestIds: IList[XQuery] = IList.empty
   ): XQuery =
-    XQuery(
-      s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
+    XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
   def uriMatch(
-      pattern: XQuery,
-      options: IList[XQuery] = IList.empty,
-      query: Option[XQuery] = None
+    pattern: XQuery,
+    options: IList[XQuery] = IList.empty,
+    query: Option[XQuery] = None
   ): XQuery =
     XQuery(s"cts:uri-match($pattern, ${mkSeq(options)}${asArg(query)})")
 
@@ -132,14 +123,13 @@ object cts {
 
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def uris(
-      start: XQuery,
-      options: IList[XQuery] = IList.empty,
-      query: XQuery,
-      qualityWeight: Option[XQuery] = None,
-      forestIds: IList[XQuery] = IList.empty
+    start: XQuery,
+    options: IList[XQuery] = IList.empty,
+    query: XQuery,
+    qualityWeight: Option[XQuery] = None,
+    forestIds: IList[XQuery] = IList.empty
   ): XQuery =
-    XQuery(
-      s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
+    XQuery(s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
   val True: XQuery =
     XQuery("cts:true-query()")

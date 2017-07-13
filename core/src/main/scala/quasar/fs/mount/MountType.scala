@@ -39,23 +39,23 @@ sealed abstract class MountType {
 
 object MountType {
   final case class FileSystemMount(fsType: FileSystemType) extends MountType
-  case object ViewMount                                    extends MountType
-  case object ModuleMount                                  extends MountType
+  case object ViewMount extends MountType
+  case object ModuleMount extends MountType
 
   val fileSystemMount: Prism[MountType, FileSystemType] =
     Prism.partial[MountType, FileSystemType] {
       case FileSystemMount(fs) => fs
-    }(FileSystemMount)
+    } (FileSystemMount)
 
   val viewMount: Prism[MountType, Unit] =
     Prism.partial[MountType, Unit] {
       case ViewMount => ()
-    }(κ(ViewMount))
+    } (κ(ViewMount))
 
   val moduleMount: Prism[MountType, Unit] =
     Prism.partial[MountType, Unit] {
       case ModuleMount => ()
-    }(κ(ModuleMount))
+    } (κ(ModuleMount))
 
   implicit val order: Order[MountType] =
     Order.orderBy(mt => (viewMount.nonEmpty(mt), fileSystemMount.getOption(mt)))

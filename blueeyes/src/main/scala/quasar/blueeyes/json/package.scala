@@ -24,10 +24,9 @@ package object json {
 
   type JFieldTuple = (String, JValue)
 
-  def jarray(elements: JValue*): JValue = JArray(elements.toList)
-  def jobject(fields: JField*): JValue  = JObject(fields.toList)
-  def jfield[A](name: String, value: A)(implicit d: Decomposer[A]): JField =
-    JField(name, d(value))
+  def jarray(elements: JValue*): JValue                                    = JArray(elements.toList)
+  def jobject(fields: JField*): JValue                                     = JObject(fields.toList)
+  def jfield[A](name: String, value: A)(implicit d: Decomposer[A]): JField = JField(name, d(value))
 
   private def ppath(p: String) = if (p startsWith ".") p else "." + p
 
@@ -35,11 +34,10 @@ package object json {
   implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)
   implicit def liftJPath(path: String): JPath          = JPath(path)
 
-  implicit val JPathNodeOrder: Order[JPathNode] = Order orderBy (x =>
-    x.optName -> x.optIndex)
-  implicit val JPathNodeOrdering        = JPathNodeOrder.toScalaOrdering
-  implicit val JPathOrder: Order[JPath] = Order orderBy (_.nodes)
-  implicit val JPathOrdering            = JPathOrder.toScalaOrdering
+  implicit val JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
+  implicit val JPathNodeOrdering                = JPathNodeOrder.toScalaOrdering
+  implicit val JPathOrder: Order[JPath]         = Order orderBy (_.nodes)
+  implicit val JPathOrdering                    = JPathOrder.toScalaOrdering
 
   implicit val JObjectMergeMonoid = new Monoid[JObject] {
     val zero = JObject(Nil)
@@ -47,13 +45,13 @@ package object json {
     def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
   }
 
-  val NoJPath = JPath()
+  val NoJPath     = JPath()
   type JPath      = quasar.precog.JPath
   type JPathNode  = quasar.precog.JPathNode
   type JPathField = quasar.precog.JPathField
-  val JPathField = quasar.precog.JPathField
+  val JPathField  = quasar.precog.JPathField
   type JPathIndex = quasar.precog.JPathIndex
-  val JPathIndex = quasar.precog.JPathIndex
+  val JPathIndex  = quasar.precog.JPathIndex
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
     val sb = new StringBuilder
@@ -64,16 +62,14 @@ package object json {
   implicit class JPathOps(private val x: JPath) {
     import x._
 
-    def parent: Option[JPath] =
-      if (nodes.isEmpty) None else Some(JPath(nodes dropRight 1: _*))
+    def parent: Option[JPath]        = if (nodes.isEmpty) None else Some(JPath(nodes dropRight 1: _*))
     def apply(index: Int): JPathNode = nodes(index)
     def head: Option[JPathNode]      = nodes.headOption
     def tail: JPath                  = JPath(nodes.tail)
     def path: String                 = x.to_s
 
     def ancestors: List[JPath] = {
-      def loop(path: JPath, acc: List[JPath]): List[JPath] =
-        path.parent.fold(acc)(p => loop(p, p :: acc))
+      def loop(path: JPath, acc: List[JPath]): List[JPath] = path.parent.fold(acc)(p => loop(p, p :: acc))
       loop(x, Nil).reverse
     }
 
@@ -111,9 +107,7 @@ package object json {
       extract0(nodes, jvalue)
     }
     def expand(jvalue: JValue): List[JPath] = {
-      def expand0(current: List[JPathNode],
-                  right: List[JPathNode],
-                  d: JValue): List[JPath] = right match {
+      def expand0(current: List[JPathNode], right: List[JPathNode], d: JValue): List[JPath] = right match {
         case Nil                            => JPath(current) :: Nil
         case (hd @ JPathIndex(index)) :: tl => expand0(current :+ hd, tl, jvalue(index))
         case (hd @ JPathField(name)) :: tl  => expand0(current :+ hd, tl, jvalue \ name)
@@ -135,10 +129,7 @@ package object json {
     def \(that: JPathNode) = JPath(x :: that :: Nil)
   }
 
-  private def renderJArray(self: JArray,
-                           sb: StringBuilder,
-                           mode: RenderMode,
-                           indent: String) {
+  private def renderJArray(self: JArray, sb: StringBuilder, mode: RenderMode, indent: String) {
     import self.elements
     mode match {
       case Compact =>
@@ -174,20 +165,14 @@ package object json {
     }
   }
 
-  private def renderJValue(self: JValue,
-                           sb: StringBuilder,
-                           mode: RenderMode,
-                           indent: String): Unit = self match {
+  private def renderJValue(self: JValue, sb: StringBuilder, mode: RenderMode, indent: String): Unit = self match {
     case JString(value) => JString.internalEscape(sb, value)
     case x: JObject     => renderJObject(x, sb, mode, indent)
     case x: JArray      => renderJArray(x, sb, mode, indent)
     case _              => sb append self.renderCompact
   }
 
-  private def renderJObject(self: JObject,
-                            sb: StringBuilder,
-                            mode: RenderMode,
-                            indent: String) {
+  private def renderJObject(self: JObject, sb: StringBuilder, mode: RenderMode, indent: String) {
     import self.fields
     mode match {
       case Compact =>
@@ -233,6 +218,7 @@ package object json {
     }
   }
 
+
   implicit class JValueOps(private val self: JValue) {
     import Validation._
 
@@ -275,9 +261,8 @@ package object json {
     def to_s = renderPretty
 
     def normalize: JValue = self match {
-      case JUndefined => sys error "Can't normalize JUndefined"
-      case JObject(fields) =>
-        JObject(fields filter (_._2.isDefined) mapValues (_.normalize) toMap)
+      case JUndefined       => sys error "Can't normalize JUndefined"
+      case JObject(fields)  => JObject(fields filter (_._2.isDefined) mapValues (_.normalize) toMap)
       case JArray(elements) => JArray(elements filter (_.isDefined) map (_.normalize))
       case _                => self
     }
@@ -298,15 +283,12 @@ package object json {
     /**
       * Returns the element as a JValue of the specified class.
       */
-    def -->[A <: JValue](clazz: Class[A]): A =
-      (self -->? clazz).getOrElse(
-        sys.error("Expected class " + clazz + ", but found: " + self.getClass))
+    def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(sys.error("Expected class " + clazz + ", but found: " + self.getClass))
 
     /**
       * Returns the element as an option of a JValue of the specified class.
       */
-    def -->?[A <: JValue](clazz: Class[A]): Option[A] =
-      if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
+    def -->?[A <: JValue](clazz: Class[A]): Option[A] = if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
 
     /**
       * Does a breadth-first traversal of all descendant JValues, beginning
@@ -320,18 +302,15 @@ package object json {
         else {
           val (head, nextQueue) = queue.dequeue
 
-          breadthFirst0(
-            head :: cur,
-            head match {
-              case JObject(fields) =>
-                nextQueue.enqueue(fields.values.toList)
+          breadthFirst0(head :: cur, head match {
+            case JObject(fields) =>
+              nextQueue.enqueue(fields.values.toList)
 
-              case JArray(elements) =>
-                nextQueue.enqueue(elements)
+            case JArray(elements) =>
+              nextQueue.enqueue(elements)
 
-              case jvalue => nextQueue
-            }
-          )
+            case jvalue => nextQueue
+          })
         }
       }
 
@@ -380,8 +359,7 @@ package object json {
       */
     def insertAll(other: JValue): ValidationNel[Throwable, JValue] = {
       other.flattenWithPath.foldLeft[ValidationNel[Throwable, JValue]](success(self)) {
-        case (acc, (path, value)) =>
-          acc flatMap { (_: JValue).insert(path, value).toValidationNel }
+        case (acc, (path, value)) => acc flatMap { (_: JValue).insert(path, value).toValidationNel }
       }
     }
 
@@ -409,8 +387,7 @@ package object json {
                 rest + JField(name, child.set(JPath(nodes), value))
 
               case x =>
-                sys.error(
-                  "Objects are not indexed: attempted to set " + path + " on " + self)
+                sys.error("Objects are not indexed: attempted to set " + path + " on " + self)
             }
 
           case arr @ JArray(elements) =>
@@ -418,8 +395,7 @@ package object json {
               case JPathIndex(index) :: nodes =>
                 JArray(arraySet(elements, index, JPath(nodes), value))
               case x =>
-                sys.error(
-                  "Arrays have no fields: attempted to set " + path + " on " + self)
+                sys.error("Arrays have no fields: attempted to set " + path + " on " + self)
             }
 
           case _ =>
@@ -450,11 +426,8 @@ package object json {
 
         case JPathIndex(idx) :: xs =>
           self match {
-            case JArray(elements) =>
-              Some(JArray(elements.zipWithIndex.flatMap {
-                case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v)
-              }))
-            case unmodified => Some(unmodified)
+            case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
+            case unmodified       => Some(unmodified)
           }
 
         case Nil => None
@@ -491,7 +464,7 @@ package object json {
                 rec(acc, p \ field._1, field._2)
             }
 
-          case JArray(l) =>
+          case JArray(l)                                         =>
             l.zipWithIndex.foldLeft(newAcc) { case (a, (e, idx)) => rec(a, p \ idx, e) }
 
           case _ => newAcc
@@ -514,23 +487,19 @@ package object json {
       */
     def foldUpWithPath[A](z: A)(f: (A, JPath, JValue) => A): A = {
       def rec(acc: A, p: JPath, v: JValue): A = {
-        f(
-          v match {
-            case JObject(l) =>
-              l.foldLeft(acc) { (acc, field) =>
-                rec(acc, p \ field._1, field._2)
-              }
+        f(v match {
+          case JObject(l) =>
+            l.foldLeft(acc) { (acc, field) =>
+              rec(acc, p \ field._1, field._2)
+            }
 
-            case JArray(l) =>
-              l.zipWithIndex.foldLeft(acc) { (a, t) =>
-                val (e, idx) = t; rec(a, p \ idx, e)
-              }
+          case JArray(l) =>
+            l.zipWithIndex.foldLeft(acc) { (a, t) =>
+              val (e, idx) = t; rec(a, p \ idx, e)
+            }
 
-            case _ => acc
-          },
-          p,
-          v
-        )
+          case _ => acc
+        }, p, v)
       }
 
       rec(z, NoJPath, self)
@@ -554,12 +523,13 @@ package object json {
           }))
 
         case JArray(l) =>
-          f(p,
+          f(
+            p,
             JArray(l.zipWithIndex.flatMap(t =>
               rec(p \ t._2, t._1) match {
                 case JUndefined => Nil
                 case x          => x :: Nil
-            })))
+              })))
 
         case x => f(p, x)
       }
@@ -622,8 +592,7 @@ package object json {
               j match {
                 case JObjectFields(fields) =>
                   JObject(fields.map {
-                    case JField(name2, value) if (name1 == name2) =>
-                      JField(name1, replace0(JPath(tail: _*), value))
+                    case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
 
                     case field => field
                   })
@@ -654,8 +623,7 @@ package object json {
     /** A shorthand for the other replacement in the case that the replacement
       * does not depend on the value being replaced.
       */
-    def replace(target: JPath, replacement: JValue): JValue =
-      replace(target, r => replacement)
+    def replace(target: JPath, replacement: JValue): JValue = replace(target, r => replacement)
 
     /** Return the first element from JSON which matches the given predicate.
       */
@@ -687,14 +655,10 @@ package object json {
     def flattenWithPath: List[(JPath, JValue)] = {
       def flatten0(path: JPath)(value: JValue): List[(JPath, JValue)] = value match {
         case JObject.empty | JArray.empty => List(path -> value)
-        case JObject(fields) =>
-          fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
-        case JArray(elements) =>
-          elements.zipWithIndex.flatMap({
-            case (element, index) => flatten0(path \ index)(element)
-          })
-        case JUndefined => Nil
-        case leaf       => List(path -> leaf)
+        case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
+        case JArray(elements)             => elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })
+        case JUndefined                   => Nil
+        case leaf                         => List(path -> leaf)
       }
 
       flatten0(NoJPath)(self)
@@ -727,13 +691,10 @@ package object json {
       */
     def minimize: Option[JValue] = {
       self match {
-        case JObjectFields(fields) =>
-          Some(JObject(fields flatMap {
-            case JField(k, v) => v.minimize.map(JField(k, _))
-          }))
-        case JArray(elements) => Some(JArray(elements.flatMap(_.minimize)))
-        case JUndefined       => None
-        case value            => Some(value)
+        case JObjectFields(fields) => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
+        case JArray(elements)      => Some(JArray(elements.flatMap(_.minimize)))
+        case JUndefined            => None
+        case value                 => Some(value)
       }
     }
   }
@@ -742,8 +703,8 @@ package object json {
 package json {
   object JPath {
     def apply(path: String): JPath = {
-      val PathPattern      = """[.]|(?=\[\d+\])""".r
-      val IndexPattern     = """^\[(\d+)\]$""".r
+      val PathPattern  = """[.]|(?=\[\d+\])""".r
+      val IndexPattern = """^\[(\d+)\]$""".r
       def ppath(p: String) = if (p startsWith ".") p else "." + p
       JPath(
         PathPattern split ppath(path) map (_.trim) flatMap {

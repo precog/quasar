@@ -16,9 +16,9 @@
 
 package quasar.fs
 
-trait Arbitraries
-    extends FileSystemTypeArbitrary
-    with InMemoryArbitrary
-    with MoveSemanticsArbitrary
+trait Arbitraries extends
+  FileSystemTypeArbitrary with
+  InMemoryArbitrary with
+  MoveSemanticsArbitrary
 
 object Arbitraries extends Arbitraries

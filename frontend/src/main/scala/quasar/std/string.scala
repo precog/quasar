@@ -32,8 +32,7 @@ import shapeless.{Data => _, :: => _, _}
 trait StringLib extends Library {
   private def stringApply(f: (String, String) => String): Func.Typer[nat._2] =
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Str(a)), Type.Const(Data.Str(b))) =>
-        Type.Const(Data.Str(f(a, b)))
+      case Sized(Type.Const(Data.Str(a)), Type.Const(Data.Str(b))) => Type.Const(Data.Str(f(a, b)))
 
       case Sized(Type.Str, Type.Const(Data.Str(_))) => Type.Str
       case Sized(Type.Const(Data.Str(_)), Type.Str) => Type.Str
@@ -47,8 +46,9 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input2(Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
-                                TC: Corecursive.Aux[T, LP]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case InvokeUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
             second.some
@@ -58,18 +58,18 @@ trait StringLib extends Library {
         }
     },
     stringApply(_ + _),
-    basicUntyper
-  )
+    basicUntyper)
 
-  private def regexForLikePattern(pattern: String, escapeChar: Option[Char]): String = {
+  private def regexForLikePattern(pattern: String, escapeChar: Option[Char]):
+      String = {
     def sansEscape(pat: List[Char]): List[Char] = pat match {
-      case '_' :: t => '.' +: escape(t)
+      case '_' :: t =>         '.' +: escape(t)
       case '%' :: t => ".*".toList ⊹ escape(t)
-      case c :: t =>
+      case c   :: t =>
         if ("\\^$.|?*+()[{".contains(c))
           '\\' +: c +: escape(t)
         else c +: escape(t)
-      case Nil => Nil
+      case Nil      => Nil
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -98,32 +98,25 @@ trait StringLib extends Library {
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
-                                TC: Corecursive.Aux[T, LP]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeUnapply(_,
-                             Sized(Embed(str),
-                                   Embed(Constant(Data.Str(pat))),
-                                   Embed(Constant(Data.Str(esc))))) =>
+          case InvokeUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
-              Search(
-                str.embed,
+              Search(str.embed,
                 constant[T](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
                 constant[T](Data.Bool(false)).embed).some
           case _ => None
         }
     },
     constTyper(Type.Bool),
-    basicUntyper
-  )
+    basicUntyper)
 
   def matchAnywhere(str: String, pattern: String, insen: Boolean) =
-    java.util.regex.Pattern
-      .compile(if (insen) "(?i)" ⊹ pattern else pattern)
-      .matcher(str)
-      .find()
+    java.util.regex.Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
 
   val Search = TernaryFunc(
     Mapping,
@@ -132,18 +125,14 @@ trait StringLib extends Library {
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
     partialTyperV[nat._3] {
-      case Sized(Type.Const(Data.Str(str)),
-                 Type.Const(Data.Str(pattern)),
-                 Type.Const(Data.Bool(insen))) =>
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen))) =>
         success(Type.Const(Data.Bool(matchAnywhere(str, pattern, insen))))
       case Sized(strT, patternT, insenT) =>
         (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-          Type.typecheck(Type.Str, patternT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-          Type.typecheck(Type.Bool, insenT).leftMap(nel => nel.map(ι[SemanticError])))(
-          (_, _, _) => Type.Bool)
+         Type.typecheck(Type.Str, patternT).leftMap(nel => nel.map(ι[SemanticError])) |@|
+         Type.typecheck(Type.Bool, insenT).leftMap(nel => nel.map(ι[SemanticError])))((_, _, _) => Type.Bool)
     },
-    basicUntyper
-  )
+    basicUntyper)
 
   val Length = UnaryFunc(
     Mapping,
@@ -155,8 +144,7 @@ trait StringLib extends Library {
       case Sized(Type.Const(Data.Str(str))) => Type.Const(Data.Int(str.length))
       case Sized(Type.Str)                  => Type.Int
     },
-    basicUntyper
-  )
+    basicUntyper)
 
   val Lower = UnaryFunc(
     Mapping,
@@ -169,8 +157,7 @@ trait StringLib extends Library {
         Type.Const(Data.Str(str.toLowerCase))
       case Sized(Type.Str) => Type.Str
     },
-    basicUntyper
-  )
+    basicUntyper)
 
   val Upper = UnaryFunc(
     Mapping,
@@ -183,8 +170,7 @@ trait StringLib extends Library {
         Type.Const(Data.Str(str.toUpperCase))
       case Sized(Type.Str) => Type.Str
     },
-    basicUntyper
-  )
+    basicUntyper)
 
   /** Substring which always gives a result, no matter what offsets are provided.
     * Reverse-engineered from MongoDb's \$substr op, for lack of a better idea
@@ -203,53 +189,57 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input3(Type.Str, Type.Int, Type.Int),
     new Func.Simplifier {
-      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP],
-                                TC: Corecursive.Aux[T, LP]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _),
-                             Sized(Embed(Constant(Data.Str(str))),
-                                   Embed(Constant(Data.Int(from))),
-                                   for0)) if 0 < from =>
-            Invoke(f,
-                   Func.Input3(Constant[T](Data.Str(str.substring(from.intValue))).embed,
-                               Constant[T](Data.Int(0)).embed,
-                               for0)).some
+          case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
+            Embed(Constant(Data.Str(str))),
+            Embed(Constant(Data.Int(from))),
+            for0))
+              if 0 < from =>
+            Invoke(f, Func.Input3(
+              Constant[T](Data.Str(str.substring(from.intValue))).embed,
+              Constant[T](Data.Int(0)).embed,
+              for0)).some
           case _ => None
         }
     },
     partialTyperV[nat._3] {
-      case Sized(Type.Const(Data.Str(str)),
-                 Type.Const(Data.Int(from)),
-                 Type.Const(Data.Int(for0))) => {
+      case Sized(
+        Type.Const(Data.Str(str)),
+        Type.Const(Data.Int(from)),
+        Type.Const(Data.Int(for0))) => {
         success(Type.Const(Data.Str(safeSubstring(str, from.intValue, for0.intValue))))
       }
       case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Int(from)), _)
           if str.length <= from =>
         success(Type.Const(Data.Str("")))
-      case Sized(_, Type.Const(Data.Int(from)), _) if from < 0 =>
+      case Sized(_, Type.Const(Data.Int(from)), _)
+          if from < 0 =>
         success(Type.Const(Data.Str("")))
-      case Sized(_, _, Type.Const(Data.Int(for0))) if for0.intValue ≟ 0 =>
+      case Sized(_, _, Type.Const(Data.Int(for0)))
+          if for0.intValue ≟ 0 =>
         success(Type.Const(Data.Str("")))
       case Sized(Type.Const(Data.Str(_)), Type.Const(Data.Int(_)), Type.Int) =>
         success(Type.Str)
       case Sized(Type.Const(Data.Str(_)), Type.Int, Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case Sized(Type.Const(Data.Str(_)), Type.Int, Type.Int) =>
+      case Sized(Type.Const(Data.Str(_)), Type.Int,                Type.Int) =>
         success(Type.Str)
       case Sized(Type.Str, Type.Const(Data.Int(_)), Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case Sized(Type.Str, Type.Const(Data.Int(_)), Type.Int) =>
+      case Sized(Type.Str, Type.Const(Data.Int(_)), Type.Int)                =>
         success(Type.Str)
-      case Sized(Type.Str, Type.Int, Type.Const(Data.Int(_))) =>
+      case Sized(Type.Str, Type.Int,                Type.Const(Data.Int(_))) =>
         success(Type.Str)
-      case Sized(Type.Str, Type.Int, Type.Int) =>
+      case Sized(Type.Str, Type.Int,                Type.Int)                =>
         success(Type.Str)
-      case Sized(Type.Str, _, _) =>
+      case Sized(Type.Str, _,                       _)                       =>
         failureNel(GenericError("expected integer arguments for SUBSTRING"))
       case Sized(t, _, _) => failureNel(TypeError(Type.Str, t, None))
     },
-    basicUntyper
-  )
+    basicUntyper)
 
   val Boolean = UnaryFunc(
     Mapping,
@@ -258,21 +248,20 @@ trait StringLib extends Library {
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str("true"))) =>
+      case Sized(Type.Const(Data.Str("true")))  =>
         success(Type.Const(Data.Bool(true)))
       case Sized(Type.Const(Data.Str("false"))) =>
         success(Type.Const(Data.Bool(false)))
-      case Sized(Type.Const(Data.Str(str))) =>
+      case Sized(Type.Const(Data.Str(str)))     =>
         failureNel(InvalidStringCoercion(str, List("true", "false").right))
-      case Sized(Type.Str) => success(Type.Bool)
+      case Sized(Type.Str)                      => success(Type.Bool)
     },
-    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_)))
-  )
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
-  val intRegex       = "[+-]?\\d+"
-  val floatRegex     = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
-  val dateRegex      = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})"
-  val timeRegex      = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
+  val intRegex = "[+-]?\\d+"
+  val floatRegex = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
+  val dateRegex = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})"
+  val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
   val timestampRegex = dateRegex + "T" + timeRegex
 
   val Integer = UnaryFunc(
@@ -284,15 +273,12 @@ trait StringLib extends Library {
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
         \/.fromTryCatchNonFatal(BigInt(str)).fold(
-          κ(
-            failureNel(
-              InvalidStringCoercion(str, "a string containing an integer".left))),
+          κ(failureNel(InvalidStringCoercion(str, "a string containing an integer".left))),
           i => success(Type.Const(Data.Int(i))))
 
       case Sized(Type.Str) => success(Type.Int)
     },
-    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_)))
-  )
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
   val Decimal = UnaryFunc(
     Mapping,
@@ -303,14 +289,11 @@ trait StringLib extends Library {
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
         \/.fromTryCatchNonFatal(BigDecimal(str)).fold(
-          κ(
-            failureNel(
-              InvalidStringCoercion(str, "a string containing an decimal number".left))),
+           κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
           i => success(Type.Const(Data.Dec(i))))
       case Sized(Type.Str) => success(Type.Int)
     },
-    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_)))
-  )
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
   val Null = UnaryFunc(
     Mapping,
@@ -324,8 +307,7 @@ trait StringLib extends Library {
         failureNel(InvalidStringCoercion(str, List("null").right))
       case Sized(Type.Str) => success(Type.Null)
     },
-    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_)))
-  )
+    untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
   val ToString: UnaryFunc = UnaryFunc(
     Mapping,
@@ -334,25 +316,24 @@ trait StringLib extends Library {
     Func.Input1(Type.Syntaxed),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(data)) =>
-        (data match {
-          case Data.Str(str) => success(str)
-          case Data.Null     => success("null")
-          case Data.Bool(b)  => success(b.shows)
-          case Data.Int(i)   => success(i.shows)
-          case Data.Dec(d)   => success(d.shows)
-          case Data.Timestamp(t) =>
-            success(t.atZone(UTC).format(DataCodec.dateTimeFormatter))
-          case Data.Date(d)     => success(d.toString)
-          case Data.Time(t)     => success(t.format(DataCodec.timeFormatter))
-          case Data.Interval(i) => success(i.toString)
-          // NB: Should not be able to hit this case, because of the domain.
-          case other =>
-            failureNel(
-              TypeError(Type.Syntaxed,
-                        other.dataType,
-                        "can not convert aggregate types to String".some): SemanticError)
-        }).map(s => Type.Const(Data.Str(s)))
+      case Sized(Type.Const(data)) => (data match {
+        case Data.Str(str)     => success(str)
+        case Data.Null         => success("null")
+        case Data.Bool(b)      => success(b.shows)
+        case Data.Int(i)       => success(i.shows)
+        case Data.Dec(d)       => success(d.shows)
+        case Data.Timestamp(t) => success(t.atZone(UTC).format(DataCodec.dateTimeFormatter))
+        case Data.Date(d)      => success(d.toString)
+        case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
+        case Data.Interval(i)  => success(i.toString)
+        // NB: Should not be able to hit this case, because of the domain.
+        case other             =>
+          failureNel(
+            TypeError(
+              Type.Syntaxed,
+              other.dataType,
+              "can not convert aggregate types to String".some):SemanticError)
+      }).map(s => Type.Const(Data.Str(s)))
       case Sized(_) => success(Type.Str)
     },
     partialUntyperV[nat._1] {
@@ -366,8 +347,7 @@ trait StringLib extends Library {
           DateLib.Timestamp.tpe(Func.Input1(x)) <+>
           DateLib.Interval.tpe(Func.Input1(x)))
           .map(Func.Input1(_))
-    }
-  )
+    })
 }
 
 object StringLib extends StringLib

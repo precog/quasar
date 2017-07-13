@@ -26,7 +26,6 @@ import scalaz.syntax.monad._
   * Cribbed from [doobie](http://github.com/tpolecat/doobie)
   */
 trait Capture[F[_]] {
-
   /** Captures the effect of producing `A`, including any exceptions that may
     * be thrown.
     */
@@ -56,8 +55,7 @@ sealed abstract class CaptureInstances extends CaptureInstances0 {
   implicit val taskCapture: Capture[Task] =
     new TaskCapture
 
-  implicit def freeCapture[F[_]: Capture, S[_]](
-      implicit I: F :<: S): Capture[Free[S, ?]] =
+  implicit def freeCapture[F[_]: Capture, S[_]](implicit I: F :<: S): Capture[Free[S, ?]] =
     new FreeCapture[F, S]
 }
 
@@ -71,8 +69,7 @@ sealed abstract class CaptureInstances0 {
   implicit def stateTCapture[F[_]: Monad: Capture, S]: Capture[StateT[F, S, ?]] =
     new TransCapture[F, StateT[?[_], S, ?]]
 
-  implicit def writerTCapture[F[_]: Monad: Capture, W: Monoid]
-    : Capture[WriterT[F, W, ?]] =
+  implicit def writerTCapture[F[_]: Monad: Capture, W: Monoid]: Capture[WriterT[F, W, ?]] =
     new TransCapture[F, WriterT[?[_], W, ?]]
 }
 
@@ -81,11 +78,11 @@ private[effect] class TaskCapture extends Capture[Task] {
 }
 
 private[effect] class TransCapture[F[_]: Monad: Capture, T[_[_], _]: MonadTrans]
-    extends Capture[T[F, ?]] {
+  extends Capture[T[F, ?]] {
   def capture[A](a: => A) = Capture[F].capture(a).liftM[T]
 }
 
 private[effect] class FreeCapture[F[_], S[_]](implicit F: Capture[F], I: F :<: S)
-    extends Capture[Free[S, ?]] {
+  extends Capture[Free[S, ?]] {
   def capture[A](a: => A) = Free.liftF(I(F.capture(a)))
 }

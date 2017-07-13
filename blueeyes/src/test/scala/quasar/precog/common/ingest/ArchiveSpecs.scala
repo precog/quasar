@@ -32,8 +32,7 @@ class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCh
     }
 
     "read legacy archives" in {
-      val Success(JArray(input)) = JParser.parseFromString(
-        """[
+      val Success(JArray(input)) = JParser.parseFromString("""[
 {"path":"/test/test/php/query/T10170960455069fb56d061c690884208/","tokenId":"test1"},
 {"path":"/test/test/php/query/T9345418045069fd119e9ed256256425/","tokenId": "test1"},
 {"path":"/test/test/php/query/T1373621163506a00891eb60240629876/","tokenId":"test1"},
@@ -54,8 +53,7 @@ class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCh
     }
 
     "read new archives" in {
-      val Success(JArray(input)) =
-        JParser.parseFromString("""[
+      val Success(JArray(input)) = JParser.parseFromString("""[
 {"apiKey":"test1","path":"/foo1/test/js/delete/"},
 {"apiKey":"test2","path":"/foo2/blargh/"},
 {"apiKey":"test2","path":"/foo2/blargh/"},
@@ -72,8 +70,7 @@ class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCh
     }
 
     "read archives with reversed fields" in {
-      val Success(JArray(input)) =
-        JParser.parseFromString("""[
+      val Success(JArray(input)) = JParser.parseFromString("""[
 {"path":"test1","apiKey":"/foo1/test/js/delete/"},
 {"path":"test2","apiKey":"/foo2/blargh/"},
 {"path":"test2","apiKey":"/foo2/blargh/"},
@@ -91,3 +88,5 @@ class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCh
 
   }
 }
+
+

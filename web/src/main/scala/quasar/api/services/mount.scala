@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import slamdata.Predef.{-> => _, _}
+import slamdata.Predef.{ -> => _, _ }
 import quasar.api._
 import quasar.contrib.pathy._
 import quasar.fp._
@@ -34,46 +34,39 @@ object mount {
   import posixCodec.printPath
 
   def service[S[_]](
-      implicit
-      M: Mounting.Ops[S],
-      S0: Task :<: S,
-      S1: MountingFailure :<: S,
-      S2: PathMismatchFailure :<: S
+    implicit
+    M: Mounting.Ops[S],
+    S0: Task :<: S,
+    S1: MountingFailure :<: S,
+    S2: PathMismatchFailure :<: S
   ): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
-        def err =
-          ApiError.fromMsg(NotFound withReason "Mount point not found.",
-                           s"There is no mount point at ${printPath(path)}",
-                           "path" := path)
+        def err = ApiError.fromMsg(
+          NotFound withReason "Mount point not found.",
+          s"There is no mount point at ${printPath(path)}",
+          "path" := path)
         respondT(M.lookupConfig(path).toRight(err))
 
       case req @ MOVE -> AsPath(src) =>
-        respondT(
-          requiredHeader(Destination, req)
-            .map(_.value)
-            .fold(
-              _.raiseError[ApiErrT[M.FreeS, ?], String],
-              dst =>
-                refineType(src).fold(
-                  srcDir =>
-                    move[S, Dir](srcDir, dst, UriPathCodec.parseAbsDir, "directory"),
-                  srcFile =>
-                    move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))
-            ))
+        respondT(requiredHeader(Destination, req).map(_.value).fold(
+          _.raiseError[ApiErrT[M.FreeS, ?], String],
+          dst => refineType(src).fold(
+            srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
+            srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))))
 
       case req @ POST -> AsDirPath(parent) =>
         respondT(for {
           hdr <- EitherT.fromDisjunction[M.FreeS](requiredHeader(XFileName, req))
-          fn = hdr.value
+          fn  =  hdr.value
           dst <- EitherT.fromDisjunction[M.FreeS](
-            (UriPathCodec.parseRelDir(fn) orElse UriPathCodec.parseRelFile(fn))
-              .flatMap(sandbox(currentDir, _))
-              .map(parent </> _)
-              .toRightDisjunction(ApiError.apiError(
-                BadRequest withReason "Filename must be a relative path.",
-                "fileName" := fn)))
-          _ <- mount[S](dst, req, replaceIfExists = false)
+                  (UriPathCodec.parseRelDir(fn) orElse UriPathCodec.parseRelFile(fn))
+                    .flatMap(sandbox(currentDir, _))
+                    .map(parent </> _)
+                    .toRightDisjunction(ApiError.apiError(
+                      BadRequest withReason "Filename must be a relative path.",
+                      "fileName" := fn)))
+          _   <- mount[S](dst, req, replaceIfExists = false)
         } yield s"added ${printPath(dst)}")
 
       case req @ PUT -> AsPath(path) =>
@@ -88,56 +81,48 @@ object mount {
   ////
 
   private def move[S[_], T](
-      src: AbsPath[T],
-      dstStr: String,
-      parse: String => Option[Path[Abs, T, Unsandboxed]],
-      typeStr: String
+    src: AbsPath[T],
+    dstStr: String,
+    parse: String => Option[Path[Abs, T, Unsandboxed]],
+    typeStr: String
   )(implicit
     M: Mounting.Ops[S],
     S0: MountingFailure :<: S,
-    S1: PathMismatchFailure :<: S): EitherT[Free[S, ?], ApiError, String] =
-    parse(dstStr)
-      .map(unsafeSandboxAbs)
-      .cata(
-        dst =>
-          M.remount[T](src, dst)
-            .as(s"moved ${printPath(src)} to ${printPath(dst)}")
-            .liftM[ApiErrT],
-        ApiError
-          .apiError(
-            BadRequest withReason s"Expected an absolute $typeStr.",
-            "path" := transcode(UriPathCodec, posixCodec)(dstStr)
-          )
-          .raiseError[ApiErrT[Free[S, ?], ?], String]
-      )
+    S1: PathMismatchFailure :<: S
+  ): EitherT[Free[S, ?], ApiError, String] =
+    parse(dstStr).map(unsafeSandboxAbs).cata(dst =>
+      M.remount[T](src, dst)
+        .as(s"moved ${printPath(src)} to ${printPath(dst)}")
+        .liftM[ApiErrT],
+      ApiError.apiError(
+        BadRequest withReason s"Expected an absolute $typeStr.",
+        "path" := transcode(UriPathCodec, posixCodec)(dstStr)
+      ).raiseError[ApiErrT[Free[S, ?], ?], String])
 
   private def mount[S[_]](
-      path: APath,
-      req: Request,
-      replaceIfExists: Boolean
+    path: APath,
+    req: Request,
+    replaceIfExists: Boolean
   )(implicit
     M: Mounting.Ops[S],
     S0: Task :<: S,
     S1: MountingFailure :<: S,
-    S2: PathMismatchFailure :<: S): EitherT[Free[S, ?], ApiError, Boolean] =
+    S2: PathMismatchFailure :<: S
+  ): EitherT[Free[S, ?], ApiError, Boolean] =
     for {
-      body <- free
-        .lift(EntityDecoder.decodeString(req))
-        .into[S]
-        .liftM[ApiErrT]
-      bConf <- EitherT.fromDisjunction[Free[S, ?]](
-        Parse.decodeWith(
-          body,
-          (_: MountConfig).right[ApiError],
-          parseErrorMsg =>
-            ApiError
-              .fromMsg_(BadRequest withReason "Malformed input.", parseErrorMsg)
-              .left,
-          (msg, _) => ApiError.fromMsg_(BadRequest, msg).left
-        ))
+      body  <- free.lift(EntityDecoder.decodeString(req))
+                 .into[S].liftM[ApiErrT]
+      bConf <- EitherT.fromDisjunction[Free[S, ?]](Parse.decodeWith(
+                 body,
+                 (_: MountConfig).right[ApiError],
+                 parseErrorMsg => ApiError.fromMsg_(
+                   BadRequest withReason "Malformed input.",
+                   parseErrorMsg).left,
+                 (msg, _) => ApiError.fromMsg_(
+                   BadRequest, msg).left))
       exists <- M.lookupType(path).isDefined.liftM[ApiErrT]
-      mnt = if (replaceIfExists && exists) M.replace(path, bConf)
-      else M.mount(path, bConf)
-      _ <- mnt.liftM[ApiErrT]
+      mnt    =  if (replaceIfExists && exists) M.replace(path, bConf)
+                else M.mount(path, bConf)
+      _      <- mnt.liftM[ApiErrT]
     } yield exists
 }

@@ -22,9 +22,7 @@ import eu.timepit.refined.auto._
 import scalaz.Functor
 
 object mem {
-  val m = module("mem",
-                 "http://xqdev.com/in-mem-update",
-                 "/MarkLogic/appservices/utils/in-mem-update.xqy")
+  val m = module("mem", "http://xqdev.com/in-mem-update", "/MarkLogic/appservices/utils/in-mem-update.xqy")
 
   def nodeDelete[F[_]: Functor: PrologW](node: XQuery): F[XQuery] =
     m("node-delete") apply node

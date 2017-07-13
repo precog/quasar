@@ -22,7 +22,7 @@ import quasar.yggdrasil.table._
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
     import trans._
-    import StdLib.{BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined}
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }
 
     object Unary {
       val UnaryNamespace = Vector("std", "unary")

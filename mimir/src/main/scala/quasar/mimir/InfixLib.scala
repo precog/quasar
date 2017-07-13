@@ -23,16 +23,7 @@ import quasar.precog.util.NumericComparisons
 
 trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {
-    import StdLib.{
-      BoolFrom,
-      DoubleFrom,
-      LongFrom,
-      NumFrom,
-      StrFrom,
-      doubleIsDefined,
-      StrAndDateT,
-      dateToStrCol
-    }
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined, StrAndDateT, dateToStrCol }
 
     object Infix {
       val InfixNamespace = Vector("std", "infix")
@@ -45,10 +36,7 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       final def doubleNeZero(x: Double, y: Double)      = y != 0.0
       final def numNeZero(x: BigDecimal, y: BigDecimal) = y != 0
 
-      class InfixOp2(name: String,
-                     longf: (Long, Long) => Long,
-                     doublef: (Double, Double) => Double,
-                     numf: (BigDecimal, BigDecimal) => BigDecimal)
+      class InfixOp2(name: String, longf: (Long, Long) => Long, doublef: (Double, Double) => Double, numf: (BigDecimal, BigDecimal) => BigDecimal)
           extends Op2F2(InfixNamespace, name) {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
         def f2: F2 = CF2P("builtin::infix::op2::" + name) {
@@ -89,7 +77,7 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       val Div = new Op2F2(InfixNamespace, "divide") {
         def doublef(x: Double, y: Double) = x / y
 
-        val context                            = java.math.MathContext.DECIMAL128
+        val context = java.math.MathContext.DECIMAL128
         def numf(x: BigDecimal, y: BigDecimal) = x(context) / y(context)
 
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
@@ -168,7 +156,7 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       trait Power {
         def cf2pName: String
 
-        val tpe                           = BinaryOperationType(JNumberT, JNumberT, JNumberT)
+        val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
         def defined(x: Double, y: Double) = doubleIsDefined(x) && doubleIsDefined(y)
         def f2: F2 = CF2P(cf2pName) {
           case (c1: DoubleColumn, c2: DoubleColumn) =>
@@ -204,8 +192,7 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         val cf2pName = "builtin::infix::pow"
       }
 
-      class CompareOp2(name: String, f: Int => Boolean)
-          extends Op2F2(InfixNamespace, name) {
+      class CompareOp2(name: String, f: Int => Boolean) extends Op2F2(InfixNamespace, name) {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JBooleanT)
         import NumericComparisons.compare
         def f2: F2 = CF2P("builtin::infix::compare") {
@@ -246,8 +233,7 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       val Gt   = new CompareOp2("gt", _ > 0)
       val GtEq = new CompareOp2("gte", _ >= 0)
 
-      class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean)
-          extends Op2F2(InfixNamespace, name) {
+      class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean) extends Op2F2(InfixNamespace, name) {
         val tpe = BinaryOperationType(JBooleanT, JBooleanT, JBooleanT)
         def f2: F2 = CF2P("builtin::infix::bool") {
           case (c1: BoolColumn, c2: BoolColumn) => new BoolFrom.BB(c1, c2, f)
@@ -265,11 +251,10 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           new StrFrom.SS(c1, c2, _ != null && _ != null, _ + _)
 
         def f2: F2 = CF2P("builtin::infix:concatString") {
-          case (c1: StrColumn, c2: StrColumn)  => build(c1, c2)
-          case (c1: DateColumn, c2: StrColumn) => build(dateToStrCol(c1), c2)
-          case (c1: StrColumn, c2: DateColumn) => build(c1, dateToStrCol(c2))
-          case (c1: DateColumn, c2: DateColumn) =>
-            build(dateToStrCol(c1), dateToStrCol(c2))
+          case (c1: StrColumn, c2: StrColumn)   => build(c1, c2)
+          case (c1: DateColumn, c2: StrColumn)  => build(dateToStrCol(c1), c2)
+          case (c1: StrColumn, c2: DateColumn)  => build(c1, dateToStrCol(c2))
+          case (c1: DateColumn, c2: DateColumn) => build(dateToStrCol(c1), dateToStrCol(c2))
         }
       }
     }

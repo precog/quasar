@@ -32,29 +32,24 @@ import scalaz.concurrent.Task
 
 object MongoDbSpec {
   def connect(uri: ConnectionUri): Task[MongoClient] =
-    asyncClientDef[Task](uri).run
-      .foldMap(NaturalTransformation.refl)
-      .flatMap(_.fold(err => Task.fail(new RuntimeException(err.toString)), Task.now))
+    asyncClientDef[Task](uri).run.foldMap(NaturalTransformation.refl).flatMap(_.fold(
+      err => Task.fail(new RuntimeException(err.toString)),
+      Task.now))
 
   def tempColl(prefix: ADir): Task[Collection] =
     NameGenerator.salt >>= (n =>
-      Collection
-        .fromFile(prefix </> file(n))
-        .fold(err => Task.fail(new RuntimeException(err.shows)), Task.now))
+      Collection.fromFile(prefix </> file(n)).fold(
+        err => Task.fail(new RuntimeException(err.shows)),
+        Task.now))
 
-  def clientShould(fsType: FileSystemType)(
-      examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
-    TestConfig.testDataPrefix
-      .flatMap { prefix =>
-        TestConfig.fileSystemConfigs(fsType) >>= (_.traverse {
-          case (ref, setupUri, testUri) =>
-            (connect(setupUri) |@| connect(testUri))(
-              (setupClient, testClient) =>
-                Fragments(examples(ref.name, prefix, setupClient, testClient),
-                          step(testClient.close),
-                          step(setupClient.close)))
-        })
-      }
-      .map(_.suml)
-      .unsafePerformSync
+  def clientShould(fsType: FileSystemType)(examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
+    TestConfig.testDataPrefix.flatMap { prefix =>
+      TestConfig.fileSystemConfigs(fsType) >>= (_.traverse { case (ref, setupUri, testUri) =>
+        (connect(setupUri) |@| connect(testUri))((setupClient, testClient) =>
+          Fragments(
+            examples(ref.name, prefix, setupClient, testClient),
+            step(testClient.close),
+            step(setupClient.close)))
+      })
+    }.map(_.suml).unsafePerformSync
 }

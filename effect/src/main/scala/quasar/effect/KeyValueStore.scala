@@ -33,19 +33,23 @@ sealed abstract class KeyValueStore[K, V, A]
 
 object KeyValueStore {
   // NB: Switch to cursor style terms for Keys once backing stores exist where all keys won't fit into memory.
-  final case class Keys[K, V]() extends KeyValueStore[K, V, Vector[K]]
+  final case class Keys[K, V]()
+    extends KeyValueStore[K, V, Vector[K]]
 
-  final case class Get[K, V](k: K) extends KeyValueStore[K, V, Option[V]]
+  final case class Get[K, V](k: K)
+    extends KeyValueStore[K, V, Option[V]]
 
-  final case class Put[K, V](k: K, v: V) extends KeyValueStore[K, V, Unit]
+  final case class Put[K, V](k: K, v: V)
+    extends KeyValueStore[K, V, Unit]
 
   final case class CompareAndPut[K, V](k: K, expect: Option[V], update: V)
-      extends KeyValueStore[K, V, Boolean]
+    extends KeyValueStore[K, V, Boolean]
 
-  final case class Delete[K, V](k: K) extends KeyValueStore[K, V, Unit]
+  final case class Delete[K, V](k: K)
+    extends KeyValueStore[K, V, Unit]
 
   final class Ops[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S)
-      extends LiftedOps[KeyValueStore[K, V, ?], S] {
+    extends LiftedOps[KeyValueStore[K, V, ?], S] {
 
     /** Atomically associates the given key with the first part of the result
       * of applying the given function to the value currently associated with
@@ -54,10 +58,10 @@ object KeyValueStore {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alterS[A](k: K, f: Option[V] => (V, A)): FreeS[A] =
       for {
-        cur <- get(k).run
-        (nxt, a0) = f(cur)
-        updated <- compareAndPut(k, cur, nxt)
-        a       <- if (updated) a0.point[FreeS] else alterS(k, f)
+        cur       <- get(k).run
+        (nxt, a0) =  f(cur)
+        updated   <- compareAndPut(k, cur, nxt)
+        a         <- if (updated) a0.point[FreeS] else alterS(k, f)
       } yield a
 
     /** Returns whether a value is associated with the given key. */
@@ -103,24 +107,24 @@ object KeyValueStore {
   }
 
   object Ops {
-    implicit def apply[K, V, S[_]](
-        implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
+    implicit def apply[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
       new Ops[K, V, S]
   }
 
   object impl {
 
-    def empty[K, V]: Task[KeyValueStore[K, V, ?] ~> Task] = Task.delay {
+    def empty[K, V]: Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
       val state = scala.collection.concurrent.TrieMap.empty[K, V]
       new (KeyValueStore[K, V, ?] ~> Task) {
         def apply[A](fa: KeyValueStore[K, V, A]): Task[A] = fa match {
-          case Keys()                      => Task.delay(state.keys.toVector)
-          case Get(k)                      => Task.delay(state.get(k))
-          case Put(k, v)                   => Task.delay(state.update(k, v))
+          case Keys() => Task.delay(state.keys.toVector)
+          case Get(k) => Task.delay(state.get(k))
+          case Put(k, v) => Task.delay(state.update(k, v))
           case CompareAndPut(k, expect, v) =>
             // Beware, type-checking does not work properly in this block as of scala 2.11.8
-            Task.delay(
-              expect.cata(e => state.replace(k, e, v), state.putIfAbsent(k, v).isEmpty))
+            Task.delay(expect.cata(
+              e => state.replace(k, e, v),
+              state.putIfAbsent(k, v).isEmpty))
           case Delete(k) => Task.delay(state.remove(k)).void
         }
       }
@@ -131,7 +135,7 @@ object KeyValueStore {
       */
     def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
       new (KeyValueStore[K, V, ?] ~> Task) {
-        val toST = toState[State[Map[K, V], ?]](Lens.id[Map[K, V]])
+        val toST = toState[State[Map[K,V],?]](Lens.id[Map[K,V]])
         def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
           ref.modifyS(toST(fa).run)
       }
@@ -161,10 +165,9 @@ object KeyValueStore {
                 R.modify(_ + (path -> cfg)).void
 
               case CompareAndPut(path, expect, update) =>
-                R.modifyS(
-                  m =>
-                    if (m.get(path) == expect) (m + (path -> update), true)
-                    else (m, false))
+                R.modifyS(m =>
+                  if (m.get(path) == expect) (m + (path -> update), true)
+                  else (m, false))
 
               case Delete(path) =>
                 R.modify(_ - path).void
@@ -184,9 +187,9 @@ object KeyValueStore {
         new Aux[F]
 
       final class Aux[F[_]] {
-        def apply[K, V, S](l: Lens[S, Map[K, V]])(
-            implicit F: MonadState[F, S]): KeyValueStore[K, V, ?] ~> F =
-          new (KeyValueStore[K, V, ?] ~> F) {
+        def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
+                          : KeyValueStore[K, V, ?] ~> F =
+          new(KeyValueStore[K, V, ?] ~> F) {
             // FIXME
             @SuppressWarnings(Array("org.wartremover.warts.Equals"))
             def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {

@@ -33,9 +33,8 @@ class ToDataSpec extends quasar.Qspec {
           <bar>msg2</bar>
         </foo>
       val expected =
-        Obj(
-          ListMap("foo" ->
-            Obj(ListMap("bar" -> Arr(List(Str("msg1"), Str("msg2")))))))
+        Obj(ListMap("foo" ->
+          Obj(ListMap("bar" -> Arr(List(Str("msg1"), Str("msg2")))))))
       toEJsonData(sample) must_= expected
     }
 
@@ -46,43 +45,40 @@ class ToDataSpec extends quasar.Qspec {
             <bar>msg</bar>
           </foo>
         val expected =
-          Obj(
-            ListMap(
-              "foo" -> Obj(
-                ListMap(
-                  "_xml.attributes" -> Obj(ListMap(
-                    "type" -> Str("baz")
-                  )),
-                  "bar" -> Str("msg")
-                ))
+          Obj(ListMap(
+            "foo" -> Obj(ListMap(
+              "_xml.attributes" -> Obj(ListMap(
+                "type" -> Str("baz")
+              )),
+              "bar" -> Str("msg")
             ))
+          ))
         toEJsonData(sample) must_= expected
       }
 
       "element with attribute but only text" in {
         val sample = <foo type="baz">msg</foo>
         val expected =
-          Obj(
-            ListMap(
-              "foo" -> Obj(
-                ListMap(
-                  "_xml.attributes" -> Obj(ListMap(
-                    "type" -> Str("baz")
-                  )),
-                  "_xml.text" -> Str("msg")
-                ))
-            ))
+          Obj(ListMap(
+            "foo" -> Obj(ListMap(
+              "_xml.attributes" -> Obj(ListMap(
+                "type" -> Str("baz")
+              )),
+              "_xml.text" -> Str("msg")
+          ))
+        ))
         toEJsonData(sample) must_= expected
       }
 
       "element with just attributes" in {
         val sample = <foo type="baz" quux="bar" />
         val expected = Obj(
-          "foo" -> Obj("_xml.attributes" -> Obj(
-                         "type" -> Str("baz"),
-                         "quux" -> Str("bar")
-                       ),
-                       "_xml.text" -> Str("")))
+          "foo" -> Obj(
+            "_xml.attributes" -> Obj(
+              "type" -> Str("baz"),
+              "quux" -> Str("bar")
+            ),
+            "_xml.text" -> Str("")))
         toEJsonData(sample) must_= expected
       }
     }
@@ -90,20 +86,18 @@ class ToDataSpec extends quasar.Qspec {
     "element with name prefix" in {
       val sample = <quasar:foo>hello</quasar:foo>
       val expected =
-        Obj(
-          ListMap(
-            "quasar:foo" -> Str("hello")
-          ))
+        Obj(ListMap(
+          "quasar:foo" -> Str("hello")
+        ))
       toEJsonData(sample) must_= expected
     }
 
     "empty element" in {
       val sample = <foo></foo>
       val expected =
-        Obj(
-          ListMap(
-            "foo" -> Str("")
-          ))
+        Obj(ListMap(
+          "foo" -> Str("")
+        ))
       toEJsonData(sample) must_= expected
     }
 
@@ -115,13 +109,11 @@ class ToDataSpec extends quasar.Qspec {
           <bar></bar>
         </foo>
       val expected =
-        Obj(
-          ListMap(
-            "foo" -> Obj(
-              ListMap(
-                "bar" -> Arr(List(Str(""), Str(""), Str("")))
-              ))
+        Obj(ListMap(
+          "foo" -> Obj(ListMap(
+            "bar" -> Arr(List(Str(""), Str(""), Str("")))
           ))
+        ))
       toEJsonData(sample) must_= expected
     }
 
@@ -136,20 +128,19 @@ class ToDataSpec extends quasar.Qspec {
           <quux>lorem ipsum</quux>
         </foo>
       val expected =
-        Obj(
-          ListMap(
-            "foo" -> Obj(ListMap(
-              "_xml.attributes" -> Obj(ListMap(
-                "type" -> Str("baz"),
-                "id"   -> Str("1")
-              )),
-              "bar" -> Obj(ListMap(
-                "baz" -> Str("37"),
-                "bat" -> Arr(List(Str("one"), Str("two")))
-              )),
-              "quux" -> Str("lorem ipsum")
-            ))
+        Obj(ListMap(
+          "foo" -> Obj(ListMap(
+            "_xml.attributes" -> Obj(ListMap(
+              "type" -> Str("baz"),
+              "id"   -> Str("1")
+            )),
+            "bar"         -> Obj(ListMap(
+              "baz" -> Str("37"),
+              "bat" -> Arr(List(Str("one"), Str("two")))
+            )),
+            "quux"        -> Str("lorem ipsum")
           ))
+        ))
       toEJsonData(sample) must_= expected
     }
   }

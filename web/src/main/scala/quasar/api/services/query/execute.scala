@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import slamdata.Predef.{-> => _, _}
+import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
@@ -44,46 +44,36 @@ object execute {
   // QScriptCore :<: F ===> ThetaJoin :+: F => EquiJoin :+: F
 
   def service[S[_]](
-      implicit
-      W: WriteFile :<: S,
-      Q: QueryFile.Ops[S],
-      M: ManageFile :<: S,
-      S1: Task :<: S,
-      S2: FileSystemFailure :<: S,
-      S3: Mounting :<: S
+    implicit
+    W: WriteFile :<: S,
+    Q: QueryFile.Ops[S],
+    M: ManageFile :<: S,
+    S1: Task :<: S,
+    S2: FileSystemFailure :<: S,
+    S3: Mounting :<: S
   ): QHttpService[S] = {
-    val fsQ   = new FilesystemQueries[S]
+    val fsQ = new FilesystemQueries[S]
     val xform = QueryFile.Transforms[Free[S, ?]]
 
-    def destinationFile(fileStr: String)
-      : ApiError \/ (Path[Abs, File, Unsandboxed] \/ Path[Rel, File, Unsandboxed]) = {
-      val err = -\/(
-        ApiError.apiError(BadRequest withReason "Destination must be a file.",
-                          "destination" := transcode(UriPathCodec, posixCodec)(fileStr)))
+    def destinationFile(fileStr: String): ApiError \/ (Path[Abs,File,Unsandboxed] \/ Path[Rel,File,Unsandboxed]) = {
+      val err = -\/(ApiError.apiError(
+        BadRequest withReason "Destination must be a file.",
+        "destination" := transcode(UriPathCodec, posixCodec)(fileStr)))
 
-      UriPathCodec.parsePath(relFile => \/-(\/-(relFile)),
-                             absFile => \/-(-\/(absFile)),
-                             κ(err),
-                             κ(err))(fileStr)
+      UriPathCodec.parsePath(relFile => \/-(\/-(relFile)), absFile => \/-(-\/(absFile)), κ(err), κ(err))(fileStr)
     }
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
-        respond(parsedQueryRequest(req, offset, limit) traverse {
-          case (xpr, basePath, off, lim) =>
-            // FIXME: use fsQ.evaluateQuery here
-            resolveImports[S](xpr, basePath).run.map { block =>
-              block
-                .leftMap(_.wrapNel)
-                .flatMap(
-                  block =>
-                    queryPlan(block, requestVars(req), basePath, off, lim).run.value map (
-                        lp =>
-                          formattedDataResponse(
-                            MessageFormat.fromAccept(req.headers.get(Accept)),
-                            lp.fold(Process(_: _*), Q.evaluate(_))
-                              .translate(xform.dropPhases))))
-            }
+        respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
+          // FIXME: use fsQ.evaluateQuery here
+          resolveImports[S](xpr, basePath).run.map { block =>
+            block.leftMap(_.wrapNel).flatMap(block =>
+              queryPlan(block, requestVars(req), basePath, off, lim)
+                .run.value map (lp => formattedDataResponse(
+                MessageFormat.fromAccept(req.headers.get(Accept)),
+                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases))))
+          }
         })
 
       case req @ POST -> AsDirPath(path) =>
@@ -103,28 +93,16 @@ object execute {
                 decodedDir(req.uri.path)
 
               parseRes tuple absDestination tuple basePath
-            } traverse {
-              case ((expr, out), basePath) =>
-                resolveImports(expr, basePath)
-                  .leftMap(_.toApiError)
-                  .flatMap { block =>
-                    EitherT(
-                      fsQ
-                        .executeQuery(block, requestVars(req), basePath, out)
-                        .run
-                        .run
-                        .run map {
-                        case (phases, result) =>
-                          result
-                            .leftMap(_.toApiError)
-                            .flatMap(_.leftMap(_.toApiError))
-                            .bimap(_ :+ ("phases" := phases),
-                                   f =>
-                                     Json("out" := posixCodec.printPath(f),
-                                          "phases" := phases))
-                      })
-                  }
-                  .run
+            } traverse { case ((expr, out), basePath) =>
+              resolveImports(expr, basePath).leftMap(_.toApiError).flatMap { block =>
+                  EitherT(fsQ.executeQuery(block, requestVars(req), basePath, out).run.run.run map {
+                    case (phases, result) =>
+                      result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
+                        .bimap(_ :+ ("phases" := phases), f => Json(
+                          "out"    := posixCodec.printPath(f),
+                          "phases" := phases))
+                  })
+              }.run
             })
           }
         }

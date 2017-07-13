@@ -21,22 +21,21 @@ import slamdata.Predef.Throwable
 import scalaz._, Scalaz._
 
 trait EitherTInstances extends EitherTInstances0 {
-  implicit def eitherTCatchable[F[_]: Catchable: Functor, E]
-    : Catchable[EitherT[F, E, ?]] =
+  implicit def eitherTCatchable[F[_]: Catchable : Functor, E]: Catchable[EitherT[F, E, ?]] =
     new Catchable[EitherT[F, E, ?]] {
       def attempt[A](fa: EitherT[F, E, A]) =
-        EitherT[F, E, Throwable \/ A](Catchable[F].attempt(fa.run) map {
-          case -\/(t)      => \/.right(\/.left(t))
-          case \/-(-\/(e)) => \/.left(e)
-          case \/-(\/-(a)) => \/.right(\/.right(a))
-        })
+        EitherT[F, E, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)      => \/.right(\/.left(t))
+            case \/-(-\/(e)) => \/.left(e)
+            case \/-(\/-(a)) => \/.right(\/.right(a))
+          })
 
       def fail[A](t: Throwable) =
         EitherT[F, E, A](Catchable[F].fail(t))
     }
 
-  implicit def eitherTThrowableCatchable[M[_]: Monad]
-    : Catchable[EitherT[M, Throwable, ?]] =
+  implicit def eitherTThrowableCatchable[M[_]: Monad]: Catchable[EitherT[M, Throwable, ?]] =
     new Catchable[EitherT[M, Throwable, ?]] {
       def attempt[A](f: EitherT[M, Throwable, A]): EitherT[M, Throwable, Throwable \/ A] =
         EitherT.right(f.run)
@@ -44,44 +43,40 @@ trait EitherTInstances extends EitherTInstances0 {
         EitherT.left(err.point[M])
     }
 
-  implicit def eitherTMonadState[F[_], S, E](
-      implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
+  implicit def eitherTMonadState[F[_], S, E](implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
     new MonadState[EitherT[F, E, ?], S] {
-      def init                                                       = F.init.liftM[EitherT[?[_], E, ?]]
-      def get                                                        = F.get.liftM[EitherT[?[_], E, ?]]
-      def put(s: S)                                                  = F.put(s).liftM[EitherT[?[_], E, ?]]
-      override def map[A, B](fa: EitherT[F, E, A])(f: A => B)        = fa map f
+      def init = F.init.liftM[EitherT[?[_], E, ?]]
+      def get = F.get.liftM[EitherT[?[_], E, ?]]
+      def put(s: S) = F.put(s).liftM[EitherT[?[_], E, ?]]
+      override def map[A, B](fa: EitherT[F, E, A])(f: A => B) = fa map f
       def bind[A, B](fa: EitherT[F, E, A])(f: A => EitherT[F, E, B]) = fa flatMap f
-      def point[A](a: => A)                                          = F.point(a).liftM[EitherT[?[_], E, ?]]
+      def point[A](a: => A) = F.point(a).liftM[EitherT[?[_], E, ?]]
     }
 }
 
 trait EitherTInstances0 extends EitherTInstances1 {
-  implicit def eitherTMonadReader[F[_], R, E](
-      implicit F: MonadReader[F, R]): MonadReader[EitherT[F, E, ?], R] =
+  implicit def eitherTMonadReader[F[_], R, E](implicit F: MonadReader[F, R]): MonadReader[EitherT[F, E, ?], R] =
     new MonadReader[EitherT[F, E, ?], R] {
-      def ask                                                        = EitherT.right(F.ask)
-      def local[A](f: R => R)(fa: EitherT[F, E, A])                  = EitherT(F.local(f)(fa.run))
-      override def map[A, B](fa: EitherT[F, E, A])(f: A => B)        = fa map f
+      def ask = EitherT.right(F.ask)
+      def local[A](f: R => R)(fa: EitherT[F, E, A]) = EitherT(F.local(f)(fa.run))
+      override def map[A, B](fa: EitherT[F, E, A])(f: A => B) = fa map f
       def bind[A, B](fa: EitherT[F, E, A])(f: A => EitherT[F, E, B]) = fa flatMap f
-      def point[A](a: => A)                                          = F.point(a).liftM[EitherT[?[_], E, ?]]
+      def point[A](a: => A) = F.point(a).liftM[EitherT[?[_], E, ?]]
     }
 }
 
 trait EitherTInstances1 extends EitherTInstances2 {
-  implicit def eitherTMonadListen[F[_], W, E](
-      implicit F: MonadListen[F, W]): MonadListen[EitherT[F, E, ?], W] =
+  implicit def eitherTMonadListen[F[_], W, E](implicit F: MonadListen[F, W]): MonadListen[EitherT[F, E, ?], W] =
     EitherT.monadListen[F, W, E]
 }
 
 trait EitherTInstances2 {
-  implicit def eitherTMonadTell[F[_], W, E](
-      implicit F: MonadTell[F, W]): MonadTell[EitherT[F, E, ?], W] =
+  implicit def eitherTMonadTell[F[_], W, E](implicit F: MonadTell[F, W]): MonadTell[EitherT[F, E, ?], W] =
     EitherT.monadTell[F, W, E]
 }
 
 object eitherT extends EitherTInstances {
-  implicit class NestedEitherT[E, F[_]: Monad, A](a: EitherT[EitherT[F, E, ?], E, A]) {
+  implicit class NestedEitherT[E,F[_]: Monad, A](a: EitherT[EitherT[F, E, ?], E, A]) {
     def flattenLeft: EitherT[F, E, A] =
       a.run.flatMapF(_.point[F])
   }

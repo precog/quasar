@@ -26,9 +26,9 @@ import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 
 class StreamingQueryRegressionSpec
-    extends QueryRegressionTest[AnalyticalFileSystemIO](
-      QueryRegressionTest.externalFS.map(
-        _.filter(_.ref.supports(BackendCapability.query())))) {
+  extends QueryRegressionTest[AnalyticalFileSystemIO](
+    QueryRegressionTest.externalFS.map(_.filter(
+      _.ref.supports(BackendCapability.query())))) {
 
   val suiteName = "Streaming Queries"
 

@@ -22,7 +22,7 @@ import scala.Predef.$conforms
 import scala.collection.mutable.Builder
 import scala.collection.Traversable
 import scala.language.postfixOps
-import scala.{Byte, Char}
+import scala.{ Byte, Char }
 
 package object tests extends TestsPackage
 
@@ -41,8 +41,7 @@ trait SpecsSupport {
   type ThrownExpectations = org.specs2.matcher.ThrownExpectations
 
   trait SpecificationHelp extends SpecificationLike with ThrownMessages {
-    def haveAllElementsLike[A](pf: PartialFunction[A, Boolean]): ContainWithResult[A] =
-      contain(like[A]({ case x if pf.isDefinedAt(x) && pf(x) => ok })).forall
+    def haveAllElementsLike[A](pf: PartialFunction[A, Boolean]): ContainWithResult[A] = contain(like[A]({ case x if pf.isDefinedAt(x) && pf(x) => ok })).forall
   }
 }
 
@@ -60,7 +59,7 @@ trait ScalacheckSupport {
   type Prop                    = org.scalacheck.Prop
   type Shrink[A]               = org.scalacheck.Shrink[A]
 
-  import Gen.{listOfN, containerOfN, identifier, sized, oneOf, frequency, alphaNumChar}
+  import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency, alphaNumChar }
 
   def choose(lo: Int, hi: Int): Gen[Int]    = Gen.choose(lo, hi)
   def choose(lo: Long, hi: Long): Gen[Long] = Gen.choose(lo, hi)
@@ -76,28 +75,19 @@ trait ScalacheckSupport {
     def builder: Builder[A, Vector[A]] = Vector.newBuilder[A]
   }
 
-  def genFile: Gen[jFile] =
-    listOfN(3, identifier map (_ take 5)) map (xs =>
-      new jFile(xs.mkString("/", "/", ".cooked")))
+  def genFile: Gen[jFile] = listOfN(3, identifier map (_ take 5)) map (xs => new jFile(xs.mkString("/", "/", ".cooked")))
 
-  def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(
-      implicit b: Buildable[A, C[A]]): Gen[C[A]] =
-    sized(size =>
-      for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
+  def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
+    sized(size => for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
-  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]] =
-    containerOfAtMostN[Vector, A](maxSequenceLength, gen)
-  def listOf[A](gen: Gen[A]): Gen[List[A]] =
-    containerOfAtMostN[List, A](maxSequenceLength, gen)
-  def setOf[A](gen: Gen[A]): Gen[Set[A]] =
-    containerOfAtMostN[Set, A](maxSequenceLength, gen)
+  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]     = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
+  def listOf[A](gen: Gen[A]): Gen[List[A]]         = containerOfAtMostN[List, A](maxSequenceLength, gen)
+  def setOf[A](gen: Gen[A]): Gen[Set[A]]           = containerOfAtMostN[Set, A](maxSequenceLength, gen)
 
-  def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] =
-    vectorOfN(len, gen) ^^ (_.toArray)
-  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]] =
-    containerOfN[Vector, A](len, gen)
-  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]] = containerOfN[Set, A](len, gen)
+  def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
+  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]     = containerOfN[Vector, A](len, gen)
+  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]           = containerOfN[Set, A](len, gen)
 
   // !!! Should take an Eq[K].
   def mapOfN[K, V](len: Int, k: Gen[K], v: Gen[V]): Gen[sciMap[K, V]] =
@@ -118,9 +108,8 @@ trait ScalacheckSupport {
   def genOffsetAndLen: Gen[Int -> Int] = (genMinus10To10, 0 upTo 20).zip
   def genPosInt: Gen[Int]              = choose(1, Int.MaxValue)
   def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
-  def genStartAndEnd: Gen[Int -> Int] =
-    genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
-  def genString: Gen[String] = Arbitrary.arbString.arbitrary
+  def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
+  def genString: Gen[String]           = Arbitrary.arbString.arbitrary
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)
@@ -139,12 +128,11 @@ trait ScalacheckSupport {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
 
-    def take(n: Int): Vec[A] =
-      Stream continually gen.sample flatMap (x => x) take n toVector
+    def take(n: Int): Vec[A]         = Stream continually gen.sample flatMap (x => x) take n toVector
     def *(gn: Gen[Int]): Gen[Seq[A]] = gn >> (this * _)
     def *(n: Int): Gen[Seq[A]]       = vectorOfN(n, gen)
     def list: Gen[List[A]]           = listOf(gen)
-    def opt: Gen[Option[A]] = frequency(
+    def opt: Gen[Option[A]]          = frequency(
       1  -> None,
       10 -> (gen map (x => Some(x)))
     )
@@ -154,8 +142,7 @@ trait ScalacheckSupport {
     def zip: Gen[A -> B]              = >>(scala.Tuple2(_, _))
   }
   implicit class ScalacheckGen3Ops[A, B, C](gen: (Gen[A], Gen[B], Gen[C])) {
-    def >>[D](f: (A, B, C) => D): Gen[D] =
-      for (a <- gen._1; b <- gen._2; c <- gen._3) yield f(a, b, c)
-    def zip: Gen[(A, B, C)] = >>(scala.Tuple3(_, _, _))
+    def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1; b <- gen._2; c <- gen._3) yield f(a, b, c)
+    def zip: Gen[(A, B, C)]              = >>(scala.Tuple3(_, _, _))
   }
 }

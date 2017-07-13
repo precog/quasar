@@ -37,9 +37,8 @@ trait Versioning {
         channel.write(buffer)
       }
       Success(())
-    } catch {
-      case ioe: IOException =>
-        Failure(ioe)
+    } catch { case ioe: IOException =>
+      Failure(ioe)
     }
   }
 
@@ -58,9 +57,10 @@ trait Versioning {
       } else {
         Failure(new IOException("Incorrect magic number found."))
       }
-    } catch {
-      case ioe: IOException =>
-        Failure(ioe)
+    } catch { case ioe: IOException =>
+      Failure(ioe)
     }
   }
 }
+
+

@@ -34,7 +34,7 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
   // FIXME: This overloading is terrible, but would break many things to change,
   //        and we need to think about what is the right set of operators.
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def \(that: DocVar): Option[DocVar] = (this, that) match {
+  def \ (that: DocVar): Option[DocVar] = (this, that) match {
     case (DocVar(n1, f1), DocVar(n2, f2)) if (n1 == n2) =>
       val f3 = (f1 |@| f2)(_ \ _) orElse (f1) orElse (f2)
 
@@ -43,27 +43,25 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
     case _ => None
   }
 
-  def \\(that: DocVar): DocVar = (this, that) match {
+  def \\ (that: DocVar): DocVar = (this, that) match {
     case (DocVar(n1, f1), DocVar(_, f2)) =>
       val f3 = (f1 |@| f2)(_ \ _) orElse (f1) orElse (f2)
 
       DocVar(n1, f3)
   }
 
-  def \(field: BsonField): DocVar =
-    copy(deref = Some(deref.map(_ \ field).getOrElse(field)))
+  def \ (field: BsonField): DocVar = copy(deref = Some(deref.map(_ \ field).getOrElse(field)))
 
-  def toJs: JsFn =
-    JsFn(JsFn.defaultName, this match {
-      case DocVar(_, None)        => jscore.Ident(JsFn.defaultName)
-      case DocVar(_, Some(deref)) => deref.toJs(jscore.Ident(JsFn.defaultName))
-    })
+  def toJs: JsFn = JsFn(JsFn.defaultName, this match {
+    case DocVar(_, None)        => jscore.Ident(JsFn.defaultName)
+    case DocVar(_, Some(deref)) => deref.toJs(jscore.Ident(JsFn.defaultName))
+  })
 
   def bson: Bson = this match {
     case DocVar(DocVar.ROOT, Some(deref)) => Bson.Text(deref.asField)
-    case DocVar(name, deref) =>
+    case DocVar(name,        deref) =>
       val root = BsonField.Name(name.name)
-      Bson.Text(deref.map(root \ _).getOrElse(root).asVar)
+        Bson.Text(deref.map(root \ _).getOrElse(root).asVar)
   }
 }
 
@@ -75,7 +73,7 @@ object DocVar {
 
     def apply(leaves: List[BsonField.Name]) = DocVar(this, BsonField(leaves))
 
-    def apply(deref: Option[BsonField])             = DocVar(this, deref)
+    def apply(deref: Option[BsonField]) = DocVar(this, deref)
     def unapply(v: DocVar): Some[Option[BsonField]] = Some(v.deref)
   }
 
@@ -91,8 +89,8 @@ object DocVar {
   implicit val equal: Equal[DocVar] = Equal.equalA
 
   implicit val show: Show[DocVar] = Show.shows {
-    case DocVar(DocVar.ROOT, None)        => "DocVar.ROOT()"
+    case DocVar(DocVar.ROOT, None) => "DocVar.ROOT()"
     case DocVar(DocVar.ROOT, Some(deref)) => s"DocField(${deref.shows})"
-    case dv                               => s"DocVar(${dv.name.shows}, ${dv.deref.shows})"
+    case dv => s"DocVar(${dv.name.shows}, ${dv.deref.shows})"
   }
 }

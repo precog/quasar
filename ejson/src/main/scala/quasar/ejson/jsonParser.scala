@@ -24,9 +24,9 @@ import matryoshka.implicits._
 import scalaz.{:<:, Functor}
 
 object jsonParser {
-  def apply[T, F[_]: Functor](implicit T: Corecursive.Aux[T, F],
-                              C: Common :<: F,
-                              O: Obj :<: F): SupportParser[T] =
+  def apply[T, F[_]: Functor]
+    (implicit T: Corecursive.Aux[T, F], C: Common :<: F, O: Obj :<: F)
+      : SupportParser[T] =
     new SupportParser[T] {
       implicit val facade: Facade[T] =
         new SimpleFacade[T] {

@@ -30,11 +30,11 @@ package object server {
   import Mounting.PathTypeMismatch
 
   def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
-    failureResponseIOT[F, PhysicalError] :+:
-      failureResponseIOT[F, Module.Error] :+:
-      failureResponseIOT[F, PathTypeMismatch] :+:
-      failureResponseIOT[F, MountingError] :+:
-      failureResponseIOT[F, FileSystemError]
+    failureResponseIOT[F, PhysicalError]    :+:
+    failureResponseIOT[F, Module.Error]     :+:
+    failureResponseIOT[F, PathTypeMismatch] :+:
+    failureResponseIOT[F, MountingError]    :+:
+    failureResponseIOT[F, FileSystemError]
 
   /** Interprets errors into `Response`s, for use in web services. */
   val qErrsToResponseOr: QErrs ~> ResponseOr =

@@ -38,9 +38,7 @@ import scodec.bits.ByteVector
 
 import java.util.UUID
 
-final case class VersionLog(baseDir: ADir,
-                            committed: List[Version],
-                            versions: Set[Version]) {
+final case class VersionLog(baseDir: ADir, committed: List[Version], versions: Set[Version]) {
   def head: Option[Version] = committed.headOption
 }
 
@@ -50,16 +48,15 @@ object VersionLog {
 
   private type ST[F[_], A] = StateT[F, VersionLog, A]
 
-  private val Head: RDir             = Path.dir("HEAD")
-  private val VersionsJson: RFile    = Path.file("versions.json")
+  private val Head: RDir = Path.dir("HEAD")
+  private val VersionsJson: RFile = Path.file("versions.json")
   private val VersionsJsonNew: RFile = Path.file("versions.json.new")
 
   // keep the 5 most recent versions, by default
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S,
-                                IT: Task :<: S): Free[S, VersionLog] = {
+  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
     for {
       exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
@@ -87,8 +84,8 @@ object VersionLog {
       paths <- POSIX.ls[S](baseDir)
 
       versions = for {
-        path    <- paths
-        dir     <- Path.maybeDir(path).toList
+        path <- paths
+        dir <- Path.maybeDir(path).toList
         dirName <- Path.dirName(dir).toList
 
         version <- try {
@@ -102,7 +99,7 @@ object VersionLog {
 
   def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
     for {
-      log  <- StateTContrib.get[Free[S, ?], VersionLog]
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
       uuid <- POSIX.genUUID[S].liftM[ST]
       v = Version(uuid)
 
@@ -110,10 +107,9 @@ object VersionLog {
         fresh[S]
       } else {
         for {
-          _ <- StateTContrib.put[Free[S, ?], VersionLog](
-            log.copy(versions = log.versions + v))
+          _ <- StateTContrib.put[Free[S, ?], VersionLog](log.copy(versions = log.versions + v))
           target <- underlyingDir[Free[S, ?]](v)
-          _      <- POSIX.mkDir[S](target).liftM[ST]
+          _ <- POSIX.mkDir[S](target).liftM[ST]
         } yield v
       }
     } yield back
@@ -124,8 +120,7 @@ object VersionLog {
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
   // TODO add symlink
-  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S,
-                               IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
@@ -141,14 +136,12 @@ object VersionLog {
           writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
           _ <- POSIXWithTask.generalize(writer).liftM[ST]
 
-          _ <- POSIX
-            .move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson)
-            .liftM[ST]
+          _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
 
           _ <- POSIX.delete[S](log.baseDir </> Head).liftM[ST]
-          _ <- POSIX
-            .linkDir[S](log.baseDir </> Path.dir(v.value.toString), log.baseDir </> Head)
-            .liftM[ST]
+          _ <- POSIX.linkDir[S](
+            log.baseDir </> Path.dir(v.value.toString),
+            log.baseDir </> Head).liftM[ST]
         } yield ()
       } else {
         ().point[StateT[Free[S, ?], VersionLog, ?]]
@@ -172,12 +165,13 @@ object VersionLog {
       _ <- toPurge traverse { v =>
         for {
           dir <- underlyingDir[Free[S, ?]](v)
-          _   <- POSIX.delete[S](dir).liftM[ST]
+          _ <- POSIX.delete[S](dir).liftM[ST]
         } yield ()
       }
 
-      log2 = log.copy(committed = log.committed.take(KeepLimit),
-                      versions = log.versions -- toPurge)
+      log2 = log.copy(
+        committed = log.committed.take(KeepLimit),
+        versions = log.versions -- toPurge)
 
       // TODO write new versions.json
       _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)

@@ -37,8 +37,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 trait TablePagerModule extends ColumnarTableModule[Future] {
 
-  final class TablePager private (slices: StreamT[Task, Slice],
-                                  queue: Queue[Task, Vector[Data]]) {
+  final class TablePager private (
+      slices: StreamT[Task, Slice],
+      queue: Queue[Task, Vector[Data]]) {
 
     private val running = new AtomicBoolean(true)
 
@@ -67,7 +68,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
     }
 
     def more: Task[Vector[Data]] = queue.dequeue1
-    def close: Task[Unit]        = Task.delay(running.set(false))
+    def close: Task[Unit] = Task.delay(running.set(false))
   }
 
   object TablePager {

@@ -37,40 +37,34 @@ abstract class writefile {
 
   def open(file: AFile): Backend[WriteHandle] =
     for {
-      ctx <- MR.asks(_.ctx)
-      col = docTypeValueFromPath(file)
-      i <- MonotonicSeq.Ops[Eff].next.liftB
-      handle = WriteHandle(file, i)
-      _ <- wh.put(handle, Collection(ctx.bucket, col)).liftB
+      ctx    <- MR.asks(_.ctx)
+      col    =  docTypeValueFromPath(file)
+      i      <- MonotonicSeq.Ops[Eff].next.liftB
+      handle =  WriteHandle(file, i)
+      _      <- wh.put(handle, Collection(ctx.bucket, col)).liftB
     } yield handle
 
   def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
     (for {
-      ctx <- MR.asks(_.ctx)
-      col <- ME.unattempt(
-        wh.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
-      data <- lift(
-        Task.delay(
-          chunk
-            .map(DataCodec.render)
-            .unite
-            .map(str =>
-              JsonObject
-                .create()
-                .put(ctx.docTypeKey.v, col.docTypeValue.v)
-                .put("value", jsonTranscoder.stringToJsonObject(str))))).into[Eff].liftB
-      docs <- data
-        .traverse(d =>
-          GenUUID.Ops[Eff].asks(uuid => JsonDocument.create(uuid.toString, d)))
-        .liftB
-      _ <- lift(
-        Task.delay(
-          Observable
-            .from(docs)
-            .flatMap(ctx.bucket.async.insert(_).asScala)
-            .toBlocking
-            .last
-        )).into[Eff].liftB
+      ctx  <- MR.asks(_.ctx)
+      col  <- ME.unattempt(wh.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
+      data <- lift(Task.delay(chunk.map(DataCodec.render).unite
+                .map(str =>
+                  JsonObject
+                    .create()
+                    .put(ctx.docTypeKey.v, col.docTypeValue.v)
+                    .put("value", jsonTranscoder.stringToJsonObject(str))))
+              ).into[Eff].liftB
+      docs <- data.traverse(d => GenUUID.Ops[Eff].asks(uuid =>
+                JsonDocument.create(uuid.toString, d)
+              )).liftB
+      _    <- lift(Task.delay(
+                Observable
+                  .from(docs)
+                  .flatMap(ctx.bucket.async.insert(_).asScala)
+                  .toBlocking
+                  .last
+              )).into[Eff].liftB
     } yield Vector()).run.value ∘ (_.valueOr(Vector(_)))
 
   def close(h: WriteHandle): Configured[Unit] =

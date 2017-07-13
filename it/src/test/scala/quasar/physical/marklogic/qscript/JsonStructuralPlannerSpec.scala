@@ -26,7 +26,7 @@ import scalaz._, Scalaz._
 import WriterT.writerTMonadListen
 
 final class JsonStructuralPlannerSpec
-    extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, DocType.Json] {
+  extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, DocType.Json] {
 
   import JsonStructuralPlannerSpec.JsonPlan
 

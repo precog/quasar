@@ -42,33 +42,23 @@ object SimplifyProjection {
   }
 
   // FIXME: if these are only used implicitly they should have names less likely to collide.
-  implicit def projectBucket[T[_[_]], G[_]](
-      implicit QC: QScriptCore[T, ?] :<: G): Aux[ProjectBucket[T, ?], G] =
+  implicit def projectBucket[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[ProjectBucket[T, ?], G] =
     simplifiableProjection[T].ProjectBucket[G]
-  implicit def qscriptCore[T[_[_]], G[_]](
-      implicit QC: QScriptCore[T, ?] :<: G): Aux[QScriptCore[T, ?], G] =
+  implicit def qscriptCore[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[QScriptCore[T, ?], G] =
     simplifiableProjection[T].QScriptCore[G]
-  implicit def thetaJoin[T[_[_]], G[_]](
-      implicit QC: ThetaJoin[T, ?] :<: G): Aux[ThetaJoin[T, ?], G] =
+  implicit def thetaJoin[T[_[_]], G[_]](implicit QC: ThetaJoin[T, ?] :<: G): Aux[ThetaJoin[T, ?], G] =
     simplifiableProjection[T].ThetaJoin[G]
-  implicit def equiJoin[T[_[_]], G[_]](
-      implicit QC: EquiJoin[T, ?] :<: G): Aux[EquiJoin[T, ?], G] =
+  implicit def equiJoin[T[_[_]], G[_]](implicit QC: EquiJoin[T, ?] :<: G): Aux[EquiJoin[T, ?], G] =
     simplifiableProjection[T].EquiJoin[G]
-  implicit def deadEnd[F[_]](
-      implicit DE: Const[DeadEnd, ?] :<: F): Aux[Const[DeadEnd, ?], F] =
+  implicit def deadEnd[F[_]](implicit DE: Const[DeadEnd, ?] :<: F): Aux[Const[DeadEnd, ?], F] =
     default[Const[DeadEnd, ?], F]
-  implicit def read[F[_], A](
-      implicit R: Const[Read[A], ?] :<: F): Aux[Const[Read[A], ?], F] =
+  implicit def read[F[_], A](implicit R: Const[Read[A], ?] :<: F): Aux[Const[Read[A], ?], F] =
     default[Const[Read[A], ?], F]
-  implicit def shiftedRead[F[_], A](
-      implicit SR: Const[ShiftedRead[A], ?] :<: F): Aux[Const[ShiftedRead[A], ?], F] =
+  implicit def shiftedRead[F[_], A](implicit SR: Const[ShiftedRead[A], ?] :<: F): Aux[Const[ShiftedRead[A], ?], F] =
     default[Const[ShiftedRead[A], ?], F]
 
-  implicit def coproduct[T[_[_]], G[_], I[_], J[_]](
-      implicit I: Aux[I, G],
-      J: Aux[J, G]): Aux[Coproduct[I, J, ?], G] =
-    make(λ[Coproduct[I, J, ?] ~> G](fa =>
-      fa.run.fold(I.simplifyProjection, J.simplifyProjection)))
+  implicit def coproduct[T[_[_]], G[_], I[_], J[_]](implicit I: Aux[I, G], J: Aux[J, G]): Aux[Coproduct[I, J, ?], G] =
+    make(λ[Coproduct[I, J, ?] ~> G](fa => fa.run.fold(I.simplifyProjection, J.simplifyProjection)))
 
   // This assembles the coproduct out of the individual implicits.
   def simplifyQScriptTotal[T[_[_]]]: Aux[QScriptTotal[T, ?], QScriptTotal[T, ?]] = apply

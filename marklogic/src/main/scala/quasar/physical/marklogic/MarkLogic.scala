@@ -69,36 +69,29 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
 
   val Type = FsType
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]
-    : Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](
-      ::\::[ThetaJoin[T, ?]](
-        ::/::[T, Const[ShiftedRead[ADir], ?], Const[QRead[AFile], ?]]))
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[QRead[AFile], ?]]))
 
   // BackendModule
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
-    implicitly[Delay[RenderTree, QSM[T, ?]]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]]               = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM                              = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
-    implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
-    Unicoalesce.Capture[T, QS[T]]
+  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def MonadM = Monad[M]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
   // Managed
-  def MonoSeqM   = MonoSeq[M]
+  def MonoSeqM = MonoSeq[M]
   def ResultKvsM = Kvs[M, QueryFile.ResultHandle, XccDataStream]
-  def WriteKvsM  = Kvs[M, WriteFile.WriteHandle, AFile]
-  def ReadKvsM   = Kvs[M, ReadFile.ReadHandle, XccDataStream]
+  def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
+  def ReadKvsM = Kvs[M, ReadFile.ReadHandle, XccDataStream]
 
   implicit val xccSessionR  = quasar.effect.Read.monadReader_[Session, fs.XccEvalEff]
   implicit val xccSourceR   = quasar.effect.Read.monadReader_[ContentSource, fs.XccEvalEff]
   implicit val mlfsSessionR = quasar.effect.Read.monadReader_[Session, fs.MarkLogicFs]
-  implicit val mlfsCSourceR =
-    quasar.effect.Read.monadReader_[ContentSource, fs.MarkLogicFs]
-  implicit val mlfsUuidR = quasar.effect.Read.monadReader_[UUID, fs.MarkLogicFs]
+  implicit val mlfsCSourceR = quasar.effect.Read.monadReader_[ContentSource, fs.MarkLogicFs]
+  implicit val mlfsUuidR    = quasar.effect.Read.monadReader_[UUID, fs.MarkLogicFs]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import Kleisli.kleisliMonadReader
@@ -113,8 +106,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   }
 
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
-    MarkLogicConfig
-      .fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
+    MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
       .bimap(_.left[EnvironmentError], MLBackendConfig fromMarkLogicConfig _)
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = {
@@ -122,8 +114,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     runMarkLogicFs(cfg.cfg.xccUri) map { case (f, c) => (f compose dropWritten, c) }
   }
 
-  override def interpreter(
-      cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] = {
+  override def interpreter(cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] = {
     val xformPaths =
       if (cfg.cfg.rootDir === rootDir) liftFT[AnalyticalFileSystem]
       else chroot.analyticalFileSystem[AnalyticalFileSystem](cfg.cfg.rootDir)
@@ -133,36 +124,30 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     }
   }
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      qs: T[QSM[T, ?]]): Backend[Repr] = {
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {
       import cfg.{searchOptions, structuralPlannerM}
-      MainModule
-        .fromWritten(
-          qs.cataM(cfg.planner[T].plan[Q, V])
-            .flatMap(_.fold(
-              s =>
-                Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
-                  implicitly,
-                  implicitly,
-                  implicitly,
-                  // NB: Not sure why these aren't found implicitly, maybe something
-                  //     isn't a "stable" value?
-                  structuralPlannerM,
-                  searchOptions
-              ),
-              _.point[cfg.M]
-            ))
-            .strengthL(Version.`1.0-ml`)
-        )
-        .liftQB
+      MainModule.fromWritten(
+        qs.cataM(cfg.planner[T].plan[Q, V])
+          .flatMap(_.fold(s =>
+            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
+              implicitly,
+              implicitly,
+              implicitly,
+              // NB: Not sure why these aren't found implicitly, maybe something
+              //     isn't a "stable" value?
+              structuralPlannerM,
+              searchOptions),
+            _.point[cfg.M]))
+          .strengthL(Version.`1.0-ml`)
+      ).liftQB
     }
 
     for {
-      main <- config[Backend] >>= doPlan
-      pp   <- fs.ops.prettyPrint[Backend](main.queryBody)
-      xqyLog = MainModule.queryBody.modify(pp getOrElse _)(main).render
-      _ <- PhaseResultTell[Backend].tell(Vector(PhaseResult.detail("XQuery", xqyLog)))
+      main   <- config[Backend] >>= doPlan
+      pp     <- fs.ops.prettyPrint[Backend](main.queryBody)
+      xqyLog =  MainModule.queryBody.modify(pp getOrElse _)(main).render
+      _      <- PhaseResultTell[Backend].tell(Vector(PhaseResult.detail("XQuery", xqyLog)))
       // NB: While it would be nice to use the pretty printed body in the module
       //     returned for nicer error messages, we cannot as xdmp:pretty-print has
       //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
@@ -179,26 +164,24 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
           MonadListen_[Backend, Prologs]
             .listen(saveTo(out, mm.queryBody))
 
-        module0 map {
-          case (body, plogs) =>
-            (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
+        module0 map { case (body, plogs) =>
+          (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
       }
 
       val deleteOutIfExists =
         config[Backend] flatMap { cfg =>
           import cfg.{FMT, searchOptions}
-          fs.ops
-            .pathHavingFormatExists[M, FMT](out)
+          fs.ops.pathHavingFormatExists[M, FMT](out)
             .flatMap(_.whenM(fs.ops.deleteFile[M](out)))
             .transact
             .liftB
         }
 
       for {
-        mm <- saveResults(repr)
-        _  <- deleteOutIfExists
-        _  <- Xcc[M].execute(mm).liftB
+        mm  <- saveResults(repr)
+        _   <- deleteOutIfExists
+        _   <- Xcc[M].execute(mm).liftB
       } yield out
     }
 
@@ -208,11 +191,9 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
       config[Backend] >>= { cfg =>
         import cfg.{FMT, searchOptions}
-        ops
-          .pathHavingFormatExists[M, FMT](dir)
-          .liftB
-          .ifM(ops.directoryContents[M, FMT](dir).liftB,
-               pathErr(pathNotFound(dir)).raiseError[Backend, Set[PathSegment]])
+        ops.pathHavingFormatExists[M, FMT](dir).liftB.ifM(
+          ops.directoryContents[M, FMT](dir).liftB,
+          pathErr(pathNotFound(dir)).raiseError[Backend, Set[PathSegment]])
       }
 
     def fileExists(file: AFile): Configured[Boolean] =
@@ -222,8 +203,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     def resultsCursor(repr: Repr): Backend[XccDataStream] =
-      Xcc[XccEval]
-        .evaluate(repr)
+      Xcc[XccEval].evaluate(repr)
         .chunk(readChunkSize.value.toInt)
         .map(_ traverse xdmitem.decodeForFileSystem)
         .point[Backend]
@@ -238,26 +218,22 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
 
     private def saveTo(dst: AFile, results: XQuery): Backend[XQuery] =
       config[Backend] >>= { cfg =>
-        cfg.structuralPlannerM
-          .seqToArray(results)
+        cfg.structuralPlannerM.seqToArray(results)
           .map(xdmp.documentInsert(pathUri(dst).xs, _))
           .liftQB
       }
   }
 
   object ManagedReadFileModule extends ManagedReadFileModule {
-    def readCursor(file: AFile,
-                   offset: Natural,
-                   limit: Option[Positive]): Backend[XccDataStream] =
+    def readCursor(file: AFile, offset: Natural, limit: Option[Positive]): Backend[XccDataStream] =
       config[Backend] >>= { cfg =>
         import cfg._
         xccEvalToMLFSQ(ops.pathHavingFormatExists[XccEval, FMT](file))
-          .map(
-            _.fold(ops
-                     .readFile[XccEval, FMT](file, offset, limit)
-                     .chunk(readChunkSize.value.toInt)
-                     .map(_ traverse xdmitem.decodeForFileSystem),
-                   Process.empty))
+          .map(_.fold(
+            ops.readFile[XccEval, FMT](file, offset, limit)
+              .chunk(readChunkSize.value.toInt)
+              .map(_ traverse xdmitem.decodeForFileSystem),
+            Process.empty))
           .liftQB
       }
 
@@ -275,12 +251,10 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     def writeChunk(f: AFile, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
       config[Configured] >>= { cfg =>
         import cfg._
-        chunk
-          .grouped(writeChunkSize.value.toInt)
+        chunk.grouped(writeChunkSize.value.toInt)
           .toStream
           .foldMapM(write[FMT](f, _))
-          .run
-          .map(_.valueOr(mlerr => Vector(mlPlannerErrorToFsError(mlerr))))
+          .run.map(_.valueOr(mlerr => Vector(mlPlannerErrorToFsError(mlerr))))
           .liftM[ConfiguredT]
       }
 
@@ -290,12 +264,13 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     ////
 
     private def write[FMT](
-        dst: AFile,
-        lines: Vector[Data]
+      dst: AFile,
+      lines: Vector[Data]
     )(implicit
       P: StructuralPlanner[MLFSQ, FMT],
       O: SearchOptions[FMT],
-      C: AsContent[FMT, Data]): MLFSQ[Vector[FileSystemError]] = {
+      C: AsContent[FMT, Data]
+    ): MLFSQ[Vector[FileSystemError]] = {
       val chunk = Data._arr(lines.toList)
       ops.upsertFile[MLFSQ, FMT, Data](dst, chunk) map (_.fold(
         msgs => Vector(FileSystemError.writeFailed(chunk, msgs intercalate ", ")),
@@ -315,16 +290,19 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     def delete(path: APath): Backend[Unit] =
       config[Backend] >>= { cfg =>
         import cfg._
-        ifExists(path)(
-          refineType(path)
-            .fold(ops.deleteDir[Backend, FMT], ops.deleteFile[Backend])).void
+        ifExists(path)(refineType(path).fold(
+          ops.deleteDir[Backend, FMT],
+          ops.deleteFile[Backend])
+        ).void
       }
 
     def tempFile(path: APath): Backend[AFile] =
       // Take my hand, scalac
       UuidReader[FileSystemErrT[PhaseResultT[Configured, ?], ?]] asks { uuid =>
         val fname = s"temp-$uuid"
-        refineType(path).fold(d => d </> file(fname), f => fileParent(f) </> file(fname))
+        refineType(path).fold(
+          d => d </> file(fname),
+          f => fileParent(f) </> file(fname))
       }
 
     ////
@@ -332,8 +310,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     private def ifExists[A](path: APath)(thenDo: => Backend[A]): Backend[A] =
       config[Backend] >>= { cfg =>
         import cfg._
-        ops
-          .pathHavingFormatExists[Backend, FMT](path)
+        ops.pathHavingFormatExists[Backend, FMT](path)
           .ifM(thenDo, pathErr(pathNotFound(path)).raiseError[Backend, A])
           .transact
       }
@@ -346,13 +323,11 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
             ().point[Backend]
 
           case MoveSemantics.FailIfExists =>
-            ops
-              .pathHavingFormatExists[Backend, FMT](dst)
+            ops.pathHavingFormatExists[Backend, FMT](dst)
               .flatMap(_ whenM pathErr(pathExists(dst)).raiseError[Backend, Unit])
 
           case MoveSemantics.FailIfMissing =>
-            ops
-              .pathHavingFormatExists[Backend, FMT](dst)
+            ops.pathHavingFormatExists[Backend, FMT](dst)
               .flatMap(_ unlessM pathErr(pathNotFound(dst)).raiseError[Backend, Unit])
         }
       }
@@ -362,7 +337,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
         import cfg._
         ifExists(src)(
           checkMoveSemantics(dst, sem) *>
-            ops.moveFile[Backend, FMT](src, dst).void)
+          ops.moveFile[Backend, FMT](src, dst).void)
       }
 
     private def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): Backend[Unit] =
@@ -370,7 +345,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
         import cfg._
         ifExists(src)(
           checkMoveSemantics(dst, sem) *>
-            ops.moveDir[PrologT[Backend, ?], FMT](src, dst).value.void)
+          ops.moveDir[PrologT[Backend, ?], FMT](src, dst).value.void)
       }
   }
 }

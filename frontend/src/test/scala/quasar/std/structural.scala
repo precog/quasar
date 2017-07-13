@@ -113,8 +113,7 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     }
 
     "untype to a map type from some key type" in {
-      FlattenMapKeys.untpe(Str).map(_.unsized) must beSuccessful(
-        List(Obj(Map(), Top.some)))
+      FlattenMapKeys.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Top.some)))
     }
   }
 
@@ -128,8 +127,7 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     }
 
     "untype to an array type from some value type" in {
-      FlattenArray.untpe(Str).map(_.unsized) must beSuccessful(
-        List(FlexArr(0, None, Str)))
+      FlattenArray.untpe(Str).map(_.unsized) must beSuccessful(List(FlexArr(0, None, Str)))
     }
   }
 
@@ -219,8 +217,7 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     }
 
     "untype from a map type to the type of its values" in {
-      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(
-        List(Top, Str))
+      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(List(Top, Str))
     }
   }
 
@@ -230,15 +227,15 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     }
 
     "untype from an array type to the type of its values" in {
-      UnshiftArray.untpe(FlexArr(0, None, Str)).map(_.unsized) must beSuccessful(
-        List(Str))
+      UnshiftArray.untpe(FlexArr(0, None, Str)).map(_.unsized) must beSuccessful(List(Str))
     }
   }
 
   import org.scalacheck.Gen, Gen._
   import org.scalacheck.Arbitrary, Arbitrary._
-  lazy val arbStrType: Arbitrary[Type] = Arbitrary(
-    Gen.oneOf(const(Str), arbitrary[String].map(s => Const(Data.Str(s)))))
+  lazy val arbStrType: Arbitrary[Type] = Arbitrary(Gen.oneOf(
+    const(Str),
+    arbitrary[String].map(s => Const(Data.Str(s)))))
 
   lazy val arbArrayType: Arbitrary[Type] = Arbitrary(simpleArrayGen)
   lazy val simpleArrayGen = Gen.oneOf(
@@ -252,6 +249,5 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     } yield Arr(t),
     for {
       ds <- resize(5, arbitrary[List[Data]])
-    } yield Const(Data.Arr(ds))
-  )
+    } yield Const(Data.Arr(ds)))
 }

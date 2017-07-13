@@ -31,20 +31,9 @@ trait DateArbitrary {
   implicit val arbDate: Arbitrary[LocalDate]            = genDate
   implicit val arbTime: Arbitrary[LocalTime]            = genTime
 
-  implicit def genTemporalPart: Gen[TemporalPart] =
-    Gen.oneOf(Century,
-              Day,
-              Decade,
-              Hour,
-              Microsecond,
-              Millennium,
-              Millisecond,
-              Minute,
-              Month,
-              Quarter,
-              Second,
-              Week,
-              Year)
+  implicit def genTemporalPart: Gen[TemporalPart] = Gen.oneOf(
+    Century, Day, Decade, Hour, Microsecond, Millennium,
+    Millisecond, Minute, Month, Quarter, Second, Week, Year)
 
   private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
   private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)

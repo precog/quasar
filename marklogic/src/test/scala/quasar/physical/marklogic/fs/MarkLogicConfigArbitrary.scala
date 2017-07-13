@@ -36,7 +36,7 @@ trait MarkLogicConfigArbitrary {
       db   <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
       u    <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
       p    <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
-      uri = new URI("xcc", s"$u:$p", "ml.example.com", port, s"/${db}", null, null)
+      uri  =  new URI("xcc", s"$u:$p", "ml.example.com", port, s"/${db}", null, null)
     } yield MarkLogicConfig(uri, rdir.path, fmt))
 }
 

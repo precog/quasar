@@ -43,10 +43,7 @@ abstract class MetaStoreAccessSpec extends Specification with AnalysisSpec {
     check(Queries.mountsHavingPrefix(rootDir))
     check(Queries.lookupMountType(rootDir))
     check(Queries.lookupMountConfig(rootDir))
-    check(
-      Queries.insertMount(
-        rootDir,
-        MountConfig.fileSystemConfig(FileSystemType(""), ConnectionUri(""))))
+    check(Queries.insertMount(rootDir, MountConfig.fileSystemConfig(FileSystemType(""), ConnectionUri(""))))
     check(Queries.deleteMount(rootDir))
   }
 }

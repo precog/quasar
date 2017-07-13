@@ -37,7 +37,7 @@ private[json] class FailureException extends Exception
 object AsyncParser {
   sealed trait Input
   case class More(buf: ByteBuffer) extends Input
-  case object Done                 extends Input
+  case object Done extends Input
 
   @deprecated("Use AsyncParser.stream() to maintain the current behavior", "1.0")
   def apply(): AsyncParser = stream()
@@ -46,44 +46,20 @@ object AsyncParser {
     * Asynchronous parser for a stream of (whitespace-delimited) JSON values.
     */
   def stream(): AsyncParser =
-    new AsyncParser(state = -1,
-                    curr = 0,
-                    stack = Nil,
-                    data = new Array[Byte](131072),
-                    len = 0,
-                    allocated = 131072,
-                    offset = 0,
-                    done = false,
-                    streamMode = 0)
+    new AsyncParser(state = -1, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = 0)
 
   /**
     * Asynchronous parser for a single JSON value.
     */
   def json(): AsyncParser =
-    new AsyncParser(state = -1,
-                    curr = 0,
-                    stack = Nil,
-                    data = new Array[Byte](131072),
-                    len = 0,
-                    allocated = 131072,
-                    offset = 0,
-                    done = false,
-                    streamMode = -1)
+    new AsyncParser(state = -1, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = -1)
 
   /**
     * Asynchronous parser which can unwrap a single JSON array into a stream of
     * values (or return a single value otherwise).
     */
   def unwrap(): AsyncParser =
-    new AsyncParser(state = -5,
-                    curr = 0,
-                    stack = Nil,
-                    data = new Array[Byte](131072),
-                    len = 0,
-                    allocated = 131072,
-                    offset = 0,
-                    done = false,
-                    streamMode = 1)
+    new AsyncParser(state = -5, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = 1)
 }
 
 /*
@@ -142,15 +118,7 @@ final class AsyncParser protected[json] (
   protected[this] final def column(i: Int) = i - pos
 
   protected[this] final def copy() =
-    new AsyncParser(state,
-                    curr,
-                    stack,
-                    data.clone,
-                    len,
-                    allocated,
-                    offset,
-                    done,
-                    streamMode)
+    new AsyncParser(state, curr, stack, data.clone, len, allocated, offset, done, streamMode)
 
   final def apply(input: Input): (AsyncParse, AsyncParser) = copy.feed(input)
 

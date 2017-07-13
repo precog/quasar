@@ -42,16 +42,12 @@ class JsonParserSpec extends Specification with ScalaCheck {
 
     val json     = Examples.person
     val executor = Executors.newFixedThreadPool(100)
-    val results = (0 to 100)
-      .map(_ => executor.submit(new Callable[JValue] { def call = parseUnsafe(json) }))
-      .toList
-      .map(_.get)
+    val results  = (0 to 100).map(_ => executor.submit(new Callable[JValue] { def call = parseUnsafe(json) })).toList.map(_.get)
     results.zip(results.tail).forall(pair => pair._1 == pair._2) mustEqual true
   }
 
   "All valid string escape characters can be parsed" in {
-    parseUnsafe("[\"abc\\\"\\\\\\/\\b\\f\\n\\r\\t\\u00a0\\uffff\"]") must_== JArray(
-      JString("abc\"\\/\b\f\n\r\t\u00a0\uffff") :: Nil)
+    parseUnsafe("[\"abc\\\"\\\\\\/\\b\\f\\n\\r\\t\\u00a0\\uffff\"]") must_== JArray(JString("abc\"\\/\b\f\n\r\t\u00a0\uffff") :: Nil)
   }
 }
 
@@ -106,8 +102,8 @@ object AsyncParserSpec extends Specification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs                  = mutable.ArrayBuffer.empty[JValue]
-    val n                   = data.length
+    var vs = mutable.ArrayBuffer.empty[JValue]
+    val n = data.length
     var i                   = 0
     var parser: AsyncParser = async
     while (i < n) {
@@ -257,7 +253,7 @@ xyz
     val bs = json.getBytes(Utf8Charset)
     val c  = chunk(bs, 0, bs.length)
 
-    var p                        = AsyncParser.stream()
+    var p = AsyncParser.stream()
     val (AsyncParse(es, js), p2) = p(c)
 
     // we should only have parsed 1 valid record, and seen 1 error
@@ -274,10 +270,8 @@ xyz
   "Handles whitespace correctly" in {
     def ja(ns: Int*) = JArray(ns.map(n => JNum(n)): _*)
 
-    JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(
-      ja(1, 2, 3, 4, 5))
-    JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(
-      Seq(ja(1, 2), ja(3, 4)))
+    JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
+    JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
     JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
     JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
   }
@@ -285,10 +279,8 @@ xyz
   "Handles whitespace correctly" in {
     def ja(ns: Int*) = JArray(ns.map(n => JNum(n)): _*)
 
-    JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(
-      ja(1, 2, 3, 4, 5))
-    JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(
-      Seq(ja(1, 2), ja(3, 4)))
+    JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
+    JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
     JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
     JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
   }
@@ -377,10 +369,7 @@ object ArrayUnwrappingSpec extends Specification {
       (js.length, data.length, ms)
     }
 
-    def async(parser: AsyncParser,
-              isArray: Boolean,
-              elem: String,
-              num: Int): (Int, Int, Long) = {
+    def async(parser: AsyncParser, isArray: Boolean, elem: String, num: Int): (Int, Int, Long) = {
       val elemsPerChunk    = 4520
       val completeChunks   = num / elemsPerChunk
       val partialChunkSize = num % elemsPerChunk
@@ -389,13 +378,9 @@ object ArrayUnwrappingSpec extends Specification {
       val es       = (0 until elemsPerChunk).map(_ => elem)
       val leftover = (0 until partialChunkSize).map(_ => elem)
       val (firstChunk, chunk, lastChunk) = if (isArray) {
-        (es.mkString("[", ",", ",").getBytes("UTF-8"),
-         es.mkString("", ",", ",").getBytes("UTF-8"),
-         leftover.mkString("", ",", "]").getBytes("UTF-8"))
+        (es.mkString("[", ",", ",").getBytes("UTF-8"), es.mkString("", ",", ",").getBytes("UTF-8"), leftover.mkString("", ",", "]").getBytes("UTF-8"))
       } else {
-        (es.mkString("", "\n", "\n").getBytes("UTF-8"),
-         es.mkString("", "\n", "\n").getBytes("UTF-8"),
-         leftover.mkString("", "\n", "\n").getBytes("UTF-8"))
+        (es.mkString("", "\n", "\n").getBytes("UTF-8"), es.mkString("", "\n", "\n").getBytes("UTF-8"), leftover.mkString("", "\n", "\n").getBytes("UTF-8"))
       }
 
       var i      = 0
@@ -404,7 +389,7 @@ object ArrayUnwrappingSpec extends Specification {
       var done   = false
       var seen   = 0
       var bytes  = 0
-      val t0     = System.currentTimeMillis
+      val t0 = System.currentTimeMillis
 
       while (i <= completeChunks && !done) {
         val (AsyncParse(errors, results), parser) = if (i <= completeChunks) {
@@ -446,8 +431,7 @@ object ArrayUnwrappingSpec extends Specification {
     b2 must_== b4
     b1 must_== b3
     b1 must_== b5
-    println(
-      "parsed array (%d bytes):  sync=%dms  async=%dms  unpacked=%dms" format (b1, t1, t3, t5))
+    println("parsed array (%d bytes):  sync=%dms  async=%dms  unpacked=%dms" format (b1, t1, t3, t5))
     println("parsed stream (%d bytes): sync=%dms  async=%dms" format (b2, t2, t4))
     ok
   }

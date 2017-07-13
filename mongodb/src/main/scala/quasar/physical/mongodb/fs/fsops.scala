@@ -25,7 +25,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object fsops {
-  type MongoFsM[A] = FileSystemErrT[MongoDbIO, A]
+  type MongoFsM[A]  = FileSystemErrT[MongoDbIO, A]
 
   import FileSystemError._, PathError._
 
@@ -34,24 +34,21 @@ object fsops {
     for {
       dbName <- dbNameFromPathM(dir)
       prefix <- collPrefixFromDirM(dir)
-        .getOrElse(CollectionName(""))
-        .liftM[FileSystemErrT]
-      cs <- MongoDbIO
-        .collectionsIn(dbName)
-        .filter(_.collection isDescendantOf prefix)
-        .runLog
-        .map(_.toVector)
-        .liftM[FileSystemErrT]
-      _ <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoFsM, Unit]
-      else ().point[MongoFsM]
+                  .getOrElse(CollectionName(""))
+                  .liftM[FileSystemErrT]
+      cs     <- MongoDbIO.collectionsIn(dbName)
+                  .filter(_.collection isDescendantOf prefix)
+                  .runLog.map(_.toVector)
+                  .liftM[FileSystemErrT]
+      _      <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoFsM, Unit]
+                else ().point[MongoFsM]
     } yield cs
 
   /** The user (non-system) collections having a prefix equivalent to the given
     * directory path.
     */
   def userCollectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
-    collectionsInDir(dir) map (_.filterNot(
-      _.collection isDescendantOf CollectionName("system")))
+    collectionsInDir(dir) map (_.filterNot(_.collection isDescendantOf CollectionName("system")))
 
   /** A filesystem `PathSegment` representing the first segment of a collection name
     * relative to the given parent directory.

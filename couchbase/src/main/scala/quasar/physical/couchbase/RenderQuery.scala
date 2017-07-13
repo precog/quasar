@@ -43,17 +43,15 @@ object RenderQuery {
 
   val alg: AlgebraM[PlannerError \/ ?, N1QL, String] = {
     case Data(QData.Str(v)) =>
-      ("'" ⊹ v.flatMap { case ''' => "''"; case v => v.toString } ⊹ "'").right
+      ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
     case Data(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Id(v) =>
       s"`$v`".right
     case Obj(m) =>
       m.map {
-          case (k, v) => s"$k: $v"
-        }
-        .mkString("{", ", ", "}")
-        .right
+        case (k, v) => s"$k: $v"
+      }.mkString("{", ", ", "}").right
     case Arr(l) =>
       l.mkString("[", ", ", "]").right
     case Date(a1) =>
@@ -203,18 +201,18 @@ object RenderQuery {
       s"(array $a1 for $a2 in $a3 end)".right
     case Select(v, re, ks, jn, un, lt, ft, gb, ob) =>
       def alias(a: Option[Id[String]]) = ~(a ∘ (i => s" as `${i.v}`"))
-      val value                        = v.v.fold("value ", "")
-      val resultExprs                  = (re ∘ (r => r.expr ⊹ alias(r.alias))).intercalate(", ")
-      val kSpace                       = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
-      val join = ~(jn ∘ (j =>
-        j.joinType.fold(κ(""), κ(" left outer")) ⊹ s" join `${j.id.v}`" ⊹ alias(j.alias) ⊹
-          " on keys " ⊹ j.pred))
-      val unnest = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
-      val let =
-        lt.toNel.foldMap(" let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
-      val filter  = ~(ft ∘ (f => s" where ${f.v}"))
-      val groupBy = ~(gb ∘ (g => s" group by ${g.v}"))
-      val orderBy =
+      val value       = v.v.fold("value ", "")
+      val resultExprs = (re ∘ (r => r.expr ⊹ alias(r.alias))).intercalate(", ")
+      val kSpace      = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
+      val join        = ~(jn ∘ (j =>
+                          j.joinType.fold(κ(""), κ(" left outer")) ⊹ s" join `${j.id.v}`" ⊹ alias(j.alias) ⊹
+                          " on keys " ⊹ j.pred))
+      val unnest      = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
+      val let         = lt.toNel.foldMap(
+                          " let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
+      val filter      = ~(ft ∘ (f  => s" where ${f.v}"))
+      val groupBy     = ~(gb ∘ (g  => s" group by ${g.v}"))
+      val orderBy     =
         ~((ob ∘ {
           case OrderBy(a, Ascending)  => s"$a ASC"
           case OrderBy(a, Descending) => s"$a DESC"

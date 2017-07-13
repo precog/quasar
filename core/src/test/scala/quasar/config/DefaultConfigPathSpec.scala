@@ -33,8 +33,8 @@ class DefaultConfigPathSpec extends quasar.Qspec {
 
   sequential
 
-  val comp   = "quasar-config.json"
-  val macp   = "Library/Application Support"
+  val comp = "quasar-config.json"
+  val macp = "Library/Application Support"
   val posixp = ".config"
 
   def printPosix[T](fp: FsPath[T, Sandboxed]) =
@@ -66,37 +66,29 @@ class DefaultConfigPathSpec extends quasar.Qspec {
   "defaultPathForOS" should {
     "OS X" >> {
       "when home dir" in {
-        val p = withProp("user.home",
-                         "/home/foo",
-                         defaultPathForOS(file("quasar-config.json"))(OS.mac))
+        val p = withProp("user.home", "/home/foo", defaultPathForOS(file("quasar-config.json"))(OS.mac))
         printPosix(p.unsafePerformSync) ==== s"/home/foo/$macp/$comp"
       }
 
       "no home dir" in {
-        val p =
-          withoutProp("user.home", defaultPathForOS(file("quasar-config.json"))(OS.mac))
+        val p = withoutProp("user.home", defaultPathForOS(file("quasar-config.json"))(OS.mac))
         printPosix(p.unsafePerformSync) ==== s"./$macp/$comp"
       }
     }
 
     "POSIX" >> {
       "when home dir" in {
-        val p = withProp("user.home",
-                         "/home/bar",
-                         defaultPathForOS(file("quasar-config.json"))(OS.posix))
+        val p = withProp("user.home", "/home/bar", defaultPathForOS(file("quasar-config.json"))(OS.posix))
         printPosix(p.unsafePerformSync) ==== s"/home/bar/$posixp/$comp"
       }
 
       "when home dir with trailing slash" in {
-        val p = withProp("user.home",
-                         "/home/bar/",
-                         defaultPathForOS(file("quasar-config.json"))(OS.posix))
+        val p = withProp("user.home", "/home/bar/", defaultPathForOS(file("quasar-config.json"))(OS.posix))
         printPosix(p.unsafePerformSync) ==== s"/home/bar/$posixp/$comp"
       }
 
       "no home dir" in {
-        val p =
-          withoutProp("user.home", defaultPathForOS(file("quasar-config.json"))(OS.posix))
+        val p = withoutProp("user.home", defaultPathForOS(file("quasar-config.json"))(OS.posix))
         printPosix(p.unsafePerformSync) ==== s"./$posixp/$comp"
       }
     }

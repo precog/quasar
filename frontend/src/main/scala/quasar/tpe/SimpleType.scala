@@ -44,12 +44,12 @@ object SimpleType {
       case "integer"   => Int
       case "decimal"   => Dec
     } {
-      case Null => "null"
-      case Bool => "boolean"
-      case Byte => "byte"
-      case Char => "character"
-      case Int  => "integer"
-      case Dec  => "decimal"
+      case Null        => "null"
+      case Bool        => "boolean"
+      case Byte        => "byte"
+      case Char        => "character"
+      case Int         => "integer"
+      case Dec         => "decimal"
     }
 
   implicit val enum: Enum[SimpleType] =

@@ -30,11 +30,10 @@ object SpecialStr {
       val specialChars =
         Gen.oneOf('$', '.', '/', '\\', '_', '~', ' ', '*', '+', '-')
 
-      Gen.nonEmptyListOf(
-        Gen.frequency(
-          (9, Arbitrary.arbitrary[Char]),
-          (1, specialChars)
-        )) map (cs => SpecialStr(cs.mkString))
+      Gen.nonEmptyListOf(Gen.frequency(
+        (9, Arbitrary.arbitrary[Char]),
+        (1, specialChars)
+      )) map (cs => SpecialStr(cs.mkString))
     }
 
   implicit val specialStrShow: Show[SpecialStr] =

@@ -21,11 +21,7 @@ import quasar.yggdrasil.TableModule._
 
 import scalaz.Need
 
-trait BlockStoreColumnarTableModuleSpec
-    extends TableModuleSpec[Need]
-    with BlockLoadSpec
-    with BlockSortSpec
-    with BlockAlignSpec {
+trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
   type MemoId = Int
 
   "a block store columnar table" should {
@@ -38,20 +34,20 @@ trait BlockStoreColumnarTableModuleSpec
       //"a dense dataset" in checkLoadDense //scalacheck + numeric columns = pain
     }
     "sort" >> {
-      "fully homogeneous data" in homogeneousSortSample
+      "fully homogeneous data"        in homogeneousSortSample
       "fully homogeneous data with object" in homogeneousSortSampleWithNonexistentSortKey
       "data with undefined sort keys" in partiallyUndefinedSortSample
-      "heterogeneous sort keys" in heterogeneousSortSample
+      "heterogeneous sort keys"       in heterogeneousSortSample
       "heterogeneous sort keys case 2" in heterogeneousSortSample2
       "heterogeneous sort keys ascending" in heterogeneousSortSampleAscending
       "heterogeneous sort keys descending" in heterogeneousSortSampleDescending
       "top-level hetereogeneous values" in heterogeneousBaseValueTypeSample
-      "sort with a bad schema" in badSchemaSortSample
-      "merges over three cells" in threeCellMerge
-      "empty input" in emptySort
-      "with uniqueness for keys" in uniqueSort
+      "sort with a bad schema"        in badSchemaSortSample
+      "merges over three cells"       in threeCellMerge
+      "empty input"                   in emptySort
+      "with uniqueness for keys"      in uniqueSort
 
-      "arbitrary datasets" in skipped { checkSortDense(SortAscending) }             // FIXME skipped per #2309
+      "arbitrary datasets" in skipped { checkSortDense(SortAscending) } // FIXME skipped per #2309
       "arbitrary datasets descending" in skipped { checkSortDense(SortDescending) } // FIXME skipped per #2309
     }
   }

@@ -28,11 +28,11 @@ import scalaz._
 package object analysis {
 
   sealed trait AnalysisResult
-  case object Instant         extends AnalysisResult
-  case object Interactive     extends AnalysisResult
+  case object Instant extends AnalysisResult
+  case object Interactive extends AnalysisResult
   case object SemiInteractive extends AnalysisResult
-  case object Batch           extends AnalysisResult
-  case object Unknown         extends AnalysisResult
+  case object Batch extends AnalysisResult
+  case object Unknown extends AnalysisResult
 
   implicit val encode: EncodeJson[AnalysisResult] =
     EncodeJson((r: AnalysisResult) => Json(("value" := s"$r")))
@@ -45,15 +45,14 @@ package object analysis {
     case i             => Batch
   }
 
-  def analyze[S[_], F[_]: Traverse, T](qs: T)(
-      implicit
-      R: Recursive.Aux[T, F],
-      CA: Cardinality[F],
-      CO: Cost[F],
-      Q: QueryFile.Ops[S]): Free[S, AnalysisResult] = {
-    val resultErr =
-      R.zygoM(qs)(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S])).map(costToResult)
-    resultErr.fold(κ(Unknown), ι)
+  def analyze[S[_], F[_] : Traverse, T](qs: T)(implicit
+    R: Recursive.Aux[T, F],
+    CA: Cardinality[F],
+    CO: Cost[F],
+    Q: QueryFile.Ops[S]
+  ): Free[S, AnalysisResult] = {
+    val resultErr = R.zygoM(qs)(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S])).map(costToResult)
+    resultErr.fold(κ(Unknown),ι)
   }
-
+  
 }

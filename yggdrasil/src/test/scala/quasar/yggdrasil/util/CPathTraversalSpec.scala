@@ -32,8 +32,7 @@ class CPathTraversalSpec extends Specification {
   }
 
   object ColBuilder {
-    private def builder[@spec(Boolean, Long, Double) A](
-        f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
+    private def builder[@spec(Boolean, Long, Double) A](f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
       new ColBuilder[A] {
         def apply(defined: BitSet, items: Array[A]): Column = f(defined, items)
       }
@@ -52,28 +51,22 @@ class CPathTraversalSpec extends Specification {
   "constructing CPathTraversal from CPaths" should {
     "handle trivial select" in {
       val t = CPathTraversal(List(CPath("a[*].b[0]")))
-      t must_== Select(CPathField("a"),
-                       Select(CPathArray,
-                              Select(CPathField("b"), Select(CPathIndex(0), Done))))
+      t must_== Select(CPathField("a"), Select(CPathArray, Select(CPathField("b"), Select(CPathIndex(0), Done))))
     }
 
     "handle CPath with simple array intersection" in {
       val t = CPathTraversal(List(CPath("[*][0]"), CPath("[*][1]")))
-      t must_== Select(CPathArray,
-                       Sequence(
-                         List(
-                           Select(CPathIndex(0), Done),
-                           Select(CPathIndex(1), Done)
-                         )))
+      t must_== Select(CPathArray, Sequence(List(
+        Select(CPathIndex(0), Done),
+        Select(CPathIndex(1), Done)
+      )))
     }
   }
-  def col[@spec(Boolean, Long, Double) A](defined: Int*)(
-      values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
-    val max    = defined.max + 1
+  def col[@spec(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
+    val max = defined.max + 1
     val column = m.newArray(max)
-    (defined zip values) foreach {
-      case (i, x) =>
-        column(i) = x
+    (defined zip values) foreach { case (i, x) =>
+      column(i) = x
     }
     builder(BitSetUtil.create(defined), column)
   }
@@ -88,40 +81,36 @@ class CPathTraversalSpec extends Specification {
       // { a: 1, b: [ 0, "b" ] }
 
       val cols = Map(
-        CPath("a")    -> Set(col(0, 1)(2L, 1L)),
+        CPath("a") -> Set(col(0, 1)(2L, 1L)),
         CPath("b[0]") -> Set(col(0, 1)(0L, 0L)),
         CPath("b[1]") -> Set(col(0, 1)("a", "b"))
       )
       val allPaths = cols.keys.toList
-      val order    = CPathTraversal(allPaths).rowOrder(allPaths, cols)
+      val order = CPathTraversal(allPaths).rowOrder(allPaths, cols)
       order.eqv(0, 0) must beTrue
       order.gt(0, 1) must beTrue
       order.lt(0, 1) must beFalse
 
       val subPaths = List(CPath("b[0]"), CPath("b[1]"))
-      val order2   = CPathTraversal(subPaths).rowOrder(allPaths, cols)
+      val order2 = CPathTraversal(subPaths).rowOrder(allPaths, cols)
       order2.lt(0, 1) must beTrue
       order2.gt(0, 1) must beFalse
       order2.eqv(1, 1)
 
       val singlePath = List(CPath("b[0]"))
-      val order3     = CPathTraversal(singlePath).rowOrder(allPaths, cols)
+      val order3 = CPathTraversal(singlePath).rowOrder(allPaths, cols)
       order3.eqv(0, 1) must beTrue
     }
 
     "order non-intersecting arrays by length" in {
       val cols: Map[CPath, Set[Column]] = Map(
-        CPath("[*]") -> Set(
-          ArrayHomogeneousArrayColumn(
-            Array(
-              Array(0L, 1L),
-              Array(0L),
-              Array(0L, 1L, 2L)
-            )))
+        CPath("[*]") -> Set(ArrayHomogeneousArrayColumn(Array(
+          Array(0L, 1L), Array(0L), Array(0L, 1L, 2L)
+        )))
       )
       val paths = cols.keys.toList
 
-      val t     = CPathTraversal(paths)
+      val t = CPathTraversal(paths)
       val order = t.rowOrder(paths, cols)
       order.eqv(0, 0) must beTrue
       order.eqv(1, 1) must beTrue
@@ -141,12 +130,12 @@ class CPathTraversalSpec extends Specification {
     // . = false, .foo = undefined
     val valueAndObject: Map[CPath, Set[Column]] = Map(
       CPath.Identity -> Set(col(0)(false)),
-      CPath("foo")   -> Set(col(1)(5L))
+      CPath("foo") -> Set(col(1)(5L))
     )
 
     "order value and object" in {
       val paths = valueAndObject.keys.toList
-      val t     = CPathTraversal(paths)
+      val t = CPathTraversal(paths)
       val order = t.rowOrder(paths, valueAndObject)
       order.gt(0, 1) must beTrue
     }
@@ -163,7 +152,7 @@ class CPathTraversalSpec extends Specification {
     "order non-intersecting heterogeneous arrays" in {
 
       val paths = nonIntersectingHet.keys.toList
-      val t     = CPathTraversal(paths)
+      val t = CPathTraversal(paths)
       val order = t.rowOrder(paths, nonIntersectingHet)
       order.gt(0, 1) must beTrue
       order.gt(1, 2) must beTrue
@@ -182,7 +171,7 @@ class CPathTraversalSpec extends Specification {
       // element.
 
       val paths = nonIntersectingHet.keys.toList
-      val t     = CPathTraversal(List(CPath("[0]")))
+      val t = CPathTraversal(List(CPath("[0]")))
       val order = t.rowOrder(paths, nonIntersectingHet)
       order.eqv(0, 1)
       order.lt(2, 1)
@@ -190,21 +179,23 @@ class CPathTraversalSpec extends Specification {
     }
 
     val intersectingHom: Map[CPath, Set[Column]] = Map(
-      CPath("[*][0]") -> Set(
-        ArrayHomogeneousArrayColumn(
-          Array(Array(0L, 1L, 2L), Array(0L, 1L, 1L), Array(0L, 1L, 2L)))),
-      CPath("[*][1]") -> Set(
-        ArrayHomogeneousArrayColumn(
-          Array(Array("a", "b", "c"), Array("a", "c", "c"), Array("a", "b", "c"))))
+      CPath("[*][0]") -> Set(ArrayHomogeneousArrayColumn(Array(
+        Array(0L, 1L, 2L),
+        Array(0L, 1L, 1L),
+        Array(0L, 1L, 2L)))),
+      CPath("[*][1]") -> Set(ArrayHomogeneousArrayColumn(Array(
+        Array("a", "b", "c"),
+        Array("a", "c", "c"),
+        Array("a", "b", "c"))))
     )
 
     "order simple intersecting arrays" in {
       // [0, "a"], [1, "b"], [2, "c"]
       // [0, "a"], [1, "c"], [1, "c"]
-      val cols  = intersectingHom
+      val cols = intersectingHom
       val paths = cols.keys.toList
 
-      val t     = CPathTraversal(paths)
+      val t = CPathTraversal(paths)
       val order = t.rowOrder(paths, cols)
       order.lt(0, 1) must beTrue
       order.lt(1, 0) must beFalse
@@ -222,19 +213,18 @@ class CPathTraversalSpec extends Specification {
       // { "kids": [ { "name": "Tom", "age": 27 }, { "name": "Eric", "age": 29 } ] }
       // { "kids": [ { "name": "Emily", "age": 21 }, { "name": "Amanda", "age": 27 } ] }
       val cols = Map(
-        CPath("kids[*].name") -> Set(
-          col(0, 1)(Array("Tom", "Eric"), Array("Amanda", "Emily"))),
+        CPath("kids[*].name") -> Set(col(0, 1)(Array("Tom", "Eric"), Array("Amanda", "Emily"))),
         CPath("kids[*].age") -> Set(col(0, 1)(Array(27L, 29L), Array(27L, 21L)))
       )
 
       val paths = cols.keys.toList
-      val all   = CPathTraversal(paths)
-      val ages  = CPathTraversal(CPath("kids[*].age"))
+      val all = CPathTraversal(paths)
+      val ages = CPathTraversal(CPath("kids[*].age"))
       val name0 = CPathTraversal(CPath("kids[0].name"))
       val name1 = CPathTraversal(CPath("kids[1].name"))
 
-      val order      = all.rowOrder(paths, cols)
-      val agesOrder  = ages.rowOrder(paths, cols)
+      val order = all.rowOrder(paths, cols)
+      val agesOrder = ages.rowOrder(paths, cols)
       val name0Order = name0.rowOrder(paths, cols)
       val name1Order = name1.rowOrder(paths, cols)
 
@@ -245,8 +235,8 @@ class CPathTraversalSpec extends Specification {
     }
 
     "order parts of intersecting arrays" in {
-      val cols  = intersectingHom
-      val t     = CPathTraversal(List("[0][0]", "[0][1]", "[1][0]", "[1][1]") map (CPath(_)))
+      val cols = intersectingHom
+      val t = CPathTraversal(List("[0][0]", "[0][1]", "[1][0]", "[1][1]") map (CPath(_)))
       val order = t.rowOrder(cols.keys.toList, cols)
       order.eqv(0, 2) must beTrue
       order.lt(0, 1) must beTrue
@@ -254,3 +244,5 @@ class CPathTraversalSpec extends Specification {
     }
   }
 }
+
+

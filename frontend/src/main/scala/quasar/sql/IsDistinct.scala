@@ -23,9 +23,9 @@ import scalaz._
 sealed abstract class IsDistinct extends Product with Serializable
 
 final case object SelectDistinct extends IsDistinct
-final case object SelectAll      extends IsDistinct
+final case object SelectAll extends IsDistinct
 
 object IsDistinct {
   implicit val equal: Equal[IsDistinct] = Equal.equalRef
-  implicit val show: Show[IsDistinct]   = Show.showFromToString
+  implicit val show: Show[IsDistinct] = Show.showFromToString
 }

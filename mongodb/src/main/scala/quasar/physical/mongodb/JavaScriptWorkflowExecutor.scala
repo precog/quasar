@@ -32,7 +32,7 @@ import scalaz.syntax.functor._
   * MongoDB.
   */
 private[mongodb] final class JavaScriptWorkflowExecutor
-    extends WorkflowExecutor[JavaScriptLog, Unit] {
+  extends WorkflowExecutor[JavaScriptLog, Unit] {
 
   import JavaScriptWorkflowExecutor._
   import quasar.physical.mongodb.workflow.$SortF
@@ -46,20 +46,21 @@ private[mongodb] final class JavaScriptWorkflowExecutor
     fa.traverse_[ExprS](a => MonadState[ExprS, Expr].modify(f(a, _)))
 
   protected def aggregate(src: Collection, pipeline: Pipeline) =
-    tell(
-      Call(Select(toJsRef(src), "aggregate"),
-           List(AnonElem(pipeline map (_.bson.toJs)),
-                AnonObjDecl(List("allowDiskUse" -> Bool(true))))))
+    tell(Call(
+      Select(toJsRef(src), "aggregate"),
+      List(
+        AnonElem(pipeline map (_.bson.toJs)),
+        AnonObjDecl(List("allowDiskUse" -> Bool(true))))))
 
   protected def aggregateCursor(src: Collection, pipeline: Pipeline) =
     aggregate(src, pipeline)
 
   protected def count(src: Collection, cfg: Count) = {
-    val count0 =
-      List(foldExpr(cfg.limit)((n, js) => Call(Select(js, "limit"), List(num(n)))),
-           foldExpr(cfg.skip)((n, js) => Call(Select(js, "skip"), List(num(n)))))
-        .sequence_[ExprS, Unit]
-        .exec(Call(Select(toJsRef(src), "count"), cfg.query.toList.map(_.bson.toJs)))
+    val count0 = List(
+      foldExpr(cfg.limit)((n, js) => Call(Select(js, "limit"), List(num(n)))),
+      foldExpr(cfg.skip)((n, js) => Call(Select(js, "skip"), List(num(n)))))
+      .sequence_[ExprS, Unit]
+      .exec(Call(Select(toJsRef(src), "count"), cfg.query.toList.map(_.bson.toJs)))
 
     tell(count0) as 0L
   }
@@ -69,12 +70,9 @@ private[mongodb] final class JavaScriptWorkflowExecutor
       foldExpr(cfg.query)((q, js) => Call(Select(js, "filter"), List(q.bson.toJs)))
         .exec(Call(Select(toJsRef(src), "distinct"), List(Str(cfg.field.asText))))
 
-    tell(
-      Call(
-        Select(distinct0, "map"),
-        List(
-          AnonFunDecl(List("elem"),
-                      List(Return(AnonObjDecl(List(field.asText -> Ident("elem")))))))))
+    tell(Call(
+      Select(distinct0, "map"),
+      List(AnonFunDecl(List("elem"), List(Return(AnonObjDecl(List(field.asText -> Ident("elem")))))))))
   }
 
   protected def drop(coll: Collection) =
@@ -83,33 +81,30 @@ private[mongodb] final class JavaScriptWorkflowExecutor
   protected def find(src: Collection, cfg: Find) = {
     val find0 = Call(
       Select(toJsRef(src), "find"),
-      cfg.query
-        .foldRight(cfg.projection.foldRight(List[Expr]())(_.toJs :: _))(_.bson.toJs :: _))
+      cfg.query.foldRight(cfg.projection.foldRight(List[Expr]())(_.toJs :: _))(_.bson.toJs :: _))
 
-    tell(
-      List(
-        foldExpr(cfg.sort)((keys, f) =>
-          Call(Select(f, "sort"), List($SortF.keyBson(keys).toJs))),
-        foldExpr(cfg.skip)((n, f) => Call(Select(f, "skip"), List(num(n)))),
-        foldExpr(cfg.limit)((n, f) => Call(Select(f, "limit"), List(num(n))))
-      ).sequence_[ExprS, Unit]
-        .exec(find0))
+    tell(List(
+      foldExpr(cfg.sort)((keys, f) => Call(Select(f, "sort"), List($SortF.keyBson(keys).toJs))),
+      foldExpr(cfg.skip)((n, f) => Call(Select(f, "skip"), List(num(n)))),
+      foldExpr(cfg.limit)((n, f) => Call(Select(f, "limit"), List(num(n)))))
+      .sequence_[ExprS, Unit]
+      .exec(find0))
   }
 
   protected def insert(dst: Collection, values: List[Bson.Doc]) =
-    tell(Call(Select(toJsRef(dst), "insert"), List(AnonElem(values map (_.toJs)))))
+    tell(Call(
+      Select(toJsRef(dst), "insert"),
+      List(AnonElem(values map (_.toJs)))))
 
-  protected def mapReduce(src: Collection,
-                          dst: MapReduce.OutputCollection,
-                          mr: MapReduce) =
-    tell(
-      Call(Select(toJsRef(src), "mapReduce"),
-           List(mr.map, mr.reduce, mr.toCollBson(dst).toJs)))
+  protected def mapReduce(src: Collection, dst: MapReduce.OutputCollection, mr: MapReduce) =
+    tell(Call(
+      Select(toJsRef(src), "mapReduce"),
+      List(mr.map, mr.reduce, mr.toCollBson(dst).toJs)))
 
   protected def mapReduceCursor(src: Collection, mr: MapReduce) =
-    tell(
-      Call(Select(toJsRef(src), "mapReduce"),
-           List(mr.map, mr.reduce, mr.inlineBson.toJs)))
+    tell(Call(
+      Select(toJsRef(src), "mapReduce"),
+      List(mr.map, mr.reduce, mr.inlineBson.toJs)))
 }
 
 private[mongodb] object JavaScriptWorkflowExecutor {

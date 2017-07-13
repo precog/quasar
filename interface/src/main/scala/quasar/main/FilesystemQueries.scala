@@ -38,11 +38,13 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   /** Returns the source of values from the result of executing the given
     * SQL^2 query.
     */
-  def evaluateQuery(query: Fix[Sql],
-                    vars: Variables,
-                    basePath: ADir,
-                    off: Natural,
-                    lim: Option[Positive]): Process[CompExecM, Data] =
+  def evaluateQuery(
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir,
+    off: Natural,
+    lim: Option[Positive]):
+      Process[CompExecM, Data] =
     queryPlan(query, vars, basePath, off, lim).sequenceU.fold(
       Process(_: _*),
       compToCompExec(_)
@@ -52,42 +54,39 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   /** Returns the path to the result of executing the given SQL^2 query
     * using the given output file if possible.
     */
-  def executeQuery(query: Fix[Sql], vars: Variables, basePath: ADir, out: AFile)(
-      implicit W: WriteFile.Ops[S],
-      MF: ManageFile.Ops[S]): CompExecM[AFile] =
+  def executeQuery(
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir,
+    out: AFile)(
+    implicit W: WriteFile.Ops[S], MF: ManageFile.Ops[S]):
+      CompExecM[AFile] =
     compToCompExec(queryPlan(query, vars, basePath, 0L, None))
-      .flatMap(
-        lp =>
-          execToCompExec(
-            lp.fold(d =>
-                      fsErrToExec(W
-                        .saveThese(out, d.toVector)
-                        .flatMap(fse => EitherT.fromDisjunction(fse.headOption <\/ out))),
-                    Q.execute(_, out))))
+      .flatMap(lp => execToCompExec(lp.fold(
+        d => fsErrToExec(W.saveThese(out, d.toVector).flatMap(fse => EitherT.fromDisjunction(fse.headOption <\/ out))),
+        Q.execute(_, out))))
 
   /** Returns the physical execution plan for the given SQL^2 query. */
   def explainQuery(
-      query: Fix[Sql],
-      vars: Variables,
-      basePath: ADir
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir
   ): CompExecM[ExecutionPlan] =
     compToCompExec(queryPlan(query, vars, basePath, 0L, None))
-      .flatMap(
-        lp =>
-          execToCompExec(lp.fold(
-            κ(ExecutionPlan(FileSystemType("none"), "Constant", ISet.empty).point[ExecM]),
-            Q.explain(_))))
+      .flatMap(lp => execToCompExec(lp.fold(
+        κ(ExecutionPlan(FileSystemType("none"), "Constant", ISet.empty).point[ExecM]),
+        Q.explain(_))))
 
   /** The results of executing the given SQL^2 query. */
   def queryResults(
-      query: Fix[Sql],
-      vars: Variables,
-      basePath: ADir,
-      off: Natural,
-      lim: Option[Positive]
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir,
+    off: Natural,
+    lim: Option[Positive]
   ): CompExecM[Process0[Data]] =
     compToCompExec(queryPlan(query, vars, basePath, off, lim))
-      .flatMap(
-        _.fold(ds => Process.emitAll(ds).point[CompExecM],
-               lp => execToCompExec(Q.results(lp))))
+      .flatMap(_.fold(
+        ds => Process.emitAll(ds).point[CompExecM],
+        lp => execToCompExec(Q.results(lp))))
 }

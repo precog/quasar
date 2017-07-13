@@ -53,10 +53,7 @@ object JPathSpec extends Specification with ScalaCheck {
     }
 
     "extract a second level node" in {
-      val j = JObject(JField("address",
-                             JObject(JField("city", JString("B")) :: JField(
-                               "street",
-                               JString("2")) :: Nil)) :: Nil)
+      val j = JObject(JField("address", JObject(JField("city", JString("B")) :: JField("street", JString("2")) :: Nil)) :: Nil)
 
       JPath("address.city").extract(j) mustEqual (JString("B"))
     }
@@ -78,9 +75,7 @@ object JPathSpec extends Specification with ScalaCheck {
 
   "Ancestors" should {
     "return two ancestors" in {
-      JPath(".foo.bar.baz").ancestors mustEqual List(JPath(".foo.bar"),
-                                                     JPath(".foo"),
-                                                     NoJPath)
+      JPath(".foo.bar.baz").ancestors mustEqual List(JPath(".foo.bar"), JPath(".foo"), NoJPath)
     }
 
     "return empty list for identity" in {

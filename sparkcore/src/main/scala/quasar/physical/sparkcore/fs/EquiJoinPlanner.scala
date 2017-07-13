@@ -33,12 +33,12 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT] extends Planner[EquiJoin[T, ?]] {
+
+class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT]  extends Planner[EquiJoin[T, ?]] {
 
   import Planner.{SparkState, SparkStateT}
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]])
-    : AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
+  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
       val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
       val srcState = src.point[SparkState]
@@ -50,33 +50,30 @@ class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT] extends Planner[EquiJoin[T, ?]
         EitherT(CoreMap.changeJoinFunc(combine).point[Task]).liftM[SparkStateT]
 
       for {
-        lk    <- genKey(lKey)
-        rk    <- genKey(rKey)
-        lRdd  <- lBranch.cataM(interpretM(κ(srcState), algebraM))
-        rRdd  <- rBranch.cataM(interpretM(κ(srcState), algebraM))
+        lk <- genKey(lKey)
+        rk <- genKey(rKey)
+        lRdd <- lBranch.cataM(interpretM(κ(srcState), algebraM))
+        rRdd <- rBranch.cataM(interpretM(κ(srcState), algebraM))
         merge <- merger
       } yield {
         val klRdd = lRdd.map(d => (lk(d), d))
         val krRdd = rRdd.map(d => (rk(d), d))
 
         jt match {
-          case JoinType.Inner =>
-            klRdd.join(krRdd).map {
-              case (_, (l, r)) => merge(l, r)
-            }
-          case JoinType.LeftOuter =>
-            klRdd.leftOuterJoin(krRdd).map {
-              case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
-            }
-          case JoinType.RightOuter =>
-            klRdd.rightOuterJoin(krRdd).map {
-              case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
-            }
-          case JoinType.FullOuter =>
-            klRdd.fullOuterJoin(krRdd).map {
-              case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
-            }
+          case JoinType.Inner => klRdd.join(krRdd).map {
+            case (_, (l, r)) => merge(l, r)
+          }
+          case JoinType.LeftOuter => klRdd.leftOuterJoin(krRdd).map {
+            case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
+          }
+          case JoinType.RightOuter => klRdd.rightOuterJoin(krRdd).map {
+            case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
+          }
+          case JoinType.FullOuter => klRdd.fullOuterJoin(krRdd).map {
+            case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
+          }
         }
       }
   }
 }
+ 

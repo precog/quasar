@@ -27,7 +27,7 @@ import scalaz.scalacheck.ScalaCheckBinding._
 
 /** Defines the domains of values for which the MongoDb connector is expected
   * to behave properly. May be mixed in when implementing `StdLibTestRunner`.
-  */
+*/
 trait MongoDbDomain {
   // NB: in the pipeline, the entire 64-bit range works, but in map-reduce,
   // only about 53 bits of integer resolution are available.

@@ -32,27 +32,23 @@ object Mounter {
   /** A kind of key-value store where the keys are absolute paths, with an
     * additional operation to efficiently look up nested paths. */
   trait PathStore[F[_], V] {
-
     /** The current value for a path, if any. */
     def get(path: APath): OptionT[F, V]
-
     /** All paths which are nested within the given path and for which a value
       * is present. */
     def descendants(dir: ADir): F[Set[APath]]
-
     /** Associate a value with a path that is not already present, or else do
       * nothing. Yields true if the write occurred. */
     def insert(path: APath, value: V): F[Boolean]
-
     /** Remove a path and its value, if present, or do nothing */
     def delete(path: APath): F[Unit]
   }
 
   /** `Mounting` interpreter */
   def apply[F[_]: Monad](
-      mount: MountRequest => MntErrT[F, Unit],
-      unmount: MountRequest => F[Unit],
-      store: PathStore[F, MountConfig]
+    mount: MountRequest => MntErrT[F, Unit],
+    unmount: MountRequest => F[Unit],
+    store: PathStore[F, MountConfig]
   ): Mounting ~> F = {
     type MntE[A] = MntErrT[F, A]
 
@@ -70,19 +66,17 @@ object Mounter {
 
     def handleMount(req: MountRequest): MntE[Unit] = {
       val putOrUnmount: MntE[Unit] =
-        store
-          .insert(req.path, req.toConfig)
-          .liftM[MntErrT]
-          .ifM(merr.point(()),
-               unmount(req).liftM[MntErrT] <*
-                 merr.raiseError(pathExists(req.path)))
+        store.insert(req.path, req.toConfig)
+          .liftM[MntErrT].ifM(
+            merr.point(()),
+            unmount(req).liftM[MntErrT] <*
+              merr.raiseError(pathExists(req.path)))
 
       failIfExisting(req.path) *> mount(req) *> putOrUnmount
     }
 
     def handleUnmount(path: APath): OptionT[F, Unit] =
-      store
-        .get(path)
+      store.get(path)
         .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[F]))
         .flatMapF(req => store.delete(path) *> unmount(req))
 
@@ -96,12 +90,12 @@ object Mounter {
         srcReq <- reqOrFail(src, cfg)
         dstReq <- reqOrFail(dst, cfg)
 
-        _ <- store.delete(src).liftM[MntErrT]
-        _ <- unmount(srcReq).liftM[MntErrT]
+        _      <- store.delete(src).liftM[MntErrT]
+        _      <- unmount(srcReq).liftM[MntErrT]
 
-        upd = store.insert(dst, dstReq.toConfig)
-        _ <- OptionT(upd.map(_.option(()))).toRight(pathExists(dst))
-        _ <- mount(dstReq)
+        upd    =  store.insert(dst, dstReq.toConfig)
+        _      <- OptionT(upd.map(_.option(()))).toRight(pathExists(dst))
+        _      <- mount(dstReq)
       } yield ()
     }
 
@@ -129,11 +123,9 @@ object Mounter {
 
       case Unmount(path) =>
         handleUnmount(path)
-          .flatMapF(
-            _ =>
-              refineType(path).swap
-                .foldMapM(store.descendants)
-                .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
+          .flatMapF(_ =>
+            refineType(path).swap.foldMapM(store.descendants)
+              .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
 
@@ -141,17 +133,14 @@ object Mounter {
         if (src ≟ dst)
           store.get(src).void.toRight(pathNotFound(src)).run
         else {
-          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs, T, Sandboxed]): F[Unit] =
+          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): F[Unit] =
             p.relativeTo(srcDir)
               .map(rel => handleRemount(p, dstDir </> rel).run.void)
               .sequence_
 
           val moveNested: F[Unit] =
-            (maybeDir(src) |@| maybeDir(dst))(
-              (srcDir, dstDir) =>
-                store
-                  .descendants(srcDir)
-                  .flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
+            (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
+              store.descendants(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
 
           failIfExisting(dst) *>
             handleRemount(src, dst) <*
@@ -167,11 +156,12 @@ object Mounter {
     * @param unmount Called to handle the removal/undoing of a mount request.
     */
   def kvs[F[_], S[_]](
-      mount: MountRequest => F[MountingError \/ Unit],
-      unmount: MountRequest => F[Unit]
+    mount: MountRequest => F[MountingError \/ Unit],
+    unmount: MountRequest => F[Unit]
   )(implicit
     S0: F :<: S,
-    S1: MountConfigs :<: S): Mounting ~> Free[S, ?] = {
+    S1: MountConfigs :<: S
+  ): Mounting ~> Free[S, ?] = {
     val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
     Mounter[Free[S, ?]](
       req => EitherT[Free[S, ?], MountingError, Unit](free.lift(mount(req)).into[S]),
@@ -180,14 +170,14 @@ object Mounter {
         def get(path: APath) =
           mountConfigs.get(path)
         def descendants(dir: ADir) =
-          mountConfigs.keys.map(_.filter(p =>
-            (dir: APath) ≠ p && p.relativeTo(dir).isDefined).toSet)
+          mountConfigs.keys.map(_
+            .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
+            .toSet)
         def insert(path: APath, value: MountConfig) =
           mountConfigs.compareAndPut(path, None, value)
         def delete(path: APath) =
           mountConfigs.delete(path)
-      }
-    )
+      })
   }
 
   /** A mounter where all mount requests succeed trivially.
@@ -196,7 +186,7 @@ object Mounter {
     */
   def trivial[S[_]](implicit S: MountConfigs :<: S): Mounting ~> Free[S, ?] = {
     type F[A] = Coproduct[Id, S, A]
-    val mnt = Mounter.kvs[Id, F](κ(().right), κ(()))
+    val mnt   = Mounter.kvs[Id, F](κ(().right), κ(()))
 
     λ[Mounting ~> Free[S, ?]](m => mnt(m) foldMap (pointNT[Free[S, ?]] :+: liftFT[S]))
   }
@@ -206,17 +196,12 @@ object Mounter {
 
   private def mkMountRequest(path: APath, cfg: MountConfig): Option[MountRequest] =
     refineType(path).fold(
-      d =>
-        fileSystemConfig.getOption(cfg) map {
-          case (t, u) =>
-            MountRequest.mountFileSystem(d, t, u)
-        } orElse {
-          moduleConfig.getOption(cfg) map (MountRequest.mountModule(d, _))
+      d => fileSystemConfig.getOption(cfg) map { case (t, u) =>
+        MountRequest.mountFileSystem(d, t, u)
+      } orElse {
+        moduleConfig.getOption(cfg) map (MountRequest.mountModule(d, _))
       },
-      f =>
-        viewConfig.getOption(cfg) map {
-          case (q, vs) =>
-            MountRequest.mountView(f, q, vs)
-      }
-    )
+      f => viewConfig.getOption(cfg) map { case (q, vs) =>
+        MountRequest.mountView(f, q, vs)
+      })
 }

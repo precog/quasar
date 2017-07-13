@@ -50,11 +50,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
 import scala.concurrent.duration._
 
-import java.util.concurrent.{
-  ConcurrentHashMap,
-  ScheduledThreadPoolExecutor,
-  ThreadFactory
-}
+import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
@@ -63,8 +59,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
 
   // TODO 20 is the old default size; need to actually tune this
-  private val TxLogScheduler = new ScheduledThreadPoolExecutor(
-    20,
+  private val TxLogScheduler = new ScheduledThreadPoolExecutor(20,
     new ThreadFactory {
       private val counter = new AtomicInteger(0)
 
@@ -74,8 +69,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
         t
       }
-    }
-  )
+    })
 
   def CookThreshold: Int
   def StorageTimeout: FiniteDuration
@@ -91,7 +85,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     val failure = ResourceError.fromExtractorError(s"failed to open NIHDB in path $path")
 
     for {
-      blob    <- OptionT(vfs.readPath(path))
+      blob <- OptionT(vfs.readPath(path))
       version <- OptionT(vfs.headOfBlob(blob))
 
       cached <- Task.delay(Option(dbs.get((blob, version)))).liftM[OptionT]
@@ -105,18 +99,19 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
             dir <- vfs.underlyingDir(blob, version).liftM[OptionT]
 
             tndb = Task delay {
-              NIHDB
-                .open(masterChef, dir, CookThreshold, StorageTimeout, TxLogScheduler)
-                .unsafePerformIO()
+              NIHDB.open(
+                masterChef,
+                dir,
+                CookThreshold,
+                StorageTimeout,
+                TxLogScheduler).unsafePerformIO()
             }
 
             validation <- OptionT(tndb)
 
             back <- validation.disjunction.leftMap(failure) traverse { nihdb: NIHDB =>
               for {
-                check <- Task
-                  .delay(dbs.putIfAbsent((blob, version), nihdb))
-                  .liftM[OptionT]
+                check <- Task.delay(dbs.putIfAbsent((blob, version), nihdb)).liftM[OptionT]
 
                 back <- if (check == null)
                   nihdb.right[ResourceError].point[OptionT[Task, ?]]
@@ -134,25 +129,24 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     val createBlob: Task[Blob] = for {
       blob <- vfs.scratch
-      _    <- vfs.link(blob, path) // should be `true` because we already looked for path
+      _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
     } yield blob
 
     for {
       maybeBlob <- vfs.readPath(path)
-      blob      <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
+      blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
 
-      version <- vfs.fresh(blob) // overwrite any previously-existing HEAD
-      dir     <- vfs.underlyingDir(blob, version)
+      version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
+      dir <- vfs.underlyingDir(blob, version)
 
       validation <- Task delay {
-        NIHDB
-          .create(masterChef,
-                  Authorities(AccountFinder.DefaultId),
-                  dir,
-                  CookThreshold,
-                  StorageTimeout,
-                  TxLogScheduler)
-          .unsafePerformIO()
+        NIHDB.create(
+          masterChef,
+          Authorities(AccountFinder.DefaultId),
+          dir,
+          CookThreshold,
+          StorageTimeout,
+          TxLogScheduler).unsafePerformIO()
       }
 
       disj = validation.disjunction.leftMap(failure)
@@ -163,7 +157,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     // last-wins semantics
     lazy val replaceM: OptionT[Task, Unit] = for {
       oldHead <- OptionT(vfs.headOfBlob(blob))
-      oldDB   <- OptionT(Task.delay(Option(dbs.get((blob, oldHead)))))
+      oldDB <- OptionT(Task.delay(Option(dbs.get((blob, oldHead)))))
 
       check <- Task.delay(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
 
@@ -188,10 +182,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield ()
   }
 
-  def ingest(path: PrecogPath,
-             ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
+  def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
     for {
-      afile  <- pathToAFileET[Task](path)
+      afile <- pathToAFileET[Task](path)
       triple <- EitherT.eitherT(createDB(afile))
       (blob, version, nihdb) = triple
 
@@ -212,8 +205,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     val ot = for {
       blob <- OptionT(vfs.readPath(path))
       head <- OptionT(vfs.headOfBlob(blob))
-      db   <- OptionT(Task.delay(Option(dbs.get((blob, head)))))
-      _    <- db.cook.toTask.liftM[OptionT]
+      db <- OptionT(Task.delay(Option(dbs.get((blob, head)))))
+      _ <- db.cook.toTask.liftM[OptionT]
     } yield ()
 
     ot.getOrElse(Task.now(()))
@@ -239,9 +232,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
         for {
           _ <- {
             val ot = for {
-              blob    <- OptionT(vfs.readPath(target))
+              blob <- OptionT(vfs.readPath(target))
               version <- OptionT(vfs.headOfBlob(blob))
-              nihdb   <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
+              nihdb <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
 
               removed <- Task.delay(dbs.remove((blob, version), nihdb)).liftM[OptionT]
 
@@ -277,16 +270,15 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     path.elements.lastOption.map(parent </> Path.file(_))
   }
 
-  private def pathToAFileET[F[_]: Monad](
-      path: PrecogPath): EitherT[F, ResourceError, AFile] = {
+  private def pathToAFileET[F[_]: Monad](path: PrecogPath): EitherT[F, ResourceError, AFile] = {
     pathToAFile(path) match {
       case Some(afile) =>
         EitherT.right[F, ResourceError, AFile](afile.point[F])
 
       case None =>
         EitherT.left[F, ResourceError, AFile] {
-          val err: ResourceError =
-            ResourceError.notFound(s"invalid path does not contain file element: $path")
+          val err: ResourceError = ResourceError.notFound(
+            s"invalid path does not contain file element: $path")
 
           err.point[F]
         }
@@ -297,8 +289,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
       for {
-        _ <- EitherT.right(table.toJson.map(json =>
-          log.trace("Starting load from " + json.toList.map(_.renderCompact))))
+        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
         paths <- EitherT.right(pathsM(table))
 
         projections <- paths.toList traverse { path =>
@@ -307,10 +298,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
             afile <- pathToAFileET[Task](path)
 
-            nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map {
-              opt =>
-                opt.getOrElse(
-                  -\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
+            nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map { opt =>
+              opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
             })
 
             projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[ET]
@@ -327,18 +316,14 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
           }
 
           log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c =>
-            proj.getBlockStream(c)
-          })
+          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
         }
 
         Table(stream, ExactSize(length))
       }
     }
 
-    def load(table: Table,
-             apiKey: APIKey,
-             tpe: JType): EitherT[Future, ResourceError, Table] =
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] =
       load(table, tpe)
   }
 }

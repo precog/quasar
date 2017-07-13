@@ -28,25 +28,26 @@ import scalaz._, Scalaz._
   type IT[F[_]]
 
   /**
-    * Merges `a1` and `a2` into a common source, providing access
-    * through that common source to X and Y.
-    *
-    * In general, if `a1` and `a2` are equal, we cannot simply return
-    * `SrcMerge(a1, fm1, fm2)` because the `Hole` in `fm1` and `fm2` reference
-    * some unknown source and do not reference `a1`. In this case, our source
-    * merging has converged (at least for this iteration), but `fm1` and `fm2` still
-    * reference the old common source (which is not known to us here).
-    *
-    * @param fm1 provides access to some unknown target X.
-    * @param fm2 provides access to some unknown target Y.
-    * @param a1 the left source to be merged
-    * @param a2 the right source to be merged
-    */
+   * Merges `a1` and `a2` into a common source, providing access
+   * through that common source to X and Y.
+   *
+   * In general, if `a1` and `a2` are equal, we cannot simply return
+   * `SrcMerge(a1, fm1, fm2)` because the `Hole` in `fm1` and `fm2` reference
+   * some unknown source and do not reference `a1`. In this case, our source
+   * merging has converged (at least for this iteration), but `fm1` and `fm2` still
+   * reference the old common source (which is not known to us here).
+   *
+   * @param fm1 provides access to some unknown target X.
+   * @param fm2 provides access to some unknown target Y.
+   * @param a1 the left source to be merged
+   * @param a2 the right source to be merged
+   */
   def mergeSrcs(
-      fm1: FreeMap[IT],
-      fm2: FreeMap[IT],
-      a1: F[ExternallyManaged],
-      a2: F[ExternallyManaged]): Option[SrcMerge[F[ExternallyManaged], FreeMap[IT]]]
+    fm1: FreeMap[IT],
+    fm2: FreeMap[IT],
+    a1: F[ExternallyManaged],
+    a2: F[ExternallyManaged])
+      : Option[SrcMerge[F[ExternallyManaged], FreeMap[IT]]]
 }
 
 object Mergeable {
@@ -61,26 +62,28 @@ object Mergeable {
       //     arbitrarily for the result.
       //
       //     Also, note that we can optimize the `(p1 ≟ p2)` case in the `Const` case.
-      def mergeSrcs(left: FreeMap[T],
-                    right: FreeMap[T],
-                    p1: Const[A, ExternallyManaged],
-                    p2: Const[A, ExternallyManaged]) =
-        (p1 ≟ p2).option(
-          SrcMerge[Const[A, ExternallyManaged], FreeMap[IT]](p1, HoleF, HoleF))
+      def mergeSrcs(
+        left: FreeMap[T],
+        right: FreeMap[T],
+        p1: Const[A, ExternallyManaged],
+        p2: Const[A, ExternallyManaged]) =
+        (p1 ≟ p2).option(SrcMerge[Const[A, ExternallyManaged], FreeMap[IT]](p1, HoleF, HoleF))
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](
-      implicit F: Mergeable.Aux[T, F],
-      G: Mergeable.Aux[T, G],
-      FC: F :<: Coproduct[F, G, ?],
-      GC: G :<: Coproduct[F, G, ?]): Mergeable.Aux[T, Coproduct[F, G, ?]] =
+    implicit F: Mergeable.Aux[T, F],
+             G: Mergeable.Aux[T, G],
+             FC: F :<: Coproduct[F, G, ?],
+             GC: G :<: Coproduct[F, G, ?]):
+      Mergeable.Aux[T, Coproduct[F, G, ?]] =
     new Mergeable[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
-      def mergeSrcs(left: FreeMap[IT],
-                    right: FreeMap[IT],
-                    cp1: Coproduct[F, G, ExternallyManaged],
-                    cp2: Coproduct[F, G, ExternallyManaged]) =
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        cp1: Coproduct[F, G, ExternallyManaged],
+        cp2: Coproduct[F, G, ExternallyManaged]) =
         (cp1.run, cp2.run) match {
           case (-\/(left1), -\/(left2)) =>
             F.mergeSrcs(left, right, left1, left2).map {
@@ -97,14 +100,16 @@ object Mergeable {
     }
 
   implicit def coenv[T[_[_]], F[_]](
-      implicit F: Mergeable.Aux[T, F]): Mergeable.Aux[T, CoEnv[Hole, F, ?]] =
+    implicit F: Mergeable.Aux[T, F]):
+      Mergeable.Aux[T, CoEnv[Hole, F, ?]] =
     new Mergeable[CoEnv[Hole, F, ?]] {
       type IT[F[_]] = T[F]
 
-      def mergeSrcs(left: FreeMap[IT],
-                    right: FreeMap[IT],
-                    cp1: CoEnv[Hole, F, ExternallyManaged],
-                    cp2: CoEnv[Hole, F, ExternallyManaged]) =
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        cp1: CoEnv[Hole, F, ExternallyManaged],
+        cp2: CoEnv[Hole, F, ExternallyManaged]) =
         (cp1.run, cp2.run) match {
           case (-\/(hole), -\/(_)) =>
             SrcMerge(CoEnv(hole.left[F[ExternallyManaged]]), left, right).some

@@ -28,16 +28,16 @@ import scalaz.std.tuple._
 import scalaz.syntax.std.boolean._
 
 final case class ApiError(status: Status, detail: JsonObject) {
-  def +:(jassoc: JsonAssoc): ApiError =
+  def +: (jassoc: JsonAssoc): ApiError =
     copy(detail = jassoc +: detail)
 
-  def :+(jassoc: JsonAssoc): ApiError =
+  def :+ (jassoc: JsonAssoc): ApiError =
     copy(detail = detail + (jassoc._1, jassoc._2))
 
-  def +?:(maybeAssoc: Option[JsonAssoc]): ApiError =
+  def +?: (maybeAssoc: Option[JsonAssoc]): ApiError =
     maybeAssoc.fold(this)(_ +: this)
 
-  def :?+(maybeAssoc: Option[JsonAssoc]): ApiError =
+  def :?+ (maybeAssoc: Option[JsonAssoc]): ApiError =
     maybeAssoc.fold(this)(this :+ _)
 }
 
@@ -59,11 +59,10 @@ object ApiError {
     fromMsg(status, msg)
 
   implicit val encodeJson: EncodeJson[ApiError] =
-    EncodeJson(
-      err =>
-        ("status" := err.status.reason) ->:
-          ("detail" :?= err.detail.isNotEmpty.option(jObject(err.detail))) ->?:
-        jEmptyObject)
+    EncodeJson(err =>
+      ("status" :=  err.status.reason) ->:
+      ("detail" :?= err.detail.isNotEmpty.option(jObject(err.detail))) ->?:
+      jEmptyObject)
 
   implicit val equal: Equal[ApiError] =
     Equal.equalBy(ae => (ae.status.code, ae.status.reason, ae.detail))

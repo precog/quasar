@@ -26,14 +26,15 @@ object implicits {
   // NB: This is defined here as we need to elide metadata from args before
   //     comparing them.
   implicit def ejsonOrder[T](
-      implicit
-      TC: Corecursive.Aux[T, EJson],
-      TR: Recursive.Aux[T, EJson]
+    implicit
+    TC: Corecursive.Aux[T, EJson],
+    TR: Recursive.Aux[T, EJson]
   ): Order[T] =
     Order.order { (x, y) =>
       implicit val ordExt = Extension.order
-      OrderR.order[T, EJson](x.transCata[T](EJson.elideMetadata[T]),
-                             y.transCata[T](EJson.elideMetadata[T]))
+      OrderR.order[T, EJson](
+        x.transCata[T](EJson.elideMetadata[T]),
+        y.transCata[T](EJson.elideMetadata[T]))
     }
 
   implicit final class EncodeEJsonOps[A](val self: A) extends scala.AnyVal {

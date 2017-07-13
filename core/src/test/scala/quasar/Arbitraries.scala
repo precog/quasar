@@ -16,10 +16,10 @@
 
 package quasar
 
-trait Arbitraries
-    extends DataArbitrary
-    with DateArbitrary
-    with TypeArbitrary
-    with VariablesArbitrary
+trait Arbitraries extends
+  DataArbitrary with
+  DateArbitrary with
+  TypeArbitrary with
+  VariablesArbitrary
 
 object Arbitraries extends Arbitraries

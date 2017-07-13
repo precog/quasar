@@ -38,8 +38,7 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](
-        test: ((InMemState, Map[APath, MountConfig]) => HttpService) => Fragment) = {
+    def testBoth[A](test: ((InMemState, Map[APath, MountConfig]) => HttpService) => Fragment) = {
       "Compile" should {
         test(compileService)
       }
@@ -89,10 +88,12 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
               query = Some(Query("select * from :foo")),
               state = filesystem.state,
               status = Status.BadRequest,
-              response = (_: Json) must_=== Json("error" -> Json(
-                "status" := "Unbound variable.",
-                "detail" -> Json("message" := "There is no binding for the variable :foo",
-                                 "varName" := "foo")))
+              response = (_: Json) must_=== Json(
+                "error" -> Json(
+                  "status" := "Unbound variable.",
+                  "detail" -> Json(
+                    "message" := "There is no binding for the variable :foo",
+                    "varName" := "foo")))
             )
           }
           "multiple variables" >> prop { filesystem: SingleFileMemState =>
@@ -101,19 +102,21 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
               query = Some(Query("select * from :foo where :baz")),
               state = filesystem.state,
               status = Status.BadRequest,
-              response = (_: Json) must_=== Json("error" -> Json(
-                "status" := "Multiple errors",
-                "detail" -> Json("errors" := List(
-                  Json("status" := "Unbound variable.",
-                       "detail" -> Json(
-                         "message" := "There is no binding for the variable :foo",
-                         "varName" := "foo")),
-                  Json("status" := "Unbound variable.",
-                       "detail" -> Json(
-                         "message" := "There is no binding for the variable :baz",
-                         "varName" := "baz"))
-                ))
-              ))
+              response = (_: Json) must_=== Json(
+                "error" -> Json(
+                  "status" := "Multiple errors",
+                  "detail" -> Json(
+                    "errors" := List(
+                      Json(
+                        "status" := "Unbound variable.",
+                        "detail" -> Json(
+                          "message" := "There is no binding for the variable :foo",
+                          "varName" := "foo")),
+                      Json(
+                        "status" := "Unbound variable.",
+                        "detail" -> Json(
+                          "message" := "There is no binding for the variable :baz",
+                          "varName" := "baz"))))))
             )
           }
         }
@@ -121,23 +124,21 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
         def asFile[B, S](dir: Path[B, Dir, S]): Option[Path[B, Path.File, S]] =
           peel(dir).flatMap {
             case (p, -\/(d)) => (p </> file(d.value)).some
-            case _           => None
+            case _ => None
           }
 
-        "be 400 for bad path (file instead of dir)" >> prop {
-          filesystem: SingleFileMemState =>
-            filesystem.parent =/= rootDir ==> {
+        "be 400 for bad path (file instead of dir)" >> prop { filesystem: SingleFileMemState =>
+          filesystem.parent =/= rootDir ==> {
 
-              val parentAsFile = asFile(filesystem.parent).get
+            val parentAsFile = asFile(filesystem.parent).get
 
-              val req = Request(
-                uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
-              val resp = service(filesystem.state, Map.empty)(req).unsafePerformSync
-              resp.status must_== Status.BadRequest
-              resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
-                Status.BadRequest withReason "Directory path expected.",
-                "path" := parentAsFile)
-            }
+            val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
+            val resp = service(filesystem.state, Map.empty)(req).unsafePerformSync
+            resp.status must_== Status.BadRequest
+            resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
+              Status.BadRequest withReason "Directory path expected.",
+              "path" := parentAsFile)
+          }
         }
       }
     }

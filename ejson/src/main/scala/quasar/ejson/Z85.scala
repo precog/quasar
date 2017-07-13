@@ -39,44 +39,35 @@ package object z85 {
     * containing exactly five ASCII characters.
     */
   def encodeBlock(bytes: ByteVector): String = {
-    val num1   = bytes.toLong(false)
+    val num1 = bytes.toLong(false)
     val index1 = num1 % 85
-    val char1  = mapping(index1.toInt)
-    val num2   = (num1 - index1) / 85
+    val char1 = mapping(index1.toInt)
+    val num2 = (num1 - index1) / 85
     val index2 = num2 % 85
-    val char2  = mapping(index2.toInt)
-    val num3   = (num2 - index2) / 85
+    val char2 = mapping(index2.toInt)
+    val num3 = (num2 - index2) / 85
     val index3 = num3 % 85
-    val char3  = mapping(index3.toInt)
-    val num4   = (num3 - index3) / 85
+    val char3 = mapping(index3.toInt)
+    val num4 = (num3 - index3) / 85
     val index4 = num4 % 85
-    val char4  = mapping(index4.toInt)
-    val num5   = (num4 - index4) / 85
+    val char4 = mapping(index4.toInt)
+    val num5 = (num4 - index4) / 85
     val index5 = num5 % 85
-    val char5  = mapping(index5.toInt)
+    val char5 = mapping(index5.toInt)
 
     java.lang.String.valueOf(Array(char5, char4, char3, char2, char1))
   }
 
   // TODO: this should really fail if unsupported chars are included
   val decodeBlock: String => Option[ByteVector] =
-    str =>
-      ByteVector
-        .fromLong(
-          str.toList
-            .map(mapping.indexOf(_).toLong)
-            .fzipWith(List(85 * 85 * 85 * 85, 85 * 85 * 85, 85 * 85, 85, 1))(_ * _)
-            .foldRight(0L)(_ + _),
-          4)
-        .some
+    str => ByteVector.fromLong(str.toList.map(mapping.indexOf(_).toLong).fzipWith(List(85 * 85 * 85 * 85, 85 * 85 * 85, 85 * 85, 85, 1))(_ * _).foldRight(0L)(_ + _), 4).some
 
   val encode: ByteVector => String =
     StreamT
       .unfold(_)(b =>
         if (b.size ≟ 0) None
         else (b.take(4).padTo(4), b.drop(4)).some)
-      .foldLeftRec(Cord(""))((acc, b) => acc ++ Cord(encodeBlock(b)))
-      .toString
+      .foldLeftRec(Cord(""))((acc, b) => acc ++ Cord(encodeBlock(b))).toString
 
   val decode: String => Option[ByteVector] =
     StreamT

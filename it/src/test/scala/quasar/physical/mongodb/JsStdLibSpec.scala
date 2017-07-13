@@ -38,11 +38,9 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in JS")
 
   /** Identify constructs that are expected not to be implemented in JS. */
-  def shortCircuit[N <: Nat](backend: BackendName,
-                             func: GenericFunc[N],
-                             args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Lower, _) => Skipped("TODO").left
-    case (string.Upper, _) => Skipped("TODO").left
+  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (string.Lower, _)   => Skipped("TODO").left
+    case (string.Upper, _)   => Skipped("TODO").left
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
@@ -51,36 +49,35 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Skipped("Interval prints numeric representation").left
 
-    case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil) if x == 0 && y < 0 =>
+    case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
+        if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (relations.Cond, _) => Skipped("TODO").left
+    case (relations.Cond, _)           => Skipped("TODO").left
 
-    case (date.ExtractDayOfYear, _) => Skipped("TODO").left
+    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
-    case (date.ExtractIsoYear, _) => Skipped("TODO").left
-    case (date.ExtractWeek, _)    => Skipped("TODO").left
-    case (date.ExtractQuarter, _) => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
+    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
-    case (structural.ConcatOp, _) => Skipped("TODO").left
+    case (structural.ConcatOp, _)      => Skipped("TODO").left
 
-    case _ => ().right
+    case _                             => ().right
   }
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = Skipped("TODO").left
 
-  def compile(
-      queryModel: MongoQueryModel,
-      coll: Collection,
-      lp: Fix[LogicalPlan]): PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
+      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
 
     for {
-      t <- lp.cata(MongoDbPlanner.jsExprƒ)
+      t  <- lp.cata(MongoDbPlanner.jsExprƒ)
       (pj, ifs) = t
-      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError.fromMsg(
-        "no JS compilation")
-      wf = chain[Fix[WorkflowF]]($read(coll),
-                                 $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))
+      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError.fromMsg("no JS compilation")
+      wf =  chain[Fix[WorkflowF]](
+              $read(coll),
+              $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))
     } yield (Crystallize[WorkflowF].crystallize(wf), BsonField.Name("value"))
   }
 }

@@ -22,10 +22,10 @@ import scalaz._
 
 sealed abstract class OrderType extends Product with Serializable
 
-final case object ASC  extends OrderType
+final case object ASC extends OrderType
 final case object DESC extends OrderType
 
 object OrderType {
   implicit val equal: Equal[OrderType] = Equal.equalRef
-  implicit val show: Show[OrderType]   = Show.showFromToString
+  implicit val show: Show[OrderType] = Show.showFromToString
 }

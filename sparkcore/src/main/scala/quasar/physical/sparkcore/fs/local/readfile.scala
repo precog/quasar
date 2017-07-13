@@ -35,20 +35,20 @@ import scalaz.concurrent.Task
 
 object readfile {
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(
-      implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)
+    (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
     read.asks { sc =>
       sc.textFile(posixCodec.unsafePrintPath(f))
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
         .zipWithIndex()
         .filter {
-          case (value, index) =>
-            maybeLimit.fold(
-              index >= offset.value
-            )(
-              limit => index >= offset.value && index < limit.value + offset.value
-            )
-        }
+        case (value, index) =>
+          maybeLimit.fold(
+            index >= offset.value
+          ) (
+            limit => index >= offset.value && index < limit.value + offset.value
+          )
+      }
     }
 
   def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] =
@@ -59,6 +59,6 @@ object readfile {
   def readChunkSize: Int = 5000
 
   def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f, off, lim) => rddFrom(f, off, lim), f => fileExists(f), readChunkSize _)
+    Input((f,off, lim) => rddFrom(f, off, lim), f => fileExists(f), readChunkSize _)
 
 }

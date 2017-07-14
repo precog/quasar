@@ -25,8 +25,9 @@ import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFC}
+import quasar.contrib.pathy.AFile
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns.CoEnv
@@ -90,4 +91,18 @@ private[qscript] final class FilterPlanner[
     case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(\/-(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>
       Query.ElementRange[T[EJson], Q](IList(QName.unprefixed(NCName.fromString(key).toOption.get)), ComparisonOp.EQ, IList(v)).embed
   }
+
+  private def projectFieldPath[T[_[_]], A](f: FreeMapA[T, A])(
+    implicit R: Recursive.Aux[FreeMapA[T, A], CoEnv[A, MapFuncCore[T, ?], ?]]
+  ): Option[AFile] = {
+    final case class ProjectPath[A](src: A, path: AFile)
+
+    type PathMapFuncCore[A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
+
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    def nestedProject[A]: AlgebraM[Option, CoEnv[A, MapFuncCore[T, ?], ?], ProjectPath[A]] = ???
+
+    R.cataM(f)(nestedProject[A]) map (_.path)
+  }
+
 }

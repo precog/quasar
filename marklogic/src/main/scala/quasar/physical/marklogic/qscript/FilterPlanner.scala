@@ -100,7 +100,7 @@ private[qscript] final class FilterPlanner[
     type PathMapFuncCore[A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
 
     @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    def nestedProject[A]: AlgebraM[Option, CoEnv[A, MapFuncCore[T, ?], ?], ProjectPath[A]] = ???
+    def nestedProject[A]: AlgebraM[Option, CoEnv[A, MapFuncCore[T, ?], ?], PathMapFuncCore[A]] = ???
 
     R.cataM(f)(nestedProject[A]) map (_.path)
   }

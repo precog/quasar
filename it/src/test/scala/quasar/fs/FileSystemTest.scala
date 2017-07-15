@@ -158,12 +158,11 @@ object FileSystemTest {
 
     TestConfig.externalFileSystems {
       fsTestConfig(couchbase.fs.FsType,       Couchbase.definition translate injectFT[Task, filesystems.Eff]) orElse
-      fsTestConfig(marklogic.fs.FsType,       marklogicDef) orElse
+      fsTestConfig(marklogic.fs.FsType,       marklogicDef)                  orElse
       fsTestConfig(mimir.Mimir.Type,          mimir.Mimir.definition translate injectFT[Task, filesystems.Eff]) orElse
-      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition) orElse
-      fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition) orElse
-      fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition) orElse
-      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition) orElse
+      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
+      fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
+      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
     }
   }

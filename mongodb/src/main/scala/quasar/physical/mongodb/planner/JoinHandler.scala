@@ -17,17 +17,19 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.Planner.PlannerError
 import quasar.RenderTree
+import quasar.common.JoinType
+import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.std.StdLib._
-import quasar.physical.mongodb._
+import quasar.physical.mongodb._, WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import WorkflowBuilder._
+import quasar.qscript.ExcludeId
 import quasar.sql.JoinDir
 
 import matryoshka._
@@ -35,13 +37,13 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final case class JoinHandler[WF[_], F[_]](run: (MongoJoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
+final case class JoinHandler[WF[_], F[_]](run: (JoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
 
-  def apply(tpe: MongoJoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
+  def apply(tpe: JoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
     run(tpe, left, right)
 }
 
-final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[WorkflowBuilder[WF]], js: Option[List[JsFn]])
+final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[Expr])
 
 object JoinHandler {
 
@@ -60,19 +62,37 @@ object JoinHandler {
       second: JoinHandler[WF, F]): JoinHandler[WF, F] =
     JoinHandler((tpe, l, r) => first(tpe, l, r) getOrElseF second(tpe, l, r))
 
+  def padEmpty(side: BsonField): Fix[ExprOp] =
+    $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
+      $literal(Bson.Arr(List(Bson.Doc()))),
+      $var(DocField(side)))
+
+  // TODO: Generate `Both` not `That`.
+  // TODO: Modify this to include the flattening, and on 3.2+, use
+  //       `preserveNullAndEmptyArrays: true` rather than `padEmpty`.
+  def buildProjection[WF[_]]
+    (src: WorkflowBuilder[WF],
+      leftField: BsonField.Name, l: BsonField.Name => Fix[ExprOp],
+      rightField: BsonField.Name, r: BsonField.Name => Fix[ExprOp])
+      : WorkflowBuilder[WF] =
+    DocBuilder(src, ListMap(
+      leftField -> \&/-(l(leftField)),
+      rightField -> \&/-(r(rightField))))
+
   /** When possible, plan a join using the more efficient \$lookup operator in
     * the aggregation pipeline.
     */
-  def pipeline[WF[_]: Functor: Coalesce: Crush: Crystallize]
+  def pipeline[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
     (stats: Collection => Option[CollectionStatistics],
       indexes: Collection => Option[Set[Index]])
     (implicit
+      M: MonadError_[M, PlannerError],
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowOp3_2F :<: WF,
       ev2: RenderTree[WorkflowBuilder[WF]],
       ev3: ExprOpOps.Uni[ExprOp])
-    : JoinHandler[WF, OptionT[WorkflowBuilder.M, ?]] = JoinHandler({ (tpe, left, right) =>
+    : JoinHandler[WF, OptionT[M, ?]] = JoinHandler({ (tpe, left, right) =>
 
     val WB = WorkflowBuilder.Ops[WF]
 
@@ -88,6 +108,7 @@ object JoinHandler {
         _.exists(_.primary ≟ field),
         false)
 
+    // TODO: Make this `AlgebraM`?
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
       case ev0($ReadF(Collection(db, _))) => db.some
       case op                             => C.pipeline(op).flatMap(_.src)
@@ -96,88 +117,94 @@ object JoinHandler {
 
     def sourceDb: Algebra[WorkflowBuilderF[WF, ?], Option[DatabaseName]] = {
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
-      case ArrayBuilderF(src, _)              => src
-      case ArraySpliceBuilderF(src, _)        => src
       case DocBuilderF(src, _)                => src
       case ExprBuilderF(src, _)               => src
       case FlatteningBuilderF(src, _)         => src
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
-      case SpliceBuilderF(src, _)             => src
-      case ValueBuilderF(_)                   => None
+      case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
     }
 
     def lookup(
-        lSrc: WorkflowBuilder[WF], lKey: WorkflowBuilder[WF], lName: BsonField.Name,
-        rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
+      lSrc: WorkflowBuilder[WF], lKey: Expr, lName: BsonField.Name,
+      rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
 
       // NB: filtering on the left prior to the join is not strictly necessary,
       // but it avoids a runtime explosion in the common error case that the
       // field referenced on one side of the condition is not found.
       def filterExists(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
         WB.filter(wb,
-          List(ExprBuilder(wb, \/-($var(DocField(field))))),
+          List(docVarToExpr(DocField(field))),
           { case List(f) => Selector.Doc(f -> Selector.Exists(true)) })
 
       lKey match {
-        case Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(lField)))))) if src ≟ lSrc =>
+        case HasThat($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
-          generateWorkflow(filtered).map { case (left, _) =>
+          generateWorkflow[M, WF](filtered).map { case (left, _) =>
             CollectionBuilder(
               chain[Fix[WF]](
                 left,
-                $lookup(rColl, lName \ lField, rField, rName),
-                $unwind(DocField(rName))),
+                $lookup(rColl, lName \ lField, rField, rName)),
               Root(),
               None)
-            }
+          }
 
         case _ =>
           for {
-            tmpName  <- emitSt(freshName)
-            left     <- WB.objectConcat(
-                          WB.makeObject(lSrc, lName.asText),
-                          WB.makeObject(lKey, tmpName.asText))
-            t        <- generateWorkflow(left)
+            t <- generateWorkflow[M, WF](
+              DocBuilder(lSrc, ListMap(
+                lName               -> docVarToExpr(DocVar.ROOT()),
+                BsonField.Name("0") -> lKey)))
             (src, _) = t
-          } yield CollectionBuilder(
-              chain[Fix[WF]](
-                src,
-                $lookup(rColl, tmpName, rField, rName),
-                $project(
-                  Reshape(ListMap(
-                    lName -> \/-($var(DocField(lName))),
-                    rName -> \/-($var(DocField(rName))))),
-                  IgnoreId),
-                $unwind(DocField(rName))),
-              Root(),
-              None)
+          } yield
+              DocBuilder(
+                CollectionBuilder(
+                  chain[Fix[WF]](
+                    src,
+                    $lookup(rColl, BsonField.Name("0"), rField, rName)),
+                  Root(),
+                  None),
+                ListMap(
+                  lName -> docVarToExpr(DocField(lName)),
+                  rName -> docVarToExpr(DocField(rName))))
       }
     }
 
     (tpe, left, right) match {
-      case (set.InnerJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
+      case (JoinType.Inner, JoinSource(src, List(key)), IsLookupFrom(coll, field))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, LeftName,
-          coll.collection, field, RightName).liftM[OptionT]
+          coll.collection, field, RightName).liftM[OptionT] ∘
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId))))
 
-      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.LeftOuterJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
-      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   ???
+      case (JoinType.LeftOuter, JoinSource(src, List(key)), IsLookupFrom(coll, field))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+        lookup(
+          src, key, LeftName,
+          coll.collection, field, RightName).liftM[OptionT] ∘
+          (look =>
+            FlatteningBuilder(
+              buildProjection(look, LeftName, n => $var(DocField(n)), RightName, padEmpty),
+              Set(StructureType.Array(DocField(RightName), ExcludeId))))
 
-      case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
+      case (JoinType.Inner, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, RightName,
-          coll.collection, field, LeftName).liftM[OptionT]
+          coll.collection, field, LeftName).liftM[OptionT] ∘
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId))))
 
-      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
-      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   ???
+      case (JoinType.RightOuter, IsLookupFrom(coll, field), JoinSource(src, List(key)))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+        lookup(
+          src, key, RightName,
+          coll.collection, field, LeftName).liftM[OptionT] ∘
+          (look =>
+            FlatteningBuilder(
+              buildProjection(look, LeftName, padEmpty, RightName, n => $var(DocField(n))),
+              Set(StructureType.Array(DocField(LeftName), ExcludeId))))
 
       case _ => OptionT.none
     }
@@ -194,18 +221,21 @@ object JoinHandler {
       arg match {
         case JoinSource(
               Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
-              List(Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(field))))))),
-              _) if src ≟ arg.src =>
+              List(HasThat($var(DocVar(_, Some(field)))))) =>
           (coll, field).some
         case _ =>
           None
       }
   }
 
-  /** Plan an arbitrary join using only "core" operators, which always means a map-reduce. */
-  def mapReduce[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
-    : JoinHandler[WF, WorkflowBuilder.M] = JoinHandler({ (tpe, left0, right0) =>
+  /** Plan an arbitrary join using only "core" operators, which always means a
+    * map-reduce.
+    */
+  def mapReduce[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
+    (implicit M: MonadError[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
+    : JoinHandler[WF, M] = JoinHandler({ (tpe, left0, right0) =>
+
+    val WB = WorkflowBuilder.Ops[WF]
 
     val ops = Ops[WF]
     import ops._
@@ -213,38 +243,43 @@ object JoinHandler {
     val leftField0 = LeftName
     val rightField0 = RightName
 
-    def keyMap(keyExpr: List[JsFn], rootField: BsonField.Name, otherField: BsonField.Name): Js.AnonFunDecl =
+    def keyMap(base: Base, keyExpr: List[JsFn], rootField: BsonField.Name, otherField: BsonField.Name): Js.AnonFunDecl =
       $MapF.mapKeyVal(("key", "value"),
         keyExpr match {
           case Nil => Js.Null
           case _   =>
-            jscore.Obj(keyExpr.map(_(jscore.ident("value"))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
+            jscore.Obj(keyExpr.map(_(base.toDocVar.toJs(jscore.ident("value")))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
               case (acc, (j, i)) => acc + (jscore.Name(i.toString) -> j)
             }).toJs
         },
         Js.AnonObjDecl(List(
           (otherField.asText, Js.AnonElem(Nil)),
-          (rootField.asText, Js.AnonElem(List(Js.Ident("value")))))))
+          (rootField.asText, Js.AnonElem(List(base.toDocVar.toJs(jscore.ident("value")).toJs))))))
 
     def jsReduce(src: WorkflowBuilder[WF], key: List[JsFn],
                  rootField: BsonField.Name, otherField: BsonField.Name):
-        (WorkflowBuilder[WF], FixOp[WF]) =
-      (src, $map[WF](keyMap(key, rootField, otherField), ListMap()))
+        (WorkflowBuilder[WF], Base => FixOp[WF]) =
+      (src, b => $map[WF](keyMap(b, key, rootField, otherField), ListMap()))
 
     def wbReduce
-      (src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
+      (src: WorkflowBuilder[WF], key: List[Expr],
         rootField: BsonField.Name, otherField: BsonField.Name)
-        : (WorkflowBuilder[WF], FixOp[WF]) =
+        : (WorkflowBuilder[WF], Base => FixOp[WF]) =
       (DocBuilder(
-        reduce(groupBy(src, key))($push(_)),
+        // TODO: If we can identify cases where the group key _is_ the `_id`
+        //       field, then we can avoid the `$group` / `$unwind` on whichever
+        //       side that applies to, since we know there’s only one entry per
+        //       `_id`.
+        groupBy(src, key, ListMap(BsonField.Name("0") -> $push($$ROOT))),
         ListMap(
-          rootField             -> \/-($$ROOT),
-          otherField            -> \/-($literal(Bson.Arr())),
-          BsonField.Name("_id") -> \/-($include()))),
-        ι)
+          rootField             -> \&/-($field("0")),
+          otherField            -> \&/-($literal(Bson.Arr())),
+          BsonField.Name("_id") -> \&/-($include()))),
+        // FIXME: Don’t ignore the base.
+        _ => ι)
 
     val (left, right, leftField, rightField) =
-      (left0.js, right0.js) match {
+      (left0.keys.map(HasThis.unapply).sequence, right0.keys.map(HasThis.unapply).sequence) match {
         case (Some(js), _)
             if preferMapReduce(left0.src) && !preferMapReduce(right0.src) =>
           (wbReduce(right0.src, right0.keys, rightField0, leftField0),
@@ -264,40 +299,55 @@ object JoinHandler {
             leftField0, rightField0)
       }
 
+    // TODO: Do we get any benefit from pre-filtering the join before unwinding?
+    //       We should check.
     val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
 
-    def padEmpty(side: BsonField): Fix[ExprOp] =
-      $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
-        $literal(Bson.Arr(List(Bson.Doc()))),
-        $var(DocField(side)))
-
-    def buildProjection(l: Fix[ExprOp], r: Fix[ExprOp]): FixOp[WF] =
-      $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
-
-    // TODO exhaustive pattern match
-    def buildJoin(src: Fix[WF], tpe: MongoJoinType): Fix[WF] =
+    def buildJoin(src: WorkflowBuilder[WF], tpe: JoinType): WorkflowBuilder[WF] =
       tpe match {
-        case set.FullOuterJoin =>
-          chain(src,
-            buildProjection(padEmpty(leftField), padEmpty(rightField)))
-        case set.LeftOuterJoin =>
-          chain(src,
-            $match[WF](Selector.Doc(ListMap(
-              leftField.asInstanceOf[BsonField] -> nonEmpty))),
-            buildProjection($var(DocField(leftField)), padEmpty(rightField)))
-        case set.RightOuterJoin =>
-          chain(src,
-            $match[WF](Selector.Doc(ListMap(
-              rightField.asInstanceOf[BsonField] -> nonEmpty))),
-            buildProjection(padEmpty(leftField), $var(DocField(rightField))))
-        case set.InnerJoin =>
-          chain(
-            src,
-            $match[WF](
-              Selector.Doc(ListMap(
-                leftField.asInstanceOf[BsonField] -> nonEmpty,
-                rightField -> nonEmpty))))
-        case _ => scala.sys.error("How did this get here?")
+        case JoinType.FullOuter =>
+          FlatteningBuilder(
+            buildProjection(src, leftField, padEmpty, rightField, padEmpty),
+            Set(
+              StructureType.Array(DocField(leftField), ExcludeId),
+              StructureType.Array(DocField(rightField), ExcludeId)))
+        case JoinType.LeftOuter =>
+          FlatteningBuilder(
+            buildProjection(
+              WB.filter(src,
+                List(docVarToExpr(DocField(leftField))),
+                { case l :: Nil => Selector.Doc(ListMap(l -> nonEmpty)) }),
+              leftField, n => $var(DocField(n)),
+              rightField, padEmpty),
+            Set(
+              StructureType.Array(DocField(leftField), ExcludeId),
+              StructureType.Array(DocField(rightField), ExcludeId)))
+        case JoinType.RightOuter =>
+          FlatteningBuilder(
+            buildProjection(
+              WB.filter(
+                src,
+                List(docVarToExpr(DocField(rightField))),
+                { case r :: Nil => Selector.Doc(ListMap(r -> nonEmpty)) }),
+              leftField, padEmpty,
+              rightField, n => $var(DocField(n))),
+            Set(
+              StructureType.Array(DocField(leftField), ExcludeId),
+              StructureType.Array(DocField(rightField), ExcludeId)))
+        case JoinType.Inner =>
+          FlatteningBuilder(
+            WB.filter(
+              src,
+              List(
+                docVarToExpr(DocField(leftField)),
+                docVarToExpr(DocField(rightField))),
+              {
+                case l :: r :: Nil =>
+                  Selector.Doc(ListMap(l -> nonEmpty, r -> nonEmpty))
+              }),
+            Set(
+              StructureType.Array(DocField(leftField), ExcludeId),
+              StructureType.Array(DocField(rightField), ExcludeId)))
       }
 
     val rightReduce = {
@@ -325,18 +375,16 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (generateWorkflow(left._1) |@| generateWorkflow(right._1)) {
-      case ((l, _), (r, _)) =>
-        CollectionBuilder(
-          chain(
+    (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
+      case ((l, lb), (r, rb)) =>
+        buildJoin(
+          CollectionBuilder(
             $foldLeft[WF](
-              left._2(l),
-              chain(r, right._2, $reduce[WF](rightReduce, ListMap()))),
-            (op: Fix[WF]) => buildJoin(op, tpe),
-            $unwind[WF](DocField(leftField)),
-            $unwind[WF](DocField(rightField))),
-          Root(),
-          None)
+              left._2(lb)(l),
+              chain(r, right._2(rb), $reduce[WF](rightReduce, ListMap()))),
+            Root(),
+            None),
+          tpe)
     }
   })
 
@@ -355,7 +403,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    generateWorkflow[WF](wb).evalZero.fold(
+    generateWorkflow[PlannerError \/ ?, WF](wb).fold(
       κ(false),
       wf => checkTask(task(Crystallize[WF].crystallize(wf._1))))
   }

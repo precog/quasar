@@ -30,7 +30,7 @@ import monocle.Prism
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
-sealed abstract class Statement[BODY] {
+sealed abstract class Statement[BODY] extends Product with Serializable {
   def pprint(implicit ev: BODY <~< String): String
 }
 

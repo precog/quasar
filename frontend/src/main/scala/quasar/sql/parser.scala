@@ -165,9 +165,6 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         failure("Import must identify a directory"))
     }
 
-  @SuppressWarnings(Array(
-    "org.wartremover.warts.Product",
-    "org.wartremover.warts.Serializable"))
   def statements: Parser[List[Statement[T[Sql]]]] =
     repsep(func_def | import_, op(";")) <~ opt(op(";"))
 

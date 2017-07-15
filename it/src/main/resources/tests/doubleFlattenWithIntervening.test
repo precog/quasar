@@ -1,7 +1,10 @@
 {
     "name": "double flatten with intervening field",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_read_only": "pending",
         "postgresql": "pending"
     },
     "data": "nested.data",

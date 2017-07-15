@@ -2,7 +2,7 @@
     "name": "filter with complex query involving not",
 
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
 

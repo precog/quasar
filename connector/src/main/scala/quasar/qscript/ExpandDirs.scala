@@ -258,9 +258,9 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
       def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
         (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
         fa => (fa match {
-          case EquiJoin(src, lb, rb, lk, rk, jType, combine) =>
+          case EquiJoin(src, lb, rb, k, jType, combine) =>
             (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
-              EquiJoin(src, _, _, lk, rk, jType, combine))
+              EquiJoin(src, _, _, k, jType, combine))
         }) ∘ (OutToF.compose(EJ))
     }
 }

@@ -89,9 +89,9 @@ package object analysis {
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, QScriptCore[T, ?], Int] = {
           case Map(card, f) => card.point[M]
           case Reduce(card, bucket, reducers, repair) =>
-            bucket.fold(κ(card / 2), {
-              case MapFuncsCore.Constant(v) => 1
-              case _ => card / 2
+            (bucket match {
+              case Nil => 1
+              case _   => card / 2
             }).point[M]
           case Sort(card, bucket, orders) => card.point[M]
           case Filter(card, f) => (card / 2).point[M]
@@ -126,7 +126,7 @@ package object analysis {
       new Cardinality[EquiJoin[T, ?]] {
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, EquiJoin[T, ?], Int] = {
-          case EquiJoin(card, lBranch, rBranch, _, _, _, _) =>
+          case EquiJoin(card, lBranch, rBranch, _, _, _) =>
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
             (lBranch.cataM(interpretM(κ(card.point[M]), compile)) |@| rBranch.cataM(interpretM(κ(card.point[M]), compile))) { _ * _}
         }
@@ -211,7 +211,7 @@ package object analysis {
       new Cost[EquiJoin[T, ?]] {
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, EquiJoin[T, ?], Int] = {
-          case EquiJoin((card, cost), lBranch, rBranch, lKey, rKey, jt, combine) =>
+          case EquiJoin((card, cost), lBranch, rBranch, key, jt, combine) =>
             val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
             val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
             (lBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost)) |@|

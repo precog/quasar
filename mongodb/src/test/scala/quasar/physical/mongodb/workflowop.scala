@@ -54,14 +54,18 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
     new (Cogen ~> λ[α => Cogen[CardinalExpr[α]]]) {
       def apply[α](cg: Cogen[α]): Cogen[CardinalExpr[α]] =
         Cogen { (seed: Seed, ce: CardinalExpr[α]) =>
-          cg.perturb(seed, ce.copoint)
+          ce match {
+            case MapExpr(fn)        => cg.perturb(seed, fn)
+            case SubExpr(place, fn) => cg.perturb(cg.perturb(seed, place), fn)
+            case FlatExpr(fn)       => cg.perturb(seed, fn)
+          }
         }
     }
 
   implicit val cogenIntCardinalExpr = cogenCardinalExpr(Cogen.cogenInt)
 
   checkAll("CardinalExpr", traverse.laws[CardinalExpr])
-  checkAll("CardinalExpr", comonad.laws[CardinalExpr])
+  // checkAll("CardinalExpr", comonad.laws[CardinalExpr])
 }
 
 class WorkflowSpec extends quasar.Qspec with TreeMatchers {
@@ -294,63 +298,6 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
     import quasar.jscore, jscore._
 
     val readZips = $read[WorkflowF](collection("db", "zips"))
-
-    "coalesce previous projection into a map" in {
-      val given = chain[Workflow](
-        readZips,
-        $project(Reshape(ListMap(
-          BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
-        $simpleMap((MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), Select(ident("x"), "value")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
-
-      val expected = chain[Workflow](
-        readZips,
-        $simpleMap(
-          NonEmptyList(
-            MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x"))))),
-          ListMap()))
-
-      crystallize(given) must beTree(Crystallized(expected))
-    }
-
-    "coalesce previous projection into a flatMap" in {
-      val given = chain[Workflow](
-        readZips,
-        $project(Reshape(ListMap(
-          BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
-        $simpleMap(
-          (FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo"))):CardinalExpr[JsFn]).wrapNel,
-          ListMap()))
-
-      val expected = chain[Workflow](
-        readZips,
-        $simpleMap(
-          NonEmptyList(
-            MapExpr(JsFn(Name("x"), Obj(ListMap(Name("value") -> ident("x"))))),
-            FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo")))),
-          ListMap()))
-
-      crystallize(given) must beTree(Crystallized(expected))
-    }
-
-    "convert previous projection before a reduce" in {
-      val given = chain[Workflow](
-        readZips,
-        $project(Reshape(ListMap(
-          BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
-        $reduce($ReduceF.reduceNOP, ListMap()))
-
-      val expected = chain[Workflow](
-        readZips,
-        $simpleMap(
-          (MapExpr(JsFn(Name("x"), Obj(ListMap(Name("value") -> ident("x"))))):CardinalExpr[JsFn]).wrapNel,
-          ListMap()),
-        $reduce($ReduceF.reduceNOP, ListMap()))
-
-      crystallize(given) must beTree(Crystallized(expected))
-    }
 
     "coalesce previous unwind into a map" in {
       val given = chain[Workflow](

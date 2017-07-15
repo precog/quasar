@@ -17,37 +17,30 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner.{PlannerError, InternalError}
-import quasar.std.StdLib._
-import quasar.fp.ski._
-import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.mongodb.fs._
-import quasar.physical.mongodb.planner.MongoDbPlanner
+import quasar._, Planner.PlannerError
+import quasar.contrib.scalaz._
+import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.planner.FuncHandler
 import quasar.physical.mongodb.workflow._
+import quasar.qscript._
+import quasar.std.StdLib._
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.specs2.execute._
-import scalaz._, Scalaz._
+import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat
 
 /** Test the implementation of the standard library for MongoDb's aggregation
   * pipeline (aka ExprOp).
-  *
-  * NB: because compilation to the Expression AST can't currently be separated
-  * from the rest of the MongoDb planner, this test runs the whole planner and
-  * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Length, _)   => notHandled.left
-    case (string.Integer, _)  => notHandled.left
-    case (string.Decimal, _)  => notHandled.left
-    case (string.ToString, _) => notHandled.left
+    case (string.Length | string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
@@ -64,24 +57,23 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-    val wrapped =
-      Fix(structural.MakeObject(
-        lpf.constant(Data.Str("result")),
-        lp))
+  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
+      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+    queryModel match {
+      case MongoQueryModel.`3.2` =>
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+      case MongoQueryModel.`3.0` =>
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0)(mf) >>=
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
-    val ctx = QueryContext(queryModel, κ(None), κ(None), listContents)
+      case _                     =>
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6)(mf) >>=
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
-    MongoDbPlanner.plan(wrapped, ctx).run.value
-      .flatMap { wf =>
-        val singlePipeline = wf.op.cata[Boolean] {
-          case IsSource(_)   => true
-          case IsPipeline(p) => p.src
-          case _             => false
-        }
-        if (singlePipeline) wf.right else InternalError.fromMsg("compiled to map-reduce").left
-      }
-      .strengthR(BsonField.Name("result"))
+    }
   }
 }

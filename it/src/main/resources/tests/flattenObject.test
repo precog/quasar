@@ -2,8 +2,11 @@
     "name": "flatten object",
     "backends": {
         "couchbase":  "ignoreFieldOrder",
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_read_only": "pending",
+        "postgresql": "pending"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",

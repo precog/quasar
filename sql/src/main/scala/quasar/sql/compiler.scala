@@ -220,7 +220,6 @@ final class Compiler[M[_], T: Equal]
       CIName("type_of")                 -> identity.TypeOf,
       CIName("between")                 -> relations.Between,
       CIName("where")                   -> set.Filter,
-      CIName("distinct")                -> set.Distinct,
       CIName("within")                  -> set.Within,
       CIName("constantly")              -> set.Constantly,
       CIName("concat")                  -> string.Concat,
@@ -245,6 +244,10 @@ final class Compiler[M[_], T: Equal]
       CIName("shift_map")               -> structural.ShiftMap,
       CIName("shift_array")             -> structural.ShiftArray,
       CIName("meta")                    -> structural.Meta)
+
+    def compileDistinct(t: T) =
+      CompilerState.freshName("distinct") ∘ (name =>
+        lpr.let(name, t, agg.Arbitrary(set.GroupBy(lpr.free(name), lpr.free(name)).embed).embed))
 
     def compileCases
       (cases: List[Case[CoExpr]], default: T)
@@ -439,7 +442,7 @@ final class Compiler[M[_], T: Equal]
          * 5. Select (SELECT)
          * 6. Squash
          * 7. Sort (ORDER BY)
-         * 8. Distinct (DISTINCT/DISTINCT BY)
+         * 8. Distinct
          * 9. Prune synthetic fields
          */
 
@@ -504,24 +507,40 @@ final class Compiler[M[_], T: Equal]
                         val squashed = select.map(Squash(_).embed)
 
                         stepBuilder(squashed.some) {
-                          val sort = orderBy.map(orderBy =>
-                            CompilerState.rootTableReq[M, T] >>= (t =>
+                          def sort(ord: OrderBy[CoExpr], nu: T) =
+                            CompilerState.rootTableReq[M, T] >>= (preSorted =>
                               nam.fold(
-                                orderBy.keys.traverse(p => (t, p._1).point[M]))(
-                                n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
-                                .map(ks => lpr.sort(t, ks map {
-                                  case (k, ASC ) => (k, SortDir.Ascending)
-                                  case (k, DESC) => (k, SortDir.Descending)
-                                }))))
+                                ord.keys.map(p => (nu, p._1)).point[M])(
+                                na => CompilerState.addFields(na.unite)(ord.keys.traverse {
+                                  case (ot, key) =>
+                                    compile0(key).map(_.transApoT(substitute(preSorted, nu))) strengthR ot
+                                })) ∘
+                                (ks =>
+                                  lpr.sort(nu,
+                                    ks.map(_.map {
+                                      case ASC  => SortDir.Ascending
+                                      case DESC => SortDir.Descending
+                                    }))))
 
-                          stepBuilder(sort) {
+                          val sorted = orderBy ∘ (ord => CompilerState.rootTableReq[M, T] >>= (sort(ord, _)))
+
+                          stepBuilder(sorted) {
+                            def distinct(name: Symbol, aggregation: UnaryFunc, t: T) = {
+                              val fvar = lpr.free(name)
+
+                              lpr.let(name, t,
+                                (syntheticNames.nonEmpty).fold(
+                                  aggregation(set.GroupBy(fvar, syntheticNames.foldLeft(fvar)((acc, field) =>
+                                    structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed),
+                                  agg.Arbitrary(set.GroupBy(fvar, fvar).embed)).embed)
+                            }
+
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                CompilerState.rootTableReq[M, T].map(t =>
-                                  if (syntheticNames.nonEmpty)
-                                    set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed
-                                  else set.Distinct(t).embed).some
+                                ((CompilerState.rootTableReq[M, T] ⊛ CompilerState.freshName("distinct"))((t, name) =>
+                                  orderBy.fold(
+                                    distinct(name, agg.Arbitrary, t).point[M])(
+                                    sort(_, distinct(name, agg.First, t)))).join).some
                               case _ => None
                             }
 
@@ -607,7 +626,7 @@ final class Compiler[M[_], T: Equal]
           // TODO: NOP, but should we ensure we have a Num or Interval here?
           case Positive            => compile0(expr).right
           case Negative            => math.Negate.left
-          case Distinct            => set.Distinct.left
+          case Distinct            => (compile0(expr) >>= compileDistinct).right
           case FlattenMapKeys      => structural.FlattenMapKeys.left
           case FlattenMapValues    => structural.FlattenMap.left
           case ShiftMapKeys        => structural.ShiftMapKeys.left

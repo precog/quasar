@@ -49,7 +49,7 @@ sealed abstract class ProjectBucket[T[_[_]], A] {
     extends ProjectBucket[T, A]
 
 object ProjectBucket {
-  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ProjectBucket[T, ?]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Delay[Equal, ProjectBucket[T, ?]] =
     new Delay[Equal, ProjectBucket[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -106,7 +106,7 @@ object ProjectBucket {
       }
     }
 
-  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]

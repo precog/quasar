@@ -2,9 +2,13 @@
     "name": "filter on date part, where the field isn't a timestamp",
 
     "backends": {
-        "mimir":"pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":    "pending"
+        "mimir": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_read_only": "pending",
+        "postgresql": "pending"
     },
 
     "data": "../days.data",

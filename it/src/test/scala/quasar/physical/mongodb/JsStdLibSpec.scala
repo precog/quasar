@@ -17,16 +17,14 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner.{PlannerError, InternalError}
+import quasar._
+import quasar.fs.FileSystemError
 import quasar.std.StdLib._
-import quasar.jscore._
-import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
+import quasar.qscript._
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.specs2.execute._
 import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat
@@ -35,17 +33,12 @@ import shapeless.Nat
   * (i.e. JavaScript).
   */
 class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
-  val notHandled = Skipped("not implemented in JS")
-
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Lower, _)   => Skipped("TODO").left
-    case (string.Upper, _)   => Skipped("TODO").left
-
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
     case (string.ToString, Data.Date(_) :: Nil) =>
-      Skipped("Date printing doesn't match").left
+      Skipped("Date prints timestamp").left
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Skipped("Interval prints numeric representation").left
 
@@ -53,31 +46,27 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (relations.Cond, _)           => Skipped("TODO").left
-
-    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
-    // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
-    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
-    case (date.ExtractWeek, _)         => Skipped("TODO").left
-    case (date.ExtractQuarter, _)      => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
 
     case (structural.ConcatOp, _)      => Skipped("TODO").left
 
     case _                             => ().right
   }
 
-  def shortCircuitTC(args: List[Data]): Result \/ Unit = Skipped("TODO").left
+  def shortCircuitTC(args: List[Data]): Result \/ Unit = args match {
+    case Data.Date(_) :: Nil => Skipped("TODO").left
+    case Data.Time(_) :: Nil => Skipped("TODO").left
+    case _                   => ().right
+  }
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-
-    for {
-      t  <- lp.cata(MongoDbPlanner.jsExprƒ)
-      (pj, ifs) = t
-      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError.fromMsg("no JS compilation")
-      wf =  chain[Fix[WorkflowF]](
-              $read(coll),
-              $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))
-    } yield (Crystallize[WorkflowF].crystallize(wf), BsonField.Name("value"))
+  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
+      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+    MongoDbPlanner.getJsFn[Fix, FileSystemError \/ ?](mf) ∘
+      (js =>
+        (Crystallize[WorkflowF].crystallize(
+          chain[Fix[WorkflowF]](
+            $read(coll),
+            $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))),
+          BsonField.Name("value")))
   }
 }

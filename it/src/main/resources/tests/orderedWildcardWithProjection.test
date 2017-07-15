@@ -1,8 +1,15 @@
 {
     "name": "wildcard with projection and synthetic field",
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir": "pending",
+        "mongodb_2_6":       "ignoreResultOrder",
+        "mongodb_3_0":       "ignoreResultOrder",
+        "mongodb_3_2":       "ignoreResultOrder",
+        "mongodb_3_4":       "ignoreResultOrder",
+        "mongodb_read_only": "ignoreResultOrder",
+        "postgresql":        "pending",
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
     "data": "largeZips.data",
     "query": "select *, pop * 10 as dpop from largeZips order by pop / 10 desc",

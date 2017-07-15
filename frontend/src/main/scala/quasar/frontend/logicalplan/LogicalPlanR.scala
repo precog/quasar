@@ -446,10 +446,8 @@ final class LogicalPlanR[T]
 
       t.project match {
         case Free(name)            => bind.get(name).fold(default)(_.point[M])
-        case Let(name, form, body) => for {
-          form1 <- loop(form, bind)
-          rez   <- loop(body, bind + (name -> form1))
-        } yield rez
+        case Let(name, form, body) =>
+          loop(form, bind) >>= (form1 => loop(body, bind + (name -> form1)))
         case _                     => default
       }
     }

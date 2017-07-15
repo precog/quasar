@@ -183,8 +183,6 @@ final class Optimizer[T: Equal]
     case Join(_, _, _, _) =>
       Some(List(JoinDir.Left.const, JoinDir.Right.const))
     case InvokeUnapply(GroupBy, Sized(src, _)) => src._2
-    case InvokeUnapply(Distinct, Sized(src, _)) => src._2
-    case InvokeUnapply(DistinctBy, Sized(src, _)) => src._2
     case InvokeUnapply(identity.Squash, Sized(src)) => src._2
     case _ => None
   }

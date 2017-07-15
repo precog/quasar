@@ -1,9 +1,8 @@
 {
     "name": "filter on `!= null`",
     "backends": {
-        "mimir":"pending",
-        "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "nulls.data",
     "query": "select distinct (val != null) as expr from nulls where val != null",

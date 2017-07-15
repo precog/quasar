@@ -22,7 +22,7 @@ import quasar.physical.mongodb._
 
 import scalaz._, Scalaz._
 
-class MongoDbIOSpec extends QuasarSpecification {
+class MongoDbIOSpec extends Qspec {
   import MongoDbSpec._
 
   clientShould(FsType) { (backend, prefix, setupClient, testClient) =>

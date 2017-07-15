@@ -18,6 +18,7 @@ package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
 import quasar.{Data => QData, NameGenerator}
+import quasar.Planner.{PlannerErrorME, InternalError}
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -26,7 +27,6 @@ import quasar.physical.couchbase._,
   N1QL.{Id, Union, Unreferenced, _},
   planner.Planner._,
   Select.{Filter, Value, _}, Case._
-import quasar.Planner.{PlannerErrorME, InternalError}
 import quasar.qscript, qscript._
 
 import matryoshka._
@@ -129,11 +129,14 @@ final class QScriptCorePlanner[
         id1 <- genId[T[N1QL], F]
         id2 <- genId[T[N1QL], F]
         id3 <- genId[T[N1QL], F]
-        b   <- processFreeMap(bucket, id1)
+        b   <- processFreeMap(bucket match {
+          case Nil => MapFuncsCore.NullLit()
+          case _   => MapFuncCore.StaticArray(bucket)
+        }, id1)
         red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
                  reduceFuncPlanner[T, F].plan)
         rep <- repair.cataM(interpretM(
-                 _.idx.fold(SelectElem(ArrAgg(b).embed, int(0)).embed)(red(_)).point[F],
+                 _.idx.fold(i => SelectElem(SelectElem(ArrAgg(b).embed, int(0)).embed, int(i)).embed, red(_)).point[F],
                  mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
@@ -164,7 +167,7 @@ final class QScriptCorePlanner[
         id1 <- genId[T[N1QL], F]
         id2 <- genId[T[N1QL], F]
         id3 <- genId[T[N1QL], F]
-        b   <- processFreeMap(bucket, id1)
+        b   <- processFreeMap(MapFuncCore.StaticArray(bucket), id1)
         o   <- order.traverse { case (or, d) =>
                  (processFreeMap(or, id3) ∘ (OrderBy(_, d)))
                }

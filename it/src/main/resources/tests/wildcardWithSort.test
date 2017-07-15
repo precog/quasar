@@ -1,7 +1,7 @@
 {
     "name": "wildcard with sort",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

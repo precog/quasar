@@ -19,8 +19,11 @@ package quasar.physical.mongodb.workflow
 import scalaz._, Scalaz._
 
 sealed abstract class CardinalExpr[A]
-
 final case class MapExpr[A](fn: A)  extends CardinalExpr[A]
+/** Like `MapExpr`, but stores the result of `fn` in `place` (which must be
+  * assignable).
+  */
+final case class SubExpr[A](place: A, fn: A)  extends CardinalExpr[A]
 final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
 
 object CardinalExpr {
@@ -31,34 +34,16 @@ object CardinalExpr {
           G[CardinalExpr[B]] =
         fa match {
           case MapExpr(e)  => f(e).map(MapExpr(_))
+          case SubExpr(p, e) => (f(p) ⊛ f(e))(SubExpr(_, _))
           case FlatExpr(e) => f(e).map(FlatExpr(_))
         }
-    }
-
-  implicit val comonad: Comonad[CardinalExpr] =
-    new Comonad[CardinalExpr] {
-      def map[A, B](fa: CardinalExpr[A])(f: A => B): CardinalExpr[B] =
-        fa match {
-          case MapExpr(e)  => MapExpr(f(e))
-          case FlatExpr(e) => FlatExpr(f(e))
-        }
-
-      def cobind[A, B](fa: CardinalExpr[A])(f: CardinalExpr[A] => B):
-          CardinalExpr[B] = fa match {
-        case MapExpr(_)  => MapExpr(f(fa))
-        case FlatExpr(_) => FlatExpr(f(fa))
-      }
-
-      def copoint[A](p: CardinalExpr[A]) = p match {
-        case MapExpr(e)  => e
-        case FlatExpr(e) => e
-      }
     }
 
   implicit def equal[A: Equal]: Equal[CardinalExpr[A]] = new Equal[CardinalExpr[A]] {
 
     def equal(left: CardinalExpr[A], right: CardinalExpr[A]) = (left, right) match {
       case (MapExpr(lfn), MapExpr(rfn)) => lfn === rfn
+      case (SubExpr(lp, lfn), SubExpr(rp, rfn)) => lp === rp && lfn === rfn
       case (FlatExpr(lfn), FlatExpr(rfn)) => lfn === rfn
       case _ => false
     }

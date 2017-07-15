@@ -1,8 +1,11 @@
 {
     "name": "states sorted by the length of name of their first city, alphabetically",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "couchbase": "pending",
+        "mongodb_2_6": "ignoreResultOrder",
+        "mongodb_3_0": "ignoreResultOrder",
+        "mongodb_read_only": "ignoreResultOrder",
         "postgresql": "pending"
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",

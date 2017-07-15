@@ -17,25 +17,28 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner.PlannerError
+import quasar._
 import quasar.contrib.scalaz.catchable._
-import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.DataCursor
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
+import quasar.fp.tree._
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.fs.{DataCursor, FileSystemError}
+import quasar.physical.mongodb.WorkflowExecutor.WorkflowCursor
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
-import WorkflowExecutor.WorkflowCursor
+import quasar.qscript._
+import quasar.std._
 
-import scala.concurrent.duration._
+import scala.sys
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
+import scala.concurrent.duration._
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}
@@ -44,7 +47,7 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
-  val lpf = new LogicalPlanR[Fix[LP]]
+  val lpf = new lp.LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))
 
@@ -52,11 +55,11 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
+  def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
+      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is2_6(backend: BackendName): Boolean = backend === TestConfig.MONGO_2_6.name
-  def is3_2(backend: BackendName): Boolean = backend === TestConfig.MONGO_3_2.name
+  def is2_6(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_2_6.name
+  def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_2.name
 
   MongoDbSpec.clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
@@ -73,7 +76,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(func, _)     => shortCircuit(backend, func, args)
       case lp.TemporalTrunc(_, _) => shortCircuitTC(args)
-      case _ => ().right
+      case _                      => ().right
     }
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
@@ -103,52 +106,71 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
-    def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
-      check(args, prg).getOrElse(
-        (for {
-          coll <- MongoDbSpec.tempColl(prefix)
-          argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
-                      BsonCodec.fromData(arg).point[Task].unattemptRuntime.strengthL("arg" + idx) }
-          _     <- insert(
-                    coll,
-                    List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
+    val runner = new MapFuncStdLibTestRunner with MongoDbDomain {
+      def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
+        check(args, prg).getOrElse(
+          (for {
+            coll <- MongoDbSpec.tempColl(prefix)
+            argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
+              BsonCodec.fromData(arg).point[Task].unattemptRuntime.strengthL("arg" + idx) }
+            _     <- insert(
+              coll,
+              List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
 
-          qm  <- serverVersion.map(MongoQueryModel(_)).run(testClient)
+            qm  <- serverVersion.map(MongoQueryModel(_)).run(testClient)
 
-          lp = prg(
-                (0 until args.length).toList.map(idx =>
-                  Fix(StructuralLib.ObjectProject(
-                    lpf.read(coll.asFile),
-                    lpf.constant(Data.Str("arg" + idx))))))
-          t  <- compile(qm, coll, lp).point[Task].unattemptRuntime
-          (wf, resultField) = t
+            lp = prg(
+              (0 until args.length).toList.map(idx =>
+                Fix(StructuralLib.ObjectProject(
+                  lpf.free('hole),
+                  lpf.constant(Data.Str("arg" + idx))))))
+            t  <- compile(qm, coll, translate[Hole](lp, _ => SrcHole)).point[Task].unattemptRuntime
+            (wf, resultField) = t
+            rez <- evaluate(wf, coll).run(testClient)
 
-          rez <- evaluate(wf, coll).run(testClient)
+            _     <- dropCollection(coll).run(setupClient)
+          } yield {
+            rez must beSingleResult(beCloseTo(massage(expected)))
+          }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
-          _     <- dropCollection(coll).run(setupClient)
-        } yield {
-          rez must beSingleResult(beCloseTo(massage(expected)))
-        }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
+      // TODO: Currently still using the old MapFuncStdLibSpec API. The new one
+      //       doesn’t mesh well with the general approach of the Mongo version.
+      //       Need to revisit later, and hopefully come up with a better one.
 
-    val runner = new StdLibTestRunner with MongoDbDomain {
-      def nullary(
+      def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data) =
+        sys.error("impossible!")
+
+      def unaryMapFunc(prg: FreeMapA[Fix, UnaryArg], arg: Data, expected: Data) =
+        sys.error("impossible!")
+
+      def binaryMapFunc
+        (prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data, expected: Data) =
+        sys.error("impossible!")
+
+      def ternaryMapFunc
+        (prg: FreeMapA[Fix, TernaryArg],
+          arg1: Data, arg2: Data, arg3: Data,
+          expected: Data) =
+        sys.error("impossible!")
+
+      override def nullary(
         prg: Fix[LP],
         expected: Data): Result =
         run(Nil, κ(prg), expected)
 
-      def unary(
+      override def unary(
         prg: Fix[LP] => Fix[LP],
         arg: Data,
         expected: Data): Result =
         run(List(arg), { case List(arg) => prg(arg) }, expected)
 
-      def binary(
+      override def binary(
         prg: (Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data,
         expected: Data): Result =
         run(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }, expected)
 
-      def ternary(
+      override def ternary(
         prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data, arg3: Data,
         expected: Data): Result =

@@ -16,11 +16,29 @@
 
 package quasar.contrib
 
-import _root_.scalaz._, \&/._
+import slamdata.Predef._
+
+import _root_.scalaz._, \&/._, Scalaz._
 
 package object scalaz {
   def -\&/[A, B](a: A): These[A, B] = This(a)
   def \&/-[A, B](b: B): These[A, B] = That(b)
+
+  object HasThis {
+    def unapply[A](these: A \&/ _): Option[A] = these match {
+      case Both(a, _) => a.some
+      case This(a)    => a.some
+      case That(_)    => none
+    }
+  }
+
+  object HasThat {
+    def unapply[B](these: _ \&/ B): Option[B] = these match {
+      case Both(_, b) => b.some
+      case This(_)    => none
+      case That(b)    => b.some
+    }
+  }
 
   implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)

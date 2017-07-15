@@ -1,18 +1,17 @@
 {
-  "name": "filter on date part",
+    "name": "filter on date part",
 
-  "backends": {
-        "mimir":"pending",
-    "mongodb_q_3_2":  "pending",
-    "postgresql":     "pending"
-  },
+    "backends": {
+        "mimir": "pending",
+        "postgresql": "pending"
+    },
 
-  "data": "../days.data",
+    "data": "../days.data",
 
-  "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",
+    "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",
 
-  "predicate": "exactly",
-  "ignoreResultOrder": true,
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
-  "expected": ["Wednesday", "Thursday", "Friday", "Saturday"]
+    "expected": ["Wednesday", "Thursday", "Friday", "Saturday"]
 }

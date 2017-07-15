@@ -1,8 +1,8 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
-        "mimir":"pending",
+        "couchbase":  "ignoreFieldOrder",
+        "mimir":      "pending",
         "postgresql": "pending"
     },
     "data": "smalltimeseries.data",

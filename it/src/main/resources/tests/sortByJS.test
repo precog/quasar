@@ -2,7 +2,7 @@
   "name": "sort by JS expression with filter",
 
   "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
   },
 

@@ -1,7 +1,7 @@
 {
     "name": "largest zips",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

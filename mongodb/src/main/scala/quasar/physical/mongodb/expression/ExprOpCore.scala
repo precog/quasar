@@ -17,14 +17,12 @@
 package quasar.physical.mongodb.expression
 
 import slamdata.Predef._
-import quasar._, Planner._
 import quasar.fp._
-import quasar.javascript._
-import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators available in all supported version of MongoDB
@@ -285,105 +283,10 @@ object ExprOpCoreF {
       case $ifNullF(expr, replacement)   => Bson.Doc("$ifNull" -> Bson.Arr(expr, replacement))
     }
 
-    // FIXME: Define a proper `Show[ExprOpCoreF]` instance.
-    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-    def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOpCoreF, JsFn] = {
-      val mjs = quasar.physical.mongodb.javascript[JsCore](Fix(_))
-      import mjs._
-
-      def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
-        \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
-      def expr2(x1: JsFn, x2: JsFn)(f: (JsCore, JsCore) => JsCore): PlannerError \/ JsFn =
-        \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)), x2(jscore.Ident(JsFn.defaultName)))))
-
-      def unop(op: jscore.UnaryOperator, x: JsFn) =
-        expr1(x)(x => jscore.UnOp(op, x))
-      def binop(op: jscore.BinaryOperator, l: JsFn, r: JsFn) =
-        expr2(l, r)((l, r) => jscore.BinOp(op, l, r))
-      def invoke(x: JsFn, name: String) =
-        expr1(x)(x => jscore.Call(jscore.Select(x, name), Nil))
-
-      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def const(bson: Bson): PlannerError \/ JsCore = {
-        def js(l: Js.Lit) = \/-(jscore.Literal(l))
-        bson match {
-          case Bson.Int64(n)        => js(Js.num(n))
-          case Bson.Int32(n)        => js(Js.num(n.toLong))
-          case Bson.Dec(x)          => js(Js.num(x))
-          case Bson.Bool(v)         => js(Js.Bool(v))
-          case Bson.Text(v)         => js(Js.Str(v))
-          case Bson.Null            => js(Js.Null)
-          case Bson.Doc(values)     => values.map { case (k, v) => jscore.Name(k) -> const(v) }.sequenceU.map(jscore.Obj(_))
-          case Bson.Arr(values)     => values.toList.traverse(const(_)).map(jscore.Arr(_))
-          case o @ Bson.ObjectId(_) => \/-(toJsObjectId(o))
-          case d @ Bson.Date(_)     => \/-(toJsDate(d))
-          // TODO: implement the rest of these (see SD-451)
-          case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.shows))
-          case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.shows))
-          case Bson.Undefined       => \/-(jscore.ident("undefined"))
-
-          case _ => -\/(NonRepresentableInJS(bson.shows))
-        }
-      }
-
-      {
-        case expr @ $includeF()      => -\/(NonRepresentableInJS(expr.toString))
-        case $varF(dv)               => \/-(dv.toJs)
-        case $addF(l, r)             => binop(jscore.Add, l, r)
-        case $andF(f, s, o @ _*)     =>
-          \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-            JsFn(JsFn.defaultName, jscore.BinOp(jscore.And, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-        case $condF(t, c, a)         =>
-          \/-(JsFn(JsFn.defaultName,
-              jscore.If(t(jscore.Ident(JsFn.defaultName)), c(jscore.Ident(JsFn.defaultName)), a(jscore.Ident(JsFn.defaultName)))))
-        case $divideF(l, r)          => binop(jscore.Div, l, r)
-        case $eqF(l, r)              => binop(jscore.Eq, l, r)
-        case $gtF(l, r)              => binop(jscore.Gt, l, r)
-        case $gteF(l, r)             => binop(jscore.Gte, l, r)
-        case $literalF(bson)         => const(bson).map(l => JsFn.const(l))
-        case $ltF(l, r)              => binop(jscore.Lt, l, r)
-        case $lteF(l, r)             => binop(jscore.Lte, l, r)
-        case expr @ $metaF()          => -\/(NonRepresentableInJS(expr.toString))
-        case $multiplyF(l, r)        => binop(jscore.Mult, l, r)
-        case $modF(l, r)             => binop(jscore.Mod, l, r)
-        case $neqF(l, r)             => binop(jscore.Neq, l, r)
-        case $notF(a)                => unop(jscore.Not, a)
-        case $orF(f, s, o @ _*)      =>
-          \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-            JsFn(JsFn.defaultName, jscore.BinOp(jscore.Or, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-
-        case $concatF(f, s, o @ _*)  =>
-          \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-            JsFn(JsFn.defaultName, jscore.BinOp(jscore.Add, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-        case $substrF(f, start, len) =>
-          \/-(JsFn(JsFn.defaultName,
-            jscore.Call(
-              jscore.Select(f(jscore.Ident(JsFn.defaultName)), "substr"),
-              List(start(jscore.Ident(JsFn.defaultName)), len(jscore.Ident(JsFn.defaultName))))))
-        case $subtractF(l, r)        => binop(jscore.Sub, l, r)
-        case $toLowerF(a)            => invoke(a, "toLowerCase")
-        case $toUpperF(a)            => invoke(a, "toUpperCase")
-
-        case $yearF(a)               => invoke(a, "getUTCFullYear")
-        // case $dayOfYear(a)           => // TODO: no JS equivalent
-        case $monthF(a)              => expr1(a)(x =>
-          jscore.BinOp(jscore.Add,
-            jscore.Call(jscore.Select(x, "getUTCMonth"), Nil),
-            jscore.Literal(Js.Num(1, false))))
-        case $dayOfMonthF(a)         => invoke(a, "getUTCDate")
-        // case $week(a)                => // TODO: no JS equivalent
-        case $dayOfWeekF(a)          => expr1(a)(x =>
-          jscore.BinOp(jscore.Add,
-            jscore.Call(jscore.Select(x, "getUTCDay"), Nil),
-            jscore.Literal(Js.Num(1, false))))
-        case $hourF(a)               => invoke(a, "getUTCHours")
-        case $minuteF(a)             => invoke(a, "getUTCMinutes")
-        case $secondF(a)             => invoke(a, "getUTCSeconds")
-        case $millisecondF(a)        => invoke(a, "getUTCMilliseconds")
-
-        // TODO: implement the rest of these and remove the catch-all (see SD-451)
-        case expr                    => -\/(UnsupportedJS(expr.toString))
-      }
+    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = {
+      case $varF(DocVar.ROOT(None)) => base.project.some
+      case $includeF()              => none
+      case in                       => I(in).some
     }
 
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {

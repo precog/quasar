@@ -139,6 +139,12 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
           (a, e) => Free.roll(ConcatArrays(a, Free.roll(MakeArray(e))))).some
     })
 
+  def genBucketList(ps: List[Provenance]): Option[(List[Provenance], List[FreeMap])] =
+    ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
+      case Nil => None
+      case l   => l.some
+    })
+
   val genBucket: Provenance => State[Int, (Provenance, List[FreeMap])] = {
     case Nada()      => (Nada[T](): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
     case Value(expr) =>

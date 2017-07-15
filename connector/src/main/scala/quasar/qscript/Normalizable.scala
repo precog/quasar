@@ -19,7 +19,6 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
@@ -87,8 +86,9 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A: Show](fm: Free[MapFuncCore, A]): Free[MapFuncCore, A] =
+  def freeMF[A: Equal: Show](fm: Free[MapFuncCore, A]): Free[MapFuncCore, A] =
     fm.transCata[Free[MapFuncCore, A]](MapFuncCore.normalize[T, A])
+      .transCata[Free[MapFuncCore, A]](repeatedly(MapFuncCore.extractGuards[T, A]))
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
@@ -101,54 +101,89 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     }
 
   def EquiJoin = make(
-    λ[EquiJoin ~> (Option ∘ EquiJoin)#λ](ej =>
-      (freeTCEq(ej.lBranch), freeTCEq(ej.rBranch), freeMFEq(ej.lKey), freeMFEq(ej.rKey), freeMFEq(ej.combine)) match {
-        case (None, None, None, None, None) => None
-        case (lBranchNorm, rBranchNorm, lKeyNorm, rKeyNorm, combineNorm) =>
+    λ[EquiJoin ~> (Option ∘ EquiJoin)#λ](ej => {
+      val keyOpt: List[(Option[FreeMap], Option[FreeMap])] =
+        ej.key ∘ (_.bimap(freeMFEq[Hole], freeMFEq[Hole]))
+
+      val keyNormOpt: Option[List[(FreeMap, FreeMap)]] =
+        keyOpt.exists(p => p._1.nonEmpty || p._2.nonEmpty).option(
+          Zip[List].zipWith(keyOpt, ej.key)((p1, p2) =>
+            (p1._1.getOrElse(p2._1), p1._2.getOrElse(p2._2))))
+
+      (freeTCEq(ej.lBranch), freeTCEq(ej.rBranch), keyNormOpt, freeMFEq(ej.combine)) match {
+        case (None, None, None, None) => None
+        case (lBranchNorm, rBranchNorm, keyNorm, combineNorm) =>
           quasar.qscript.EquiJoin(
             ej.src,
             lBranchNorm.getOrElse(ej.lBranch),
             rBranchNorm.getOrElse(ej.rBranch),
-            lKeyNorm.getOrElse(ej.lKey),
-            rKeyNorm.getOrElse(ej.rKey),
+            keyNorm.getOrElse(ej.key),
             ej.f,
             combineNorm.getOrElse(ej.combine)).some
-      }))
+      }
+    }))
+
+  private def extractFilterFromThetaJoin[A](tj: ThetaJoin[A])
+      : Option[ThetaJoin[A]] =
+    (MapFuncCore.extractFilter(tj.on) {
+      case LeftSide => SrcHole.some
+      case RightSide => none
+    },
+      MapFuncCore.extractFilter(tj.on) {
+        case LeftSide => none
+        case RightSide => SrcHole.some
+      }) match {
+      case (None, None) => none
+      case (Some((lf, on)), _) =>
+        quasar.qscript.ThetaJoin(tj.src, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Filter(tj.lBranch, lf))), tj.rBranch, on, tj.f, tj.combine).some
+      case (_, Some((rf, on))) =>
+        quasar.qscript.ThetaJoin(tj.src, tj.lBranch, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Filter(tj.rBranch, rf))), on, tj.f, tj.combine).some
+    }
 
   def ThetaJoin = make(
     λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj =>
       (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), freeMFEq(tj.on), freeMFEq(tj.combine)) match {
-        case (None, None, None, None) => None
+        case (None, None, None, None) => extractFilterFromThetaJoin(tj)
+
         case (lBranchNorm, rBranchNorm, onNorm, combineNorm) =>
-          quasar.qscript.ThetaJoin(
-            tj.src,
-            lBranchNorm.getOrElse(tj.lBranch),
-            rBranchNorm.getOrElse(tj.rBranch),
-            onNorm.getOrElse(tj.on),
-            tj.f,
-            combineNorm.getOrElse(tj.combine)).some
+          val newTJ =
+            quasar.qscript.ThetaJoin(
+              tj.src,
+              lBranchNorm.getOrElse(tj.lBranch),
+              rBranchNorm.getOrElse(tj.rBranch),
+              onNorm.getOrElse(tj.on),
+              tj.f,
+              combineNorm.getOrElse(tj.combine))
+
+          extractFilterFromThetaJoin(newTJ).getOrElse(newTJ).some
       }))
+
+  def rebucket(bucket: List[FreeMap]): Option[List[FreeMap]] = {
+    val bucketNormOpt: List[Option[FreeMap]] = bucket ∘ freeMFEq[Hole]
+
+    bucketNormOpt.any(_.isDefined).option(
+      (Zip[List].zipWith(bucketNormOpt, bucket)(_.getOrElse(_)): List[FreeMap]) >>= (b =>
+        b.resume.fold(
+          {
+            case MapFuncsCore.Constant(_) => Nil
+            case _                        => List(b)
+          },
+          κ(List(b)))))
+  }
 
   def QScriptCore = {
     make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
       case Reduce(src, bucket, reducers, repair) => {
         val reducersOpt: List[Option[ReduceFunc[FreeMap]]] =
+          // FIXME: This shouldn’t use `traverse` because it does the wrong
+          //        thing on UnshiftMap.
           reducers.map(_.traverse(freeMFEq[Hole](_)))
 
         val reducersNormOpt: Option[List[ReduceFunc[FreeMap]]] =
           reducersOpt.exists(_.nonEmpty).option(
             Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)))
 
-        val bucketNormOpt: Option[FreeMap] = freeMFEq(bucket)
-
-        val bucketNormConst: Option[FreeMap] =
-          bucketNormOpt.getOrElse(bucket).resume.fold({
-            case MapFuncsCore.Constant(ej) =>
-              (!EJson.isNull(ej)).option(MapFuncsCore.NullLit[T, Hole]())
-            case _ => bucketNormOpt
-          }, κ(bucketNormOpt))
-
-        (bucketNormConst, reducersNormOpt, freeMFEq(repair)) match {
+        (rebucket(bucket), reducersNormOpt, freeMFEq(repair)) match {
           case (None, None, None) =>
             None
           case (bucketNorm, reducersNorm, repairNorm)  =>
@@ -167,7 +202,7 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
         val orderNormOpt: Option[NonEmptyList[(FreeMap, SortDir)]] =
           orderOpt any (_.nonEmpty) option orderOpt.fzipWith(order)(_ | _)
 
-        makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
+        makeNorm(bucket, order)(rebucket, _ => orderNormOpt)(Sort(src, _, _))
 
       case Map(src, f)             => freeMFEq(f).map(Map(src, _))
       case LeftShift(src, s, i, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, _))

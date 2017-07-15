@@ -334,6 +334,17 @@ object JsFuncHandler {
 
       case ProjectField(obj, field) => Access(obj, field)
       case ProjectIndex(arr, index) => Access(arr, index)
+
+      // TODO: This doesn't return the right values most of the time.
+      case TypeOf(v) =>
+        Let(Name("typ"), UnOp(jscore.TypeOf, v),
+          If(BinOp(jscore.Eq, ident("typ"), Literal(Js.Str("object"))),
+            If(BinOp(jscore.Eq, v, Literal(Js.Null)),
+              Literal(Js.Str("null")),
+              If(Call(select(ident("Array"), "isArray"), List(v)),
+                Literal(Js.Str("array")),
+                Literal(Js.Str("map")))),
+            ident("typ")))
     }
   }
 }

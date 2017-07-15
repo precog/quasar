@@ -76,7 +76,6 @@ object Failure {
     private type Err[A]      = Failure[E, A]
     private type G[A]        = EitherT[FreeS, E, A]
     private type GT[X[_], A] = EitherT[X, E, A]
-    private type GE[A, B]    = EitherT[FreeS, A, B]
 
     private val attemptE: Err ~> G = new (Err ~> G) {
       val err = MonadError[G, E]

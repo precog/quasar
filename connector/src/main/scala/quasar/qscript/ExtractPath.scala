@@ -67,7 +67,7 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   ): ExtractPath[EquiJoin[T, ?], P] =
     new ExtractPath[EquiJoin[T, ?], P] {
       def extractPath[G[_]: ApplicativePlus] = {
-        case EquiJoin(paths, l, r, _, _, _, _) =>
+        case EquiJoin(paths, l, r, _, _, _) =>
           extractBranch[T, G, P](l) <+> extractBranch[T, G, P](r) <+> paths
       }
     }

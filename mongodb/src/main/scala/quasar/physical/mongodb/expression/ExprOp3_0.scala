@@ -17,11 +17,9 @@
 package quasar.physical.mongodb.expression
 
 import slamdata.Predef._
-import quasar._, Planner._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.physical.mongodb.Bson
-import quasar.jscore, jscore.JsFn
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -65,11 +63,7 @@ object ExprOp3_0F {
           "date" -> date))
     }
 
-    // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
-    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-    def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_0F, JsFn] =
-      // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
-      expr => UnsupportedJS(expr.toString).left
+    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
 
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
       κ(None)

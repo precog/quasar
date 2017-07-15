@@ -1,7 +1,7 @@
 {
     "name": "select array element",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

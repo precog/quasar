@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import java.util.concurrent.atomic.AtomicReference
 import scalaz.syntax.id._
+import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
 /** A thread-safe, atomically updatable mutable reference.
@@ -45,14 +46,12 @@ object TaskRef {
       def write(a: A) = Task.delay(ref.set(a))
       def compareAndSet(oldA: A, newA: A) =
         Task.delay(ref.compareAndSet(oldA, newA))
-
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def modifyS[B](f: A => (A, B)) = for {
-        a0 <- read
-        (a1, b) = f(a0)
-        p  <- compareAndSet(a0, a1)
-        b  <- if (p) Task.now(b) else modifyS(f)
-      } yield b
+      def modifyS[B](f: A => (A, B)) =
+        read >>= (a0 => {
+          val (a1, b) = f(a0)
+          compareAndSet(a0, a1) >>= (if (_) Task.now(b) else modifyS(f))
+        })
     }
   }
 }

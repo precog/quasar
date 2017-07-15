@@ -52,10 +52,10 @@ object CoreMap extends Serializable {
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
   def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFuncCore[T, ?], ReduceIndex])
-      : PlannerError \/ ((Data, List[Data]) => Data) =
+      : PlannerError \/ ((List[Data], List[Data]) => Data) =
     f.cataM(interpretM(
-      _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
-      change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
+      _.idx.fold[((List[Data], List[Data])) => Data](i => _._1(i), i => _._2(i)).right,
+      change[T, (List[Data], List[Data])])).map(f => (l: List[Data], r: List[Data]) => f((l, r)))
 
   def change[T[_[_]]: RecursiveT, A]
       : AlgebraM[PlannerError \/ ?, MapFuncCore[T, ?], A => Data] = {

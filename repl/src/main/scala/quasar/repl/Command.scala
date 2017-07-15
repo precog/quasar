@@ -59,7 +59,6 @@ object Command {
   final case class SetVar(name: String, value: String) extends Command
   final case class UnsetVar(name: String) extends Command
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def parse(input: String): Command =
     input match {
       case ExitPattern()                 => Exit

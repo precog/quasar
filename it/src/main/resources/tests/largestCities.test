@@ -2,12 +2,10 @@
     "name": "largest cities",
 
     "backends": {
-        "mimir":"pending",
-        "mongodb_2_6": "ignoreFieldOrder",
-        "mongodb_3_0": "ignoreFieldOrder",
-        "mongodb_3_2": "ignoreFieldOrder",
-        "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
+        "mimir": "pending",
+        "mongodb_2_6": "ignoreResultOrder",
+        "mongodb_3_0": "ignoreResultOrder",
+        "mongodb_read_only": "ignoreResultOrder",
         "postgresql": "pending"
     },
     "data": "zips.data",

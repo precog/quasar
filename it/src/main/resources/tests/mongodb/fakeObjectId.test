@@ -1,14 +1,18 @@
 {
     "name": "convert a field to ObjectId",
     "backends": {
-        "mimir":"pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "couchbase": "skip",
+        "marklogic_json": "skip",
+        "marklogic_xml": "skip",
+        "mimir": "skip",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_read_only": "pending",
+        "postgresql": "skip",
+        "spark_hdfs": "skip",
+        "spark_local": "skip"
     },
     "data": "../objectids.data",
     "query": "select oid(bar) from `../objectids`",

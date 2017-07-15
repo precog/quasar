@@ -74,4 +74,11 @@ package object matryoshka {
         Order.orderBy((_: Coproduct[F, G, A]).run)
       }
     }
+
+  implicit def AlgebraMZip[M[_]: Applicative, F[_]: Functor]
+      : Zip[AlgebraM[M, F, ?]] =
+    new Zip[AlgebraM[M, F, ?]] {
+      def zip[A, B](a: ⇒ AlgebraM[M, F, A], b: ⇒ AlgebraM[M, F, B]) =
+        w => Bitraverse[(?, ?)].bisequence((a(w ∘ (_._1)), b(w ∘ (_._2))))
+    }
 }

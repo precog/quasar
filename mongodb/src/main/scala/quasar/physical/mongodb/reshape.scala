@@ -20,8 +20,7 @@ import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar._, Planner._
-import quasar.jscore, jscore.{JsFn}
+import quasar._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 
@@ -57,18 +56,6 @@ object Grouped {
 
 final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]]) {
   import Reshape.Shape
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def toJs(implicit
-      ev0: ExprOpOps.Uni[EX],
-      ev1: ExprOpCoreF :<: EX,
-      ev2: Traverse[EX],
-      ev3: Equal[Fix[EX]]): PlannerError \/ JsFn =
-    value.map { case (key, expr) =>
-      key.asText -> expr.fold[PlannerError \/ JsFn](_.toJs, _.para(expression.toJs[Fix[EX], EX]))
-    }.sequence.map { l => JsFn(JsFn.defaultName,
-      jscore.Obj(l.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(JsFn.defaultName)) }))
-    }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def bson(implicit ops: ExprOpOps.Uni[EX], ev: Functor[EX]): Bson.Doc = Bson.Doc(value.map {

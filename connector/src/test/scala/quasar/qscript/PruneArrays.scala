@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import slamdata.Predef.List
+import slamdata.Predef._
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
@@ -114,7 +114,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               HoleF,
               ExcludeId,
               initialArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
@@ -135,7 +135,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               HoleF,
               ExcludeId,
               expectedArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(2)), SortDir.Ascending)))).embed,
@@ -166,7 +166,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               HoleF,
               ExcludeId,
               initialArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
@@ -200,7 +200,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
             ConcatArraysR(
               MakeArrayR(IntLit(6)),
               MakeArrayR(IntLit(7))))).embed,
-          ProjectIndexR(HoleF, IntLit(1)),
+          List(ProjectIndexR(HoleF, IntLit(1))),
           NonEmptyList(
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
@@ -337,7 +337,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               ProjectIndexR(HoleF, IntLit(1)))).embed,
             HoleF,
             ExcludeId,
-            ConcatArraysR(LeftSideF, RightSideF))).embed,
+            ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
       val innerExpected: Fix[QST] =
@@ -355,7 +355,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               ProjectIndexR(HoleF, IntLit(0)))).embed,
             HoleF,
             ExcludeId,
-            LeftSideF[Fix])).embed,
+            MakeArrayR(LeftSideF))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
       initial.pruneArraysF must equal(expected)
@@ -429,9 +429,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           QCT.inj(Filter(
             srcInitial,
             ProjectIndexR(HoleF, IntLit(3)))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(2)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
 
       val srcExpected: Fix[QST] =
         QCT.inj(LeftShift(
@@ -447,9 +447,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           QCT.inj(Filter(
             srcExpected,
             ProjectIndexR(HoleF, IntLit(1)))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
 
       initial.embed.pruneArraysF must equal(expected.embed)
     }
@@ -518,9 +518,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF))))),
             Drop,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)))),
-          ReduceIndexF(0.some))).embed
+          ReduceIndexF(0.right))).embed
 
       val expected: Fix[QST] =
         QCT.inj(Reduce(
@@ -533,9 +533,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
               MakeArrayR(RightSideF)))),
             Drop,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
-          ReduceIndexF(0.some))).embed
+          ReduceIndexF(0.right))).embed
 
       initial.pruneArraysF must equal(expected)
     }
@@ -596,8 +596,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
             HoleQS,
             ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
           HoleQS,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
@@ -610,8 +609,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           arrayBranch3,
           HoleQS,
-          HoleF,  // reference entire left branch
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit("xyz"),
@@ -643,8 +641,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           arrayBranch3,
           HoleQS,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-          HoleF,
+          List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit("xyz"),
@@ -677,8 +674,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
             UnreferencedRT.embed,
             arrayBranch3,
             HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-            HoleF,
+            List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
             JoinType.Inner,
             ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
           ProjectIndexR(
@@ -713,10 +709,11 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
           HoleQS,
-          EqR(
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-            StrLit[Fix, Hole]("foo")),
-          HoleF,
+          List(
+            (EqR(
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+              StrLit[Fix, Hole]("foo")),
+              HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit[Fix, JoinSide]("bar"),
@@ -800,8 +797,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           arrayBranch3,
           rBranch,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          List(
+            (ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
           JoinType.Inner,
           MakeMapR(
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
@@ -829,8 +827,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           lBranchExpected,
           rBranchExpected,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          List(
+            (ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
           JoinType.Inner,
           MakeMapR(
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
@@ -1084,8 +1083,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           branch,
           HoleQS,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(LeftSideF, RightSideF))).embed
 
@@ -1098,8 +1096,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           HoleQS,
           branch,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(LeftSideF, RightSideF))).embed
 

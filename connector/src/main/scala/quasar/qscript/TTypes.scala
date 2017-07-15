@@ -93,8 +93,7 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
         ej.src,
         applyToBranch(ej.lBranch),
         applyToBranch(ej.rBranch),
-        ej.lKey,
-        ej.rKey,
+        ej.key,
         ej.f,
         ej.combine
       )

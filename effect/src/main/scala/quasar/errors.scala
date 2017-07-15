@@ -40,17 +40,13 @@ object Errors {
 
   def handleWith[E, A, B>:A](t: ETask[E, A])(f: PartialFunction[Throwable, ETask[E, B]]):
       ETask[E, B] = {
-    type G[F[_], X] = EitherT[F, E, X]
-    Catchable[G[Task, ?]].attempt(t) flatMap {
+    Catchable[ETask[E, ?]].attempt(t) flatMap {
       case -\/(t) => f.lift(t) getOrElse liftE(Task.fail(t))
-      case \/-(a) => Applicative[G[Task, ?]].point(a)
+      case \/-(a) => Applicative[ETask[E, ?]].point(a)
     }
   }
 
-  def liftE[E]: (Task ~> ETask[E, ?]) = {
-    type G[F[_], A] = EitherT[F, E, A]
-    liftMT[Task, G]
-  }
+  def liftE[E]: (Task ~> ETask[E, ?]) = liftMT[Task, EitherT[?[_], E, ?]]
 }
 
 /** Given a function A => B, returns a natural transformation from

@@ -379,17 +379,3 @@ object MongoDbFileSystemSpec {
         }
       )(_.liftIO)
 }
-
-object MongoDbQScriptFileSystemSpec {
-  // NB: No `chroot` here as we want to test deleting top-level
-  //     dirs (i.e. databases).
-  val mongoFsUT: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
-    (Functor[Task] compose Functor[IList])
-      .map(
-        TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
-        ).handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
-          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
-        }
-      )(_.liftIO)
-}

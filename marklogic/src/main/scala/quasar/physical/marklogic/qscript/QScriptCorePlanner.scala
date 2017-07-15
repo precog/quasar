@@ -112,9 +112,9 @@ private[qscript] final class QScriptCorePlanner[
         idfn  <- lib.identity[F] flatMap (_.ref[F])
         fnl   <- lib.zipApply[F] apply (mkSeq(idfn :: fnls))
         y     <- freshName[F]
-        rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(r => (~y)((r.idx.fold(1)(_ + 2)).xqy))
+        rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(_.idx.fold(i => (~y)(1.xqy)((i + 1).xqy), i => (~y)((i + 2).xqy)))
         rfnl  <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
-        bckt  <- fx(mapFuncXQuery[T, F, FMT](bucket, _))
+        bckt  <- fx(mapFuncXQuery[T, F, FMT](MapFuncCore.StaticArray(bucket), _))
         red   <- lib.reduceWith[F] apply (init, cmb, rfnl, bckt, src)
       } yield red.right
 
@@ -123,7 +123,7 @@ private[qscript] final class QScriptCorePlanner[
       for {
         src      <- elimSearch[Q, V](src0)
         x        <- freshName[F]
-        xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
+        xqyOrder <- (bucket.toIList.map((_, SortDir.asc)) <::: order).traverse { case (func, sortDir) =>
                       mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
                         SP.asSortKey(by) strengthR SortDirection.fromQScript(sortDir)
                       }

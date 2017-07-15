@@ -210,8 +210,6 @@ trait GenericFuncInstances {
       case set.RightOuterJoin             => "RightOuterJoin"
       case set.FullOuterJoin              => "FullOuterJoin"
       case set.GroupBy                    => "GroupBy"
-      case set.Distinct                   => "Distinct"
-      case set.DistinctBy                 => "DistinctBy"
       case set.Union                      => "Union"
       case set.Intersect                  => "Intersect"
       case set.Except                     => "Except"

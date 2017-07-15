@@ -1,8 +1,7 @@
 {
     "name": "group by array",
     "backends": {
-        "mimir":"pending",
-        "mongodb_q_3_2": "pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "slamengine_commits.data",

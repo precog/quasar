@@ -344,17 +344,12 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
               Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
               Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
-              ConcatArraysR(
-                MakeArrayR(
-                  ProjectFieldR(HoleF, StrLit("l_id"))),
-                MakeArrayR(
-                  AddR(
-                    ProjectFieldR(HoleF, StrLit("l_min")),
-                    ProjectFieldR(HoleF, StrLit("l_max"))))),
-              ConcatArraysR(
-                MakeArrayR(
+              List(
+                (ProjectFieldR(HoleF, StrLit("l_id")),
                   ProjectFieldR(HoleF, StrLit("r_id"))),
-                MakeArrayR(
+                (AddR(
+                  ProjectFieldR(HoleF, StrLit("l_min")),
+                  ProjectFieldR(HoleF, StrLit("l_max"))),
                   SubtractR(
                     ProjectFieldR(HoleF, StrLit("l_max")),
                     ProjectFieldR(HoleF, StrLit("l_min"))))),

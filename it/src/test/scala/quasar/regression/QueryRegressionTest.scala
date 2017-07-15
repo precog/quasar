@@ -214,12 +214,18 @@ abstract class QueryRegressionTest[S[_]](
     val h2: H ~> H2 = Hoist[SemanticErrsT].hoist(h1)
     val h3: CompExecM ~> H3 = Hoist[FileSystemErrT].hoist(h2)
 
-    val liftRun = λ[CompExecM ~> Task](fa =>
-      rethrow[H1, NonEmptyList[SemanticError]].apply(rethrow[H2, FileSystemError].apply(h3(fa))).value
-    )
+    val liftRun = λ[CompExecM ~> Task](fa => {
+      val w = rethrow[H1, NonEmptyList[SemanticError]].apply(rethrow[H2, FileSystemError].apply(h3(fa)))
+      // TODO: Make it so this only prints out for _failed_ tests.
+      // TODO: Make this configurable via an option to `it/test`
+      // NB: Uncomment this line to print out the PhaseResults of each test
+      //     (really only useful with `testOnly`).
+      // (w.written ∘ (w => println(w.shows))) >>
+      w.value
+    })
 
     def deleteFields: Json => Json =
-      _.withObject(obj => exp.ignoredFields.foldLeft(obj)(_ - _))
+      _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
 
     val result =
       exp.predicate(

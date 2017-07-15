@@ -1,7 +1,7 @@
 {
     "name": "flatten an object resulting from an array projection",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql":        "pending"
     },
     "data": "slamengine_commits.data",

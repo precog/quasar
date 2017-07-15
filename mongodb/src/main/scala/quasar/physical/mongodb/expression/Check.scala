@@ -46,6 +46,7 @@ final class Check[T, EX[_]]
   def isNumber(expr: T)     = betweenExcl(Bson.Null,              expr, Bson.Text(""))
   def isString(expr: T)     = between    (Bson.Text(""),          expr, Bson.Doc())
   def isObject(expr: T)     = between    (Bson.Doc(),             expr, Bson.Arr())
+  // TODO: This should use `$isArray` on 3.2 and later
   def isArray(expr: T)      = between    (Bson.Arr(),             expr, Bson.Binary(minBinary))
   def isBinary(expr: T)     = between    (Bson.Binary(minBinary), expr, Bson.ObjectId(minOid))
   def isId(expr: T)         = between    (Bson.ObjectId(minOid),  expr, Bson.Bool(false))

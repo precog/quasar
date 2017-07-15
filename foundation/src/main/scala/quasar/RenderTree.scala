@@ -87,6 +87,13 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Cofree[F, ?])#λ](rt =>
       make(t => NonTerminal(List("Cofree"), None, List(rt.render(t.head), F(cofree(F)(rt)).render(t.tail))))))
 
+  implicit def these[A: RenderTree, B: RenderTree]: RenderTree[A \&/ B] =
+    make {
+      case \&/.Both(a, b) => NonTerminal(List("\\&/"), "Both".some, List(a.render, b.render))
+      case \&/.This(a)    => NonTerminal(List("\\&/"), "This".some, List(a.render))
+      case \&/.That(b)    => NonTerminal(List("\\&/"), "That".some, List(b.render))
+    }
+
   implicit def coproduct[F[_], G[_], A](implicit RF: RenderTree[F[A]], RG: RenderTree[G[A]]): RenderTree[Coproduct[F, G, A]] =
     make(_.run.fold(RF.render, RG.render))
 

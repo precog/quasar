@@ -37,25 +37,24 @@ import scalaz._, Scalaz._
   src: A,
   lBranch: FreeQS[T],
   rBranch: FreeQS[T],
-  lKey: FreeMap[T],
-  rKey: FreeMap[T],
+  key: List[(FreeMap[T], FreeMap[T])],
   f: JoinType,
+  // TODO: This could potentially also index into the key.
   combine: JoinFunc[T])
 
 object EquiJoin {
-  implicit def equal[T[_[_]]: EqualT]:
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]:
       Delay[Equal, EquiJoin[T, ?]] =
     new Delay[Equal, EquiJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](eq: Equal[A]) =
         Equal.equal {
-          case (EquiJoin(a1, l1, r1, lk1, rk1, f1, c1),
-                EquiJoin(a2, l2, r2, lk2, rk2, f2, c2)) =>
+          case (EquiJoin(a1, l1, r1, k1, f1, c1),
+                EquiJoin(a2, l2, r2, k2, f2, c2)) =>
             eq.equal(a1, a2) &&
             l1 ≟ l2 &&
             r1 ≟ r2 &&
-            lk1 ≟ lk2 &&
-            rk1 ≟ rk2 &&
+            k1 ≟ k2 &&
             f1 ≟ f2 &&
             c1 ≟ c2
         }
@@ -65,13 +64,12 @@ object EquiJoin {
     new Delay[Show, EquiJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
-        case EquiJoin(src, lBr, rBr, lkey, rkey, f, combine) =>
+        case EquiJoin(src, lBr, rBr, key, f, combine) =>
           Cord("EquiJoin(") ++
           showA.show(src) ++ Cord(",") ++
           lBr.show ++ Cord(",") ++
           rBr.show ++ Cord(",") ++
-          lkey.show ++ Cord(",") ++
-          rkey.show ++ Cord(",") ++
+          key.show ++ Cord(",") ++
           f.show ++ Cord(",") ++
           combine.show ++ Cord(")")
       }
@@ -82,13 +80,12 @@ object EquiJoin {
       val nt = List("EquiJoin")
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {
-          case EquiJoin(src, lBr, rBr, lKey, rKey, tpe, combine) =>
+          case EquiJoin(src, lBr, rBr, key, tpe, combine) =>
             NonTerminal(nt, None, List(
               r.render(src),
               lBr.render,
               rBr.render,
-              lKey.render,
-              rKey.render,
+              key.render,
               tpe.render,
               combine.render))
         }
@@ -100,7 +97,7 @@ object EquiJoin {
         fa: EquiJoin[T, A])(
         f: A => G[B]) =
         f(fa.src) ∘
-          (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
+          (EquiJoin(_, fa.lBranch, fa.rBranch, fa.key, fa.f, fa.combine))
     }
 
   implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
@@ -115,16 +112,16 @@ object EquiJoin {
         p1: EquiJoin[IT, ExternallyManaged],
         p2: EquiJoin[IT, ExternallyManaged]) =
         (p1, p2) match {
-          case (EquiJoin(s1, l1, r1, lk1, rk1, f1, c1),
-                EquiJoin(_, l2, r2, lk2, rk2, f2, c2)) =>
+          case (EquiJoin(s1, l1, r1, k1, f1, c1),
+                EquiJoin(_, l2, r2, k2, f2, c2)) =>
             val left1 = rebaseBranch(l1, left)
             val right1 = rebaseBranch(r1, left)
             val left2 = rebaseBranch(l2, right)
             val right2 = rebaseBranch(r2, right)
 
-            (left1 ≟ left2 && right1 ≟ right2 && lk1 ≟ lk2 && rk1 ≟ rk2 && f1 ≟ f2).option {
+            (left1 ≟ left2 && right1 ≟ right2 && k1 ≟ k2 && f1 ≟ f2).option {
               val (merged, left, right) = concat(c1, c2)
-              SrcMerge(EquiJoin(s1, left1, right1, lk1, rk1, f1, merged), left, right)
+              SrcMerge(EquiJoin(s1, left1, right1, k1, f1, merged), left, right)
             }
         }
     }

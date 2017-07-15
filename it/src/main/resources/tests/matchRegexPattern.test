@@ -1,7 +1,7 @@
 {
     "name": "match regex pattern",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

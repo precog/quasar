@@ -69,11 +69,11 @@ object ShiftRead {
           Free.liftF(GtoH(SR.inj(Const(ShiftedRead(
             read.getConst.path,
             IncludeId))))),
-          NullLit(),
+          Nil,
           List(ReduceFuncs.UnshiftMap(
             Free.roll(ProjectIndex(HoleF, IntLit(0))),
             Free.roll(ProjectIndex(HoleF, IntLit(1))))),
-          Free.point(ReduceIndex(0.some)))))
+          Free.point(ReduceIndex(0.right)))))
        )
     }
 
@@ -116,8 +116,7 @@ object ShiftRead {
           Free.point(ej.src),
           applyToBranch(ej.lBranch),
           applyToBranch(ej.rBranch),
-          ej.lKey,
-          ej.rKey,
+          ej.key,
           ej.f,
           ej.combine)))
       )

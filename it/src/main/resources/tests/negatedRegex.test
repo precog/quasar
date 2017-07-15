@@ -2,7 +2,7 @@
     "name": "negate matches in filter and projection",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

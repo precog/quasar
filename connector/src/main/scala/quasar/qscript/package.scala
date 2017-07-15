@@ -119,7 +119,7 @@ package object qscript {
     Free.point[MapFuncCore[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFuncCore[T, ?], JoinSide](RightSide)
-  def ReduceIndexF[T[_[_]]](i: Option[Int]): FreeMapA[T, ReduceIndex] =
+  def ReduceIndexF[T[_[_]]](i: Int \/ Int): FreeMapA[T, ReduceIndex] =
     Free.point[MapFuncCore[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
@@ -129,35 +129,35 @@ package object qscript {
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
-    val norml = norm.freeMF(l)
-    val normr = norm.freeMF(r)
-
-    // NB: Might be better to do this later, after some normalization, part of
-    //     array compaction, but this helps us avoid some autojoins.
-    (norml ≟ normr).fold(
-      (norml, HoleF[T], HoleF[T]),
-      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+    (norm.freeMF(l), norm.freeMF(r)) match {
+      case (newL, newR) if newL ≟ newR => (newL, HoleF[T], HoleF[T])
+      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+        (newR, newL >> HoleF, HoleF[T])
+      case (newL, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+        (newL, HoleF[T], newR >> HoleF)
+      case (newL, newR) =>
+        (StaticArray(List(newL, newR)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+    }
   }
 
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
-    val rewrite = new Rewrite[T]
     val norm = Normalizable.normalizable[T]
 
     val norml = norm.freeMF(l)
     val normr = norm.freeMF(r)
 
-    val leftElems: List[FreeMapA[T, A]] = norml.resume match {
-      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
-      case _ => Nil
+    val leftElems: List[FreeMapA[T, A]] = norml.project match {
+      case StaticArray(array) => array
+      case _                  => Nil
     }
 
-    val rightElems: List[FreeMapA[T, A]] = normr.resume match {
-      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
-      case _ => Nil
+    val rightElems: List[FreeMapA[T, A]] = normr.project  match {
+      case StaticArray(array) => array
+      case _                  => Nil
     }
 
     def projectIndex(idx: Int): FreeMap[T] =
@@ -174,23 +174,92 @@ package object qscript {
   }
 
   // FIXME naive - use `concat`
-  def naiveConcat3[T[_[_]]: CorecursiveT, A](
+  def naiveConcat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r)) match {
+      case (newL, newC, newR) if newL ≟ newC && newL ≟ newR =>
+        (newL, HoleF[T], HoleF[T], HoleF[T])
+      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+        (newR, newL >> HoleF[T], newC >> HoleF[T], HoleF[T])
+      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+        (newC, newL >> HoleF[T], HoleF[T], newR >> HoleF[T])
+      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+        (newL, HoleF[T], newC >> HoleF[T], newR >> HoleF[T])
+      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR) =>
+        if (newC ≟ newR)
+          (newC, newL >> HoleF, HoleF[T], HoleF[T])
+        else
+          (StaticArray(List(newC, newR)),
+            newL >> HoleF,
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+        if (newL ≟ newR)
+          (newL, HoleF[T], newC >> HoleF, HoleF[T])
+        else
+          (StaticArray(List(newL, newR)),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+            newC >> HoleF,
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+      case (newL, newC, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+        if (newL ≟ newC)
+          (newL, HoleF[T], HoleF[T], newR >> HoleF)
+        else
+          (StaticArray(List(newL, newC)),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+            newR >> HoleF)
+      case (newL, newC, newR) =>
+        (StaticArray(List(newL, newC, newR)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+    }
+  }
 
   // FIXME naive - use `concat`
-  def naiveConcat4[T[_[_]]: CorecursiveT, A](
+  def naiveConcat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
+      // TODO: Handle cases with more than one constant.
+      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR, newR2) =>
+        (StaticArray(List(newC, newR, newR2)),
+          newL >> HoleF,
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR, newR2) =>
+        (StaticArray(List(newL, newR, newR2)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          newC >> HoleF,
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+      case (newL, newC, newR @ Embed(CoEnv(-\/(Constant(_)))), newR2) =>
+        (StaticArray(List(newL, newC, newR2)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          newR >> HoleF,
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+      case (newL, newC, newR, newR2 @ Embed(CoEnv(-\/(Constant(_))))) =>
+        (StaticArray(List(newL, newC, newR)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+          newR2 >> HoleF)
+      case (newL, newC, newR, newR2) =>
+        (StaticArray(List(newL, newC, newR, newR2)),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+    }
+  }
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
@@ -301,7 +370,7 @@ package qscript {
   @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 
   object Ann {
-    implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
+    implicit def equal[T[_[_]]: BirecursiveT: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
       Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
 
     implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
@@ -311,7 +380,7 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: EqualT, F[_]: Functor](
+    implicit def equal[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor](
       implicit F: Delay[Equal, F], J: Equal[T[EJson]]
     ): Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)

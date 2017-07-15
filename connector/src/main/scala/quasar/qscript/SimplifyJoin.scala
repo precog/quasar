@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
@@ -83,6 +82,7 @@ object SimplifyJoin {
           @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
+              // TODO: Use `MapFunc.flattenAnd` instead of this case.
               case -\/(And(a, b)) =>
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
@@ -109,8 +109,7 @@ object SimplifyJoin {
               tj.src,
               applyToBranch(tj.lBranch),
               applyToBranch(tj.rBranch),
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))).embed,
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))).embed,
+              keys.map(k => (k.left, k.right)),
               tj.f,
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
@@ -147,8 +146,7 @@ object SimplifyJoin {
           ej.src,
           applyToBranch(ej.lBranch),
           applyToBranch(ej.rBranch),
-          ej.lKey,
-          ej.rKey,
+          ej.key,
           ej.f,
           ej.combine)))
     }

@@ -141,8 +141,8 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
       StateT((sc: SparkContext) =>
         EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[Task]))
     case Reduce(src, bucket, reducers, repair) =>
-      val maybePartitioner: PlannerError \/ (Data => Data) =
-        CoreMap.changeFreeMap(bucket)
+      val maybePartitioner: PlannerError \/ List[Data => Data] =
+        bucket.traverse(CoreMap.changeFreeMap[T])
 
       val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
         case Count(a) => a >>> {
@@ -174,7 +174,7 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
       val reducersFuncs: List[(Data,Data) => Data] =
         reducers.map(reduceData)
 
-      val maybeRepair: PlannerError \/ ((Data, List[Data]) => Data) =
+      val maybeRepair: PlannerError \/ ((List[Data], List[Data]) => Data) =
         CoreMap.changeReduceFunc(repair)
 
       def merge
@@ -188,9 +188,9 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
       }
 
       StateT((sc: SparkContext) =>
-        EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
-          case (partitioner, trans, repair) =>
-            src.map(d => (partitioner(d), trans.map(_(d))))
+        EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair)(
+          (partitioner, trans, repair) =>
+            src.map(d => (partitioner.map(_(d)), trans.map(_(d))))
               .reduceByKey(merge(_,_, reducersFuncs))
               .map {
                 case (k, vs) =>
@@ -199,9 +199,7 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
                     case (d, _) => d
                   }
                   repair(k, v)
-              }
-        }).map((sc, _)).point[Task])
-      )
+              })).map((sc, _)).point[Task]))
     case Sort(src, bucket, orders) =>
 
       val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
@@ -209,7 +207,7 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
           case (freemap, sdir) => CoreMap.changeFreeMap(freemap).map((_, sdir))
         }
 
-      val maybeBucket = CoreMap.changeFreeMap(bucket)
+      val maybeBucket = bucket.traverse(CoreMap.changeFreeMap[T])
 
       case class KO(keys: List[(Data, SortDir)], main: SortDir)
 
@@ -231,7 +229,7 @@ class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
       EitherT((maybeBucket |@| maybeSortBys) {
         case (bucket, sortBys) =>
           val main = sortBys.head._2
-          val keys = (bucket, main) :: sortBys.toList
+          val keys = bucket.map((_, main)) ++ sortBys.toList
           src.sortBy(d => KO(keys.map(p => p.leftMap(_(d))), main), main === SortDir.Ascending)
       }.point[Task]).liftM[SparkStateT]
 

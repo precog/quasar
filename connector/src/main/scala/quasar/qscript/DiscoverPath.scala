@@ -311,9 +311,9 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
       type OUT[A] = O[A]
 
       def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
-        case EquiJoin(src, lb, rb, lk, rk, jType, combine) if !src.isThat =>
+        case EquiJoin(src, lb, rb, k, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            EJ.inj(EquiJoin(s, l, r, lk, rk, jType, combine)))
+            EJ.inj(EquiJoin(s, l, r, k, jType, combine)))
         case x => x.traverse(unionAll(g)) ∘ (in => \&/-(EJ.inj(in).embed))
       }
     }

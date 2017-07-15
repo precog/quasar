@@ -1,7 +1,7 @@
 {
     "name": "filter on field comparison",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql":        "pending"
     },
     "data": "zips.data",

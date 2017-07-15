@@ -1,14 +1,18 @@
 {
     "name": "cities with largest individual zip codes",
     "backends": {
-        "mimir":"pending",
-        "couchbase":  "pending",
+        "couchbase":      "pending",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mimir":          "pending",
+        "mongodb_2_6":    "pending",
+        "mongodb_3_0":    "pending",
+        "mongodb_3_2":    "pending",
+        "mongodb_3_4":    "pending",
+        "mongodb_read_only": "pending",
+        "postgresql":     "pending",
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
     "NB": "Skipped for all connectors due to reduce/sort ordering bug.
            Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.
@@ -23,9 +27,9 @@
 
     "predicate": "exactly",
 
-    "expected": [{ "city" : "CHICAGO" },
-                 { "city" : "BROOKLYN" },
-                 { "city" : "NEW YORK" },
-                 { "city" : "BELL GARDENS" },
-                 { "city" : "LOS ANGELES" }]
+    "expected": ["CHICAGO",
+                 "BROOKLYN",
+                 "NEW YORK",
+                 "BELL GARDENS",
+                 "LOS ANGELES"]
 }

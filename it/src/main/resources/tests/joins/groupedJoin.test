@@ -2,19 +2,18 @@
     "name": "count grouped joined tables",
 
     "backends": {
-        "mimir":"pending",
         "couchbase":         "timeout",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
-        "mongodb_2_6": "ignoreFieldOrder",
-        "mongodb_3_0": "ignoreFieldOrder",
-        "mongodb_3_2": "ignoreFieldOrder",
-        "mongodb_3_4": "ignoreFieldOrder",
+        "mimir": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "spark_local":       "pending",
-        "spark_hdfs":        "pending"
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
 
     "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",

@@ -2,7 +2,7 @@
     "name": "project unrelated field with object flatten",
     "backends": {
         "couchbase": "pending",
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "usa_factbook.data",

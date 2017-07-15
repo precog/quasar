@@ -1,7 +1,7 @@
 {
     "name": "match like complement",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

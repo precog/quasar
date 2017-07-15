@@ -411,7 +411,6 @@ object Data {
           Str(ejson.z85.encode(ByteVector.view(value.toArray))),
           EJsonTypeSize(BinaryTag, value.size))).right
       case Id(value)        =>
-        // FIXME: This evilly guesses the backend-specific OID formats
         E.inj(ejson.Meta(Str(value), EJsonType("_bson.oid"))).right
       case data             => data.left
     })

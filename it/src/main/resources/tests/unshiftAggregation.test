@@ -4,13 +4,12 @@
     "backends": {
         "couchbase":  "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
+        "mimir": "pending",
         "mongodb_2_6": "ignoreFieldOrder",
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
         "mongodb_3_4": "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder",
-        "mongodb_q_3_2": "ignoreFieldOrder",
         "postgresql": "pending"
     },
     "data": "zips.data",

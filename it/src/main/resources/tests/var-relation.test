@@ -2,7 +2,7 @@
     "name": "select from a table named by a variable",
 
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
 

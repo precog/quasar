@@ -12,7 +12,6 @@
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
@@ -33,6 +32,8 @@
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
+        { "name": "basic analytic query",           "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "basic analytic query",           "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_3_2",       "prevStatus": "success", "currStatus": "pending" },

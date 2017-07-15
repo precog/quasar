@@ -231,28 +231,6 @@ trait SetLib extends Library {
     },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
-  val Distinct = UnaryFunc(
-    Sifting,
-    "Discards all but the first instance of each unique value",
-    Type.Top,
-    Func.Input1(Type.Top),
-    noSimplification,
-    partialTyper[nat._1] {
-      case Sized(a) => a
-    },
-    untyper[nat._1](t => success(Func.Input1(t))))
-
-  val DistinctBy = BinaryFunc(
-    Sifting,
-    "Discards all but the first instance of the first argument, based on uniqueness of the second argument",
-    Type.Top,
-    Func.Input2(Type.Top, Type.Top),
-    noSimplification,
-    partialTyper[nat._2] {
-      case Sized(a, _) => a
-    },
-    untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
-
   val Union = BinaryFunc(
     Transformation,
     "Creates a new set with all the elements of each input set, keeping duplicates.",

@@ -259,7 +259,7 @@ class Transform
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     provs.tailOption.fold(values(0)) { tail =>
-      prov.genBuckets(tail) match {
+      prov.genBucketList(tail) match {
         case Some((newProvs, buckets)) =>
           Target(Ann(
             prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
@@ -268,17 +268,19 @@ class Transform
               values(0).value,
               buckets,
               List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
+              StaticArray(List(
+                StaticArray(buckets.zipWithIndex.map {
+                  case (_, i) =>  Free.point[MapFuncCore, ReduceIndex](ReduceIndex(i.left))
+                }),
+                Free.point(ReduceIndex(0.right)))))).embed)
         case None =>
           Target(
             Ann(provs, HoleF),
             QC.inj(Reduce[T, T[F]](
               values(0).value,
-              NullLit(),
+              Nil,
               List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
-              Free.point(ReduceIndex(0.some)))).embed)
+              Free.point(ReduceIndex(0.right)))).embed)
       }
     }
   }
@@ -290,7 +292,7 @@ class Transform
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     join.base.buckets.tailOption.fold(Target(EmptyAnn[T], join.base.src)) { tail =>
-      prov.genBuckets(tail) match {
+      prov.genBucketList(tail) match {
         case Some((newProvs, buckets)) =>
           Target(Ann(
             prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
@@ -300,17 +302,19 @@ class Transform
               buckets,
               List(
                 ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
+              StaticArray(List(
+                StaticArray(buckets.zipWithIndex.map {
+                  case (_, i) =>  Free.point[MapFuncCore, ReduceIndex](ReduceIndex(i.left))
+                }),
+                Free.point(ReduceIndex(0.right)))))).embed)
         case None =>
           Target(
             Ann(join.base.buckets, HoleF),
             QC.inj(Reduce[T, T[F]](
               values(0).value,
-              NullLit(),
+              Nil,
               List(ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
-              Free.point(ReduceIndex(0.some)))).embed)
+              Free.point(ReduceIndex(0.right)))).embed)
       }
     }
   }
@@ -432,37 +436,6 @@ class Transform
         if func.effect ≟ Reduction =>
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
-    case lp.InvokeUnapply(set.Distinct, Sized(a1)) =>
-      // NB: If there’s no provenance, then there’s nothing to reduce. We’re
-      //     already holding a single value.
-      prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance).tailOption.fold(a1) { tail =>
-        prov.genBuckets(tail) match {
-          case Some((newProvs, buckets)) =>
-            Target(Ann(
-              prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
-              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-              QC.inj(Reduce[T, T[F]](
-                a1.value,
-                buckets,
-                Nil,
-                Free.roll(ConcatArrays(
-                  Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                  Free.roll(MakeArray(Free.roll(ProjectIndex(Free.point(ReduceIndex(none)), IntLit(0))))))))).embed)
-          case None => a1
-        }
-      }.right
-
-    case lp.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
-      val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
-      invokeReduction1(
-        agg.First,
-        Func.Input1(
-          Target(
-            Ann(
-              prov.swapProvenances(provenance.Value(rval) :: base.buckets),
-              lval),
-            base.src))).right
-
     case lp.InvokeUnapply(set.Sample, Sized(a1, a2)) =>
       val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 
@@ -488,7 +461,7 @@ class Transform
           Ann[T](base.buckets, dset),
           QC.inj(Sort(
             base.src,
-            prov.genBuckets(base.buckets.drop(1)).fold(NullLit[T, Hole]())(_._2),
+            prov.genBucketList(base.buckets.drop(1)).fold[List[FreeMap]](Nil)(_._2),
             os)).embed))
 
     case lp.TemporalTrunc(part, src) =>

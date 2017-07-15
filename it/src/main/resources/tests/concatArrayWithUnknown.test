@@ -4,7 +4,6 @@
         "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip",
-        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

@@ -1,11 +1,11 @@
 {
-    "name": "simple join written in 'cross join' form (must be optimized to an inner join or else the join explodes, taking several minutes to complete)",
+    "name": "right outer join",
 
     "backends": {
         "couchbase": "pending",
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",
-        "mimir": "pending",
+        "mimir": "skip",
         "postgresql": "pending"
     },
 
@@ -14,12 +14,13 @@
     "data": ["../smallZips.data", "../zips.data"],
 
     "query": "select smallZips.city, zips.state
-              from `../smallZips`, `../zips`
-              where smallZips.`_id` = zips.`_id`",
+              from `../smallZips` right outer join `../zips`
+              on smallZips.`_id` = zips.`_id`",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,
 
     "expected": [{ "city": "AGAWAM",  "state": "MA" },
-                 { "city": "CUSHMAN", "state": "MA" }]
+                 { "city": "CUSHMAN", "state": "MA" },
+                 {                    "state": "PA" }]
 }

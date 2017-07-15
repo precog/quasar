@@ -66,9 +66,9 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
         SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](
           ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
         QCT.inj(Reduce((),
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some))))))).some)
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right))))))).some)
     }
   }
 }

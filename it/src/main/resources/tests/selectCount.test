@@ -2,8 +2,7 @@
     "name": "select count and another field",
     "backends": {
         "couchbase": "pending",
-        "mimir":"pending",
-        "mongodb_q_3_2": "pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "slamengine_commits.data",

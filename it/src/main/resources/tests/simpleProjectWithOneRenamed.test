@@ -3,12 +3,12 @@
 
     "backends": {
         "couchbase":    "ignoreFieldOrder",
-        "mimir":"pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
+        "mimir": "pending",
+        "mongodb_2_6":       "ignoreFieldOrder",
+        "mongodb_3_0":       "ignoreFieldOrder",
+        "mongodb_3_2":       "ignoreFieldOrder",
+        "mongodb_3_4":       "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
         "postgresql":        "pending"
     },
 

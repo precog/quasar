@@ -1,7 +1,7 @@
 {
     "name": "filter on JS with non-JS",
     "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

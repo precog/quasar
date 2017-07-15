@@ -21,15 +21,14 @@ import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, MapFuncsDerived => D,  _}, MapFuncsCore._
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
+import simulacrum.typeclass
 
-trait FuncHandler[IN[_]] {
+@typeclass trait FuncHandler[IN[_]] {
 
   def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
       : IN ~> OptionFree[EX, ?]
@@ -106,11 +105,12 @@ object FuncHandler {
               case Multiply(a1, a2)      => $multiply(a1, a2)
               case Subtract(a1, a2)      => $subtract(a1, a2)
               case Divide(a1, a2)        =>
-                // TODO
-                // 1) remove workaround for appropriate Mongo version driver
-                // once this Mongo issue is fixed: https://jira.mongodb.org/browse/SERVER-29410
-                // 2) it would be nice if we would be able to generate simply $divide(a1, a2) for
-                // $literal's != 0 (but the type of a2 is generic so we can't check it here)
+                // NB: It’s apparently intential that division by zero crashes
+                //     the query in MongoDB. See
+                //     https://jira.mongodb.org/browse/SERVER-29410
+                // TODO: It would be nice if we would be able to generate simply
+                //       $divide(a1, a2) for $literal denominators, but the type
+                //       of a2 is generic so we can't check it here.
                 $cond($eq(a2, $literal(Bson.Int32(0))),
                   $cond($eq(a1, $literal(Bson.Int32(0))),
                     $literal(Bson.Dec(Double.NaN)),
@@ -127,7 +127,9 @@ object FuncHandler {
               case Gt(a1, a2)            => $gt(a1, a2)
               case Gte(a1, a2)           => $gte(a1, a2)
 
-              case ConcatArrays(a1, a2)  => $concat(a1, a2)  // NB: this is valid for strings only
+              // FIXME: this is valid for strings only
+              case ConcatArrays(a1, a2)  => $concat(a1, a2)
+
               case Lower(a1)             => $toLower(a1)
               case Upper(a1)             => $toUpper(a1)
               case Substring(a1, a2, a3) => $substr(a1, a2, a3)
@@ -153,7 +155,7 @@ object FuncHandler {
                 trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
               case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
               case ExtractDecade(a1) => trunc($divide($year(a1), $literal(Bson.Int32(10))))
-              case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))
+              case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1)))
               case ExtractDayOfYear(a1) => $dayOfYear(a1)
               case ExtractEpoch(a1) =>
                 $divide(
@@ -163,7 +165,7 @@ object FuncHandler {
               case ExtractIsoDayOfWeek(a1) =>
                 $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
                   $literal(Bson.Int32(7)),
-                  $add($dayOfWeek(a1), $literal(Bson.Int32(-1))))
+                  $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))))
               // TODO: case ExtractIsoYear(a1) =>
               case ExtractMicroseconds(a1) =>
                 $multiply(
@@ -239,13 +241,32 @@ object FuncHandler {
             implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
             def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
-              val fp = new ExprOp3_2F.fixpoint[Free[EX, A], EX](Free.roll)
-              import fp._
+              val fp32 = new ExprOp3_2F.fixpoint[Free[EX, A], EX](Free.roll)
+              val fp26 = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
+              import fp32._, fp26._
 
               mfc.some collect {
-                case Power(a1, a2) =>
-                  $pow(a1, a2)
-              }
+                case Power(a1, a2) => $pow(a1, a2)
+                case ProjectIndex(a1, a2) => $arrayElemAt(a1, a2)
+                case ConcatArrays(a1, a2) =>
+                  $let(ListMap(DocVar.Name("a1") -> a1, DocVar.Name("a2") -> a2),
+                    $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                      $concatArrays(List($field("$a1"), $field("$a2"))),
+                      $concat($field("$a1"), $field("$a2"))))
+                case TypeOf(a1) => // NB: Identical to the one in Core, but uses $isArray
+                  $cond($lt(a1, $literal(Bson.Null)),                          $literal(Bson.Undefined),
+                    $cond($eq(a1, $literal(Bson.Null)),                        $literal(Bson.Text("null")),
+                      // TODO: figure out how to distinguish integer
+                      $cond($lt(a1, $literal(Bson.Text(""))),                  $literal(Bson.Text("decimal")),
+                        // TODO: Once we’re encoding richer types, we need to check for metadata here.
+                        $cond($lt(a1, $literal(Bson.Doc())),                   $literal(Bson.Text("array")),
+                          $cond($lt(a1, $literal(Bson.Arr())),                 $literal(Bson.Text("map")),
+                            $cond($isArray(a1),                                $literal(Bson.Text("array")),
+                              $cond($lt(a1, $literal(Bson.Bool(false))),       $literal(Bson.Text("_bson.objectid")),
+                                $cond($lt(a1, $literal(Check.minDate)),        $literal(Bson.Text("boolean")),
+                                  $cond($lt(a1, $literal(Check.minTimestamp)), $literal(Bson.Text("_ejson.timestamp")),
+                                    $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
+                                      $literal(Bson.Text("_bson.regularexpression"))))))))))))}
             }
           }
     }
@@ -342,12 +363,12 @@ object FuncHandler {
     }
 
   def handle2_6[F[_]: FuncHandler]: F ~> OptionFree[Expr2_6, ?] =
-    implicitly[FuncHandler[F]].handle2_6
+    FuncHandler[F].handle2_6
 
   def handle3_0[F[_]: FuncHandler]: F ~> OptionFree[Expr3_0, ?] =
-    implicitly[FuncHandler[F]].handle3_0
+    FuncHandler[F].handle3_0
 
   def handle3_2[F[_]: FuncHandler]: F ~> OptionFree[Expr3_2, ?] =
-    implicitly[FuncHandler[F]].handle3_2
+    FuncHandler[F].handle3_2
 
 }

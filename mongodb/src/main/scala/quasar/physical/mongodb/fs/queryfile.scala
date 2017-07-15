@@ -28,7 +28,6 @@ import quasar.fs._
 import quasar.javascript._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
-import quasar.physical.mongodb.planner.MongoDbPlanner
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
@@ -57,15 +56,7 @@ object queryfile {
       : QueryFile ~> MongoQuery[C, ?] =
     new QueryFileInterpreter(
       execMongo,
-      (lp, qc) => EitherT(WriterT(MongoDbPlanner.plan(lp, qc).leftMap(FileSystemError.planningFailed(lp, _)).run.run.point[MongoDbIO])))
-
-  def interpretQ[C]
-    (execMongo: WorkflowExecutor[MongoDbIO, C])
-    (implicit C: DataCursor[MongoDbIO, C])
-      : QueryFile ~> MongoQuery[C, ?] =
-    new QueryFileInterpreter(
-      execMongo,
-      MongoDbQScriptPlanner.plan[Fix, FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]])
+      MongoDbPlanner.plan[Fix, FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]])
 
   def run[C, S[_]](
     client: MongoClient,

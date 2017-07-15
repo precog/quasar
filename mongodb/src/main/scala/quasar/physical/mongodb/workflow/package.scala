@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree}, RenderTree.ops._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.jscore, jscore.JsCore
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflowtask._
@@ -609,17 +609,6 @@ package object workflow {
 
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-            case I($ProjectF(src, shape, _))  =>
-              shape.toJs.fold(
-                κ(I.inj(mr)),
-                x => {
-                  val base = jscore.Name("__rez")
-                  mr.singleSource.fmap(ι, I).reparentW(
-                    chain(src,
-                      $simpleMap[F](
-                        NonEmptyList(MapExpr(JsFn(base, x(jscore.Ident(base))))),
-                        ListMap()))).project
-                })
             case I(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
               mr.singleSource.fmap(ι, I).reparentW(I.inj(uw.flatmapop).embed).project
             case _                        => I.inj(mr)

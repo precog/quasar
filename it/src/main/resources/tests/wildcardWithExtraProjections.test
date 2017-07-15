@@ -2,7 +2,7 @@
   "name": "wildcard with additional projections and filtering",
 
   "backends": {
-        "mimir":"pending",
+        "mimir": "pending",
         "postgresql": "pending"
   },
   "data": "zips.data",

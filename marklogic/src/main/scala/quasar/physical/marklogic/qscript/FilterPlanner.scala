@@ -41,7 +41,9 @@ private[qscript] final class FilterPlanner[
 
   case class ProjectPath[A](src: A, path: IList[String])
 
-  object ProjectPath extends ProjectPathInstances
+  object ProjectPath extends ProjectPathInstances {
+    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] = pr.run.toOption
+  }
 
   sealed abstract class ProjectPathInstances {
     implicit def functor: Functor[ProjectPath] =
@@ -103,15 +105,14 @@ private[qscript] final class FilterPlanner[
   }
 
   object PathProject {
-    object PathProjection extends ProjectPathInstances {
-      def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] = pr.run.toOption
-    }
-
     def run[T[_[_]]: RecursiveT, U](fm: FreeMap[T]): Free[PathMapFuncCore[T, ?], Hole] = {
+      // CoEnv[Hole,MapFuncCore[T,?],(Free[MapFuncCore[T,?],Hole], Free[Coproduct[MapFuncCore[T,?],ProjectPath,?],Hole])] => CoEnv[Hole,Coproduct[MapFuncCore[T,?],ProjectPath,?],Free[Coproduct[MapFuncCore[T,?],ProjectPath,?],Hole]]
       val alg: AlgebraicGTransform[(FreeMap[T], ?), Free[PathMapFuncCore[T, ?], Hole], CoEnv[Hole, MapFuncCore[T, ?], ?], CoEnv[Hole, PathMapFuncCore[T, ?], ?]] = {
-        case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProjection(path))))), (MFC.StrLit(field), _)))) =>
-          CoEnv(\/-(Coproduct(\/-(ProjectPath(path.src, field :: "/" :: path.path)))))
-        case CoEnv(-\/(h)) => CoEnv(-\/(h))
+        case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(ProjectPath(path))))), (MFC.StrLit(field), _)))) =>
+          CoEnv((Coproduct((ProjectPath(path.src, field :: "/" :: path.path).right))).right)
+        case CoEnv(\/-(other)) =>
+          CoEnv(\/-(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2))))
+        case CoEnv(-\/(h)) => CoEnv(h.left)
       }
 
       fm.transPara[Free[PathMapFuncCore[T, ?], Hole]](alg)

@@ -25,14 +25,12 @@ import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFC}
-import quasar.contrib.pathy.AFile
 
 import matryoshka.{Hole => _, _}
-import matryoshka.data.free._
+import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.CoEnv
+import matryoshka.patterns._
 import scalaz._, Scalaz._
-import xml.name._
 
 private[qscript] final class FilterPlanner[
   F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
@@ -44,7 +42,7 @@ private[qscript] final class FilterPlanner[
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = src match {
     case \/-(src) => xqueryFilter(src, f) map (_.right)
-    case -\/(src) => planPredicate[T, Q].lift(f)
+    case -\/(src) => planPredicate[T, Q](f)
         .fold(fallbackFilter(src, f) map (_.right[Search[Q]]))(searchFilter(src, f))
   }
 
@@ -85,24 +83,27 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def planPredicate[T[_[_]]: RecursiveT, Q](
+  private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): PartialFunction[FreeMap[T], Q] = {
-    case Embed(CoEnv(\/-(MFC.Eq(Embed(CoEnv(\/-(MFC.ProjectField(Embed(CoEnv(\/-(_))), MFC.StrLit(key))))), Embed(CoEnv(\/-(MFC.Constant(v)))))))) =>
-      Query.ElementRange[T[EJson], Q](IList(QName.unprefixed(NCName.fromString(key).toOption.get)), ComparisonOp.EQ, IList(v)).embed
+  ): Option[Q] = {
+    fm match {
+      case Embed(CoEnv(\/-(MFC.Eq(ProjectPath(path), Embed(CoEnv(\/-(MFC.Constant(v)))))))) => {
+        Query.PathRange[T[EJson], Q](path, ComparisonOp.EQ, IList(v)).embed.some
+      }
+      case _ => none
+    }
   }
 
-  private def projectFieldPath[T[_[_]], A](f: FreeMapA[T, A])(
-    implicit R: Recursive.Aux[FreeMapA[T, A], CoEnv[A, MapFuncCore[T, ?], ?]]
-  ): Option[AFile] = {
-    final case class ProjectPath[A](src: A, path: AFile)
+  object ProjectPath {
+    def unapply[T[_[_]]: RecursiveT](f: FreeMap[T]): Option[IList[String]] = {
+      val alg: GAlgebraM[(FreeMap[T], ?), Option, CoEnv[Hole, MapFuncCore[T, ?], ?], IList[String]] = {
+        case CoEnv(\/-(MFC.ProjectField((_, fields), (MFC.StrLit(field), _)))) => (field :: "/" :: fields).some
+        case fm @ CoEnv(-\/(_)) => IList.empty.some
+        case fm @ _ => none
+      }
 
-    type PathMapFuncCore[A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
-
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    def nestedProject[A]: AlgebraM[Option, CoEnv[A, MapFuncCore[T, ?], ?], PathMapFuncCore[A]] = ???
-
-    R.cataM(f)(nestedProject[A]) map (_.path)
+      f.paraM[Option, IList[String]](alg)
+    }
   }
 
 }

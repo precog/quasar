@@ -56,7 +56,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.TimeOfDay, _) if is2_6(backend) => Pending("not implemented in aggregation on MongoDB 2.6").left
 
     case (math.Power, _) if !is3_2(backend) => Pending("not implemented in aggregation on MongoDB < 3.2").left
-    case (math.Trunc, Data.Dec(_) :: Nil) => Pending("sometimes causes mongo container crash").left
+    case (math.Trunc, Data.Dec(_) :: Nil) => Skipped("sometimes causes mongo container crash").left
 
     case (structural.ConcatOp, _)   => notHandled.left
 

@@ -42,13 +42,13 @@ class Queries {
   def lookupMountType(path: APath): Query0[MountType] =
     sql"SELECT type FROM Mounts WHERE path = ${refineType(path)}".query[MountType]
 
-  def lookupMountConfig(path: APath): Query0[MountConfig] =
-    sql"SELECT type, connectionUri FROM Mounts WHERE path = ${refineType(path)}".query[MountConfig]
+  def lookupMountConfig(path: APath): Query0[Mount] =
+    sql"SELECT type, connectionUri FROM Mounts WHERE path = ${refineType(path)}".query[Mount]
 
   def insertMount(path: APath, cfg: MountConfig): Update0 = {
-    val (typ, uri) = MountConfig.toConfigPair(cfg)
+    val mnt = Mount.fromMountConfig(cfg)
     sql"""INSERT INTO Mounts (path, type, connectionUri)
-          VALUES (${refineType(path)}, $typ, $uri)
+          VALUES (${refineType(path)}, ${mnt.`type`}, ${mnt.uri.value})
           """.update
   }
 

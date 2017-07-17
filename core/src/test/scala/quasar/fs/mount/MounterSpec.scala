@@ -43,10 +43,10 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
 
   def interpName = "Mounter"
 
-  def interpret = {
-    val mm = Mounter.kvs[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
+  def interpret: MounterSpec.Eff ~> Task = {
+    val mm: Mounting ~> Free[MEff, ?] = Mounter.kvs[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
 
-    val interpEff =
+    val interpEff: MounterSpec.Eff ~> Free[MEff, ?] =
       mm :+: injectFT[MountingFailure, MEff] :+: injectFT[PathMismatchFailure, MEff]
 
     val interpMnts: MountConfigs ~> Task =
@@ -67,7 +67,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
       val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
       mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
-        .tuple(mnt.lookupConfig(loc).run)
+        .tuple(mnt.lookupConfig(loc).run.run)
         .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
     }
   }

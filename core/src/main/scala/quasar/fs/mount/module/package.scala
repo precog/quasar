@@ -45,7 +45,7 @@ package object module {
     λ[ReadFile ~> Free[S, ?]] {
       case Open(file, off, lim) =>
         mount.havingPrefix(rootDir).flatMap { map =>
-          val modules = map.filter { case (k, v) => v === ModuleMount }
+          val modules = map.filter { case (k, v) => v ≟ ModuleMount.right }
           if(modules.keys.exists { path => refineType(path).fold(dir => file.relativeTo(dir).isDefined, _ => false) })
             pathErr(invalidPath(file, "Cannot read file in a module.")).left.point[Free[S, ?]]
           else readUnsafe.open(file, off, lim).run
@@ -63,7 +63,7 @@ package object module {
                      ): WriteFile ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     nonFsMounts.failSomeWrites(
-      on = file => mount.lookupType(file).run.map(_.filter(_ === ModuleMount).isDefined),
+      on = file => mount.lookupType(file).run.run.map(_.filter(_ ≟ ModuleMount.right).isDefined),
       message = "Cannot write to a module.")
   }
 
@@ -85,9 +85,10 @@ package object module {
       })
 
     def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[PathSegment]] =
-      mount.lookupConfig(dir).flatMap(c => OptionT(moduleConfig.getOption(c).point[Free[S, ?]])).map { statements =>
-        statements.collect { case FunctionDecl(name, _, _) => liftFileName(FileName(name.value)) }.toSet
-      }
+      mount.lookupConfig(dir).run
+        .flatMap(i => OptionT((i.toOption >>= (c => moduleConfig.getOption(c))).η[Free[S, ?]]))
+        .map(statements =>
+          statements.collect { case FunctionDecl(name, _, _) => liftFileName(FileName(name.value)) }.toSet)
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>

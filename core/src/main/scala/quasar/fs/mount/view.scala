@@ -121,7 +121,7 @@ object view {
   ): WriteFile ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     nonFsMounts.failSomeWrites(
-      on = file => mount.lookupType(file).run.map(_.filter(_ === MountType.ViewMount).isDefined),
+      on = file => mount.lookupType(file).run.run.map(_.filter(_ ≟ MountType.ViewMount.right).isDefined),
       message = "Cannot write to a view.")
   }
 
@@ -237,10 +237,19 @@ object view {
       plan.project.map((e, _)).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
-      for {
-        viewConfig   <- M.lookupViewConfig(loc)
-        block        <- resolveImports_(viewConfig.query, rootDir).run.run.liftM[OptionT]
-      } yield block.map(_.leftMap(_.wrapNel).flatMap(precompile[Fix[LP]](_, viewConfig.vars, fileParent(loc)).run.value))
+      (for {
+        viewConfig   <- EitherT(EitherT(OptionT(
+                          M.lookupViewConfig(loc)
+                            .leftMap(e => SemanticError.genericError(e.shows))
+                            .run.run.map(_.map(_.right[FileSystemError]))
+                        ))).leftMap(_.wrapNel)
+        block        <- EitherT(EitherT(
+                          resolveImports_(viewConfig.query, rootDir).run.run.liftM[OptionT]
+                        )).leftMap(_.wrapNel)
+        r            <- EitherT(EitherT(
+                          precompile[Fix[LP]](block, viewConfig.vars, fileParent(loc))
+                            .run.value.right[FileSystemError].η[Free[S, ?]].liftM[OptionT]))
+      } yield r).run.run
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.

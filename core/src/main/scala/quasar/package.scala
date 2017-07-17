@@ -92,7 +92,14 @@ package object quasar {
   def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S]
   ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
-    resolveImportsImpl(scopedExpr, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
+    resolveImportsImpl[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
+      scopedExpr,
+      baseDir,
+      d => EitherT(EitherT(mount
+             .lookupModuleConfig(d)
+             .bimap(e => SemanticError.genericError(e.shows), _.statements)
+             .run.run ∘ (_ \/> (pathErr(pathNotFound(d))))))
+    ).run >>= (i => EitherT(EitherT.right(i.η[Free[S, ?]])))
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
     * results, if the query was foldable to a constant.

@@ -58,6 +58,12 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (math.Power, _) if !is3_2(backend) => Pending("not implemented in aggregation on MongoDB < 3.2").left
     case (math.Trunc, Data.Dec(_) :: Nil) => Skipped("sometimes causes mongo container crash").left
 
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+
     case (structural.ConcatOp, _)   => notHandled.left
 
     case _                  => ().right

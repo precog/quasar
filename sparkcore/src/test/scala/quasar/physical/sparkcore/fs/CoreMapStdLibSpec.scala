@@ -35,6 +35,12 @@ import scalaz._, Scalaz._
 class CoreMapStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Pending("TODO").left
 
+  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+    (prg, arg1, arg2) match {
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
+      case _ => run
+    }
+
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
     case MFC(ExtractIsoYear(_))  => TODO
@@ -77,8 +83,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
       arg1: Data, arg2: Data,
       expected: Data
     ): Result =
-      check(prg, List(arg1, arg2)) getOrElse
-       run[BinaryArg](prg, _.fold(arg1, arg2), expected)
+      ignoreSome(prg, arg1, arg2)(check(prg, List(arg1, arg2)) getOrElse
+       run[BinaryArg](prg, _.fold(arg1, arg2), expected))
 
     def ternaryMapFunc(
       prg: FreeMapA[Fix, TernaryArg],

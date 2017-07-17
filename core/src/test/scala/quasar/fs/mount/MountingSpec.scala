@@ -98,8 +98,7 @@ abstract class MountingSpec[S[_]](
         val mnts = Map[APath, MountType](
           f1 -> MountType.viewMount(),
           f2 -> MountType.viewMount(),
-          dA -> MountType.fileSystemMount(dbType)
-        )
+          dA -> MountType.fileSystemMount(dbType))
 
         val setup =
           mountViewNoVars(f1, exprA)        *>
@@ -108,7 +107,7 @@ abstract class MountingSpec[S[_]](
           mountFileSystem(dB, dbType, uriB)
 
         (setup *> havingPrefix(rootDir </> dir("d1")))
-          .map(_ must_=== mnts)
+          .map(_ must_=== mnts ∘ (_.right))
       }
 
       "returns nothing when no mounts have the given prefix" >>* {
@@ -127,22 +126,22 @@ abstract class MountingSpec[S[_]](
       "returns a view config when asked for an existing view path" >>* {
         val f = rootDir </> dir("d1") </> file("f1")
 
-        (mountViewNoVars(f, exprA) *> lookupConfig(f).run)
-          .map(_ must beSome(viewCfgA))
+        (mountViewNoVars(f, exprA) *> lookupConfig(f).run.run)
+          .map(_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "returns a filesystem config when asked for an existing fs path" >>* {
         val d = rootDir </> dir("d1")
 
-        (mountFileSystem(d, dbType, uriA) *> lookupConfig(d).run)
-          .map(_ must beSome(fsCfgA))
+        (mountFileSystem(d, dbType, uriA) *> lookupConfig(d).run.run)
+          .map(_ must beSome(fsCfgA.right[MountingError]))
       }
 
       "returns none when nothing mounted at the requested path" >>* {
         val f = rootDir </> dir("d2") </> file("f2")
         val d = rootDir </> dir("d3")
 
-        lookupConfig(f).run.tuple(lookupConfig(d).run)
+        lookupConfig(f).run.run.tuple(lookupConfig(d).run.run)
           .map(_ must_=== ((None, None)))
       }
 
@@ -169,22 +168,22 @@ abstract class MountingSpec[S[_]](
       "returns the view type when asked for an existing view path" >>* {
         val f = rootDir </> dir("d1") </> file("f1")
 
-        (mountViewNoVars(f, exprA) *> lookupType(f).run)
-          .map(_ must beSome(MountType.viewMount()))
+        (mountViewNoVars(f, exprA) *> lookupType(f).run.run)
+          .map(_ must beSome(MountType.viewMount().right[MountingError]))
       }
 
       "returns a filesystem type when asked for an existing fs path" >>* {
         val d = rootDir </> dir("d1")
 
-        (mountFileSystem(d, dbType, uriA) *> lookupType(d).run)
-          .map(_ must beSome(MountType.fileSystemMount(dbType)))
+        (mountFileSystem(d, dbType, uriA) *> lookupType(d).run.run)
+          .map(_ must beSome(MountType.fileSystemMount(dbType).right[MountingError]))
       }
 
       "returns none when nothing mounted at the requested path" >>* {
         val f = rootDir </> dir("d2") </> file("f2")
         val d = rootDir </> dir("d3")
 
-        lookupType(f).run.tuple(lookupType(d).run)
+        lookupType(f).run.run.tuple(lookupType(d).run.run)
           .map(_ must_=== ((None, None)))
       }
     }
@@ -193,8 +192,8 @@ abstract class MountingSpec[S[_]](
       "allow mounting a view at a file path" >>* {
         val f = rootDir </> file("f1")
 
-        (mountViewNoVars(f, exprA) *> lookupConfig(f).run)
-          .map(_ must beSome(viewCfgA))
+        (mountViewNoVars(f, exprA) *> lookupConfig(f).run.run)
+          .map(_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "allow mounting a view above another view" >>* {
@@ -204,9 +203,9 @@ abstract class MountingSpec[S[_]](
         val r = (
           mountViewNoVars(f1, exprA) *>
           mountViewNoVars(f2, exprB)
-        ) *> lookupConfig(f2).run
+        ) *> lookupConfig(f2).run.run
 
-        r map (_ must beSome(viewCfgB))
+        r map (_ must beSome(viewCfgB.right[MountingError]))
       }
 
       "allow mounting a view below another view" >>* {
@@ -216,9 +215,9 @@ abstract class MountingSpec[S[_]](
         val r = (
           mountViewNoVars(f1, exprA) *>
           mountViewNoVars(f2, exprB)
-        ) *> lookupConfig(f2).run
+        ) *> lookupConfig(f2).run.run
 
-        r map (_ must beSome(viewCfgB))
+        r map (_ must beSome(viewCfgB.right[MountingError]))
       }
 
       "allow mounting a view above a filesystem" >>* {
@@ -228,9 +227,9 @@ abstract class MountingSpec[S[_]](
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ) *> lookupConfig(f).run
+        ) *> lookupConfig(f).run.run
 
-        r map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "allow mounting a view at a file with the same name as an fs mount" >>* {
@@ -240,9 +239,9 @@ abstract class MountingSpec[S[_]](
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ) *> lookupConfig(f).run
+        ) *> lookupConfig(f).run.run
 
-        r map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "allow mounting a view below a filesystem" >>* {
@@ -252,9 +251,9 @@ abstract class MountingSpec[S[_]](
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ) *> lookupConfig(f).run
+        ) *> lookupConfig(f).run.run
 
-        r map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "fail when a view is already mounted at the file path" >>* {
@@ -273,34 +272,34 @@ abstract class MountingSpec[S[_]](
       def mountVF(f: AFile, d: ADir): FreeS[Option[MountConfig]] =
         mountViewNoVars(f, exprA)        *>
         mountFileSystem(d, dbType, uriA) *>
-        lookupConfig(d).run
+        lookupConfig(d).run.run ∘ (_ >>= (_.toOption))
 
       "mounts a filesystem at a directory" >>* {
         val d = rootDir </> dir("d1")
 
-        (mountFileSystem(d, dbType, uriA) *> lookupConfig(d).run)
-          .map(_ must beSome(fsCfgA))
+        (mountFileSystem(d, dbType, uriA) *> lookupConfig(d).run.run)
+          .map(_ must beSome(fsCfgA.right[MountingError]))
       }
 
       "succeed mounting above an existing fs mount" >>* {
         val d1 = rootDir </> dir("d1")
         val d2 = d1 </> dir("d2")
 
-        (mountFF(d2, d1) *> lookupConfig(d1).run) map (_ must beSome(fsCfgB))
+        (mountFF(d2, d1) *> lookupConfig(d1).run.run) map (_ must beSome(fsCfgB.right[MountingError]))
       }
 
       "succeed mounting below an existing fs mount" >>* {
         val d1 = rootDir </> dir("d1")
         val d2 = d1 </> dir("d2")
 
-        (mountFF(d1, d2) *> lookupConfig(d2).run) map (_ must beSome(fsCfgB))
+        (mountFF(d1, d2) *> lookupConfig(d2).run.run) map (_ must beSome(fsCfgB.right[MountingError]))
       }
 
       "fail when mounting at an existing fs mount" >>* {
         val d = rootDir </> dir("exists")
 
-        mntErr.attempt(mountFF(d, d)).tuple(lookupConfig(d).run) map { case (dj, cfg) =>
-          maybeExists(dj).tuple(cfg) must beSome((d, fsCfgA))
+        mntErr.attempt(mountFF(d, d)).tuple(lookupConfig(d).run.run) map { case (dj, cfg) =>
+          maybeExists(dj).tuple(cfg) must beSome((d, fsCfgA.right[MountingError]))
         }
       }
 
@@ -330,8 +329,8 @@ abstract class MountingSpec[S[_]](
       "succeeds when loc and config agree" >>* {
         val f = rootDir </> file("view")
 
-        (mnt.mount(f, viewCfgA) *> lookupConfig(f).run)
-          .map(_ must beSome(viewCfgA))
+        (mnt.mount(f, viewCfgA) *> lookupConfig(f).run.run)
+          .map(_ must beSome(viewCfgA.right[MountingError]))
       }
 
       "fails when using a dir for a view" >>* {
@@ -353,9 +352,9 @@ abstract class MountingSpec[S[_]](
 
         val r =
           (mnt.mount(d1, fsCfgA) *> remount(d1, d2)) *>
-          (lookupConfig(d1).run.tuple(lookupConfig(d2).run))
+          (lookupConfig(d1).run.run.tuple(lookupConfig(d2).run.run))
 
-        r map (_ must_=== ((None, Some(fsCfgA))))
+        r map (_ must_=== ((None, Some(fsCfgA.right[MountingError]))))
       }
 
       "moves the mount at src to dst (file)" >>* {
@@ -364,9 +363,9 @@ abstract class MountingSpec[S[_]](
 
         val r =
           (mnt.mount(d1, viewCfgA) *> remount(d1, d2)) *>
-          (lookupConfig(d1).run.tuple(lookupConfig(d2).run))
+          (lookupConfig(d1).run.run.tuple(lookupConfig(d2).run.run))
 
-        r map (_ must_=== ((None, Some(viewCfgA))))
+        r map (_ must_=== ((None, Some(viewCfgA.right[MountingError]))))
       }
 
       "moves mount nested under src to dst" >>* {
@@ -376,9 +375,9 @@ abstract class MountingSpec[S[_]](
 
         val r =
           (mnt.mount(d1, fsCfgA) *> mnt.mount(d1 </> f, viewCfgA) *> remount(d1, d2)) *>
-          (lookupConfig(d1 </> f).run.tuple(lookupConfig(d2 </> f).run))
+          (lookupConfig(d1 </> f).run.run.tuple(lookupConfig(d2 </> f).run.run))
 
-        r map (_ must_=== ((None, Some(viewCfgA))))
+        r map (_ must_=== ((None, Some(viewCfgA.right[MountingError]))))
       }
 
       "succeeds when src == dst" >>* {
@@ -387,9 +386,9 @@ abstract class MountingSpec[S[_]](
         val r =
           mnt.mount(d, fsCfgB) *>
           remount(d, d)        *>
-          lookupConfig(d).run
+          lookupConfig(d).run.run
 
-        r map (_ must beSome(fsCfgB))
+        r map (_ must beSome(fsCfgB.right[MountingError]))
       }
 
       "fails if there is no mount at src" >>* {
@@ -408,8 +407,8 @@ abstract class MountingSpec[S[_]](
           mountViewNoVars(f2, exprB) *>
           remount(f1, f2)
 
-        mntErr.attempt(r).tuple(lookupConfig(f1).run) map { case (dj, cfg) =>
-          maybeExists(dj).tuple(cfg) must beSome((f2, viewCfgA))
+        mntErr.attempt(r).tuple(lookupConfig(f1).run.run) map { case (dj, cfg) =>
+          maybeExists(dj).tuple(cfg) must beSome((f2, viewCfgA.right[MountingError]))
         }
       }
     }
@@ -421,9 +420,9 @@ abstract class MountingSpec[S[_]](
         val r =
           mnt.mount(d, fsCfgA) *>
           replace(d, fsCfgB)   *>
-          lookupConfig(d).run
+          lookupConfig(d).run.run
 
-        r map (_ must beSome(fsCfgB))
+        r map (_ must beSome(fsCfgB.right[MountingError]))
       }
 
       "fails if there is no mount at the given src location" >>* {
@@ -437,8 +436,8 @@ abstract class MountingSpec[S[_]](
         val f = rootDir </> file("f1")
         val r = mountViewNoVars(f, exprA) *> replace(f, fsCfgB)
 
-        mmErr.attempt(r).tuple(lookupConfig(f).run)
-          .map(_ must_=== ((-\/(Mounting.PathTypeMismatch(f)), Some(viewCfgA))))
+        mmErr.attempt(r).tuple(lookupConfig(f).run.run)
+          .map(_ must_=== ((-\/(Mounting.PathTypeMismatch(f)), Some(viewCfgA.right[MountingError]))))
       }
     }
 
@@ -449,7 +448,7 @@ abstract class MountingSpec[S[_]](
         val r =
           mountViewNoVars(f, exprA) *>
           unmount(f)                *>
-          lookupConfig(f).run
+          lookupConfig(f).run.run
 
         r map (_ must beNone)
       }
@@ -460,7 +459,7 @@ abstract class MountingSpec[S[_]](
         val r =
           mountFileSystem(d, dbType, uriB) *>
           unmount(d)                       *>
-          lookupConfig(d).run
+          lookupConfig(d).run.run
 
         r map (_ must beNone)
       }
@@ -473,7 +472,7 @@ abstract class MountingSpec[S[_]](
           mountFileSystem(d, dbType, uriB) *>
           mountViewNoVars(f, exprA)        *>
           unmount(d)                       *>
-          lookupConfig(f).run
+          lookupConfig(f).run.run
 
         r map (_ must beNone)
       }

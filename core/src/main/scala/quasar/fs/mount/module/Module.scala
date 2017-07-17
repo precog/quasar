@@ -166,7 +166,9 @@ object Module {
           val iArgs = args.map{ case (key, value) => (CIName(key), value)}
           val currentDir = fileParent(file)
           (for {
-            moduleConfig <- mount.lookupModuleConfig(currentDir).toRight(notFoundError)
+            moduleConfig <- EitherT(mount.lookupModuleConfig(currentDir)
+                              .leftMap(e => semErrors(SemanticError.genericError(e.shows).wrapNel))
+                              .run.toRight(notFoundError).run.map(_.join))
             name         =  fileName(file).value
             funcDec      <- EitherT(moduleConfig.declarations.find(_.name.value ≟ name)
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])

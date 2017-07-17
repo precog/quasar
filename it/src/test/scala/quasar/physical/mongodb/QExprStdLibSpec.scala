@@ -53,6 +53,12 @@ class MongoDbQExprStdLibSpec extends MongoDbQStdLibSpec {
 
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+
     case (structural.ConcatOp, _)   => notHandled.left
 
     case _                  => ().right

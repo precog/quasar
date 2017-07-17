@@ -157,6 +157,9 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Invalid mount configuration.",
           "reasons" := rsns)
 
+      case InvalidMount(_, e) =>
+        fromMsg_(InternalServerError withReason "Invalid mount.", e)
+
       case PError(e) => e.toApiError
       case EError(e) => e.toApiError
     }

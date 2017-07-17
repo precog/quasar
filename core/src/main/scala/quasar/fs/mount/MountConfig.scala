@@ -24,6 +24,7 @@ import quasar.sql, sql._
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
 import monocle.Prism
+import org.http4s.Uri
 import scalaz._, Scalaz._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
@@ -59,7 +60,7 @@ object MountConfig {
   } ((ViewConfig(_, _)).tupled)
 
   val viewConfigUri: Prism[String, (ScopedExpr[Fix[Sql]], Variables)] =
-    Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
+    Prism((viewCfgFromUriStr _) andThen (_.toOption))((viewCfgAsUriStr _).tupled)
 
   val fileSystemConfig =
     Prism.partial[MountConfig, (FileSystemType, ConnectionUri)] {
@@ -79,48 +80,36 @@ object MountConfig {
   implicit def equal: Equal[MountConfig] =
     Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
-  val toConfigPair: MountConfig => (String, String) = {
-    case ViewConfig(query, vars) =>
-      "view" -> viewCfgAsUri(query, vars)
-    case FileSystemConfig(typ, uri) =>
-      typ.value -> uri.value
-    case ModuleConfig(statements) =>
-      "module" -> statements.pprint
-  }
-
-  val fromConfigPair: (String, String) => String \/ MountConfig = {
-    case ("view", uri) =>
-      viewCfgFromUri(uri).map(i => viewConfig(i))
-    case ("module", stmts) =>
-      sql.fixParser.parseModule(stmts).bimap(
-        _.message,
-        moduleConfig(_))
-    case (typ, uri) =>
-      fileSystemConfig(FileSystemType(typ), ConnectionUri(uri)).right
-  }
-
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({
       case ModuleConfig(statements)   =>
         Json("module" := statements.pprint)
       case ViewConfig(query, vars)    =>
-        Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
+        Json("view" := Json("connectionUri" := viewCfgAsUriStr(query, vars)))
       case FileSystemConfig(typ, uri) =>
         Json(typ.value := Json("connectionUri" := uri.value))
     },
     json => json.fields match {
-      case Some(key :: Nil) =>
-        if (key === "module") (json --\ key).as[String].flatMap { statementsString =>
-          DecodeResult(fromConfigPair(key, statementsString)
-            .leftMap((_, (json --\ key).history)).toEither)
-        } else {
-          val uriCur = json --\ key --\ "connectionUri"
-          uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
-            fromConfigPair(key, uri.value).leftMap((_, uriCur.history)).toEither))
-        }
+      case Some(key :: Nil) => key match {
+        case "module" =>
+          (json --\ key).as[String].flatMap(stmtsStr =>
+            DecodeResult(stmtsStrAsSql(stmtsStr).bimap(e => (e.message, (json --\ key).history), moduleConfig(_)).toEither))
+        case "view" =>
+          (json --\ key --\ "connectionUri").as[ConnectionUri].flatMap(uri =>
+            DecodeResult(viewCfgFromUriStr(uri.value).bimap((_, (json --\ key).history), viewConfig(_)).toEither))
+        case fsType =>
+          (json --\ key --\ "connectionUri").as[ConnectionUri].map(uri =>
+            fileSystemConfig(FileSystemType(fsType), uri))
+      }
       case _ =>
         DecodeResult.fail(s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}", json.history)
     })
+
+  def viewCfgFromUri(uri: ConnectionUri): String \/ (ScopedExpr[Fix[Sql]], Variables) = viewCfgFromUriStr(uri.value)
+
+  def viewCfgAsUri(query: ScopedExpr[Fix[Sql]], vars: Variables): ConnectionUri = ConnectionUri(viewCfgAsUriStr(query, vars))
+
+  def stmtsAsSqlUri(stmts: List[Statement[Fix[Sql]]]): ConnectionUri = ConnectionUri(stmtsAsSqlStr(stmts))
 
   ////
 
@@ -128,7 +117,7 @@ object MountConfig {
 
   // FIXME
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-  private def viewCfgFromUri(uri: String): String \/ (ScopedExpr[Fix[Sql]], Variables) = {
+  private def viewCfgFromUriStr(uri: String): String \/ (ScopedExpr[Fix[Sql]], Variables) = {
     import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
 
     for {
@@ -146,7 +135,7 @@ object MountConfig {
     } yield (sExpr, vars)
   }
 
-  private def viewCfgAsUri(scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): String = {
+  private def viewCfgAsUriStr(scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): String = {
     import org.http4s._, util._, CaseInsensitiveString._
 
     val qryMap = vars.value.foldLeft(Map("q" -> List(scopedExpr.pprint))) {
@@ -165,4 +154,10 @@ object MountConfig {
       query     = Query.fromMap(qryMap)
     ).renderString
   }
+
+  private def stmtsAsSqlStr(stmts: List[Statement[Fix[Sql]]]) =
+    stmts.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n")
+
+  private def stmtsStrAsSql(stmts: String): sql.ParsingError \/ List[Statement[Fix[Sql]]] =
+    sql.fixParser.parseModule(stmts)
 }

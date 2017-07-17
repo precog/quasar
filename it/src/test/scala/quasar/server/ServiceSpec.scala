@@ -258,6 +258,61 @@ class ServiceSpec extends quasar.Qspec {
 
       r.map(_.status) must beRightDisjunction(Ok)
     }
+
+    "GET invalid view" in {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val insertMnt =
+        MetaStoreMounterSpec.insertMount(rootDir </> file("f1"), MountType.ViewMount, "bogus")
+
+      val r = withServer(port, insertMnt) { baseUri: Uri =>
+        client.fetch(
+          Request(
+            uri = baseUri / "data" / "fs" / "f1",
+            method = Method.GET)
+        )(Task.now)
+      }
+
+      r.map(_.status) must beRightDisjunction(BadRequest withReason "Compilation failed")
+    }
+  }
+
+  "/metadata/fs" should {
+    "GET directory with invalid view" in {
+      import Json._
+
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val viewConfig = MountConfig.viewConfig0(sqlB"select 42")
+
+      val insertMnts =
+        insertMount(rootDir </> file("f1"), viewConfig) *>
+        MetaStoreMounterSpec.insertMount(rootDir </> file("f2"), MountType.ViewMount, "bogus")
+
+      val r = withServer(port, insertMnts) { baseUri: Uri =>
+        client.expect[Json](baseUri / "metadata" / "fs")
+      }
+
+      r.map(json =>
+        (json.hcursor
+          --\ "children"
+          -\ (c => (c.hcursor --\ "name").as[String].toOption ≟ "f2".some)
+          --\ "mount"
+          --\ "error"
+          --\ "detail"
+          --\ "message" := jEmptyString
+        ).up.up.up.up.up.focus >>= (_.array ∘ (_.toSet))
+      ) must beRightDisjunction(
+        Set(
+          Json("name" := "f1", "type" := "file", "mount" := "view"),
+          Json(
+            "name" := "f2",
+            "type" := "view",
+            "mount" := Json(
+              "error" := Json(
+                "status" := "Invalid mount.",
+                "detail" := Json("message" := ""))))).some)
+    }
   }
 
   step(client.shutdown.unsafePerformSync)

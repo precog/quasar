@@ -271,7 +271,9 @@ object Repl {
   def mountType[S[_]](path: APath)(implicit
     M: Mounting.Ops[S]
   ): Free[S, Option[String]] =
-    M.lookupType(path).map(_.fold(_.value, "view", "module")).run
+    M.lookupType(path).run.run.map(_ >>= (_.fold(
+      MountingError.invalidMount.getOption(_) ∘ (_._1.fold(_.value, "view", "module")),
+      _.fold(_.value, "view", "module").some)))
 
   def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
 

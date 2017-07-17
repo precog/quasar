@@ -71,8 +71,8 @@ object ShiftRead {
             IncludeId))))),
           NullLit(),
           List(ReduceFuncs.UnshiftMap(
-            Free.roll(ProjectIndex(HoleF, IntLit(0))),
-            Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+            Free.roll(MFC(ProjectIndex(HoleF, IntLit(0)))),
+            Free.roll(MFC(ProjectIndex(HoleF, IntLit(1)))))),
           Free.point(ReduceIndex(0.some)))))
        )
     }

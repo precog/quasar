@@ -103,24 +103,42 @@ package object qscript {
   implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
+  type MapFunc[T[_[_]], A] = (MapFuncCore[T, ?] :/: MapFuncDerived[T, ?])#M[A]
+
+  object MFC {
+    def apply[T[_[_]], A](mfc: MapFuncCore[T, A]): MapFunc[T, A] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
+  object MFD {
+    def apply[T[_[_]], A](mfc: MapFuncDerived[T, A]): MapFunc[T, A] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncDerived[T, A]] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
-  type FreeMapA[T[_[_]], A] = Free[MapFuncCore[T, ?], A]
+  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
-  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFuncCore[T, ?], B]
+  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
   type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
-  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFuncCore[T, ?], Hole](SrcHole)
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFuncCore[T, ?], JoinSide](LeftSide)
+    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFuncCore[T, ?], JoinSide](RightSide)
+    Free.point[MapFunc[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Option[Int]): FreeMapA[T, ReduceIndex] =
-    Free.point[MapFuncCore[T, ?], ReduceIndex](ReduceIndex(i))
+    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
@@ -136,9 +154,9 @@ package object qscript {
     //     array compaction, but this helps us avoid some autojoins.
     (norml ≟ normr).fold(
       (norml, HoleF[T], HoleF[T]),
-      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+      (Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(r)))))),
+        Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+        Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))))
   }
 
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
@@ -151,20 +169,20 @@ package object qscript {
     val normr = norm.freeMF(r)
 
     val leftElems: List[FreeMapA[T, A]] = norml.resume match {
-      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
+      case -\/(MFC(array @ ConcatArrays(_, _))) => rewrite.flattenArray[A](array)
       case _ => Nil
     }
 
     val rightElems: List[FreeMapA[T, A]] = normr.resume match {
-      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
+      case -\/(MFC(array @ ConcatArrays(_, _))) => rewrite.flattenArray[A](array)
       case _ => Nil
     }
 
     def projectIndex(idx: Int): FreeMap[T] =
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](idx)))
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
 
     def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
-      IList.fromList(elems).indexOf(Free.roll(MakeArray(value)))
+      IList.fromList(elems).indexOf(Free.roll(MFC(MakeArray(value))))
 
     indexOf(leftElems, normr).cata(
       idx => (norml, HoleF[T], projectIndex(idx)),
@@ -177,20 +195,21 @@ package object qscript {
   def naiveConcat3[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+    (Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(c)))))), Free.roll(MFC(MakeArray(r)))))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
 
   // FIXME naive - use `concat`
   def naiveConcat4[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+    (Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(c)))))), Free.roll(MFC(MakeArray(r)))))), Free.roll(MFC(MakeArray(r2)))))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](3)))))
+
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 

@@ -70,6 +70,7 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {
+
   implicit def constReadFile[F[_]: Applicative: MonadPlanErr, FMT](
     implicit SP: StructuralPlanner[F, FMT]
   ): Planner[F, FMT, Const[Read[AFile], ?]] =

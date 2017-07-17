@@ -338,13 +338,13 @@ object QScriptCore {
 
             val idAccess: IdStatus => JoinFunc[IT] = {
               case ExcludeId =>
-                Free.roll(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
                   RightSideF[IT],
-                  MapFuncsCore.IntLit[IT, JoinSide](1)))
+                  MapFuncsCore.IntLit[IT, JoinSide](1))))
               case IdOnly =>
-                Free.roll(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
                   RightSideF[IT],
-                  MapFuncsCore.IntLit[IT, JoinSide](0)))
+                  MapFuncsCore.IntLit[IT, JoinSide](0))))
               case IncludeId => RightSideF
             }
 

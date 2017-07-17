@@ -27,7 +27,7 @@ import quasar.physical.couchbase.fs.{parseConfig, FsType}
 import quasar.physical.couchbase.Couchbase._, QueryFileModule.n1qlResults
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.PlannerError
-import quasar.qscript.{MapFuncCore, MapFuncStdLibTestRunner, FreeMapA}
+import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
 
 import java.time.LocalDate
@@ -50,7 +50,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   type M[A] = EitherT[F, PlannerError, A]
 
   def run[A](
-    fm: Free[MapFuncCore[Fix, ?], A],
+    fm: Free[MapFunc[Fix, ?], A],
     args: A => QData,
     expected: QData,
     cfg: Config

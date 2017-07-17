@@ -36,7 +36,6 @@ import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.main.ArgProperty
 import org.specs2.matcher._
-import org.specs2.specification.BeforeEach
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}
@@ -44,9 +43,7 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-abstract class MongoDbStdLibSpec extends StdLibSpec with BeforeEach {
-
-  override def before = print(".")
+abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   val lpf = new LogicalPlanR[Fix[LP]]
 

@@ -2,7 +2,6 @@
     "name": "convert dates to/from strings (MongoDB)",
     "backends": {
         "mimir":"pending",
-        "postgresql":        "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "couchbase":         "skip",

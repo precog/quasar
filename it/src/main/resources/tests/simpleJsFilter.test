@@ -1,8 +1,7 @@
 {
     "name": "filter on simple JS",
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
     "data": "largeZips.data",
     "query": "select city from largeZips where length(city) < 5",

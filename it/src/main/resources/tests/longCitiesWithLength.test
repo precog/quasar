@@ -3,8 +3,7 @@
     "backends": {
         "couchbase":  "ignoreFieldOrder",
         "mimir":"pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2": "pending"
     },
     "data": "largeZips.data",
     "query": "select distinct city, length(city) as len from largeZips where state=\"CO\" and length(city) >= 10",

@@ -1,8 +1,7 @@
 {
     "name": "select wildcard and field",
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "largeZips.data",
     "query": "select *, pop/1000 as popInK from largeZips",

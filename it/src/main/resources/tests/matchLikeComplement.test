@@ -1,8 +1,7 @@
 {
     "name": "match like complement",
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
     "data": "zips.data",
     "query": "select city from zips where city not like \"%E%\"",

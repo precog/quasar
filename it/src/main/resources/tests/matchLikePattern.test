@@ -1,8 +1,7 @@
 {
     "name": "match like pattern",
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
     "data": "zips.data",
     "query": "select city from zips where city like \"%OULD%CIT%\"",

@@ -2,8 +2,7 @@
   "name": "select _id as zip",
 
   "backends": {
-        "mimir":"pending",
-    "postgresql": "pending"
+        "mimir":"pending"
   },
 
   "data": "zips.data",

@@ -2,8 +2,7 @@
   "name": "select wildcard with group by",
 
   "backends": {
-        "mimir":"pending",
-    "postgresql": "pending"
+        "mimir":"pending"
   },
 
   "data": "zips.data",

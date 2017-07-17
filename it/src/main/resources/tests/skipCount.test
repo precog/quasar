@@ -2,8 +2,7 @@
     "name": "skip and count",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "zips.data",

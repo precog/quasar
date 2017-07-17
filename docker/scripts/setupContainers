@@ -25,15 +25,6 @@ init_metastore() {
   docker exec quasar_metastore /tmp/initPostgresql metastore
 }
 
-init_postgresql() {
-  # a restart of the container is needed here due to
-  # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
-  echo "configuring postgresql..."
-  docker restart quasar_postgresql
-  docker cp $SCRIPTS_DIR/initPostgresql quasar_postgresql:/tmp/initPostgresql
-  docker exec quasar_postgresql /tmp/initPostgresql quasar-test
-}
-
 init_couchbase() {
   echo "configuring couchbase..."
   docker cp $SCRIPTS_DIR/initCouchbase quasar_couchbase:/tmp/initCouchbase
@@ -59,7 +50,6 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_couchbase"         ]]; then init_couchbase;                              fi
   if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
   if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
-  if [[ $CONTAINER == "quasar_postgresql"        ]]; then init_postgresql;                             fi
   if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                              fi
 }
 
@@ -121,7 +111,7 @@ create_database() {
 usage() {
 cat << EOF
 Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
-Create and configure mongo, couchbase, marklogic, and postgresql containers
+Create and configure metastore, mongo, couchbase, and marklogic containers
 for integration tests with Quasar.
 
   -h                   help (also trigged with no parameters): display this help and exit

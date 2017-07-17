@@ -3,7 +3,6 @@
     "backends": {
         "mimir":"pending",
         "couchbase":      "pending",
-        "postgresql":     "pending",
         "spark_hdfs":     "pending",
         "spark_local":    "pending"
     },

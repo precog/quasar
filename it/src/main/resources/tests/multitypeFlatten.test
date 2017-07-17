@@ -6,7 +6,6 @@
         "marklogic_xml":     "timeout",
         "mimir":"pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
         "spark_local":       "pending",
         "spark_hdfs":        "pending"
     },

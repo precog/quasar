@@ -9,7 +9,6 @@
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },

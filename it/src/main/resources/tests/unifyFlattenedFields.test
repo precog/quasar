@@ -2,8 +2,7 @@
     "name": "unify flattened fields",
     "backends": {
         "mimir":"pending",
-        "couchbase":  "pending",
-        "postgresql": "pending"
+        "couchbase":  "pending"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",

@@ -4,8 +4,7 @@
         "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
     "data": "largeZips.data",
     "query": "select city, state, loc || [ pop ] as lp from largeZips",

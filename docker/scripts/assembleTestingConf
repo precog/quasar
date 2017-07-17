@@ -53,15 +53,6 @@ configure_metastore() {
 }
 
 ##########################################
-# injects postgresql url into
-# it/testing.conf
-#
-configure_postgresql() {
-  CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}:5433/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE
-}
-
-##########################################
 # injects various mongodb urls into
 # it/testing.conf depending on argument
 #
@@ -78,7 +69,6 @@ configure_mongo() {
 container_lookup() {
   CONTAINER=$(echo "$1" | cut -d_ -f2-)
   if [[ $CONTAINER =~ "mongodb"          ]]; then configure_mongo          $CONTAINER;      fi
-  if [[ $CONTAINER == "postgresql"       ]]; then configure_postgresql     $CONTAINER;      fi
   if [[ $CONTAINER == "marklogic_xml"    ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
   if [[ $CONTAINER == "marklogic_json"   ]]; then configure_marklogic_json $CONTAINER 9001; fi
   if [[ $CONTAINER == "couchbase"        ]]; then configure_couchbase      $CONTAINER;      fi

@@ -1,8 +1,7 @@
 {
     "name": "population of Boulder",
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
     "data": "zips.data",
     "query": "select sum(pop) as Population from zips where city=\"BOULDER\" and state=\"CO\"",

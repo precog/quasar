@@ -3,8 +3,7 @@
     "backends": {
         "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "skip",
-        "postgresql":        "pending"
+        "mimir":             "skip"
     },
     "data": "smallZips.data",
     "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from smallZips",

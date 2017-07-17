@@ -2,8 +2,7 @@
     "name": "count distinct",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "olympics.data",

@@ -2,8 +2,7 @@
     "name": "handle nested let binding and selects",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "zips.data",

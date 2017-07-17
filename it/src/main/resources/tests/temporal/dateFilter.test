@@ -3,8 +3,7 @@
 
   "backends": {
         "mimir":"pending",
-    "mongodb_q_3_2":  "pending",
-    "postgresql":     "pending"
+    "mongodb_q_3_2":  "pending"
   },
 
   "data": "../days.data",

@@ -1,8 +1,7 @@
 {
     "name": "concat field with constant array",
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "largeZips.data",
     "query": "select array_concat(make_array(pop), array_concat(make_array(1), make_array(2))) as arr from largeZips",

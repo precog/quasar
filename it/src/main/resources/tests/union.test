@@ -3,8 +3,7 @@
     "backends": {
         "mimir":"pending",
         "couchbase":         "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
     "data": "zips.data",
     "query": "select `_id` as zip from zips union select city, state from zips",

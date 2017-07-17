@@ -3,8 +3,7 @@
     "backends": {
         "couchbase": "pending",
         "mimir":"pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mongodb_q_3_2": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select committer.login, count(*) from slamengine_commits",

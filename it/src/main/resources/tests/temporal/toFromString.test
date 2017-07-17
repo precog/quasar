@@ -9,8 +9,7 @@
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
     "data": "../days.data",
     "query": "select date(substring(str, 0, 10)) as d, time(substring(str, 11, 8)) as t, timestamp(str) as ts, to_string(ts) as s from `../days`",

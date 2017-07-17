@@ -43,7 +43,7 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-abstract class MongoDbStdLibSpec extends StdLibSpec {
+abstract class MongoDbStdLibSpec extends StdLibSpec with quasar.ExclusiveQuasarSpecification {
   val lpf = new LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))

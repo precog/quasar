@@ -25,6 +25,7 @@ import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFC}
+import quasar.fp.free._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -41,9 +42,7 @@ private[qscript] final class FilterPlanner[
 
   case class ProjectPath[A](src: A, path: IList[String])
 
-  object ProjectPath extends ProjectPathInstances {
-    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] = pr.run.toOption
-  }
+  object ProjectPath extends ProjectPathInstances
 
   sealed abstract class ProjectPathInstances {
     implicit def functor: Functor[ProjectPath] =
@@ -53,6 +52,10 @@ private[qscript] final class FilterPlanner[
   }
 
   type PathMapFuncCore[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
+
+  object MapFunc {
+    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[MapFuncCore[T, A]] = pr.run.swap.toOption
+  }
 
   def plan[Q](src: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
@@ -101,17 +104,24 @@ private[qscript] final class FilterPlanner[
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = {
-    PathProject.run(fm)
+    println(fm)
+    println(StaticPath(fm))
+    none
   }
 
   object PathProject {
-    def run[T[_[_]]: RecursiveT, U](fm: FreeMap[T]): Free[PathMapFuncCore[T, ?], Hole] = {
-      // CoEnv[Hole,MapFuncCore[T,?],(Free[MapFuncCore[T,?],Hole], Free[Coproduct[MapFuncCore[T,?],ProjectPath,?],Hole])] => CoEnv[Hole,Coproduct[MapFuncCore[T,?],ProjectPath,?],Free[Coproduct[MapFuncCore[T,?],ProjectPath,?],Hole]]
+    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] = pr.run.toOption
+  }
+
+  object StaticPath {
+    def apply[T[_[_]]: RecursiveT, U](fm: FreeMap[T]): Free[PathMapFuncCore[T, ?], Hole] = {
       val alg: AlgebraicGTransform[(FreeMap[T], ?), Free[PathMapFuncCore[T, ?], Hole], CoEnv[Hole, MapFuncCore[T, ?], ?], CoEnv[Hole, PathMapFuncCore[T, ?], ?]] = {
-        case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(ProjectPath(path))))), (MFC.StrLit(field), _)))) =>
-          CoEnv((Coproduct((ProjectPath(path.src, field :: "/" :: path.path).right))).right)
+        case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) =>
+          CoEnv(Coproduct((ProjectPath(path.src, field :: "/" :: path.path).right)).right)
+        case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) =>
+          Free.roll(src)
         case CoEnv(\/-(other)) =>
-          CoEnv(\/-(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2))))
+          CoEnv(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2)).right)
         case CoEnv(-\/(h)) => CoEnv(h.left)
       }
 

@@ -27,7 +27,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFC, _}
 import quasar.{RenderTree, NonTerminal}
-
+import quasar.RenderTree.ops._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -51,8 +51,9 @@ private[qscript] final class FilterPlanner[
         def map[A, B](fa: ProjectPath[A])(f: A => B) = ProjectPath(f(fa.src), fa.path)
       }
 
-    implicit def renderTreeProjectPath[A](implicit R: RenderTree[A]): RenderTree[ProjectPath[A]] =
-      RenderTree.make((pp: ProjectPath[A]) => NonTerminal(List("ProjectPath"), none, List(R.render(pp.src))))
+    implicit def delayRenderTree[A]: Delay[RenderTree, ProjectPath] =
+      Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ ProjectPath)#λ](rt =>
+        RenderTree.make(pp => NonTerminal(List("ProjectPath"), pp.path.shows.some, List(rt.render(pp.src))))))
   }
 
   type PathMapFuncCore[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
@@ -106,11 +107,12 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]],
-             R: RenderTree[FreeMap[T]]
+    implicit Q:   Corecursive.Aux[Q, Query[T[EJson], ?]],
+             RTF: RenderTree[FreeMap[T]],
+             RTP: RenderTree[Free[PathMapFuncCore[T, ?], Hole]]
   ): Option[Q] = {
-    println(R.render(fm).show)
-    println(StaticPath(fm))
+    println(fm.render.show)
+    println(StaticPath(fm).render.show)
     none
   }
 
@@ -122,7 +124,7 @@ private[qscript] final class FilterPlanner[
     def apply[T[_[_]]: RecursiveT, U](fm: FreeMap[T]): Free[PathMapFuncCore[T, ?], Hole] = {
       val alg: AlgebraicGTransform[(FreeMap[T], ?), Free[PathMapFuncCore[T, ?], Hole], CoEnv[Hole, MapFuncCore[T, ?], ?], CoEnv[Hole, PathMapFuncCore[T, ?], ?]] = {
         case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) =>
-          CoEnv(Coproduct((ProjectPath(path.src, field :: "/" :: path.path).right)).right)
+          CoEnv(Coproduct((ProjectPath(path.src, (path.path :+ "/") :+ field).right)).right)
         case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) =>
           CoEnv(Coproduct((ProjectPath(Free.roll(src).mapSuspension(injectNT[MapFuncCore[T, ?], PathMapFuncCore[T, ?]]), IList(field)).right)).right)
         case CoEnv(\/-(other)) =>

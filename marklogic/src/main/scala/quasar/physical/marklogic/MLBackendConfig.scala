@@ -40,7 +40,7 @@ private[marklogic] sealed abstract class MLBackendConfig {
   type FMT
 
   val cfg: MarkLogicConfig
-  implicit def planner[T[_[_]]: BirecursiveT]: Planner[M, FMT, QSM[T, ?], T[EJson]]
+  implicit def planner[T[_[_]]: BirecursiveT: ShowT]: Planner[M, FMT, QSM[T, ?], T[EJson]]
   implicit def structuralPlanner: StructuralPlanner[XccEval, FMT]
   implicit def searchOptions: SearchOptions[FMT]
   implicit def dataAsContent: AsContent[FMT, Data]
@@ -52,7 +52,7 @@ private[marklogic] sealed abstract class MLBackendConfig {
 private[marklogic] object MLBackendConfig {
   final class JsonConfig(val cfg: MarkLogicConfig) extends MLBackendConfig {
     type FMT = DocType.Json
-    def planner[T[_[_]]: BirecursiveT] = Planner[M, FMT, QSM[T, ?], T[EJson]]
+    def planner[T[_[_]]: BirecursiveT: ShowT] = Planner[M, FMT, QSM[T, ?], T[EJson]]
     val structuralPlanner = StructuralPlanner.jsonStructuralPlanner[XccEval]
     val searchOptions = SearchOptions[FMT]
     val dataAsContent = AsContent[FMT, Data]
@@ -60,7 +60,7 @@ private[marklogic] object MLBackendConfig {
 
   final class XmlConfig(val cfg: MarkLogicConfig) extends MLBackendConfig {
     type FMT = DocType.Xml
-    def planner[T[_[_]]: BirecursiveT] = Planner[M, FMT, QSM[T, ?], T[EJson]]
+    def planner[T[_[_]]: BirecursiveT: ShowT] = Planner[M, FMT, QSM[T, ?], T[EJson]]
     val structuralPlanner = StructuralPlanner.xmlStructuralPlanner[XccEval]
     val searchOptions = SearchOptions[FMT]
     val dataAsContent = AsContent[FMT, Data]

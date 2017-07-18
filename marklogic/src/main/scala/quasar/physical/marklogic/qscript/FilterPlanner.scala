@@ -18,14 +18,16 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.ejson.EJson
+import quasar.fp.free._
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
-import quasar.qscript.{MapFuncsCore => MFC}
-import quasar.fp.free._
+import quasar.qscript.{MapFuncsCore => MFC, _}
+import quasar.{RenderTree, NonTerminal}
+
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -33,11 +35,10 @@ import matryoshka.patterns._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-@SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 private[qscript] final class FilterPlanner[
   F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
   FMT: SearchOptions,
-  T[_[_]]: BirecursiveT
+  T[_[_]]: BirecursiveT: ShowT
 ](implicit SP: StructuralPlanner[F, FMT]) {
 
   case class ProjectPath[A](src: A, path: IList[String])
@@ -45,10 +46,13 @@ private[qscript] final class FilterPlanner[
   object ProjectPath extends ProjectPathInstances
 
   sealed abstract class ProjectPathInstances {
-    implicit def functor: Functor[ProjectPath] =
+    implicit def functorProjectPath: Functor[ProjectPath] =
       new Functor[ProjectPath] {
         def map[A, B](fa: ProjectPath[A])(f: A => B) = ProjectPath(f(fa.src), fa.path)
       }
+
+    implicit def renderTreeProjectPath[A](implicit R: RenderTree[A]): RenderTree[ProjectPath[A]] =
+      RenderTree.make((pp: ProjectPath[A]) => NonTerminal(List("ProjectPath"), none, List(R.render(pp.src))))
   }
 
   type PathMapFuncCore[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
@@ -102,9 +106,10 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]],
+             R: RenderTree[FreeMap[T]]
   ): Option[Q] = {
-    println(fm)
+    println(R.render(fm).show)
     println(StaticPath(fm))
     none
   }
@@ -119,7 +124,7 @@ private[qscript] final class FilterPlanner[
         case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) =>
           CoEnv(Coproduct((ProjectPath(path.src, field :: "/" :: path.path).right)).right)
         case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) =>
-          Free.roll(src)
+          CoEnv(Coproduct((ProjectPath(Free.roll(src).mapSuspension(injectNT[MapFuncCore[T, ?], PathMapFuncCore[T, ?]]), IList(field)).right)).right)
         case CoEnv(\/-(other)) =>
           CoEnv(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2)).right)
         case CoEnv(-\/(h)) => CoEnv(h.left)

@@ -67,7 +67,11 @@ before_cache:
 
 env:
   matrix:
+    - CONNECTOR=mongodb_2_6
+    - CONNECTOR=mongodb_3_0
     - CONNECTOR=mongodb_3_2
+    - CONNECTOR=mongodb_3_4
+    - CONNECTOR=mongodb_read_only
 
   global:
     - COURSIER_PROGRESS=0

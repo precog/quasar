@@ -16,10 +16,15 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
+
 import quasar.ejson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 import simulacrum._
 
@@ -32,6 +37,15 @@ import simulacrum._
 object ExpandMapFunc extends ExpandMapFuncInstances {
   type Aux[IN[_], OUTʹ[_]] = ExpandMapFunc[IN] {
     type OUT[A] = OUTʹ[A]
+  }
+
+  def expand[T[_[_]]: CorecursiveT, F[_]: Monad, A]
+    (core: AlgebraM[F, MapFuncCore[T, ?], A],
+      derived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], A])
+      : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
+    derived(f).getOrElse(
+      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
   }
 }
 
@@ -49,8 +63,11 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
             MFC(Cond(
               Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
               Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
-              a.point[Free[OUT, ?]]
-            ))
+              a.point[Free[OUT, ?]]))
+          case D.Trunc(a) =>
+            MFC(Subtract(
+              a.point[Free[OUT, ?]],
+              Free.roll(MFC(Modulo(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(1))))))))))
         }
     }
 

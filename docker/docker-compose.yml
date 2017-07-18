@@ -4,6 +4,7 @@ quasar_mongodb_2_6:
   command: mongod --smallfiles
   ports:
     - "27018:27017"
+  mem_limit: 2560m
 
 quasar_mongodb_3_0:
   container_name: quasar_mongodb_3_0
@@ -11,6 +12,7 @@ quasar_mongodb_3_0:
   command: mongod --smallfiles
   ports:
     - "27019:27017"
+  mem_limit: 2560m
 
 quasar_mongodb_read_only:
   container_name: quasar_mongodb_read_only
@@ -18,6 +20,7 @@ quasar_mongodb_read_only:
   command: mongod --smallfiles
   ports:
     - "27020:27017"
+  mem_limit: 2560m
 
 quasar_mongodb_3_2:
   container_name: quasar_mongodb_3_2
@@ -25,6 +28,7 @@ quasar_mongodb_3_2:
   command: ["mongod", "--smallfiles"]
   ports:
     - "27021:27017"
+  mem_limit: 2560m
 
 quasar_mongodb_3_4:
   container_name: quasar_mongodb_3_4
@@ -32,6 +36,7 @@ quasar_mongodb_3_4:
   command: ["mongod", "--smallfiles"]
   ports:
     - "27022:27017"
+  mem_limit: 2560m
 
 quasar_metastore:
   container_name: quasar_metastore

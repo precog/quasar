@@ -39,6 +39,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
   scalacOptions ++= Seq(
     "-target:jvm-1.8",
     "-Ybackend:GenBCode"),
+
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq(
     "-Xlint"),

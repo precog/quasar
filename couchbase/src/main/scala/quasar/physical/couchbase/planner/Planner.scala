@@ -64,9 +64,11 @@ object Planner {
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
-    : Planner[T, F, MapFuncCore[T, ?]] =
-    new MapFuncPlanner[T, F]
+  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
+    : Planner[T, F, MapFunc[T, ?]] = {
+    val core = new MapFuncCorePlanner[T, F]
+    coproduct(core, new MapFuncDerivedPlanner(core))
+  }
 
   implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
     : Planner[T, F, ProjectBucket[T, ?]] =

@@ -39,18 +39,18 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
       jf.resume match {
-        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
-        case _                           => List(jf)
+        case -\/(MFC(ConcatArrays(lhs, rhs))) => inner(lhs) ++ inner(rhs)
+        case _                                => List(jf)
       }
-    inner(Free.roll(array))
+    inner(Free.roll(MFC(array)))
   }
 
   def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
-      case Nil          => Free.roll(EmptyArray[T, FreeMapA[A]])
+      case Nil          => Free.roll(MFC(EmptyArray[T, FreeMapA[A]]))
       case func :: Nil  => func
-      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
+      case func :: rest => Free.roll(MFC(ConcatArrays(inner(rest), func)))
     }
     inner(funcs.reverse)
   }
@@ -59,7 +59,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       : Option[(IdStatus, JoinFunc)] =
     (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
       def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFuncCore, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+        Free.roll[MapFunc, JoinSide](MFC(ProjectIndex(RightSideF, IntLit(idx))))
 
       val zeroRef: JoinFunc = makeRef(0)
       val oneRef: JoinFunc = makeRef(1)
@@ -289,7 +289,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
           fm.resume match {
-            case -\/(MakeArray(value)) =>
+            case -\/(MFC(MakeArray(value))) =>
               QC.inj(Map(innerSrc, joinFunc >>= {
                 case LeftSide => fm
                 case RightSide => value
@@ -297,7 +297,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
             case _ => None
           }
         // LeftShift(_, MakeArray(_), ExcludeId, _)
-        case (_, -\/(MakeArray(value))) =>
+        case (_, -\/(MFC(MakeArray(value)))) =>
           QC.inj(Map(src.embed, joinFunc >>= {
             case LeftSide => HoleF
             case RightSide => value
@@ -326,7 +326,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   private def findUniqueBuckets(bucket0: FreeMap): Option[FreeMap] =
     bucket0.resume match {
-      case -\/(array @ ConcatArrays(_, _)) =>
+      case -\/(MFC(array @ ConcatArrays(_, _))) =>
         val bucket: FreeMap = rebuildArray(flattenArray(array).distinctE.toList)
         if (bucket0 ≟ bucket) None else bucket.some
      case _ => None

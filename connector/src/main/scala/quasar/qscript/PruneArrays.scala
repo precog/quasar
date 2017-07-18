@@ -18,6 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef.{ Map => ScalaMap, _ }
 import quasar.contrib.matryoshka._
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
@@ -88,8 +89,8 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     func.project.run.fold(k => ScalaMap(k -> none), κ(findIndicesInStruct(func)))
 
   def findIndicesInStruct[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] = {
-    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFuncCore, ScalaMap[A, KnownIndices]] = {
-      case ProjectIndex((src, acc1), (value, acc2)) =>
+    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
+      case MFC(ProjectIndex((src, acc1), (value, acc2))) =>
         val newMap = acc1 |++| acc2
         (src.project.run, value.project.run) match {
           case (-\/(k), \/-(IntLitMapFunc(idx))) => newMap + (k -> newMap.get(k).fold(Set(idx).some)(_.map(_ + idx))) // static integer index
@@ -110,35 +111,38 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   }
 
   private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
-      CoEnvMapA[A, FreeMapA[A]] =
-    CoEnv[A, MapFuncCore, FreeMapA[A]](ProjectIndex[T, FreeMapA[A]](
+      CoEnvMapA[A, FreeMapA[A]] = {
+    val x = MFC(ProjectIndex[T, FreeMapA[A]](
       hole,
-      IntLit(mapping.get(idx).getOrElse(idx))).right[A])
+      IntLit(mapping.get(idx).getOrElse(idx))))
+
+    CoEnv[A, MapFunc, FreeMapA[A]](x.right[A])
+  }
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
     */
   def remapIndicesInFunc(func: FreeMap, mapping: IndexMapping): FreeMap =
     func.transCata[FreeMap] {
-      case CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLit(idx)))) =>
+      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLit(idx))))) =>
         remapResult[Hole](hole, mapping, idx)
       case co => co
     }
 
   def remapIndicesInJoinFunc(func: JoinFunc, lMapping: IndexMapping, rMapping: IndexMapping): JoinFunc =
     func.transCata[JoinFunc] {
-      case CoEnv(\/-(ProjectIndex(side @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx)))) =>
+      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
         remapResult[JoinSide](side, lMapping, idx)
-      case CoEnv(\/-(ProjectIndex(side @ Embed(CoEnv(-\/(RightSide))), IntLit(idx)))) =>
+      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) =>
         remapResult[JoinSide](side, rMapping, idx)
       case co => co
     }
 
   def remapIndicesInLeftShift[A](struct: FreeMap, repair: JoinFunc, mapping: IndexMapping): JoinFunc =
     repair.transCata[JoinFunc] {
-      case CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx)))) =>
+      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
         remapResult[JoinSide](hole, mapping, idx)
-      case CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(RightSide))), IntLit(idx)))) if struct ≟ HoleF =>
+      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) if struct ≟ HoleF =>
         remapResult[JoinSide](hole, mapping, idx)
       case co => co
     }
@@ -166,7 +170,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         Inject[QScriptCore, QScriptTotal].prj(qs) match {
           case Some(LeftShift(src, struct, id, repair)) =>
             repair.resume match {
-              case -\/(array @ ConcatArrays(_, _)) =>
+              case -\/(MFC(array @ ConcatArrays(_, _))) =>
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(
                   LeftShift(src, struct, id, rewriteRepair(array, seen)))).some
               case _ => none
@@ -372,8 +376,8 @@ object PruneArrays {
               }) |+| liftHole(findIndicesInFunc[Hole](struct))
 
             M.get >>= (st => M.put(state).as(repair.resume match {
-              case -\/(ConcatArrays(_, _)) => st // annotate previous state as environment
-              case _                       => Ignore
+              case -\/(MFC(ConcatArrays(_, _))) => st // annotate previous state as environment
+              case _                            => Ignore
             }))
 
           case Reduce(src, bucket, reducers, _) =>
@@ -415,7 +419,7 @@ object PruneArrays {
               M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacementRemap)))
 
             repair.resume match {
-              case -\/(array @ ConcatArrays(_, _)) =>
+              case -\/(MFC(array @ ConcatArrays(_, _))) =>
                 env match {
                   case Ignore => notSeen
                   case Rewrite(indices) =>

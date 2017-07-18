@@ -963,7 +963,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           UnreferencedRT.embed,
           HoleF,
           ExcludeId,
-          Free.roll(Constant(ejsonArr())))).embed
+          Free.roll(MFC(Constant(ejsonArr()))))).embed
 
       val expected: Fix[QST] =
         QCT.inj(LeftShift(

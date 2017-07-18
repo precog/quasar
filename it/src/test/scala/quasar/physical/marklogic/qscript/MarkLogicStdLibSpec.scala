@@ -46,11 +46,11 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (Embed(CoEnv(\/-(MapFuncsCore.Eq(_,_)))), Data.Date(_), Data.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Lt(_,_)))), Data.Date(_), Data.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Lte(_,_)))), Data.Date(_), Data.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Gt(_,_)))), Data.Date(_), Data.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Gte(_,_)))), Data.Date(_), Data.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lt(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lte(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gt(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gte(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
       case _ => run
     }
 

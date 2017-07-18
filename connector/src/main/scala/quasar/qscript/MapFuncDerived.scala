@@ -53,6 +53,7 @@ object MapFuncDerived {
           G[MapFuncDerived[T, B]] = fa match {
             // unary
             case Abs(a1) => f(a1) ∘ (Abs(_))
+            case Trunc(a1) => f(a1) ∘ (Trunc(_))
           }
     }
 
@@ -61,7 +62,10 @@ object MapFuncDerived {
     new Delay[Equal, MapFuncDerived[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFuncDerived[T, A]] = Equal.equal {
         // unary
-        case (Abs(a1), Abs(a2)) => a1.equals(a2)
+        case (Abs(a1), Abs(a2)) => in.equal(a1, a2)
+        case (Trunc(a1), Trunc(a2)) => in.equal(a1, a2)
+
+        case (_, _) => false
       }
     }
 
@@ -74,6 +78,7 @@ object MapFuncDerived {
         Show.show {
           // unary
           case Abs(a1) => shz("Abs", a1)
+          case Trunc(a1) => shz("Trunc", a1)
         }
       }
     }
@@ -92,6 +97,7 @@ object MapFuncDerived {
         RenderTree.make {
           // unary
           case Abs(a1) => nAry("Abs", a1)
+          case Trunc(a1) => nAry("Trunc", a1)
         }
       }
     }
@@ -99,4 +105,5 @@ object MapFuncDerived {
 
 object MapFuncsDerived {
   @Lenses final case class Abs[T[_[_]], A](a1: A) extends UnaryDerived[T, A]
+  @Lenses final case class Trunc[T[_[_]], A](a1: A) extends UnaryDerived[T, A]
 }

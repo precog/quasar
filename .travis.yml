@@ -11,7 +11,7 @@ services:
 # needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
- 
+
 # create all the docker containers we need for IT testing
 install:
   - docker/scripts/initContainer quasar_metastore
@@ -67,16 +67,11 @@ before_cache:
 
 env:
   matrix:
-    - CONNECTOR=couchbase
-    - CONNECTOR=marklogic_json
-    - CONNECTOR=marklogic_xml
-    - CONNECTOR=mimir
     - CONNECTOR=mongodb_2_6
     - CONNECTOR=mongodb_3_0
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=spark_local_test
 
   global:
     - COURSIER_PROGRESS=0

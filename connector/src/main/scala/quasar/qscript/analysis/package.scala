@@ -82,7 +82,6 @@ package object analysis {
 
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
       new Cardinality[QScriptCore[T, ?]] {
-
         val I = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -90,7 +89,7 @@ package object analysis {
           case Map(card, f) => card.point[M]
           case Reduce(card, bucket, reducers, repair) =>
             bucket.fold(κ(card / 2), {
-              case MapFuncsCore.Constant(v) => 1
+              case MFC(MapFuncsCore.Constant(v)) => 1
               case _ => card / 2
             }).point[M]
           case Sort(card, bucket, orders) => card.point[M]

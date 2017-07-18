@@ -47,6 +47,8 @@ import delorean._
 import fs2.async
 import fs2.interop.scalaz._
 
+import org.slf4s.Logging
+
 import scalaz.Monad
 import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
@@ -96,7 +98,7 @@ final class Precog private (dataDir0: File)
     }
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
-    gated.run.unsafePerformAsync(_ => ())
+    Precog.startTask(gated.run).unsafePerformSync
     vfsLatch.await()      // sigh....
   }
 
@@ -153,7 +155,12 @@ final class Precog private (dataDir0: File)
   }
 }
 
-object Precog {
+object Precog extends Logging {
+
   def apply(dataDir: File): Task[Precog] =
     Task.delay(new Precog(dataDir))
+
+  // utility function for running a Task in the background
+  def startTask(ta: Task[_]): Task[Unit] =
+    Task.delay(ta.unsafePerformAsync(_.fold(log.error(s"exception in background task", _), _ => ())))
 }

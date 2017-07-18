@@ -127,6 +127,24 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     jsonResult.copoint must_== expected
   }
 
+  def testTrivialNoRecordCogroup(f: Table => Table = identity[Table]) = {
+    def recl = JNum(12)
+    def recr = JNum(13)
+
+    val ltable = fromSample(SampleData(Stream(recl)))
+    val rtable = fromSample(SampleData(Stream(recr)))
+
+    val expected = Vector(JNum(12), JNum(13))
+
+    val result: Table = ltable.cogroup(Leaf(Source), Leaf(Source), rtable)(
+      Leaf(Source),
+      Leaf(Source),
+      OuterArrayConcat(SourceValue.Left, SourceValue.Right))
+
+    val jsonResult = toJson(f(result))
+    jsonResult.copoint must_== expected
+  }
+
   def testSimpleCogroup(f: Table => Table = identity[Table]) = {
     def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
     def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))

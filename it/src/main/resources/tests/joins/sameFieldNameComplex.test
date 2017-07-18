@@ -4,7 +4,6 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
         "mongodb_q_3_2":     "pending"
     },
 

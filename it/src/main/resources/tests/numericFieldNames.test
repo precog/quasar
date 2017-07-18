@@ -2,8 +2,7 @@
   "name": "numeric field names",
 
   "backends": {
-    "couchbase": "ignoreFieldOrder",
-    "mimir":"pending"
+    "couchbase": "ignoreFieldOrder"
   },
 
   "data": "smallZips.data",

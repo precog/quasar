@@ -1,9 +1,7 @@
 {
     "name": "handle select in form of let",
 
-    "backends": {
-        "mimir":"pending"
-    },
+    "backends": {},
 
     "data": "zips.data",
 

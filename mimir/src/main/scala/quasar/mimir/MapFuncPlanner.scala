@@ -17,12 +17,27 @@
 package quasar.mimir
 
 import quasar.qscript.{MapFuncCore, MapFuncDerived}
+import quasar.blueeyes.json.JValue
+import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
+import quasar.yggdrasil.table.cf.math
+import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, BirecursiveT, RecursiveT}
+import matryoshka.{AlgebraM, RecursiveT}
+import matryoshka.implicits._
+
+import scalaz.Applicative
+import scalaz.syntax.applicative._
 import scalaz.{Applicative, Coproduct, Monad}
 
-abstract class MapFuncPlanner[T[_[_]], F[_]: Applicative, QS[_]] {
-  def plan(cake: Precog): AlgebraM[F, QS, cake.trans.TransSpec1]
+abstract class MapFuncPlanner[T[_[_]], F[_]: Applicative, MF[_]] {
+  def plan(cake: Precog): PlanApplicator[cake.type] = new PlanApplicator(cake)
+
+  final class PlanApplicator[P <: Precog](val cake: P) {
+    import cake.trans._
+
+    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MF, TransSpec[A]] = ???
+  }
 }
 
 object MapFuncPlanner {
@@ -34,8 +49,8 @@ object MapFuncPlanner {
     (implicit G: MapFuncPlanner[T, F, G], H: MapFuncPlanner[T, F, H])
       : MapFuncPlanner[T, F, Coproduct[G, H, ?]] =
     new MapFuncPlanner[T, F, Coproduct[G, H, ?]] {
-      def plan(cake: Precog): AlgebraM[F, Coproduct[G, H, ?], cake.trans.TransSpec1] =
-        _.run.fold(G.plan(cake), H.plan(cake))
+      // def plan(cake: Precog): AlgebraM[F, Coproduct[G, H, ?], cake.trans.TransSpec1] =
+      //   _.run.fold(G.plan(cake), H.plan(cake))
     }
 
   implicit def mapFuncCore[T[_[_]]: RecursiveT, F[_]: Applicative]

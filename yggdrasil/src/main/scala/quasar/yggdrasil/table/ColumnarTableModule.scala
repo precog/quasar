@@ -823,7 +823,7 @@ trait ColumnarTableModule[M[+ _]]
                                                                         rightResultTrans: TransSpec1,
                                                                         bothResultTrans: TransSpec2): Table = {
 
-      //println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
+      // println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
       class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
         val lbuf   = new ArrayIntList(lInitialSize)
         val rbuf   = new ArrayIntList(rInitialSize)
@@ -845,7 +845,7 @@ trait ColumnarTableModule[M[+ _]]
         }
 
         @inline def advanceBoth(lpos: Int, rpos: Int): Unit = {
-          //println("advanceBoth: lpos = %d, rpos = %d" format (lpos, rpos))
+          // println("advanceBoth: lpos = %d, rpos = %d" format (lpos, rpos))
           lbuf.add(-1)
           rbuf.add(-1)
           leqbuf.add(lpos)
@@ -992,8 +992,8 @@ trait ColumnarTableModule[M[+ _]]
                         // catch input-out-of-order errors early
                         rightEnd match {
                           case None =>
-                            //println("lhead\n" + lkey.toJsonString())
-                            //println("rhead\n" + rkey.toJsonString())
+                            // println("lhead\n" + lkey.toJsonString())
+                            // println("rhead\n" + rkey.toJsonString())
                             sys.error(
                               "Inputs are not sorted; value on the left exceeded value on the right at the end of equal span. lpos = %d, rpos = %d"
                                 .format(lpos, rpos))
@@ -1011,6 +1011,7 @@ trait ColumnarTableModule[M[+ _]]
                     }
                   } else if (lpos < lhead.size) {
                     if (endRight) {
+                      // println(s"Restarting right: lpos = ${lpos + 1}; rpos = $rpos")
                       RestartRight(leftPosition.copy(pos = lpos + 1), resetMarker, rightPosition.copy(pos = rpos))
                     } else {
                       // right slice is exhausted, so we need to emit that slice from the right tail
@@ -1188,6 +1189,8 @@ trait ColumnarTableModule[M[+ _]]
                   case (completeSlice, lr0, rr0, br0) => {
                     val nextState = Cogroup(lr0, rr0, br0, left, rightStart, Some(rightStart), Some(rightEnd))
 
+                    // println(s"Computing restart state as $nextState")
+
                     Some(completeSlice -> nextState)
                   }
                 }
@@ -1291,7 +1294,6 @@ trait ColumnarTableModule[M[+ _]]
         case class CrossState(a: A, position: Int, tail: StreamT[M, Slice])
 
         def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[(A, StreamT[M, Slice])] = {
-
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
 
@@ -1394,6 +1396,8 @@ trait ColumnarTableModule[M[+ _]]
                   rempty <- rtail.isEmpty
 
                   back <- {
+                    // println(s"checking cross: lempty = $lempty; rempty = $rempty")
+
                     if (lempty && rempty) {
                       // both are small sets, so find the cross in memory
                       crossBothSingle(lhead, rhead)(transform.initial) map { _._2 }

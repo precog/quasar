@@ -2,7 +2,7 @@
     "name": "filter on date part, where the field isn't a timestamp",
 
     "backends": {
-        "mimir":"pending",
+        "mimir":"skip",
         "mongodb_q_3_2": "pending"
     },
 

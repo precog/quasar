@@ -32,7 +32,7 @@ import scalaz.syntax.applicative._
 
 final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
   extends MapFuncPlanner[T, F, MapFuncCore[T, ?]] {
-  def plan(cake: Precog): AlgebraM[F, MapFuncCore[T, ?], cake.trans.TransSpec1] = {
+  def planv(cake: Precog): AlgebraM[F, MapFuncCore[T, ?], cake.trans.TransSpec1] = {
     import cake.trans._
     {
       case MapFuncsCore.Undefined() =>

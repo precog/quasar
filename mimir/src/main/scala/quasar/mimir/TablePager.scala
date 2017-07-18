@@ -36,6 +36,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.atomic.AtomicBoolean
 
 trait TablePagerModule extends ColumnarTableModule[Future] {
+  import Precog.startTask
 
   final class TablePager private (
       slices: StreamT[Task, Slice],
@@ -62,9 +63,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
         } yield ()
       }
 
-      val withCompletion = driver >> queue.enqueue1(Vector.empty)
-
-      withCompletion.unsafePerformAsync(_ => ())
+      startTask(driver >> queue.enqueue1(Vector.empty)).unsafePerformSync
     }
 
     def more: Task[Vector[Data]] = queue.dequeue1

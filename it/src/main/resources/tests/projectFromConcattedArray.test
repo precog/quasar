@@ -1,7 +1,6 @@
 {
     "name": "project from non-static concatted array",
     "backends": {
-        "mimir":"timeout",
         "mongodb_q_3_2": "pending"
     },
     "data": "largeZips.data",

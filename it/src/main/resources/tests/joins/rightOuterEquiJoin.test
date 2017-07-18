@@ -1,0 +1,35 @@
+{
+    "name": "perform right-outer equi-join",
+
+    "backends": {
+        "couchbase": "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_2_6": "pending",
+        "mongodb_q_3_0": "pending",
+        "mongodb_q_3_2": "pending",
+        "mongodb_q_3_4": "pending",
+        "spark_hdfs": "pending",
+        "spark_local": "pending"
+    },
+
+    "data": ["../cars.data", "../divide.data"],
+
+    "query": "select *
+              from `../cars` right outer join `../divide`
+              on cars.`_id` = divide.nr",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "ignoreFieldOrder": true,
+
+    "expected": [{ "_id": "1", "year": [2012], "name": "RangeRover-Evoque" },
+                 { "_id": "2", "year": [2010], "name": "Honda-civic" },
+                 { "_id": "3", "year": [2003], "name": "BMW-X5" },
+                 { "nr": 4, "val1":   1.0, "val2":  4.0 }]
+}

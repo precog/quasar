@@ -1,8 +1,6 @@
 {
     "name": "concat known array structure",
-    "backends": {
-        "mimir":"pending"
-    },
+    "backends": {},
     "data": "largeZips.data",
     "query": "select [ city, pop ] as cp from largeZips",
     "predicate": "atLeast",

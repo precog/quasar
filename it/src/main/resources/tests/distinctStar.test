@@ -1,6 +1,7 @@
 {
     "name": "distinct *",
     "backends": {
+        "couchbase": "skip",
         "mimir":"pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
@@ -9,6 +10,7 @@
         "mongodb_3_4":       "pending",
         "mongodb_q_3_2": "pending"
     },
+    "NB": "Skipped for couchbase due to #2329 failure to load test data.",
     "data": "cities.data",
     "query": "select distinct * from cities where city = \"BOSTON\"",
     "predicate": "exactly",

@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.Path
+import quasar.precog.common.{CEmptyArray, Path}
 import quasar.yggdrasil.bytecode.JType
 
 import fs2.{async, Stream}
@@ -62,6 +62,7 @@ import java.util.concurrent.atomic.AtomicLong
 object Mimir extends BackendModule with Logging {
   import FileSystemError._
   import PathError._
+  import Precog.startTask
 
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
@@ -95,6 +96,9 @@ object Mimir extends BackendModule with Logging {
      */
     def unsafeCoerce[F[_ <: Cake]](term: F[Cake]): Task[F[P]] =
       Task.delay(term.asInstanceOf[F[P]])
+
+    def unsafeMerge(other: Repr): Task[Repr { type P = Repr.this.P.type }] =
+      Task.delay(other.asInstanceOf[Repr { type P = Repr.this.P.type }])
 
     def map(f: P.Table => P.Table): Repr { type P = Repr.this.P.type } =
       Repr(P)(f(table))
@@ -177,11 +181,13 @@ object Mimir extends BackendModule with Logging {
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
+        import src.P.trans._
+
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
         } yield Repr(src.P)(src.table.transform(trans))
 
       case qscript.LeftShift(src, struct, id, repair) => ???
@@ -189,19 +195,21 @@ object Mimir extends BackendModule with Logging {
       case qscript.Sort(src, bucket, order) => ???
 
       case qscript.Filter(src, f) =>
+        import src.P.trans._
+
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
-        } yield Repr(src.P)(src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+        } yield Repr(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))
 
-      case qscript.Union(src, lBranch, rBranch) => ???
-        //for {
-        //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
-        //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
+      case qscript.Union(src, lBranch, rBranch) =>
+        for {
+         leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+         rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+         rightCoerced <- leftRepr.unsafeMerge(rightRepr).liftM[MT].liftB
+        } yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
       case qscript.Subset(src, from, op, count) =>
         for {
@@ -237,7 +245,81 @@ object Mimir extends BackendModule with Logging {
         }).liftB
     }
 
-    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
+    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
+      case qscript.EquiJoin(src, lbranch, rbranch, lkey, rkey, tpe, combine) =>
+        import src.P.trans._
+
+        for {
+          leftRepr <- lbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+          rightRepr <- rbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+
+          lmerged <- src.unsafeMerge(leftRepr).liftM[MT].liftB
+          ltable = lmerged.table
+
+          rmerged <- src.unsafeMerge(rightRepr).liftM[MT].liftB
+          rtable = rmerged.table
+
+          transLKey <- lkey.cataM[Backend, TransSpec1](
+            interpretM(
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          transRKey <- rkey.cataM[Backend, TransSpec1](
+            interpretM(
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          transMiddle <- combine.cataM[Backend, TransSpec2](
+            interpretM(
+              {
+                case qscript.LeftSide => TransSpec2.LeftId.point[Backend]
+                case qscript.RightSide => TransSpec2.RightId.point[Backend]
+              },
+              mapFuncPlanner.plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
+
+          // identify full-cross and avoid cogroup
+          result <- if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
+            log.trace("EQUIJOIN: full-cross detected!")
+
+            rtable.cross(ltable)(transMiddle).point[Backend]
+          } else {
+            log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
+
+            for {
+              lsorted <- ltable.sort(transLKey).toTask.liftM[MT].liftB
+              rsorted <- rtable.sort(transRKey).toTask.liftM[MT].liftB
+
+              transLeft <- combine.cataM[Backend, TransSpec1](
+                interpretM(
+                  {
+                    case qscript.LeftSide =>
+                      TransSpec1.Id.point[Backend]
+
+                    case qscript.RightSide =>
+                      tpe match {
+                        case JoinType.Inner | JoinType.RightOuter => TransSpec1.Undef.point[Backend]
+                        case JoinType.FullOuter | JoinType.LeftOuter => TransSpec1.Id.point[Backend]
+                      }
+                  },
+                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+              transRight <- combine.cataM[Backend, src.P.trans.TransSpec1](
+                interpretM(
+                  {
+                    case qscript.LeftSide =>
+                      tpe match {
+                        case JoinType.Inner | JoinType.LeftOuter => TransSpec1.Undef.point[Backend]
+                        case JoinType.FullOuter | JoinType.RightOuter => TransSpec1.Id.point[Backend]
+                      }
+
+                    case qscript.RightSide =>
+                      TransSpec1.Id.point[Backend]
+                  },
+                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+            } yield lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+          }
+        } yield Repr(src.P)(result)
+    }
 
     lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
       case Const(ShiftedRead(path, status)) => {
@@ -272,7 +354,8 @@ object Mimir extends BackendModule with Logging {
                 val ids = constants.SourceKey.Single
                 val values = constants.SourceValue.Single
 
-                repr.map(_.transform(InnerArrayConcat(WrapArray(ids), WrapArray(values))))
+                // note that ids are already an array
+                repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
 
               case ExcludeId =>
                 repr.map(_.transform(constants.SourceValue.Single))
@@ -292,17 +375,6 @@ object Mimir extends BackendModule with Logging {
       in.run.fold(planQScriptCore, _.run.fold(planEquiJoin, planShiftedRead))
 
     cp.cataM(planQSM _)
-  }
-
-  private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
-    StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
-      q.dequeue1 map { a =>
-        if (until(a))
-          None
-        else
-          Some((a, q))
-      }
-    }
   }
 
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
@@ -484,7 +556,7 @@ object Mimir extends BackendModule with Logging {
           } yield ()
 
           // run asynchronously forever
-          _ <- Task.delay(ingestion.unsafePerformAsync(_ => ())).liftM[MT]
+          _ <- startTask(ingestion).liftM[MT]
           _ <- Task.delay(log.debug(s"Started ingest.")).liftM[MT]
 
           _ <- Task.delay(map.put(handle, (queue, signal))).liftM[MT]

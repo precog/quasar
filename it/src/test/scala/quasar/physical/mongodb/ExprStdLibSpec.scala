@@ -44,7 +44,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   //implicit val params = Parameters(minTestsOk = 2)
 
-  val notHandled = Pending("not implemented in aggregation")
+  val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
@@ -54,13 +54,13 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, _) => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
-    case (date.ExtractWeek, _)    => Pending("Implemented, but not ISO compliant").left
+    case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
 
     case (date.StartOfDay, _) => notHandled.left
-    case (date.TimeOfDay, _) if is2_6(backend) => Pending("not implemented in aggregation on MongoDB 2.6").left
+    case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
     case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
-    case (math.Power, _) if !is3_2(backend) => Pending("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
     case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left

@@ -29,6 +29,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute._
+//import org.specs2.scalacheck.Parameters
 import scalaz._, Scalaz._
 import shapeless.Nat
 
@@ -40,6 +41,9 @@ import shapeless.Nat
   * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
+
+  //implicit val params = Parameters(minTestsOk = 2)
+
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
@@ -55,9 +59,10 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.StartOfDay, _) => notHandled.left
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
+    case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
-    case (math.Subtract, Data.Dec(_) :: Data.Dec(_) :: Nil) => Skipped("sometimes causes mongo container crash").left
-    case (math.Trunc, Data.Dec(_) :: Nil) => Skipped("sometimes causes mongo container crash").left
+    //case (math.Subtract, _) => Skipped("sometimes causes mongo container crash").left
+    case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left

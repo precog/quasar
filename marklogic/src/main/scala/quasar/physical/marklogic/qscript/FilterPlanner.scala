@@ -63,6 +63,9 @@ private[qscript] final class FilterPlanner[
   }
 
   type PathMapFuncCore[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
+  type FreePathMap[T[_[_]]]        = Free[PathMapFuncCore[T, ?], Hole]
+  type CoMapFunc[T[_[_]], A]       = CoEnv[Hole, MapFuncCore[T, ?], A]
+  type CoPathMapFunc[T[_[_]], A]   = CoEnv[Hole, PathMapFuncCore[T, ?], A]
 
   def plan[Q](src: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
@@ -114,7 +117,7 @@ private[qscript] final class FilterPlanner[
              RTP: RenderTree[Free[PathMapFuncCore[T, ?], Hole]]
   ): Option[Q] = {
     println(fm.render.show)
-    println(StaticPath(fm).render.show)
+    println(foldProjectField(fm).render.show)
     none
   }
 
@@ -123,27 +126,25 @@ private[qscript] final class FilterPlanner[
       pr.run.toOption
   }
 
-  object StaticPath {
-    def apply[T[_[_]]: RecursiveT](fm: FreeMap[T]): Free[PathMapFuncCore[T, ?], Hole] = {
-      val alg: AlgebraicGTransform[(FreeMap[T], ?), Free[PathMapFuncCore[T, ?], Hole], CoEnv[Hole, MapFuncCore[T, ?], ?], CoEnv[Hole, PathMapFuncCore[T, ?], ?]] = {
-        case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) => {
-          val dir0 = path.path </> dir(field)
+  def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
+    val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
+      case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) => {
+        val dir0 = path.path </> dir(field)
 
-          CoEnv(Coproduct((ProjectPath(path.src, dir0).right)).right)
-        }
-        case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) => {
-          val dir0 = rootDir[Sandboxed] </> dir(field)
-          val desc = Free.roll(src).mapSuspension(injectNT[MapFuncCore[T, ?], PathMapFuncCore[T, ?]])
-
-          CoEnv(Coproduct((ProjectPath(desc, dir0).right)).right)
-        }
-        case CoEnv(\/-(other)) =>
-          CoEnv(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2)).right)
-        case CoEnv(-\/(h)) => CoEnv(h.left)
+        CoEnv(Coproduct((ProjectPath(path.src, dir0).right)).right)
       }
+      case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) => {
+        val dir0 = rootDir[Sandboxed] </> dir(field)
+        val desc = Free.roll(src).mapSuspension(injectNT[MapFuncCore[T, ?], PathMapFuncCore[T, ?]])
 
-      fm.transPara[Free[PathMapFuncCore[T, ?], Hole]](alg)
+        CoEnv(Coproduct((ProjectPath(desc, dir0).right)).right)
+      }
+      case CoEnv(\/-(other)) =>
+        CoEnv(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2)).right)
+      case CoEnv(-\/(h)) => CoEnv(h.left)
     }
+
+    fm.transPara[FreePathMap[T]](alg)
   }
 
 }

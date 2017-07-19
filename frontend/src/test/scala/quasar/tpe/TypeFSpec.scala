@@ -36,10 +36,8 @@ import scalaz.scalacheck.ScalazProperties._
 import scalaz.scalacheck.ScalazArbitrary._
 
 final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
-  // TODO: Anything above 5 seems to explode (even '6'), quick thread dump
-  //       landed in scalacheck.Gen, so probably need to tune the Arbitrary
-  //       instance for TypeF (and maybe EJson).
-  implicit val params = Parameters(maxSize = 5)
+  // NB: Limit type depth to something reasonable.
+  implicit val params = Parameters(maxSize = 10)
 
   type J = Fix[EJson]
   type T = Fix[TypeF[J, ?]]

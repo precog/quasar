@@ -19,7 +19,7 @@ package quasar.metastore
 import slamdata.Predef._
 
 import quasar.contrib.pathy.{ADir, APath}
-import quasar.fs.mount.{MountConfig, MountType}, MountConfig.FileSystemConfig
+import quasar.fs.mount.{MountConfig, MountType, MountingError}, MountConfig.FileSystemConfig
 import quasar.db._
 
 import doobie.imports._
@@ -39,8 +39,8 @@ abstract class MetaStoreAccess {
   def lookupMountType(path: APath): ConnectionIO[Option[MountType]] =
     Queries.lookupMountType(path).option
 
-  def lookupMountConfig(path: APath): ConnectionIO[Option[MountConfig]] =
-    Queries.lookupMountConfig(path).option
+  def lookupMountConfig(path: APath): ConnectionIO[Option[MountingError \/ MountConfig]] =
+    Queries.lookupMountConfig(path).option ∘ (_ ∘ (Mount.toMountConfig))
 
   def insertMount(path: APath, cfg: MountConfig): ConnectionIO[Unit] =
     runOneRowUpdate(Queries.insertMount(path, cfg))

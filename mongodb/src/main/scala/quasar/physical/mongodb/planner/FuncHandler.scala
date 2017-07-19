@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.physical.mongodb.Bson
+import quasar.physical.mongodb.{Bson, BsonCodec}
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, MapFuncsDerived => D,  _}, MapFuncsCore._
 
@@ -87,12 +87,13 @@ trait FuncHandler[IN[_]] {
 
 object FuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: CorecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
       def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
           : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
         new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]) {
+
           implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
           def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
@@ -100,7 +101,7 @@ object FuncHandler {
             val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
             import fp._
 
-            mfc.some collect {
+            def partial(mfc: MapFuncCore[T, A]): OptionFree[EX, A] = mfc.some collect {
               case Undefined()           => $literal(Bson.Undefined)
               case Add(a1, a2)           => $add(a1, a2)
               case Multiply(a1, a2)      => $multiply(a1, a2)
@@ -212,6 +213,11 @@ object FuncHandler {
                                  $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
                                                                                $literal(Bson.Text("_bson.regularexpression"))))))))))))
             }
+
+            partial(mfc) orElse (mfc match {
+              case Constant(v1)  => v1.cataM(BsonCodec.fromEJson).toOption.map($literal(_))
+              case _             => None
+            })
           }
         }
 
@@ -276,14 +282,16 @@ object FuncHandler {
 
             fa.some collect {
               case D.Abs(a1)       => $abs(a1)
+              case D.Ceil(a1)      => $ceil(a1)
+              case D.Floor(a1)     => $floor(a1)
+              case D.Trunc(a1)     => $trunc(a1)
             }
           }
         }
     }
 
-  // TODO generalize this and make available for other connectors
   implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
-      (implicit core: FuncHandler[MapFuncCore[T, ?]])
+    (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived

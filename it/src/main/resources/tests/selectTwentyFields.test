@@ -2,8 +2,7 @@
     "name": "select twenty fields quickly",
     "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "largeZips.data",
     "query": "select

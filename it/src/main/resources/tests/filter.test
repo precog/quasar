@@ -2,8 +2,7 @@
     "name": "filter with pipeline and JS",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
 
     "data": "smallZips.data",

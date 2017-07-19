@@ -1,0 +1,33 @@
+{
+    "name": "perform large inner equi-join",
+
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mimir": "ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
+    },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
+    "data": ["../smallZips.data", "../zips.data"],
+
+    "query": "select smallZips.city, zips.state
+              from `../smallZips` join `../zips`
+              on smallZips.`_id` = zips.`_id`",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "expected": [{"city": "AGAWAM",       "state": "MA"},
+                 {"city": "CUSHMAN",      "state": "MA"},
+                 {"city": "BARRE",        "state": "MA"},
+                 {"city": "BELCHERTOWN",  "state": "MA"},
+                 {"city": "BLANDFORD",    "state": "MA"},
+                 {"city": "BRIMFIELD",    "state": "MA"},
+                 {"city": "CHESTER",      "state": "MA"},
+                 {"city": "CHESTERFIELD", "state": "MA"},
+                 {"city": "CHICOPEE",     "state": "MA"},
+                 {"city": "CHICOPEE",     "state": "MA"}]
+}

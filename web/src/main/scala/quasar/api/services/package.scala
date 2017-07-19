@@ -22,6 +22,9 @@ import quasar.contrib.argonaut._
 import quasar.effect.Failure
 import quasar.ejson.{EJson, JsonCodec}
 import quasar.fp.numeric._
+import quasar.contrib.pathy.AFile
+
+import java.nio.charset.StandardCharsets
 
 import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
@@ -30,9 +33,12 @@ import matryoshka.implicits._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process, Process1, process1}
+import scodec.bits.ByteVector
+
 
 package object services {
   import Validation.FlatMap._
@@ -66,6 +72,22 @@ package object services {
   ): QResponse[S] = {
     val js = ejson.take(1).map(_.cata[Json](JsonCodec.encodeƒ[Json]).spaces2)
     contentJsonEncodedEJson(QResponse.streaming(js))
+  }
+
+  def formattedZipDataResponse[S[_], E](
+    format: MessageFormat,
+    filePath: AFile,
+    data: Process[EitherT[Free[S, ?], E, ?], Data]
+  )(implicit
+    S0: Failure[E, ?] :<: S,
+    S1: Task :<: S
+  ): QResponse[S] = {
+    val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: 
+      (format.disposition.toList: List[Header])
+    val p = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8))) 
+    val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath)) 
+    val z = Zip.zipFiles(Map(f -> p))
+    QResponse.headers.modify(_ ++ headers)(QResponse.streaming(z))
   }
 
   def formattedDataResponse[S[_], E](

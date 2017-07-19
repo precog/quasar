@@ -21,17 +21,21 @@ import quasar.precog.common._
 
 class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extends Slice {
 
-  private val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] = source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {
-    case (acc, (ColumnRef(CPath(root, xs @ _ *), ctype), col)) =>
-      val resultRef = ColumnRef(CPath(xs: _*), ctype)
-      // we know the combination of xs and ctype to be unique within root
-      acc + (root -> (acc.getOrElse(root, Map()) + (resultRef -> col)))
-  }
+  private val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] =
+    source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {
+      case (acc, (ColumnRef(CPath(root, xs @ _*), ctype), col)) =>
+        val resultRef = ColumnRef(CPath(xs: _*), ctype)
+        // we know the combination of xs and ctype to be unique within root
+        acc + (root -> (acc.getOrElse(root, Map()) + (resultRef -> col)))
 
-  private val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] = source.columns.collect {
-    case (ColumnRef(CPath(CPathArray, xs @ _ *), ctype), col: HomogeneousArrayColumn[_]) =>
-      (ColumnRef(CPath(xs: _*), ctype), col)
-  }.toMap
+      case (acc, (ColumnRef(CPath(), _), _)) => acc
+    }
+
+  private val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] =
+    source.columns.collect {
+      case (ColumnRef(CPath(CPathArray, xs @ _*), ctype), col: HomogeneousArrayColumn[_]) =>
+        (ColumnRef(CPath(xs: _*), ctype), col)
+    }.toMap
 
   private def derefColumns(node: CPathNode): Option[Map[ColumnRef, Column]] = node match {
     case CPathIndex(i) if !indexableArrays.isEmpty =>
@@ -206,6 +210,9 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
       }
 
       acc + (resultRef -> acc.getOrElse(resultRef, resultCol))
+
+    // deref at the root is eliminationd
+    case (acc, ColumnRef(CPath(), _)) => acc
   }
 }
 

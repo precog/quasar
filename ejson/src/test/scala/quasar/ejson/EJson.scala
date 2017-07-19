@@ -23,6 +23,7 @@ import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
 
 import scala.Predef.implicitly
+import scala.Predef.$conforms
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -52,5 +53,29 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
   "ordering ignores metadata" >> prop { (x: J, y: J, m: J) =>
     val xMeta = ExtEJson(meta[J](x, m)).embed
     (xMeta ?|? y) ≟ (x ?|? y)
+  }
+
+  def addAssoc(ys: List[(J, J)]): J => J = totally {
+    case Embed(ExtEJson(Map(xs))) => ExtEJson(Map(xs ::: ys)).embed
+  }
+
+  "Type extractor" >> {
+    "roundtrip" >> prop { tt: TypeTag =>
+      Type.unapply(Type[J](tt).project) ≟ Some(tt)
+    }
+
+    "just match type" >> prop { (tt: TypeTag, ys: List[(J, J)]) =>
+      Type.unapply(addAssoc(ys)(Type[J](tt)).project) ≟ Some(tt)
+    }
+  }
+
+  "SizedType extractor" >> {
+    "roundtrip" >> prop { (tt: TypeTag, n: BigInt) =>
+      SizedType.unapply(SizedType[J](tt, n).project) ≟ Some((tt, n))
+    }
+
+    "only match when type and size present" >> prop { (tt: TypeTag, ys: List[(J, J)]) =>
+      SizedType.unapply(addAssoc(ys)(Type[J](tt)).project) ≟ None
+    }
   }
 }

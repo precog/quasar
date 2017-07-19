@@ -3,13 +3,11 @@
 
     "backends": {
         "couchbase":    "ignoreFieldOrder",
-        "mimir":"pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "postgresql":        "pending"
+        "mongodb_3_4":       "pending"
     },
 
     "data": "zips.data",

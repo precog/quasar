@@ -3,14 +3,13 @@
 
     "backends": {
         "couchbase":         "pending",
-        "mimir":"pending",
+        "mimir":"skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
 
     "data": "../days.data",

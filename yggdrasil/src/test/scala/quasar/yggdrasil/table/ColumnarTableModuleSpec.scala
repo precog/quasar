@@ -244,6 +244,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
     "in cogroup" >> {
       "perform a trivial cogroup" in testTrivialCogroup(identity[Table])
+      "perform a trivial no-record cogroup" in testTrivialNoRecordCogroup(identity[Table])
       "perform a simple cogroup" in testSimpleCogroup(identity[Table])
       "perform another simple cogroup" in testAnotherSimpleCogroup
       "cogroup for unions" in testUnionCogroup

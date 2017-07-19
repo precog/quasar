@@ -17,11 +17,10 @@
 package quasar.tpe
 
 import slamdata.Predef.Option
+import quasar.contrib.matryoshka.PatternArbitrary
 import quasar.pkg.tests._
 
-// NB: Something in here is needed by scalacheck's Arbitrary defs
-//     for scala collections.
-import scala.Predef._
+import scala.Predef.$conforms
 
 import matryoshka.Delay
 import scalaz._
@@ -31,20 +30,19 @@ trait TypeFArbitrary {
   import TypeF._, SimpleTypeArbitrary._
 
   implicit def arbitraryTypeF[J: Arbitrary: Order]: Delay[Arbitrary, TypeF[J, ?]] =
-    new Delay[Arbitrary, TypeF[J, ?]] {
-      def apply[α](arb: Arbitrary[α]) = {
-        implicit val arbA: Arbitrary[α] = arb
-        val x = arbitrary[IList[α]]
-        Arbitrary(Gen.oneOf(
-          Gen.const(                                     bottom[J, α]() ),
-          Gen.const(                                        top[J, α]() ),
-          arbitrary[SimpleType]                   ^^ (   simple[J, α](_)),
-          arbitrary[J]                            ^^ (    const[J, α](_)),
-          arbitrary[IList[α] \/ α]                ^^ (      arr[J, α](_)),
-          arbitrary[(IMap[J, α], Option[(α, α)])] ^^ (      map[J, α](_)),
-          arbitrary[(α, α)]                       ^^ (coproduct[J, α](_))
-        ))
-      }
+    new PatternArbitrary[TypeF[J, ?]] {
+      def leafGenerators[A] =
+        uniformly(
+          Gen.const(                bottom[J, A]() ),
+          Gen.const(                   top[J, A]() ),
+          arbitrary[SimpleType] ^^ (simple[J, A](_)),
+          arbitrary[J]          ^^ ( const[J, A](_)))
+
+      def branchGenerators[A: Arbitrary] =
+        uniformly(
+          arbitrary[IList[A] \/ A]                ^^ (      arr[J, A](_)),
+          arbitrary[(IMap[J, A], Option[(A, A)])] ^^ (      map[J, A](_)),
+          arbitrary[(A, A)]                       ^^ (coproduct[J, A](_)))
     }
 }
 

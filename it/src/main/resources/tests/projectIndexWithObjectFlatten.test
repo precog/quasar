@@ -3,8 +3,7 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0] as parent, commit{*} from slamengine_commits",

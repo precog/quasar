@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef.{Eq =>_, _}
+import quasar.fp._
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
 import matryoshka._
@@ -27,13 +28,13 @@ import scalaz._, Scalaz._
 
 final class RewriteNullSpec extends quasar.Qspec {
   def eq[T[_[_]]: BirecursiveT, A](lhs: FreeMapA[T, A], rhs: FreeMapA[T, A]): FreeMapA[T, A] =
-    Free.roll(Eq(lhs, rhs))
+    Free.roll(MFC(Eq(lhs, rhs)))
 
   def neq[T[_[_]]: BirecursiveT, A](lhs: FreeMapA[T, A], rhs: FreeMapA[T, A]): FreeMapA[T, A] =
-    Free.roll(Neq(lhs, rhs))
+    Free.roll(MFC(Neq(lhs, rhs)))
 
   def typeOf[T[_[_]]: BirecursiveT, A](fm: FreeMapA[T, A]): FreeMapA[T, A] =
-    Free.roll(TypeOf(fm))
+    Free.roll(MFC(TypeOf(fm)))
 
   def rewrite(fm: FreeMapA[Fix, Unit]): FreeMapA[Fix, Unit] =
     fm.transCata[FreeMapA[Fix, Unit]](rewriteNullCheck[Fix, FreeMapA[Fix, Unit], Unit])

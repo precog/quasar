@@ -3,9 +3,8 @@
 
   "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mimir":"skip",
+        "mongodb_q_3_2": "pending"
   },
 
   "data": "../days.data",

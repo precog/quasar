@@ -16,23 +16,28 @@
 
 package quasar.ejson
 
+import slamdata.Predef._
+
+import quasar.contrib.matryoshka.PatternArbitrary
 import quasar.fp._
 import quasar.pkg.tests._
+
+import scala.Predef.$conforms
 
 import matryoshka.Delay
 
 trait EJsonArbitrary {
   implicit val arbitraryCommon: Delay[Arbitrary, Common] =
-    new Delay[Arbitrary, Common] {
-      def apply[α](arb: Arbitrary[α]) = Arbitrary(
-        Gen.oneOf(
-          arb.list      ^^ Arr[α],
-          const(           Null[α]()),
-          genBool       ^^ Bool[α],
-          genString     ^^ Str[α],
-          genBigDecimal ^^ Dec[α]
-        )
-      )
+    new PatternArbitrary[Common] {
+      def leafGenerators[A] =
+        uniformly(
+          const(Null[A]()),
+          genBool       ^^ Bool[A],
+          genString     ^^ Str[A],
+          genBigDecimal ^^ Dec[A])
+
+      def branchGenerators[A: Arbitrary] =
+        uniformly(arbitrary[List[A]] ^^ Arr[A])
     }
 
   implicit val arbitraryObj: Delay[Arbitrary, Obj] =
@@ -42,17 +47,21 @@ trait EJsonArbitrary {
     }
 
   implicit val arbitraryExtension: Delay[Arbitrary, Extension] =
-    new Delay[Arbitrary, Extension] {
-      def apply[α](arb: Arbitrary[α]) = Arbitrary(
-        Gen.oneOf(
-          (arb.gen, arb.gen).zip      ^^ (Meta[α] _).tupled,
-          (arb.gen, arb.gen).zip.list ^^ Map[α],
-          genByte                     ^^ Byte[α],
-          genChar                     ^^ Char[α],
-          genBigInt                   ^^ Int[α]
-        )
-      )
+    new PatternArbitrary[Extension] {
+      def leafGenerators[A] =
+        uniformly(
+          genByte   ^^ Byte[A],
+          genChar   ^^ Char[A],
+          genBigInt ^^ Int[A])
+
+      def branchGenerators[A: Arbitrary] =
+        uniformly(
+          arbitrary[(A, A)] ^^ (Meta[A] _).tupled,
+          arbitrary[List[(A, A)]] ^^ Map[A])
     }
+
+  implicit val arbitraryTypeTag: Arbitrary[TypeTag] =
+    Arbitrary(Gen.alphaNumStr map (TypeTag(_)))
 }
 
 object EJsonArbitrary extends EJsonArbitrary

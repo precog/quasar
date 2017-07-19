@@ -16,10 +16,15 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
+
 import quasar.ejson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 import simulacrum._
 
@@ -33,6 +38,15 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
   type Aux[IN[_], OUTʹ[_]] = ExpandMapFunc[IN] {
     type OUT[A] = OUTʹ[A]
   }
+
+  def expand[T[_[_]]: CorecursiveT, F[_]: Monad, A]
+    (core: AlgebraM[F, MapFuncCore[T, ?], A],
+      derived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], A])
+      : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
+    derived(f).getOrElse(
+      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
+  }
 }
 
 sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
@@ -42,15 +56,64 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
       : ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
     new ExpandMapFunc[MapFuncDerived[T, ?]] {
       type OUT[A] = OUTʹ[A]
+      type OutFree[A] = (OUT ∘ Free[OUT, ?])#λ[A]
+
+      def intR[A](i: Int): Free[OUT, A] =
+        Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(i)))))
+
+      def truncR[A](a: Free[OUT, A]): Free[OUT, A] =
+        Free.roll[OUT, A](trunc(a))
+
+      def trunc[A](a: Free[OUT, A]): (OUT ∘ Free[OUT, ?])#λ[A] =
+        MFC(Subtract(
+          a,
+          moduloR(a, intR(1))))
+
+      def addR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Add(a1, a2)))
+
+      def subtractR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Subtract(a1, a2)))
+
+      def moduloR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Modulo(a1, a2)))
+
+      def eqR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(MapFuncsCore.Eq(a1, a2)))
+
+      def ltR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Lt(a1, a2)))
+
+      def negateR[A](a: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Negate(a)))
+
+      def condR[A](a1: Free[OUT, A], a2: Free[OUT, A], a3: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Cond(a1, a2, a3)))
 
       val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
           case D.Abs(a) =>
             MFC(Cond(
-              Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
-              Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
-              a.point[Free[OUT, ?]]
-            ))
+              ltR(a.point[Free[OUT, ?]], intR(0)),
+              negateR(a.point[Free[OUT, ?]]),
+              a.point[Free[OUT, ?]]))
+          case D.Ceil(a) =>
+            MFC(Cond(
+              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+              a.point[Free[OUT, ?]],
+              condR(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                truncR(a.point[Free[OUT, ?]]),
+                addR(truncR(a.point[Free[OUT, ?]]), intR(1)))))
+          case D.Floor(a) =>
+            MFC(Cond(
+              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+              a.point[Free[OUT, ?]],
+              condR(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                subtractR(truncR(a.point[Free[OUT, ?]]), intR(1)),
+                truncR(a.point[Free[OUT, ?]]))))
+          case D.Trunc(a) => trunc(a.point[Free[OUT, ?]])
         }
     }
 

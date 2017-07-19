@@ -4,7 +4,6 @@
         "mimir":"pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
-        "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },

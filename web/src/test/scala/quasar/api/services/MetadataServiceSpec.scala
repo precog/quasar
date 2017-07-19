@@ -29,7 +29,7 @@ import quasar.fs.mount.Fixture.runConstantMount
 import quasar.sql._
 import quasar.sql.Arbitraries._
 
-import argonaut._, Argonaut._
+import argonaut._, Argonaut._, EncodeJsonScalaz._
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
@@ -103,7 +103,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
-          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.toIList.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
         .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
@@ -139,7 +139,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
             FsNode(viewName.value, "file", Some("view"), None),
             FsNode(fsMountName.value, "directory", Some(fsCfg._1.value), None),
             FsNode(moduleName.value, "directory", Some("module"), None)
-          ).sorted)
+          ).toIList.sorted)
       }}
 
       "and functions as files on a module mount with additional info about functions parameters" >> prop { dir: ADir =>
@@ -154,14 +154,14 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
           .as[Json].unsafePerformSync must_=== Json("children" := List(
           FsNode("FOO", "file", mount = None, args = Some(List("BAR"))),
           FsNode("BAR", "file", mount = None, args = Some(List("BAR", "BAZ")))
-        ).sorted)
+        ).toIList.sorted)
       }
 
       "support offset and limit" >> prop { (dir: NonEmptyDir, offset: Int @@ NonNegative, limit: Int @@ RPositive) =>
         val childNodes = dir.ls.map(FsNode(_, None))
 
         service(dir.state, Map())(Request(uri = pathUri(dir.dir).+?("offset", offset.toString).+?("limit", limit.toString)))
-          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted.drop(offset).take(limit))
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.toIList.sorted.drop(offset).take(limit))
       }.set(minTestsOk = 10) // NB: this test is slow because NonEmptyDir instances are still relatively large
 
       "and empty object for existing file" >> prop { s: SingleFileMemState =>

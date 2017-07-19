@@ -60,6 +60,15 @@ object EnvironmentError {
         s"Unsupported $name version: $version"
     }
 
+  // Roll with universal equality for Throwable
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+  implicit val equal: Equal[EnvironmentError] = Equal.equal {
+    case (ConnectionFailed(a), ConnectionFailed(b))           => a == b
+    case (InvalidCredentials(a), InvalidCredentials(b))       => a ≟ b
+    case (UnsupportedVersion(a, b), UnsupportedVersion(c, d)) => a ≟ c && b ≟ d
+    case _                                                    => false
+  }
+
   implicit val environmentErrorEncodeJson: EncodeJson[EnvironmentError] = {
     def format(message: String, detail: Option[String]) =
       Json(("error" := message) :: detail.toList.map("errorDetail" := _): _*)

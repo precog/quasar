@@ -28,12 +28,12 @@ import simulacrum.typeclass
 /** Typeclass for higher-kinded types that can be encoded as EJson. */
 @typeclass
 trait EncodeEJsonK[F[_]] {
-  def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[F, J]
+  def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[F, J]
 
   def contramapK[G[_]](f: G ~> F): EncodeEJsonK[G] = {
     val orig = this
     new EncodeEJsonK[G] {
-      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[G, J] =
+      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[G, J] =
         gj => orig.encodeK[J].apply(f(gj))
     }
   }
@@ -45,7 +45,7 @@ object EncodeEJsonK extends EncodeEJsonKInstances {
     lowerLabel: String
   ): EncodeEJsonK[EnvT[E, F, ?]] =
     new EncodeEJsonK[EnvT[E, F, ?]] {
-      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[EnvT[E, F, ?], J] = {
+      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[EnvT[E, F, ?], J] = {
         case EnvT((ask, lower)) =>
           val fAlg = EncodeEJsonK[F].encodeK[J]
           ExtEJson(map[J](List(
@@ -59,7 +59,17 @@ object EncodeEJsonK extends EncodeEJsonKInstances {
 sealed abstract class EncodeEJsonKInstances {
   implicit val ejsonEncodeEJsonK: EncodeEJsonK[EJson] =
     new EncodeEJsonK[EJson] {
-      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[EJson, J] =
+      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[EJson, J] =
         _.embed
+    }
+
+  implicit def coproductEncodeEJsonK[F[_], G[_]](
+    implicit
+    F: EncodeEJsonK[F],
+    G: EncodeEJsonK[G]
+  ): EncodeEJsonK[Coproduct[F, G, ?]] =
+    new EncodeEJsonK[Coproduct[F, G, ?]] {
+      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[Coproduct[F, G, ?], J] =
+        _.run.fold(F.encodeK[J], G.encodeK[J])
     }
 }

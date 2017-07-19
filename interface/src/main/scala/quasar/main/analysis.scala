@@ -108,7 +108,7 @@ object analysis {
     JR: Recursive.Aux[J, EJson]
   ): Q.M[SemanticErrors \/ Option[SST[J, A] \/ PopulationSST[J, A]]] = {
     type TS   = TypeStat[A]
-    type P[X] = StructuralType[J, Option[X]]
+    type P[X] = StructuralType[J, X]
 
     val k: A = ConvertableTo[A].fromLong(sampleSize.value)
 

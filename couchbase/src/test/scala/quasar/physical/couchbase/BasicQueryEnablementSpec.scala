@@ -142,9 +142,9 @@ class BasicQueryEnablementSpec
         chain[Fix[QST], QST](
           SRTF.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
           QCT.inj(qscript.Map((),
-            Free.roll(Add(
+            Free.roll(MFC(Add(
               ProjectFieldR(HoleF, StrLit("a")),
-              ProjectFieldR(HoleF, StrLit("b")))))))
+              ProjectFieldR(HoleF, StrLit("b"))))))))
 
       val n1ql = n1qlFromQS(qs)
 

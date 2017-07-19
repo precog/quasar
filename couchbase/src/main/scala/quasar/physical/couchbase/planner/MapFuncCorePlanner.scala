@@ -30,7 +30,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
+final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
   extends Planner[T, F, MapFuncCore[T, ?]] {
 
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed

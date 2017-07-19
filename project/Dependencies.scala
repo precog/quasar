@@ -106,11 +106,6 @@ object Dependencies {
     )
   }
 
-  val postgresql = Seq(
-    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
-    "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
-  )
-
   def sparkcore(sparkProvided: Boolean) = Seq(
     ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,

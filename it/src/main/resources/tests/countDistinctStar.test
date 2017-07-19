@@ -2,8 +2,7 @@
     "name": "count distinct *",
     "backends": {
         "mimir":"pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
     "data": "olympics.data",
     "query": "select count(distinct *) as cnt from olympics",

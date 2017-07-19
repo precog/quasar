@@ -1,6 +1,7 @@
 {
-    "name": "select tests that have changed status",
-    "NB": "This is currently disabled on all connectors due to #2110.",
+    "name": "select tests that have changed status (interim)",
+    "NB": "This is a workaround for a QScript issue in changedTestStatus.test
+           and shoud be removed when some connectors start passing that test.",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pending",
@@ -12,20 +13,22 @@
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },
     "data": ["oldTests.data", "newTests.data"],
     "query": "select old.name ?? new.name as name,
-                     old.backends{_:} ?? new.backends{_:} as backend,
-                     old.backends{:_} ?? \"success\" as prevStatus,
-                     new.backends{:_} ?? \"success\" as currStatus
-                from oldTests as old full outer join newTests as new
+                     old.backend ?? new.backend as backend,
+                     old.status ?? \"success\" as prevStatus,
+                     new.status ?? \"success\" as currStatus
+                -- NB: this field order matters because of #1929
+                from (select backends{_:} as backend, backends{:_} as status, name from oldTests) as old
+                     full outer join
+                     (select backends{_:} as backend, backends{:_} as status, name from newTests) as new
                   on old.name = new.name and
-                     old.backends{_:} = new.backends{_:} and
-                     old.backends{_:} <> \"mongodb_q_3_2\" and
-                     old.backends{:_} <> new.backends{:_}",
+                     old.backend = new.backend and
+                     old.backend <> \"mongodb_q_3_2\" and
+                     old.status <> new.status",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

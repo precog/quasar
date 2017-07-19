@@ -44,7 +44,7 @@ object MetaStoreMounter {
       req => lift(unmount(req)).into[S],
       new Mounter.PathStore[Free[S, ?], MountConfig] {
         def get(path: APath) =
-          OptionT(lift(lookupMountConfig(path)).into[S])
+          EitherT(OptionT(lift(lookupMountConfig(path)).into[S]))
         def descendants(dir: ADir) =
           lift(mountsHavingPrefix(dir).map(_.keys.toSet)).into[S]
         def insert(path: APath, value: MountConfig) =

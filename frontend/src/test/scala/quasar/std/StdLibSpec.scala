@@ -16,7 +16,7 @@
 
 package quasar.std
 
-import slamdata.Predef._
+import slamdata.Predef._, BigDecimal.RoundingMode
 import quasar.{Data, DataCodec, Qspec, Type}
 import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
@@ -29,6 +29,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
+import org.specs2.specification.core.Fragment
 import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
 
@@ -55,7 +56,7 @@ abstract class StdLibSpec extends Qspec {
     }
   }
 
-  def tests(runner: StdLibTestRunner) = {
+  def tests(runner: StdLibTestRunner): Fragment = {
     import runner._
 
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
@@ -930,26 +931,77 @@ abstract class StdLibSpec extends Qspec {
         // TODO: Interval
       }
 
-      "Modulo" >> {
-        "any int by 1" >> prop { (x: Int) =>
-            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
+      "Abs" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Abs(_).embed, Data.Int(x), Data.Int(x.abs))
         }
 
-        "any positive ints" >> prop { (x0: Int, y0: Int) =>
-          val x = abs(x0)
-          val y = abs(y0)
-          (x > 0 && y > 1) ==>
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Abs(_).embed, Data.Dec(x), Data.Dec(x.abs))
+        }
+
+        // TODO: add support for interval
+        // "any Interval" >> prop { (x: Duration) =>
+        //   unary(Abs(_).embed, Data.Interval(x), if (x.isNegative) Data.Interval(x.negated) else Data.Interval(x))
+        // }
+      }
+
+      "Trunc" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Trunc(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Trunc(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.DOWN)))
+        }
+      }
+
+      "Ceil" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Ceil(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Ceil(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.CEILING)))
+        }
+      }
+
+      "Floor" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Floor(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Floor(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.FLOOR)))
+        }
+      }
+
+      "Modulo" >> {
+        "any int by 1" >> prop { (x: Int) =>
+          binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
+        }
+
+        "any ints" >> prop { (x: Int, y: Int) =>
+          y != 0 ==>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
 
-        // TODO: figure out what domain can be tested here
+        // TODO analyze and optionally shortCircuit per connector
         // "any doubles" >> prop { (x: Double, y: Double) =>
-        //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
+        //   y != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(BigDecimal(x).remainder(BigDecimal(y))))
         // }
-
-        // TODO: figure out what domain can be tested here
+        //
+        // "any big decimals" >> prop { (x: BigDecimal, y: BigDecimal) =>
+        //   !y.equals(0.0) ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x.remainder(y)))
+        // }
+        //
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
-        //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
+        //   y != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
+        //   x != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
         // }
       }
     }
@@ -994,6 +1046,9 @@ abstract class StdLibSpec extends Qspec {
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Eq(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: the rest of the types
       }
 
@@ -1062,6 +1117,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: Timestamp, Interval, cross-type comparison
       }
 
@@ -1090,7 +1148,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gt" >> {
@@ -1117,8 +1177,9 @@ abstract class StdLibSpec extends Qspec {
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
         }
-
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gte" >> {
@@ -1146,7 +1207,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Between" >> {
@@ -1263,7 +1326,7 @@ abstract class StdLibSpec extends Qspec {
 
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
-        "returns metadata associated with a value" >> skipped("Requires EJson.")
+        "returns metadata associated with a value" >> pending("Requires EJson.")
       }
     }
   }

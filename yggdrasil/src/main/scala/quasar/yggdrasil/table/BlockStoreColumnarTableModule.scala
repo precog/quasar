@@ -295,6 +295,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       def opened(): (File, DB, JDBMState) = fdb match {
         case Some((f, db)) => (f, db, this)
         case None          =>
+          log.trace(s"opening a new JDBM database and things")
           // Open a JDBM3 DB for use in sorting under a temp directory
           val dbFile = new File(newScratchDir(), prefix)
           val db     = DBMaker.openFile(dbFile.getCanonicalPath).make()

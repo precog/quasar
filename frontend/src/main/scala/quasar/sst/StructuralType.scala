@@ -18,7 +18,11 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK}
+import quasar.contrib.scalaz.zipper._
+import quasar.ejson
+import quasar.ejson.{CommonEJson => C, EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Type => EType, TypeTag}
+import quasar.ejson.implicits._
+import quasar.fp.{coproductEqual, coproductShow}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -34,7 +38,7 @@ import scalaz._, Scalaz._
   * @tparam L the type of literals
   * @tparam V the measure the type is annotated with
   */
-final case class StructuralType[L, V](toCofree: Cofree[TypeF[L, ?], V]) extends scala.AnyVal {
+final case class StructuralType[L, V](toCofree: Cofree[StructuralType.ST[L, ?], V]) extends scala.AnyVal {
   def cobind[W](f: StructuralType[L, V] => W): StructuralType[L, W] =
     StructuralType(toCofree.cobind(c => f(StructuralType(c))))
 
@@ -46,16 +50,56 @@ final case class StructuralType[L, V](toCofree: Cofree[TypeF[L, ?], V]) extends 
 
   def map[W](f: V => W): StructuralType[L, W] =
     StructuralType(toCofree map f)
-
-  /** Convert to a type, forgetting annotations. */
-  def toType[T](implicit T: Corecursive.Aux[T, TypeF[L, ?]]): T =
-    forgetAnnotation[Cofree[TypeF[L, ?], V], T, TypeF[L, ?], V](toCofree)
 }
 
 object StructuralType extends StructuralTypeInstances {
+  type ST[L, A]     = Coproduct[TypeF[L, ?], Tagged, A]
+  type STF[L, V, A] = EnvT[V, ST[L, ?], A]
+
+  object TypeST {
+    def apply[L, A](tf: TypeF[L, A]): ST[L, A] =
+      Inject[TypeF[L, ?], ST[L, ?]].inj(tf)
+
+    def unapply[L, A](st: ST[L, A]): Option[TypeF[L, A]] =
+      Inject[TypeF[L, ?], ST[L, ?]].prj(st)
+  }
+
+  object TagST {
+    def apply[L] = new PartiallyApplied[L]
+
+    final class PartiallyApplied[L] {
+      def apply[A](tg: Tagged[A]): ST[L, A] =
+        Inject[Tagged, ST[L, ?]].inj(tg)
+    }
+
+    def unapply[L, A](st: ST[L, A]): Option[Tagged[A]] =
+      Inject[Tagged, ST[L, ?]].prj(st)
+  }
+
+  object ConstST {
+    def unapply[L, V](stf: STF[L, V, StructuralType[L, V]]): Option[(Option[(V, TypeTag)], V, L)] =
+      stf match {
+        case EnvT((v, TypeST(TypeF.Const(j)))) =>
+          some((none, v, j))
+
+        case EnvT((v1, TagST(Tagged(t, Embed(EnvT((v2, TypeST(TypeF.Const(j))))))))) =>
+          some((some((v1, t)), v2, j))
+
+        case _ => none
+      }
+  }
+
   /** Lens targeting the top-level annotation of a structural type. */
   def measure[L, V]: Lens[StructuralType[L, V], V] =
     Lens[StructuralType[L, V], V](_.copoint)(v => st => envT(v, st.project.lower).embed)
+
+  // TODO{matryoshka}: Define over EnvT once generalized attribute* are available.
+  /** Lift an algebra over types to an algebra annotating a structural type. */
+  def attributeSTƒ[J, V](measure: Algebra[TypeF[J, ?], V]): Algebra[ST[J, ?], Cofree[ST[J, ?], V]] =
+    attributeAlgebra[ST[J, ?], V] {
+      case TypeST(tf)          => measure(tf)
+      case TagST(Tagged(_, v)) => v
+    }
 
   /** The structural type representing the given EJson value, annotated with
     * the result of `measure`.
@@ -70,16 +114,9 @@ object StructuralType extends StructuralTypeInstances {
         JR: Recursive.Aux[J, EJson]
       ): StructuralType[J, V] = {
         type T = Fix[TypeF[J, ?]]
-
-        val attrV =
-          attributeAlgebra[TypeF[J, ?], V](measure)
-
-        val normAndAttr =
-          ((_: T).cata[Cofree[TypeF[J, ?], V]](attrV)) <<<
-          ((_: TypeF[J, T]).embed)                     <<<
-          normalization.lowerConst[J, T]
-
-        StructuralType(normAndAttr(TypeF.const[J, T](ejson)))
+        StructuralType(
+          TypeF.const[J, T](ejson).embed
+            .hylo(attributeSTƒ(measure), fromTypeƒ[J, T]))
       }
     }
   }
@@ -100,116 +137,176 @@ object StructuralType extends StructuralTypeInstances {
     }
   }
 
+  /** Whether the StructuralType is constant. */
+  def isConst[L, V](st: StructuralType[L, V]): Boolean =
+    ConstST.unapply(st.project).isDefined
+
   /** Unfold a pair of structural types into their deep structural merge. */
-  def mergeƒ[L: Order, V: Monoid, T](
+  def mergeƒ[L, V: Semigroup, F[_]: Functor, T](
     implicit
-    TR: Recursive.Aux[T, EnvT[V, TypeF[L, ?], ?]],
-    TC: Corecursive.Aux[T, EnvT[V, TypeF[L, ?], ?]]
-  ): ElgotCoalgebra[T \/ ?, EnvT[V, TypeF[L, ?], ?], (T, T)] = {
-    import TypeF._
-    type TT = (T, T)
-    val ⊥ = envT(∅[V], bottom[L, T]()).embed
+    I: TypeF[L, ?] :<: F,
+    F: StructuralMerge[F],
+    TC: Corecursive.Aux[T, EnvT[V, F, ?]],
+    TR: Recursive.Aux[T, EnvT[V, F, ?]]
+  ): GCoalgebra[T \/ ?, EnvT[V, F, ?], (T, T)] =
+    tt => {
+      val pp = tt.umap(_.project)
+      F.merge[V, T](pp) getOrElse (pp match {
+        case (EnvT((v, I(TypeF.Unioned(xs)))), y @ EnvT((w, _))) =>
+          envT(v |+| w, I(TypeF.union[L, T](y.embed, xs.head, xs.tail)) map (_.left))
 
-    def mergeThese[F[_]: Align](xs: F[T], ys: F[T]): F[TT] =
-      xs.alignWith(ys)(_.fold((_, ⊥), (_, ⊥), (_, _)))
+        case (x @ EnvT((v, _)), EnvT((w, I(TypeF.Unioned(ys))))) =>
+          envT(v |+| w, I(TypeF.union[L, T](x.embed, ys.head, ys.tail)) map (_.left))
 
-    def mergeArr(l: (V, IList[T] \/ T), r: (V, IList[T] \/ T)): TypeF[L, T] \/ TypeF[L, TT] =
-      (l, r) match {
-        case ((_, -\/(              xs)), (_, -\/(              ys))) => arr[L, TT](mergeThese(xs, ys).left).right
-        case ((_, \/-(               x)), (_, \/-(               y))) => arr[L, TT]((x, y).right).right
-        case ((_, -\/(          INil())), (_, y @ \/-(           _))) => arr[L,  T](y).left
-        case ((_, x @ \/-(           _)), (_, -\/(          INil()))) => arr[L,  T](x).left
-        case ((_, -\/(ICons(x, INil()))), (_, \/-(               y))) => arr[L, TT]((x, y).right).right
-        case ((_, \/-(               x)), (_, -\/(ICons(y, INil())))) => arr[L, TT]((x, y).right).right
+        case (EnvT((v, _)), EnvT((w, _))) =>
+          envT(v |+| w, I(TypeF.coproduct[L, T](tt) map (_.left)))
+      })
+    }
 
-        case ((v, -\/(ICons(a, ICons(b, cs)))), (_, \/-(y))) =>
-          arr[L, TT]((envT(v, union[L, T](a, b, cs)).embed, y).right).right
-
-        case ((_, \/-(x)), (v, -\/(ICons(a, ICons(b, cs))))) =>
-          arr[L, TT]((x, envT(v, union[L, T](a, b, cs)).embed).right).right
+  /** A transform ensuring unions are disjoint by merging their members. */
+  def disjoinUnionsƒ[L, V: Semigroup, F[_]: Functor, T](
+    implicit
+    I: TypeF[L, ?] :<: F,
+    F: StructuralMerge[F],
+    TC: Corecursive.Aux[T, EnvT[V, F, ?]],
+    TR: Recursive.Aux[T, EnvT[V, F, ?]]
+  ): EnvT[V, F, T] => EnvT[V, F, T] = {
+    def strictMerge(x: T, y: T): Option[T] =
+      some((x, y).apo[T](mergeƒ[L, V, F, T])) filter { t =>
+        I.prj(t.project.lower) all TypeF.union[L, T].isEmpty
       }
 
-    def mergeUnk(xu: Option[TT], yu: Option[TT]): Option[(TT, TT)] =
-      (xu, yu) match {
-        case (Some((xk, xv)), Some((yk, yv))) => some(((xk, yk), (xv, yv)))
-        case (Some((xk, xv)),           None) => some(((xk,  ⊥), (xv,  ⊥)))
-        case (          None, Some((yk, yv))) => some(((⊥ , yk), (⊥ , yv)))
-        case (          None,           None) => none
-      }
-
-    def mergeable(x: T, y: T): Boolean =
-      (x, y).umap(_.project.lower) match {
-        case (    Top(),     Top()) => true
-        case (Simple(a), Simple(b)) => a ≟ b
-        case ( Const(a),  Const(b)) => a ≟ b
-        case (   Arr(_),    Arr(_)) => true
-        case (Map(_, _), Map(_, _)) => true
-        case _                      => false
-      }
-
-    def mergeUnions(v: V, xs: NonEmptyList[T], ys: NonEmptyList[T]): T \/ EnvT[V, TypeF[L, ?], TT] =
-      xs.foldLeft(ys.toZipper map (_.right[TT]))((z, x) =>
-        // Pair with merge candidate if found, otherwise add to the union.
-        z.findZ(_ exists (mergeable(x, _))).cata(
-          _.modify(_ >>= ((x, _).left[T])),
-          z.insert((x, ⊥).left[T])))
-        .map(_.swap valueOr ((⊥, _)))
-        .toNel match {
-          case NonEmptyList(a, ICons(b, cs)) => envT(v, union[L, TT](a, b, cs)).right
-          case NonEmptyList(a,       INil()) => envT(v, coproduct[L, T](a)).embed.left
+    orOriginal(ft => I.prj(ft.lower) collect {
+      case TypeF.Unioned(NonEmptyList(h, t)) =>
+        val disjoint = t.foldLeft(h.wrapNel.toZipper) { (z, t) =>
+          z.findMap(strictMerge(t, _)) getOrElse z.insert(t)
         }
 
-    _.umap(_.project) match {
-      case (                     x, EnvT((_,    Bottom())))            => x.embed.left
-      case (EnvT((_,    Bottom())),                      y)            => y.embed.left
-      case (EnvT((v,       Top())), EnvT((w,       Top())))            => envT(v |+| w, top[L, T]()).embed.left
-      case (EnvT((v,   Simple(x))), EnvT((w,   Simple(y)))) if (x ≟ y) => envT(v |+| w, simple[L, T](x)).embed.left
-      case (EnvT((v,    Const(x))), EnvT((w,    Const(y)))) if (x ≟ y) => envT(v |+| w, const[L, T](x)).embed.left
-      case (EnvT((v, Unioned(xs))), EnvT((w, Unioned(ys))))            => mergeUnions(v |+| w, xs, ys)
-      case (x @ EnvT((v,       _)), EnvT((w, Unioned(ys))))            => mergeUnions(v |+| w, x.embed.wrapNel, ys)
-      case (EnvT((v, Unioned(xs))), y @ EnvT((w,       _)))            => mergeUnions(v |+| w, xs, y.embed.wrapNel)
+        disjoint.toNel match {
+          case NonEmptyList(a, INil()) =>
+            a.project
 
-      case (EnvT((v, Arr(x))), EnvT((w, Arr(y)))) =>
-        val sum = v |+| w
-        mergeArr((v, x), (w, y)).bimap(envT(sum, _).embed, envT(sum, _))
+          case NonEmptyList(a, ICons(b, cs)) =>
+            envT(ft.ask, I(TypeF.union[L, T](a, b, cs)))
+        }
+    })
+  }
 
-      case (EnvT((v, Map(xs, xunk))), EnvT((w, Map(ys, yunk)))) =>
-        envT(v |+| w, map[L, TT](mergeThese(xs, ys), mergeUnk(xunk, yunk))).right
+  /** Unfold a StructuralType from a Type. */
+  def fromTypeƒ[J: Order, T](
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): Coalgebra[ST[J, ?], T] =
+    _.project match {
+      case TypeF.Const(Embed(E(ejson.Meta(j, Embed(EType(t)))))) =>
+        TagST[J](Tagged(t, TypeF.const[J, T](j).embed))
 
-      case (x @ EnvT((v, _)), y @ EnvT((w, _))) =>
-        envT(v |+| w, coproduct[L, T](x.embed, y.embed)).embed.left
+      case other =>
+        TypeST(normalization.lowerConst[J, T].apply(other))
+    }
+
+  /** Lift a transform over types to a transform over structural types. */
+  object typeTransform {
+    def apply[L] = new PartiallyApplied[L]
+
+    final class PartiallyApplied[L] {
+      type G[A, B] = EnvT[A, TypeF[L, ?], B]
+      val I = Inject[TypeF[L, ?], StructuralType.ST[L, ?]]
+
+      def apply[A, B](pf: PartialFunction[G[A, B], G[A, B]])
+        : STF[L, A, B] => STF[L, A, B] =
+        orOriginal((stf: STF[L, A, B]) =>
+            stf.run.traverse(I.prj)
+              .map(EnvT(_))
+              .collect(pf)
+              .map(EnvT.hmap(I)(_)))
     }
   }
 }
 
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
-  implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] = {
-    implicit val encodeEnvT = EncodeEJsonK.envT[V, TypeF[L, ?]]("measure", "structure")
-    EncodeEJson.encodeEJsonR[StructuralType[L, V], EnvT[V, TypeF[L, ?], ?]]
+  import StructuralType.{ST, STF, TypeST, TagST}
+
+  private final case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
+
+  private object TTags {
+    def collectTags[V, L]: Transform[Cofree[TTags[L, ?], V], STF[L, V, ?], EnvT[V, TTags[L, ?], ?]] = {
+      case EnvT((v, TypeST(tpe))) =>
+        envT(v, TTags(Nil, tpe))
+
+      case EnvT((_, TagST(Tagged(t, Embed(EnvT((v, TTags(ts, tpe)))))))) =>
+        envT(v, TTags(t :: ts, tpe))
+    }
+
+    implicit def functor[L]: Functor[TTags[L, ?]] =
+      new Functor[TTags[L, ?]] {
+        def map[A, B](fa: TTags[L, A])(f: A => B) = fa.copy(tpe = fa.tpe.map(f))
+      }
+
+    // TODO{ejson}: Lift tags back to metadata once we're using EJson everywhere.
+    implicit def encodeEJsonK[L: EncodeEJson]: EncodeEJsonK[TTags[L, ?]] =
+      new EncodeEJsonK[TTags[L, ?]] {
+        def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) = {
+          case TTags(     Nil, j) => j.asEJsonK
+          case TTags(t :: Nil, j) => tagEjs(t.asEJson[J], j.asEJsonK)
+          case TTags(     ts , j) => tagEjs(C(ejson.arr(ts map (_.asEJson[J]))).embed, j.asEJsonK)
+        }
+
+        val encType = EncodeEJsonK[TypeF[L, ?]]
+
+        def tagEjs[J](tejs: J, v: J)(
+          implicit
+          JC: Corecursive.Aux[J, EJson],
+          JR: Recursive.Aux[J, EJson]
+        ): J = v.project match {
+          case E(ejson.Map(xs)) =>
+            E(ejson.map((C(ejson.str[J]("tag")).embed, tejs) :: xs)).embed
+
+          case other =>
+            C(ejson.arr[J](List(tejs, v))).embed
+        }
+      }
   }
 
-  implicit def corecursive[L, V]: Corecursive.Aux[StructuralType[L, V], EnvT[V, TypeF[L, ?], ?]] =
-    new Corecursive[StructuralType[L, V]] {
-      type Base[B] = EnvT[V, TypeF[L, ?], B]
+  implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] =
+    new EncodeEJson[StructuralType[L, V]] {
+      implicit val encodeEnvT = EncodeEJsonK.envT[V, TTags[L, ?]]("measure", "structure")
 
-      def embed(st: EnvT[V, TypeF[L, ?], StructuralType[L, V]])(implicit BF: Functor[EnvT[V, TypeF[L, ?], ?]]) =
+      def encode[J](st: StructuralType[L, V])(
+        implicit
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
+      ): J =
+        st.transCata[Cofree[TTags[L, ?], V]](TTags.collectTags).cata[J](encodeEnvT.encodeK)
+    }
+
+  implicit def corecursive[L, V]: Corecursive.Aux[StructuralType[L, V], STF[L, V, ?]] =
+    new Corecursive[StructuralType[L, V]] {
+      type Base[B] = STF[L, V, B]
+
+      def embed(st: STF[L, V, StructuralType[L, V]])(implicit BF: Functor[STF[L, V, ?]]) =
         StructuralType(st.map(_.toCofree).embed)
     }
 
-  implicit def recursive[L, V]: Recursive.Aux[StructuralType[L, V], EnvT[V, TypeF[L, ?], ?]] =
+  implicit def recursive[L, V]: Recursive.Aux[StructuralType[L, V], STF[L, V, ?]] =
     new Recursive[StructuralType[L, V]] {
-      type Base[B] = EnvT[V, TypeF[L, ?], B]
+      type Base[B] = STF[L, V, B]
 
-      def project(st: StructuralType[L, V])(implicit BF: Functor[EnvT[V, TypeF[L, ?], ?]]) =
+      def project(st: StructuralType[L, V])(implicit BF: Functor[STF[L, V, ?]]) =
         st.toCofree.project map (StructuralType(_))
     }
 
-  implicit def monoid[L: Order, V: Monoid]: Monoid[StructuralType[L, V]] =
-    new Monoid[StructuralType[L, V]] {
-      type T = Cofree[TypeF[L, ?], V]
-      val zero = StructuralType(Cofree(∅[V], TypeF.bottom[L, T]()))
+  implicit def semigroup[L: Order, V: Semigroup]: Semigroup[StructuralType[L, V]] =
+    new Semigroup[StructuralType[L, V]] {
+      type F[A] = ST[L, A]
+      type T    = Cofree[F, V]
       def append(x: StructuralType[L, V], y: => StructuralType[L, V]) =
-        StructuralType((x.toCofree, y.toCofree).elgotApo[T](StructuralType.mergeƒ[L, V, T]))
+        StructuralType((x.toCofree, y.toCofree)
+          .apo[T](StructuralType.mergeƒ[L, V, F, T])
+          .transAna[T](StructuralType.disjoinUnionsƒ[L, V, F, T]))
     }
 
   implicit def comonad[L]: Comonad[StructuralType[L, ?]] =

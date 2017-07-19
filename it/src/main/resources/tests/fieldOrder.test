@@ -2,8 +2,7 @@
     "name": "reduced expressions which trigger bad field ordering in MongoDB (#598)",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "zips.data",

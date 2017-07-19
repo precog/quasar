@@ -1,8 +1,7 @@
 {
     "name": "LIKE with constant-foldable pattern",
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
     "data": "zips.data",
     "variables": { "substr": "\"ULDER\"" },

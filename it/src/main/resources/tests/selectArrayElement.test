@@ -1,9 +1,6 @@
 {
     "name": "select array element",
-    "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
-    },
+    "backends": {},
     "data": "largeZips.data",
     "query": "select city, loc[0] as lat from largeZips",
     "predicate": "atLeast",

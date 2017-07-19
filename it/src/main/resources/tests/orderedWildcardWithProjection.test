@@ -1,8 +1,7 @@
 {
     "name": "wildcard with projection and synthetic field",
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "largeZips.data",
     "query": "select *, pop * 10 as dpop from largeZips order by pop / 10 desc",

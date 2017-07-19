@@ -3,8 +3,7 @@
     "backends": {
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2":     "pending"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",

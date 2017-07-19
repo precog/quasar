@@ -35,7 +35,7 @@ import scalaz.stream.Process
 import spire.std.double._
 
 final class ExtractSchemaSpec extends quasar.Qspec {
-  import Data._
+  import Data._, StructuralType.TypeST
 
   type J = Fix[EJson]
   type S = SST[J, Double]
@@ -47,11 +47,11 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       .pipe(analysis.extractSchema[J, Double](cs))
       .toVector.headOption must beSome(equal(expected))
 
-  def ints(ns: SInt*): IList[S] =
-    IList(ns: _*) map (n =>
+  def ints(n: SInt, ns: SInt*): NonEmptyList[S] =
+    NonEmptyList(n, ns: _*) map (n =>
       envT(
-        TypeStat.int(SampleStats.one(n.toDouble), BigInt(n), BigInt(n)).some,
-        TypeF.const[J, S](E(e.int[J](BigInt(n))).embed)).embed)
+        TypeStat.int(SampleStats.one(n.toDouble), BigInt(n), BigInt(n)),
+        TypeST(TypeF.const[J, S](E(e.int[J](BigInt(n))).embed))).embed)
 
   "compress arrays" >> {
     val input = List(
@@ -60,16 +60,16 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap(
+      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
-          TypeStat.coll(1.0, 2.0.some, 2.0.some).some,
-          TypeF.arr[J, S](ints(1, 2).left)).embed,
+          TypeStat.coll(1.0, 2.0.some, 2.0.some),
+          TypeST(TypeF.arr[J, S](ints(1, 2).list.left))).embed,
 
         C(e.str[J]("bar")).embed -> envT(
-          TypeStat.coll(1.0, 3.0.some, 3.0.some).some,
-          TypeF.arr[J, S](ints(1, 2, 3).suml.right)).embed
-      ), None)).embed
+          TypeStat.coll(1.0, 3.0.some, 3.0.some),
+          TypeST(TypeF.arr[J, S](ints(1, 2, 3).suml1.right))).embed
+      ), None))).embed
 
     verify(settings.copy(arrayMaxLength = 2L), input, expected)
   }
@@ -81,20 +81,20 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap(
+      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
-          TypeStat.coll(1.0, 6.0.some, 6.0.some).some,
-          TypeF.arr[J, S](envT(
-            TypeStat.count(1.0).some,
-            TypeF.simple[J, S](SimpleType.Char)
-          ).embed.right)).embed,
+          TypeStat.coll(1.0, 6.0.some, 6.0.some),
+          TypeST(TypeF.arr[J, S](envT(
+            TypeStat.count(1.0),
+            TypeST(TypeF.simple[J, S](SimpleType.Char))
+          ).embed.right))).embed,
 
         C(e.str[J]("bar")).embed -> envT(
-          TypeStat.str(1.0, 5.0, 5.0, "abcde", "abcde").some,
-          TypeF.const[J, S](C(e.str[J]("abcde")).embed)
+          TypeStat.str(1.0, 5.0, 5.0, "abcde", "abcde"),
+          TypeST(TypeF.const[J, S](C(e.str[J]("abcde")).embed))
         ).embed
-      ), None)).embed
+      ), None))).embed
 
     verify(settings.copy(stringMaxLength = 5L), input, expected)
   }
@@ -111,22 +111,22 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap(
+      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
-          TypeStat.coll(1.0, l1.some, l1.some).some,
-          TypeF.arr[J, S](envT(
-            TypeStat.count(1.0).some,
-            TypeF.simple[J, S](SimpleType.Byte)
-          ).embed.right)).embed,
+          TypeStat.coll(1.0, l1.some, l1.some),
+          TypeST(TypeF.arr[J, S](envT(
+            TypeStat.count(1.0),
+            TypeST(TypeF.simple[J, S](SimpleType.Byte))
+          ).embed.right))).embed,
 
         C(e.str[J]("bar")).embed -> envT(
-          TypeStat.coll(1.0, l2.some, l2.some).some,
-          TypeF.arr[J, S](envT(
-            TypeStat.count(1.0).some,
-            TypeF.simple[J, S](SimpleType.Byte)
-          ).embed.right)).embed
-      ), None)).embed
+          TypeStat.coll(1.0, l2.some, l2.some),
+          TypeST(TypeF.arr[J, S](envT(
+            TypeStat.count(1.0),
+            TypeST(TypeF.simple[J, S](SimpleType.Byte))
+          ).embed.right))).embed
+      ), None))).embed
 
     verify(settings, input, expected)
   }
@@ -140,19 +140,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap.empty[J, S], Some((
+      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux").some,
-          TypeF.arr[J, S](envT(
-            TypeStat.count(4.0).some,
-            TypeF.simple[J, S](SimpleType.Char)
-          ).embed.right)).embed,
+          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
+          TypeST(TypeF.arr[J, S](envT(
+            TypeStat.count(4.0),
+            TypeST(TypeF.simple[J, S](SimpleType.Char))
+          ).embed.right))).embed,
         envT(
-          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)).some,
-          TypeF.const[J, S](E(e.int[J](1)).embed)
+          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
+          TypeST(TypeF.const[J, S](E(e.int[J](1)).embed))
         ).embed
-      )))).embed
+      ))))).embed
 
     verify(settings.copy(mapMaxSize = 3L, unionMaxSize = 1L), input, expected)
   }
@@ -166,19 +166,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap.empty[J, S], Some((
+      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux").some,
-          TypeF.arr[J, S](envT(
-            TypeStat.count(4.0).some,
-            TypeF.simple[J, S](SimpleType.Char)
-          ).embed.right)).embed,
+          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
+          TypeST(TypeF.arr[J, S](envT(
+            TypeStat.count(4.0),
+            TypeST(TypeF.simple[J, S](SimpleType.Char))
+          ).embed.right))).embed,
         envT(
-          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)).some,
-          TypeF.const[J, S](E(e.int[J](1)).embed)
+          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
+          TypeST(TypeF.const[J, S](E(e.int[J](1)).embed))
         ).embed
-      )))).embed
+      ))))).embed
 
     verify(settings.copy(mapMaxSize = 2L, unionMaxSize = 1L), input, expected)
   }
@@ -192,22 +192,22 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap(
+      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
-          TypeStat.count(4.0).some,
-          TypeF.coproduct[J, S](
+          TypeStat.count(4.0),
+          TypeST(TypeF.coproduct[J, S](
             envT(
               TypeStat.int(
                 SampleStats.fromFoldable(IList(1.0, 2.0)),
                 BigInt(1),
-                BigInt(2)).some,
-              TypeF.simple[J, S](SimpleType.Int)).embed,
+                BigInt(2)),
+              TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
             envT(
-              TypeStat.bool(1.0, 1.0).some,
-              TypeF.simple[J, S](SimpleType.Bool)).embed)
+              TypeStat.bool(1.0, 1.0),
+              TypeST(TypeF.simple[J, S](SimpleType.Bool))).embed))
         ).embed
-      ), None)).embed
+      ), None))).embed
 
     verify(settings.copy(unionMaxSize = 2L), input, expected)
   }
@@ -221,22 +221,22 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some).some,
-      TypeF.map[J, S](IMap(
+      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeST(TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
-          TypeStat.count(4.0).some,
-          TypeF.coproduct[J, S](
+          TypeStat.count(4.0),
+          TypeST(TypeF.coproduct[J, S](
             envT(
               TypeStat.int(
                 SampleStats.fromFoldable(IList(1.0, 2.0, 3.0)),
                 BigInt(1),
-                BigInt(3)).some,
-              TypeF.simple[J, S](SimpleType.Int)).embed,
+                BigInt(3)),
+              TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
             envT(
-              TypeStat.bool(1.0, 0.0).some,
-              TypeF.const[J, S](C(e.bool[J](true)).embed)).embed)
+              TypeStat.bool(1.0, 0.0),
+              TypeST(TypeF.const[J, S](C(e.bool[J](true)).embed))).embed))
         ).embed
-      ), None)).embed
+      ), None))).embed
 
     verify(settings.copy(unionMaxSize = 2L), input, expected)
   }

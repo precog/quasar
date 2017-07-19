@@ -5,10 +5,11 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 source scripts/constants
 
-# Only publishAndTag on first Travis job
+# Only publishAndTag from a single job
 if [[ $CONNECTOR == "mongodb_2_6" ]]; then
   "$SBT" transferPublishAndTagResources
-  scripts/publishAndTag 'quasar-analytics/quasar'
+  # Set TRAVIS_JOB_NUMBER as a workaround to meet sbt-slamdata's publishAndTag assumption
+  TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'quasar-analytics/quasar'
 else
-  echo "Travis not running on job 1, so skipping publishAndTag"
+  echo "Travis not running on mongodb_2_6 job, so skipping publishAndTag"
 fi

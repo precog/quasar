@@ -234,20 +234,20 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body     <- lift(res.as[String]).into[Eff]
 
-              srcAfter <- M.lookupConfig(src).run
-              dstAfter <- M.lookupConfig(dst).run
-              srcViewAfter <- M.lookupConfig(src </> view).run
-              dstViewAfter <- M.lookupConfig(dst </> view).run
+              srcAfter <- M.lookupConfig(src).run.run
+              dstAfter <- M.lookupConfig(dst).run.run
+              srcViewAfter <- M.lookupConfig(src </> view).run.run
+              dstViewAfter <- M.lookupConfig(dst </> view).run.run
             } yield {
-              (body must_== s"moved ${printPath(src)} to ${printPath(dst)}")       and
-              (res.status must_== Ok)                                              and
+              (body must_== s"moved ${printPath(src)} to ${printPath(dst)}")                            and
+              (res.status must_== Ok)                                                                   and
               (mntd must_== Set(
                 MR.mountFileSystem(dst, StubFs, fooUri),
-                MR.mountView(dst </> view, scopedExpr, vars)))                           and
-              (srcAfter must beNone)                                               and
-              (dstAfter must beSome(MountConfig.fileSystemConfig(StubFs, fooUri))) and
-              (srcViewAfter must beNone)                                           and
-              (dstViewAfter must beSome(MountConfig.viewConfig(scopedExpr, vars)))
+                MR.mountView(dst </> view, scopedExpr, vars)))                                          and
+              (srcAfter must beNone)                                                                    and
+              (dstAfter must beSome(MountConfig.fileSystemConfig(StubFs, fooUri).right[MountingError])) and
+              (srcViewAfter must beNone)                                                                and
+              (dstViewAfter must beSome(MountConfig.viewConfig(scopedExpr, vars).right[MountingError]))
             }
           }
         }
@@ -270,14 +270,14 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body     <- lift(res.as[String]).into[Eff]
 
-              srcAfter <- M.lookupConfig(src).run
-              dstAfter <- M.lookupConfig(dst).run
+              srcAfter <- M.lookupConfig(src).run.run
+              dstAfter <- M.lookupConfig(dst).run.run
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
               (res.status must_== Ok)                                        and
               (mntd must_== Set(MR.mountView(dst, scopedExpr, vars)))              and
               (srcAfter must beNone)                                         and
-              (dstAfter must beSome(MountConfig.viewConfig(scopedExpr, vars)))
+              (dstAfter must beSome(MountConfig.viewConfig(scopedExpr, vars).right[MountingError]))
             }
           }
         }
@@ -297,14 +297,14 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body     <- lift(res.as[String]).into[Eff]
 
-              srcAfter <- M.lookupConfig(src).run
-              dstAfter <- M.lookupConfig(dst).run
+              srcAfter <- M.lookupConfig(src).run.run
+              dstAfter <- M.lookupConfig(dst).run.run
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
                 (res.status must_== Ok)                                      and
                 (mntd must_== Set(MR.mountModule(dst, sampleStatements)))    and
                 (srcAfter must beNone)                                       and
-                (dstAfter must beSome(MountConfig.moduleConfig(sampleStatements)))
+                (dstAfter must beSome(MountConfig.moduleConfig(sampleStatements).right[MountingError]))
             }
           }
         }
@@ -430,17 +430,20 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
               dst   =  parent </> fsDir
-              after <- M.lookupConfig(dst).run
+              after <- M.lookupConfig(dst).run.run
             } yield {
               (body must_== s"added ${printPath(dst)}")                   and
               (res.status must_== Ok)                                     and
               (mntd must_== Set(MR.mountFileSystem(dst, StubFs, fooUri))) and
-              (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
+              (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri).right[MountingError]))
             }
           }
         }
 
         "succeed with view path" >> prop { (parent: ADir, f: RFile) =>
+          val parent: ADir = rootDir
+          val f: RFile = file("a")
+
           runTest { service =>
             val scopedExpr = sqlB"select * from zips where pop < :cutoff"
             val vars = Variables(Map(VarName("cutoff") -> VarValue("1000")))
@@ -453,12 +456,12 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
               dst   =  parent </> f
-              after <- M.lookupConfig(dst).run
+              after <- M.lookupConfig(dst).run.run
             } yield {
-              (body must_== s"added ${printPath(dst)}")         and
-              (res.status must_== Ok)                           and
+              (body must_== s"added ${printPath(dst)}")               and
+              (res.status must_== Ok)                                 and
               (mntd must_== Set(MR.mountView(dst, scopedExpr, vars))) and
-              (after must beSome(cfg))
+              (after must beSome(cfg.right[MountingError]))
             }
           }
         }
@@ -480,8 +483,8 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body      <- lift(res.as[String]).into[Eff]
 
-              afterFs   <- M.lookupConfig(fs).run
-              afterView <- M.lookupConfig(view).run
+              afterFs   <- M.lookupConfig(fs).run.run
+              afterView <- M.lookupConfig(view).run.run
             } yield {
               (body must_== s"added ${printPath(view)}") and
               (res.status must_== Ok)                    and
@@ -490,7 +493,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
                 MR.mountView(view, scopedExpr, vars)
               ))                                         and
               (afterFs must beSome)                      and
-              (afterView must beSome(cfg))
+              (afterView must beSome(cfg.right[MountingError]))
             }
           }
         }
@@ -512,7 +515,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
               vdst  =  d </> view
-              after <- M.lookupConfig(vdst).run
+              after <- M.lookupConfig(vdst).run.run
             } yield {
               (body must_== s"added ${printPath(vdst)}") and
               (res.status must_== Ok)                    and
@@ -520,7 +523,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
                 MR.mountFileSystem(fs, StubFs, fooUri),
                 MR.mountView(vdst, scopedExpr, vars)
               ))                                         and
-              (after must beSome(cfg))
+              (after must beSome(cfg.right[MountingError]))
             }
           }
         }
@@ -535,12 +538,12 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
               dst   =  parent </> d
-              after <- M.lookupConfig(dst).run
+              after <- M.lookupConfig(dst).run.run
             } yield {
-              (body must_== s"added ${printPath(dst)}")                         and
-                (res.status must_== Ok)                                         and
-                (mntd must_== Set(MR.mountModule(dst, sampleStatements)))       and
-                (after must beSome(MountConfig.moduleConfig(sampleStatements)))
+              (body must_== s"added ${printPath(dst)}")                   and
+                (res.status must_== Ok)                                   and
+                (mntd must_== Set(MR.mountModule(dst, sampleStatements))) and
+                (after must beSome(MountConfig.moduleConfig(sampleStatements).right[MountingError]))
             }
           }
         }
@@ -559,7 +562,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
                 (res, mntd) = r
                 jerr  <- lift(res.as[Json]).into[Eff]
                 dst   =  d </> fs
-                after <- M.lookupConfig(dst).run
+                after <- M.lookupConfig(dst).run.run
               } yield {
                 (jerr must_== Json("error" := s"cannot mount at ${printPath(dst)} because existing mount below: ${printPath(fs1)}")) and
                 (res.status must_== Conflict)                               and
@@ -669,11 +672,11 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             err   <- lift(res.as[ApiError]).into[Eff]
 
-            after <- M.lookupConfig(mntPath).run
+            after <- M.lookupConfig(mntPath).run.run
           } yield {
             (err must beApiErrorLike(pathExists(mntPath)))                  and
             (mntd must_== Set(MR.mountFileSystem(mntPath, StubFs, barUri))) and
-            (after must beSome(MountConfig.fileSystemConfig(StubFs, barUri)))
+            (after must beSome(MountConfig.fileSystemConfig(StubFs, barUri).right[MountingError]))
           }
         }
       }
@@ -713,12 +716,12 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
 
-            after <- M.lookupConfig(fsDir).run
+            after <- M.lookupConfig(fsDir).run.run
           } yield {
             (body must_== s"updated ${printPath(fsDir)}")                 and
             (res.status must_== Ok)                                       and
             (mntd must_== Set(MR.mountFileSystem(fsDir, StubFs, fooUri))) and
-            (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
+            (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri).right[MountingError]))
           }
         }
       }
@@ -738,7 +741,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
 
-            after <- M.lookupConfig(d).run
+            after <- M.lookupConfig(d).run.run
           } yield {
             (body must_== s"deleted ${printPath(d)}") and
             (res.status must_== Ok)                   and
@@ -762,7 +765,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
 
-            after <- M.lookupConfig(d).run
+            after <- M.lookupConfig(d).run.run
           } yield {
             (body must_== s"deleted ${printPath(d)}") and
             (res.status must_== Ok)                   and
@@ -785,7 +788,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
 
-            after <- M.lookupConfig(f).run
+            after <- M.lookupConfig(f).run.run
           } yield {
             (body must_== s"deleted ${printPath(f)}") and
             (res.status must_== Ok)                   and
@@ -808,7 +811,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
 
-            after <- M.lookupConfig(d).run
+            after <- M.lookupConfig(d).run.run
           } yield {
             (body must_== s"deleted ${printPath(d)}") and
               (res.status must_== Ok)                 and

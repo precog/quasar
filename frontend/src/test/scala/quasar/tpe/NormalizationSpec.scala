@@ -33,7 +33,8 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
 
 final class NormalizationSpec extends Qspec with TypeFArbitrary with EJsonArbitrary {
-  implicit val params = Parameters(maxSize = 5)
+  // NB: Limit type depth to something reasonable.
+  implicit val params = Parameters(maxSize = 10)
 
   import TypeF._, normalization._
 

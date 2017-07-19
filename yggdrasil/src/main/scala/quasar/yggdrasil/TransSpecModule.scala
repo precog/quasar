@@ -256,6 +256,10 @@ trait TransSpecModule extends FNModule {
 
       val Id: TransSpec1 = Leaf(Source)
 
+      // fakes an undefinedness literal by derefing an empty object
+      val Undef: TransSpec1 =
+        DerefObjectStatic(ConstLiteral(CEmptyObject, Id), CPathField("bogus"))
+
       val DerefArray0 = DerefArrayStatic(Leaf(Source), CPathIndex(0))
       val DerefArray1 = DerefArrayStatic(Leaf(Source), CPathIndex(1))
       val DerefArray2 = DerefArrayStatic(Leaf(Source), CPathIndex(2))
@@ -268,7 +272,12 @@ trait TransSpecModule extends FNModule {
     type TransSpec2 = TransSpec[Source2]
 
     object TransSpec2 {
-      val LeftId = Leaf(SourceLeft)
+      val LeftId: TransSpec2 = Leaf(SourceLeft)
+      val RightId: TransSpec2 = Leaf(SourceRight)
+
+      // fakes an undefinedness literal by derefing an empty object
+      val Undef: TransSpec2 =
+        DerefObjectStatic(ConstLiteral(CEmptyObject, LeftId), CPathField("bogus"))
 
       /** Flips all `SourceLeft`s to `SourceRight`s and vice versa. */
       def flip(spec: TransSpec2): TransSpec2 = TransSpec.mapSources(spec) {

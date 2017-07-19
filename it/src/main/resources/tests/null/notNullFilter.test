@@ -2,8 +2,7 @@
     "name": "filter on is not null",
     "backends": {
         "mimir":"pending",
-        "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending"
+        "mongodb_q_3_2":  "pending"
     },
     "description": "expression with `is not null` should be true whenever the same filter is satisfied",
     "data": "nulls.data",

@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.physical.sparkcore.fs
+package quasar.physical.sparkcore
 
 import quasar._
 import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
+import quasar.qscript._, MapFuncsCore._, MapFuncsDerived._
+import quasar.physical.sparkcore.fs.CoreMap
 import quasar.std._
 
 import matryoshka._
@@ -32,26 +33,33 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
 
-class CoreMapStdLibSpec extends StdLibSpec {
+class SparkStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Skipped("TODO").left
 
+  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+    (prg, arg1, arg2) match {
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
+      case _ => run
+    }
+
   /** Identify constructs that are expected not to be implemented. */
-  val shortCircuit: AlgebraM[Result \/ ?, MapFuncCore[Fix, ?], Unit] = {
-    case ExtractIsoYear(_)  => TODO
-    case ExtractWeek(_)     => TODO
-    case Power(_, _)        => Skipped("TODO: handle large value").left
-    case ConcatArrays(_, _) => Skipped("TODO: handle mixed string/array").left
-    case _                  => ().right
+  val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
+    case MFC(ExtractIsoYear(_))  => TODO
+    case MFC(ExtractWeek(_))     => TODO
+    case MFD(Trunc(_))           => TODO
+    case MFC(Power(_, _))        => Pending("TODO: handle large value").left
+    case MFC(ConcatArrays(_, _)) => Pending("TODO: handle mixed string/array").left
+    case _                       => ().right
   }
 
   // TODO: figure out how to pass the args to shortCircuit so they can be inspected
-  def check[A](fm: Free[MapFuncCore[Fix, ?], A], args: List[Data]): Option[Result] =
-    fm.cataM(interpretM[Result \/ ?, MapFuncCore[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
+  def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
+    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
 
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
-  def run[A](fm: Free[MapFuncCore[Fix, ?], A], args: A => Data, expected: Data): Result = {
-    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFuncCore[Fix, ?], A, Data => Data](
+  def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
+    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
       a => κ(args(a)).right, CoreMap.change))
     (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }
@@ -76,8 +84,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
       arg1: Data, arg2: Data,
       expected: Data
     ): Result =
-      check(prg, List(arg1, arg2)) getOrElse
-       run[BinaryArg](prg, _.fold(arg1, arg2), expected)
+      ignoreSome(prg, arg1, arg2)(check(prg, List(arg1, arg2)) getOrElse
+       run[BinaryArg](prg, _.fold(arg1, arg2), expected))
 
     def ternaryMapFunc(
       prg: FreeMapA[Fix, TernaryArg],

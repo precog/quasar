@@ -149,7 +149,6 @@ object TypeF extends TypeFInstances {
     JR: Recursive.Aux[J, EJson]
   ): GCoalgebra[T \/ ?, TypeF[J, ?], (T, T)] = {
     type LR  = (T, T)
-    type OUT = TypeF[J, T \/ LR]
     val T    = top[J, T]().embed
     val ⊥    = bottom[J, T]().embed
 
@@ -362,7 +361,7 @@ private[quasar] sealed abstract class TypeFInstances {
 
   implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
     new EncodeEJsonK[TypeF[A, ?]] {
-      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
+      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
         case Bottom()        => tlabel("bottom")
         case Top()           => tlabel("top")
         case Simple(s)       => tlabel(SimpleType.name(s))

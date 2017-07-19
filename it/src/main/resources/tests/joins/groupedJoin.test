@@ -12,7 +12,6 @@
         "mongodb_3_4": "ignoreFieldOrder",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
         "spark_local":       "pending",
         "spark_hdfs":        "pending"
     },

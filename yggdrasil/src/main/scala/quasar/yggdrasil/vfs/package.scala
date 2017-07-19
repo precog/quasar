@@ -56,7 +56,6 @@ package object vfs {
   object POSIXWithTask {
     def generalize[S[_]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
 
-
     trait GeneralizeSyntax[S[_]] {
       def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, A] =
         pwt.mapSuspension(λ[Coproduct[POSIXOp, Task, ?] ~> S](_.run.fold(IP.inj, IT.inj)))

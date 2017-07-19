@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, MountConfig}
-import quasar.physical.{couchbase, marklogic, mongodb, postgresql, sparkcore}
+import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
 
 import pathy.Path._
 import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}
@@ -54,7 +54,6 @@ object TestConfig {
   val MONGO_Q_3_0     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All), mongodb.fs.QScriptFsType)
   val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), mongodb.fs.QScriptFsType)
   val MONGO_Q_3_4     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_4")    , BackendCapability.All), mongodb.fs.QScriptFsType)
-  val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), postgresql.fs.FsType)
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
   val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
 
@@ -64,7 +63,6 @@ object TestConfig {
     MIMIR,
     MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
     MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2, MONGO_Q_3_4,
-    POSTGRESQL,
     SPARK_HDFS, SPARK_LOCAL)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)

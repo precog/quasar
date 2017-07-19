@@ -6,7 +6,6 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "skip",
         "spark_hdfs":        "skip",
         "spark_local":       "skip"
     },

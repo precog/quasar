@@ -2,8 +2,7 @@
     "name": "filter, sort, and limit",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "zips.data",

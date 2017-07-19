@@ -2,7 +2,6 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
-        "postgresql": "pending"
     },
 
     "data": "largeZips.data",

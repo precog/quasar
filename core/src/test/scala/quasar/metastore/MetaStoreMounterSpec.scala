@@ -31,7 +31,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with ScalaCheck {
-  import MetaStoreMounterSpec.Eff
+  import MetaStoreMounterSpec._
   import MountRequest.MountFileSystem
 
   isolated  // NB: each test needs a fresh DB, or else need to get cleanup working in between
@@ -45,6 +45,9 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
     tr
   }
 
+  val db: ConnectionIO ~> Task =
+    λ[ConnectionIO ~> Task](_.transact(xa))
+
   def interpName = "MetaStoreMounter"
 
   def interpret: Eff ~> Task = {
@@ -52,9 +55,6 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       MetaStoreMounter[ConnectionIO, ConnectionIO](
         doMount.andThen(_.point[ConnectionIO]),
         κ(().point[ConnectionIO]))
-
-    val db: ConnectionIO ~> Task =
-      λ[ConnectionIO ~> Task](_.transact(xa))
 
     foldMapNT(db).compose(t)                       :+:
     Failure.toRuntimeError[Task, PathTypeMismatch] :+:
@@ -76,8 +76,37 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
       mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
-        .tuple(mnt.lookupConfig(loc).run)
+        .tuple(mnt.lookupConfig(loc).run.run)
         .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
+    }
+
+    "handle invalid view" >> {
+      val prefix = rootDir
+      val d1 = prefix </> dir("d1")
+      val f1 = prefix </> file("f1")
+      val f2 = prefix </> file("f2")
+
+      val invalidViewMnt = MountingError.invalidMount(MountType.viewMount(), "")
+
+      val mnts = Map[APath, MountingError \/ MountType](
+        f1 -> MountType.viewMount().right,
+        f2 -> MountingError.invalidMount(MountType.viewMount(), "").left,
+        d1 -> MountType.fileSystemMount(dbType).right)
+
+      val a = db(insertMount(f2, MountType.ViewMount, "bogus"))
+
+      val b = (
+        mnt.mountFileSystem(d1, dbType, uriA) >>
+        mnt.mountView(f1, exprA, noVars)      >>
+        mnt.havingPrefix(prefix)
+      ).foldMap(interpret)
+
+      val r = (a >> b).unsafePerformSync
+
+      r ∘ {
+        case -\/(i @ MountingError.InvalidMount(MountType.ViewMount, _)) => i.copy(error = "").left
+        case i => i
+      } must_=== mnts
     }
   }
 
@@ -148,4 +177,10 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
 object MetaStoreMounterSpec {
   type Eff[A]  = Coproduct[Mounting, Eff0, A]
   type Eff0[A] = Coproduct[PathMismatchFailure, MountingFailure, A]
+
+  def insertMount(path: APath, `type`: MountType, uri: String): ConnectionIO[Unit] =
+    MetaStoreAccess.runOneRowUpdate(
+      sql"""INSERT INTO Mounts (path, type, connectionUri)
+            VALUES (${refineType(path)}, ${`type`}, $uri)
+            """.update)
 }

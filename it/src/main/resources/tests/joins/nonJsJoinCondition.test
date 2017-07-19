@@ -5,9 +5,8 @@
         "couchbase":      "pending",
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
-        "mimir":          "skip",
+        "mimir":          "pending",
         "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending",
         "spark_local":    "pending",
         "spark_hdfs":     "pending"
     },

@@ -76,7 +76,6 @@ env:
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=postgresql
     - CONNECTOR=spark_local_test
 
   global:

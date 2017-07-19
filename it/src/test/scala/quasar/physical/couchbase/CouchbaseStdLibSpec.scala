@@ -27,11 +27,12 @@ import quasar.physical.couchbase.fs.{parseConfig, FsType}
 import quasar.physical.couchbase.Couchbase._, QueryFileModule.n1qlResults
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.PlannerError
-import quasar.qscript.{MapFuncCore, MapFuncStdLibTestRunner, FreeMapA}
+import quasar.qscript._
 import quasar.std.StdLibSpec
 
 import java.time.LocalDate
 
+import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import matryoshka.patterns._
@@ -49,8 +50,18 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   type F[A] = Free[Eff, A]
   type M[A] = EitherT[F, PlannerError, A]
 
+  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
+    (prg, arg1, arg2) match {
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lt(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lte(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gt(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gte(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case _ => run
+    }
+
   def run[A](
-    fm: Free[MapFuncCore[Fix, ?], A],
+    fm: Free[MapFunc[Fix, ?], A],
     args: A => QData,
     expected: QData,
     cfg: Config
@@ -107,7 +118,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       arg1: QData, arg2: QData,
       expected: QData
     ): Result =
-      run[BinaryArg](prg, _.fold(arg1, arg2), expected, cfg)
+      ignoreSome(prg, arg1, arg2)(run[BinaryArg](prg, _.fold(arg1, arg2), expected, cfg))
 
     def ternaryMapFunc(
       prg: FreeMapA[Fix, TernaryArg],

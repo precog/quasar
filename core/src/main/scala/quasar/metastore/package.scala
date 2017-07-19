@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
-import quasar.fs.mount.{MountConfig, MountType}
+import quasar.fs.mount.MountType
 
 import doobie.imports._
 import pathy.Path, Path._
@@ -83,18 +83,9 @@ package object metastore {
   implicit val mountTypeMeta: Meta[MountType] = {
     import MountType._
     Meta[String].xmap[MountType](
-      str => (str === "view") ? viewMount() | fileSystemMount(FileSystemType(str)),
-      mt  => fileSystemMount.getOption(mt).fold("view")(_.value))
+      { case "view" => viewMount(); case "module" => moduleMount(); case fsType => fileSystemMount(FileSystemType(fsType)) },
+      _.fold(_.value, "view", "module"))
   }
-
-  implicit val mountConfigComposite: Composite[MountConfig] =
-    Composite[(String, String)].xmap(
-      { case (typ, uri) =>
-        MountConfig.fromConfigPair(typ, uri)
-          .leftMap(unexpectedValue(_))
-          .merge
-      },
-      MountConfig.toConfigPair)
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))

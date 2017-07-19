@@ -40,13 +40,6 @@ quasar_metastore:
   ports:
     - "5432:5432"
 
-quasar_postgresql:
-  container_name: quasar_postgresql
-  image: postgres:9.6
-  privileged: true
-  ports:
-    - "5433:5432"
-
 quasar_marklogic_xml:
   container_name: quasar_marklogic_xml
   build: ./Dockerfiles/Marklogic

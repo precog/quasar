@@ -2,8 +2,7 @@
     "name": "filter with pipeline using variables in query",
 
     "backends": {
-        "mimir":"pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "data": "smallZips.data",

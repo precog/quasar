@@ -29,11 +29,7 @@ import scala.math.{BigDecimal, BigInt}
 import matryoshka._
 import matryoshka.implicits._
 import monocle.{Iso, Prism}
-import scalaz._
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.bind._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._
 
 package object ejson {
   def arr[A] =
@@ -81,10 +77,6 @@ package object ejson {
   val ExtEJson    = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
-  val TypeKey   = "_ejson.type"
-  val SizeKey   = "_ejson.size"
-  val BinaryTag = "_ejson.binary"
-
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
@@ -124,38 +116,67 @@ package object ejson {
     }
   }
 
+
+  final case class TypeTag(value: String) extends scala.AnyVal
+
   object TypeTag {
+    val Binary    = TypeTag("_ejson.binary")
+    val Date      = TypeTag("_ejson.date")
+    val Interval  = TypeTag("_ejson.interval")
+    val Time      = TypeTag("_ejson.time")
+    val Timestamp = TypeTag("_ejson.timestamp")
+
+    val stringIso: Iso[TypeTag, String] =
+      Iso[TypeTag, String](_.value)(TypeTag(_))
+
+    implicit val encodeEJson: EncodeEJson[TypeTag] =
+      EncodeEJson[String].contramap(_.value)
+
+    implicit val order: Order[TypeTag] =
+      Order.orderBy(_.value)
+
+    implicit val show: Show[TypeTag] =
+      Show.showFromToString
+  }
+
+  object Type {
     import EJson._
 
-    def apply[T](tag: String)(implicit T: Corecursive.Aux[T, EJson]): T =
-      fromExt(Map(List(fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)))))
+    val TypeKey = "_ejson.type"
 
-    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[String] =
+    def apply[T](tag: TypeTag)(implicit T: Corecursive.Aux[T, EJson]): T =
+      fromExt(Map(List(fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag.value)))))
+
+    /** Extracts the type tag from a metadata map, if present. */
+    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[TypeTag] =
       ejs match {
-        case ExtEJson(Map(List((Embed(CommonEJson(Str(`TypeKey`))), Embed(CommonEJson(Str(s))))))) => some(s)
-        case _                                                                                     => none
+        case ExtEJson(Map(xs)) =>
+          xs collectFirst {
+            case (Embed(CommonEJson(Str(TypeKey))), Embed(CommonEJson(Str(t)))) => TypeTag(t)
+          }
+        case _ => none
       }
   }
 
-  object SizedTypeTag {
+  object SizedType {
     import EJson._
 
-    def apply[T](tag: String, size: BigInt)(implicit T: Corecursive.Aux[T, EJson]): T =
+    val SizeKey = "_ejson.size"
+
+    def apply[T](tag: TypeTag, size: BigInt)(implicit T: Corecursive.Aux[T, EJson]): T =
       fromExt(Map(List(
-        fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)),
-        fromCommon[T](Str(SizeKey)) -> fromExt[T](Int(size))
+        fromCommon[T](Str(Type.TypeKey)) -> fromCommon[T](Str(tag.value)),
+        fromCommon[T](Str(SizeKey))      -> fromExt[T](Int(size))
       )))
 
-    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[(String, BigInt)] =
+    /** Extracts the type tag and size from a metadata map, if both are present. */
+    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[(TypeTag, BigInt)] =
       ejs match {
         case ExtEJson(Map(xs)) =>
-          val tpe = xs collectFirst {
-            case (Embed(CommonEJson(Str(TypeKey))), Embed(CommonEJson(Str(t)))) => t
-          }
           val size = xs collectFirst {
             case (Embed(CommonEJson(Str(SizeKey))), Embed(ExtEJson(Int(s)))) => s
           }
-          tpe tuple size
+          Type.unapply(ejs) tuple size
 
         case _ => none
       }

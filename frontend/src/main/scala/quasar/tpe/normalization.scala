@@ -106,15 +106,14 @@ object normalization {
     TR: Recursive.Aux[T, TypeF[J, ?]],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): TypeF[J, T] => TypeF[J, T] = {
-    val expandContainers: Coalgebra[TypeF[J, ?], J] =
-      j => j.project match {
-        case CommonEJson(JArr(js)) => arr[J, J](js.toIList.left[J])
-        case ExtEJson(JMap(tts))   => map[J, J](IMap fromFoldable tts, none)
-        case _                     => const[J, J](j)
-      }
+  ): TypeF[J, T] => TypeF[J, T] = totally {
+    case Const(Embed(CommonEJson(JArr(js)))) =>
+      arr[J, T](js.foldRight(IList[T]())((j, ts) =>
+        const[J, T](j).embed :: ts).left)
 
-    totally { case Const(j) => j.ana[T](expandContainers).project }
+    case Const(Embed(ExtEJson((JMap(tts))))) =>
+      map[J, T](tts.foldLeft(IMap.empty[J, T])((m, kv) =>
+        m + kv.map(j => const[J, T](j).embed)), none)
   }
 
   /** Normalizes EJson literals by

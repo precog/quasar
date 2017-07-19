@@ -39,13 +39,13 @@ object Mounting {
     * mounts) to be implemented more efficiently.
     */
   final case class HavingPrefix(dir: ADir)
-    extends Mounting[Map[APath, MountType]]
+    extends Mounting[Map[APath, MountingError \/ MountType]]
 
   final case class LookupType(path: APath)
-    extends Mounting[Option[MountType]]
+      extends Mounting[Option[MountingError \/ MountType]]
 
   final case class LookupConfig(path: APath)
-    extends Mounting[Option[MountConfig]]
+    extends Mounting[Option[MountingError \/ MountConfig]]
 
   final case class MountView(loc: AFile, scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables)
     extends Mounting[MountingError \/ Unit]
@@ -81,7 +81,7 @@ object Mounting {
     import MountConfig._
 
     /** Returns mounts located at a path having the given prefix. */
-    def havingPrefix(dir: ADir): FreeS[Map[APath, MountType]] =
+    def havingPrefix(dir: ADir): FreeS[Map[APath, MountingError \/ MountType]] =
       lift(HavingPrefix(dir))
 
     /** The views mounted at paths having the given prefix. */
@@ -92,7 +92,8 @@ object Mounting {
       viewsHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
 
     def modulesHavingPrefix(dir: ADir): FreeS[Set[ADir]] =
-      havingPrefix(dir).map(_.collect { case (k, v) if v === MountType.ModuleMount => k }.toSet
+      havingPrefix(dir).map(_.collect {
+        case (k, \/-(v)) if v ≟ MountType.ModuleMount => k }.toSet
         .foldMap(p => refineType(p).swap.toSet))
 
     def modulesHavingPrefix_(dir: ADir): FreeS[Set[RDir]] =
@@ -100,21 +101,23 @@ object Mounting {
 
     /** Whether the given path refers to a mount. */
     def exists(path: APath): FreeS[Boolean] =
-      lookupType(path).isDefined
+      lookupType(path).run.isDefined
 
     /** Returns the mount configuration if the given path refers to a mount. */
-    def lookupConfig(path: APath): OptionT[FreeS, MountConfig] =
-      OptionT(lift(LookupConfig(path)))
+    def lookupConfig(path: APath): EitherT[OptionT[FreeS, ?], MountingError, MountConfig] =
+      EitherT(OptionT(lift(LookupConfig(path))))
 
-    def lookupViewConfig(path: AFile): OptionT[FreeS, ViewConfig] =
-      OptionT(lookupConfig(path).run.map(_.flatMap(viewConfig.getOption).map(ViewConfig.tupled)))
+    def lookupViewConfig(path: AFile): EitherT[OptionT[FreeS, ?], MountingError, ViewConfig] =
+      lookupConfig(path).flatMap(config =>
+        EitherT.right(OptionT(viewConfig.getOption(config).map(ViewConfig.tupled).point[FreeS])))
 
-    def lookupModuleConfig(path: ADir): OptionT[FreeS, ModuleConfig] =
-      OptionT(lookupConfig(path).run.map(_.flatMap(moduleConfig.getOption).map(ModuleConfig(_))))
+    def lookupModuleConfig(path: ADir): EitherT[OptionT[FreeS, ?], MountingError, ModuleConfig] =
+      lookupConfig(path).flatMap(config =>
+        EitherT.right(OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS])))
 
     /** Returns the type of mount the path refers to, if any. */
-    def lookupType(path: APath): OptionT[FreeS, MountType] =
-      OptionT(lift(LookupType(path)))
+    def lookupType(path: APath): EitherT[OptionT[FreeS, ?], MountingError, MountType] =
+      EitherT(OptionT(lift(LookupType(path))))
 
     /** Create a view mount at the given location. */
     def mountView(
@@ -216,7 +219,8 @@ object Mounting {
       val mmErr = PathMismatchFailure.Ops[S]
 
       for {
-        cfg     <- lookupConfig(src) getOrElseF mntErr.fail(notFound(src))
+        cfg     <- lookupConfig(src).run.run >>=[MountConfig] (
+                     _.cata(_.fold(mntErr.fail(_), _.η[FreeS]), mntErr.fail(notFound(src))))
         _       <- unmount(src)
         mod     =  mount(dst, f(cfg))
         restore =  mount(src, cfg)

@@ -1,8 +1,7 @@
 {
     "name": "flatten an object resulting from an array projection",
     "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
+        "mimir":"pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0]{*} as parent from slamengine_commits",

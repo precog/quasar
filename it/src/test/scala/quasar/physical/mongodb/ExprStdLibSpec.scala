@@ -55,7 +55,19 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.StartOfDay, _) => notHandled.left
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
+    //FIXME modulo and trunc (which is defined in terms of modulo) cause the
+    //mongo docker container to crash (with quite high frequency but not always).
+    //One or more of the other tests that are now marked as skipped also seem to
+    //cause failures when marked as pending (but with low frequency)
+    case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
+    case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
 
     case (structural.ConcatOp, _)   => notHandled.left
 

@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp.free._
 import quasar.physical.marklogic.cts._
@@ -28,7 +29,6 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFC, _}
 import quasar.{RenderTree, NonTerminal, Terminal}
-import quasar.RenderTree.ops._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -112,21 +112,36 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
-    implicit Q:   Corecursive.Aux[Q, Query[T[EJson], ?]],
-             RTF: RenderTree[FreeMap[T]],
-             RTP: RenderTree[Free[PathMapFuncCore[T, ?], Hole]]
+    implicit Q:   Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = {
-    println(fm.render.show)
-    println(foldProjectField(fm).render.show)
-    none
+    elideGuards(foldProjectField(fm)) match {
+      case Embed(CoEnv(\/-(MapFunc(MFC.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MapFunc(MFC.Constant(v)))))))))) =>
+        Query.PathRange[T[EJson], Q](IList(prettyPrint(pp.path).dropRight(1)), ComparisonOp.EQ, IList(v)).embed.some
+    }
   }
 
-  object PathProject {
+  private object PathProject {
     def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] =
       pr.run.toOption
   }
 
-  def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
+  private object MapFunc {
+    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[MapFuncCore[T, A]] =
+      pr.run.swap.toOption
+  }
+
+  /* Discards nested projection guards. The existence of a path range index a/b/c
+   * guarantees that the nested projection a/b/c is valid. */
+  private def elideGuards[T[_[_]]: RecursiveT](fpm: FreePathMap[T]): FreePathMap[T] = {
+    val alg: CoPathMapFunc[T, FreePathMap[T]] => CoPathMapFunc[T, FreePathMap[T]] = totally {
+      case CoEnv(\/-(MapFunc(MFC.Guard(Embed(CoEnv(\/-(PathProject(_)))), _, cont, _)))) =>
+        CoEnv(cont.resume.swap)
+    }
+
+    fpm.transCata[FreePathMap[T]](alg)
+  }
+
+  private def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
     val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
       case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) => {
         val dir0 = path.path </> dir(field)

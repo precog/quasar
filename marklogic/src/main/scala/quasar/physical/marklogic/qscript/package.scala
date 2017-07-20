@@ -42,6 +42,11 @@ package object qscript {
 
   type MonadPlanErr[F[_]] = MonadError_[F, MarkLogicPlannerError]
 
+  type PathMapFunc[T[_[_]], A]   = Coproduct[ProjectPath, MapFunc[T, ?], A]
+  type FreePathMap[T[_[_]]]      = Free[PathMapFunc[T, ?], Hole]
+  type CoMapFunc[T[_[_]], A]     = CoEnv[Hole, MapFunc[T, ?], A]
+  type CoPathMapFunc[T[_[_]], A] = CoEnv[Hole, PathMapFunc[T, ?], A]
+
   object MonadPlanErr {
     def apply[F[_]](implicit F: MonadPlanErr[F]): MonadPlanErr[F] = F
   }

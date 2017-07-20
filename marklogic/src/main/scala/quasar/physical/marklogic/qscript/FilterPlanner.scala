@@ -62,10 +62,10 @@ private[qscript] final class FilterPlanner[
             List(rt.render(pp.src), Terminal(List("Path"), prettyPrint(pp.path).some))))))
   }
 
-  type PathMapFuncCore[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], ProjectPath, A]
-  type FreePathMap[T[_[_]]]        = Free[PathMapFuncCore[T, ?], Hole]
-  type CoMapFunc[T[_[_]], A]       = CoEnv[Hole, MapFuncCore[T, ?], A]
-  type CoPathMapFunc[T[_[_]], A]   = CoEnv[Hole, PathMapFuncCore[T, ?], A]
+  type CoMapFunc[T[_[_]], A]     = CoEnv[Hole, MapFunc[T, ?], A]
+  type CoPathMapFunc[T[_[_]], A] = CoEnv[Hole, PathMapFunc[T, ?], A]
+  type FreePathMap[T[_[_]]]      = Free[PathMapFunc[T, ?], Hole]
+  type PathMapFunc[T[_[_]], A]   = Coproduct[ProjectPath, MapFunc[T, ?], A]
 
   def plan[Q](src: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
@@ -121,20 +121,20 @@ private[qscript] final class FilterPlanner[
   }
 
   private object PathProject {
-    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[ProjectPath[A]] =
-      pr.run.toOption
+    def unapply[T[_[_]], A](pr: Coproduct[ProjectPath, MapFunc[T, ?], A]): Option[ProjectPath[A]] =
+      pr.run.swap.toOption
   }
 
-  private object MapFunc {
-    def unapply[T[_[_]], A](pr: Coproduct[MapFuncCore[T, ?], ProjectPath, A]): Option[MapFuncCore[T, A]] =
-      pr.run.swap.toOption
+  private object MapFuncCore {
+    def unapply[T[_[_]], A](pr: PathMapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].prj(pr)
   }
 
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
   private def elideGuards[T[_[_]]: RecursiveT](fpm: FreePathMap[T]): FreePathMap[T] = {
     val alg: CoPathMapFunc[T, FreePathMap[T]] => CoPathMapFunc[T, FreePathMap[T]] = totally {
-      case CoEnv(\/-(MapFunc(MFC.Guard(Embed(CoEnv(\/-(PathProject(_)))), _, cont, _)))) =>
+      case CoEnv(\/-(MapFuncCore(MFC.Guard(Embed(CoEnv(\/-(PathProject(_)))), _, cont, _)))) =>
         CoEnv(cont.resume.swap)
     }
 
@@ -150,12 +150,12 @@ private[qscript] final class FilterPlanner[
       }
       case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) => {
         val dir0 = rootDir[Sandboxed] </> dir(field)
-        val desc = Free.roll(src).mapSuspension(injectNT[MapFuncCore[T, ?], PathMapFuncCore[T, ?]])
+        val desc = Free.roll(src).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]])
 
         CoEnv(Coproduct((ProjectPath(desc, dir0).right)).right)
       }
       case CoEnv(\/-(other)) =>
-        CoEnv(Inject[MapFuncCore[T, ?], PathMapFuncCore[T, ?]].inj(other.map(_._2)).right)
+        CoEnv(Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].inj(other.map(_._2)).right)
       case CoEnv(-\/(h)) => CoEnv(h.left)
     }
 

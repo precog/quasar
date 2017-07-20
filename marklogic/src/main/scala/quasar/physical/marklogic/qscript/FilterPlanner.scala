@@ -27,7 +27,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
-import quasar.qscript.{MapFuncsCore => MFC, _}
+import quasar.qscript.{MapFuncsCore => MFCore, MFC => _, _}
 import quasar.{RenderTree, NonTerminal, Terminal}
 
 import matryoshka.{Hole => _, _}
@@ -112,29 +112,34 @@ private[qscript] final class FilterPlanner[
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
-    implicit Q:   Corecursive.Aux[Q, Query[T[EJson], ?]]
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = {
     elideGuards(foldProjectField(fm)) match {
-      case Embed(CoEnv(\/-(MapFunc(MFC.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MapFunc(MFC.Constant(v)))))))))) =>
+      case Embed(CoEnv(\/-(MFC(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFC(MFCore.Constant(v)))))))))) =>
         Query.PathRange[T[EJson], Q](IList(prettyPrint(pp.path).dropRight(1)), ComparisonOp.EQ, IList(v)).embed.some
     }
   }
 
   private object PathProject {
-    def unapply[T[_[_]], A](pr: Coproduct[ProjectPath, MapFunc[T, ?], A]): Option[ProjectPath[A]] =
-      pr.run.swap.toOption
+    def unapply[T[_[_]], A](pr: PathMapFunc[T, A]): Option[ProjectPath[A]] =
+      Inject[ProjectPath, PathMapFunc[T, ?]].prj(pr)
   }
 
-  private object MapFuncCore {
+  private object MFC {
     def unapply[T[_[_]], A](pr: PathMapFunc[T, A]): Option[MapFuncCore[T, A]] =
       Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].prj(pr)
+  }
+
+  private object MF {
+    def unapply[T[_[_]], A](pr: MapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].prj(pr)
   }
 
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
   private def elideGuards[T[_[_]]: RecursiveT](fpm: FreePathMap[T]): FreePathMap[T] = {
     val alg: CoPathMapFunc[T, FreePathMap[T]] => CoPathMapFunc[T, FreePathMap[T]] = totally {
-      case CoEnv(\/-(MapFuncCore(MFC.Guard(Embed(CoEnv(\/-(PathProject(_)))), _, cont, _)))) =>
+      case CoEnv(\/-(MFC(MFCore.Guard(Embed(CoEnv(\/-(PathProject(_)))), _, cont, _)))) =>
         CoEnv(cont.resume.swap)
     }
 
@@ -143,19 +148,21 @@ private[qscript] final class FilterPlanner[
 
   private def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
     val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
-      case CoEnv(\/-(MFC.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFC.StrLit(field), _)))) => {
+      case CoEnv(\/-(MF(MFCore.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFCore.StrLit(field), _))))) => {
         val dir0 = path.path </> dir(field)
+        val pp   = ProjectPath(path.src, dir0)
 
-        CoEnv(Coproduct((ProjectPath(path.src, dir0).right)).right)
+        CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
-      case CoEnv(\/-(MFC.ProjectField((Embed(CoEnv(\/-(src))), _), (MFC.StrLit(field), _)))) => {
+      case CoEnv(\/-(MF(MFCore.ProjectField((Embed(CoEnv(\/-(src))), _), (MFCore.StrLit(field), _))))) => {
         val dir0 = rootDir[Sandboxed] </> dir(field)
         val desc = Free.roll(src).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]])
+        val pp   = ProjectPath(desc, dir0)
 
-        CoEnv(Coproduct((ProjectPath(desc, dir0).right)).right)
+        CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
       case CoEnv(\/-(other)) =>
-        CoEnv(Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].inj(other.map(_._2)).right)
+        CoEnv(Inject[MapFunc[T, ?], PathMapFunc[T, ?]].inj(other.map(_._2)).right)
       case CoEnv(-\/(h)) => CoEnv(h.left)
     }
 

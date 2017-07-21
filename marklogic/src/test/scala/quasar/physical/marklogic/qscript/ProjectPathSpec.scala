@@ -20,12 +20,13 @@ import slamdata.Predef._
 import quasar.contrib.pathy.ADir
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
+import quasar.fp._
 
 import matryoshka.data._
 import matryoshka.{Hole => _, _}
 import pathy._, Path._
 
-import scalaz._
+import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
   def projectField[T[_[_]]: BirecursiveT](src: FreeMap[T], str: String): FreeMap[T] =
@@ -34,14 +35,14 @@ final class ProjectPathSpec extends quasar.Qspec {
   def projectPath[T[_[_]]: BirecursiveT](src: FreePathMap[T], path: ADir): FreePathMap[T] =
     Free.roll(Inject[ProjectPath, PathMapFunc[T, ?]].inj(ProjectPath(src, path)))
 
-  def hole[T[_[_]]: BirecursiveT]: FreePathMap[T] = Free.point[PathMapFunc[T, ?], Hole](SrcHole)
+  def hole: FreePathMap[Fix] = Free.point[PathMapFunc[Fix, ?], Hole](SrcHole)
 
   "foldProjectField" should {
-    "squash nested ProjectField of constants into a single ProjectPath" in {
+    "squash nested ProjectField of strings into a single ProjectPath" in {
       val nestedProjects: FreeMap[Fix] = projectField(projectField(HoleF, "info"), "location")
 
-      ProjectPath.foldProjectField(nestedProjects) must_===
-        projectPath(hole, rootDir[Sandboxed] </> dir("location") </> dir("info"))
+      ProjectPath.foldProjectField(nestedProjects) must
+        equal(projectPath(hole, rootDir[Sandboxed] </> dir("info") </> dir("location")))
     }
   }
 }

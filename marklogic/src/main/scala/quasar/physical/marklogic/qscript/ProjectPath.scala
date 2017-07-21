@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore, MFC => _, _}
 import quasar.{RenderTree, NonTerminal, Terminal}
@@ -62,9 +63,10 @@ object ProjectPath extends ProjectPathInstances {
 
         CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
-      case CoEnv(\/-(MFC(MFCore.ProjectField((Embed(CoEnv(\/-(src))), _), (MFCore.StrLit(field), _))))) => {
+      case CoEnv(\/-(MFC(MFCore.ProjectField((Embed(CoEnv(src)), _), (MFCore.StrLit(field), _))))) => {
         val dir0 = rootDir[Sandboxed] </> dir(field)
-        val desc = Free.roll(src).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]])
+        val desc = src.fold(κ(Free.point[PathMapFunc[T, ?],  Hole](SrcHole)),
+          Free.roll(_).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]]))
         val pp   = ProjectPath(desc, dir0)
 
         CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
@@ -84,7 +86,17 @@ sealed abstract class ProjectPathInstances {
       def map[A, B](fa: ProjectPath[A])(f: A => B) = ProjectPath(f(fa.src), fa.path)
     }
 
-  implicit def delayRenderTree[A]: Delay[RenderTree, ProjectPath] =
+  implicit def show[A]: Delay[Show, ProjectPath] = new Delay[Show, ProjectPath] {
+    def apply[A](sh: Show[A]): Show[ProjectPath[A]] = Show.show { pp =>
+      Cord.fromStrings(List("ProjectPath(", sh.shows(pp.src), ")"))
+    }
+  }
+
+  implicit def equal[A]: Delay[Equal, ProjectPath] = new Delay[Equal, ProjectPath] {
+    def apply[A](eq: Equal[A]) = Equal.equalBy(_.path)
+  }
+
+  implicit def renderTree[A]: Delay[RenderTree, ProjectPath] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ ProjectPath)#λ](rt =>
       RenderTree.make(pp =>
         NonTerminal(List("ProjectPath"), none,

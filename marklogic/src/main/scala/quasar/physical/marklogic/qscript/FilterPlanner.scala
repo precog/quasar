@@ -83,13 +83,12 @@ private[qscript] final class FilterPlanner[
   private def interpretSearch[Q](s: Search[Q])(implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]): F[XQuery] =
     Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
+  /* Discards nested projection guards. The existence of a path range index a/b/c
+   * guarantees that the nested projection a/b/c is valid. */
   private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
     case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
       Query.PathRange[T[EJson], Q](IList(prettyPrint(pp.path).dropRight(1)), ComparisonOp.EQ, IList(v)).embed.some
   }
-
-  /* Discards nested projection guards. The existence of a path range index a/b/c
-   * guarantees that the nested projection a/b/c is valid. */
 }

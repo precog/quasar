@@ -18,9 +18,10 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
+import quasar.fp._
+import quasar.fp.free._
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
-import quasar.fp._
 
 import matryoshka.data._
 import matryoshka.{Hole => _, _}
@@ -35,14 +36,27 @@ final class ProjectPathSpec extends quasar.Qspec {
   def projectPath[T[_[_]]: BirecursiveT](src: FreePathMap[T], path: ADir): FreePathMap[T] =
     Free.roll(Inject[ProjectPath, PathMapFunc[T, ?]].inj(ProjectPath(src, path)))
 
-  def hole: FreePathMap[Fix] = Free.point[PathMapFunc[Fix, ?], Hole](SrcHole)
+  def makeMap[T[_[_]]: BirecursiveT](key: String, values: FreeMap[T]): FreeMap[T] =
+    Free.roll(MFC(MakeMap(StrLit(key), values)))
+
+  def makeMapPath[T[_[_]]: BirecursiveT](key: String, values: FreeMap[T]): FreePathMap[T] =
+    makeMap(key, values).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]])
+
+  def hole[T[_[_]]]: FreePathMap[T] = Free.point[PathMapFunc[T, ?], Hole](SrcHole)
 
   "foldProjectField" should {
     "squash nested ProjectField of strings into a single ProjectPath" in {
-      val nestedProjects: FreeMap[Fix] = projectField(projectField(HoleF, "info"), "location")
+      val nestedProjects = projectField[Fix](projectField(HoleF, "info"), "location")
 
       ProjectPath.foldProjectField(nestedProjects) must
-        equal(projectPath(hole, rootDir[Sandboxed] </> dir("info") </> dir("location")))
+        equal(projectPath[Fix](hole, rootDir[Sandboxed] </> dir("info") </> dir("location")))
+    }
+
+    "preserve an unrelated node inside a nesting of ProjectField" in {
+      val unrelatedNode = projectField[Fix](makeMap("k", projectField(HoleF, "info")), "location")
+
+      ProjectPath.foldProjectField(unrelatedNode) must
+        equal(projectPath[Fix](hole, rootDir[Sandboxed] </> dir("location")))
     }
   }
 }

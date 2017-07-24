@@ -33,6 +33,8 @@ import matryoshka.implicits._
 import pathy._, Path._
 import scalaz._, Scalaz._
 
+/* TODO switch from ADir to AFile
+ *  @tparam A recursive position */
 final case class ProjectPath[A](src: A, path: ADir)
 
 object PathProject {
@@ -81,7 +83,7 @@ object ProjectPath extends ProjectPathInstances {
 }
 
 sealed abstract class ProjectPathInstances {
-  implicit def functorProjectPath: Functor[ProjectPath] =
+  implicit def functor: Functor[ProjectPath] =
     new Functor[ProjectPath] {
       def map[A, B](fa: ProjectPath[A])(f: A => B) = ProjectPath(f(fa.src), fa.path)
     }

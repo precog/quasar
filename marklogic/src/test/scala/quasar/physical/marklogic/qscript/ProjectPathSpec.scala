@@ -30,33 +30,44 @@ import pathy._, Path._
 import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
-  def projectField[T[_[_]]: BirecursiveT](src: FreeMap[T], str: String): FreeMap[T] =
-    Free.roll(MFC(ProjectField(src, StrLit(str))))
+  def projectField0[T[_[_]]: BirecursiveT, S[_]: Functor](src: Free[MapFunc[T, ?], Hole], str: String)(
+    implicit I: MapFunc[T, ?] :<: S
+  ): Free[S, Hole] =
+    Free.roll[MapFunc[T, ?], Hole](MFC(ProjectField(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[T, ?], S])
+
+  def makeMap[T[_[_]]: BirecursiveT, S[_]: Functor](key: String, values: Free[MapFunc[T, ?], Hole])(
+    implicit I: MapFunc[T, ?] :<: S
+  ) : Free[S, Hole] =
+    Free.roll[MapFunc[T, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(injectNT[MapFunc[T, ?], S])
+
+  def holeS[T[_[_]]: BirecursiveT, S[_]: Functor](implicit I: MapFunc[T, ?] :<: S): Free[S, Hole] =
+    Free.point[MapFunc[T, ?], Hole](SrcHole).mapSuspension(injectNT[MapFunc[T, ?], S])
 
   def projectPath[T[_[_]]: BirecursiveT](src: FreePathMap[T], path: ADir): FreePathMap[T] =
     Free.roll(Inject[ProjectPath, PathMapFunc[T, ?]].inj(ProjectPath(src, path)))
 
-  def makeMap[T[_[_]]: BirecursiveT](key: String, values: FreeMap[T]): FreeMap[T] =
-    Free.roll(MFC(MakeMap(StrLit(key), values)))
+  def projectField(src: FreeMap[Fix], str: String) =
+    projectField0[Fix, MapFunc[Fix, ?]](src, str)
 
-  def makeMapPath[T[_[_]]: BirecursiveT](key: String, values: FreeMap[T]): FreePathMap[T] =
-    makeMap(key, values).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]])
+  def makeMapPath(key: String, values: Free[MapFunc[Fix, ?], Hole]): FreePathMap[Fix] =
+    makeMap[Fix, PathMapFunc[Fix, ?]](key, values)
 
-  def hole[T[_[_]]]: FreePathMap[T] = Free.point[PathMapFunc[T, ?], Hole](SrcHole)
+  def holeM = holeS[Fix, MapFunc[Fix, ?]]
+  def holeP = holeS[Fix, PathMapFunc[Fix, ?]]
 
   "foldProjectField" should {
     "squash nested ProjectField of strings into a single ProjectPath" in {
-      val nestedProjects = projectField[Fix](projectField(HoleF, "info"), "location")
+      val nestedProjects = projectField(projectField(holeM, "info"), "location")
 
       ProjectPath.foldProjectField(nestedProjects) must
-        equal(projectPath[Fix](hole, rootDir[Sandboxed] </> dir("info") </> dir("location")))
+        equal(projectPath[Fix](holeP, rootDir[Sandboxed] </> dir("info") </> dir("location")))
     }
 
     "preserve an unrelated node inside a nesting of ProjectField" in {
-      val unrelatedNode = projectField[Fix](makeMap("k", projectField(HoleF, "info")), "location")
+      val inclUnrelatedNode = projectField(makeMap("k", projectField(holeM, "info")), "location")
 
-      ProjectPath.foldProjectField(unrelatedNode) must
-        equal(projectPath[Fix](hole, rootDir[Sandboxed] </> dir("location")))
+      ProjectPath.foldProjectField(inclUnrelatedNode) must
+        equal(projectPath[Fix](makeMapPath("k", projectField0(holeM, "info")), rootDir[Sandboxed] </> dir("location")))
     }
   }
 }

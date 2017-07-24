@@ -46,7 +46,7 @@ final class ProjectPathSpec extends quasar.Qspec {
   def projectPath[T[_[_]]: BirecursiveT](src: FreePathMap[T], path: ADir): FreePathMap[T] =
     Free.roll(Inject[ProjectPath, PathMapFunc[T, ?]].inj(ProjectPath(src, path)))
 
-  def projectField(src: FreeMap[Fix], str: String) =
+  def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
     projectField0[Fix, MapFunc[Fix, ?]](src, str)
 
   def makeMapPath(key: String, values: Free[MapFunc[Fix, ?], Hole]): FreePathMap[Fix] =

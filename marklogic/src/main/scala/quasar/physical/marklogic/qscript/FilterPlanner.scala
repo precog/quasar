@@ -39,24 +39,28 @@ private[qscript] final class FilterPlanner[
   FMT: SearchOptions,
   T[_[_]]: BirecursiveT: ShowT
 ](implicit SP: StructuralPlanner[F, FMT]) {
-  def plan[Q](src: Search[Q] \/ XQuery, f: FreeMap[T])(
+  def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Search[Q] \/ XQuery] = src match {
-    case \/-(src) => xqueryFilter(src, f) map (_.right)
-    case -\/(src) => planPredicate[T, Q](f)
-        .fold(fallbackFilter(src, f) map (_.right[Search[Q]]))(searchFilter(src, f))
-  }
+  ): F[Search[Q] \/ XQuery] = {
+    lazy val query        = planPredicate[T, Q](f)
+    lazy val isQueryValid = (query map (queryIsValid[F, Q, T[EJson], FMT](_))).getOrElse(false.point[F])
 
-  private def searchFilter[Q](src: Search[Q], f: FreeMap[T])(q: Q)(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Search[Q] \/ XQuery] =
-    queryIsValid[F, Q, T[EJson], FMT](planAsSearch(src, f, q).query)
-      .ifM(planAsSearch(src, f, q).left[XQuery].point[F], fallbackFilter(src, f) map (_.right[Search[Q]]))
+    (src0.point[F] |@| query.point[F] |@| isQueryValid) {
+      case (\/-(src), _, _)           => xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), None, _)        => fallbackFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), Some(q), false) => fallbackFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), Some(q), true)  => planAsSearch(src, f, q).left[XQuery].point[F]
+    }.join
+  }
 
   private def fallbackFilter[Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[XQuery] =
-    (interpretSearch[Q](src) >>= (xqueryFilter(_: XQuery, f)))
+  ): F[XQuery] = {
+    def interpretSearch(s: Search[Q]): F[XQuery] =
+      Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
+
+    interpretSearch(src) >>= (xqueryFilter(_: XQuery, f))
+  }
 
   private def planAsSearch[Q](src: Search[Q], f: FreeMap[T], q: Q)(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
@@ -80,8 +84,6 @@ private[qscript] final class FilterPlanner[
         for_(x in src) where_ p return_ ~x
     }
 
-  private def interpretSearch[Q](s: Search[Q])(implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]): F[XQuery] =
-    Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */

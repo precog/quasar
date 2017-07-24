@@ -31,6 +31,8 @@ import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.patterns._
 import matryoshka.implicits._
+import pathy.Path.depth
+import xml.name._
 
 import scalaz._, Scalaz._
 
@@ -42,14 +44,14 @@ private[qscript] final class FilterPlanner[
   def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
-    lazy val query        = planPredicate[T, Q](f)
-    lazy val isQueryValid = (query map (queryIsValid[F, Q, T[EJson], FMT](_))).getOrElse(false.point[F])
+    lazy val pathQuery      = planPathIndex[T, Q](f)
+    lazy val pathQueryValid = (pathQuery map (queryIsValid[F, Q, T[EJson], FMT](_))).getOrElse(false.point[F])
 
-    (src0.point[F] |@| query.point[F] |@| isQueryValid) {
+    (src0.point[F] |@| pathQuery.point[F] |@| pathQueryValid) {
       case (\/-(src), _, _)           => xqueryFilter(src, f) map (_.right[Search[Q]])
       case (-\/(src), None, _)        => fallbackFilter(src, f) map (_.right[Search[Q]])
       case (-\/(src), Some(q), false) => fallbackFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), Some(q), true)  => planAsSearch(src, f, q).left[XQuery].point[F]
+      case (-\/(src), Some(q), true)  => indexFilter(src, q).left[XQuery].point[F]
     }.join
   }
 
@@ -61,11 +63,6 @@ private[qscript] final class FilterPlanner[
 
     interpretSearch(src) >>= (xqueryFilter(_: XQuery, f))
   }
-
-  private def planAsSearch[Q](src: Search[Q], f: FreeMap[T], q: Q)(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Search[Q] =
-    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
   private def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
     for {
@@ -85,12 +82,41 @@ private[qscript] final class FilterPlanner[
     }
 
 
+  private def indexFilter[Q](src: Search[Q], q: Q)(
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Search[Q] =
+    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
+
+
+  private object PathProjection {
+    def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ADir, T[EJson])] = fpm match {
+      case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
+        (pp.path, v).some
+    }
+  }
+
+  private object QNamePath {
+    def unapply(path: ADir): Option[QName] = {
+      if(depth(path) === 1) {
+        NCName.fromString(prettyPrint(path).drop(1).dropRight(1))
+          .toOption map (QName.unprefixed(_))
+      } else none
+    }
+  }
+
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
-  private def planPredicate[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
+  private def planPathIndex[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
-    case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
-      Query.PathRange[T[EJson], Q](IList(prettyPrint(pp.path).dropRight(1)), ComparisonOp.EQ, IList(v)).embed.some
+    case PathProjection(path, const) =>
+      Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
+  }
+
+  private def planElementIndex[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
+    case PathProjection(QNamePath(path), const) =>
+      Query.ElementRange[T[EJson], Q](IList(path), ComparisonOp.EQ, IList(const)).embed.some
   }
 }

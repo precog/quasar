@@ -19,6 +19,7 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.ejson.EJson
+import quasar.fp.ski._
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
@@ -44,7 +45,8 @@ private[qscript] final class FilterPlanner[
   def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
-    lazy val pathQuery: F[Option[Q]] = validQuery(planPathIndex(f))
+    lazy val pathQuery: F[Option[Q]] = (planPathIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
+    lazy val elementQuery: F[Option[Q]] = (planElementIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
 
     (src0.point[F] |@| pathQuery) {
       case (\/-(src), _)       => xqueryFilter(src, f) map (_.right[Search[Q]])
@@ -118,10 +120,7 @@ private[qscript] final class FilterPlanner[
       Query.ElementRange[T[EJson], Q](IList(qname), ComparisonOp.EQ, IList(const)).embed.some
   }
 
-  private def validQuery[Q](q: Option[Q])(
+  private def validQuery[Q](qry: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Option[Q]] = q match {
-    case Some(qry) => queryIsValid[F, Q, T[EJson], FMT](qry).ifM(qry.some.point[F], none.point[F])
-    case None      => none.point[F]
-  }
+  ): F[Option[Q]] = queryIsValid[F, Q, T[EJson], FMT](qry).ifM(qry.some.point[F], none.point[F])
 }

@@ -44,14 +44,12 @@ private[qscript] final class FilterPlanner[
   def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
-    lazy val pathQuery      = planPathIndex[T, Q](f)
-    lazy val pathQueryValid = (pathQuery map (queryIsValid[F, Q, T[EJson], FMT](_))).getOrElse(false.point[F])
+    lazy val pathQuery: F[Option[Q]] = validQuery(planPathIndex(f))
 
-    (src0.point[F] |@| pathQuery.point[F] |@| pathQueryValid) {
-      case (\/-(src), _, _)           => xqueryFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), None, _)        => fallbackFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), Some(q), false) => fallbackFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), Some(q), true)  => indexFilter(src, q).left[XQuery].point[F]
+    (src0.point[F] |@| pathQuery) {
+      case (\/-(src), _)       => xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), None)    => fallbackFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), Some(q)) => indexFilter(src, q).left[XQuery].point[F]
     }.join
   }
 
@@ -106,17 +104,24 @@ private[qscript] final class FilterPlanner[
 
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
-  private def planPathIndex[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
+  private def planPathIndex[Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
     case PathProjection(path, const) =>
       Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
   }
 
-  private def planElementIndex[T[_[_]]: RecursiveT, Q](fm: FreeMap[T])(
+  private def planElementIndex[Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
-    case PathProjection(QNamePath(path), const) =>
-      Query.ElementRange[T[EJson], Q](IList(path), ComparisonOp.EQ, IList(const)).embed.some
+    case PathProjection(QNamePath(qname), const) =>
+      Query.ElementRange[T[EJson], Q](IList(qname), ComparisonOp.EQ, IList(const)).embed.some
+  }
+
+  private def validQuery[Q](q: Option[Q])(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): F[Option[Q]] = q match {
+    case Some(qry) => queryIsValid[F, Q, T[EJson], FMT](qry).ifM(qry.some.point[F], none.point[F])
+    case None      => none.point[F]
   }
 }

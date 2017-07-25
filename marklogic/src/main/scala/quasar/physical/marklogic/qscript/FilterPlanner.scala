@@ -92,6 +92,7 @@ private[qscript] final class FilterPlanner[
     def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ADir, T[EJson])] = fpm match {
       case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
         (pp.path, v).some
+      case _ => none
     }
   }
 
@@ -111,6 +112,7 @@ private[qscript] final class FilterPlanner[
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
     case PathProjection(path, const) =>
       Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
+    case _ => none
   }
 
   private def planElementIndex[Q](fm: FreeMap[T])(
@@ -118,6 +120,7 @@ private[qscript] final class FilterPlanner[
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
     case PathProjection(QNamePath(qname), const) =>
       Query.ElementRange[T[EJson], Q](IList(qname), ComparisonOp.EQ, IList(const)).embed.some
+    case _ => none
   }
 
   private def validQuery[Q](qry: Q)(

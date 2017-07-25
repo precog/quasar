@@ -63,8 +63,12 @@ trait Xcc[F[_]] extends MonadError_[F, XccError] {
     execute(defaultModule(query))
 
   /** Returns the sequence of `XdmItem`s resulting from evaluating the given XQuery expression. */
-  def queryResults(query: XQuery): F[Vector[XdmItem]] =
+  def queryResults(query: XQuery): F[Vector[XdmItem]] = {
+    println("######## Running ########")
+    println(query)
+    println("#########################")
     results(defaultModule(query))
+  }
 
   ////
 

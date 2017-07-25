@@ -32,7 +32,7 @@ import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.patterns._
 import matryoshka.implicits._
-import pathy.Path.depth
+import pathy.Path._
 import xml.name._
 
 import scalaz._, Scalaz._
@@ -45,13 +45,16 @@ private[qscript] final class FilterPlanner[
   def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
-    lazy val pathQuery: F[Option[Q]] = (planPathIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
+    lazy val pathQuery: F[Option[Q]]    = (planPathIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
     lazy val elementQuery: F[Option[Q]] = (planElementIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
+    lazy val starQuery: F[Option[Q]]    = (planPathStarIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
 
-    (src0.point[F] |@| pathQuery) {
-      case (\/-(src), _)       => xqueryFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), None)    => fallbackFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), Some(q)) => indexFilter(src, q).left[XQuery].point[F]
+    (src0.point[F] |@| pathQuery |@| starQuery |@| elementQuery) {
+      case (\/-(src), _, _, _)          => xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src), Some(q), _, _)    => indexedFilter(src, q).left[XQuery].point[F]
+      case (-\/(src), _, Some(q), _)    => indexedFilter(src, q).left[XQuery].point[F]
+      case (-\/(src), _, _, Some(q))    => indexedFilter(src, q).left[XQuery].point[F]
+      case (-\/(src), None, None, None) => fallbackFilter(src, f) map (_.right[Search[Q]])
     }.join
   }
 
@@ -82,7 +85,7 @@ private[qscript] final class FilterPlanner[
     }
 
 
-  private def indexFilter[Q](src: Search[Q], q: Q)(
+  private def indexedFilter[Q](src: Search[Q], q: Q)(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Search[Q] =
     Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
@@ -112,6 +115,16 @@ private[qscript] final class FilterPlanner[
   ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
     case PathProjection(path, const) =>
       Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
+    case _ => none
+  }
+
+  private def planPathStarIndex[Q](fm: FreeMap[T])(
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
+    case PathProjection(path, const) => {
+      val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
+      Query.PathRange[T[EJson], Q](IList(prettyPrint(starPath).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
+    }
     case _ => none
   }
 

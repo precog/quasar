@@ -24,7 +24,7 @@ import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}
+import quasar.fs.mount.{ConnectionUri, BackendDef}
 
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -36,9 +36,9 @@ object filesystems {
   def testFileSystem(
     uri: ConnectionUri,
     prefix: ADir,
-    f: Free[Eff, FileSystemDef.DefinitionError \/ FileSystemDef.DefinitionResult[Free[Eff, ?]]]
-  ): Task[(AnalyticalFileSystem ~> Task, Task[Unit])] = {
-    val fsDef = f.flatMap[FileSystemDef.DefinitionResult[EffM]] {
+    f: Free[Eff, BackendDef.DefinitionError \/ BackendDef.DefinitionResult[Free[Eff, ?]]]
+  ): Task[(BackendEffect ~> Task, Task[Unit])] = {
+    val fsDef = f.flatMap[BackendDef.DefinitionResult[EffM]] {
         case -\/(-\/(strs)) => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
         case -\/(\/-(err))  => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(err.shows)))
         case \/-(d)         => d.point[EffM]

@@ -21,6 +21,7 @@ import quasar.precog.common._
 trait FNModule {
   type F1
   type F2
+  type FN
 
   implicit def liftF1(f1: F1): F1Like
   trait F1Like {

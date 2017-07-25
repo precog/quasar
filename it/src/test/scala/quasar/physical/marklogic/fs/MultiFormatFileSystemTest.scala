@@ -31,24 +31,24 @@ import scalaz.concurrent.Task
 
 abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpers {
   def multiFormatFileSystemShould(
-    js:  AnalyticalFileSystem ~> Task,
-    xml: AnalyticalFileSystem ~> Task
+    js:  BackendEffect ~> Task,
+    xml: BackendEffect ~> Task
   ): Fragment
 
-  type Fs[A]  = Free[AnalyticalFileSystem, A]
+  type Fs[A]  = Free[BackendEffect, A]
   type FsE[A] = FileSystemErrT[Fs, A]
 
-  val manage = ManageFile.Ops[AnalyticalFileSystem]
-  val query  = QueryFile.Ops[AnalyticalFileSystem]
-  val read   = ReadFile.Ops[AnalyticalFileSystem]
-  val write  = WriteFile.Ops[AnalyticalFileSystem]
+  val manage = ManageFile.Ops[BackendEffect]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
 
   val dropPhases = λ[query.transforms.ExecM ~> FsE](e => EitherT(e.run.value))
 
-  def runFs(fs: AnalyticalFileSystem ~> Task): Fs ~> Task =
+  def runFs(fs: BackendEffect ~> Task): Fs ~> Task =
     foldMapNT(fs)
 
-  def runFsE(fs: AnalyticalFileSystem ~> Task): FsE ~> FileSystemErrT[Task, ?] =
+  def runFsE(fs: BackendEffect ~> Task): FsE ~> FileSystemErrT[Task, ?] =
     Hoist[FileSystemErrT].hoist(runFs(fs))
 
   TestConfig.fileSystemConfigs(FsType).flatMap (cfgs =>
@@ -59,8 +59,8 @@ abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpe
       case (_, uri, _) =>
         (testing.multiFormatDef(uri, 10000L, 10000L) |@| testsRoot) { (mfd, root) =>
           val (js, xml, close) = mfd
-          val chrootJs  = foldMapNT(js) compose chroot.analyticalFileSystem[AnalyticalFileSystem](root)
-          val chrootXml = foldMapNT(xml) compose chroot.analyticalFileSystem[AnalyticalFileSystem](root)
+          val chrootJs  = foldMapNT(js) compose chroot.backendEffect[BackendEffect](root)
+          val chrootXml = foldMapNT(xml) compose chroot.backendEffect[BackendEffect](root)
           val cleanup   = {
             val delRoot = manage.delete(root).run.void
             (delRoot foldMap js) *> (delRoot foldMap xml)

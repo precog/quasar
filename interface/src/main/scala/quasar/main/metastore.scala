@@ -25,7 +25,7 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
+import quasar.fs.mount._, BackendDef.DefinitionResult
 import quasar.metastore._
 
 import argonaut._, Argonaut._
@@ -92,7 +92,7 @@ object metastore {
   }
 
   def jdbcMounter[S[_]](
-    hfsRef: TaskRef[AnalyticalFileSystem~> HierarchicalFsEffM],
+    hfsRef: TaskRef[BackendEffect~> HierarchicalFsEffM],
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,
@@ -168,7 +168,7 @@ object metastore {
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {
-      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephmralMnt   =  KvsMounter.interpreter[Task, QErrsTCnxIO](

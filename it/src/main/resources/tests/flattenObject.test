@@ -2,7 +2,7 @@
     "name": "flatten object",
     "backends": {
         "couchbase":  "ignoreFieldOrder",
-        "mimir":"pending"
+        "mimir":"ignoreFieldOrder"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",

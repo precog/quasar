@@ -48,16 +48,16 @@ import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec
-  extends FileSystemTest[AnalyticalFileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
+  extends FileSystemTest[BackendEffectIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
   with quasar.ExclusiveQuasarSpecification {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 
-  val query  = QueryFile.Ops[AnalyticalFileSystemIO]
-  val write  = WriteFile.Ops[AnalyticalFileSystemIO]
-  val manage = ManageFile.Ops[AnalyticalFileSystemIO]
-  val fsQ    = new FilesystemQueries[AnalyticalFileSystemIO]
+  val query  = QueryFile.Ops[BackendEffectIO]
+  val write  = WriteFile.Ops[BackendEffectIO]
+  val manage = ManageFile.Ops[BackendEffectIO]
+  val fsQ    = new FilesystemQueries[BackendEffectIO]
 
   type X[A] = Process[manage.M, A]
 
@@ -369,12 +369,12 @@ class MongoDbFileSystemSpec
 object MongoDbFileSystemSpec {
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
-  val mongoFsUT: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
+  val mongoFsUT: Task[IList[SupportedFs[BackendEffectIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
           FileSystemTest.fsTestConfig(FsType, definition)
-        ).handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
+        ).handleWith[IList[SupportedFs[BackendEffect]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
       )(_.liftIO)
@@ -383,12 +383,12 @@ object MongoDbFileSystemSpec {
 object MongoDbQScriptFileSystemSpec {
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
-  val mongoFsUT: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
+  val mongoFsUT: Task[IList[SupportedFs[BackendEffectIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
           FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
-        ).handleWith[IList[SupportedFs[AnalyticalFileSystem]]] {
+        ).handleWith[IList[SupportedFs[BackendEffect]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
       )(_.liftIO)

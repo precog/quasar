@@ -18,6 +18,7 @@ package quasar.mimir
 
 import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.std.StringLib
 import quasar.yggdrasil.bytecode._
 
 import quasar.yggdrasil.table._
@@ -83,6 +84,16 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
+    class Op1SB(name: String, f: String => Boolean) extends Op1F1(StringNamespace, name) {
+      //@deprecated, see the DEPRECATED comment in StringLib
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      private def build(c: StrColumn) = new BoolFrom.S(c, _ != null, f)
+      def f1: F1 = CF1P("builtin::str::op1sb::" + name) {
+        case c: StrColumn  => build(c)
+        case c: DateColumn => build(dateToStrCol(c))
+      }
+    }
+
     object trim extends Op1SS("trim", _.trim)
 
     object toUpperCase extends Op1SS("toUpperCase", _.toUpperCase)
@@ -90,6 +101,88 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     object toLowerCase extends Op1SS("toLowerCase", _.toLowerCase)
 
     object intern extends Op1SS("intern", _.intern)
+
+    object readBoolean extends Op1F1(StringNamespace, "readBoolean") {
+      val tpe = UnaryOperationType(StrAndDateT, JBooleanT)
+      def f1: F1 = CF1P("builtin::str::readBoolean") {
+        case c: StrColumn => new BoolFrom.S(c, s => s == "true" || s == "false", _.toBoolean)
+        case c: DateColumn => new BoolFrom.S(dateToStrCol(c), s => s == "true" || s == "false", _.toBoolean)
+      }
+    }
+
+    object readInteger extends Op1F1(StringNamespace, "readInteger") {
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      def f1: F1 = CF1P("builtin::str::readInteger") {
+        case c: StrColumn => new LongFrom.S(c, s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
+        case c: DateColumn => new LongFrom.S(dateToStrCol(c), s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
+      }
+    }
+
+    object readDecimal extends Op1F1(StringNamespace, "readDecimal") {
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      def f1: F1 = CF1P("builtin::str::readDecimal") {
+        case c: StrColumn => new NumFrom.S(c, s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
+        case c: DateColumn => new NumFrom.S(dateToStrCol(c), s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
+      }
+    }
+
+    object readNull extends Op1F1(StringNamespace, "readNull") {
+      val tpe = UnaryOperationType(StrAndDateT, JNullT)
+      def f1: F1 = CF1P("builtin::str::readNull") {
+        case c: StrColumn =>
+          new NullColumn {
+            def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
+          }
+
+        case dc: DateColumn =>
+          val c = dateToStrCol(dc)
+
+          new NullColumn {
+            def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
+          }
+      }
+    }
+
+    object convertToString extends Op1F1(StringNamespace, "toString") {
+      val tpe = UnaryOperationType(JType.JPrimitiveUnfixedT, JTextT)
+      def f1: F1 = CF1P("builtin::str::toString") {
+        case c: BoolColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: LongColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: DoubleColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: NumColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: PeriodColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: DateColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: NullColumn =>
+          new StrColumn {
+            def apply(row: Int) = "null"
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+      }
+    }
 
     object isEmpty extends Op1F1(StringNamespace, "isEmpty") {
       //@deprecated, see the DEPRECATED comment in StringLib
@@ -134,6 +227,176 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     object endsWith extends Op2SSB("endsWith", _ endsWith _)
 
     object matches extends Op2SSB("matches", _ matches _)
+
+    // like matches, except for quasar, and hilariously less efficient
+    lazy val searchDynamic: CFN = CFNP("builtin::str::searchDynamic") {
+      case List(target: StrColumn, pattern: StrColumn, flag: BoolColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            // we're literally recompiling this on a row-by-row basis
+            val compiled = if (flag(row))
+              Pattern.compile(pattern(row), Pattern.CASE_INSENSITIVE)
+            else
+              Pattern.compile(pattern(row))
+
+            compiled.matcher(target(row)).find()
+          }
+
+          def isDefinedAt(row: Int) =
+            target.isDefinedAt(row) && pattern.isDefinedAt(row) && flag.isDefinedAt(row)
+        }
+
+      case List(target: DateColumn, pattern: StrColumn, flag: BoolColumn) =>
+        searchDynamic(List(dateToStrCol(target), pattern, flag)).get
+
+      case List(target: StrColumn, pattern: DateColumn, flag: BoolColumn) =>
+        searchDynamic(List(target, dateToStrCol(pattern), flag)).get
+
+      case List(target: DateColumn, pattern: DateColumn, flag: BoolColumn) =>
+        searchDynamic(List(dateToStrCol(target), dateToStrCol(pattern), flag)).get
+    }
+
+    // please use this one as much as possible. it is orders of magnitude faster than searchDynamic
+    def search(pattern: String, flag: Boolean) = {
+      val compiled = if (flag)
+        Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+      else
+        Pattern.compile(pattern)
+
+      new Op1SB("search", { target =>
+        compiled.matcher(target).find()
+      })
+    }
+
+    // starting to follow a different pattern  since we don't do evaluator lookups anymore
+    // note that this different pattern means we can't test in StringLibSpecs
+    lazy val substring = CFNP("builtin::str::substring") {
+      case List(s: StrColumn, f: LongColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: LongColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: LongColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+    }
 
     object regexMatch extends Op2(StringNamespace, "regexMatch") with Op2Array {
 

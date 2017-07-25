@@ -4,7 +4,7 @@
   "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending"
+        "mimir":"pendingIgnoreFieldOrder"
   },
 
   "data": "../slamengine_commits.data",

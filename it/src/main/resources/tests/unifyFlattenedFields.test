@@ -1,7 +1,6 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "mimir":"pending",
         "couchbase":  "pending"
     },
     "data": "zips.data",

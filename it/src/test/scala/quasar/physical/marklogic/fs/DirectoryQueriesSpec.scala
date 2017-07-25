@@ -30,7 +30,7 @@ import scalaz.stream.Process
 
 final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
-  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task, xml: AnalyticalFileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: BackendEffect ~> Task, xml: BackendEffect ~> Task) = {
     "Querying directory paths" >> {
       "results in a dataset comprised of immediate child documents" >> {
         val loc: ADir = rootDir </> dir("childdocs")

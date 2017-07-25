@@ -2,7 +2,7 @@
     "name": "flattening both sides of a join condition",
 
     "backends": {
-        "mimir":"pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "couchbase":         "pending",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",

@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef._
+import quasar.fs.mount.{ConnectionUri, BackendDef}, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
 
 import java.io.PrintWriter

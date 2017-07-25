@@ -87,7 +87,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import Kleisli.kleisliMonadReader
   import WriterT.writerTMonadListen
-  import FileSystemDef.DefErrT
+  import BackendDef.DefErrT
 
   final implicit class LiftMLFSQ[A](mlfsq: MLFSQ[A]) {
     val liftQB: Backend[A] =
@@ -105,10 +105,10 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     runMarkLogicFs(cfg.cfg.xccUri) map { case (f, c) => (f compose dropWritten, c) }
   }
 
-  override def interpreter(cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] = {
+  override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
     val xformPaths =
-      if (cfg.cfg.rootDir === rootDir) liftFT[AnalyticalFileSystem]
-      else chroot.analyticalFileSystem[AnalyticalFileSystem](cfg.cfg.rootDir)
+      if (cfg.cfg.rootDir === rootDir) liftFT[BackendEffect]
+      else chroot.backendEffect[BackendEffect](cfg.cfg.rootDir)
 
     super.interpreter(cfg) map {
       case (f, c) => (foldMapNT(f) compose xformPaths, c)

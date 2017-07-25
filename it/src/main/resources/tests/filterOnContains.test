@@ -1,7 +1,7 @@
 {
     "name": "filter on contains",
     "backends": {
-        "mimir":"pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",

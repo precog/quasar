@@ -29,6 +29,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   import SampleData._
   import trans._
 
+  def addThree: FN
+
   def checkTransformLeaf = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
@@ -339,6 +341,31 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       lookupF2(Nil, "add"))
     })
     val expected = Stream(JNum(80))
+
+    results.copoint mustEqual expected
+  }
+
+  def testMapNAddThree = {
+    val parsed = JParser.parseUnsafe("""[
+      { "values": [1, 2, 3] },
+      { "not-values": false },
+      { "values": [1, "hi", 3] },
+      { "values": [1, { "a": 42 }, 3] }
+    ]""")
+
+    val data: Stream[JValue] = parsed match {
+      case JArray(ls) => ls.toStream
+      case _ => sys.error("derp")
+    }
+
+    val sample = SampleData(data)
+    val table = fromSample(sample)
+
+    val results = toJson(table transform {
+      MapN(DerefObjectStatic(Leaf(Source), CPathField("values")), addThree)
+    })
+
+    val expected = Stream(JNum(6))
 
     results.copoint mustEqual expected
   }

@@ -27,16 +27,16 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class WriteFilesSpec extends FileSystemTest[AnalyticalFileSystem](
+class WriteFilesSpec extends FileSystemTest[BackendEffect](
   FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._
 
-  val query  = QueryFile.Ops[AnalyticalFileSystem]
-  val read   = ReadFile.Ops[AnalyticalFileSystem]
-  val write  = WriteFile.Ops[AnalyticalFileSystem]
-  val manage = ManageFile.Ops[AnalyticalFileSystem]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   val writesPrefix: ADir = rootDir </> dir("forwriting")
 

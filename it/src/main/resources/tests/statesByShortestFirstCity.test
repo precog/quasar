@@ -1,7 +1,7 @@
 {
     "name": "states sorted by the length of name of their first city, alphabetically",
     "backends": {
-        "mimir":"pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "couchbase": "pending"
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",

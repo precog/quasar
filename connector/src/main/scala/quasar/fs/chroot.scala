@@ -59,7 +59,7 @@ object chroot {
   }
 
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
-  def analyticalFileSystem[S[_]](
+  def backendEffect[S[_]](
     prefix: ADir
   )(implicit
     S0: ReadFile :<: S,

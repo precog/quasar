@@ -2,7 +2,7 @@
     "name": "time series aggregation",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "smalltimeseries.data",
     "query": "

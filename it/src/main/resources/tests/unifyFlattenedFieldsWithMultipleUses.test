@@ -1,7 +1,7 @@
 {
     "name": "unify flattened fields with multiple shape-preserving ops.",
     "backends": {
-        "mimir":"pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "couchbase": "pending",
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",

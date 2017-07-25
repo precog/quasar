@@ -5,6 +5,8 @@
         "mimir":"pending"
   },
 
+  "NB": "pendingIgnoreFieldOrder doesn't work here",
+
   "data": "zips.data",
 
   "query": "select city, pop from zips where pop > 110000 order by length(city)",

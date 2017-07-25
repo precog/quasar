@@ -1,8 +1,5 @@
 {
     "name": "LIKE with constant-foldable pattern",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "zips.data",
     "variables": { "substr": "\"ULDER\"" },
     "query": "select * from zips where city like (\"%\" || :substr || \"%\")",

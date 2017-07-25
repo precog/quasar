@@ -18,35 +18,37 @@ package quasar.precog.util
 
 import java.time._
 import java.time.format._
-import java.time.temporal.{TemporalAccessor, TemporalQuery}
 
 import java.util.regex.Pattern
 
 object DateTimeUtil {
-  // from http://stackoverflow.com/a/30072486/9815
-  private val fullParser = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss[xxx]")
 
-  // from joda-time javadoc
-  private val basicParser = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSZ")
-
-  //2013-02-04T18:07:39.608835
-  private val dateTimeRegex = Pattern.compile("^[0-9]{4}-?[0-9]{2}-?[0-9]{2}.*$")
+  // mimics ISO_INSTANT
+  private val dateTimeRegex =
+    Pattern.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
   def looksLikeIso8601(s: String): Boolean = dateTimeRegex.matcher(s).matches
 
-  def parseDateTime(value0: String): ZonedDateTime = {
-    val value = value0.trim.replace(" ", "T")
+  // FIXME ok this really sucks.  Instant ≠ ZonedDateTime
+  def parseDateTime(value: String): ZonedDateTime = {
+    val utc = ZoneId.of("UTC")
 
-    val parser = if (value.contains("-") || value.contains(":")) {
-      fullParser
-    } else {
-      basicParser
+    try {
+      Instant.parse(value).atZone(utc)
+    } catch {
+      case _: Throwable => try {
+        ZonedDateTime.of(
+          LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE),
+          LocalTime.of(0, 0, 0, 0),
+          utc)
+      } catch {
+        case _: Throwable =>
+          ZonedDateTime.of(
+            LocalDate.now(utc), // FIXME what is the expected default?
+            LocalTime.parse(value, DateTimeFormatter.ISO_TIME),
+            utc)
+      }
     }
-
-    parser.parse(value, new TemporalQuery[ZonedDateTime] {
-      def queryFrom(temporal: TemporalAccessor) =
-        ZonedDateTime.from(temporal)
-    })
   }
 
   def isValidISO(str: String): Boolean = try {

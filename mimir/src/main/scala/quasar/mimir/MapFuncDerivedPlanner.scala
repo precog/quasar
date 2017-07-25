@@ -17,23 +17,32 @@
 package quasar.mimir
 
 import quasar.fp.ski._
-import quasar.qscript.{ExpandMapFunc, MapFuncCore, MapFuncDerived}
+import quasar.qscript.{ExpandMapFunc, MapFuncCore, MapFuncDerived, MapFuncsDerived}
 
-import matryoshka._
+import matryoshka.{AlgebraM, BirecursiveT}
+
 import scalaz.Monad
+import scalaz.syntax.monad._
 
 final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
-  (core: MapFuncPlanner[T, F, MapFuncCore[T, ?]])
-  extends MapFuncPlanner[T, F, MapFuncDerived[T, ?]] {
+   (core: MapFuncPlanner[T, F, MapFuncCore[T, ?]])
+   extends MapFuncPlanner[T, F, MapFuncDerived[T, ?]] {
 
   def plan(cake: Precog): PlanApplicator[cake.type] =
     new PlanApplicatorDerived(cake)
 
   final class PlanApplicatorDerived[P <: Precog](override val cake: P)
     extends PlanApplicator[P](cake) {
-    import cake.trans._
 
-    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncDerived[T, ?], TransSpec[A]] =
-      ExpandMapFunc.expand(core.plan(cake).apply(id), κ(None))
+    import cake.trans._
+    import cake.Library._
+
+    def apply[A <: SourceType](id: TransSpec[A]): AlgebraM[F, MapFuncDerived[T, ?], TransSpec[A]] = {
+      case MapFuncsDerived.Ceil(src) => Unary.Ceil.spec(src).point[F]
+      case MapFuncsDerived.Floor(src) => Unary.Floor.spec(src).point[F]
+      case MapFuncsDerived.Abs(src) => Unary.Abs.spec(src).point[F]
+      case MapFuncsDerived.Trunc(src) => Unary.Trunc.spec(src).point[F]
+      case x => ExpandMapFunc.expand[T, F, TransSpec[A]](core.plan(cake)(id), κ(None)).apply(x)
+    }
   }
 }

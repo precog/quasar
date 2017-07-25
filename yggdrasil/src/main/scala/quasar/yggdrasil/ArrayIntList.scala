@@ -16,11 +16,12 @@
 
 package quasar.yggdrasil
 
-class ArrayIntList(initialCapacity: Int) {
+final class ArrayIntList(private[this] var _data: Array[Int]) {
   private[this] var _size: Int        = 0
-  private[this] var _data: Array[Int] = new Array[Int](initialCapacity)
 
-  def this()             = this(8)
+  def this(initialCapacity: Int) = this(new Array[Int](initialCapacity))
+  def this() = this(8)
+
   def size(): Int        = _size
   def get(row: Int): Int = _data(row)
   def toArray(): Array[Int] = {

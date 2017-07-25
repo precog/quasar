@@ -2,7 +2,7 @@
     "name": "derived function ceil",
     "backends": {
       "couchbase": "ignoreFieldOrder",
-      "mimir": "pending"
+      "mimir": "pendingIgnoreFieldOrder"
     },
     "data": "divide.data",
     "query": "select nr, ceil(val3) as ceil1 from divide",

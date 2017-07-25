@@ -16,6 +16,8 @@
 
 package quasar.yggdrasil.bytecode
 
+import quasar.Type
+
 sealed trait JType {
   def |(jtype: JType) = JUnionT(this, jtype)
 }
@@ -51,6 +53,42 @@ case class JUnionT(left: JType, right: JType) extends JType {
 object JType {
   val JPrimitiveUnfixedT = JNumberT | JTextT | JBooleanT | JNullT | JDateT | JPeriodT
   val JUniverseT         = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
+
+  // this must be consistent with JValue.fromData
+  def fromType(tpe: Type): JType = tpe match {
+    case Type.Null => JNullT
+    case Type.Str => JTextT
+    case Type.Int | Type.Dec | Type.Binary => JNumberT
+    case Type.Bool => JBooleanT
+    case Type.Timestamp | Type.Date | Type.Time => JDateT | JTextT
+    case Type.Interval => JPeriodT | JTextT
+    case Type.Id => JTextT
+    case Type.Arr(tpes) =>
+      val mapped: Map[Int, JType] =
+        tpes.map(fromType).zipWithIndex.map(_.swap)(collection.breakOut)
+
+      JArrayFixedT(mapped)
+
+    case Type.FlexArr(_, _, _) => JArrayUnfixedT
+
+    case Type.Obj(tpes, unknowns) =>
+      if (unknowns.isEmpty) {
+        val mapped: Map[String, JType] = tpes map {
+          case (field, tpe) => field -> fromType(tpe)
+        }
+
+        JObjectFixedT(mapped)
+      } else {
+        JObjectUnfixedT
+      }
+
+    case Type.Coproduct(left, right) => fromType(left) | fromType(right)
+
+    case Type.Top => JUniverseT
+    case Type.Bottom => JUniverseT
+
+    case Type.Const(_) => JUniverseT
+  }
 }
 
 case class UnaryOperationType(arg: JType, result: JType)

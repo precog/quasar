@@ -1,7 +1,7 @@
 {
     "name": "flatten array on the left with unflattened field",
     "backends": {
-        "mimir":"pending",
+        "mimir": "ignoreFieldOrder",
         "couchbase": "pending",
         "marklogic_json": "ignoreFieldOrder"
     },

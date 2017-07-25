@@ -53,9 +53,9 @@ object Skeleton extends BackendModule {
 
   type Config = Unit
 
-  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] = ???
+  def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] = ???
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
+  def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
 
   val Type = FileSystemType("skeleton")
 

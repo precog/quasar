@@ -41,6 +41,9 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
       Skipped("Date prints timestamp").left
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Skipped("Interval prints numeric representation").left
+    case (string.Search, _) =>
+      Skipped("compiles to a map/reduce, so can't be run in tests").left
+
 
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>

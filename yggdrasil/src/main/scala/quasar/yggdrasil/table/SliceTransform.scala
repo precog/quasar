@@ -96,6 +96,51 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             }
           }
 
+        case MapN(contents, f) =>
+          composeSliceTransform2(contents) map { slice =>
+            new Slice {
+
+              val size = slice.size
+
+              val columns: Map[ColumnRef, Column] = {
+                // find all of the scalar array values at root
+                val cols = slice.columns.toList collect {
+                  case (ref @ ColumnRef(CPath(CPathIndex(_)), _), col) => ref -> col
+                }
+
+                // group them up (note this may be sparse! that's why it must be a Map not a Vector)
+                val grouped = cols groupBy {
+                  case (ColumnRef(CPath(CPathIndex(i)), _), _) => i
+                } map { case (i, bucket) => i -> bucket.map(_._2) }
+
+                // to mirror the semantics of the concrete cardinalities, we do the cross-product of possible index columns
+                val processed = grouped.keys.reduceOption(_ max _) map { maxIndex =>
+                  def permuteFrom(i: Int): Stream[List[Column]] = {
+                    if (i > maxIndex) {   // it's maxIndex, not length, so we don't want >=
+                      Stream(Nil)
+                    } else {
+                      val potentials: Stream[Column] =
+                        grouped.get(i).getOrElse(List(UndefinedColumn.raw)).toStream
+
+                      potentials flatMap { col =>
+                        permuteFrom(i + 1).map(col :: _)
+                      }
+                    }
+                  }
+
+                  val back: Map[ColumnRef, Column] =
+                    permuteFrom(0).flatMap(f(_).toList).map({ col =>
+                      ColumnRef(CPath.Identity, col.tpe) -> col
+                    })(collection.breakOut)
+
+                  back
+                }
+
+                processed.getOrElse(Map())
+              }
+            }
+          }
+
         case Filter(source, predicate) =>
           val typed = Typed(predicate, JBooleanT)
           composeSliceTransform2(source).zip(composeSliceTransform2(typed)) { (s: Slice, filter: Slice) =>

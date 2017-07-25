@@ -96,7 +96,7 @@ object Empty {
   def fileSystem[F[_]: Applicative]: FileSystem ~> F =
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
-  def analyticalFileSystem[F[_]: Applicative]: AnalyticalFileSystem ~> F =
+  def backendEffect[F[_]: Applicative]: BackendEffect ~> F =
     analyze :+: fileSystem
 
   ////

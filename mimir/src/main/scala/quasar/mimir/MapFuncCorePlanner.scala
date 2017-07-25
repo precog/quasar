@@ -20,8 +20,9 @@ import quasar.Data
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
-import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
-import quasar.yggdrasil.table.cf.math
+import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
+// import quasar.yggdrasil.TransSpecModule
+// import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, RecursiveT}
@@ -38,7 +39,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
   final class PlanApplicatorCore[P <: Precog](override val cake: P)
     extends PlanApplicator[P](cake) {
+
     import cake.trans._
+    import cake.Library._
 
     def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
@@ -53,31 +56,44 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 
-      case MapFuncsCore.Length(a1) => ???
+      case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
       case MapFuncsCore.ExtractCentury(a1) => ???
-      case MapFuncsCore.ExtractDayOfMonth(a1) => ???
+      case MapFuncsCore.ExtractDayOfMonth(a1) =>
+        (Map1[A](a1, cake.Library.DayOfMonth.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractDecade(a1) => ???
-      case MapFuncsCore.ExtractDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractDayOfYear(a1) => ???
+      case MapFuncsCore.ExtractDayOfWeek(a1) =>
+        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractDayOfYear(a1) =>
+        (Map1[A](a1, cake.Library.DayOfYear.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractEpoch(a1) => ???
-      case MapFuncsCore.ExtractHour(a1) => ???
-      case MapFuncsCore.ExtractIsoDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractIsoYear(a1) => ???
+      case MapFuncsCore.ExtractHour(a1) =>
+        (Map1[A](a1, cake.Library.HourOfDay.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractIsoDayOfWeek(a1) =>
+        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractIsoYear(a1) =>
+        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractMicroseconds(a1) => ???
       case MapFuncsCore.ExtractMillennium(a1) => ???
       case MapFuncsCore.ExtractMilliseconds(a1) => ???
-      case MapFuncsCore.ExtractMinute(a1) => ???
-      case MapFuncsCore.ExtractMonth(a1) => ???
-      case MapFuncsCore.ExtractQuarter(a1) => ???
-      case MapFuncsCore.ExtractSecond(a1) => ???
-      case MapFuncsCore.ExtractTimezone(a1) => ???
+      case MapFuncsCore.ExtractMinute(a1) =>
+        (Map1[A](a1, cake.Library.MinuteOfHour.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractMonth(a1) =>
+        (Map1[A](a1, cake.Library.MonthOfYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractQuarter(a1) =>
+        (Map1[A](a1, cake.Library.QuarterOfYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractSecond(a1) => ??? // expects a decimal like 32.12383
+      case MapFuncsCore.ExtractTimezone(a1) =>
+        (Map1[A](a1, cake.Library.TimeZone.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractTimezoneHour(a1) => ???
       case MapFuncsCore.ExtractTimezoneMinute(a1) => ???
-      case MapFuncsCore.ExtractWeek(a1) => ???
-      case MapFuncsCore.ExtractYear(a1) => ???
-      case MapFuncsCore.Date(a1) => ???
-      case MapFuncsCore.Time(a1) => ???
+      case MapFuncsCore.ExtractWeek(a1) => ??? // week of year
+      case MapFuncsCore.ExtractYear(a1) =>
+        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.Date(a1) =>
+        (Map1[A](a1, cake.Library.Date.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.Time(a1) =>
+        (Map1[A](a1, cake.Library.Time.f1): TransSpec[A]).point[F]
       case MapFuncsCore.Timestamp(a1) => ???
       case MapFuncsCore.Interval(a1) => ???
       case MapFuncsCore.StartOfDay(a1) => ???
@@ -89,56 +105,81 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.TypeOf(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>
-        (Map1[A](a1, math.Negate): TransSpec[A]).point[F]
+        Unary.Neg.spec(a1).point[F]   // NB: don't use math.Negate here; it does weird things to booleans
       case MapFuncsCore.Add(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Add.f2): TransSpec[A]).point[F]
+        Infix.Add.spec(a1, a2).point[F]
       case MapFuncsCore.Multiply(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Mul.f2): TransSpec[A]).point[F]
+        Infix.Mul.spec(a1, a2).point[F]
       case MapFuncsCore.Subtract(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Sub.f2): TransSpec[A]).point[F]
+        Infix.Sub.spec(a1, a2).point[F]
       case MapFuncsCore.Divide(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Div.f2): TransSpec[A]).point[F]
+        Infix.Div.spec(a1, a2).point[F]
       case MapFuncsCore.Modulo(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Mod.f2): TransSpec[A]).point[F]
+        Infix.Mod.spec(a1, a2).point[F]
       case MapFuncsCore.Power(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Pow.f2): TransSpec[A]).point[F]
+        Infix.Pow.spec(a1, a2).point[F]
 
-      case MapFuncsCore.Not(a1) => ???
+      case MapFuncsCore.Not(a1) =>
+        Unary.Comp.spec(a1).point[F]
       case MapFuncsCore.Eq(a1, a2) =>
         (Equal[A](a1, a2): TransSpec[A]).point[F]
-      case MapFuncsCore.Neq(a1, a2) => ???
+      case MapFuncsCore.Neq(a1, a2) =>
+        Unary.Comp.spec(Equal[A](a1, a2)).point[F]
       case MapFuncsCore.Lt(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Lt.f2): TransSpec[A]).point[F]
+        Infix.Lt.spec(a1, a2).point[F]
       case MapFuncsCore.Lte(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.LtEq.f2): TransSpec[A]).point[F]
+        Infix.LtEq.spec(a1, a2).point[F]
       case MapFuncsCore.Gt(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Gt.f2): TransSpec[A]).point[F]
+        Infix.Gt.spec(a1, a2).point[F]
       case MapFuncsCore.Gte(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.GtEq.f2): TransSpec[A]).point[F]
+        Infix.GtEq.spec(a1, a2).point[F]
 
-      case MapFuncsCore.IfUndefined(a1, a2) => ???
+      // this function is completely unspecified; I'm guessing on semantics here
+      case MapFuncsCore.IfUndefined(a1, a2) =>
+        (DerefObjectStatic(
+          OuterObjectConcat(    // this operation is left-biased, so we default to a1
+            WrapObject(a1, "foo"),
+            WrapObject(a2, "foo")),
+          CPathField("foo")): TransSpec[A]).point[F]
+
       case MapFuncsCore.And(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.And.f2): TransSpec[A]).point[F]
+        Infix.And.spec(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Or.f2): TransSpec[A]).point[F]
-      case MapFuncsCore.Between(a1, a2, a3) => ???
-      case MapFuncsCore.Cond(a1, a2, a3) => ???
+        Infix.Or.spec(a1, a2).point[F]
+      case MapFuncsCore.Between(a1, a2, a3) =>
+        (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
+      case MapFuncsCore.Cond(a1, a2, a3) =>
+        (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
       case MapFuncsCore.Within(a1, a2) => ???
 
       case MapFuncsCore.Lower(a1) =>
-        (Map1[A](a1, cake.Library.toLowerCase.f1): TransSpec[A]).point[F]
+        toLowerCase.spec(a1).point[F]
       case MapFuncsCore.Upper(a1) =>
-        (Map1[A](a1, cake.Library.toUpperCase.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.Bool(a1) => ???
-      case MapFuncsCore.Integer(a1) => ???
-      case MapFuncsCore.Decimal(a1) => ???
-      case MapFuncsCore.Null(a1) => ???
-      case MapFuncsCore.ToString(a1) => ???
-      case MapFuncsCore.Search(a1, a2, a3) => ???
-      case MapFuncsCore.Substring(string, from, count) => ???
+        toUpperCase.spec(a1).point[F]
+      case MapFuncsCore.Bool(a1) =>
+        readBoolean.spec[A](a1).point[F]
+      case MapFuncsCore.Integer(a1) =>
+        readInteger.spec[A](a1).point[F]
+      case MapFuncsCore.Decimal(a1) =>
+        readDecimal.spec[A](a1).point[F]
+      case MapFuncsCore.Null(a1) =>
+        readNull.spec[A](a1).point[F]
+      case MapFuncsCore.ToString(a1) =>
+        convertToString.spec[A](a1).point[F]
 
-      // FIXME detect constant cases so we don't have to always use the dynamic variants
+      // significantly faster fast path
+      case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
+        search(pattern, flag).spec[A](src).point[F]
+
+      // this case is hideously slow; hopefully we don't see it too often
+      case MapFuncsCore.Search(src, pattern, flag) =>
+        (MapN((OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))), searchDynamic): TransSpec[A]).point[F]
+
+      case MapFuncsCore.Substring(string, from, count) =>
+        val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))
+        (MapN(args, substring): TransSpec[A]).point[F]
+
       case MapFuncsCore.MakeArray(a1) =>
         (WrapArray[A](a1): TransSpec[A]).point[F]
       case MapFuncsCore.MakeMap(ConstLiteral(CString(key), _), value) =>
@@ -157,14 +198,28 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>
         (DerefObjectDynamic[A](src, field): TransSpec[A]).point[F]
+
+      case MapFuncsCore.DeleteField(src, ConstLiteral(CString(key), _)) =>
+        (ObjectDelete[A](src, Set(CPathField(key))): TransSpec[A]).point[F]
+
+      // mimir doesn't have a way to implement this
       case MapFuncsCore.DeleteField(src, field) => ???
 
       case MapFuncsCore.Meta(a1) => ???
 
+      // this returns rows, rather than array; literally cannot be implemented in mimir at present
       case MapFuncsCore.Range(from, to) => ???
 
-      // FIXME if fallback is not undefined don't throw this away
-      case MapFuncsCore.Guard(_, _, a2, _) => a2.point[F]
+      // rely on implicit guard
+      // this really should be restricted to undefined only, but that breaks some join/ integration tests
+      case MapFuncsCore.Guard(_, _, a2, _ /*Map1(_, Undefined)*/) =>
+        a2.point[F]
+
+      /*case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
+        (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]*/
+
+      // FIXME not sure exactly how to implement this...
+      // case MapFuncsCore.Guard(_, _, _, _) => ???
     }
   }
 }

@@ -28,13 +28,13 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
-class QueryFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.allFsUT) {
+class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT) {
   import FileSystemTest._, FileSystemError._, PathError._, StdLib._
 
-  val query  = QueryFile.Ops[AnalyticalFileSystem]
-  val read   = ReadFile.Ops[AnalyticalFileSystem]
-  val write  = WriteFile.Ops[AnalyticalFileSystem]
-  val manage = ManageFile.Ops[AnalyticalFileSystem]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   val queryPrefix: ADir = rootDir </> dir("forquery")
 

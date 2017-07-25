@@ -69,6 +69,9 @@ trait TransSpecModule extends FNModule {
     // apply a function to the cartesian product of the transformed left and right subsets of columns
     case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: F2) extends TransSpec[A]
 
+    // apply a function to an array
+    case class MapN[+A <: SourceType](contents: TransSpec[A], f: FN) extends TransSpec[A]
+
     // Perform the specified transformation on the all sources, and then create a new set of columns
     // containing all the resulting columns.
     case class InnerObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A]
@@ -173,6 +176,7 @@ trait TransSpecModule extends FNModule {
           case trans.Map1(source, f1)      => trans.Map1(mapSources(source)(f), f1)
           case trans.DeepMap1(source, f1)  => trans.DeepMap1(mapSources(source)(f), f1)
           case trans.Map2(left, right, f2) => trans.Map2(mapSources(left)(f), mapSources(right)(f), f2)
+          case trans.MapN(contents, f1) => trans.MapN(mapSources(contents)(f), f1)
 
           case trans.OuterObjectConcat(objects @ _ *) => trans.OuterObjectConcat(objects.map(mapSources(_)(f)): _*)
           case trans.InnerObjectConcat(objects @ _ *) => trans.InnerObjectConcat(objects.map(mapSources(_)(f)): _*)
@@ -220,6 +224,7 @@ trait TransSpecModule extends FNModule {
         case trans.Map1(source, f1)      => trans.Map1(deepMap(source)(f), f1)
         case trans.DeepMap1(source, f1)  => trans.DeepMap1(deepMap(source)(f), f1)
         case trans.Map2(left, right, f2) => trans.Map2(deepMap(left)(f), deepMap(right)(f), f2)
+        case trans.MapN(contents, f1) => trans.MapN(deepMap(contents)(f), f1)
 
         case trans.OuterObjectConcat(objects @ _ *) => trans.OuterObjectConcat(objects.map(deepMap(_)(f)): _*)
         case trans.InnerObjectConcat(objects @ _ *) => trans.InnerObjectConcat(objects.map(deepMap(_)(f)): _*)

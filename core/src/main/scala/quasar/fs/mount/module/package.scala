@@ -141,7 +141,7 @@ package object module {
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
   // FIX-ME
-  def analyticalFileSystem[S[_]](
+  def backendEffect[S[_]](
                         implicit
                         S0: ReadFile :<: S,
                         S1: WriteFile :<: S,
@@ -153,7 +153,7 @@ package object module {
                         S7: MountingFailure :<: S,
                         S8: PathMismatchFailure :<: S,
                         S9: Analyze :<: S
-                      ): AnalyticalFileSystem ~> Free[S, ?] = {
+                      ): BackendEffect ~> Free[S, ?] = {
     (injectFT[Analyze, S]) :+: fileSystem[S]
   }
 }

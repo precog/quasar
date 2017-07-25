@@ -36,8 +36,8 @@ object testing {
     uri: ConnectionUri,
     readChunkSize: Positive,
     writeChunkSize: Positive
-  ): Task[(AnalyticalFileSystem ~> Task, AnalyticalFileSystem ~> Task, Task[Unit])] = {
-    def failOnError[A](err: FileSystemDef.DefinitionError): Task[A] =
+  ): Task[(BackendEffect ~> Task, BackendEffect ~> Task, Task[Unit])] = {
+    def failOnError[A](err: BackendDef.DefinitionError): Task[A] =
       err.fold[Task[A]](
         errs => Task.fail(new RuntimeException(errs intercalate ", ")),
         ee   => Task.fail(new RuntimeException(ee.shows)))

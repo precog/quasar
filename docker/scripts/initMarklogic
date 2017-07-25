@@ -28,7 +28,7 @@ await_restart
 
 # Limit group memory usage
 curl -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: application/json" \
-  -d '{"list-cache-size": 64, "compressed-tree-cache-size": 64, "expanded-tree-cache-size": 64, "triple-cache-size": 64, "triple-value-cache-size": 64}' \
+  -d '{"list-cache-size": 64, "compressed-tree-cache-size": 64, "expanded-tree-cache-size": 128, "triple-cache-size": 64, "triple-value-cache-size": 64}' \
   ${ML_MANAGE_PREFIX}/groups/Default/properties
 
 await_restart

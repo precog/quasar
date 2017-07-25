@@ -1,10 +1,6 @@
 {
     "name": "explicitly grouped, with only reduced projections, and a filter",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "zips.data",
 
     "query": "select count(*) as cnt from zips where pop < 5 group by pop",

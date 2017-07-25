@@ -37,13 +37,13 @@ import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
-class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.allFsUT) {
+class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT) {
   import ReadFilesSpec._, FileSystemError._
   import ReadFile._
 
-  val read   = ReadFile.Ops[AnalyticalFileSystem]
-  val write  = WriteFile.Ops[AnalyticalFileSystem]
-  val manage = ManageFile.Ops[AnalyticalFileSystem]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   def loadForReading(run: Run): FsTask[Unit] = {
     type P[A] = Process[write.M, A]

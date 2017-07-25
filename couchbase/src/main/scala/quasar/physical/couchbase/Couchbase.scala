@@ -26,7 +26,7 @@ import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, numeric._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount._, FileSystemDef.DefErrT
+import quasar.fs.mount._, BackendDef.DefErrT
 import quasar.physical.couchbase.common._
 import quasar.physical.couchbase.planner.Planner
 import quasar.Planner.PlannerError

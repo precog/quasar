@@ -1,8 +1,5 @@
 {
     "name": "flatten array",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips",
     "predicate": "atLeast",

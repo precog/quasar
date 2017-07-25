@@ -34,7 +34,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
     case e: Exception => e.getMessage must contain("different format exists")
   }
 
-  def multiFormatFileSystemShould(js: AnalyticalFileSystem ~> Task, xml: AnalyticalFileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: BackendEffect ~> Task, xml: BackendEffect ~> Task) = {
     "FileSystem operations should respect the mount format" >> {
       "creating a file that already exists in a different format should fail" >> {
         val f: AFile = rootDir </> dir("createconflict") </> file("thefile")

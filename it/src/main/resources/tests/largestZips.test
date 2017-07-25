@@ -3,6 +3,7 @@
     "backends": {
         "mimir":"pending"
     },
+    "NB": "this should be pendingIgnoreFieldOrder, but it doesn't quite work for some reason",
     "data": "zips.data",
     "query": "select city, pop from zips where pop > 90000 order by city, pop desc",
     "predicate": "exactly",

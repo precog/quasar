@@ -1,10 +1,6 @@
 {
     "name": "select from a table named by a variable",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "smallZips.data",
 
     "variables": {

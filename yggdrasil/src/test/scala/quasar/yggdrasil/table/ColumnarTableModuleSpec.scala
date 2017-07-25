@@ -38,6 +38,16 @@ trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
 
+  def addThree: CFN = CFNP("addThree") {
+    case List(x: LongColumn, y: LongColumn, z: LongColumn) =>
+      new LongColumn {
+        def apply(row: Int) = x(row) + y(row) + z(row)
+
+        def isDefinedAt(row: Int) =
+          x.isDefinedAt(row) && y.isDefinedAt(row) && z.isDefinedAt(row)
+      }
+  }
+
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
@@ -61,6 +71,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     with TableModuleSpec[M]
     with CogroupSpec[M]
     with CrossSpec[M]
+    with LeftShiftSpec[M]
     with TransformSpec[M]
     with CompactSpec[M]
     with TakeRangeSpec[M]
@@ -313,6 +324,15 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       }
     }
 
+    "in leftShift" >> {
+      "shift a simple array" in testTrivialArrayLeftShift
+      "shift a simple object" in testTrivialObjectLeftShift
+      "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift
+      "shift a set of arrays" in testSetArrayLeftShift
+      "shift a heterogeneous array" in testHeteroArrayLeftShift
+      "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject
+    }
+
     "in transform" >> {
       "perform the identity transform" in checkTransformLeaf
 
@@ -334,6 +354,8 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform a trivial map2 add" in checkMap2Add.pendingUntilFixed
       "perform a trivial map2 eq" in checkMap2Eq
       "perform a map2 add over but not into arrays and objects" in testMap2ArrayObject
+
+      "perform a mapN add over arrays and objects" in testMapNAddThree
 
       "perform a trivial equality check" in checkEqualSelf
       "perform a trivial equality check on an array" in checkEqualSelfArray

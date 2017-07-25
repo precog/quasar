@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
+import quasar.fs.mount._, BackendDef.DefinitionResult
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.mimir
@@ -141,13 +141,13 @@ object FileSystemTest {
 
   //--- FileSystems to Test ---
 
-  def allFsUT: Task[IList[SupportedFs[AnalyticalFileSystem]]] =
+  def allFsUT: Task[IList[SupportedFs[BackendEffect]]] =
     (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.analyticalFileSystem[AnalyticalFileSystem](ut.testDir)))))
+      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir)))))
     }
 
-  def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
-    : PartialFunction[(MountConfig, ADir), Task[(AnalyticalFileSystem ~> Task, Task[Unit])]] = {
+  def fsTestConfig(fsType: FileSystemType, fsDef: BackendDef[Free[filesystems.Eff, ?]])
+    : PartialFunction[(MountConfig, ADir), Task[(BackendEffect ~> Task, Task[Unit])]] = {
     case (MountConfig.FileSystemConfig(FileSystemType(fsType.value), uri), dir) =>
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
   }
@@ -167,7 +167,7 @@ object FileSystemTest {
     }
   }
 
-  def localFsUT: Task[IList[SupportedFs[AnalyticalFileSystem]]] =
+  def localFsUT: Task[IList[SupportedFs[BackendEffect]]] =
     (inMemUT |@| hierarchicalUT |@| nullViewUT) { (mem, hier, nullUT) =>
       IList(
         SupportedFs(mem.ref, mem.some),
@@ -176,13 +176,13 @@ object FileSystemTest {
       )
     }
 
-  def nullViewUT: Task[FileSystemUT[AnalyticalFileSystem]] =
+  def nullViewUT: Task[FileSystemUT[BackendEffect]] =
     (
       inMemUT                                             |@|
       TaskRef(0L)                                         |@|
       ViewState.toTask(Map())                             |@|
       TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM])       |@|
+      TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
@@ -195,34 +195,34 @@ object FileSystemTest {
           .compose(toPhysFs)
       }
 
-      type ViewAnalyticalFileSystem[A] = (
+      type ViewBackendEffect[A] = (
         Mounting
           :\: PathMismatchFailure
           :\: MountingFailure
           :\: ViewState
           :\: MonotonicSeq
-          :/: AnalyticalFileSystem
+          :/: BackendEffect
       )#M[A]
 
-      val memPlus: ViewAnalyticalFileSystem ~> Task = mounting :+:
+      val memPlus: ViewBackendEffect ~> Task = mounting :+:
       Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
       Failure.toRuntimeError[Task, MountingError] :+:
       viewState :+:
       MonotonicSeq.fromTaskRef(seqRef) :+:
       mem.testInterp
 
-      val fs = foldMapNT(memPlus) compose view.analyticalFileSystem[ViewAnalyticalFileSystem]
+      val fs = foldMapNT(memPlus) compose view.backendEffect[ViewBackendEffect]
       val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
 
       FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
     }
 
-  def hierarchicalUT: Task[FileSystemUT[AnalyticalFileSystem]] = {
+  def hierarchicalUT: Task[FileSystemUT[BackendEffect]] = {
     val mntDir: ADir = rootDir </> dir("mnt") </> dir("inmem")
 
-    def fs(f: HfsIO ~> Task, r: AnalyticalFileSystem ~> Task) =
+    def fs(f: HfsIO ~> Task, r: BackendEffect ~> Task) =
       foldMapNT[HfsIO, Task](f) compose
-        hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mntDir, r))
+        hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mntDir, r))
 
     (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(
@@ -233,7 +233,7 @@ object FileSystemTest {
         mem.close))
   }
 
-  def inMemUT: Task[FileSystemUT[AnalyticalFileSystem]] = {
+  def inMemUT: Task[FileSystemUT[BackendEffect]] = {
     val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
 
     InMemory.runStatefully(InMemory.InMemState.empty)

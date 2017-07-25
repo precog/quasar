@@ -1,8 +1,5 @@
 {
     "name": "double flatten with intervening field",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",
     "predicate": "exactly",

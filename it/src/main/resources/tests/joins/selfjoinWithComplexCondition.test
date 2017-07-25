@@ -2,7 +2,7 @@
     "name": "self-join with complex conditions",
 
     "backends": {
-        "mimir":             "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
         "couchbase":         "pending",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",

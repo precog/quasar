@@ -2,7 +2,7 @@
     "name": "convert null to/from strings",
     "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending"
+        "mimir":"ignoreFieldOrder"
     },
     "data": "nulls.data",
     "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",

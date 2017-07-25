@@ -1,7 +1,7 @@
 {
     "name": "filter on JS with non-JS",
     "backends": {
-        "mimir":"pending"
+        "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, pop from largeZips where length(city) < 5 and pop < 30000",

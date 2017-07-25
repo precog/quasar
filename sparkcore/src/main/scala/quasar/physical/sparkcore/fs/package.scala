@@ -21,7 +21,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount._, FileSystemDef._
+import quasar.fs.mount._, BackendDef._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
@@ -85,9 +85,9 @@ package object fs {
     fsInterpret: T => (FileSystem ~> Free[HS, ?])
   )(implicit
     S0: Task :<: S, S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] = {
+  ): BackendDef[Free[S, ?]] = {
 
-    FileSystemDef.fromPF {
+    BackendDef.fromPF {
       case (`fsType`, uri) =>
         for {
           config <- EitherT(parseUri(uri).point[Free[S, ?]])
@@ -102,7 +102,7 @@ package object fs {
                 val analyze0: Analyze ~> Free[QueryFile, ?] =
                   Analyze.defaultInterpreter[QueryFile, SparkQScript, Fix[SparkQScript]](lp => toQScript(listContents)(lp).mapT(_.value))
                 val analyzeInterpreter   = analyze0 andThen flatMapSNT(queryFileIntereter)
-                FileSystemDef.DefinitionResult[Free[S, ?]](
+                BackendDef.DefinitionResult[Free[S, ?]](
                   (analyzeInterpreter :+: fileSystemInterpreter) andThen run,
                   close)
             }.liftM[DefErrT]

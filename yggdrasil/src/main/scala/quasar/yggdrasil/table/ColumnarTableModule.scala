@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
-import quasar.precog.{MimeType, MimeTypes}
+import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
 import quasar.precog.util.RawBitSet
@@ -42,6 +42,7 @@ import scala.collection.mutable
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1
   type F2         = CF2
+  type FN         = CFN
   type Scanner    = CScanner
   type Mapper     = CMapper[M]
   type Reducer[α] = CReducer[α]
@@ -1444,6 +1445,202 @@ trait ColumnarTableModule[M[+ _]]
       } else {
         throw EnormousCartesianException(this.size, that.size)
       }
+    }
+
+    def leftShift(focus: CPath): Table = {
+      def lens(columns: Map[ColumnRef, Column]): (Map[ColumnRef, Column], Map[ColumnRef, Column]) = {
+        val (focused, unfocused) = columns.partition(_._1.selector.hasPrefix(focus))
+
+        // discard scalar values at focus
+        val typed = focused filter {
+          case (ColumnRef(`focus`, CArrayType(_)), _) => true
+          case (ColumnRef(`focus`, _), _) => false
+          case _ => true
+        }
+
+        // remap focused to be at "root"
+        val remapped = typed map {
+          case (ColumnRef(path, tpe), col) =>
+            (ColumnRef(path.dropPrefix(focus).get, tpe), col)
+        }
+
+        (remapped, unfocused)
+      }
+
+      // eagerly force the slices, since we'll be backtracking within each
+      val slices2 = slices.map(_.materialized) flatMap { slice =>
+        val (focused, unfocused) = lens(slice.columns)
+
+        val innerHeads = {
+          val unsorted = focused.keys.toVector flatMap {
+            case ColumnRef(path, _) => path.head.toVector
+          }
+
+          // sort the index lexicographically except in the case of indices
+          unsorted sortWith {
+            case (CPathIndex(i1), CPathIndex(i2)) => i1 < i2
+            case (p1, p2) => p1.toString < p2.toString
+          }
+        }
+
+        val innerIndex = Map(innerHeads.zipWithIndex: _*)
+
+        val primitiveWaterMarks = focused.toList collect {
+          case (ColumnRef(CPath.Identity, CArrayType(_)), col: HomogeneousArrayColumn[a]) =>
+            (0 until slice.size).map(col(_).length).max
+        }
+
+        // .max doesn't work, because Scala doesn't understand monoids
+        val primitiveMax = primitiveWaterMarks.fold(0)(math.max)
+
+        // TODO doesn't handle the case where we have a sparse array with a missing column!
+        // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
+        val highWaterMark = math.max(innerHeads.length, primitiveMax)
+
+        val resplit = if (slice.size * highWaterMark > yggConfig.maxSliceSize) {
+          val numSplits =
+            math.ceil((slice.size * highWaterMark).toDouble / yggConfig.maxSliceSize).toInt
+
+          // this has accumulating rounding errors which can cause slices to exceed max by a small amount in rare cases
+          val targetIdx = slice.size / numSplits
+
+          val (acc, last) = (0 until numSplits).foldLeft((Vector.empty[Slice], slice)) {
+            case ((acc, cur), _) =>
+              val (left, right) = cur.split(targetIdx)
+              (acc :+ left, right)
+          }
+
+          (acc :+ last).filterNot(_.isEmpty)
+        } else {
+          Vector(slice)
+        }
+
+        // shadow the outer `slice`
+        StreamT.fromIterable(resplit).trans(λ[Id.Id ~> M](M.point(_))) map { slice =>
+          // ...and the outer `focused` and `unfocused`
+          val (focused, unfocused) = lens(slice.columns)
+
+          // a CF1 for inflating column sizes to account for shifting
+          val expansion = cf.util.Remap(_ / highWaterMark)
+
+          // expand all of the unfocused columns, then mostly leave them alone
+          val unfocusedExpanded = unfocused map {
+            case (ref, col) => ref -> expansion(col).get
+          }
+
+          val remapped: List[(ColumnRef, Column)] = focused.toList map {
+            case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
+              ???
+
+            // because of how we have defined things, path is guaranteed NOT to be Identity now
+            case (ColumnRef(path, tpe), col) =>
+              val head = path.head.get
+              val locus = innerIndex(head)
+
+              // explode column and then sparsen by mod ring
+              val expanded =
+                expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
+
+              ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
+          }
+
+          // put together all the same-ref columns which now are mapped to the same path
+          val merged: Map[ColumnRef, Column] = remapped.groupBy(_._1).map({
+            // the key here is the column ref; the value is the list of same-type pairs
+            case (ref, toMerge) =>
+              ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
+          })(collection.breakOut)
+
+          // figure out the definedness of the exploded, filtered result
+          // this is necessary so we can implement inner-concat semantics
+          val definedness: BitSet =
+            merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
+
+          // move all of our results into second index of an array
+          val indexed = merged map {
+            case (ColumnRef(path, tpe), col) =>
+              ColumnRef(1 \: path, tpe) -> col
+          }
+
+          val refinedHeads = innerHeads collect {
+            case CPathField(field) => -\/(field)
+            case CPathIndex(idx) => \/-(idx)
+          }
+
+          val hasFields = refinedHeads.exists(_.isLeft)
+          val hasIndices = refinedHeads.exists(_.isRight)
+
+          // generate the field names column
+          val fieldsCol = if (hasFields) {
+            val loci = refinedHeads.zipWithIndex collect {
+              case (-\/(_), i) => i
+            } toSet
+
+            val col = new StrColumn {
+              def apply(row: Int) = {
+                val -\/(back) = refinedHeads(row % refinedHeads.length)
+                back
+              }
+
+              def isDefinedAt(row: Int) =
+                loci(row % refinedHeads.length) && definedness(row)
+            }
+
+            Some(col)
+          } else {
+            None
+          }
+
+          // generate the array indices column
+          val indicesCol = if (hasIndices) {
+            val loci = refinedHeads.zipWithIndex collect {
+              case (\/-(_), i) => i
+            } toSet
+
+            val col = new LongColumn {
+              def apply(row: Int) = {
+                val \/-(back) = refinedHeads(row % refinedHeads.length)
+                back
+              }
+
+              def isDefinedAt(row: Int) =
+                loci(row % refinedHeads.length) && definedness(row)
+            }
+
+            Some(col)
+          } else {
+            None
+          }
+
+          // put the fields and index columns into the same path, in the first index of the array
+          val fassigned = fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
+          val iassigned = indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
+
+          // merge them together to produce the heterogeneous output
+          val idCols = Map(fassigned ++ iassigned: _*)
+
+          // put the focus prefix BACK on the results and ids (which are now in an array together)
+          val focusedTransformed = (indexed ++ idCols) map {
+            case (ColumnRef(path, tpe), col) =>
+              ColumnRef(focus \ path, tpe) -> col
+          }
+
+          // we need to go back to our original columns and filter them by results
+          // if we don't do this, the data will be highly sparse (like an outer join)
+          val unfocusedTransformed = unfocusedExpanded map {
+            case (ref, col) =>
+              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness)(col).get
+          }
+
+          // glue everything back together with the unfocused and compute the new size
+          Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
+        }
+      }
+
+      // without peaking into the effects, we don't know exactly what has happened
+      // it's possible that there were no vector values, or those vectors were all
+      // cardinality 0, in which case the table will have shrunk (perhaps to empty!)
+      Table(slices2, UnknownSize)
     }
 
     /**

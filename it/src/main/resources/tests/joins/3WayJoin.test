@@ -5,6 +5,7 @@
         "couchbase":         "pending",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
+        "mimir": "ignoreFieldOrder",
         "mongodb_q_3_2":     "pending"
     },
 

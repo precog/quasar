@@ -22,7 +22,7 @@ import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._, ski.κ
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
-import quasar.fs.mount._, FileSystemDef.{DefErrT, DefinitionError}
+import quasar.fs.mount._, BackendDef.{DefErrT, DefinitionError}
 
 import java.time.Duration
 import scala.collection.JavaConverters._

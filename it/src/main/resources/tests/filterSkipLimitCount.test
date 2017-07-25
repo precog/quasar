@@ -2,7 +2,7 @@
     "name": "filter, skip, limit, and count",
 
     "backends": {
-        "mimir":"pending"
+        "mimir":"skip"
     },
 
     "data": "zips.data",

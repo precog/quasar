@@ -3,7 +3,7 @@
     "backends": {
         "couchbase": "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending"
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips",

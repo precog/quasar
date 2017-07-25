@@ -3,7 +3,6 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_xml":     "pending",
-        "mimir":             "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",

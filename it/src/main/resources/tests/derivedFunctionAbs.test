@@ -3,7 +3,7 @@
     "backends": {
       "couchbase": "ignoreFieldOrder",
       "marklogic_json": "ignoreFieldOrder",
-      "mimir": "pending"
+      "mimir": "ignoreFieldOrder"
     },
     "data": "divide.data",
     "query": "select nr, -val1 as neg1, abs(val1) as abs1 from divide",

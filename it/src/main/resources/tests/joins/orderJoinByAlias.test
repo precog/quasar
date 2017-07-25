@@ -10,6 +10,7 @@
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
+    "NB": "Technically, mimir should be pendingIgnoreFieldOrder, but that oddly doesn't work",
 
     "data": ["../smallZips.data", "../zips.data"],
 

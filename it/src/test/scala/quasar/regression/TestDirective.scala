@@ -23,24 +23,26 @@ import argonaut._, Argonaut._
 sealed abstract class TestDirective
 
 object TestDirective {
-  final case object Skip              extends TestDirective
-  final case object SkipCI            extends TestDirective
-  final case object Timeout           extends TestDirective
-  final case object Pending           extends TestDirective
-  final case object IgnoreAllOrder    extends TestDirective
-  final case object IgnoreFieldOrder  extends TestDirective
+  final case object Skip extends TestDirective
+  final case object SkipCI extends TestDirective
+  final case object Timeout extends TestDirective
+  final case object Pending extends TestDirective
+  final case object PendingIgnoreFieldOrder extends TestDirective
+  final case object IgnoreAllOrder extends TestDirective
+  final case object IgnoreFieldOrder extends TestDirective
   final case object IgnoreResultOrder extends TestDirective
 
   import DecodeResult.{ok, fail}
 
   implicit val TestDirectiveDecodeJson: DecodeJson[TestDirective] =
     DecodeJson(c => c.as[String].flatMap {
-      case "skip"              => ok(Skip)
-      case "skipCI"            => ok(SkipCI)
-      case "timeout"           => ok(Timeout)
-      case "pending"           => ok(Pending)
-      case "ignoreAllOrder"    => ok(IgnoreAllOrder)
-      case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
+      case "skip" => ok(Skip)
+      case "skipCI" => ok(SkipCI)
+      case "timeout" => ok(Timeout)
+      case "pending" => ok(Pending)
+      case "pendingIgnoreFieldOrder" => ok(PendingIgnoreFieldOrder)
+      case "ignoreAllOrder" => ok(IgnoreAllOrder)
+      case "ignoreFieldOrder" => ok(IgnoreFieldOrder)
       case "ignoreResultOrder" => ok(IgnoreResultOrder)
       case str => fail("\"" + str + "\" is not a valid backend directive.", c.history)
     })

@@ -36,6 +36,7 @@ object CFId {
 
 trait CF {
   def identity: CFId
+
   override final def equals(other: Any): Boolean = other match {
     case cf: CF => identity == cf.identity
     case _      => false
@@ -111,6 +112,27 @@ object CF2P {
   def apply(id: String)(f: PartialFunction[(Column, Column), Column]): CF2 = apply(CFId(id))(f)
   def apply(id: CFId)(f: PartialFunction[(Column, Column), Column]): CF2 = new CF2 {
     def apply(c1: Column, c2: Column) = f.lift((c1, c2))
+    val identity = id
+  }
+}
+
+trait CFN extends CF {
+  def apply(columns: List[Column]): Option[Column]
+}
+
+object CFN {
+  def apply(id: String)(f: List[Column] => Option[Column]): CFN = apply(CFId(id))(f)
+  def apply(id: CFId)(f: List[Column] => Option[Column]): CFN = new CFN {
+    def apply(columns: List[Column]): Option[Column] = f(columns)
+    val identity = id
+  }
+}
+
+object CFNP {
+  def apply(id: String)(f: PartialFunction[List[Column], Column]): CFN = apply(CFId(id))(f)
+  def apply(id: CFId)(f: PartialFunction[List[Column], Column]): CFN = new CFN {
+    private val lifted: List[Column] => Option[Column] = f.lift
+    def apply(columns: List[Column]): Option[Column] = lifted(columns)
     val identity = id
   }
 }

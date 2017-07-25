@@ -26,7 +26,7 @@ import fs2.async
 import fs2.async.mutable.Queue
 import fs2.interop.scalaz._
 
-import scalaz.{~>, StreamT}
+import scalaz.{\/, -\/, \/-, ~>, StreamT}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 
@@ -36,11 +36,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.atomic.AtomicBoolean
 
 trait TablePagerModule extends ColumnarTableModule[Future] {
-  import Precog.startTask
 
   final class TablePager private (
       slices: StreamT[Task, Slice],
-      queue: Queue[Task, Vector[Data]]) {
+      queue: Queue[Task, Throwable \/ Vector[Data]]) {
 
     private val running = new AtomicBoolean(true)
 
@@ -55,7 +54,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
             if (json.isEmpty)
               Task.now(())
             else
-              queue.enqueue1(json)
+              queue.enqueue1(\/-(json))
           } else {
             // we can't terminate early, because there are no finalizers in StreamT
             Task.now(())
@@ -63,17 +62,24 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
         } yield ()
       }
 
-      startTask(driver >> queue.enqueue1(Vector.empty), ()).unsafePerformSync
+      val ta = driver >> queue.enqueue1(\/-(Vector.empty))
+
+      ta unsafePerformAsync {
+        case -\/(t) => queue.enqueue1(-\/(t)).unsafePerformAsync(_ => ())
+        case \/-(_) => ()
+      }
     }
 
-    def more: Task[Vector[Data]] = queue.dequeue1
+    def more: Task[Vector[Data]] =
+      queue.dequeue1.flatMap(_.fold(Task.fail, Task.now))
+
     def close: Task[Unit] = Task.delay(running.set(false))
   }
 
   object TablePager {
     def apply(table: Table, lookahead: Int = 1): Task[TablePager] = {
       for {
-        q <- async.boundedQueue[Task, Vector[Data]](lookahead)
+        q <- async.boundedQueue[Task, Throwable \/ Vector[Data]](lookahead)
         slices = table.slices.trans(λ[Future ~> Task](_.toTask))
         back <- Task.delay(new TablePager(slices, q))
       } yield back

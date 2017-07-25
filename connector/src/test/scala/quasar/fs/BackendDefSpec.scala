@@ -26,25 +26,25 @@ import monocle.std.{disjunction => D}
 import monocle.function.Cons1
 import scalaz._, Scalaz._
 
-class FileSystemDefSpec extends QuasarSpecification {
-  import FileSystemDef._, EnvironmentError._
+class BackendDefSpec extends QuasarSpecification {
+  import BackendDef._, EnvironmentError._
 
   type DefId[A] = DefErrT[Id, A]
 
   val defnResult =
-    DefinitionResult[Id](Empty.analyticalFileSystem[Id], ())
+    DefinitionResult[Id](Empty.backendEffect[Id], ())
 
   val successfulDef =
-    FileSystemDef(κ(defnResult.point[DefId].some))
+    BackendDef(κ(defnResult.point[DefId].some))
 
   val failedDef =
-    FileSystemDef(κ(Some(
+    BackendDef(κ(Some(
       connectionFailed(new RuntimeException("NOPE"))
         .right[NonEmptyList[String]]
         .raiseError[DefId, DefinitionResult[Id]])))
 
   val unhandledDef =
-    FileSystemDef[Id](κ(None))
+    BackendDef[Id](κ(None))
 
   val someType = FileSystemType("somefs")
   val someUri = ConnectionUri("some://filesystem")

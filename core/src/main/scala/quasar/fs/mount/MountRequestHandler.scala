@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.effect._
-import quasar.fs.AnalyticalFileSystem
+import quasar.fs.BackendEffect
 import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
@@ -32,7 +32,7 @@ import scalaz._, Scalaz._
   * @tparam S the composite effect, supporting the base and hierarchical effects
   */
 final class MountRequestHandler[F[_], S[_]](
-  fsDef: FileSystemDef[F]
+  fsDef: BackendDef[F]
 )(implicit
   S0: F :<: S,
   S1: MountedResultH :<: S,
@@ -40,11 +40,11 @@ final class MountRequestHandler[F[_], S[_]](
 ) {
   import MountRequest._
 
-  type HierarchicalFsRef[A] = AtomicRef[AnalyticalFileSystem ~> Free[S, ?], A]
+  type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[S, ?], A]
 
   object HierarchicalFsRef {
     def Ops[G[_]](implicit G: HierarchicalFsRef :<: G) =
-      AtomicRef.Ops[AnalyticalFileSystem ~> Free[S, ?], G]
+      AtomicRef.Ops[BackendEffect ~> Free[S, ?], G]
   }
 
   def mount[T[_]](
@@ -106,14 +106,14 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-                 (mnts => hierarchical.analyticalFileSystem[F, S](mnts.map(_.run)))
+                 (mnts => hierarchical.backendEffect[F, S](mnts.map(_.run)))
       _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }
 
 object MountRequestHandler {
   def apply[F[_], S[_]](
-    fsDef: FileSystemDef[F]
+    fsDef: BackendDef[F]
   )(implicit
     S0: F :<: S,
     S1: MountedResultH :<: S,

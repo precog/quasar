@@ -150,7 +150,7 @@ abstract class QueryRegressionTest[S[_]](
           BuildInfo.isCIBuild.fold(
             execute.Skipped("(skipped because it times out)"),
             runTest)
-        case Some(TestDirective.Pending) =>
+        case Some(TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder) =>
           if (BuildInfo.coverageEnabled)
             execute.Skipped("(pending example skipped during coverage run)")
           else
@@ -228,14 +228,14 @@ abstract class QueryRegressionTest[S[_]](
         // TODO: Error if a backend ignores field order when the query already does.
         if (exp.ignoreFieldOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
         },
         if (exp.ignoreResultOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
@@ -250,7 +250,7 @@ abstract class QueryRegressionTest[S[_]](
           case x => x
         }.handle {
           case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
-          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.") 
+          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
         }
       case _ => result.handle {
         case e: java.util.concurrent.TimeoutException =>
@@ -368,29 +368,29 @@ abstract class QueryRegressionTest[S[_]](
 object QueryRegressionTest {
   lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
-  val externalFS: Task[IList[SupportedFs[AnalyticalFileSystemIO]]] =
+  val externalFS: Task[IList[SupportedFs[BackendEffectIO]]] =
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
       hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
-                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: AnalyticalFileSystemIO ~> Task =>
+                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: BackendEffectIO ~> Task =>
                     SupportedFs(
                       sb.ref,
                       ut.copy(testInterp = f)
-                        .contramapF(chroot.fileSystem[AnalyticalFileSystemIO](ut.testDir))
+                        .contramapF(chroot.fileSystem[BackendEffectIO](ut.testDir))
                         .some,
                       ut.some)
                   }
                 ).getOrElse(sb.point[Task]))
     } yield hfsUts
 
-  private def hierarchicalFSIO(mnt: ADir, f: AnalyticalFileSystemIO ~> Task): Task[AnalyticalFileSystemIO ~> Task] =
+  private def hierarchicalFSIO(mnt: ADir, f: BackendEffectIO ~> Task): Task[BackendEffectIO ~> Task] =
     interpretHfsIO map { hfs =>
-      val interpFS = f compose injectNT[AnalyticalFileSystem, AnalyticalFileSystemIO]
+      val interpFS = f compose injectNT[BackendEffect, BackendEffectIO]
 
-      val g: AnalyticalFileSystem ~> Free[HfsIO, ?] =
-        flatMapSNT(hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
-          .compose(chroot.analyticalFileSystem[AnalyticalFileSystem](mnt))
+      val g: BackendEffect ~> Free[HfsIO, ?] =
+        flatMapSNT(hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
+          .compose(chroot.backendEffect[BackendEffect](mnt))
 
       NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)
     }

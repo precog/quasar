@@ -1,10 +1,6 @@
 {
     "name": "filter with complex query involving not",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "largeZips.data",
 
     "query": "select `_id` as zip from largeZips where

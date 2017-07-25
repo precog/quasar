@@ -1,9 +1,10 @@
 {
     "name": "flatten an object inside a field projection",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "slamengine_commits.data",
+    "backends": {
+        "mimir": "pending"
+    },
+    "NB": "unmatched expected values 'Set(\"2015-01-29T15:52:37Z\", \"2015-01-29T00:23:14Z\", \"2015-01-26T17:37:40Z\")' is not empty (file:1)",
     "query": "select commit.author{*} from slamengine_commits",
     "predicate": "atLeast",
     "ignoreResultOrder": true,

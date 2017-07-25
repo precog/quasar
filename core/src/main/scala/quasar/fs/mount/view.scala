@@ -215,7 +215,7 @@ object view {
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
 
-  def analyticalFileSystem[S[_]](
+  def backendEffect[S[_]](
     implicit
     S0: ReadFile :<: S,
     S1: WriteFile :<: S,
@@ -227,7 +227,7 @@ object view {
     S7: MountingFailure :<: S,
     S8: PathMismatchFailure :<: S,
     S9: Analyze :<: S
-  ): AnalyticalFileSystem ~> Free[S, ?] = analyze :+: fileSystem[S]
+  ): BackendEffect ~> Free[S, ?] = analyze :+: fileSystem[S]
 
   /** Resolve view references in the given `LP`. */
   def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])

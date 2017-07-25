@@ -1,8 +1,5 @@
 {
     "name": "match like pattern",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "zips.data",
     "query": "select city from zips where city like \"%OULD%CIT%\"",
     "predicate": "atLeast",

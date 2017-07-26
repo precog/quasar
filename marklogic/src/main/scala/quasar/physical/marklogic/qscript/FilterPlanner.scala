@@ -46,8 +46,8 @@ private[qscript] final class FilterPlanner[
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
     lazy val pathQuery: F[Option[Q]]    = (planPathIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
-    lazy val elementQuery: F[Option[Q]] = (planElementIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
     lazy val starQuery: F[Option[Q]]    = (planPathStarIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
+    lazy val elementQuery: F[Option[Q]] = (planElementIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
 
     (src0.point[F] |@| pathQuery |@| starQuery |@| elementQuery) {
       case (\/-(src), _, _, _)          => xqueryFilter(src, f) map (_.right[Search[Q]])
@@ -85,11 +85,6 @@ private[qscript] final class FilterPlanner[
     }
 
 
-  private def indexedFilter[Q](src: Search[Q], q: Q)(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Search[Q] =
-    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
-
 
   private object PathProjection {
     def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ADir, T[EJson])] = fpm match {
@@ -108,11 +103,33 @@ private[qscript] final class FilterPlanner[
     }
   }
 
+  private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
+    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
+
+  private def indexedFilter[Q](src: Search[Q], q: Q)(
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Search[Q] =
+    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
+
+  private def starFilter[Q](src: Search[Q], path: ADir, q: Q)(
+    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Option[Search[Q]] =
+    (Search.query split[Search[Q], Search[Q], Option[XQuery], Option[XQuery]] Search.pred)
+      .modifyF[Option] { search: (Q, Option[XQuery]) =>
+        search match {
+          case (_, Some(pred)) =>
+            None
+          case (qr, None) =>
+            (Q.embed(Query.And(IList(qr, q))),
+              axes.child.elementNamed(prettyPrint(path)).some).some
+        }
+      }(src.squared) map (_._2)
+
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
   private def planPathIndex[Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
+  ): Option[Q] = rewrite(fm) match {
     case PathProjection(path, const) =>
       Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
     case _ => none
@@ -120,17 +137,21 @@ private[qscript] final class FilterPlanner[
 
   private def planPathStarIndex[Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
+  ): Option[(ADir, Q)] = rewrite(fm) match {
     case PathProjection(path, const) => {
       val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
-      Query.PathRange[T[EJson], Q](IList(prettyPrint(starPath).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
+      val q = Query.PathRange[T[EJson], Q](
+        IList(prettyPrint(starPath).dropRight(1)),
+        ComparisonOp.EQ, IList(const)).embed
+
+      (starPath, q).some
     }
     case _ => none
   }
 
   private def planElementIndex[Q](fm: FreeMap[T])(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Q] = ProjectPath.elideGuards(ProjectPath.foldProjectField(fm)) match {
+  ): Option[Q] = rewrite(fm) match {
     case PathProjection(QNamePath(qname), const) =>
       Query.ElementRange[T[EJson], Q](IList(qname), ComparisonOp.EQ, IList(const)).embed.some
     case _ => none
@@ -139,4 +160,5 @@ private[qscript] final class FilterPlanner[
   private def validQuery[Q](qry: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Option[Q]] = queryIsValid[F, Q, T[EJson], FMT](qry).ifM(qry.some.point[F], none.point[F])
+
 }

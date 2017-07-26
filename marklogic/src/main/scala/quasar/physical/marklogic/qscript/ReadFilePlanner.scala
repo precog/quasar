@@ -38,7 +38,8 @@ private[qscript] final class ReadFilePlanner[M[_]: Applicative: MonadPlanErr, FM
       Uri.getOption(fileUri).cata(uri =>
         Search(
           Q.embed(Query.Document[J, Q](IList(uri))),
-          ExcludeId
+          ExcludeId,
+          none
         ).left[XQuery].point[M],
         MonadPlanErr[M].raiseError(invalidUri(fileUri)))
   }

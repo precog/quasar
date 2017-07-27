@@ -18,8 +18,8 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.fp.ski.ι
 import quasar.ejson.EJson
-import quasar.fp.ski._
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
@@ -45,17 +45,21 @@ private[qscript] final class FilterPlanner[
   def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Search[Q] \/ XQuery] = {
-    lazy val pathQuery: F[Option[Q]]    = (planPathIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
-    lazy val starQuery: F[Option[Q]]    = (planPathStarIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
-    lazy val elementQuery: F[Option[Q]] = (planElementIndex[Q](f) map (validQuery[Q](_))).fold(none[Q].point[F])(ι)
+    src0 match {
+      case (\/-(src)) => xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src)) => {
+        lazy val starQuery    = StarPlanner.plan(src, f)
+        lazy val pathQuery    = PathIndexPlanner.plan(src, f)
+        lazy val elementQuery = ElementIndexPlanner.plan(src, f)
 
-    (src0.point[F] |@| pathQuery |@| starQuery |@| elementQuery) {
-      case (\/-(src), _, _, _)          => xqueryFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src), Some(q), _, _)    => indexedFilter(src, q).left[XQuery].point[F]
-      case (-\/(src), _, Some(q), _)    => indexedFilter(src, q).left[XQuery].point[F]
-      case (-\/(src), _, _, Some(q))    => indexedFilter(src, q).left[XQuery].point[F]
-      case (-\/(src), None, None, None) => fallbackFilter(src, f) map (_.right[Search[Q]])
-    }.join
+        (pathQuery |@| starQuery |@| elementQuery) {
+          case (Some(q), _, _)    => q.left[XQuery].point[F]
+          case (_, Some(q), _)    => q.left[XQuery].point[F]
+          case (_, _, Some(q))    => q.left[XQuery].point[F]
+          case (None, None, None) => fallbackFilter(src, f) map (_.right[Search[Q]])
+        }.join
+      }
+    }
   }
 
   private def fallbackFilter[Q](src: Search[Q], f: FreeMap[T])(
@@ -85,7 +89,6 @@ private[qscript] final class FilterPlanner[
     }
 
 
-
   private object PathProjection {
     def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ADir, T[EJson])] = fpm match {
       case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
@@ -103,62 +106,112 @@ private[qscript] final class FilterPlanner[
     }
   }
 
-  private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
-    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
+  private object StarPlanner {
+    private def starFilter[Q](src: Search[Q])(path: ADir, q: Q)(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Search[Q]] =
+      (Search.query split[Search[Q], Search[Q], Option[XQuery], Option[XQuery]] Search.pred)
+        .modifyF[Option] { search: (Q, Option[XQuery]) =>
+          search match {
+            case (_, Some(pred)) =>
+              None
+            case (qr, None) =>
+              (Q.embed(Query.And(IList(qr, q))),
+                axes.child.elementNamed(prettyPrint(path)).some).some
+          }
+        }(src.squared) map (_._2)
+
+    private def planPathStarIndex[Q](fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[(ADir, Q)] = rewrite(fm) match {
+      case PathProjection(path, const) => {
+        val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
+        val q = Query.PathRange[T[EJson], Q](
+          IList(prettyPrint(starPath).dropRight(1)),
+          ComparisonOp.EQ, IList(const)).embed
+
+        (starPath, q).some
+      }
+      case _ => none
+    }
+
+    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[Search[Q]]] = {
+      val nil: F[Option[Search[Q]]] = none[Search[Q]].point[F]
+
+      val pl = for {
+        plan <- planPathStarIndex[Q](fm)
+        (dir0, qry) = plan
+        search <- starFilter[Q](src)(dir0, qry)
+        isValid = validQuery[Q](qry).map(_.isDefined)
+      } yield (search, isValid)
+
+      pl.fold(nil)(x => x._2.ifM(x._1.some.point[F], nil))
+    }
+  }
+
+  private object PathIndexPlanner {
+    private def planPathIndex[Q](fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Q] = rewrite(fm) match {
+      case PathProjection(path, const) =>
+        Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)),
+          ComparisonOp.EQ, IList(const)).embed.some
+      case _ => none
+    }
+
+    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[Search[Q]]] = {
+      val qry: Option[Q] = planPathIndex[Q](fm)
+      val search: Option[Search[Q]] = qry.map(indexedFilter(src, _))
+      val valid: F[Boolean] = distF(qry.map(validQuery[Q](_))).map(_.isDefined)
+
+      valid.ifM(search.point[F], none[Search[Q]].point[F])
+    }
+  }
+
+  private object ElementIndexPlanner {
+    private def planElementIndex[Q](fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Q] = rewrite(fm) match {
+      case PathProjection(QNamePath(qname), const) =>
+        Query.ElementRange[T[EJson], Q](IList(qname),
+          ComparisonOp.EQ, IList(const)).embed.some
+      case _ => none
+    }
+
+    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[Search[Q]]] = {
+      val qry: Option[Q] = planElementIndex[Q](fm)
+      val search: Option[Search[Q]] = qry.map(indexedFilter(src, _))
+      val valid: F[Boolean] = distF(qry.map(validQuery[Q](_))).map(_.isDefined)
+
+      valid.ifM(search.point[F], none[Search[Q]].point[F])
+    }
+  }
+
+  private def distF[F[_]: Applicative, A](mfa: Option[F[Option[A]]]): F[Option[A]] =
+    mfa.fold(none[A].point[F])(ι)
 
   private def indexedFilter[Q](src: Search[Q], q: Q)(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
   ): Search[Q] =
     Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
-  private def starFilter[Q](src: Search[Q], path: ADir, q: Q)(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Search[Q]] =
-    (Search.query split[Search[Q], Search[Q], Option[XQuery], Option[XQuery]] Search.pred)
-      .modifyF[Option] { search: (Q, Option[XQuery]) =>
-        search match {
-          case (_, Some(pred)) =>
-            None
-          case (qr, None) =>
-            (Q.embed(Query.And(IList(qr, q))),
-              axes.child.elementNamed(prettyPrint(path)).some).some
-        }
-      }(src.squared) map (_._2)
-
-  /* Discards nested projection guards. The existence of a path range index a/b/c
-   * guarantees that the nested projection a/b/c is valid. */
-  private def planPathIndex[Q](fm: FreeMap[T])(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Q] = rewrite(fm) match {
-    case PathProjection(path, const) =>
-      Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), ComparisonOp.EQ, IList(const)).embed.some
-    case _ => none
-  }
-
-  private def planPathStarIndex[Q](fm: FreeMap[T])(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[(ADir, Q)] = rewrite(fm) match {
-    case PathProjection(path, const) => {
-      val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
-      val q = Query.PathRange[T[EJson], Q](
-        IList(prettyPrint(starPath).dropRight(1)),
-        ComparisonOp.EQ, IList(const)).embed
-
-      (starPath, q).some
-    }
-    case _ => none
-  }
-
-  private def planElementIndex[Q](fm: FreeMap[T])(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Option[Q] = rewrite(fm) match {
-    case PathProjection(QNamePath(qname), const) =>
-      Query.ElementRange[T[EJson], Q](IList(qname), ComparisonOp.EQ, IList(const)).embed.some
-    case _ => none
-  }
 
   private def validQuery[Q](qry: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Option[Q]] = queryIsValid[F, Q, T[EJson], FMT](qry).ifM(qry.some.point[F], none.point[F])
+  ): F[Option[Q]] = queryIsValid[F, Q, T[EJson], FMT](qry) >>= {
+    case true  => qry.some.point[F]
+    case false => none.point[F]
+  }
+
+  /* Discards nested projection guards. The existence of a path range index a/b/c
+   * guarantees that the nested projection a/b/c is valid. */
+  private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
+    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
 
 }

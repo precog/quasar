@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
-import quasar.fp.ski.ι
 import quasar.ejson.EJson
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xcc.Xcc
@@ -48,9 +47,9 @@ private[qscript] final class FilterPlanner[
     src0 match {
       case (\/-(src)) => xqueryFilter(src, f) map (_.right[Search[Q]])
       case (-\/(src)) => {
-        lazy val starQuery    = StarPlanner.plan(src, f)
-        lazy val pathQuery    = PathIndexPlanner.plan(src, f)
-        lazy val elementQuery = ElementIndexPlanner.plan(src, f)
+        lazy val starQuery    = StarIndexPlanner(src, f)
+        lazy val pathQuery    = PathIndexPlanner(src, f)
+        lazy val elementQuery = ElementIndexPlanner(src, f)
 
         (pathQuery |@| starQuery |@| elementQuery) {
           case (Some(q), _, _)    => q.left[XQuery].point[F]
@@ -106,20 +105,19 @@ private[qscript] final class FilterPlanner[
     }
   }
 
-  private object StarPlanner {
+  private object StarIndexPlanner {
     private def starFilter[Q](src: Search[Q])(path: ADir, q: Q)(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] =
-      (Search.query split[Search[Q], Search[Q], Option[XQuery], Option[XQuery]] Search.pred)
-        .modifyF[Option] { search: (Q, Option[XQuery]) =>
-          search match {
-            case (_, Some(pred)) =>
-              None
-            case (qr, None) =>
-              (Q.embed(Query.And(IList(qr, q))),
-                axes.child.elementNamed(prettyPrint(path)).some).some
-          }
-        }(src.squared) map (_._2)
+    ): Option[Search[Q]] = {
+      import axes.descendant, axes.child
+
+      val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
+      Search.pred.modifyF[Option] {
+        case Some(pred) => None
+        case None => dirName(path).map((dn: DirName) =>
+          (descendant.* `/` child.elementNamed(dn.value)).some)
+      }(src0)
+    }
 
     private def planPathStarIndex[Q](fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
@@ -135,7 +133,7 @@ private[qscript] final class FilterPlanner[
       case _ => none
     }
 
-    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+    def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
       val nil: F[Option[Search[Q]]] = none[Search[Q]].point[F]
@@ -161,7 +159,7 @@ private[qscript] final class FilterPlanner[
       case _ => none
     }
 
-    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+    def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
       val qry: Option[Q] = planPathIndex[Q](fm)
@@ -182,7 +180,7 @@ private[qscript] final class FilterPlanner[
       case _ => none
     }
 
-    def plan[Q](src: Search[Q], fm: FreeMap[T])(
+    def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
       val qry: Option[Q] = planElementIndex[Q](fm)
@@ -193,8 +191,8 @@ private[qscript] final class FilterPlanner[
     }
   }
 
-  private def distF[F[_]: Applicative, A](mfa: Option[F[Option[A]]]): F[Option[A]] =
-    mfa.fold(none[A].point[F])(ι)
+  private def distF[F[_]: Applicative, G[_]: Bind: Traverse, A](mfa: G[F[G[A]]]): F[G[A]] =
+    mfa.sequence.map(_.join)
 
   private def indexedFilter[Q](src: Search[Q], q: Q)(
     implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]

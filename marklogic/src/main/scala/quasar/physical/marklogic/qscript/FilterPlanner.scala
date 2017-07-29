@@ -47,8 +47,8 @@ private[qscript] final class FilterPlanner[
     src0 match {
       case (\/-(src)) => xqueryFilter(src, f) map (_.right[Search[Q]])
       case (-\/(src)) => {
-        lazy val starQuery    = StarIndexPlanner(src, f)
         lazy val pathQuery    = PathIndexPlanner(src, f)
+        lazy val starQuery    = StarIndexPlanner(src, f)
         lazy val elementQuery = ElementIndexPlanner(src, f)
 
         (pathQuery |@| starQuery |@| elementQuery) {
@@ -87,11 +87,22 @@ private[qscript] final class FilterPlanner[
         for_(x in src) where_ p return_ ~x
     }
 
-
   private object PathProjection {
-    def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ADir, T[EJson])] = fpm match {
-      case Embed(CoEnv(\/-(MFPath(MFCore.Eq(Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
-        (pp.path, v).some
+    object MFComp {
+      def unapply[T[_[_]], A](mfc: MapFuncCore[T, A]): Option[(ComparisonOp, A, A)] = mfc match {
+        case MFCore.Eq(a1, a2)  => (ComparisonOp.EQ, a1, a2).some
+        case MFCore.Neq(a1, a2) => (ComparisonOp.NE, a1, a2).some
+        case MFCore.Lt(a1, a2)  => (ComparisonOp.LT, a1, a2).some
+        case MFCore.Lte(a1, a2) => (ComparisonOp.LE, a1, a2).some
+        case MFCore.Gt(a1, a2)  => (ComparisonOp.GT, a1, a2).some
+        case MFCore.Gte(a1, a2) => (ComparisonOp.GE, a1, a2).some
+        case _                  => none
+      }
+    }
+
+    def unapply[T[_[_]]](fpm: FreePathMap[T]): Option[(ComparisonOp, ADir, T[EJson])] = fpm match {
+      case Embed(CoEnv(\/-(MFPath(MFComp(op, Embed(CoEnv(\/-(PathProject(pp)))), Embed(CoEnv(\/-(MFPath(MFCore.Constant(v)))))))))) =>
+        (op, pp.path, v).some
       case _ => none
     }
   }
@@ -122,11 +133,10 @@ private[qscript] final class FilterPlanner[
     private def planPathStarIndex[Q](fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(ADir, Q)] = rewrite(fm) match {
-      case PathProjection(path, const) => {
+      case PathProjection(op, path, const) => {
         val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
         val q = Query.PathRange[T[EJson], Q](
-          IList(prettyPrint(starPath).dropRight(1)),
-          ComparisonOp.EQ, IList(const)).embed
+          IList(prettyPrint(starPath).dropRight(1)), op, IList(const)).embed
 
         (starPath, q).some
       }
@@ -153,9 +163,8 @@ private[qscript] final class FilterPlanner[
     private def planPathIndex[Q](fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[Q] = rewrite(fm) match {
-      case PathProjection(path, const) =>
-        Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)),
-          ComparisonOp.EQ, IList(const)).embed.some
+      case PathProjection(op, path, const) =>
+        Query.PathRange[T[EJson], Q](IList(prettyPrint(path).dropRight(1)), op, IList(const)).embed.some
       case _ => none
     }
 
@@ -174,9 +183,8 @@ private[qscript] final class FilterPlanner[
     private def planElementIndex[Q](fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[Q] = rewrite(fm) match {
-      case PathProjection(QNamePath(qname), const) =>
-        Query.ElementRange[T[EJson], Q](IList(qname),
-          ComparisonOp.EQ, IList(const)).embed.some
+      case PathProjection(op, QNamePath(qname), const) =>
+        Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed.some
       case _ => none
     }
 

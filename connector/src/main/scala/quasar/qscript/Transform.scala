@@ -99,28 +99,89 @@ class Transform
         val lprovs = prov.genBuckets(lann.provenance) ∘ (_ ∘ (_.as[JoinSide](LeftSide)))
         val rprovs = prov.genBuckets(rann.provenance) ∘ (_ ∘ (_.as[JoinSide](RightSide)))
 
-        val (combine, newLprov, newRprov, lacc, racc) =
+        val uniHole: rewrite.BranchUnification[F, Hole, T[F]] =
+          rewrite.unifySimpleBranchesHole(src, lBranch, rBranch)(rebaseT[T, F])
+
+        val uniSide: rewrite.BranchUnification[F, JoinSide, T[F]] =
+          rewrite.unifySimpleBranchesJoinSide(src, lBranch, rBranch)(rebaseT[T, F])
+
+        def c2[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]])
+            : Option[(F[T[F]], FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            (c, lacc, racc) <- concat(l, r).some
+            res <- uni.combine(c)
+          } yield (res, lacc, racc)
+
+        def c3[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]],
+          bucket: JoinFunc)
+            : Option[(F[T[F]], FreeMap, FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            b <- uni.remap(bucket)
+            (c, bacc, lacc, racc) <- concat3(b, l, r).some
+            res <- uni.combine(c)
+          } yield (res, bacc, lacc, racc)
+
+        def c4[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]],
+          lBucket: JoinFunc,
+          rBucket: JoinFunc)
+            : Option[(F[T[F]], FreeMap, FreeMap, FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            lb <- uni.remap(lBucket)
+            rb <- uni.remap(rBucket)
+            (c, lbacc, rbacc, lacc, racc) <- concat4(lb, rb, l, r).some
+            res <- uni.combine(c)
+          } yield (res, lbacc, rbacc, lacc, racc)
+
+        def theta(
+          combine: JoinFunc,
+          newLprov: List[prov.Provenance],
+          newRprov: List[prov.Provenance])
+            : F[T[F]] =
+          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))
+
+        val (res, newLprov, newRprov, lacc, racc) =
           (lprovs, rprovs) match {
             case (None, None) =>
-              val (combine, lacc, racc) = concat(lval, rval)
+              val (combine, lacc, racc) =
+                c2(uniHole) orElse c2(uniSide) getOrElse {
+                  val (c, lacc, racc) = concat(lval, rval)
+                  (theta(c, lann.provenance, rann.provenance), lacc, racc)
+                }
               (combine, lann.provenance, rann.provenance, lacc, racc)
             case (None, Some((rProvs, rBuck))) =>
-              val (combine, bacc, lacc, racc) = naiveConcat3(rBuck, lval, rval)
+              val (combine, bacc, lacc, racc) =
+                c3(uniHole, rBuck) orElse c3(uniSide, rBuck) getOrElse {
+                  val (c, bacc, lacc, racc) = concat3(rBuck, lval, rval)
+                  (theta(c, lann.provenance, prov.rebase(bacc, rProvs)), bacc, lacc, racc)
+                }
               (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
             case (Some((lProvs, lBuck)), None) =>
-              val (combine, bacc, lacc, racc) = naiveConcat3(lBuck, lval, rval)
+              val (combine, bacc, lacc, racc) =
+                c3(uniHole, lBuck) orElse c3(uniSide, lBuck) getOrElse {
+                  val (c, bacc, lacc, racc) = concat3(lBuck, lval, rval)
+                  (theta(c, prov.rebase(bacc, lProvs), rann.provenance), bacc, lacc, racc)
+                }
               (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
             case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
               val (combine, lbacc, rbacc, lacc, racc) =
-                naiveConcat4(lBuck, rBuck, lval, rval)
+                c4(uniHole, lBuck, rBuck) orElse c4(uniSide, lBuck, rBuck) getOrElse {
+                  val (c, lbacc, rbacc, lacc, racc) = concat4(lBuck, rBuck, lval, rval)
+                  (theta(c, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs)), lbacc, rbacc, lacc, racc)
+                }
               (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
           }
 
         AutoJoinResult(
-          AutoJoinBase(
-            rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
-              TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))).embed,
-            prov.joinProvenances(newLprov, newRprov)),
+          AutoJoinBase(res.embed, prov.joinProvenances(newLprov, newRprov)),
           lacc,
           racc)
     }

@@ -5,11 +5,7 @@
         "couchbase": "skip",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
-        "mimir": "ignoreFieldOrder",
-        "mongodb_2_6": "timeout",
-        "mongodb_3_0": "timeout",
-        "mongodb_3_2": "timeout",
-        "mongodb_3_4": "timeout"
+        "mimir": "ignoreFieldOrder"
     },
     "data": ["../cars.data", "../cars2.data"],
 

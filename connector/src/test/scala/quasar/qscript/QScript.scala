@@ -953,48 +953,32 @@ class QScriptSpec
           IncludeId,
           ConcatArraysR(
             MakeArrayR(ConcatArraysR(
-              ConcatArraysR(
-                ConcatArraysR(
-                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
-                MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
+              MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
               MakeArrayR(ProjectIndexR(RightSideF, IntLit(1))))),
             MakeArrayR(ConcatArraysR(
-              ConcatArraysR(
-                ConcatArraysR(
-                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
-                MakeArrayR(
-                  Free.roll(MFC(Guard(
-                    ProjectIndexR(RightSideF, IntLit(1)),
-                    Type.Obj(ScalaMap(), Some(Type.Top)),
-                    ProjectFieldR(
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      StrLit("loc")),
-                    Free.roll(MFC(Undefined()))))))),
-              MakeArrayR(
-                Free.roll(MFC(Guard(
+              MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+              MakeArrayR(Free.roll(MFC(Guard(
+                ProjectIndexR(RightSideF, IntLit(1)),
+                Type.Obj(ScalaMap(), Some(Type.Top)),
+                ProjectFieldR(
                   ProjectIndexR(RightSideF, IntLit(1)),
-                  Type.Obj(ScalaMap(), Some(Type.Top)),
-                  ProjectFieldR(
-                    ProjectIndexR(RightSideF, IntLit(1)),
-                    StrLit("loc")),
-                  Free.roll(MFC(Undefined()))))))))))),
+                  StrLit("loc")),
+                Free.roll(MFC(Undefined()))))))))))),
         QC.inj(LeftShift((),
           Free.roll(MFC(Guard(
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
             Type.FlexArr(0, None, Type.Top),
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(3)),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
             Free.roll(MFC(Undefined()))))),
           ExcludeId,
           ConcatMapsR(
             MakeMapR(
               StrLit("city"),
               Free.roll(MFC(Guard(
-                ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2)),
+                ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
                 ProjectFieldR(
-                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(3)),
+                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
                   StrLit("city")),
                 Free.roll(MFC(Undefined())))))),
             MakeMapR(StrLit("loc"), RightSideF)))))(

@@ -191,8 +191,7 @@ package object qscript {
         concatNaive(norml, normr)))
   }
 
-  // FIXME naive - use `concat`
-  def naiveConcat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
@@ -245,13 +244,19 @@ package object qscript {
     }
   }
 
-  // FIXME naive - use `concat`
-  def naiveConcat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
     (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
+      case (newL, newC, newR, newR2) if newL ≟ newC && newR ≟ newR2 =>
+        (StaticArray(List(newL, newR)),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+
       // TODO: Handle cases with more than one constant.
       case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR, newR2) =>
         (StaticArray(List(newC, newR, newR2)),

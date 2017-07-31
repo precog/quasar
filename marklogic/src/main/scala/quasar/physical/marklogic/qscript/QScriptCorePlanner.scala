@@ -38,7 +38,7 @@ import scalaz._, Scalaz._
 //       in the best case, also be sequences and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[
   F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-  FMT: SearchOptions,
+  FMT: SearchOptions: FormatFilterPlanner,
   T[_[_]]: BirecursiveT: ShowT
 ](implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],

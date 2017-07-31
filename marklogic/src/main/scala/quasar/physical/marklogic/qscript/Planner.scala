@@ -85,7 +85,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
   ): Planner[F, FMT, Const[ShiftedRead[ADir], ?], J] =
     new ShiftedReadDirPlanner[F, FMT, J]
 
-  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc, FMT: SearchOptions, T[_[_]]: BirecursiveT: ShowT](
+  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc, FMT: SearchOptions: FormatFilterPlanner, T[_[_]]: BirecursiveT: ShowT](
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?], T[EJson]]]

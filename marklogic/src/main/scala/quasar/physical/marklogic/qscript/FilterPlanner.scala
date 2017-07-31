@@ -112,107 +112,84 @@ private[qscript] final class FilterPlanner[
   }
 
   object StarIndexPlanner {
-    private def starFilter[Q](src: Search[Q])(path: ADir, q: Q)(
+    private def planPathStarIndex[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = {
-      import axes.descendant, axes.child
-
-      val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
-      Search.pred.modifyF[Option] {
-        case Some(pred) => None
-        case None => dirName(path).map((dn: DirName) =>
-          (descendant.* `/` child.elementNamed(dn.value)).some)
-      }(src0)
-    }
-
-    private def planPathStarIndex[Q](fm: FreeMap[T])(
-      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[(ADir, Q)] = rewrite(fm) match {
+    ): Option[Search[Q]] = rewrite(fm) match {
       case PathProjection(op, path, const) => {
         val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
         val q = Query.PathRange[T[EJson], Q](
           IList(prettyPrint(starPath).dropRight(1)), op, IList(const)).embed
 
-        (starPath, q).some
+        Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
       }
-      case _ => none
-    }
-
-    // Check if there's pure logic here that can be refactored
-    def apply[Q](src: Search[Q], fm: FreeMap[T])(
-      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] =
-      (for {
-        // next three lines should be done purely
-        plan   <- planPathStarIndex[Q](fm)
-        (dir0, qry) = plan
-        search <- starFilter[Q](src)(dir0, qry)
-        isValid = validQuery[Q](qry).map(_.isDefined)
-      } yield (search, isValid)) match {
-        case Some((search, valid)) =>
-          valid.ifM(search.some.point[F], none.point[F])
-        case None =>
-          none.point[F]
-      }
-  }
-
-  object PathIndexPlanner {
-    private def planPathIndex[Q](fm: FreeMap[T])(
-      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Q] = rewrite(fm) match {
-      case PathProjection(op, path, const) =>
-        Query.PathRange[T[EJson], Q](
-          IList(prettyPrint(path).dropRight(1)),
-          op, IList(const)).embed.some
       case _ => none
     }
 
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
-      val qry: Option[Q] = planPathIndex[Q](fm)
-      val search: Option[Search[Q]] = qry.map(indexedFilter(src, _))
-      val valid: F[Boolean] = distF(qry.map(validQuery[Q](_))).map(_.isDefined)
+      val search = planPathStarIndex[Q](src, fm)
+      val valid = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
+
+      valid.ifM(search.point[F], none.point[F])
+    }
+  }
+
+  object PathIndexPlanner {
+    private def planPathIndex[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Search[Q]] = rewrite(fm) match {
+      case PathProjection(op, path, const) => {
+        val q = Query.PathRange[T[EJson], Q](
+          IList(prettyPrint(path).dropRight(1)),
+          op, IList(const)).embed
+
+        Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
+      }
+      case _ => none
+    }
+
+    def apply[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[Search[Q]]] = {
+      val search: Option[Search[Q]] = planPathIndex[Q](src, fm)
+      val valid: F[Boolean] = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
 
       valid.ifM(search.point[F], none[Search[Q]].point[F])
     }
   }
 
   object ElementIndexPlanner {
-    private def planElementIndex[Q](fm: FreeMap[T])(
+    import axes.child
+
+    private def planElementIndex[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Q] = rewrite(fm) match {
-      case PathProjection(op, QNamePath(qname), const) =>
-        Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed.some
+    ): Option[Search[Q]] = rewrite(fm) match {
+      case PathProjection(op, QNamePath(qname), const) => {
+        val q = Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed
+        val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
+
+        Search.pred.modify {
+          case Some(pred) => None
+          case None       => (child.* `/` child.elementNamed(QName.string(qname))).some
+        }(src0).some
+      }
       case _ => none
     }
-    // Check if there's logic here that can be done purely
+
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
-      val qry: Option[Q] = planElementIndex[Q](fm)
-      val search: Option[Search[Q]] = qry.map(indexedFilter(src, _))
-      val valid: F[Boolean] = distF(qry.map(validQuery[Q](_))).map(_.isDefined)
+      val search: Option[Search[Q]] = planElementIndex[Q](src, fm)
+      val valid: F[Boolean] = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
 
       valid.ifM(search.point[F], none[Search[Q]].point[F])
     }
   }
 
-  private def distF[F[_]: Applicative, G[_]: Bind: Traverse, A](mfa: G[F[G[A]]]): F[G[A]] =
-    mfa.sequence.map(_.join)
-
-  private def indexedFilter[Q](src: Search[Q], q: Q)(
-    implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Search[Q] =
-    Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
-
-
-  private def validQuery[Q](qry: Q)(
+  private def validQ[Q](qry: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Option[Q]] = queryIsValid[F, Q, T[EJson], FMT](qry) >>= {
-    case true  => qry.some.point[F]
-    case false => none.point[F]
-  }
+  ): F[Boolean] = queryIsValid[F, Q, T[EJson], FMT](qry)
 
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */

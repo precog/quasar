@@ -388,7 +388,7 @@ package object main {
     */
   def initMetaStoreOrStart[C: argonaut.DecodeJson](
     config: CmdLineConfig,
-    start: (C, CoreEff ~> QErrs_TaskM) => MainTask[Unit],
+    start: (C, CoreEff ~> QErrs_TaskM, Task[Unit]) => MainTask[Unit],
     persist: DbConnectionConfig => MainTask[Unit]
   )(implicit
     configOps: ConfigOps[C]
@@ -399,7 +399,7 @@ package object main {
         case Cmd.Start =>
           for {
             quasarFs <- Quasar.initFromMetaConfig(configOps.metaStoreConfig.get(cfg), persist)
-            _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
+            _        <- start(cfg, quasarFs.interp, quasarFs.shutdown)
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>

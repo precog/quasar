@@ -49,9 +49,9 @@ object FormatFilterPlanner {
     ): F[Option[Search[Q]]] = {
       val planner = new FilterPlanner[F, FMT, T]
 
-      lazy val pathQuery    = planner.PathIndexPlanner(src, f)
-      lazy val starQuery    = planner.StarIndexPlanner(src, f)
-      lazy val elementQuery = planner.ElementIndexPlanner(src, f)
+      lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
+      lazy val starQuery    = planner.validSearch(planner.StarIndexPlanner(src, f))
+      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner(src, f))
 
       (pathQuery |@| starQuery |@| elementQuery) {
         case (Some(q), _, _)    => q.some.point[F]
@@ -71,8 +71,8 @@ object FormatFilterPlanner {
     ): F[Option[Search[Q]]] = {
       val planner = new FilterPlanner[F, FMT, T]
 
-      lazy val pathQuery    = planner.PathIndexPlanner(src, f)
-      lazy val elementQuery = planner.ElementIndexPlanner(src, f)
+      lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
+      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner(src, f))
 
       (pathQuery |@| elementQuery) {
         case (Some(q), _) => q.some.point[F]

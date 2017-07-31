@@ -111,6 +111,11 @@ private[qscript] final class FilterPlanner[
     }
   }
 
+  /* Discards nested projection guards. The existence of a path range index a/b/c
+   * guarantees that the nested projection a/b/c is valid. */
+  private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
+    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
+
   object StarIndexPlanner {
     private def planPathStarIndex[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
@@ -127,12 +132,7 @@ private[qscript] final class FilterPlanner[
 
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] = {
-      val search = planPathStarIndex[Q](src, fm)
-      val valid = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
-
-      valid.ifM(search.point[F], none.point[F])
-    }
+    ): Option[Search[Q]] = planPathStarIndex[Q](src, fm)
   }
 
   object PathIndexPlanner {
@@ -151,12 +151,7 @@ private[qscript] final class FilterPlanner[
 
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] = {
-      val search: Option[Search[Q]] = planPathIndex[Q](src, fm)
-      val valid: F[Boolean] = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
-
-      valid.ifM(search.point[F], none[Search[Q]].point[F])
-    }
+    ): Option[Search[Q]] = planPathIndex[Q](src, fm)
   }
 
   object ElementIndexPlanner {
@@ -179,21 +174,15 @@ private[qscript] final class FilterPlanner[
 
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] = {
-      val search: Option[Search[Q]] = planElementIndex[Q](src, fm)
-      val valid: F[Boolean] = search.map(_.query).map(validQ[Q](_)).sequence[F, Boolean].map(_.getOrElse(false))
-
-      valid.ifM(search.point[F], none[Search[Q]].point[F])
-    }
+    ): Option[Search[Q]] = planElementIndex[Q](src, fm)
   }
 
-  private def validQ[Q](qry: Q)(
+  def validSearch[Q](src: Option[Search[Q]])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Boolean] = queryIsValid[F, Q, T[EJson], FMT](qry)
-
-  /* Discards nested projection guards. The existence of a path range index a/b/c
-   * guarantees that the nested projection a/b/c is valid. */
-  private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
-    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
-
+  ): F[Option[Search[Q]]] = src match {
+    case Some(search) =>
+      queryIsValid[F, Q, T[EJson], FMT](search.query).ifM(src.point[F], none.point[F])
+    case None =>
+      none.point[F]
+  }
 }

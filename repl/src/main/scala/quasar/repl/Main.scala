@@ -49,9 +49,10 @@ object Main {
   type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
-  private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = {
+  private def driver(f: Command => Free[DriverEff, Unit], onExit: Task[Unit]): Task[Unit] = {
     def shutdownConsole(c: Console): Task[Unit] =
       Task.delay(c.getShell.out.println("Exiting...")) >>
+      onExit.attempt                                   >>
       Task.delay(c.stop)
 
     Task delay {
@@ -134,10 +135,10 @@ object Main {
           _.point[DriverEffM]))
     }
 
-  def startRepl(quasarInter: CoreEff ~> QErrs_TaskM): Task[Unit] =
+  def startRepl(quasarInter: CoreEff ~> QErrs_TaskM, onExit: Task[Unit]): Task[Unit] =
     for {
       runCmd  <- repl[CoreEff](mt compose QErrs_Task.toMainTask compose quasarInter)
-      _       <- driver(runCmd)
+      _       <- driver(runCmd, onExit)
     } yield ()
 
   def safeMain(args: Vector[String]): Task[Unit] =
@@ -149,7 +150,7 @@ object Main {
           .map(some))
       _ <- initMetaStoreOrStart[CoreConfig](
         CmdLineConfig(cfgPath, opts.cmd),
-        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
+        (_, quasarInter, shutdown) => startRepl(quasarInter, shutdown).liftM[MainErrT],
         // The REPL does not allow you to change metastore
         // so no need to supply a function to persist the metastore
         _ => ().point[MainTask])

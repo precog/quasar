@@ -26,6 +26,7 @@ import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fp.ski.κ
 import quasar.main._
 import quasar.server.Http4sUtils.openBrowser
 
@@ -159,11 +160,24 @@ object Server {
       webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
       _ <- initMetaStoreOrStart[WebConfig](
              webCmdLineCfg.toCmdLineConfig,
-             (wCfg, quasarInter) => {
-               val port = webCmdLineCfg.port | wCfg.server.port
-               val persistPort = persistPortChange(webCmdLineCfg.configPath) andThen (_.foldM(s => Task.fail(new Exception(s)), Task.now))
-               (startServerUntilUserInput(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort) <*
-                openBrowser(port).whenM(webCmdLineCfg.openClient)).liftM[MainErrT]
+             (wCfg, quasarInter, shutdown) => {
+               val port =
+                 webCmdLineCfg.port | wCfg.server.port
+
+               val persistPort =
+                 persistPortChange(webCmdLineCfg.configPath)
+                   .andThen(_.foldM(s => Task.fail(new Exception(s)), Task.now))
+
+               val runUntilInput =
+                 startServerUntilUserInput(
+                   quasarInter,
+                   port,
+                   webCmdLineCfg.staticContent,
+                   webCmdLineCfg.redirect,
+                   persistPort
+                 ) <* openBrowser(port).whenM(webCmdLineCfg.openClient)
+
+               runUntilInput.onFinish(κ(shutdown)).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
     } yield ())

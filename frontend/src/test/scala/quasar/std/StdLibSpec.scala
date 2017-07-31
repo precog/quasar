@@ -37,6 +37,9 @@ import scalaz._, Scalaz._
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
+  def isPrintableAscii(c: Char): Boolean = c >= '\u0020' && c <= '\u007e'
+  def isPrintableAscii(s: String): Boolean = s.forall(isPrintableAscii)
+
   def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
       x == y || ((x - y).abs/(y.abs max err)).toDouble < err
@@ -93,6 +96,9 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "Length" >> {
+        "multibyte chars" >> {
+          unary(Length(_).embed, Data.Str("€1"), Data.Int(2))
+        }
         "any string" >> prop { (str: String) =>
           unary(Length(_).embed, Data.Str(str), Data.Int(str.length))
         }
@@ -114,6 +120,10 @@ abstract class StdLibSpec extends Qspec {
         "simple" >> {
           // NB: not consistent with PostgreSQL, which is 1-based for `start`
           ternary(Substring(_, _, _).embed, Data.Str("Thomas"), Data.Int(1), Data.Int(3), Data.Str("hom"))
+        }
+
+        "multibyte chars" >> {
+          ternary(Substring(_, _, _).embed, Data.Str("cafétéria"), Data.Int(3), Data.Int(1), Data.Str("é"))
         }
 
         "empty string and any offsets" >> prop { (start0: Int, length0: Int) =>

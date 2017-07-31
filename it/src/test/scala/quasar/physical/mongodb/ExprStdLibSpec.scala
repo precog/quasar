@@ -40,7 +40,10 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Length | string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
+    case (string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
+    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
+      Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
@@ -54,7 +57,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     //cause failures when marked as pending (but with low frequency)
     case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
-    case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.Power, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
     case (math.Abs, _) => Pending("not on par with master").left
     case (math.Floor, _) => Pending("not on par with master").left
     case (math.Ceil, _) => Pending("not on par with master").left
@@ -75,6 +78,10 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     queryModel match {
+      case MongoQueryModel.`3.4` =>
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_4](FuncHandler.handle3_4)(mf) >>=
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
       case MongoQueryModel.`3.2` =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
           (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))

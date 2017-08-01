@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._, syntax._
 import quasar.qscript._
@@ -29,7 +30,7 @@ import xml.name._
 
 @Lenses
 /** Represents a cts:search expression. */
-final case class Search[Q](query: Q, idStatus: IdStatus)
+final case class Search[Q](query: Q, idStatus: IdStatus, pred: Option[XQuery])
 
 object Search {
   def plan[F[_]: Monad: PrologW, Q, V, FMT](s: Search[Q], f: V => F[XQuery])(
@@ -43,10 +44,11 @@ object Search {
 
     def docsOnly: F[XQuery] = {
       val queryM = Q.cataM(s.query)(Query.toXQuery[V, F](f))
+      val searchExpr = s.pred.fold(fn.doc())(exp => fn.doc()(exp))
 
       queryM.map(q =>
         cts.search(
-          expr    = fn.doc(),
+          expr    = searchExpr,
           query   = q,
           options = SearchOptions[FMT].searchOptions
         ) `/` child.node())

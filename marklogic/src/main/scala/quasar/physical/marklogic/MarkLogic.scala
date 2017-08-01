@@ -28,8 +28,8 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
+import quasar.ejson.EJson
 import quasar.fp.free._
-import quasar.fp.ski.κ
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
@@ -39,15 +39,12 @@ import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => QRead, _}
 
 import scala.Predef.implicitly
 
-import com.marklogic.xcc.{ContentSource, Session}
 import matryoshka._
-import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -64,8 +61,8 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   type Repr        = MainModule
   type Config      = MLBackendConfig
   type M[A]        = MLFS[A]
-  type V           = Unit
-  type Q           = Fix[Query[V, ?]]
+  type V[T[_[_]]]  = T[EJson]
+  type Q[T[_[_]]]  = T[Query[V[T], ?]]
 
   val Type = FsType
 
@@ -86,12 +83,6 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   def ResultKvsM = Kvs[M, QueryFile.ResultHandle, XccDataStream]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
   def ReadKvsM = Kvs[M, ReadFile.ReadHandle, XccDataStream]
-
-  implicit val xccSessionR  = quasar.effect.Read.monadReader_[Session, fs.XccEvalEff]
-  implicit val xccSourceR   = quasar.effect.Read.monadReader_[ContentSource, fs.XccEvalEff]
-  implicit val mlfsSessionR = quasar.effect.Read.monadReader_[Session, fs.MarkLogicFs]
-  implicit val mlfsCSourceR = quasar.effect.Read.monadReader_[ContentSource, fs.MarkLogicFs]
-  implicit val mlfsUuidR    = quasar.effect.Read.monadReader_[UUID, fs.MarkLogicFs]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import Kleisli.kleisliMonadReader
@@ -127,10 +118,11 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {
       import cfg.{searchOptions, structuralPlannerM}
+      val ejsPlanner = EJsonPlanner.plan[T[EJson], cfg.M, cfg.FMT](implicitly, structuralPlannerM, implicitly)
       MainModule.fromWritten(
-        qs.cataM(cfg.planner[T].plan[Q, V])
+        qs.cataM(cfg.planner[T].plan[Q[T]])
           .flatMap(_.fold(s =>
-            Search.plan[cfg.M, Q, V, cfg.FMT](s, κ(emptySeq.point[cfg.M]))(
+            Search.plan[cfg.M, Q[T], V[T], cfg.FMT](s, ejsPlanner)(
               implicitly,
               implicitly,
               implicitly,

@@ -27,7 +27,6 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery.{cts => ctsfn, _}
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xcc._
 import quasar.qscript._
 import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
@@ -42,6 +41,11 @@ package object qscript {
   type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
 
   type MonadPlanErr[F[_]] = MonadError_[F, MarkLogicPlannerError]
+
+  type PathMapFunc[T[_[_]], A]   = Coproduct[ProjectPath, MapFunc[T, ?], A]
+  type FreePathMap[T[_[_]]]      = Free[PathMapFunc[T, ?], Hole]
+  type CoMapFunc[T[_[_]], A]     = CoEnv[Hole, MapFunc[T, ?], A]
+  type CoPathMapFunc[T[_[_]], A] = CoEnv[Hole, PathMapFunc[T, ?], A]
 
   object MonadPlanErr {
     def apply[F[_]](implicit F: MonadPlanErr[F]): MonadPlanErr[F] = F
@@ -135,23 +139,26 @@ package object qscript {
     *
     * TODO: Return any missing indexes when invalid.
     */
-  def queryIsValid[F[_]: Monad: Xcc, Q, V](query: Q)(
-    implicit Q: Recursive.Aux[Q, Query[V, ?]]
+  def queryIsValid[F[_]: Monad: Xcc, Q, V, FMT](query: Q)(
+    implicit Q:  Recursive.Aux[Q, Query[V, ?]],
+             V:  Recursive.Aux[V, EJson],
+             SP: StructuralPlanner[F, FMT]
   ): F[Boolean] = {
     val err = axes.descendant.elementNamed("error:error")
-    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q => fn.empty(xdmp.plan(q) `//` err))
+    val search = ((inr: XQuery) => fn.empty(xdmp.plan(ctsfn.search(fn.doc(), inr)) `//` err))
+    val xqy = query.cataM(Query.toXQuery[V, F](EJsonPlanner.plan[V, F, FMT])) map search
 
     xqy >>= (Xcc[F].queryResults(_) map booleanResult)
   }
 
-  def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](
+  def rebaseXQuery[T[_[_]]: BirecursiveT, F[_]: Monad, FMT, Q](
     fqs: FreeQS[T],
     src: Search[Q] \/ XQuery
   )(implicit
-    Q  : Birecursive.Aux[Q, Query[V, ?]],
-    QTP: Planner[F, FMT, QScriptTotal[T, ?]]
+    Q  : Birecursive.Aux[Q, Query[T[EJson], ?]],
+    QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]]
   ): F[Search[Q] \/ XQuery] =
-    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q, V]))
+    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan[Q]))
 
   def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
     implicit UR: Recursive.Aux[U, CoEnv[E, MapFunc[T, ?], ?]],

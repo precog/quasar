@@ -16,15 +16,16 @@
 
 package quasar.physical.marklogic.qscript
 
-import slamdata.Predef.{Map => _, _}
 import quasar.common.SortDir
 import quasar.physical.marklogic.cts.Query
+import quasar.physical.marklogic.xcc.Xcc
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
+import quasar.ejson.EJson
 
 import eu.timepit.refined.auto._
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 
 // TODO: We assume a FLWOR expression emits single values if at least one tuple
@@ -36,21 +37,23 @@ import scalaz._, Scalaz._
 //       return expression to a variable as, if it is a sequence, the results will,
 //       in the best case, also be sequences and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-  FMT: SearchOptions,
-  T[_[_]]: BirecursiveT
+  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+  FMT: SearchOptions: FormatFilterPlanner,
+  T[_[_]]: BirecursiveT: ShowT
 ](implicit
-  QTP: Planner[F, FMT, QScriptTotal[T, ?]],
+  QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],
   SP : StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, QScriptCore[T, ?]] {
+) extends Planner[F, FMT, QScriptCore[T, ?], T[EJson]] {
 
   import expr.{func, for_, if_, let_}
   import ReduceFuncs._
 
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
+  def plan[Q](
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): AlgebraM[F, QScriptCore[T, ?], Search[Q] \/ XQuery] = {
     case Map(src0, f) =>
       for {
-        src <- elimSearch[Q, V](src0)
+        src <- elimSearch[Q](src0)
         x   <- freshName[F]
         g   <- mapFuncXQuery[T, F, FMT](f, ~x)
       } yield (src match {
@@ -71,7 +74,7 @@ private[qscript] final class QScriptCorePlanner[
         r0      <- freshName[F]
         r       <- freshName[F]
         i       <- freshName[F]
-        src     <- elimSearch[Q, V](src0)
+        src     <- elimSearch[Q](src0)
         extract <- mapFuncXQuery[T, F, FMT](struct, ~l)
         lshift  <- SP.leftShift(~ext)
         chkArr  <- SP.isArray(~ext)
@@ -103,7 +106,7 @@ private[qscript] final class QScriptCorePlanner[
     // TODO: Start leveraging the cts:* aggregation functions when possible
     case Reduce(src0, bucket, reducers, repair) =>
       for {
-        src   <- elimSearch[Q, V](src0)
+        src   <- elimSearch[Q](src0)
         inits <- reducers traverse (reduceFuncInit)
         init  <- lib.combineApply[F] apply (mkSeq(inits))
         cmbs  <- reducers traverse (reduceFuncCombine)
@@ -121,7 +124,7 @@ private[qscript] final class QScriptCorePlanner[
     // TODO: Add an order param to Search and leverage cts:index-order
     case Sort(src0, bucket, order) =>
       for {
-        src      <- elimSearch[Q, V](src0)
+        src      <- elimSearch[Q](src0)
         x        <- freshName[F]
         xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
                       mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
@@ -138,42 +141,26 @@ private[qscript] final class QScriptCorePlanner[
 
     case Union(src, lBranch, rBranch) =>
       for {
-        l0  <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
-        r0  <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
-        l   <- elimSearch[Q, V](l0)
-        r   <- elimSearch[Q, V](r0)
+        l0  <- rebaseXQuery[T, F, FMT, Q](lBranch, src)
+        r0  <- rebaseXQuery[T, F, FMT, Q](rBranch, src)
+        l   <- elimSearch[Q](l0)
+        r   <- elimSearch[Q](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
-    case Filter(src0, f) =>
-      for {
-        src <- elimSearch[Q, V](src0)
-        x   <- freshName[F]
-        p   <- mapFuncXQuery[T, F, FMT](f, ~x) map (xs.boolean)
-      } yield (src match {
-        case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          XQuery.Flwor(
-            bindings :::> IList(BindingClause.let_(x := result)),
-            Some(filter.fold(p)(_ and p)),
-            order,
-            isStable,
-            ~x)
-
-        case _ =>
-          for_(x in src) where_ p return_ ~x
-      }).right
+    case Filter(src, f) => (new FilterPlanner[F, FMT, T]).plan(src, f)
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.
     case Subset(src0, from, sel, count) =>
       for {
-        src <- elimSearch[Q, V](src0)
+        src <- elimSearch[Q](src0)
         s   <- freshName[F]
         f   <- freshName[F]
         c   <- freshName[F]
-        fm0 <- rebaseXQuery[T, F, FMT, Q, V](from, (~s).right)
-        ct0 <- rebaseXQuery[T, F, FMT, Q, V](count, (~s).right)
-        fm  <- elimSearch[Q, V](fm0)
-        ct  <- elimSearch[Q, V](ct0)
+        fm0 <- rebaseXQuery[T, F, FMT, Q](from, (~s).right)
+        ct0 <- rebaseXQuery[T, F, FMT, Q](count, (~s).right)
+        fm  <- elimSearch[Q](fm0)
+        ct  <- elimSearch[Q](ct0)
       } yield (let_(s := src, f := fm, c := ct) return_ (sel match {
         case Drop   => fn.subsequence(~f, ~c + 1.xqy)
         case Take   => fn.subsequence(~f, 1.xqy, some(~c))

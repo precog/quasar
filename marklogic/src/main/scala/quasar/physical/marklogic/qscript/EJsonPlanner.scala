@@ -16,19 +16,18 @@
 
 package quasar.physical.marklogic.qscript
 
-import slamdata.Predef.String
-import quasar.fp.ski.κ
-import quasar.physical.marklogic.cts.Query
+import quasar.Data
+import quasar.ejson._
 import quasar.physical.marklogic.xquery._
 
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._
 
-private[qscript] final class UnreachablePlanner[M[_]: MonadPlanErr, FMT, F[_], J](
-  name: String
-) extends Planner[M, FMT, F, J] {
-
-  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]
-  ): AlgebraM[M, F, Search[Q] \/ XQuery] =
-    κ(MonadPlanErr[M].raiseError(MarkLogicPlannerError.unreachable(name)))
+object EJsonPlanner {
+  def plan[J, M[_]: Monad, FMT](
+    implicit SP: StructuralPlanner[M, FMT],
+             R:  Recursive.Aux[J, EJson]
+  ): J => M[XQuery] =
+    (ejs => DataPlanner[M, FMT](ejs.cata(Data.fromEJson)))
 }

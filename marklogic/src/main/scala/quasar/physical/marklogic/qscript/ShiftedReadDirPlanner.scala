@@ -25,19 +25,21 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanErr, FMT]
-    extends Planner[F, FMT, Const[ShiftedRead[ADir], ?]] {
+private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanErr, FMT, J]
+    extends Planner[F, FMT, Const[ShiftedRead[ADir], ?], J] {
 
   import MarkLogicPlannerError._
 
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
+  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]
+  ): AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
     case Const(ShiftedRead(dir, idStatus)) =>
       val dirUri = UriPathCodec.printPath(dir)
 
       Uri.getOption(dirUri).cata(uri =>
         Search(
-          Q.embed(Query.Directory[V, Q](IList(uri), MatchDepth.Children)),
-          idStatus
+          Q.embed(Query.Directory[J, Q](IList(uri), MatchDepth.Children)),
+          idStatus,
+          none
         ).left[XQuery].point[F],
         MonadPlanErr[F].raiseError(invalidUri(dirUri)))
   }

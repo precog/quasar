@@ -1,12 +1,9 @@
 {
     "name": "flatten a flattened field",
-    "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
-    },
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
         "https://api.github.com/repos/slamdata/slamengine/commits/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",

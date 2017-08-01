@@ -25,46 +25,64 @@ import pathy.Path._
 import scalaz._
 import scalaz.std.option._
 
-final class MarkLogicConfigSpec extends quasar.Qspec {
+final class MarkLogicConfigSpec extends quasar.Qspec with MarkLogicConfigArbitrary {
   "fromUriString" >> {
-    val validUri = "xcc://user:pass@ml.example.com/somedb/foo/bar?format=json"
+    val validUri = "xcc://user:pass@ml.example.com:8007/somedb/foo/bar?format=json"
 
     "builds config from a valid uri" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](validUri)
         .toOption must_= Some(MarkLogicConfig(
-          new URI("xcc://user:pass@ml.example.com/somedb"),
+          new URI("xcc://user:pass@ml.example.com:8007/somedb"),
           rootDir </> dir("foo") </> dir("bar"),
           DocType.json))
     }
 
     "root dir is root when only db specified" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
-        "xcc://ml.example.com/adb"
+        "xcc://ml.example.com:8007/adb"
       ).toOption.map(_.rootDir) must_= Some(rootDir)
     }
 
     "uses XML doc type when no format parameter given" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
-        "xcc://ml.example.com/adb"
+        "xcc://ml.example.com:8007/adb"
       ).toOption.map(_.docType) must_= Some(DocType.xml)
     }
 
     "fails when no db specified" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
-        "xcc://ml.example.com/"
+        "xcc://ml.example.com:8007/"
       ).toOption must beNone
     }
 
     "fails when unknown format specified" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
-        "xcc://ml.example.com/db?format=fake"
+        "xcc://ml.example.com:8007/db?format=fake"
       ).toOption must beNone
     }
 
     "fails when non-xcc URL specified" >> {
       MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
-        "http://ml.example.com/db"
+        "http://ml.example.com:8007/db"
       ).toOption must beNone
     }
+
+    "fails with proper error messages" >> {
+      "when the host is not specified" >> {
+        MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
+          "xcc://someone:somepass@:6643/db"
+        ) must beLeftDisjunction(NonEmptyList("Missing host", "Missing port"))
+      }
+
+      "when the port is not specified" >> {
+        MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
+        "xcc://ml.example.com/db"
+        ) must beLeftDisjunction(NonEmptyList("Missing port"))
+      }
+    }
+  }
+
+  "roundtrip from/asUriString" >> prop { cfg: MarkLogicConfig =>
+    MarkLogicConfig.fromUriString[ErrorMessages \/ ?](cfg.asUriString).toOption must_= Some(cfg)
   }
 }

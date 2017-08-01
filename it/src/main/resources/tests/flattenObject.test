@@ -1,14 +1,13 @@
 {
     "name": "flatten object",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "marklogic_xml":     "pending"
+        "couchbase":  "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         {"text":"North America, bordering both the North Atlantic Ocean and the North Pacific Ocean, between Canada and Mexico"},
         {"text":"38 00 N, 97 00 W"},

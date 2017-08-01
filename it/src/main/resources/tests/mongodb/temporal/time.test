@@ -2,12 +2,11 @@
     "name": "filter on time_of_day (MongoDB)",
 
     "backends": {
+        "mimir":"skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "skip",
         "spark_local":       "skip",
         "spark_hdfs":        "skip"
     },
@@ -23,7 +22,8 @@
               where time_of_day(ts) >= time(\"08:00\")
                 and time_of_day(ts) < time(\"10:20:30.400\")",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "day": "Tuesday",   "tod": "08:00:00.000" },
         { "day": "Wednesday", "tod": "09:00:00.000" },

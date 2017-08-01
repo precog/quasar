@@ -1,13 +1,12 @@
 {
     "name": "project from non-static concatted array",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2": "pending"
     },
     "data": "largeZips.data",
     "query": "select (loc || [1, 2])[1] from largeZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [42.377017,
                  42.176443,
                  42.202007,

@@ -1,14 +1,15 @@
 {
     "name": "concat array with unknown structure",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "couchbase":         "ignoreFieldOrder",
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
     },
     "data": "largeZips.data",
     "query": "select city, state, loc || [ pop ] as lp from largeZips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "CUSHMAN",            "state": "MA", "lp": [ -72.51565, 42.377017, 36963] },
                  { "city": "CHICOPEE",           "state": "MA", "lp": [-72.576142, 42.176443, 31495] },
                  { "city": "HOLYOKE",            "state": "MA", "lp": [-72.626193, 42.202007, 43704] },

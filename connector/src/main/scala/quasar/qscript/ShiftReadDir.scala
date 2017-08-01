@@ -113,7 +113,7 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
 
   private def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] =
     branch.futu[FreeQS[T]](_.project.run.fold(
-      h => CoEnv(h.left[QScriptTotal[T, Free[CoEnv[Hole, QScriptTotal[T, ?], ?], FreeQS[T]]]]),
+      h => CoEnv(h.left[QScriptTotal[T, Free[CoEnvQS[T, ?], FreeQS[T]]]]),
       shiftTotal.shiftReadDir(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
   private def shiftTotal[T[_[_]]: BirecursiveT]: ShiftReadDir.Aux[T, QScriptTotal[T, ?], QScriptTotal[T, ?]] =

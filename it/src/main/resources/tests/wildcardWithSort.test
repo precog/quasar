@@ -1,13 +1,10 @@
 {
     "name": "wildcard with sort",
-    "backends": {
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "ignoredFields": ["_id"],
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
     "expected": [
         { "city": "ALGODONES",      "loc": [-106.616589, 35.428527], "pop": 0, "state": "NM" },
         { "city": "ALLEGHANY",      "loc": [-120.727176, 39.512698], "pop": 0, "state": "CA" },

@@ -20,7 +20,6 @@ import slamdata.Predef.{ -> => _, _ }
 
 import org.http4s.dsl._
 import org.http4s.HttpService
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -31,24 +30,32 @@ object control {
     *                    if the `DELETE` http method is used.
     * @param restart A function that will restart the server on the specified port
     */
-  def service(defaultPort: Int, restart: Int => Task[Unit]): HttpService = HttpService {
-    case req @ PUT -> Root =>
-      req.as[String].flatMap(body =>
-        body.parseInt.fold(
-          e => BadRequest(e.getMessage),
-          portNum => Http4sUtils.unavailableReason(portNum).run.flatMap { possibleReason =>
-            possibleReason map { reason =>
-              PreconditionFailed(s"Could not restart on new port because $reason")
-            } getOrElse {
-              (restart(portNum) *> Accepted(s"Restarting on port $portNum")) handleWith {
-                case e => InternalServerError(s"Failed to restart on port $portNum")
-              }
+  def service(defaultPort: Int, restart: Int => Task[Unit]): HttpService = {
+    def safeRestart(port: Int, default: Boolean, currentPort: Int) =
+      if (currentPort ≟ port)
+        Ok(s"Server is already running on port $port")
+      else
+        Http4sUtils.unavailableReason(port).run.flatMap { possibleReason =>
+          possibleReason map { reason =>
+            PreconditionFailed(s"Could not restart on new port because $reason")
+          } getOrElse {
+            val defaultString = if(default) " default " else ""
+            (restart(port) *> Accepted(s"Restarting on $defaultString port $port")) handleWith {
+              case e: Exception => InternalServerError(s"Failed to restart on port $port because ${e.getMessage}")
+              case _            => InternalServerError(s"Failed to restart on port $port for unknown reason")
             }
           }
-        )
-      )
+        }
 
-    case DELETE -> Root =>
-      restart(defaultPort) *> Accepted(s"Restarting on default port $defaultPort")
+    HttpService {
+      case req @ PUT -> Root =>
+        req.as[String].flatMap(body =>
+          body.parseInt.fold(
+            e => BadRequest(e.getMessage),
+            portNum => safeRestart(portNum, default = false, req.serverPort)))
+
+      case req @ DELETE -> Root =>
+        safeRestart(defaultPort, default = true, req.serverPort)
+    }
   }
 }

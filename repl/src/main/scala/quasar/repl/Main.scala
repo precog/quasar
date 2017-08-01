@@ -17,9 +17,9 @@
 package quasar.repl
 
 import slamdata.Predef._
-
 import quasar.config._
 import quasar.console._
+import quasar.contrib.scopt._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
@@ -36,8 +36,6 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object Main {
-  import FileSystemDef.DefinitionResult
-
   private def consoleIO(console: Console): ConsoleIO ~> Task =
     new (ConsoleIO ~> Task) {
       import ConsoleIO._
@@ -51,41 +49,47 @@ object Main {
   type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
-  private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = Task.delay {
-    val console =
-      new Console(new SettingsBuilder()
-        .parseOperators(false)
-        .enableExport(false)
-        .interruptHook(new InterruptHook {
-          def handleInterrupt(console: Console, action: Action) = {
-            console.getShell.out.println("exit")
-            console.stop
+  private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = {
+    def shutdownConsole(c: Console): Task[Unit] =
+      Task.delay(c.getShell.out.println("Exiting...")) >>
+      Task.delay(c.stop)
+
+    Task delay {
+      val console =
+        new Console(new SettingsBuilder()
+          .parseOperators(false)
+          .enableExport(false)
+          .interruptHook(new InterruptHook {
+            def handleInterrupt(console: Console, action: Action) =
+              shutdownConsole(console).unsafePerformSync
+          })
+          .create())
+
+      console.setPrompt(new Prompt("💪 $ "))
+
+      val i: DriverEff ~> MainTask =
+        Failure.toError[MainTask, String]                  :+:
+        liftMT[Task, MainErrT].compose(consoleIO(console)) :+:
+        liftMT[Task, MainErrT]
+
+      console.setConsoleCallback(new AeshConsoleCallback() {
+        override def execute(input: ConsoleOperation): Int = {
+          Command.parse(input.getBuffer.trim) match {
+            case Command.Exit =>
+              shutdownConsole(console).unsafePerformSync
+
+            case command      =>
+              f(command).foldMap(i).run.unsafePerformSync.valueOr(
+                err => console.getShell.out.println("Quasar error: " + err))
           }
-        })
-        .create())
-    console.setPrompt(new Prompt("💪 $ "))
-
-    val i: DriverEff ~> MainTask =
-      Failure.toError[MainTask, String]                  :+:
-      liftMT[Task, MainErrT].compose(consoleIO(console)) :+:
-      liftMT[Task, MainErrT]
-
-    console.setConsoleCallback(new AeshConsoleCallback() {
-      override def execute(input: ConsoleOperation): Int = {
-        Command.parse(input.getBuffer.trim) match {
-          case Command.Exit =>
-            console.stop()
-          case command      =>
-            f(command).foldMap(i).run.unsafePerformSync.valueOr(
-              err => console.getShell.out.println("Quasar error: " + err))
+          0
         }
-        0
-      }
-    })
+      })
 
-    console.start()
+      console.start()
 
-    ()
+      ()
+    }
   }
 
   type ReplEff[S[_], A] = (
@@ -104,7 +108,8 @@ object Main {
     S1: QueryFile :<: S,
     S2: ReadFile :<: S,
     S3: WriteFile :<: S,
-    S4: ManageFile :<: S
+    S4: ManageFile :<: S,
+    S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
       val i: ReplEff[S, ?] ~> DriverEffM =
@@ -129,47 +134,27 @@ object Main {
           _.point[DriverEffM]))
     }
 
-  def main(args: Array[String]): Unit = {
-    val cfgOps = ConfigOps[CoreConfig]
-
-    val main0: MainTask[Unit] = for {
-      opts         <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
-                      .cata(_.point[MainTask], MainTask.raiseError("Couldn't parse options."))
-      cfgPath      <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-                        FsPath.parseSystemFile(cfg)
-                          .toRight(s"Invalid path to config file: $cfg.")
-                          .map(some))
-
-      config       <- cfgPath.cata(cfgOps.fromFile, cfgOps.fromDefaultPaths).leftMap(_.shows)
-
-      // NB: for now, there's no way to add mounts through the REPL, so no point
-      // in starting if you can't do anything and can't correct the situation.
-      _            <- if (config.mountings.toMap.isEmpty) MainTask.raiseError("No mounts configured.")
-                      else ().point[MainTask]
-
-      cfgRef       <- TaskRef(config).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
-
-      ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](
-                        KvsMounter.ephemeralMountConfigs[Task],
-                        hfsRef, mntdRef)
-      initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
-      failedMnts   <- attemptMountAll[Mounting](config.mountings) foldMap initMnts
-      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-
-      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
-      durableMnt   =  KvsMounter.interpreter[Task, QErrsIO](
-                        writeConfig(CoreConfig.mountings, cfgRef, cfgPath),
-                        hfsRef, mntdRef)
-      toQErrsIOM   =  injectFT[Task, QErrsIO] :+: durableMnt :+: injectFT[QErrs, QErrsIO]
-
-      coreApi      =  foldMapNT(QErrsIO.toMainTask) compose (foldMapNT(toQErrsIOM) compose runCore)
-      runCmd       <- repl[CoreEff](mt compose coreApi).liftM[MainErrT]
-      _            <- driver(runCmd).liftM[MainErrT]
+  def startRepl(quasarInter: CoreEff ~> QErrs_TaskM): Task[Unit] =
+    for {
+      runCmd  <- repl[CoreEff](mt compose QErrs_Task.toMainTask compose quasarInter)
+      _       <- driver(runCmd)
     } yield ()
 
-    logErrors(main0).unsafePerformSync
-  }
+  def safeMain(args: Vector[String]): Task[Unit] =
+    logErrors(for {
+      opts    <- CliOptions.parser.safeParse(args, CliOptions.default)
+      cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+        FsPath.parseSystemFile(cfg)
+          .toRight(s"Invalid path to config file: $cfg.")
+          .map(some))
+      _ <- initMetaStoreOrStart[CoreConfig](
+        CmdLineConfig(cfgPath, opts.cmd),
+        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
+        // The REPL does not allow you to change metastore
+        // so no need to supply a function to persist the metastore
+        _ => ().point[MainTask])
+    } yield ())
 
+  def main(args: Array[String]): Unit =
+    safeMain(args.toVector).unsafePerformSync
 }

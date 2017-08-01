@@ -37,13 +37,13 @@ import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
-class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
+class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT) {
   import ReadFilesSpec._, FileSystemError._
   import ReadFile._
 
-  val read   = ReadFile.Ops[FileSystem]
-  val write  = WriteFile.Ops[FileSystem]
-  val manage = ManageFile.Ops[FileSystem]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   def loadForReading(run: Run): FsTask[Unit] = {
     type P[A] = Process[write.M, A]
@@ -117,42 +117,50 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         r.run_\/ must_= Vector.empty.right
       }
 
-      "scan with offset k > 0 and no limit skips first k data" >> prop { k: Int Refined RPositive =>
-        val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
-        val r     = runLogT(run, read.scan(smallFile.file, widenPositive(k), None)).run_\/
+      // disabled for mimir, not because it doesn't work, but because it's absurdly slow
+      "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(Set("mimir")) {
+        prop { k: Int Refined RPositive =>
+          val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
+          val r     = runLogT(run, read.scan(smallFile.file, widenPositive(k), None)).run_\/
 
-        val d = rFull.map(_.drop(k))
+          val d = rFull.map(_.drop(k))
 
-        (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-        (r must_= d)
-      }.set(minTestsOk = 10)
+          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (r must_= d)
+        }.set(minTestsOk = 10)
+      }
 
-      "scan with offset zero and limit j stops after j data" >> prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
-        val limit = Positive(j.value.toLong).get // Not ideal, but simplest solution for now
+      "scan with offset zero and limit j stops after j data" >> {
+        prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
+          val limit = Positive(j.value.toLong).get // Not ideal, but simplest solution for now
 
-        val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
-        val r     = runLogT(run, read.scan(smallFile.file, 0L, Some(limit))).run_\/
+          val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
+          val r     = runLogT(run, read.scan(smallFile.file, 0L, Some(limit))).run_\/
 
-        val d = rFull.map(_.take(j.value))
+          val d = rFull.map(_.take(j.value))
 
-        (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-        (r must_= d)
-      }.set(minTestsOk = 10)
+          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (r must_= d)
+        }.set(minTestsOk = 10)
+      }
 
-      "scan with offset k and limit j takes j data, starting from k" >> Prop.forAll(
-        chooseRefinedNum[Refined, Int, RPositive](1, 50),
-        chooseRefinedNum[Refined, Int, NonNegative](0, 50)
-      ) { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
-        val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
-        val r     = runLogT(run, read.scan(smallFile.file, k, Some(j))).run_\/
+      "scan with offset k and limit j takes j data, starting from k" >> {
+        Prop.forAll(
+          chooseRefinedNum[Refined, Int, RPositive](1, 50),
+          chooseRefinedNum[Refined, Int, NonNegative](0, 50))
+        { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
+          val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
+          val r     = runLogT(run, read.scan(smallFile.file, k, Some(j))).run_\/
 
-        val d = rFull.map(_.drop(k).take(j.value))
+          val d = rFull.map(_.drop(k).take(j.value))
 
-        (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
-        (r must_= d)
-      }.set(minTestsOk = 5)
+          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (r must_= d)
+        }.set(minTestsOk = 5)
+      }
 
-      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> prop { j: Int Refined Greater[SmallFileSize] =>
+      "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
+        prop { j: Int Refined Greater[SmallFileSize] =>
           val limit = Some(Positive(j.value.toLong).get) // Not ideal, but simplest solution for now
 
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
@@ -163,7 +171,8 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
           (j.value must beGreaterThan(smallFile.data.length))    and
           (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
           (r must_= d)
-      }.set(minTestsOk = 10)
+        }.set(minTestsOk = 10)
+      }
 
       "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(largeFile.file).foldMap(_ => 1))

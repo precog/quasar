@@ -27,7 +27,10 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType)
+final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType) {
+  def asUriString: String =
+    s"${xccUri}${posixCodec.printPath(rootDir)}?format=${DocType.name(docType)}"
+}
 
 object MarkLogicConfig {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -36,15 +39,25 @@ object MarkLogicConfig {
       Option(u.getScheme).exists(_ === "xcc")
         .unlessM("Missing or unrecognized scheme, expected 'xcc'.".failureNel)
 
+    def ensureHost(u: URI): ValidationNel[String, Unit] =
+      Option(u.getHost).isDefined.unlessM("Missing host".failureNel)
+
+    def ensurePort(u: URI): ValidationNel[String, Unit] =
+      Option(u.getPort).filter(_ > 0).isDefined
+        .unlessM("Missing port".failureNel)
+
+    def validations(u: URI): ValidationNel[String, Unit] =
+      ensureScheme(u) *> ensureHost(u) *> ensurePort(u)
+
     def dbAndRest(u: URI): ValidationNel[String, (String, ADir)] =
-      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(sandboxAbs).flatMap { d =>
+      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(unsafeSandboxAbs).flatMap { d =>
         firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
           (db, stripPrefixA(rtDir </> dir(db))(d))
         }
       } toSuccessNel "No database specified."
 
     def xccUriAndRoot(u: URI): ValidationNel[String, (URI, ADir)] =
-      ensureScheme(u) *> dbAndRest(u) map { case (db, dir) =>
+      validations(u) *> dbAndRest(u) map { case (db, dir) =>
         (new URI(u.getScheme, u.getUserInfo, u.getHost, u.getPort, "/" + db, null, null), dir)
       }
 
@@ -56,10 +69,9 @@ object MarkLogicConfig {
           case other       => List()
         })
         .find(_._1 === "format")
-        .fold(DocType.xml.successNel[String]) {
-          case (_, "json") => DocType.json.successNel[String]
-          case (_, "xml")  => DocType.xml.successNel[String]
-          case (_, other)  => s"Unsupported document format: $other".failureNel[DocType]
+        .fold(DocType.xml.successNel[String]) { case (_, fmt) =>
+          DocType.name.getOption(fmt)
+            .toSuccessNel(s"Unsupported document format: $fmt")
         }
 
     \/.fromTryCatchNonFatal(new URI(str))

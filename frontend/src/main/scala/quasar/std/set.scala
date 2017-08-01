@@ -151,6 +151,7 @@ trait SetLib extends Library {
       }
   }
 
+  // TODO: deprecated - delete when old mongo is deleted
   val InnerJoin = TernaryFunc(
     Transformation,
     "Returns a new set containing the pairs values from the two sets that satisfy the condition.",
@@ -167,6 +168,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
+  // TODO: deprecated - delete when old mongo is deleted
   val LeftOuterJoin = TernaryFunc(
     Transformation,
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the left set.",
@@ -184,6 +186,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
+  // TODO: deprecated - delete when old mongo is deleted
   val RightOuterJoin = TernaryFunc(
     Transformation,
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the right set.",
@@ -200,6 +203,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
+  // TODO: deprecated - delete when old mongo is deleted
   val FullOuterJoin = TernaryFunc(
     Transformation,
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from either set.",

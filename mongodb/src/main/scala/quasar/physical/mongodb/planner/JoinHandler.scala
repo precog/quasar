@@ -231,9 +231,10 @@ object JoinHandler {
         (WorkflowBuilder[WF], FixOp[WF]) =
       (src, $map[WF](keyMap(key, rootField, otherField), ListMap()))
 
-    def wbReduce(src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
-                 rootField: BsonField.Name, otherField: BsonField.Name):
-        (WorkflowBuilder[WF], FixOp[WF]) =
+    def wbReduce
+      (src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
+        rootField: BsonField.Name, otherField: BsonField.Name)
+        : (WorkflowBuilder[WF], FixOp[WF]) =
       (DocBuilder(
         reduce(groupBy(src, key))($push(_)),
         ListMap(
@@ -346,6 +347,7 @@ object JoinHandler {
     (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def checkTask(wt: workflowtask.WorkflowTask): Boolean = wt match {
       case workflowtask.FoldLeftTask(_, _)     => true
       case workflowtask.MapReduceTask(_, _, _) => true

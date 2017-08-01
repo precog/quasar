@@ -67,5 +67,5 @@ abstract class KeyValueStoreSpec extends quasar.Qspec {
 
 object DefaultEmptyImpl extends KeyValueStoreSpec {
   def eval[A](program: Free[S, A]) =
-    KeyValueStore.impl.empty[Int, String].flatMap(program foldMap _).unsafePerformSync
+    KeyValueStore.impl.default[Int, String].flatMap(program foldMap _).unsafePerformSync
 }

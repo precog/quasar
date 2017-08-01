@@ -2,19 +2,16 @@
     "name": "skip and count",
 
     "backends": {
-        "couchbase":  "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mimir":"skip"
     },
+
+    "NB": "Skipped in mimir due to #2506 offset is slow. Sometimes it passes and sometimes it times out.",
 
     "data": "zips.data",
 
     "query": "select count(*) from (select * from zips offset 10) as x",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [29343]
 }

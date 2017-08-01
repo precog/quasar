@@ -22,7 +22,6 @@ import quasar.fp._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
@@ -50,19 +49,20 @@ object SimplifyJoin {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
-  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T])
-      : FreeQS[T] =
-    branch
-      .convertTo[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]
-      .transCata[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]](liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)))
-      .convertTo[FreeQS[T]]
+  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
+    val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
+      _.transCata[T[CoEnvQS[T, ?]]](
+        liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+
+    applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
+  }
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
-      import MapFunc._
-      import MapFuncs._
+      import MapFuncCore._
+      import MapFuncsCore._
 
       type IT[F[_]] = T[F]
       type G[A] = F[A]
@@ -80,16 +80,17 @@ object SimplifyJoin {
               EquiJoinKey(r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
             else None
 
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
-              case -\/(And(a, b)) =>
+              case -\/(MFC(And(a, b))) =>
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
                   fir.keys ++ sec.keys,
                   fir.filter.fold(
                     sec.filter)(
-                    f => sec.filter.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
-              case -\/(Eq(l, r)) =>
+                    f => sec.filter.fold(f.some)(s => Free.roll(MFC(And[T, JoinFunc[T]](f, s))).some)))
+              case -\/(MFC(Eq(l, r))) =>
                 alignCondition(l, r).fold(
                   SimplifiedJoinCondition(Nil, fm.some))(
                   pair => SimplifiedJoinCondition(List(pair), None))
@@ -98,8 +99,8 @@ object SimplifyJoin {
 
           def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
             jf >>= {
-              case LeftSide  => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0)))
-              case RightSide => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))
+              case LeftSide  => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(0))))
+              case RightSide => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(1))))
             }
 
           val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
@@ -108,12 +109,12 @@ object SimplifyJoin {
               tj.src,
               applyToBranch(tj.lBranch),
               applyToBranch(tj.rBranch),
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))).embed,
-              ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))).embed,
+              ConcatArraysN(keys.map(k => Free.roll(MFC(MakeArray[T, FreeMap[T]](k.left))))).embed,
+              ConcatArraysN(keys.map(k => Free.roll(MFC(MakeArray[T, FreeMap[T]](k.right))))).embed,
               tj.f,
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide)))))))).embed)(
+              Free.roll(MFC(ConcatArrays(
+                Free.roll(MFC(MakeArray(Free.point(LeftSide)))),
+                Free.roll(MFC(MakeArray(Free.point(RightSide)))))))))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
             mergeSides(tj.combine))))
         }

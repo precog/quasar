@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
 import quasar.fp.liftMT
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.DocType
@@ -180,6 +181,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
       }
     })
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def toStringFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
     ejs.declare[F]("to-string") flatMap (_(
       $("item") as ST("item()?")
@@ -191,15 +193,18 @@ trait StructuralPlanner[F[_], FMT] { self =>
           .then_(emptySeq)
           .else_(if_(~t eq "null".xs)
           .then_("null".xs)
+          .else_(if_(tpe eq "date".xs)
+          .then_(fn.formatDate(castItem, lib.dateFmt.xs))
           .else_(if_(tpe eq "time".xs)
-          .then_(fn.formatTime(castItem, lib.timeFmt))
+          .then_(fn.formatTime(castItem, lib.timeFmt.xs))
           .else_(if_(tpe eq "timestamp".xs)
-          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt))
+          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt.xs))
           .else_(typeswitch(item)(
             n as ST("node()") return_ κ(nstr)
-          ) default fn.string(item)))))
+          ) default fn.string(item))))))
         })
     })
+
 
   // ejson:type-of($item as item()*) as xs:string?
   private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =

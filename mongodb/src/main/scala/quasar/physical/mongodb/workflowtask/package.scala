@@ -95,6 +95,7 @@ package object workflowtask {
     case _ => (base, task)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def shape(p: Pipeline): Option[List[BsonField.Name]] = {
     def src = shape(p.dropRight(1))
 

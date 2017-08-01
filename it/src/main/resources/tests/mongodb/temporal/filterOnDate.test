@@ -1,11 +1,11 @@
 {
     "name": "filter with date literals",
     "backends": {
+        "mimir":"skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mongodb_q_3_2":     "skip",
-        "postgresql":        "skip",
+        "mongodb_q_3_2":     "pending",
         "spark_local":       "skip",
         "spark_hdfs":        "skip"
     },
@@ -15,6 +15,7 @@
                 ((ts > date(\"2014-08-17\") and ts <= date(\"2014-08-20\"))
                   and ts != date(\"2014-08-19\"))
                 or ts = date(\"2014-08-22\")",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Monday", "Wednesday", "Friday"]
 }

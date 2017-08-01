@@ -1,17 +1,12 @@
 {
     "name": "unify flattened fields with unflattened field",
     "backends": {
-        "couchbase":  "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mimir":"ignoreFieldOrder",
+        "couchbase":  "pending"
     },
     "data": "zips.data",
-    "query": "select _id as zip, loc[*] from zips order by loc[*] limit 10",
-    "predicate": "equalsExactly",
+    "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
+    "predicate": "exactly",
     "expected": [{ "zip": "99742", "loc": -171.701685},
                  { "zip": "99769", "loc": -170.470908},
                  { "zip": "99660", "loc": -170.293408},

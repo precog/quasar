@@ -1,12 +1,12 @@
 {
   "name": "distinct of one field",
   "backends": {
-    "mongodb_q_3_2": "pending",
-    "postgresql": "pending"
+    "mongodb_q_3_2": "pending"
   },
   "data": "olympics.data",
   "query": "select distinct discipline as d from olympics",
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
   "expected": [{ "d": "Figure skating"  },
                { "d": "Bobsleigh"       },
                { "d": "Ice Hockey"      },

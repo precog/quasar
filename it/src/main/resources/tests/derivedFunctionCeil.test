@@ -1,0 +1,24 @@
+{
+    "name": "derived function ceil",
+    "backends": {
+      "couchbase": "ignoreFieldOrder",
+      "mimir": "pendingIgnoreFieldOrder"
+    },
+    "data": "divide.data",
+    "query": "select nr, ceil(val3) as ceil1 from divide",
+    "predicate": "exactly",
+    "expected": [
+        { "nr":  1, "ceil1": 1.0 },
+        { "nr":  2, "ceil1": 1 },
+        { "nr":  3, "ceil1": 3 },
+        { "nr":  4, "ceil1": 5 },
+        { "nr":  5, "ceil1": -1 },
+        { "nr":  6, "ceil1": -1 },
+        { "nr":  7, "ceil1": -1 },
+        { "nr":  8, "ceil1": -2 },
+        { "nr":  9, "ceil1": 5 },
+        { "nr": 10, "ceil1": 0 },
+        { "nr": 11, "ceil1": -1 },
+        { "nr": 12, "ceil1": -9 }
+    ]
+}

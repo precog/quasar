@@ -21,6 +21,8 @@ import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
+import quasar.fs.FileSystemError
+import quasar.fs.FileSystemErrT
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs._,
@@ -81,7 +83,7 @@ object queryfile {
   def listContents[S[_]](d: ADir)(implicit
     read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] = {
+  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT{
     val ks = keyspace(d)
     for {
       dirs <- cass.listKeyspaces(ks)

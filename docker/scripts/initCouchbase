@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+
+CB='http://admin:password@127.0.0.1'
+
+sleep 10
+
+# doing this as suggested here by Dan Douglass on 22/Jan/16 12:13PM
+# https://issues.couchbase.com/browse/MB-16233
+echo "setting up couchbase memory quota../"
+curl -v -s -X POST $CB:8091/pools/default -d memoryQuota=512
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase services../"
+curl -v $CB:8091/node/controller/setupServices -d services=kv%2Cn1ql%2Cindex%2Cfts
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase web console with username and password..."
+curl -v $CB:8091/settings/web -d port=8091 -d username=admin -d password=password
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase indexes..."
+curl -v $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase pools..."
+curl -v -X POST $CB:8091/pools/default -d indexMemoryQuota=1024
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase sample beer buckets..."
+curl -v $CB:8091/sampleBuckets/install -d '["beer-sample"]'
+printf "\n\n"
+
+sleep 20
+
+echo "setting up couchbase index on beer-sample..."
+curl -v $CB:8093/query -d 'statement=create index beer_sample_type_idx on `beer-sample`(type)'
+printf "\n\n"
+
+echo "couchbase configuration done!"
+printf "\n\n"

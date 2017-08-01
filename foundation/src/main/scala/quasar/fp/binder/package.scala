@@ -16,6 +16,7 @@
 
 package quasar.fp
 
+import slamdata.Predef._
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
@@ -30,6 +31,7 @@ package object binder {
     (f: T => A)
     (implicit TR: Recursive.Aux[T, F], TC: Corecursive.Aux[T, F], B: Binder[F])
       : Cofree[F, A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: F[T], b: B.G[(T, Cofree[F, A])]): (T, Cofree[F, A]) = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).fold {
@@ -46,11 +48,11 @@ package object binder {
     (f: F[A] => A)
     (implicit T: Recursive.Aux[T, F], B: Binder[F])
       : A = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))  
     def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => loop(x.project, newB))))
     }
-
     loop(t.project, B.initial)
   }
 
@@ -59,6 +61,7 @@ package object binder {
     (f: F[(T, A)] => M[A])
     (implicit T: Recursive.Aux[T, F], B: Binder[F])
       : M[A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: F[T], b: B.G[A]): M[A] = {
       Applicative[M].sequence(B.bindings[T, M[A]](t, B.G.map(b)(_.point[M]))(s => loop(s, b)))(B.G).flatMap { newB =>
         B.subst(t, newB).cata[M[A]](
@@ -66,7 +69,6 @@ package object binder {
           t.traverse(x => loop(x.project, newB).map((x, _))).flatMap(f))
       }
     }
-
     loop(t.project, B.initial)
   }
 
@@ -82,11 +84,11 @@ package object binder {
     (f: F[(T, A)] => A)
     (implicit T: Recursive.Aux[T, F], B: Binder[F])
       : A = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => (x, loop(x.project, newB)))))
     }
-
     loop(t.project, B.initial)
   }
 }

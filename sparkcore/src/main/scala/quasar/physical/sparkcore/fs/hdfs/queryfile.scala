@@ -22,6 +22,7 @@ import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemError._
+import quasar.fs.FileSystemErrT
 import quasar.fs.PathError._
 import quasar.fp.free._
 import quasar.contrib.pathy._
@@ -56,9 +57,9 @@ class queryfile(fileSystem: Task[FileSystem]) {
     rdd <- readfile.fetchRdd(sc, pathStr)
   } yield rdd
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit 
-    s0: Task :<: S
-    ): Free[S, Unit] = lift(for {
+  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
+    S: Task :<: S
+  ): Free[S, Unit] = lift(for {
     path <- toPath(out)
     hdfs <- fileSystem
   } yield {
@@ -75,7 +76,9 @@ class queryfile(fileSystem: Task[FileSystem]) {
     hdfs.close()
   }).into[S]
 
-  def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] = lift(for {
+  def fileExists[S[_]](f: AFile)(implicit
+    S: Task :<: S
+  ): Free[S, Boolean] = lift(for {
     path <- toPath(f)
     hdfs <- fileSystem
   } yield {
@@ -84,9 +87,9 @@ class queryfile(fileSystem: Task[FileSystem]) {
     exists
   }).into[S]
 
-  def listContents[S[_]](d: ADir)(implicit 
-    s0: Task :<: S
-    ): Free[S, FileSystemError \/ Set[PathSegment]] = lift(for {
+  def listContents[S[_]](d: ADir)(implicit
+    S: Task :<: S
+  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT(lift(for {
     path <- toPath(d)
     hdfs <- fileSystem
   } yield {
@@ -98,12 +101,12 @@ class queryfile(fileSystem: Task[FileSystem]) {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
     hdfs.close
     result
-  }).into[S]
+  }).into[S])
 
   def readChunkSize: Int = 5000
 
   def input[S[_]](implicit s0: Task :<: S): Input[S] =
-    Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+    Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 }
 
 object queryfile {

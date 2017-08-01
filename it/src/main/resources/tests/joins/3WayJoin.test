@@ -1,19 +1,26 @@
 {
     "name": "perform 3-way inner equi-join",
+
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mimir": "ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../extraSmallZips.data", "../smallZips.data", "../zips.data"],
+
     "query": "select z1.city, z2.state
               from `../extraSmallZips` as z1
-              join `../smallZips` as z2 on z1._id = z2._id
-              join `../zips` as z3 on z2._id = z3._id",
-    "predicate": "containsAtLeast",
+              join `../smallZips` as z2 on z1.`_id` = z2.`_id`
+              join `../zips` as z3 on z2.`_id` = z3.`_id`",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
     "expected": [{ "city": "AGAWAM",        "state": "MA" },
                  { "city": "CUSHMAN",       "state": "MA" },
                  { "city": "BARRE",         "state": "MA" },

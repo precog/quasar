@@ -1,13 +1,14 @@
 {
     "name": "handle undefined values",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select foo ?? pop as p, city ?? false as c from zips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "p": 15338.0, "c": "AGAWAM"       },
                  { "p": 36963.0, "c": "CUSHMAN"      },
                  { "p":  4546.0, "c": "BARRE"        },

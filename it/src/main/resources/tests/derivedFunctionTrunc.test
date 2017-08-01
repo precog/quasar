@@ -1,0 +1,23 @@
+{
+    "name": "derived function trunc",
+    "backends": {
+      "mimir": "pendingIgnoreFieldOrder"
+    },
+    "data": "divide.data",
+    "query": "select nr, trunc(val3) as trunc1 from divide",
+    "predicate": "exactly",
+    "expected": [
+        { "nr":  1, "trunc1": 1.0 },
+        { "nr":  2, "trunc1": 1 },
+        { "nr":  3, "trunc1": 2 },
+        { "nr":  4, "trunc1": 4 },
+        { "nr":  5, "trunc1": -1 },
+        { "nr":  6, "trunc1": -1 },
+        { "nr":  7, "trunc1": -1 },
+        { "nr":  8, "trunc1": -2 },
+        { "nr":  9, "trunc1": 4 },
+        { "nr": 10, "trunc1": 0 },
+        { "nr": 11, "trunc1": -1 },
+        { "nr": 12, "trunc1": -9 }
+    ]
+}

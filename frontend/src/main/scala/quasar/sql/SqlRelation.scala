@@ -28,6 +28,7 @@ import scalaz._, Scalaz._
 
 sealed abstract class SqlRelation[A] extends Product with Serializable {
   def namedRelations: Map[String, List[NamedRelation[A]]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def collect(n: SqlRelation[A]): List[(String, NamedRelation[A])] =
       n match {
         case JoinRelation(left, right, _, _) => collect(left) ++ collect(right)
@@ -37,6 +38,7 @@ sealed abstract class SqlRelation[A] extends Product with Serializable {
     collect(this).groupBy(_._1).mapValues(_.map(_._2))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def mapPathsM[F[_]: Monad](f: FUPath => F[FUPath]): F[SqlRelation[A]] = this match {
     case IdentRelationAST(_, _) => this.point[F]
     case VariRelationAST(_, _) => this.point[F]
@@ -46,6 +48,7 @@ sealed abstract class SqlRelation[A] extends Product with Serializable {
     case ExprRelationAST(_,_) => this.point[F]
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def transformM[F[_]: Monad, B](f: SqlRelation[A] => F[SqlRelation[B]], g: A => F[B]): F[SqlRelation[B]] = this match {
     case JoinRelation(left, right, tpe, clause) =>
       (left.transformM[F, B](f, g) |@|
@@ -116,6 +119,7 @@ object SqlRelation {
   implicit def renderTree: Delay[RenderTree, SqlRelation] =
     new Delay[RenderTree, SqlRelation] {
       def apply[A](ra: RenderTree[A]) = new RenderTree[SqlRelation[A]] {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def render(r: SqlRelation[A]): RenderedTree = r match {
           case IdentRelationAST(name, alias) =>
             val aliasString = alias.cata(" as " + _, "")
@@ -134,4 +138,14 @@ object SqlRelation {
         }
       }
     }
+
+  implicit val functor: Functor[SqlRelation] = new Functor[SqlRelation] {
+    def map[A, B](fa: SqlRelation[A])(f: A => B) = fa match {
+      case IdentRelationAST(name, alias)  => IdentRelationAST(name, alias)
+      case VariRelationAST(vari, alias)   => VariRelationAST(vari.map(f), alias)
+      case ExprRelationAST(select, alias) => ExprRelationAST(f(select), alias)
+      case TableRelationAST(name, alias)  => TableRelationAST(name, alias)
+      case JoinRelation(left, right, jt, clause) => JoinRelation(left.map(f), right.map(f), jt, f(clause))
+    }
+  }
 }

@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.ejson.{Common, EJson, Extension}
+import quasar.ejson.{Common, EJson, Extension, Type => EType, TypeTag, SizedType}
 import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.fp._
@@ -261,13 +261,13 @@ object Data {
     }
 
   object EJsonType {
-    def apply(typ: String): Data =
-      Data.Obj(ListMap("_ejson.type" -> Data.Str(typ)))
+    def apply(tag: TypeTag): Data =
+      Data.Obj(ListMap(EType.TypeKey -> Data.Str(tag.value)))
 
     def unapply(data: Data) = data match {
       case Data.Obj(map) =>
-        map.get("_ejson.type") >>= {
-          case Data.Str(str) => str.some
+        map.get(EType.TypeKey) >>= {
+          case Data.Str(str) => TypeTag(str).some
           case _             => None
         }
       case _ => None
@@ -275,19 +275,18 @@ object Data {
   }
 
   object EJsonTypeSize {
-    def apply(typ: String, size: BigInt): Data =
+    def apply(tag: TypeTag, size: BigInt): Data =
       Obj(ListMap(
-        "_ejson.type" -> Data.Str(typ),
-        "_ejson.size" -> Data.Int(size)))
+        EType.TypeKey     -> Data.Str(tag.value),
+        SizedType.SizeKey -> Data.Int(size)))
 
     def unapply(data: Data) = data match {
       case Data.Obj(map) =>
-        ((map.get("_ejson.type") ⊛ map.get("_ejson.size")) {
-          case (Data.Str(str), Data.Int(size)) => (str, size).some
+        ((map.get(EType.TypeKey) ⊛ map.get(SizedType.SizeKey)) {
+          case (Data.Str(str), Data.Int(size)) => (TypeTag(str), size).some
           case _                               => None
         }).join
       case _ => None
-
     }
   }
 
@@ -306,14 +305,14 @@ object Data {
 
   val fromExtension: Algebra[Extension, Data] = {
     case ejson.Meta(value, meta) => (meta, value) match {
-      case (EJsonType("_bson.oid"), Data.Str(oid)) => Data.Id(oid)
-      case (EJsonTypeSize("_ejson.binary", size), Data.Str(data)) =>
+      case (EJsonType(TypeTag("_bson.oid")), Data.Str(oid)) => Data.Id(oid)
+      case (EJsonTypeSize(TypeTag.Binary, size), Data.Str(data)) =>
         if (size.isValidInt)
           ejson.z85.decode(data).fold[Data](
             Data.NA)(
             bv => Data.Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)))
         else Data.NA
-      case (EJsonType("_ejson.date"), Data.Obj(map)) =>
+      case (EJsonType(TypeTag.Date), Data.Obj(map)) =>
         (extract(map.get("year"), _int)(_.toInt) ⊛
           extract(map.get("day_of_year"), _int)(_.toInt))((y, d) =>
           LocalDate.ofYearDay(y, d))
@@ -323,20 +322,20 @@ object Data {
             LocalDate.of(y, m, d)))
           .map(Data.Date(_))
           .getOrElse(Data.NA)
-      case (EJsonType("_ejson.time"), Data.Obj(map)) =>
+      case (EJsonType(TypeTag.Time), Data.Obj(map)) =>
         (extract(map.get("hour"), _int)(_.toInt) ⊛
           extract(map.get("minute"), _int)(_.toInt) ⊛
           extract(map.get("second"), _int)(_.toInt) ⊛
           extract(map.get("nanosecond"), _int)(_.toInt))((h, m, s, n) =>
           Data.Time(LocalTime.of(h, m, s, n))).getOrElse(Data.NA)
-      case (EJsonType("_ejson.time"), Data.Int(sec)) =>
+      case (EJsonType(TypeTag.Time), Data.Int(sec)) =>
         Data.Time(LocalTime.ofSecondOfDay(sec.toLong))
-      case (EJsonType("_ejson.time"), Data.Dec(sec)) =>
+      case (EJsonType(TypeTag.Time), Data.Dec(sec)) =>
         Data.Time(LocalTime.ofNanoOfDay((sec.toDouble * nanosPerSec).toLong))
-      case (EJsonType("_ejson.interval"), Data.Obj(map)) =>
+      case (EJsonType(TypeTag.Interval), Data.Obj(map)) =>
         extract(map.get("seconds"), _dec)(ι).map(s =>
           Data.Interval(Duration.ofNanos((s * nanosPerSec).toLong))).getOrElse(Data.NA)
-      case (EJsonType("_ejson.timestamp"), Data.Obj(map)) =>
+      case (EJsonType(TypeTag.Timestamp), Data.Obj(map)) =>
         (extract(map.get("year"), _int)(_.toInt) ⊛
           extract(map.get("month"), _int)(_.toInt) ⊛
           extract(map.get("day_of_month"), _int)(_.toInt) ⊛
@@ -388,31 +387,31 @@ object Data {
             "minute"       -> Int(ldt.getMinute),
             "second"       -> Int(ldt.getSecond),
             "nanosecond"   -> Int(ldt.getNano))),
-          EJsonType("_ejson.timestamp"))).right
+          EJsonType(TypeTag.Timestamp))).right
       case Date(value)      => E.inj(ejson.Meta(
         Obj(ListMap(
           "year" -> Int(value.getYear),
           "month" -> Int(value.getMonth.getValue),
           "day_of_month" -> Int(value.getDayOfMonth))),
-        EJsonType("_ejson.date"))).right
+        EJsonType(TypeTag.Date))).right
       case Time(value)      => E.inj(ejson.Meta(
         Obj(ListMap(
           "hour"       -> Int(value.getHour),
           "minute"     -> Int(value.getMinute),
           "second"     -> Int(value.getSecond),
           "nanosecond" -> Int(value.getNano))),
-        EJsonType("_ejson.time"))).right
+        EJsonType(TypeTag.Time))).right
       case Interval(value)  =>
         E.inj(ejson.Meta(
           Obj(ListMap("seconds" -> Dec(value.toNanos / nanosPerSec))),
-          EJsonType("_ejson.interval"))).right
+          EJsonType(TypeTag.Interval))).right
       case Binary(value)    =>
         E.inj(ejson.Meta(
           Str(ejson.z85.encode(ByteVector.view(value.toArray))),
-          EJsonTypeSize("_ejson.binary", value.size))).right
+          EJsonTypeSize(TypeTag.Binary, value.size))).right
       case Id(value)        =>
         // FIXME: This evilly guesses the backend-specific OID formats
-        E.inj(ejson.Meta(Str(value), EJsonType("_bson.oid"))).right
+        E.inj(ejson.Meta(Str(value), EJsonType(TypeTag("_bson.oid")))).right
       case data             => data.left
     })
 }

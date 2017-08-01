@@ -2,22 +2,21 @@
     "name": "group by a computed value",
 
     "backends": {
-        "couchbase":      "skip",
-        "postgresql":     "pending"
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
+        "mongodb_q_3_2": "ignoreFieldOrder"
     },
-    "ignoreFieldOrder": [
-        "marklogic_json",
-        "mongodb_2_6",
-        "mongodb_3_0",
-        "mongodb_3_2",
-        "mongodb_read_only",
-        "mongodb_q_3_2"
-    ],
     "data": "zips.data",
 
     "query": "select substring(city, 0, 1) as `first`, count(*) as numZips from zips group by substring(city, 0, 1)",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "first": "X", "numZips":    2 },
         { "first": "Z", "numZips":   48 },

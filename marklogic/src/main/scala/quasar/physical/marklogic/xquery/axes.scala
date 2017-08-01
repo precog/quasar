@@ -17,10 +17,10 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery.syntax._
 
 import scalaz.syntax.show._
+import xml.name._
 
 /** XPath [Axes](https://www.w3.org/TR/xquery/#axes) expressions.
   *
@@ -47,13 +47,13 @@ object axes {
       xqy("attribute()")
 
     def attributeNamed(name: String): XQuery =
-      xqy(s"attribute(${name.xs})")
+      xqy(s"attribute(${name})")
 
     def element(): XQuery =
       xqy("element()")
 
     def elementNamed(name: String): XQuery =
-      xqy(s"element(${name.xs})")
+      xqy(s"element(${name})")
 
     def node(): XQuery =
       xqy("node()")

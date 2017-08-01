@@ -16,46 +16,46 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
+
 import quasar.Data
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
+import java.time.format.DateTimeFormatter.{ISO_DATE, ISO_TIME}
+import java.time.ZoneOffset.UTC
+
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class DataPlanner[M[_]: Monad, FMT](
-  implicit SP: StructuralPlanner[M, FMT]
-) extends Planner[M, FMT, Const[Data, ?]] {
+private[qscript] object DataPlanner {
 
-  val plan: AlgebraM[M, Const[Data, ?], XQuery] = _.getConst match {
-    case Data.Binary(bytes) => xs.base64Binary(base64Bytes(bytes).xs).point[M]
-    case Data.Bool(b)       => b.fold(fn.True, fn.False).point[M]
-    case Data.Date(d)       => xs.date(isoLocalDate(d).xs).point[M]
-    case Data.Dec(d)        => xs.double(d.toString.xqy).point[M]
-    case Data.Id(id)        => id.xs.point[M]
-    case Data.Int(i)        => xs.integer(i.toString.xqy).point[M]
-    case Data.Interval(d)   => xs.duration(isoDuration(d).xs).point[M]
-    case Data.NA            => expr.emptySeq.point[M]
-    case Data.Null          => SP.null_
-    case Data.Str(s)        => s.xs.point[M]
-    case Data.Time(t)       => xs.time(isoLocalTime(t).xs).point[M]
-    case Data.Timestamp(ts) => xs.dateTime(isoInstant(ts).xs).point[M]
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def apply[M[_]: Monad, FMT](data: Data)(implicit SP: StructuralPlanner[M, FMT]): M[XQuery] =
+    data match {
+      case Data.Binary(bytes) => xs.base64Binary(base64Bytes(bytes).xs).point[M]
+      case Data.Bool(b)       => b.fold(fn.True, fn.False).point[M]
+      case Data.Date(d)       => xs.date(ISO_DATE.format(d atStartOfDay UTC).xs).point[M]
+      case Data.Dec(d)        => xs.double(d.toString.xqy).point[M]
+      case Data.Id(id)        => id.xs.point[M]
+      case Data.Int(i)        => xs.integer(i.toString.xqy).point[M]
+      case Data.Interval(d)   => xs.duration(isoDuration(d).xs).point[M]
+      case Data.NA            => expr.emptySeq.point[M]
+      case Data.Null          => SP.null_
+      case Data.Str(s)        => s.xs.point[M]
+      case Data.Time(t)       => xs.time(ISO_TIME.format(t atOffset UTC).xs).point[M]
+      case Data.Timestamp(ts) => xs.dateTime(isoInstant(ts).xs).point[M]
 
-    case Data.Arr(elements) =>
-      elements.traverse(planK >==> SP.mkArrayElt _) >>= (xs => SP.mkArray(mkSeq(xs)))
+      case Data.Arr(elements) =>
+        elements.traverse(Kleisli(apply[M, FMT]) >==> SP.mkArrayElt _) >>= (xs => SP.mkArray(mkSeq(xs)))
 
-    case Data.Obj(entries)  =>
-      entries.toList.traverse { case (key, value) =>
-        planK(value) >>= (SP.mkObjectEntry(key.xs, _))
-      } >>= (ents => SP.mkObject(mkSeq(ents)))
+      case Data.Obj(entries)  =>
+        entries.toList.traverse { case (key, value) =>
+          apply[M, FMT](value) >>= (SP.mkObjectEntry(key.xs, _))
+        } >>= (ents => SP.mkObject(mkSeq(ents)))
 
-    case Data.Set(elements) =>
-      elements.traverse(planK) map (mkSeq(_))
-  }
-
-  ////
-
-  private val planK: Kleisli[M, Data, XQuery] =
-    Kleisli(plan compose (Const(_)))
+      case Data.Set(elements) =>
+        elements.traverse(apply[M, FMT]) map (mkSeq(_))
+    }
 }

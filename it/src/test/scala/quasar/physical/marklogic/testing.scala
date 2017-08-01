@@ -36,17 +36,19 @@ object testing {
     uri: ConnectionUri,
     readChunkSize: Positive,
     writeChunkSize: Positive
-  ): Task[(FileSystem ~> Task, FileSystem ~> Task, Task[Unit])] = {
-    def failOnError[A](err: FileSystemDef.DefinitionError): Task[A] =
+  ): Task[(BackendEffect ~> Task, BackendEffect ~> Task, Task[Unit])] = {
+    def failOnError[A](err: BackendDef.DefinitionError): Task[A] =
       err.fold[Task[A]](
         errs => Task.fail(new RuntimeException(errs intercalate ", ")),
         ee   => Task.fail(new RuntimeException(ee.shows)))
 
+    val defn = MarkLogic(readChunkSize, writeChunkSize).definition
+
     MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
       .leftMap(_.left[EnvironmentError])
       .flatMap { cfg =>
-        val js = fileSystem[DocType.Json](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize)
-        val xml = fileSystem[DocType.Xml](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize)
+        val js = defn(FsType, ConnectionUri(cfg.copy(docType = DocType.json).asUriString))
+        val xml = defn(FsType, ConnectionUri(cfg.copy(docType = DocType.xml).asUriString))
 
         js.tuple(xml) map {
           case (jsdr, xmldr) => (jsdr.run, xmldr.run, jsdr.close *> xmldr.close)

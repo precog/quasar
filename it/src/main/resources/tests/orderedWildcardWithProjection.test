@@ -1,13 +1,9 @@
 {
     "name": "wildcard with projection and synthetic field",
-    "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
-    },
     "data": "largeZips.data",
     "query": "select *, pop * 10 as dpop from largeZips order by pop / 10 desc",
-    "predicate": "equalsInitial",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "predicate": "initial",
+    "ignoreFieldOrder": true,
     "expected": [
         { "_id": "60623", "city": "CHICAGO",      "loc": [ -87.7157,   41.849015], "pop": 112047.0, "state": "IL", "dpop": 1120470.0 },
         { "_id": "11226", "city": "BROOKLYN",     "loc": [ -73.956985, 40.646694], "pop": 111396.0, "state": "NY", "dpop": 1113960.0 },

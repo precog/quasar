@@ -29,18 +29,17 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
 
   def retype(f: List[String] => List[String]) = this.copy(nodeType = f(nodeType))
 
-  /**
-   A tree that describes differences between two trees:
-   - If the two trees are identical, the result is the same as (either) input.
-   - If the trees differ only in the labels on nodes, then the result has those
-      nodes decorated with "[Changed] old -> new".
-   - If a single node is unmatched on either side, it is decorated with "[Added]"
-      or "[Deleted]".
-   As soon as a difference is found and decorated, the subtree(s) beneath the
-   decorated nodes are not inspected.
-
-   Node types are not compared or necessarily preserved.
-   */
+  /** A tree that describes differences between two trees:
+    * - If the two trees are identical, the result is the same as (either) input.
+    * - If the trees differ only in the labels on nodes, then the result has those
+    *   nodes decorated with "[Changed] old -> new".
+    * - If a single node is unmatched on either side, it is decorated with "[Added]"
+    *   or "[Deleted]".
+    * As soon as a difference is found and decorated, the subtree(s) beneath the
+    * decorated nodes are not inspected.
+    *
+    * Node types are not compared or necessarily preserved.
+    */
   def diff(that: RenderedTree): RenderedTree = {
     def prefixedType(t: RenderedTree, p: String): List[String] = t.nodeType match {
       case first :: rest => (p + " " + first) :: rest
@@ -59,6 +58,7 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
             prefixType(that, added) ::
             Nil)
         else {
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
             case (Nil, Nil)     => Nil
             case (x :: xs, Nil) => prefixType(x, deleted) :: matchChildren(xs, Nil)
@@ -83,6 +83,7 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
   nodes.
   */
   def draw: Stream[String] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def drawSubTrees(s: List[RenderedTree]): Stream[String] = s match {
       case Nil      => Stream.Empty
       case t :: Nil => shift("╰─ ", "   ", t.draw)
@@ -138,14 +139,17 @@ object RenderedTree {
           Nil).foldMap(_.toList): _*)
   }
 
-  implicit val renderTree: RenderTree[RenderedTree] =
-    RenderTree.make(ι)
+  implicit val renderTree: RenderTree[RenderedTree] = RenderTree.make(ι)
 }
 
 object Terminal {
-  def apply(nodeType: List[String], label: Option[String]): RenderedTree = RenderedTree(nodeType, label, Nil)
+  def apply(nodeType: List[String], label: Option[String])
+      : RenderedTree =
+    RenderedTree(nodeType, label, Nil)
 }
 
 object NonTerminal {
-  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree]): RenderedTree = RenderedTree(nodeType, label, children)
+  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree])
+      : RenderedTree =
+    RenderedTree(nodeType, label, children)
 }

@@ -30,6 +30,8 @@ object Command {
   private val CdPattern           = "(?i)cd(?: +(.+))?".r
   private val NamedExprPattern    = "(?i)([^ :]+) *<- *(.+)".r
   private val ExplainPattern      = "(?i)explain +(.+)".r
+  private val CompilePattern      = "(?i)compile +(.+)".r
+  private val SchemaPattern       = "(?i)schema +(.+)".r
   private val LsPattern           = "(?i)ls(?: +(.+))?".r
   private val SavePattern         = "(?i)save +([\\S]+) (.+)".r
   private val AppendPattern       = "(?i)append +([\\S]+) (.+)".r
@@ -47,6 +49,8 @@ object Command {
   final case class Cd(dir: XDir) extends Command
   final case class Select(name: Option[String], query: Query) extends Command
   final case class Explain(query: Query) extends Command
+  final case class Compile(query: Query) extends Command
+  final case class Schema(query: Query) extends Command
   final case class Ls(dir: Option[XDir]) extends Command
   final case class Save(path: XFile, value: String) extends Command
   final case class Append(path: XFile, value: String) extends Command
@@ -65,15 +69,16 @@ object Command {
       case CdPattern(_)                  => Cd(rootDir.right)
       case NamedExprPattern(name, query) => Select(Some(name), Query(query))
       case ExplainPattern(query)         => Explain(Query(query))
+      case CompilePattern(query)         => Compile(Query(query))
+      case SchemaPattern(query)          => Schema(Query(query))
       case LsPattern(XDir(d))            => Ls(d.some)
       case LsPattern(_)                  => Ls(none)
       case SavePattern(XFile(f), value)  => Save(f, value)
       case AppendPattern(XFile(f), value) => Append(f, value)
       case DeletePattern(XFile(f))       => Delete(f)
-      case DebugPattern(code)            =>
-        Debug(DebugLevel.fromInt(code.toInt).getOrElse(DebugLevel.Normal))
+      case DebugPattern(code)            => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
       case SummaryCountPattern(rows)     => SummaryCount(rows.toInt)
-      case FormatPattern(format)         => Format(OutputFormat.fromString(format).getOrElse(OutputFormat.Table))
+      case FormatPattern(format)         => Format(OutputFormat.fromString(format) | OutputFormat.Table)
       case HelpPattern()                 => Help
       case SetVarPattern(name, value)    => SetVar(name, value)
       case UnsetVarPattern(name)         => UnsetVar(name)
@@ -89,7 +94,7 @@ object Command {
         .map(s => if (s.endsWith("/")) s else s + "/")
         .flatMap { s =>
           posixCodec.parseRelDir(s).map(_.left) orElse
-            posixCodec.parseAbsDir(s).map(sandboxAbs(_).right)
+            posixCodec.parseAbsDir(s).map(unsafeSandboxAbs(_).right)
         }
   }
   type XFile = RelFile[Unsandboxed] \/ AFile
@@ -99,7 +104,7 @@ object Command {
         .filter(_ ≠ "")
         .flatMap { s =>
           posixCodec.parseRelFile(s).map(_.left) orElse
-            posixCodec.parseAbsFile(s).map(sandboxAbs(_).right)
+            posixCodec.parseAbsFile(s).map(unsafeSandboxAbs(_).right)
         }
   }
 }

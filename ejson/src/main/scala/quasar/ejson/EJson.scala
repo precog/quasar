@@ -159,7 +159,23 @@ sealed abstract class ExtensionInstances {
       }
   }
 
-  implicit val order: Delay[Order, Extension] =
+  implicit val show: Delay[Show, Extension] =
+    new Delay[Show, Extension] {
+      def apply[α](eq: Show[α]) = Show.show(a => a match {
+        case Meta(v, m) => Cord(s"Meta($v, $m)")
+        case Map(v)     => Cord(s"Map($v)")
+        case Byte(v)    => Cord(s"Byte($v)")
+        case Char(v)    => Cord(s"Char($v)")
+        case Int(v)     => Cord(s"Int($v)")
+      })
+    }
+
+  // NB: Private as we don't consider metadata for purposes of EJson equality
+  //     and we need to elide it before using this to compare.
+  //
+  //     This _does_ consider metadata so we can use it in tests of other
+  //     Extension properties.
+  private[ejson] val order: Delay[Order, Extension] =
     new Delay[Order, Extension] {
       def apply[α](ord: Order[α]) = {
         implicit val ordA: Order[α] = ord
@@ -170,20 +186,8 @@ sealed abstract class ExtensionInstances {
           char.getOption(e)                          ,
           int.getOption(e)                           ,
           map.getOption(e) map (IMap fromFoldable _) ,
-          // NB: Metadata isn't considered for purposes of equality.
-          meta.getOption(e) map (_._1)
+          meta.getOption(e)
         ))
       }
-    }
-
-  implicit val show: Delay[Show, Extension] =
-    new Delay[Show, Extension] {
-      def apply[α](eq: Show[α]) = Show.show(a => a match {
-        case Meta(v, m) => Cord(s"Meta($v, $m)")
-        case Map(v)     => Cord(s"Map($v)")
-        case Byte(v)    => Cord(s"Byte($v)")
-        case Char(v)    => Cord(s"Char($v)")
-        case Int(v)     => Cord(s"Int($v)")
-      })
     }
 }

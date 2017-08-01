@@ -1,17 +1,17 @@
 {
     "name": "largest cities",
 
-    "NB": "Couchbase is skipped due to largish generated N1QL that leads to a timeout.",
-
     "backends": {
-        "couchbase":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mimir":"ignoreFieldOrder",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "ignoreFieldOrder": [ "mongodb_2_6", "mongodb_3_0", "mongodb_3_2", "mongodb_read_only" ],
     "query": "select city, state, sum(pop) as total from zips group by city, state order by sum(pop) desc limit 10",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "city": "CHICAGO",      "state": "IL", "total": 2452177 },
                  { "city": "BROOKLYN",     "state": "NY", "total": 2300504 },
                  { "city": "LOS ANGELES",  "state": "CA", "total": 2102295 },

@@ -26,6 +26,7 @@ import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
+import xml.name.QName
 
 private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]
   extends StructuralPlanner[F, DocType.Xml] {
@@ -33,9 +34,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   import axes.child, StructuralPlanner.ejs
   import FunctionDecl._
 
-  val ejsonN    = ejs name ejsonEjson.local
-  val arrayEltN = ejs name ejsonArrayElt.local
-  val typeAttrN = ejs name ejsonType.local
+  val ejsonN    = ejs name ejsonEjson.localPart
+  val arrayEltN = ejs name ejsonArrayElt.localPart
+  val typeAttrN = ejs name ejsonType.localPart
 
   // <ejson:ejson ejson:type="null" />
   val null_ : F[XQuery] =
@@ -71,9 +72,14 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     mkObjectFn(entries)
 
   def mkObjectEntry(key: XQuery, value: XQuery) =
-    XQuery.stringLit.getOption(key).cata(
-      s => asQName(s) >>= (qn => renameOrWrap(qn.xqy, value)),
-      renameOrWrap(xs.QName(key), value))
+    key match {
+      case XQuery.StringLit(QName.string(qn)) =>
+        renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(nonQNameKey) =>
+        renameOrWrapEncoded(xs.string(nonQNameKey.xs), value)
+      case _ =>
+        guardQNameF(key, renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(xs.string(key), value))
+    }
 
   def nodeCast(node: XQuery) =
     castAsAscribed(node)
@@ -88,28 +94,44 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     xmlNodeType(node)
 
   def objectDelete(obj: XQuery, key: XQuery) =
-    XQuery.stringLit.getOption(key).cata(
-      s => asQName(s) >>= (qn => withoutNamed(obj, qn.xqy)),
-      withoutNamed(obj, key))
+    key match {
+      case XQuery.StringLit(QName.string(qn)) => withoutNamed(obj, qn.xqy)
+      case XQuery.StringLit(name) => withoutNamedEncoded(obj, name.xs)
+      case _ => guardQNameF(key, withoutNamed(obj, xs.QName(key)), withoutNamedEncoded(obj, fn.string(key)))
+    }
 
   // TODO: This assumes the `key` is not present in the object, for performance.
   //       may need to switch to `objectUpdate` if we need to check that here.
-  def objectInsert(obj: XQuery, key: XQuery, value: XQuery) =
-    renameOrWrap(key, value) >>= (mem.nodeInsertChild[F](obj, _))
+  def objectInsert(obj: XQuery, key: XQuery, value: XQuery) = {
+    val elt = key match {
+      case XQuery.StringLit(QName.string(qn)) => renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(name) => renameOrWrapEncoded(xs.string(name.xs), value)
+      case _ => guardQNameF(key, renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(fn.string(key), value))
+    }
+
+    elt >>= (mem.nodeInsertChild[F](obj, _))
+  }
 
   def objectLookup(obj: XQuery, key: XQuery) = {
     val prj = key match {
       case XQuery.Step(_) =>
         (obj `/` key).point[F]
 
-      case XQuery.StringLit(s) =>
-        (asQName[F](s) |@| freshName[F])((qn, m) =>
+      case XQuery.StringLit(QName.string(qn)) =>
+        freshName[F] map ( m =>
           if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
           else
             obj `/` child(qn))
 
-      case _ => childrenNamed(obj, xs.QName(key))
+      case XQuery.StringLit(s) =>
+        freshName[F] map ( m =>
+          if (XQuery.flwor.nonEmpty(obj))
+            let_(m := obj) return_ childrenNamedEncoded(~m, s.xs)
+          else
+            childrenNamedEncoded(obj, s.xs))
+
+      case _ => guardQNameF(key, childrenNamed(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)).point[F])
     }
 
     prj >>= (manyToArray(_))
@@ -117,6 +139,17 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   def objectMerge(o1: XQuery, o2: XQuery) =
     elementMerge(o1, o2)
+
+  private def guardQNameF(candidate: XQuery, left: F[XQuery], right: F[XQuery]): F[XQuery] =
+    (left |@| right)((l, r) => guardQName(candidate, expr.func()(l), expr.func()(r))).join
+
+  private def childrenNamedEncoded(src: XQuery, field: XQuery): XQuery = {
+    val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
+    src `/` child(ejsonEncodedName)(pred)
+  }
+
+  private def nonEncodedAttrs(elt: XQuery): XQuery =
+    elt `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs)
 
   ////
 
@@ -165,14 +198,21 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       $("obj2") as ST("element()?")
     ).as(ST(s"element()")) { (obj1: XQuery, obj2: XQuery) =>
       val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
+      val (elt, encodedNames) = ($("elt"), $("encodedNames"))
 
       mkObjectFn {
         let_(
           xs    := (obj2 `/` child.element()),
           names := fn.map("fn:node-name#1".xqy, ~xs),
+          encodedNames := ~xs `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows),
           ys    := fn.filter(func(e.render) {
-                     every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2)
-                   }, obj1 `/` child.element()))
+            typeswitch(~e)(
+              elt as ST(s"element($ejsonEncodedName)") return_ (_ =>
+                every(
+                  n1 in ~elt `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows),
+                  n2 in ~encodedNames) satisfies (~n1 ne ~n2))
+            ) default (every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2))
+          }, obj1 `/` child.element()))
         .return_(mkSeq_(~ys, ~xs))
       }
     })
@@ -187,14 +227,37 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       }
     })
 
-  // qscript:children-named($src as element()?, $name as xs:QName?) as item()*
+  // ejson:children-named($src as element()?, $name as xs:QName?) as item()*
   lazy val childrenNamed: F[FunctionDecl2] =
     ejs.declare[F]("children-named") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
-      fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
+      fn.filter(func(n.render)(fn.nodeName(~n) eq xs.QName(field)), src `/` child.element())
+    })
+
+  // ejson:without-named-encoded($src as element()?, $name as xs:string) as element()?
+  lazy val withoutNamedEncoded: F[FunctionDecl2] =
+    ejs.declare[F]("without-named-encoded") map (_(
+      $("src")  as ST("element()?"),
+      $("name") as ST("xs:string")
+    ).as(ST("element()?")) { (src: XQuery, name: XQuery) =>
+      val (s, n, e) = ($("s"), $("n"), $("e"))
+      fn.map(func(s.render) {
+        element { fn.nodeName(~s) } {
+          mkSeq_(
+            ~s `/` axes.attribute.node(),
+            for_ (n in (~s `/` child.element()))
+            .return_(
+              typeswitch(~n)(
+                e as ST(s"element($ejsonEncodedName)") return_ ((_: XQuery) =>
+                  if_(~n `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows) eq name)
+                  .then_(emptySeq)
+                  .else_(~n))
+              ) default ~n))
+        }
+      }, src)
     })
 
   // qscript:without-named($src as element()?, $name as xs:QName) as element()?
@@ -235,10 +298,31 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
-            element { name } { mkSeq_(e `/` axes.attribute.node(), e `/` child.node()) })
+            element { name }
+              { mkSeq_(nonEncodedAttrs(e), e `/` child.node())})
         ) default (element { name } { mkSeq_(typeAttr(value), value) })
       })
     }
+
+  // ejson:rename-or-wrap-encoded($name as xs:string, $value as item()*) as element()
+  lazy val renameOrWrapEncoded: F[FunctionDecl2] =
+    typeAttrFor.fn flatMap { typeAttr =>
+      ejs.declare[F]("rename-or-wrap-encoded") map (_(
+        $("name")  as ST("xs:string"),
+        $("value") as ST.Top
+      ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
+        typeswitch(value)(
+          $("e") as ST("element()") return_ (e =>
+            element { ejsonEncodedName.xqy } {
+              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name }, nonEncodedAttrs(e), e `/` child.node())
+            })
+        ) default (element { ejsonEncodedName.xqy }
+          { mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
+              typeAttr(value),
+              value)})
+      })
+    }
+
 
   lazy val ascribedType: F[FunctionDecl1] =
     typeAttrN.qn[F] flatMap { tname =>
@@ -320,5 +404,28 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             }) default emptySeq)
           .else_(~ascribed)
         })
+    })
+
+  // ejson:guard-qname($candidate as item()*, $if-qname as item()*, $if-non-qname as item()*) as item()*
+  lazy val guardQName: F[FunctionDecl3] =
+    ejs.declare[F]("guard-qname") flatMap (_(
+      $("candidate") as ST("item()*"),
+      $("if-qname") as ST("(function() as item()*)"),
+      $("if-non-qname") as ST("(function() as item()*)")
+    ).as(ST.Top) { (candidate: XQuery, ifQName: XQuery, ifNonQName: XQuery) =>
+      isQName(candidate) map (if_(_)
+      .then_(ifQName.fnapply())
+      .else_(ifNonQName.fnapply()))
+    })
+
+  // ejson:is-qname($candidate as item()?) as xs:boolean
+  lazy val isQName: F[FunctionDecl1] =
+    ejs.declare[F]("is-qname") map (_(
+      $("candidate") as ST("item()?")
+    ).as(ST("xs:boolean")) { candidate: XQuery =>
+      xdmp.castableAs(
+        "http://www.w3.org/2001/XMLSchema".xs,
+        "QName".xs,
+        candidate)
     })
 }

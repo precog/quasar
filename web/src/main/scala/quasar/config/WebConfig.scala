@@ -16,18 +16,21 @@
 
 package quasar.config
 
-import quasar.fs.mount.MountingsConfig
+import slamdata.Predef._
 
 import argonaut._, Argonaut._
 import monocle._, macros.Lenses
+import scalaz._, Scalaz._
 
-@Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig)
+@Lenses final case class WebConfig(server: ServerConfig, metastore: Option[MetaStoreConfig])
 
 object WebConfig {
   implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
-    val default = WebConfig(ServerConfig(ServerConfig.DefaultPort), MountingsConfig.empty)
+    val name = "web"
+    def metaStoreConfig = WebConfig.metastore
+    val default = MetaStoreConfig.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
   }
 
   implicit val codecJson: CodecJson[WebConfig] =
-    casecodec2(WebConfig.apply, WebConfig.unapply)("server", "mountings")
+    casecodec2(WebConfig.apply, WebConfig.unapply)("server", "metastore")
 }

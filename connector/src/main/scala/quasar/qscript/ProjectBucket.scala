@@ -29,7 +29,7 @@ import scalaz._, Scalaz._
 /** Projections are technically dimensional (i.e., QScript) operations. However,
   * to a filesystem, they are merely Map operations. So, we use these components
   * while building the QScript plan and they are then used in static path
-  * processing, but they are replaced with equivalent MapFuncs before being
+  * processing, but they are replaced with equivalent MapFuncsCore before being
   * processed by the filesystem.
   */
 sealed abstract class ProjectBucket[T[_[_]], A] {
@@ -49,7 +49,7 @@ sealed abstract class ProjectBucket[T[_[_]], A] {
     extends ProjectBucket[T, A]
 
 object ProjectBucket {
-  implicit def equal[T[_[_]]: OrderT]: Delay[Equal, ProjectBucket[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ProjectBucket[T, ?]] =
     new Delay[Equal, ProjectBucket[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -106,7 +106,7 @@ object ProjectBucket {
       }
     }
 
-  implicit def mergeable[T[_[_]]: CorecursiveT: OrderT]:
+  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]

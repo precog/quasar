@@ -1,16 +1,20 @@
 {
     "name": "distinct *",
     "backends": {
+        "couchbase": "skip",
+        "mimir":"ignoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
+        "mongodb_3_4":       "pending",
+        "mongodb_q_3_2": "pending"
     },
+    "NB": "Skipped for couchbase due to #2329 failure to load test data.",
     "data": "cities.data",
     "query": "select distinct * from cities where city = \"BOSTON\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "_id": "02108", "city": "BOSTON" },
         { "_id": "02109", "city": "BOSTON" },

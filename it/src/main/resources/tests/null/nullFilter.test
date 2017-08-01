@@ -2,9 +2,7 @@
     "name": "filter on is null",
 
     "backends": {
-        "marklogic_json": "pending",
-        "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending"
+        "mongodb_q_3_2":  "pending"
     },
 
     "description": "expression with `is null` should be true whenever the same filter is satisfied",
@@ -13,7 +11,8 @@
 
     "query": "select distinct (val is null) as expr from nulls where val is null",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "expr": true }]
 }

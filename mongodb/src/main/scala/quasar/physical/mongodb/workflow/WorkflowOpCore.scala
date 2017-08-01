@@ -30,7 +30,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
 
-import scala.collection.Iterable
+import scala.collection.immutable.Iterable
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -55,6 +55,7 @@ object $read {
 
 final case class $MatchF[A](src: A, selector: Selector)
   extends WorkflowOpCoreF[A]  { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
       def wf = self
@@ -73,6 +74,7 @@ object $match {
 
 final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHandling)
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
@@ -124,6 +126,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
       if (fields.contains(IdName)) ExcludeId else idExclusion)
 
   def id: $ProjectF[A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(prefix: Option[BsonField], p: $ProjectF[A]): $ProjectF[A] = {
       def nest(child: BsonField): BsonField =
         prefix.map(_ \ child).getOrElse(child)
@@ -161,6 +164,7 @@ object $project {
 
 final case class $RedactF[A](src: A, value: Fix[ExprOp])
   extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOp]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
@@ -187,6 +191,7 @@ object $redact {
 
 final case class $LimitF[A](src: A, count: Long)
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
       def wf = self
@@ -205,6 +210,7 @@ object $limit {
 
 final case class $SkipF[A](src: A, count: Long)
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
       def wf = self
@@ -223,6 +229,7 @@ object $skip {
 
 final case class $UnwindF[A](src: A, field: DocVar)
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
@@ -242,7 +249,7 @@ object $unwind {
 
 final case class $GroupF[A](src: A, grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
     extends WorkflowOpCoreF[A] { self =>
-
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOp]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
@@ -275,6 +282,7 @@ object $group {
 
 final case class $SortF[A](src: A, value: NonEmptyList[(BsonField, SortDir)])
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
       def wf = self
@@ -306,6 +314,7 @@ object $sort {
  */
 final case class $OutF[A](src: A, collection: CollectionName)
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
       def wf = self
@@ -331,6 +340,7 @@ final case class $GeoNearF[A](
   distanceMultiplier: Option[Double], includeLocs: Option[BsonField],
   uniqueDocs: Option[Boolean])
     extends WorkflowOpCoreF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
@@ -382,6 +392,7 @@ sealed abstract class MapReduceF[A] extends WorkflowOpCoreF[A] {
   return a 2-element array containing the new key and new value.
   */
 final case class $MapF[A](src: A, fn: Js.AnonFunDecl, scope: Scope) extends MapReduceF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def singleSource: SingleSourceF[WorkflowOpCoreF, A] =
     new SingleSourceF[WorkflowOpCoreF, A] {
       def wf = self
@@ -449,6 +460,7 @@ object $map {
 // a new op that combines a map and reduce operation?
 final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]], scope: Scope)
     extends MapReduceF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def singleSource: SingleSourceF[WorkflowOpCoreF, A] =
     new SingleSourceF[WorkflowOpCoreF, A] {
       def wf = self
@@ -456,6 +468,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
       def reparent[B](newSrc: B) = self.copy(src = newSrc).singleSource
     }
   def getAll: Option[List[BsonField]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(x: JsCore): Option[List[BsonField]] = x match {
       case jscore.Obj(values) => Some(values.toList.flatMap { case (k, v) =>
         val n = BsonField.Name(k.value)
@@ -470,6 +483,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
   }
 
   def deleteAll(fields: List[BsonField]): $SimpleMapF[A] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(x: JsCore, fields: List[List[BsonField.Name]]): Option[JsCore] = x match {
       case jscore.Obj(values) => Some(jscore.Obj(
         values.collect(Function.unlift[(jscore.Name, JsCore), (jscore.Name, JsCore)] { t =>
@@ -615,6 +629,7 @@ object $simpleMap {
   */
 final case class $FlatMapF[A](src: A, fn: Js.AnonFunDecl, scope: Scope)
     extends MapReduceF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def singleSource: SingleSourceF[WorkflowOpCoreF, A] =
     new SingleSourceF[WorkflowOpCoreF, A] {
       def wf = self
@@ -678,6 +693,7 @@ object $flatMap {
   */
 final case class $ReduceF[A](src: A, fn: Js.AnonFunDecl, scope: Scope)
     extends MapReduceF[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def singleSource: SingleSourceF[WorkflowOpCoreF, A] =
     new SingleSourceF[WorkflowOpCoreF, A] {
       def wf = self

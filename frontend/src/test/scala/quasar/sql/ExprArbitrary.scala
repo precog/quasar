@@ -19,18 +19,32 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.common.JoinType._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalacheck.gen
+import quasar.fp.ski._
 import quasar.sql.fixpoint._
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{Arbitrary, Gen, Shrink}
+import org.scalacheck.Shrink.shrink
 import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 
 trait ExprArbitrary {
   implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))
+
+  implicit val exprShrink: Shrink[Fix[Sql]] = Shrink (expr => (expr.project match {
+    case s @ Select(_, projections, relation, filter, groupBy, orderBy) =>
+      shrink(projections).map(p => s.copy(projections = p)) append
+      relation.map(κ(s.copy(relation = None))).toStream     append
+      filter.map(κ(s.copy(filter = None))).toStream         append
+      groupBy.map(κ(s.copy(groupBy = None))).toStream       append
+      orderBy.map(κ(s.copy(orderBy = None))).toStream
+    case ArrayLiteral(elems) => shrink(elems).map(ArrayLiteral(_))
+    case SetLiteral(elems)  => shrink(elems).map(SetLiteral(_))
+    case InvokeFunction(name, args) => shrink(args).map(InvokeFunction(name, _))
+    case other                      => Stream.empty
+  }).map(_.embed))
 
   private def selectGen(depth: Int): Gen[Fix[Sql]] = for {
     isDistinct <- Gen.oneOf(SelectDistinct, SelectAll)
@@ -172,8 +186,10 @@ trait ExprArbitrary {
     genIdentString map (Vari(_))
 
   private def genIdentString: Gen[String] =
-    Gen.listOf(gen.printableAsciiChar) map (_.filter(_ ≠ '`').mkString)
-
+    for {
+      c <- Gen.alphaChar
+      cs <- Gen.listOf(Gen.frequency((1, '_'), (62, Gen.alphaNumChar)))
+    } yield (c :: cs).mkString
 }
 
 object ExprArbitrary extends ExprArbitrary

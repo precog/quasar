@@ -71,6 +71,21 @@ object Bson {
     def repr = new BsonDouble(value)
 
     def toJs = Js.Num(value, true)
+
+    override def equals(that: Any): Boolean = that match {
+      case Dec(value2) =>
+        (value.isNaN && value2.isNaN) ||
+        (value.isInfinity && value > 0 && value2.isInfinity && value2 > 0) ||
+        (value.isInfinity && value < 0 && value2.isInfinity && value2 < 0) ||
+        (value ≟ value2)
+      case _ => false
+    }
+
+    override def hashCode =
+      if (value.isNaN) "NaN".hashCode
+      else if (value.isInfinity && value > 0) "+inf".hashCode
+      else if (value.isInfinity && value < 0) "-inf".hashCode
+      else value.hashCode
   }
 
   val _dec = Prism.partial[Bson, Double] { case Bson.Dec(v) => v } (Bson.Dec(_))
@@ -296,6 +311,7 @@ sealed abstract class BsonField {
         case Name(v)  => JsFn(JsFn.defaultName, jscore.Access(acc(jscore.Ident(JsFn.defaultName)), jscore.Literal(Js.Str(v))))
       })
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   override def hashCode = this match {
     case Name(v) => v.hashCode
     case Path(v) if (v.tail.length ≟ 0) => v.head.hashCode

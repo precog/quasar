@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.syntax._
 
 import monocle.macros.Lenses
@@ -28,6 +27,7 @@ import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
+import xml.name._
 
 @Lenses
 final case class ModuleImport(prefix: Option[NSPrefix], uri: NSUri, locs: IList[NSUri]) {

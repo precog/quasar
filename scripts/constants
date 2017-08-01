@@ -17,7 +17,7 @@ mkdir -p "$TEMP_DIR"
 QUASAR_VERSION=$(cat $WS_DIR/version.sbt | sed -n -e 's/^ *version.*:= "\(.*\)"[^\n]*/\1/p')
 
 QUASAR_WEB_JAR="quasar-web-assembly-${QUASAR_VERSION}.jar"
-QUASAR_WEB_JAR_DIR="$WS_DIR/web/target/scala-2.11"
+QUASAR_WEB_JAR_DIR="$WS_DIR/.targets/web/scala-2.11"
 QUASAR_WEB_JAR_PATH="$QUASAR_WEB_JAR_DIR/$QUASAR_WEB_JAR"
 
 echo "Quasar Version: $QUASAR_VERSION"

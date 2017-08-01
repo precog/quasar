@@ -18,7 +18,6 @@ package quasar.server
 
 import slamdata.Predef._
 import quasar.console._
-import quasar.fp._
 
 import org.http4s.HttpService
 import org.http4s.server.blaze.BlazeBuilder
@@ -27,7 +26,6 @@ import scalaz.concurrent.Task
 import scalaz._, Scalaz._
 import scala.concurrent.duration._
 import scalaz.stream.Process
-import scalaz.stream.async
 import shapeless._
 import shapeless.Nat
 import shapeless.ops.nat._
@@ -93,65 +91,4 @@ object Http4sUtils {
       server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0").mountService(blueprint.svc).start
     } yield (server, actualPort)
   }
-
-  /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.
-    *
-    * The returned process will emit each time a new server configuration is provided and ensures only
-    * one server is running at a time, i.e. providing a new Configuration ensures
-    * the previous server has been stopped.
-    *
-    * When the process of configurations terminates for any reason, the last server is shutdown and the
-    * process of servers will terminate.
-    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
-    */
-  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
-
-    val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout(s"Server started listening on port $port") })
-
-    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
-      oldServer.shutdown.flatMap(_ => stdout(s"Stopped server listening on port $oldPort")) *>
-        Task.now(newServerAndPort)
-    }.cleanUpWithA{ server =>
-      server.map { case (lastServer, lastPort) =>
-        lastServer.shutdown.flatMap(_ => stdout(s"Stopped last server listening on port $lastPort"))
-      }.getOrElse(Task.now(()))
-    }
-  }
-
-  /** Produce a stream of servers that can be restarted on a supplied port
-    * @param initialPort The port on which to start the initial server
-    * @param produceService A function that given a function to restart a server
-    *                       on a new port, returns an `HttpService`
-    * @return The `Task` will start the first server and provide a function to
-    *         shutdown the active server. It will also return a process of
-    *         servers and ports. This `Process` must be run in order for
-    *         servers to actually be started and stopped. The `Process` must be
-    *         run to completion in order for appropriate clean up to occur.
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-  def startServers(
-    initialPort: Int,
-    produceService: (Int => Task[Unit]) => HttpService
-  ): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
-    val configQ = async.boundedQueue[ServerBlueprint](1)
-    def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
-      configQ.enqueueOne(conf)
-    }
-    startNew(initialPort) >> (servers(configQ.dequeue, false).unconsOption.map {
-      case None => throw new java.lang.AssertionError("should never happen")
-      case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
-    })
-  }
-
-  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] =
-    startServers(port, service) >>= {
-      case (servers, shutdown) =>
-        (openBrowser(port).whenM(openClient) *>
-          stdout("Press Enter to stop.") <*
-          Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdown.unsafePerformSync)) <*
-          servers.run) // We need to run the servers in order to make sure everything is cleaned up properly
-    }
 }

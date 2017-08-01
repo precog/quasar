@@ -2,15 +2,15 @@
   "name": "population of Boulder-like towns",
 
   "backends": {
-      "mongodb_q_3_2": "pending",
-      "postgresql": "pending"
+        "mimir":"ignoreFieldOrder"
   },
 
   "data": "zips.data",
 
   "query": "select city, state, sum(pop) as totalPop from zips where city like \"BOULDER%\" group by city, state",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "city": "BOULDER",          "state": "CO", "totalPop": 108968 },

@@ -21,6 +21,7 @@ import quasar.Data
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fs._
+import quasar.sql.SqlStringContext
 
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -29,7 +30,7 @@ import scalaz.stream.Process
 
 final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
-  def multiFormatFileSystemShould(js: FileSystem ~> Task, xml: FileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: BackendEffect ~> Task, xml: BackendEffect ~> Task) = {
     "Querying directory paths" >> {
       "results in a dataset comprised of immediate child documents" >> {
         val loc: ADir = rootDir </> dir("childdocs")
@@ -47,7 +48,7 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
         // NB: We left shift here to get the flattend set of documents as the
         //     root of each file is an array of data.
-        val lp   = fullCompileExp("select (*)[*] from `/childdocs`")
+        val lp   = fullCompileExp(sqlE"select (*)[*] from `/childdocs`")
         val eval = query.evaluate(lp) translate dropPhases
 
         (setup.liftM[Process] *> eval)
@@ -81,7 +82,7 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
           case (n, o) => write.saveThese(loc </> file1(n), Vector(o)).void
         }
 
-        val lp   = fullCompileExp("select (*)[*] from `/onlyfmt`")
+        val lp   = fullCompileExp(sqlE"select (*)[*] from `/onlyfmt`")
         val eval = query.evaluate(lp) translate dropPhases
 
         val loadAndQueryJs =

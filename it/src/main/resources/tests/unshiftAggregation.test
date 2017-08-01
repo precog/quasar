@@ -1,22 +1,21 @@
 {
     "name": "unshift aggregation",
-    "NB": "Couchbase skipped due to different ordering of pop array. Enable once group contents ordering is possible.",
+    "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
     "backends": {
-        "couchbase":  "skip",
-        "postgresql": "pending"
+        "couchbase":  "pending",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"pendingIgnoreFieldOrder",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
+        "mongodb_q_3_2": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [
-      "couchbase",
-      "marklogic_json",
-      "mongodb_2_6",
-      "mongodb_3_0",
-      "mongodb_read_only",
-      "mongodb_3_2",
-      "mongodb_q_3_2"
-    ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "state": "AK", "city": "ANCHORAGE",   "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116] },
         { "state": "AK", "city": "KETCHIKAN",   "pop": [13886, 422]                                                          },

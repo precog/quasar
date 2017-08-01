@@ -1,4 +1,4 @@
-[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+Ï[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -15,7 +15,7 @@ Quasar is an open source NoSQL analytics engine that can be used as a library or
 
 SQL² is the dialect of SQL that Quasar understands.
 
-SQL² is a superset of standard SQL. Therefore, in the following documentation SQL² will be used interchangeably with SQL.
+In the following documentation SQL² will be used interchangeably with SQL.
 
 See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
@@ -46,41 +46,64 @@ To compile the project and run tests, first clone the quasar repo and then execu
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-Running the full test suite can be done in two ways:
+Running the full test suite can be done using docker containers for various backends:
 
-##### Testing option 1 (prerequisite: docker)
+##### Full Testing (prerequisite: docker and docker-compose)
 
-A docker container running mongodb operates for the duration of the test run.
+In order to run integration tests for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
 
-```bash
-./bin/full-it-tests.sh
-```
+Of particular interest are the following two scripts:
 
-##### Testing option 2
+  1. `docker/scripts/setupContainers`
+  2. `docker/scripts/assembleTestingConf`
 
-In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
-you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
-allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
-instructions that can be found there.
-
-Once we have a MongoDB instance handy, we need to configure the integration tests
-in order to inform Quasar about where to find the backends to test.
-
-Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
+Quasar supports the following datastores:
 
 ```
-mongodb_3_2="mongodb://<mongoURL>"
-mongodb_3_0="mongodb://<mongoURL>"
-mongodb_2_6="mongodb://<mongoURL>"
+quasar_mongodb_2_6
+quasar_mongodb_3_0
+quasar_mongodb_read_only
+quasar_mongodb_3_2
+quasar_mongodb_3_4
+quasar_metastore
+quasar_marklogic_xml
+quasar_marklogic_json
+quasar_couchbase
 ```
 
-where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
-something like `localhost:27017` for a local installation. This means the integration tests will be run against
-both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
-tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported filesystems.
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
+if you wanted to run integration tests with mongo, marklogic, and couchbase you would use:
+
+```
+./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_marklogic_xml,quasar_couchbase
+```
+
+Note: `quasar_metastore` is always needed to run integration tests.
+
+This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
+
+Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test.
+This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
+file based on the currently running containerizd backends using the following command:
+
+```
+./assembleTestingConf -a
+```
+
+After running this command your `testing.conf` file should look similar to this:
+
+```
+> cat it/testing.conf
+postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
+couchbase="couchbase://192.168.99.101/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15"
+marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
+mongodb_3_0="mongodb://192.168.99.101:27019"
+```
+
+IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
+You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
+
 
 #### REPL JAR
 
@@ -96,6 +119,32 @@ To run the JAR, execute the following command:
 
 ```bash
 java -jar [<path to jar>] [-c <config file>]
+```
+
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
+
+Once you have a running metastore you can start the web api service with [these](#web-jar) instructions and issue curl commands 
+of the following format to create new mount points.
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
+```
+The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
+
+| mountKey        | protocol         | uri                                    |
+|-----------------|------------------|----------------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
+
+See [here](#get-mountfspath) for more details on the mount web api service.
+
+For example, to create a couchbase mount point, issue a `curl` command like:
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
 ```
 
 #### Web JAR
@@ -114,9 +163,12 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
+
+
 ### Configure
 
-The various JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
+The various REPL JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
 
 The JSON configuration file must have the following format:
 
@@ -125,38 +177,66 @@ The JSON configuration file must have the following format:
   "server": {
     "port": 8080
   },
-
-  "mountings": {
-    "/": {
-      "mongodb": {
-        "connectionUri": "mongodb://<user>:<pass>@<host>:<port>/<dbname>"
-      }
+  "metastore": {
+    "database": {
+      <metastore_config>
     }
   }
 }
 ```
 
-One or more mountings may be included, and each must have a unique path (above, `/`), which determines where in the filesystem the database(s) contained by the mounting will appear.
+#### Metadata Store
 
-#### Database mounts
+Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) (9.5+) databases are supported.
+
+To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
+
+If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
+
+An example H2 configuration would look something like
+```json
+"h2": {
+  "location": "`database_url`"
+}
+```
+
+Where `database_url` can be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
+
+A PostgreSQL configuration looks something like
+```json
+"postgresql": {
+  "host": "localhost",
+  "port": 8087,
+  "database": "<database name>",
+  "userName": "<database user>",
+  "password": "<password for database user>",
+  "parameters": <an optional JSON object of parameter key:value pairs>
+}
+```
+
+The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL. One example for a value of the `parameters` object may be a `loglevel`:
+
+```json
+"parameters": {
+  "loglevel": 1
+}
+```
+
+#### Initializing and updating Schema
+
+Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a web or repl quasar jar.
+
+If mounts are already defined in the config file, initialization will migrate those to the metadata store.
+
+### Database mounts
 
 If the mount's key is "mongodb", then the `connectionUri` is a standard [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/). Only the primary host is required to be present, however in most cases a database name should be specified as well. Additional hosts and options may be included as specified in the linked documentation.
 
-For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the configuration looks like this:
-```json
-  "mountings": {
-    "/local/": {
-      "mongodb": {
-        "connectionUri": "mongodb://localhost/test"
-      }
-    }
-  }
-```
-Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
+For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the `connectionUri` is `mongodb://localhost/test`. Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
-##### MongoDB
+#### MongoDB
 
 To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
 - `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
@@ -166,18 +246,18 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
-##### Couchbase
+#### Couchbase
 
 To connect to Couchbase use the following `connectionUri` format:
 
-`couchbase://<host>[:<port>]?username=<username>&password=<password>[&queryTimeoutSeconds=<seconds>]`
+`couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]`
 
 Prerequisites
 - Couchbase Server 4.5.1 or greater
 - A "default" bucket with anonymous access
-- Documents must have a "type" field to be listed
+- Documents must have a `docTypeKey` field to be listed
 - Primary index on queried buckets
-- Secondary index on "type" field for queried buckets
+- Secondary index on `docTypeKey` field for queried buckets
 - Additional indices and tuning as recommended by Couchbase for proper N1QL performance
 
 Known Limitations
@@ -185,15 +265,21 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-##### HDFS using Apache Spark
+#### Apache Spark
 
-To connect to HDFS using Apache Spark use the following `connectionUri` format:
+To connect to Apache Spark and use either local files or HDFS to query data use the following `connectionUri`:
 
-`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+with local files:
 
-e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+`spark_local=\"/path/to/data/my.data\"`
 
-##### MarkLogic
+with HDFS:
+
+`spark://<host>:<port>?rootPath=<rootPath>&hdfsUri=<hdfsUri>[&spark_configuration=spark_configuration_value]`
+
+For example: "spark://10.0.0.4:7077?hdfsUri=hdfs%3A%2F%2F10.0.0.3%3A9000&rootPath=/data&spark.executor.memory=4g&spark.eventLog.enabled=true"
+
+#### MarkLogic
 
 To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
@@ -205,13 +291,11 @@ If a root directory path is specified, all operations and queries within the mou
 
 Prerequisites
 - MarkLogic 8.0+
-- Documents must to be organized under directories to be found by Quasar.
+- The URI lexicon must be enabled.
 - Namespaces used in queries must be defined on the server.
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
-[Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
-- Field aliases when working with XML must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- "Default" numeric field names are prefixed with an underscore ("_") when working with XML in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+[Known Limitations](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+marklogic+label%3A%22topic%3A+MarkLogic%22)
 - It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
 - Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
@@ -221,39 +305,48 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
 - XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
   - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
   - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
-  - Element attributes are serialized to an object at the `_attributes` key.
-  - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
+  - Element attributes are serialized to an object at the `_xml.attributes` key.
+  - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
+- Fields that are not valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
 
-#### View mounts
+  ```xml
+  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
+  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
+  ```
+
+
+### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
 
-For example, given the above MongoDB mount, an additional view could be defined in this way:
-
-```json
-  "mountings": {
-    ...,
-    "/simpleZips": {
-      "view": {
-        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
-      }
-    }
-  }
-```
+For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
 
+### Module mounts
+
+If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.
+
+A module function can be thought of as a parameterized view, i.e. a view with "holes" that can be filled dynamically.
+
+The value of a module mount is simply the SQL string which will be parsed into a list of SQL Statements.
+
+To create a new module one would send a json blob similar to this one to the mount endpoint:
+
+```json
+{ "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
+```
+
+See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
+
+Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
+
 #### Build Quasar for Apache Spark
 
-Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
-
-1. Build sparkcore.jar
+In order for Quasar to work with Apache Spark based connectors (like `spark-hdfs` or `spark-local`) you need to build `sparkcore.jar` and move it to same location where your `quasar-web.jar` is placed.
+To build sparkcore.jar:
 
 ```./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly```
-
-2. Set environment variable QUASAR_HOME
-
-QUASAR_HOME must point to a folder holding `sparkcore.jar`
 
 ## REPL Usage
 
@@ -448,6 +541,7 @@ Returns a Json object with the following shape:
   "inputs": [<filePath>, ...],
   "physicalPlan": "Description of physical plan"
 }
+```
 
 where `inputs` is a field containing a list of files that are referenced by the query.
 where `physicalPlan` is a string description of the physical plan that would be executed by this query. `null` if no physical plan is required in order to execute this query. A query may not need a physical plan in order to be executed if the query is "constant", that is that no data needs to be read from a backend.
@@ -529,6 +623,172 @@ Removes all data and views at the specified path. Single files are deleted atomi
 Moves data from one path to another within the same backend. The new path must
 be provided in the `Destination` request header. Single files are moved atomically.
 
+### GET /invoke/fs/[path]
+
+Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
+
+### GET /schema/fs/[path]?q=[query]&var.[foo]=[value]&arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
+
+Where `path` is a directory path, `query` is a SQL² query and `size` is a positive integer. Returns a schema document, summarizing the results of the query. Free variables in the query may be bound using parameters like `var.foo=value` where `foo` is the variable to be bound and `value` is what it should be bound to.
+
+For example, given query results like:
+
+```json
+{"_id":"01001","city":"AGAWAM","loc":[-72.622739,42.070206],"pop":15338,"state":"MA"}
+{"_id":"01002","city":"CUSHMAN","loc":[-72.51565,42.377017],"pop":36963,"state":"MA"}
+{"_id":"01005","city":"BARRE","loc":[-72.108354,42.409698],"pop":4546,"state":"MA"}
+{"_id":"01007","city":"BELCHERTOWN","loc":[-72.410953,42.275103],"pop":10579,"state":"MA"}
+{"_id":"01008","city":"BLANDFORD","loc":[-72.936114,42.182949],"pop":1240,"state":"MA"}
+{"_id":"01010","city":"BRIMFIELD","loc":[-72.188455,42.116543],"pop":3706,"state":"MA"}
+{"_id":"01011","city":"CHESTER","loc":[-72.988761,42.279421],"pop":1688,"state":"MA"}
+{"_id":"01012","city":"CHESTERFIELD","loc":[-72.833309,42.38167],"pop":177,"state":"MA"}
+{"_id":"01013","city":"CHICOPEE","loc":[-72.607962,42.162046],"pop":23396,"state":"MA"}
+{"_id":"01020","city":"CHICOPEE","loc":[-72.576142,42.176443],"pop":31495,"state":"MA"}
+```
+
+a schema document might look like
+
+```json
+{
+  "measure" : {
+    "count" : 1000.0,
+    "minLength" : 5.0,
+    "maxLength" : 5.0
+  },
+  "structure" : {
+    "type" : "map",
+    "of" : {
+      "city" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "ABBEVILLE",
+          "max" : "YOUNGSVILLE",
+          "minLength" : 3.0,
+          "maxLength" : 16.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "state" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "AK",
+          "max" : "WY",
+          "minLength" : 2.0,
+          "maxLength" : 2.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "pop" : {
+        "measure" : {
+          "count" : 1000.0,
+          "distribution" : {
+            "mean" : 8560.410999999996,
+            "variance" : 153498226.66073978,
+            "skewness" : 2.1932119902818976,
+            "kurtosis" : 8.145272163842572
+          },
+          "min" : 0,
+          "max" : 83158
+        },
+        "structure" : {
+          "type" : "integer"
+        }
+      },
+      "_id" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "01342",
+          "max" : "99744",
+          "minLength" : 5.0,
+          "maxLength" : 5.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "loc" : {
+        "measure" : {
+          "count" : 1000.0,
+          "minLength" : 2.0,
+          "maxLength" : 2.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : [
+            {
+              "measure" : {
+                "count" : 1000.0,
+                "distribution" : {
+                  "mean" : -90.75566306399999,
+                  "variance" : 215.8880504119835,
+                  "skewness" : -1.3085274289304345,
+                  "kurtosis" : 5.671392237003005
+                },
+                "min" : -170.293408,
+                "max" : -68.031686
+              },
+              "structure" : {
+                "type" : "decimal"
+              }
+            },
+            {
+              "measure" : {
+                "count" : 1000.0,
+                "distribution" : {
+                  "mean" : 39.02678901400003,
+                  "variance" : 26.66316872053294,
+                  "skewness" : -0.030243876777278023,
+                  "kurtosis" : 4.447095871155061
+                },
+                "min" : 20.027748,
+                "max" : 64.840238
+              },
+              "structure" : {
+                "type" : "decimal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+Schema documents represent an estimate of the structure of the given dataset and are generated from a random sample of the data. Each node of the resulting structure is annotated with the frequency the node was observed and the bounds of the observed values, when available (NB: bounds should be seen as a reference and not taken as the true, global maximum or minimum values). Additionally, for numeric values, statistical distribution information is included.
+
+When two documents differ in structure, their differences are accumulated in a union. Basic frequency information is available for the union and more specific annotations are preserved as much as possible for the various members.
+
+The `arrayMaxLength`, `mapMaxSize`, `stringMaxLength` and `unionMaxSize` parameters allow for control over the amount of information contained in the returned schema by limiting the size of various structures in the result. Structures that exceed the various size thresholds are compressed using various heuristics depending on the structure involved.
+
 ### GET /mount/fs/[path]
 
 Retrieves the configuration for the mount point at the provided path. In the case of MongoDB, the response will look like
@@ -555,6 +815,16 @@ Deletes an existing mount point, if any exists at the given path. If no such mou
 
 Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount. Mounts that are nested within the mount being moved (i.e. views) are moved along with it.
 
+### GET /server/info
+
+Returns information about this server. Name and app version.
+
+Example response:
+
+```json
+{"name":"Quasar","version":"19.1.2"}
+```
+
 ### PUT /server/port
 
 Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
@@ -563,6 +833,44 @@ Takes a port number in the body, and attempts to restart the server on that port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
 
+### GET /metastore
+
+Retrieve the connection information of the current metastore in use
+
+An example response:
+
+```json
+{
+    "h2": {
+        "location": "mem"
+    }
+}
+
+```
+
+### PUT /metastore
+
+Attempts to change the metastore using the supplied connection information
+
+An optional `initialize` query parameter can be supplied so that Quasar automatically initializes the new
+metastore after a successful connection if it has not already been initialized. If this parameter is omitted
+and the new metastore has not been initialized, the request will fail with a message to the effect that the
+new metastore has not been initialized.
+
+An example request body:
+
+```json
+{
+    "postgresql": {
+        "host": "localhost",
+        "port": 9876,
+        "database": "bob",
+        "password": "123456"
+    }
+}
+```
+
+Returns `200 OK` if the change was performed successfully otherwise returns a `400` with a message body explaining what went wrong.
 
 ## Error Responses
 

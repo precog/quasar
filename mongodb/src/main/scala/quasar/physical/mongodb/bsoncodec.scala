@@ -155,7 +155,8 @@ object BsonCodec {
     case Bson.Null             => C.inj(ejson.Null()).right
     case Bson.Bool(value)      => C.inj(ejson.Bool(value)).right
     case Bson.Text(value)      => C.inj(ejson.Str(value)).right
-    case Bson.Dec(value)       => C.inj(ejson.Dec(value)).right
+    case Bson.Dec(value) if (!value.isNaN && !value.isInfinity)
+                               => C.inj(ejson.Dec(value)).right
     case Bson.Int32(value)     => E.inj(ejson.Int(value)).right
     case Bson.Int64(value)     => E.inj(ejson.Int(value)).right
     case Bson.Date(value)      =>

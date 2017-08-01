@@ -1,11 +1,9 @@
 {
     "name": "match like complement",
-    "backends": {
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "select city from zips where city not like \"%E%\"",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": ["AGAWAM",
                  "CUSHMAN",
                  "BLANDFORD",

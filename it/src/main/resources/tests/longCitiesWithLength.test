@@ -1,14 +1,14 @@
 {
     "name": "long city names in Colorado",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
+        "couchbase":  "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
+        "mongodb_q_3_2": "pending"
     },
     "data": "largeZips.data",
     "query": "select distinct city, length(city) as len from largeZips where state=\"CO\" and length(city) >= 10",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "GRAND LAKE",       "len": 10 },
                  { "city": "MONTE VISTA",      "len": 11 },
                  { "city": "FORT GARLAND",     "len": 12 },

@@ -1,0 +1,24 @@
+{
+    "name": "derived function floor",
+    "backends": {
+      "couchbase": "ignoreFieldOrder",
+      "mimir": "pendingIgnoreFieldOrder"
+    },
+    "data": "divide.data",
+    "query": "select nr, floor(val3) as floor1 from divide",
+    "predicate": "exactly",
+    "expected": [
+        { "nr":  1, "floor1": 1 },
+        { "nr":  2, "floor1": 1 },
+        { "nr":  3, "floor1": 2 },
+        { "nr":  4, "floor1": 4 },
+        { "nr":  5, "floor1": -1 },
+        { "nr":  6, "floor1": -2 },
+        { "nr":  7, "floor1": -2 },
+        { "nr":  8, "floor1": -2 },
+        { "nr":  9, "floor1": 4 },
+        { "nr": 10, "floor1": 0 },
+        { "nr": 11, "floor1": -2 },
+        { "nr": 12, "floor1": -10 }
+    ]
+}

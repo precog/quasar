@@ -1,11 +1,11 @@
 {
     "name": "filtered distinct of one field",
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mongodb_q_3_2": "pending"
     },
     "data": "olympics.data",
     "query": "select distinct discipline from olympics where event like \"%pursuit\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Speed skating", "Biathlon", "Cross Country S"]
 }

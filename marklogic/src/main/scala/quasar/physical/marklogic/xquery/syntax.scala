@@ -17,8 +17,6 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.{xs => xxs}
 
 import scala.math.Integral
@@ -27,6 +25,8 @@ import scala.xml.Utility
 import eu.timepit.refined.api.Refined
 import scalaz._, Scalaz._
 import scalaz.std.iterable._
+import xml.name._
+import xml.name.validate._
 
 object syntax {
   import FunctionDecl._
@@ -54,7 +54,7 @@ object syntax {
   }
 
   def $(bindingName: String Refined IsNCName): BindingName =
-    BindingName(QName.local(NCName(bindingName)))
+    BindingName(QName.unprefixed(NCName(bindingName)))
 
   // NB: Not ideal, but only used for syntatic purposes. A proper encoding of
   //     the XQuery AST should obviate this.

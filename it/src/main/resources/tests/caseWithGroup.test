@@ -2,11 +2,11 @@
     "name": "combine case (3-arg expr) with group by",
 
     "backends": {
-        "postgresql": "pending",
-        "marklogic_json":  "skip",
-        "marklogic_xml":   "skip",
+        "mimir":"pendingIgnoreFieldOrder",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
         "mongodb_q_3_2": "pending",
-        "couchbase":  "skip",
+        "couchbase": "pending",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
@@ -27,9 +27,7 @@
                 group by state
                 order by funnel, state",
 
-    "note": "should be `equalsInitial`, with a separate `containsAtLeast` with
-             the IL entry (and perhaps others).",
-    "predicate": "containsAtLeast",
+    "predicate": "initial",
     "expected": [{ "abbr": "CO", "quantity":  414, "funnel":   1 },
                  { "abbr": "WA", "quantity":  484, "funnel":   2 },
                  { "abbr": "PA", "quantity": 1458, "funnel":   3 },

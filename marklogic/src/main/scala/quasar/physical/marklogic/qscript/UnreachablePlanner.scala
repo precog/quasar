@@ -18,14 +18,16 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef.String
 import quasar.fp.ski.κ
+import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
 
-import matryoshka.AlgebraM
+import matryoshka._
+import scalaz._
 
-private[qscript] final class UnreachablePlanner[F[_]: MonadPlanErr, FMT, G[_]](
+private[qscript] final class UnreachablePlanner[M[_]: MonadPlanErr, FMT, F[_]](
   name: String
-) extends Planner[F, FMT, G] {
+) extends Planner[M, FMT, F] {
 
-  val plan: AlgebraM[F, G, XQuery] =
-    κ(MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(name)))
+  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[M, F, Search[Q] \/ XQuery] =
+    κ(MonadPlanErr[M].raiseError(MarkLogicPlannerError.unreachable(name)))
 }

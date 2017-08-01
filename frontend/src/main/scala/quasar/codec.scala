@@ -81,6 +81,7 @@ object DataCodec {
     val ObjKey = "$obj"
     val IdKey = "$oid"
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def encode(data: Data): Option[Json] = {
       import Data._
       data match {
@@ -107,6 +108,7 @@ object DataCodec {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def decode(json: Json): DataEncodingError \/ Data =
       json.fold(
         \/-(Data.Null),
@@ -142,6 +144,7 @@ object DataCodec {
   }
 
   val Readable = new DataCodec {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def encode(data: Data): Option[Json] = {
       import Data._
       data match {
@@ -171,6 +174,7 @@ object DataCodec {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def decode(json: Json): DataEncodingError \/ Data =
       json.fold(
         \/-(Data.Null),
@@ -200,7 +204,7 @@ object DataCodec {
   // - Data.NA
   // NB: For Readable, this does not account for Str values that will be confused with
   // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
-  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+  @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
   def representable(data: Data, codec: DataCodec): Boolean = data match {
     case (Data.Binary(_) | Data.Id(_)) if codec == Readable => false
     case Data.Set(_) | Data.NA                              => false

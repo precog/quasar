@@ -25,6 +25,7 @@ import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
+import quasar.fp.free._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -41,20 +42,24 @@ object queryfile {
       .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit 
-    s0: Task :<: S
-    ): Free[S, Unit] = lift(Task.delay {
+  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
+    S: Task :<: S
+  ): Free[S, Unit] = lift(Task.delay {
     val ioFile = new File(posixCodec.printPath(out))
     val pw = new PrintWriter(new FileOutputStream(ioFile, false))
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
     pw.close()
   }).into[S]
 
-  def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] = lift(Task.delay {
+  def fileExists[S[_]](f: AFile)(implicit
+    S: Task :<: S
+  ): Free[S, Boolean] = lift(Task.delay {
     Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
   }).into[S]
 
-  def listContents[S[_]](d: ADir)(implicit s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] = lift(Task.delay {
+  def listContents[S[_]](d: ADir)(implicit
+    S: Task :<: S
+  ): EitherT[Free[S, ?], FileSystemError, Set[PathSegment]] = EitherT(lift(Task.delay {
     val directory = new File(posixCodec.unsafePrintPath(d))
     if(directory.exists()) {
       \/.fromTryCatchNonFatal{
@@ -68,9 +73,11 @@ object queryfile {
           pathErr(invalidPath(d, e.getMessage()))
       }
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-  }).into[S]
+  }).into[S])
 
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit s0: Task :<: S): Input[S] = Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+  def input[S[_]](implicit
+    S: Task :<: S
+  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 }

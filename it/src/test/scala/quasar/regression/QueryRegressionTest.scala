@@ -42,7 +42,7 @@ import scala.util.matching.Regex
 import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data.Fix
-import org.specs2.execute._
+import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
@@ -128,7 +128,7 @@ abstract class QueryRegressionTest[S[_]](
     setup: Run,
     run: Run
   ): Fragment = {
-    def runTest: Result = {
+    def runTest: execute.Result = {
       val data = testQuery(
         test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
         test.query,
@@ -142,17 +142,20 @@ abstract class QueryRegressionTest[S[_]](
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
-        case Some(SkipDirective.Skip)    => skipped
-        case Some(SkipDirective.SkipCI)  =>
-          BuildInfo.isCIBuild.fold(Skipped("(skipped during CI build)"), runTest)
-        case Some(SkipDirective.Pending) =>
+        case Some(TestDirective.Skip)    => skipped
+        case Some(TestDirective.SkipCI)  =>
+          BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
+        case Some(TestDirective.Timeout)  =>
+          // NB: To locally skip tests that time out, make `Skipped` unconditional.
+          BuildInfo.isCIBuild.fold(
+            execute.Skipped("(skipped because it times out)"),
+            runTest)
+        case Some(TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder) =>
           if (BuildInfo.coverageEnabled)
-            Skipped("(pending example skipped during coverage run)")
-          else if (BuildInfo.isCIBuild)
-            Skipped("(pending example skipped during CI build)")
+            execute.Skipped("(pending example skipped during coverage run)")
           else
             runTest.pendingUntilFixed
-        case None                        => runTest
+        case _                           => runTest
       }
     }
   }
@@ -201,7 +204,7 @@ abstract class QueryRegressionTest[S[_]](
     act: Process[CompExecM, Data],
     run: Run,
     backendName: BackendName
-  ): Task[Result] = {
+  ): Task[execute.Result] = {
 
     type H1[A] = PhaseResultT[Task, A]
     type H2[A] = SemanticErrsT[H1, A]
@@ -218,15 +221,42 @@ abstract class QueryRegressionTest[S[_]](
     def deleteFields: Json => Json =
       _.withObject(obj => exp.ignoredFields.foldLeft(obj)(_ - _))
 
-    exp.predicate(
-      exp.rows.toVector,
-      act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
-      exp.ignoreFieldOrderBackend match {
-        case IgnoreFieldOrderAllBackends            =>
-          FieldOrderIgnored
-        case IgnoreFieldOrderBackends(backendNames) =>
-          backendNames.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved)
-      })
+    val result =
+      exp.predicate(
+        exp.rows.toVector,
+        act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
+        // TODO: Error if a backend ignores field order when the query already does.
+        if (exp.ignoreFieldOrder) OrderIgnored
+        else exp.backends.get(backendName) match {
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder) =>
+            OrderIgnored
+          case _ =>
+            OrderPreserved
+        },
+        if (exp.ignoreResultOrder) OrderIgnored
+        else exp.backends.get(backendName) match {
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder) =>
+            OrderIgnored
+          case _ =>
+            OrderPreserved
+        })
+
+    exp.backends.get(backendName) match {
+        case Some(TestDirective.Timeout) => result.map {
+          case execute.Success(_, _) =>
+            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
+          case execute.Failure(m, _, _, _) =>
+            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
+          case x => x
+        }.handle {
+          case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
+          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
+        }
+      case _ => result.handle {
+        case e: java.util.concurrent.TimeoutException =>
+          execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
+      }
+    }
   }
 
   /** Parse and execute the given query, returning a stream of results. */
@@ -239,11 +269,11 @@ abstract class QueryRegressionTest[S[_]](
       toCompExec compose injectTask
 
     val parseTask: Task[Fix[Sql]] =
-      sql.fixParser.parse(Query(qry))
+      sql.fixParser.parseExpr(Query(qry))
         .fold(e => Task.fail(new RuntimeException(e.message)),
         _.mkPathsAbsolute(loc).point[Task])
 
-    f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars), loc))
+    Process.await(f(parseTask))(queryResults(_, Variables.fromMap(vars), loc))
   }
 
   /** Load the contents of the test data file into the filesytem under test at
@@ -338,29 +368,29 @@ abstract class QueryRegressionTest[S[_]](
 object QueryRegressionTest {
   lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
-  val externalFS: Task[IList[SupportedFs[FileSystemIO]]] =
+  val externalFS: Task[IList[SupportedFs[BackendEffectIO]]] =
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
       hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
-                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: FileSystemIO ~> Task =>
+                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: BackendEffectIO ~> Task =>
                     SupportedFs(
                       sb.ref,
                       ut.copy(testInterp = f)
-                        .contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
+                        .contramapF(chroot.fileSystem[BackendEffectIO](ut.testDir))
                         .some,
                       ut.some)
                   }
                 ).getOrElse(sb.point[Task]))
     } yield hfsUts
 
-  private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
+  private def hierarchicalFSIO(mnt: ADir, f: BackendEffectIO ~> Task): Task[BackendEffectIO ~> Task] =
     interpretHfsIO map { hfs =>
-      val interpFS = f compose injectNT[FileSystem, FileSystemIO]
+      val interpFS = f compose injectNT[BackendEffect, BackendEffectIO]
 
-      val g: FileSystem ~> Free[HfsIO, ?] =
-        flatMapSNT(hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
-          .compose(chroot.fileSystem[FileSystem](mnt))
+      val g: BackendEffect ~> Free[HfsIO, ?] =
+        flatMapSNT(hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
+          .compose(chroot.backendEffect[BackendEffect](mnt))
 
       NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)
     }

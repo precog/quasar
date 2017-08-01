@@ -72,11 +72,8 @@ object Timing {
     * with ~10ms resolution and elapsed times accurate to probably ~1 microsecond.
     */
   val toTask: Timing ~> Task =
-    new (Timing ~> Task) {
-      def apply[A](t: Timing[A]): Task[A] =
-        t match {
-          case Timestamp => Task.delay { Instant.now }
-          case Nanos     => Task.delay { java.lang.System.nanoTime }
-        }
+    λ[Timing ~> Task]{
+      case Timestamp => Task.delay { Instant.now }
+      case Nanos     => Task.delay { java.lang.System.nanoTime }
     }
 }

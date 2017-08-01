@@ -19,6 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.BackendCapability
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.foldable._
 import quasar.fp._
 
 import monocle.std.{disjunction => D}
@@ -26,16 +27,16 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class WriteFilesSpec extends FileSystemTest[FileSystem](
+class WriteFilesSpec extends FileSystemTest[BackendEffect](
   FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._
 
-  val query  = QueryFile.Ops[FileSystem]
-  val read   = ReadFile.Ops[FileSystem]
-  val write  = WriteFile.Ops[FileSystem]
-  val manage = ManageFile.Ops[FileSystem]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   val writesPrefix: ADir = rootDir </> dir("w")
 

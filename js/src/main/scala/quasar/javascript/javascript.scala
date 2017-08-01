@@ -130,6 +130,7 @@ private object JavascriptPrinter {
     case _ => ast
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def print(ast: Js, indent: Int): String = {
     def ind(c: Int) = " " * (indent + c)
     def p(ast: Js) = print(ast, indent)

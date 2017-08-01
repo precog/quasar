@@ -17,13 +17,13 @@
 package quasar.physical.sparkcore.fs
 
 import slamdata.Predef.{Eq => _, _}
-import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
 import quasar.{Data, DataCodec}
 import quasar.Planner._
+import quasar.common.PrimaryType
 import quasar.fp.ski._
-import quasar.qscript._, MapFuncs._
+import quasar.qscript._, MapFuncsCore._
 import quasar.std.{DateLib, StringLib}
+import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
@@ -38,11 +38,11 @@ object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 
-  def changeFreeMap[T[_[_]]: RecursiveT](f: FreeMap[T])
+  def changeFreeMap[T[_[_]]: BirecursiveT](f: FreeMap[T])
       : PlannerError \/ (Data => Data) =
     f.cataM(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
 
-  def changeJoinFunc[T[_[_]]: RecursiveT](f: JoinFunc[T])
+  def changeJoinFunc[T[_[_]]: BirecursiveT](f: JoinFunc[T])
       : PlannerError \/ ((Data, Data) => Data) =
     f.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
       (js: JoinSide) => (js match {
@@ -51,16 +51,25 @@ object CoreMap extends Serializable {
       }).right,
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
-  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
+  def changeReduceFunc[T[_[_]]: BirecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
       : PlannerError \/ ((Data, List[Data]) => Data) =
     f.cataM(interpretM(
       _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
       change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
 
-  def change[T[_[_]]: RecursiveT, A]
-      : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
+  def change[T[_[_]]: BirecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] =
+    _.run.fold(changeCore, changeDerived)
+
+  def changeDerived[T[_[_]]: BirecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFuncDerived[T, ?], A => Data] =
+    ExpandMapFunc.expand(changeCore, κ(None))
+
+  def changeCore[T[_[_]]: RecursiveT, A]
+      : AlgebraM[PlannerError \/ ?, MapFuncCore[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
     case Undefined() => κ(undefined).right
+    case JoinSideName(n) => UnexpectedJoinSide(n).left
 
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)
@@ -253,6 +262,8 @@ object CoreMap extends Serializable {
     }).right
     case Or(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
+      case (Data.NA, b) => b
+      case (a, Data.NA) => a
       case _ => undefined
     }).right
     case Between(f1, f2, f3) => ((x: A) => between(f1(x), f2(x), f3(x))).right
@@ -328,6 +339,8 @@ object CoreMap extends Serializable {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2, ff3) => f2.right
+    case TypeOf(f) =>
+      (f >>> ((d: Data) => d.dataType.toPrimaryType.fold(Data.NA : Data)(p => Data.Str(PrimaryType.name(p))))).right[PlannerError]
     case _ => InternalError.fromMsg("not implemented").left
   }
 
@@ -366,21 +379,23 @@ object CoreMap extends Serializable {
   }
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a / b)
+    case (_, Data.Dec(b)) if b === BigDecimal(0) => Data.NA
+    case (_, Data.Int(b)) if b === 0 => Data.NA
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(b))
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Dec(BigDecimal(a) / BigDecimal(b))
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
   }
 
-  // TODO other cases?
+  // TODO interval cases?
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
-    case (Data.Int(a), Data.Dec(b)) => ???
-    case (Data.Dec(a), Data.Int(b)) => ???
-    case (Data.Dec(a), Data.Dec(b)) => ???
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a).remainder(b))
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a.remainder(BigDecimal(b)))
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a.remainder(b))
     case (Data.Interval(a), Data.Int(b)) => ???
     case (Data.Interval(a), Data.Dec(b)) => ???
     case _ => undefined

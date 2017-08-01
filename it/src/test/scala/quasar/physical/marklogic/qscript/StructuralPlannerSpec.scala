@@ -19,7 +19,6 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.{Data, DataArbitrary}, DataArbitrary.dataShrink
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
@@ -34,11 +33,10 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
 
 abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
-  implicit SP: StructuralPlanner[F, FMT], DP: Planner[F, FMT, Const[Data, ?]]
+  implicit SP: StructuralPlanner[F, FMT]
 ) extends XQuerySpec {
 
   def toM: F ~> M
-  def asMapKey(qn: QName): F[XQuery]
 
   implicit val scalacheckParams = Parameters(maxSize = 10)
 
@@ -47,7 +45,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
 
   implicit val arbitraryData: Arbitrary[Data] = {
-    val genKey = Gen.alphaChar flatMap (c => Gen.alphaStr map (c.toString + _))
+    val genKey = Gen.alphaNumChar flatMap (c => Gen.alphaNumStr map (c.toString + _))
     val genDbl = Gen.choose(-1000.0, 1000.0)
 
     val secondsInDay: Long        = 24L * 60 * 60
@@ -80,10 +78,41 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
 
   val emptyArr: Data              = Data._arr(List())
   val emptyObj: Data              = Data._obj(ListMap())
-  val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
+  val lit     : Data => F[XQuery] = DataPlanner[F, FMT](_)
 
-  def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
-    xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
+
+  case class StrKey(asString: String)
+  val genStrKey: Gen[StrKey] = (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _) map StrKey
+  implicit val arbGenStrKey: Arbitrary[StrKey] = Arbitrary(genStrKey)
+
+  case class MapEntry(key: String, value: Data)
+  implicit val arbMapEntry: Arbitrary[MapEntry] =
+    Arbitrary((genStrKey |@| arbitrary[Data])((key, value) => MapEntry(key.asString, value)))
+
+  case class TestCase(obj: ListMap[String, Data])
+
+  val genNonEmptyObj: Gen[ListMap[String, Data]] =
+    arbitrary[NonEmptyList[MapEntry]] map (nel => ListMap(nel.toList.map(me => (me.key, me.value)): _*))
+
+  implicit val arbNonEmptyObj: Arbitrary[TestCase] =
+    Arbitrary(genNonEmptyObj map TestCase)
+
+  // Generates a (key, obj) where key does not exist in obj
+  case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
+  implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
+    Arbitrary(for {
+      obj <- genNonEmptyObj
+      keys = obj.keys.toList
+      key <- Gen.oneOf(keys) map (_ + "foo")
+    } yield (WithoutKeyTestCase(key, obj - key)))
+
+  // Generates a (key, obj) where key exists in obj
+  case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
+  implicit val withKey: Arbitrary[WithKeyTestCase] =
+    Arbitrary(for {
+      obj <- genNonEmptyObj
+      key <- Gen.oneOf(obj.keys.toList)
+    } yield WithKeyTestCase(key, obj))
 
   xquerySpec(bn => s"Structural Planner (${bn.name})") { evalM =>
     val evalF = evalM.compose[F[XQuery]](toM(_))
@@ -173,87 +202,79 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     "leftShift" >> todo
 
     "objectDelete" >> {
-      val somekey = asMapKey(QName.local(NCName("somekey")))
+      "removes existing key from an object" >> prop { testCase: WithKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        val expectedObj = testCase.obj - testCase.key
 
-      "removes existing key from an object" >> prop { values: NonEmptyList[Data] =>
-        val entries = keyed(values).toList
-        val obj = Data._obj(ListMap(entries: _*))
-        val k0  = QName.local(NCName("k0"))
-        evalF((lit(obj) |@| asMapKey(k0))(SP.objectDelete).join) must resultIn(
-          Data._obj(ListMap(entries.tail: _*)))
+        evalF(lit(obj) >>= (SP.objectDelete(_, testCase.key.xs))) must resultIn(Data._obj(expectedObj))
       }
 
-      "identity when key not present in object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-        evalF((lit(obj) |@| somekey)(SP.objectDelete).join) must resultIn(obj)
+      "identity when key not present in object" >> prop { testCase: WithoutKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        evalF(lit(obj) >>= (SP.objectDelete(_, testCase.key.xs))) must resultIn(obj)
       }
 
-      "identity on empty object" >> {
-        evalF((lit(emptyObj) |@| somekey)(SP.objectDelete).join) must resultIn(emptyObj)
+      "identity on empty object" >> prop { key: StrKey =>
+        evalF((lit(emptyObj) |@| key.asString.xs.point[F])(SP.objectDelete).join) must resultIn(emptyObj)
       }
     }
 
     "objectInsert" >> {
-      val newKey  = QName.local(NCName("NEW_KEY"))
+      "adds new assoc to non-empty object" >> prop { (testCase: WithoutKeyTestCase, y: Data) =>
+        val res = evalF((lit(Data._obj(ListMap(testCase.obj.toList: _*))) |@| lit(y))(
+          (SP.objectInsert(_, testCase.key.xs, _))).join)
 
-      "adds new assoc to non-empty object" >> prop { (y: Data, ys: NonEmptyList[Data]) =>
-        val entries = keyed(ys)
-
-        val res = evalF((lit(Data._obj(ListMap(entries.toList: _*))) |@| asMapKey(newKey) |@| lit(y))(
-          SP.objectInsert).join)
-
-        res must resultIn(Data._obj(ListMap(((newKey.shows -> y) <:: entries).toList: _*)))
+        res must resultIn(Data._obj(testCase.obj + (testCase.key -> y)))
       }
 
-      "adds new assoc to empty object" >> prop { y: Data =>
-        val res = evalF((lit(emptyObj) |@| asMapKey(newKey) |@| lit(y))(SP.objectInsert).join)
-        res must resultIn(Data._obj(ListMap(newKey.shows -> y)))
+      "adds new assoc to empty object" >> prop { (key: StrKey, y: Data) =>
+        val res = evalF((lit(emptyObj) |@| key.asString.xs.point[F] |@| lit(y))(SP.objectInsert).join)
+        res must resultIn(Data._obj(ListMap(key.asString -> y)))
       }
     }
 
     "objectLookup" >> {
-      val notKey = asMapKey(QName.local(NCName("NOT_EXIST")))
+      "returns value for existing key" >> prop { testCase: WithKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        val expected = testCase.obj.get(testCase.key).get
 
-      "returns value for existing key" >> prop { values: NonEmptyList[Data] =>
-        val k0  = asMapKey(QName.local(NCName("k0")))
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-
-        evalF((lit(obj) |@| k0)(SP.objectLookup).join) must resultIn(values.head)
+        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectLookup).join) must resultIn(expected)
       }
 
-      "returns nothing for non-existent key in non-empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-        evalF((lit(obj) |@| notKey)(SP.objectLookup).join) must resultInNothing
+      "returns nothing for non-existent key in non-empty object" >> prop { testCase: WithoutKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        evalF(lit(obj) >>= (SP.objectLookup(_, testCase.key.xs))) must resultInNothing
       }
 
       "returns nothing for empty object" >> {
-        evalF((lit(emptyObj) |@| notKey)(SP.objectLookup).join) must resultInNothing
+        evalF((lit(emptyObj) |@| "NOT_EXIST".xs.point[F])(SP.objectLookup).join) must resultInNothing
       }
     }
 
     "objectMerge" >> {
-      "left identity with empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
+      "left identity with empty object" >> prop { testCase: TestCase =>
+        val obj = Data._obj(testCase.obj)
         evalF((lit(emptyObj) |@| lit(obj))(SP.objectMerge).join) must resultIn(obj)
       }
 
-      "right identity with empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
+      "right identity with empty object" >> prop { testCase: TestCase =>
+        val obj = Data._obj(testCase.obj)
         evalF((lit(obj) |@| lit(emptyObj))(SP.objectMerge).join) must resultIn(obj)
       }
 
-      "union when keys are disjoint" >> prop { (vs1: NonEmptyList[Data], vs2: NonEmptyList[Data]) =>
-        val ents1 = ListMap(keyed(vs1).toList: _*)
-        val ents2 = ListMap(keyed(vs2).toList map { case (k, v) => s"${k}b" -> v }: _*)
+      "union when keys are disjoint" >> prop { testCase: TestCase =>
+        val ents1 = testCase.obj
+        val ents2 = testCase.obj map { case (k, v) => s"${k}b" -> v }
         evalF((lit(Data._obj(ents1)) |@| lit(Data._obj(ents2)))(SP.objectMerge).join) must resultIn(Data._obj(ents1 ++ ents2))
       }
 
-      "right biased when keys overlap" >> prop { (vs1: NonEmptyList[Data], vs2: NonEmptyList[Data]) =>
-        val e1 = keyed(vs1).toList
-        val e2 = keyed(vs2).toList
-        val o  = Data._obj(ListMap(e1.drop(e2.length) ::: e2 : _*))
-        evalF((lit(Data._obj(ListMap(e1: _*))) |@| lit(Data._obj(ListMap(e2: _*))))(
-          SP.objectMerge).join) must resultIn(o)
+      "right biased when keys overlap" >> prop { (testCase: TestCase, values: NonEmptyList[Data]) =>
+        val left = testCase.obj
+        val right = ListMap(testCase.obj.keys.zip(values.toList).toList: _*)
+
+        val o = Data._obj(left ++ right)
+
+        evalF((lit(Data._obj(left)) |@| lit(Data._obj(right)))(SP.objectMerge).join) must resultIn(o)
       }
     }
   }

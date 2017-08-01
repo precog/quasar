@@ -27,8 +27,8 @@ import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 
-final class FileSystemMountHandler[F[_]](fsDef: FileSystemDef[F]) {
-  import MountingError._, PathError._, MountConfig._, FileSystemDef._
+final class FileSystemMountHandler[F[_]](fsDef: BackendDef[F]) {
+  import MountingError._, PathError._, MountConfig._, BackendDef._
 
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[F]], A]
 
@@ -94,6 +94,6 @@ final class FileSystemMountHandler[F[_]](fsDef: FileSystemDef[F]) {
 }
 
 object FileSystemMountHandler {
-  def apply[F[_]](fsDef: FileSystemDef[F]): FileSystemMountHandler[F] =
+  def apply[F[_]](fsDef: BackendDef[F]): FileSystemMountHandler[F] =
     new FileSystemMountHandler[F](fsDef)
 }

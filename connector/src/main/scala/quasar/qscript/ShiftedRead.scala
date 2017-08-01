@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
 import quasar.RenderTree
 import quasar.contrib.pathy.APath
 import quasar.fp._
@@ -34,10 +35,9 @@ import scalaz._, Scalaz._
 
 object ShiftedRead {
   implicit def equal[A: Equal]: Equal[ShiftedRead[A]] = Equal.equalBy(_.path)
-  implicit def show[A <: APath]: Show[ShiftedRead[A]] =
-    Show.show(r => Cord("ShiftedRead(") ++
-      posixCodec.printPath(r.path) ++ Cord(", ") ++
-      r.idStatus.show ++ Cord(")"))
+  implicit def show[A <: APath]: Show[ShiftedRead[A]] = RenderTree.toShow
   implicit def renderTree[A <: APath]: RenderTree[ShiftedRead[A]] =
-    RenderTree.fromShow("ShiftedRead")
+    RenderTree.simple(List("ShiftedRead"), r => {
+      (posixCodec.printPath(r.path) + ", " + r.idStatus.shows).some
+    })
 }

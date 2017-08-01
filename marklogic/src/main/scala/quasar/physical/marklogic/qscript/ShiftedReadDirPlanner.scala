@@ -17,45 +17,28 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.contrib.pathy.{ADir, UriPathCodec}
-import quasar.physical.marklogic.xml.NCName
+import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import eu.timepit.refined.auto._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadDirPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
-  implicit
-  SP: StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, Const[ShiftedRead[ADir], ?]] {
+private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanErr, FMT]
+    extends Planner[F, FMT, Const[ShiftedRead[ADir], ?]] {
 
-  import expr._, axes.child
+  import MarkLogicPlannerError._
 
-  val plan: AlgebraM[F, Const[ShiftedRead[ADir], ?], XQuery] = {
+  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, Const[ShiftedRead[ADir], ?], Search[Q] \/ XQuery] = {
     case Const(ShiftedRead(dir, idStatus)) =>
-      val uri = UriPathCodec.printPath(dir).xs
+      val dirUri = UriPathCodec.printPath(dir)
 
-      idStatus match {
-        case ExcludeId => docsOnly(uri).point[F]
-        case IncludeId => urisAndDocs(uri)
-        case IdOnly    => urisOnly(uri).point[F]
-      }
+      Uri.getOption(dirUri).cata(uri =>
+        Search(
+          Q.embed(Query.Directory[V, Q](IList(uri), MatchDepth.Children)),
+          idStatus
+        ).left[XQuery].point[F],
+        MonadPlanErr[F].raiseError(invalidUri(dirUri)))
   }
-
-  def docsOnly(uri: XQuery): XQuery =
-    directoryDocuments(uri, false) `/` child.node()
-
-  def urisAndDocs(uri: XQuery): F[XQuery] =
-    freshName[F] >>= { d =>
-      SP.seqToArray(mkSeq_(fn.baseUri(~d), ~d))
-        .map(pair => fn.map(func(d.render) { pair }, docsOnly(uri)))
-    }
-
-  // NB: Might be able to get better performance out of cts:uris but will
-  //     need a way to identify the format of a URI, which there doesn't
-  //     seem to be an obvious way to do.
-  def urisOnly(uri: XQuery): XQuery =
-    fn.map(fn.ns(NCName("base-uri")) :# 1, docsOnly(uri))
 }

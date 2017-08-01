@@ -1,0 +1,18 @@
+{
+    "name": "flatten a single field as an object",
+    "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "spark_local":       "pending",
+        "spark_hdfs":        "pending"
+    },
+    "data": "nested_foo.data",
+    "query": "select * from nested_foo where foo{*} = 15",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "ignoredFields": ["_id"],
+    "ignoreFieldOrder": true,
+    "expected": [{ "foo": { "bar": 15, "baz": ["qx"] }}]
+}

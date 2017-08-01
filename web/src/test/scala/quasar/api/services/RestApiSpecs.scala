@@ -22,35 +22,40 @@ import quasar.effect.Failure
 import quasar.fp._, free._
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.fs.mount.module.Module
+import quasar.main._
+import quasar.metastore.MetaStoreFixture.createNewTestMetastore
 
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import org.specs2.matcher.TraversableMatchers._
 
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :/: MountingFileSystem)#M[A]
+  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
 
   "OPTIONS" should {
-    val mount = new (Mounting ~> Task) {
-      def apply[A](m: Mounting[A]): Task[A] =
-        Task.fail(new RuntimeException("unimplemented"))
-    }
+    val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
 
-    val fs =
-      runFs(InMemState.empty)
-        .map(MountingFileSystem.interpret(mount, _))
+    val analyze = Empty.analyze[Task]
 
-    val eff = fs map { runFs =>
-      NaturalTransformation.refl[Task]               :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch] :+:
-      Failure.toRuntimeError[Task, MountingError]    :+:
-      Failure.toRuntimeError[Task, FileSystemError]  :+:
-      runFs
+    type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
+
+    val eff: Task[Eff ~> Task] = (runFs(InMemState.empty) |@| createNewTestMetastore.flatMap(TaskRef(_))){ (fs, metaRef) =>
+      NaturalTransformation.refl[Task]                   :+:
+      Failure.toRuntimeError[Task, PathTypeMismatch]     :+:
+      Failure.toRuntimeError[Task, MountingError]        :+:
+      Failure.toRuntimeError[Task, FileSystemError]      :+:
+      Failure.toRuntimeError[Task, Module.Error]         :+:
+      MetaStoreLocation.impl.default(metaRef, _ => ().point[MainTask])    :+:
+      (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
+      mount :+:
+      analyze :+:
+      fs
     }
 
     val service = eff map { runEff =>

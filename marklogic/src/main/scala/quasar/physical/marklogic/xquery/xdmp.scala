@@ -17,12 +17,12 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
 import scalaz.std.iterable._
+import xml.name._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
@@ -84,6 +84,9 @@ object xdmp {
   def parseDateTime(picture: XQuery, value: XQuery): XQuery =
     XQuery(s"xdmp:parse-dateTime($picture, $value)")
 
+  def plan(expression: XQuery): XQuery =
+    XQuery(s"xdmp:plan($expression)")
+
   // TODO: Works, but has a bug that reorders `where` and `order by` clausees
   //       in FLWOR expressions, causing them to be malformed.
   def prettyPrint(qstring: XQuery): XQuery =
@@ -106,4 +109,7 @@ object xdmp {
 
   def yeardayFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:yearday-from-date($date)")
+
+  def castableAs(namespace: XQuery, localName: XQuery, item: XQuery): XQuery =
+    XQuery(s"xdmp:castable-as($namespace, $localName, $item)")
 }

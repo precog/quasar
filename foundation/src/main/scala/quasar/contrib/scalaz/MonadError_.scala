@@ -19,6 +19,7 @@ package quasar.contrib.scalaz
 import slamdata.Predef._
 
 import scalaz._, Scalaz._
+import scalaz.Liskov._
 
 /** A version of MonadError that doesn't extend Monad to avoid ambiguous implicits
   * in the presence of multiple "mtl" constraints.
@@ -116,4 +117,7 @@ final class MonadError_Ops[F[_], E, A] private[scalaz] (self: F[A])(implicit F0:
 
   def handleWith(pf: PartialFunction[E, F[A]]): F[A] =
     F0.handleWith(self)(pf)
+
+  def unattempt[B](implicit ev: A <~< (E \/ B), M: Monad[F]): F[B] =
+    F0.unattempt(self.map(ev(_)))
 }

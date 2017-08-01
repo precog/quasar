@@ -19,13 +19,12 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.fp.ski.{ι, κ}
 import quasar.physical.marklogic.xml.namespaces._
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 import quasar.physical.marklogic.xquery._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
-import eu.timepit.refined.api.Refined
 import scalaz.{Bind, Functor, Monad}
 import scalaz.syntax.monad._
 
@@ -37,9 +36,9 @@ object lib {
 
   val qs = NamespaceDecl(qscriptNs)
 
-  val dateFmt     = "[Y0001]-[M01]-[D01]".xs
-  val dateTimeFmt = "[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z".xs
-  val timeFmt     = "[H01]:[m01]:[s01].[f001]".xs
+  val dateFmt     = "[Y0001]-[M01]-[D01]"
+  val timeFmt     = "[H01]:[m01]:[s01].[f001]"
+  val dateTimeFmt = s"${dateFmt}T${timeFmt}Z"
 
   private val epoch    = xs.dateTime("1970-01-01T00:00:00Z".xs)
   private val timeZero = xs.time("00:00:00-00:00".xs)
@@ -128,29 +127,20 @@ object lib {
       }
     })
 
-  // qscript:comp-eq($x as item()*, $y as item()*) as xs:boolean?
-  def compEq[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("eq", _ eq _, fn.False)
-
-  // qscript:comp-ne($x as item()*, $y as item()*) as xs:boolean?
-  def compNe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("ne", _ ne _, fn.True)
-
-  // qscript:comp-lt($x as item()*, $y as item()*) as xs:boolean?
-  def compLt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("lt", _ lt _, emptySeq)
-
-  // qscript:comp-le($x as item()*, $y as item()*) as xs:boolean?
-  def compLe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("le", _ le _, emptySeq)
-
-  // qscript:comp-gt($x as item()*, $y as item()*) as xs:boolean?
-  def compGt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("gt", _ gt _, emptySeq)
-
-  // qscript:comp-ge($x as item()*, $y as item()*) as xs:boolean?
-  def compGe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("ge", _ ge _, emptySeq)
+  // qscript:type-of($item as item()*) as xs:string?
+  def typeOf[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
+    qs.declare[F]("type-of-q") flatMap (_(
+      $("item") as ST.Top
+    ).as(ST("xs:string?")) { item: XQuery =>
+      val (lookup, mapped) = ($("lookup"), $("mapped"))
+      SP.typeOf(item) map ( tpe =>
+        if_(tpe === "object".xs)
+        .then_("map".xs)
+        .else_(if_(tpe === "string".xs)
+        .then_("array".xs)
+        .else_(if_(tpe === "na".xs)
+        .then_(emptySeq).else_(tpe))))
+    })
 
   // qscript:concat($x as item()?, $y as item()?) as item()?
   def concat[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
@@ -183,6 +173,7 @@ object lib {
     })
 
   // qscript:delete-field($src as element()?, $field as xs:string) as element()?
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def deleteField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
       $("src")   as ST("element()?"),
@@ -200,15 +191,8 @@ object lib {
       }, src)
     })
 
-  // qscript:element-left-shift($elt as element()) as item()*
-  def elementLeftShift[F[_]: Functor: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-left-shift") map (_(
-      $("elt") as ST("element()?")
-    ).as(ST("item()*")) { elt =>
-      elt `/` child.element()
-    })
-
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def isoyearFromDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
       $("dt") as ST("xs:dateTime?")
@@ -288,16 +272,6 @@ object lib {
     ).as(ST("node()?")) { item: XQuery =>
       val nodeClause = $("n") as ST("node()") return_ (SP.nodeMetadata(_))
       nodeClause map (ec => typeswitch(item)(ec) default emptySeq)
-    })
-
-  // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
-  def projectField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
-    qs.declare("project-field") map (_(
-      $("src")   as ST("element()?"),
-      $("field") as ST("xs:QName?")
-    ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      val n = $("n")
-      fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
     })
 
   // qscript:reduce-with(
@@ -411,7 +385,7 @@ object lib {
           xdmp.formatNumber(sec, "01".xs), ".".xs,
           xdmp.formatNumber(ms, "001".xs), "Z".xs)
 
-      def fmtDateTime(x: XQuery): XQuery = fn.formatDateTime(x, dateTimeFmt)
+      def fmtDateTime(x: XQuery): XQuery = fn.formatDateTime(x, dateTimeFmt.xs)
 
       val (dateTime, wrap) = ($("dateTime"), $("wrap"))
       let_(
@@ -424,9 +398,9 @@ object lib {
           $("dateTime") as ST("xs:dateTime") return_ (κ(
             xdmp.function(xs.QName("xs:dateTime".xs)))),
           $("date")     as ST("xs:date") return_ (κ(
-            func("$s")(xs.date(xdmp.parseDateTime(dateFmt, "$s".xqy))))),
+            func("$s")(xs.date(xdmp.parseDateTime(dateFmt.xs, "$s".xqy))))),
           $("time")     as ST("xs:time") return_ (κ(
-            func("$s")(xs.time(xdmp.parseDateTime(dateTimeFmt, "$s".xqy)))))
+            func("$s")(xs.time(xdmp.parseDateTime(dateTimeFmt.xs, "$s".xqy)))))
         ) default emptySeq
       ) return_ {
 
@@ -516,26 +490,4 @@ object lib {
         }
       }
     })
-
-  ////
-
-  private def mkComparisonFunction[F[_]: Bind: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
-    asDateTime[F].fn flatMap { asDT =>
-      qs.declare(Refined.unsafeApply(s"comp-$opName")) map (_(
-        $("x") as ST.Top,
-        $("y") as ST.Top
-      ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
-        try_ {
-          if_(
-            isCastable(x, ST("xs:date"))     or
-            isCastable(y, ST("xs:date"))     or
-            isCastable(x, ST("xs:dateTime")) or
-            isCastable(y, ST("xs:dateTime")))
-          .then_ { op(asDT(x), asDT(y)) }
-          .else_ { op(x, y) }
-        } .catch_($("_")) { _ =>
-          recover
-        }
-      })
-    }
 }

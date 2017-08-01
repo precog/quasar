@@ -1,14 +1,14 @@
 {
     "name": "basic analytic query",
     "backends": {
-        "couchbase":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":          "skip",
+        "mongodb_q_3_2":  "pending"
     },
     "data": "zips.data",
     "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM zips WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",
-    "predicate": "equalsExactly",
-    "ignoreFieldOrder": ["couchbase", "marklogic_json"],
+    "predicate": "exactly",
     "expected": [
         { "state": "NY", "count": 489, "sum": 14914135, "avg": 30499.25357873, "min": 10008, "max": 111396 },
         { "state": "CA", "count": 849, "sum": 27845412, "avg": 32797.89399293,  "min": 10009, "max": 99568 },

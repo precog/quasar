@@ -33,7 +33,7 @@ import java.time._
 import scalaz._, Scalaz._
 
 object xdmitem {
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion", "org.wartremover.warts.ToString"))
   def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = xdm match {
     case item: CtsBox                   =>
       Data.singletonObj("cts:box", Data.Obj(ListMap(

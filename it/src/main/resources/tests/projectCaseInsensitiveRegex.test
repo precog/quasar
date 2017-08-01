@@ -1,14 +1,15 @@
 {
     "name": "case-insensitive regex in projections",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, city ~* \"boU\" as a, city !~* \"Bou\" as b from largeZips",
     "NB": "Should also test `doesNotContain`, see SD-577.",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "city": "CUSHMAN",          "a": false, "b": true  },
         { "city": "CHICOPEE",         "a": false, "b": true  },

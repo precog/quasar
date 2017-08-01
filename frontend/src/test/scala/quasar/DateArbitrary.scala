@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.pkg.tests._
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 
 import java.time.{Duration, Instant, LocalDate, LocalTime}
 

@@ -26,9 +26,9 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
-import quasar.fs._, InMemory._
+import quasar.fs._, InMemory._, mount._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.{Sql, CIName}
+import quasar.sql.{Positive => _, _}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -37,10 +37,11 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
-import org.scalacheck.Arbitrary
+import org.http4s.argonaut._
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import pathy.scalacheck.AlphaCharacters
 // TODO: Consider if possible to use argonaut backend and avoid printing followed by parsing
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
@@ -55,18 +56,15 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
-  // Remove if eventually included in upstream scala-pathy
-  implicit val arbitraryFileName: Arbitrary[FileName] =
-    Arbitrary(Arbitrary.arbitrary[AFile].map(fileName(_)))
-
   def executeServiceRef(
     mem: InMemState,
-    f: FileSystem ~> InMemoryFs
+    f: FileSystem ~> InMemoryFs,
+    mounts: Map[APath, MountConfig] = Map.empty
   ): (HttpService, Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).unsafePerformSync
     val svc = HttpService.lift(req =>
       execute.service[Eff]
-        .toHttpService(effRespOr(inter compose f))
+        .toHttpService(effRespOr(inter compose f, mountingInter(mounts).unsafePerformSync))
         .apply(req))
 
     (svc, ref)
@@ -118,9 +116,9 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.fixParser.parse(sql.Query(q)).fold(
+      sql.fixParser.parseExpr(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        ast => quasar.queryPlan(ast, vars, rootDir, Nil, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        expr => quasar.queryPlan(expr, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -131,8 +129,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           query = Some(Query(query)),
           state = filesystem.state,
           status = Status.Ok,
-          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString("")
-        )
+          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString(""))
       }
       "POST" >> prop { (filesystem: SingleFileMemState, destination: FPath) => {
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
@@ -205,6 +202,132 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }
     }
+    "execute a query with function definitions" >> {
+      val sampleFile = rootDir </> file("foo")
+      val query =
+        """
+          |CREATE FUNCTION TRIVIAL(:table)
+          |  BEGIN
+          |    SELECT * FROM :table
+          |  END;
+          |TRIVIAL(`/foo`)
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "5")
+    }
+    "execute a query with imported functions" >> {
+      "imported with an absolute path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `/mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir,
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "imported with a relative path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("foo") </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "imported with a backtracking relative path" >> {
+        val sampleFile = rootDir </> file("foo")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `../../mymodule/`;
+            |TRIVIAL(`/foo`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo") </> dir("bar"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+      "if the argument to the function is a relative path, it should be relative to the calling context as opposed to the location of the module definning the function" >> {
+        val sampleFile = rootDir </> dir("foo") </> file("bar")
+        val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+        val query =
+          """
+            |import `/baz/mymodule/`;
+            |TRIVIAL(`bar`)
+          """.stripMargin
+        get(executeService)(
+          path = rootDir </> dir("foo"),
+          query = Some(Query(query)),
+          state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+          mounts = Map((rootDir </> dir("baz") </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+          status = Status.Ok,
+          response = (a: String) => a.trim must_= "5")
+      }
+    }
+    "fail on a query that has ambiguous imports" >> {
+      val funcDec = {
+        val selectAll = sqlE"select * from `foo`"
+        FunctionDecl(CIName("Trivial"), List(CIName("user_id")), selectAll)
+      }
+      val query =
+        """
+          |import `/mymodule/`;
+          |import `/otherModule/`;
+          |TRIVIAL("bob")
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.empty,
+        mounts = Map(
+          (rootDir </> dir("mymodule"): APath)    -> MountConfig.moduleConfig(List(funcDec)),
+          (rootDir </> dir("otherModule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.BadRequest,
+        response = (_: AJson) must_=== AJson(
+          "error" := AJson(
+            "status" := "Ambiguous function call",
+            "detail" := AJson(
+              "message" := "Function call `TRIVIAL` is ambiguous because the following functions: /mymodule/Trivial, /otherModule/Trivial could be applied here",
+              "invoke"  := "TRIVIAL",
+              "ambiguous functions"   := List("/mymodule/Trivial", "/otherModule/Trivial")))))
+    }
+    // TODO: Consider changing this behavior
+    "if the query has a user defined functions that shadows a standard library function, it will choose the user defined function (consider changing this behavior)" >> {
+      val funcDec = FunctionDecl(CIName("SUM"), List(CIName("a")), sqlE"1")
+      val query =
+        """
+          |import `/mymodule/`;
+          |SUM(`/foo`)
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.empty,
+        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "1")
+    }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
         post[String](fileSystem)(
@@ -213,8 +336,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(destination),
           state = InMemState.empty,
           status = Status.NotFound,
-          response = _ must_== "???"
-        )
+          response = _ must_== "???")
       }.pendingUntilFixed("SD-773")
       "be 400 with missing query" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
@@ -224,8 +346,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must equal(ApiError.fromStatus(
-            Status.BadRequest withReason "No SQL^2 query found in message body."))
-        )
+            Status.BadRequest withReason "No SQL^2 query found in message body.")))
       }
       "be 400 with missing Destination header" >> prop { filesystem: SingleFileMemState =>
         post[ApiError](fileSystem)(
@@ -234,8 +355,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = None,
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must beHeaderMissingError("Destination")
-        )
+          response = _ must beHeaderMissingError("Destination"))
       }
       "be 400 for query error" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
@@ -245,8 +365,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must beApiErrorWithMessage(
-            Status.BadRequest withReason "Malformed SQL^2 query.")
-        )
+            Status.BadRequest withReason "Malformed SQL^2 query."))
       }
       "be 400 for compile error" >> prop { (fs: SingleFileMemState, dst: AFile) =>
         val q = "select sum(1, 2, 3, 4)"
@@ -254,11 +373,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val err: SemanticError =
           SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -266,8 +385,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(dst),
           state = fs.state,
           status = Status.BadRequest,
-          response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases))
-        )
+          response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases)))
       }
       "be 500 for execution error" >> {
         val q = s"select * from `/foo`"
@@ -275,11 +393,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, Nil, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,
@@ -287,8 +405,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(rootDir </> file("outA")),
           state = InMemState.empty,
           status = Status.InternalServerError,
-          response = _ must equal(err.toApiError :+ ("phases" := phases))
-        )
+          response = _ must equal(err.toApiError :+ ("phases" := phases)))
       }
     }
   }

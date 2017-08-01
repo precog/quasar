@@ -1,13 +1,10 @@
 {
     "name": "concat field with constant array",
-    "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
-    },
+    "backends": {},
     "data": "largeZips.data",
     "query": "select array_concat(make_array(pop), array_concat(make_array(1), make_array(2))) as arr from largeZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "arr": [36963, 1.0, 2.0] },
                  { "arr": [31495, 1.0, 2.0] },
                  { "arr": [43704, 1.0, 2.0] },

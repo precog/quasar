@@ -47,6 +47,22 @@ sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
     new MonadTell_[StateT[F, S, ?], W] {
       def writer[A](w: W, a: A) = StateT(T.writer(w, a) strengthL _)
     }
+
+  implicit def kleisliMonadTell[F[_], R, W](
+      implicit F: MonadTell_[F, W]): MonadTell_[Kleisli[F, R, ?], W] =
+    new MonadTell_[Kleisli[F, R, ?], W] {
+      def writer[A](w: W, a: A): Kleisli[F, R, A] =
+        Kleisli(_ => MonadTell_[F, W].writer(w, a))
+    }
+
+  /*
+  // aspirationally, we would just have the following.  but it doesn't infer downstream
+  implicit def hoistMonadTell[T[_[_], _]: Hoist, F[_]: Monad, W](
+      implicit F: MonadTell_[F, W]): MonadTell_[T[F, ?], W] =
+    new MonadTell_[T[F, ?], W] {
+      def writer[A](w: W, a: A): T[F, A] = Hoist[T].liftM(MonadTell_[F, W].writer(w, a))
+    }
+   */
 }
 
 sealed abstract class MonadTell_Instances0 {

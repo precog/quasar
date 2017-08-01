@@ -2,17 +2,14 @@
     "name": "join the results of a pair of sub-queries",
 
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "couchbase":      "timeout",
+        "marklogic_json": "timeout",
+        "marklogic_xml":  "timeout",
+        "mimir":          "ignoreFieldOrder",
+        "mongodb_q_3_2":  "pending"
     },
 
-    "NB": "Skipped for all connectors due to QScript join bug #1866.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../zips.data", "../largeZips.data"],
 
@@ -26,7 +23,8 @@
               order by sum(pop) desc limit 200) as t2
             on t1.city = t2.city",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "CONCORD",    "popCA": 115027, "popMA": 17076 },
                  { "city": "WILMINGTON", "popCA":  49178, "popMA": 17647 }]
 }

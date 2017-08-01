@@ -19,7 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.{BackendCapability, Data}
 import quasar.contrib.pathy._
-import quasar.fp._
+import quasar.contrib.scalaz.foldable._
 import quasar.fs.FileSystemTest.allFsUT
 
 import pathy.Path._
@@ -27,14 +27,13 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
   import FileSystemTest._, FileSystemError._, PathError._
-  import ManageFile._
 
-  val query  = QueryFile.Ops[FileSystem]
-  val read   = ReadFile.Ops[FileSystem]
-  val write  = WriteFile.Ops[FileSystem]
-  val manage = ManageFile.Ops[FileSystem]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   val managePrefix: ADir = rootDir </> dir("m")
 

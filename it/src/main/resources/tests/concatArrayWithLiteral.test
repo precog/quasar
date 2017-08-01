@@ -1,22 +1,22 @@
 {
     "name": "concat unknown with literal array",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending"
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["marklogic_json"],
-    "expected": [{ "arr": [ -72.51565, 42.377017, 1.0, 2.0], "city": "CUSHMAN"          },
-                 { "arr": [-72.576142, 42.176443, 1.0, 2.0], "city": "CHICOPEE"         },
-                 { "arr": [-72.626193, 42.202007, 1.0, 2.0], "city": "HOLYOKE"          },
-                 { "arr": [-72.654245, 42.324662, 1.0, 2.0], "city": "FLORENCE"         },
-                 { "arr": [-72.754318, 42.129484, 1.0, 2.0], "city": "MONTGOMERY"       },
-                 { "arr": [-72.641109, 42.115066, 1.0, 2.0], "city": "WEST SPRINGFIELD" },
-                 { "arr": [-72.558432, 42.085314, 1.0, 2.0], "city": "SPRINGFIELD"      },
-                 { "arr": [-72.554349, 42.114455, 1.0, 2.0], "city": "SPRINGFIELD"      },
-                 { "arr": [-73.247088, 42.453086, 1.0, 2.0], "city": "PITTSFIELD"       },
-                 { "arr": [-71.803133, 42.579563, 1.0, 2.0], "city": "FITCHBURG"        }]
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [{ "arr": [-72.51565,  42.377017, 1, 2], "city": "CUSHMAN"          },
+                 { "arr": [-72.576142, 42.176443, 1, 2], "city": "CHICOPEE"         },
+                 { "arr": [-72.626193, 42.202007, 1, 2], "city": "HOLYOKE"          },
+                 { "arr": [-72.654245, 42.324662, 1, 2], "city": "FLORENCE"         },
+                 { "arr": [-72.754318, 42.129484, 1, 2], "city": "MONTGOMERY"       },
+                 { "arr": [-72.641109, 42.115066, 1, 2], "city": "WEST SPRINGFIELD" },
+                 { "arr": [-72.558432, 42.085314, 1, 2], "city": "SPRINGFIELD"      },
+                 { "arr": [-72.554349, 42.114455, 1, 2], "city": "SPRINGFIELD"      },
+                 { "arr": [-73.247088, 42.453086, 1, 2], "city": "PITTSFIELD"       },
+                 { "arr": [-71.803133, 42.579563, 1, 2], "city": "FITCHBURG"        }]
 }

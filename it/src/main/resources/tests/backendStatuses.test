@@ -1,0 +1,25 @@
+{
+    "name": "select all backend failure statuses",
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_xml":     "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
+    },
+    "data": "newTests.data",
+    "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "backend": "mongodb_2_6",       "status": "pending", "name": "select count and another field" },
+        { "backend": "mongodb_3_0",       "status": "pending", "name": "select count and another field" },
+        { "backend": "mongodb_3_2",       "status": "pending", "name": "select count and another field" },
+        { "backend": "mongodb_3_4",       "status": "pending", "name": "select count and another field" },
+        { "backend": "mongodb_read_only", "status": "pending", "name": "select count and another field" }]
+}

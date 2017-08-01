@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.xml
 
 import eu.timepit.refined.auto._
+import xml.name._
 
 object namespaces {
   // NB: We've choosen to only support EJSON maps with string keys for the
@@ -25,6 +26,10 @@ object namespaces {
   val ejsonEjson      = ejsonNs(NCName("ejson"))
   val ejsonArrayElt   = ejsonNs(NCName("array-element"))
   val ejsonType       = ejsonNs(NCName("type"))
+
+  // Related to encoding of non-QName elements
+  val ejsonEncodedName = ejsonNs(NCName("key"))
+  val ejsonEncodedAttr = ejsonNs(NCName("key-id"))
 
   val filesystemNs    = Namespace(NSPrefix(NCName("filesystem")), NSUri("http://quasar-analytics.org/filesystem"))
   val filesystemError = filesystemNs(NCName("error"))

@@ -20,8 +20,6 @@ import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.fp._
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -33,6 +31,7 @@ package object jscore {
 
   def ident(value: String): JsCore = Ident(Name(value))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def binop(op: BinaryOperator, a1: JsCore, args: JsCore*): JsCore = args.toList match {
     case Nil    => a1
     case h :: t => BinOp(op, a1, binop(op, h, t: _*))
@@ -72,9 +71,6 @@ package object jscore {
   // Check the RHS, but assume the LHS is known to be defined:
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
     Js.BinOp("=", lhs.toJs, rhs.toJs)
-
-  val meh = implicitly[EqualT[Fix]]
-  val meh2 = implicitly[Delay[Equal, JsCoreF]]
 
   private def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore):
       Option[JsCore] =
@@ -123,6 +119,7 @@ package object jscore {
 
   implicit class JsCoreOps(expr: JsCore) {
     // TODO: Turn this into an algebra, and implement `Show[JsCore]` with it.
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def toJs: Js.Expr = expr.simplify match {
       case Literal(value)      => value
       case Ident(name)         => Js.Ident(name.value)
@@ -179,7 +176,7 @@ package object jscore {
     val simplify = expr.transCata[JsCore](repeatedly(simplifyƒ))
 
     def substitute(oldExpr: JsCore, newExpr: JsCore): JsCore = {
-      @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+      @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
       def loop(x: JsCore, inScope: Set[JsCore]): JsCore =
         if (x == oldExpr && !(inScope contains x)) newExpr
         else
@@ -251,6 +248,7 @@ package object jscore {
       if (v.cata(simpleƒ)) Some(Terminal(nodeType, Some(v.toJs.pprint(0))))
       else None
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def render(v: JsCore) = v match {
       case Ident(name)           => Terminal("Ident" :: nodeType, Some(name.value))
       case Literal(js)           => Terminal("Literal" :: nodeType, Some(js.pprint(0)))

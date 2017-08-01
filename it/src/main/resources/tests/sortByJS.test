@@ -1,19 +1,15 @@
 {
   "name": "sort by JS expression with filter",
 
-  "NB": "Couchbase disabled due to heap exhaustion",
-
   "backends": {
-    "mongodb_read_only": "pending",
-    "postgresql":        "pending",
-    "couchbase":         "skip"
+        "mimir":"ignoreFieldOrder"
   },
 
   "data": "zips.data",
 
   "query": "select city, pop from zips where pop > 110000 order by length(city)",
 
-  "predicate": "equalsExactly",
+  "predicate": "exactly",
   "expected": [
     { "city": "CHICAGO",  "pop": 112047.0 },
     { "city": "BROOKLYN", "pop": 111396.0 }

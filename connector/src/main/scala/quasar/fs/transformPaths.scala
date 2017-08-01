@@ -193,6 +193,24 @@ object transformPaths {
     transformIn(g, liftFT[S])
   }
 
+  def analyze[S[_]](
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: EndoK[RelPath]
+  )(implicit
+    S: Analyze :<: S
+  ): S ~> Free[S, ?] = {
+    import Analyze._
+
+    val O = Analyze.Ops[S]
+
+    val g = λ[Analyze ~> Free[S, ?]] {
+      case QueryCost(lp) =>
+        O.queryCost(transformFile(inPath)(lp)).leftMap(transformErrorPath(outPath)).run
+    }
+    transformIn(g, liftFT[S])
+  }
+
   /** Returns a natural transformation that transforms all paths in `FileSystem`
     * operations using the given functions.
     *

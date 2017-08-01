@@ -21,10 +21,10 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson, ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
-import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly
@@ -81,36 +81,68 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   val UnreferencedRT: QST[Fix[QST]] = QCT.inj(Unreferenced[Fix, Fix[QST]]())
   def ReadRT(file: AFile): QST[Fix[QST]] = RTF.inj(Const(Read(file)))
 
+  def ConstantR[A](value: Fix[EJson]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Constant[Fix, FreeMapA[A]](value)))
+
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(ProjectField(src, field))
+    Free.roll(MFC(MapFuncsCore.ProjectField(src, field)))
+
+  def DeleteFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.DeleteField(src, field)))
 
   def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(ProjectIndex(src, field))
+    Free.roll(MFC(MapFuncsCore.ProjectIndex(src, field)))
 
   def MakeArrayR[A](src: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MakeArray(src))
+    Free.roll(MFC(MapFuncsCore.MakeArray(src)))
 
   def MakeMapR[A](key: FreeMapA[A], src: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MakeMap(key, src))
+    Free.roll(MFC(MapFuncsCore.MakeMap(key, src)))
 
   def ConcatArraysR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(ConcatArrays(left, right))
+    Free.roll(MFC(MapFuncsCore.ConcatArrays(left, right)))
 
   def ConcatMapsR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(ConcatMaps(left, right))
+    Free.roll(MFC(MapFuncsCore.ConcatMaps(left, right)))
 
   def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(Add(left, right))
+    Free.roll(MFC(MapFuncsCore.Add(left, right)))
+
+  def SubtractR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Subtract(left, right)))
+
+  def EqR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Eq(left, right)))
+
+  def LtR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Lt(left, right)))
+
+  def AndR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.And(left, right)))
+
+  def OrR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Or(left, right)))
+
+  def NotR[A](value: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Not(value)))
 
   def lpRead(path: String): Fix[LP] =
-    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(unsafeSandboxAbs(posixCodec.parseAbsFile(path).get))
 
   val prov = new provenance.ProvenanceT[Fix]
 

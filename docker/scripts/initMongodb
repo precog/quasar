@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+echo "configuring mongodb..."
+
+mongo --eval "db.stats()"  # do a simple harmless command of some sort
+
+RESULT=$?   # returns 0 if mongo eval succeeds
+
+if [ $RESULT -ne 0 ]; then
+    echo "mongodb not running..."
+    exit 1
+else
+  echo "mongodb running, creating db and users..."
+  mongo quasar-test --eval 'db.createUser({"user": "quasar-dbOwner", "pwd": "quasar", "roles": [ "dbOwner" ]})'
+  mongo quasar-test --eval 'db.createUser({"user": "quasar-read", "pwd": "quasar", "roles": [ "read" ]})'
+fi

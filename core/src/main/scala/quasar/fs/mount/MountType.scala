@@ -26,10 +26,11 @@ import scalaz._, Scalaz._
 sealed abstract class MountType {
   import MountType._
 
-  def fold[X](fs: FileSystemType => X, v: => X): X =
+  def fold[X](fs: FileSystemType => X, v: => X, m: => X): X =
     this match {
       case FileSystemMount(t) => fs(t)
       case ViewMount          => v
+      case ModuleMount        => m
     }
 
   override def toString: String =
@@ -39,6 +40,7 @@ sealed abstract class MountType {
 object MountType {
   final case class FileSystemMount(fsType: FileSystemType) extends MountType
   case object ViewMount extends MountType
+  case object ModuleMount extends MountType
 
   val fileSystemMount: Prism[MountType, FileSystemType] =
     Prism.partial[MountType, FileSystemType] {
@@ -50,9 +52,14 @@ object MountType {
       case ViewMount => ()
     } (κ(ViewMount))
 
+  val moduleMount: Prism[MountType, Unit] =
+    Prism.partial[MountType, Unit] {
+      case ModuleMount => ()
+    } (κ(ModuleMount))
+
   implicit val order: Order[MountType] =
     Order.orderBy(mt => (viewMount.nonEmpty(mt), fileSystemMount.getOption(mt)))
 
   implicit val show: Show[MountType] =
-    Show.shows(_.fold(t => s"FileSystemMount(${t.shows})", "ViewMount"))
+    Show.shows(_.fold(t => s"FileSystemMount(${t.shows})", "ViewMount", "ModuleMount"))
 }

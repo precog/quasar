@@ -1,0 +1,40 @@
+{
+    "name": "select tests that have changed status (interim)",
+    "NB": "This is a workaround for a QScript issue in changedTestStatus.test
+           and shoud be removed when some connectors start passing that test.",
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
+    },
+    "data": ["oldTests.data", "newTests.data"],
+    "query": "select old.name ?? new.name as name,
+                     old.backend ?? new.backend as backend,
+                     old.status ?? \"success\" as prevStatus,
+                     new.status ?? \"success\" as currStatus
+                -- NB: this field order matters because of #1929
+                from (select backends{_:} as backend, backends{:_} as status, name from oldTests) as old
+                     full outer join
+                     (select backends{_:} as backend, backends{:_} as status, name from newTests) as new
+                  on old.name = new.name and
+                     old.backend = new.backend and
+                     old.backend <> \"mongodb_q_3_2\" and
+                     old.status <> new.status",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "name": "select count and another field", "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_2",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_4",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_read_only", "prevStatus": "success", "currStatus": "pending" }]
+}

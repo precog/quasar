@@ -1,0 +1,48 @@
+{
+    "name": "time series aggregation",
+    "backends": {
+        "couchbase": "ignoreFieldOrder",
+        "mimir":"pendingIgnoreFieldOrder"
+    },
+    "data": "smalltimeseries.data",
+    "query": "
+        SELECT SUM(value) AS measure, timestamp(dt) AS dimension, sensor AS series
+        FROM smalltimeseries
+        GROUP BY sensor, dt
+        ORDER BY sensor ASC, dt ASC",
+    "NB": "The query is ordered, but not uniquely, so we have to use containsExactly instead of equalsExactly.",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "measure": 62, "dimension": { "$timestamp": "2017-05-15T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 54, "dimension": { "$timestamp": "2017-05-17T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 51, "dimension": { "$timestamp": "2017-05-11T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 59, "dimension": { "$timestamp": "2017-05-16T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 54, "dimension": { "$timestamp": "2017-05-12T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 171, "dimension": { "$timestamp": "2017-05-09T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 61, "dimension": { "$timestamp": "2017-05-14T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 58, "dimension": { "$timestamp": "2017-05-18T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 97, "dimension": { "$timestamp": "2017-05-10T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 57, "dimension": { "$timestamp": "2017-05-13T16:54:29.615Z" }, "series": "S0" },
+        { "measure": 44, "dimension": { "$timestamp": "2017-05-15T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 45, "dimension": { "$timestamp": "2017-05-17T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 43, "dimension": { "$timestamp": "2017-05-14T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 42, "dimension": { "$timestamp": "2017-05-12T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 44, "dimension": { "$timestamp": "2017-05-10T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 45, "dimension": { "$timestamp": "2017-05-09T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 46, "dimension": { "$timestamp": "2017-05-16T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 46, "dimension": { "$timestamp": "2017-05-18T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 40, "dimension": { "$timestamp": "2017-05-11T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 47, "dimension": { "$timestamp": "2017-05-13T16:54:29.615Z" }, "series": "S1" },
+        { "measure": 55, "dimension": { "$timestamp": "2017-05-09T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 50, "dimension": { "$timestamp": "2017-05-15T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 52, "dimension": { "$timestamp": "2017-05-13T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 43, "dimension": { "$timestamp": "2017-05-17T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 44, "dimension": { "$timestamp": "2017-05-18T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 53, "dimension": { "$timestamp": "2017-05-11T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 56, "dimension": { "$timestamp": "2017-05-10T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 47, "dimension": { "$timestamp": "2017-05-16T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 55, "dimension": { "$timestamp": "2017-05-14T16:54:29.615Z" }, "series": "S2" },
+        { "measure": 48, "dimension": { "$timestamp": "2017-05-12T16:54:29.615Z" }, "series": "S2" }
+    ]
+}

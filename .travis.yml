@@ -2,35 +2,40 @@ language: scala
 scala: 2.11.8
 jdk: oraclejdk8
 dist: trusty
-sudo: false
-
-addons:
-  postgresql: 9.4
+sudo: required
 
 services:
   - docker
-  - postgresql
 
+# travis installs postgres by default this will stop and free up the psql port
+# needed by the  postgreql container
+before_install:
+  - sudo /etc/init.d/postgresql stop
+ 
+# create all the docker containers we need for IT testing
+install:
+  - docker/scripts/initContainer quasar_metastore
+  - docker/scripts/initContainer quasar_$CONNECTOR
+  - docker ps
+
+# run db config scripts and populate the it/testing.conf file
+before_script:
+  - docker/scripts/setupContainers -c quasar_metastore
+  - docker/scripts/setupContainers -c quasar_$CONNECTOR
+  - docker/scripts/assembleTestingConf -c quasar_metastore
+  - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
+  - cat it/testing.conf
+
+# export some needed env vars, build, then publish and tag resources
 script:
-  # Export color variables needed by travis_wait and travis_jigger
+  - cd $TRAVIS_BUILD_DIR
   - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
   - export -f travis_wait travis_jigger
-  - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
-  - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
-  - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
-  - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" > $TEST_CONFIG_FILE ; fi
-  - if [[ $QUASAR_MARKLOGIC_JSON || $QUASAR_MARKLOGIC_XML ]]; then ./scripts/installMarkLogic; fi
-  - if [ $QUASAR_MARKLOGIC_XML ]; then echo "marklogic_xml=${QUASAR_MARKLOGIC_XML}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_MARKLOGIC_JSON ]; then echo "marklogic_json=${QUASAR_MARKLOGIC_JSON}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
-  - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
-  - ./scripts/build $MONGO_RELEASE
-  - sbt transferPublishAndTagResources
-  - ./scripts/publishAndTag 'quasar-analytics/quasar'
+  - ./scripts/build
+  - ./scripts/quasarPublishAndTag
 
-after_success: ./scripts/afterSuccess
+after_success:
+  - ./scripts/afterSuccess
 
 notifications:
   irc:
@@ -42,14 +47,19 @@ notifications:
 
 branches:
   except:
-    - /^v\d+\.\d+\.\d+-.*$/ # don't redundantly build tags
+    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
+    - mimir
 
 cache:
   directories:
+    - $HOME/.cache/quasar/marklogic
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
-    - scripts/marklogic/docker
+    - target
+    - .targets
+    - project/project/target
+    - project/target
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
@@ -57,30 +67,16 @@ before_cache:
 
 env:
   matrix:
-    - MONGO_RELEASE=2_6
-    - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
-    - QUASAR_MARKLOGIC_JSON='"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"'
-    - QUASAR_MARKLOGIC_XML='"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"'
-    - QUASAR_SPARK_LOCAL='spark_local_test'
-    - MONGO_RELEASE=3_0
-    - MONGO_RELEASE=3_0_RO
-    - MONGO_RELEASE=3_2
-    - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
+    - CONNECTOR=couchbase
+    - CONNECTOR=marklogic_json
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=mimir
+    - CONNECTOR=mongodb_2_6
+    - CONNECTOR=mongodb_3_0
+    - CONNECTOR=mongodb_3_2
+    - CONNECTOR=mongodb_3_4
+    - CONNECTOR=mongodb_read_only
+    - CONNECTOR=spark_local_test
 
   global:
     - COURSIER_PROGRESS=0
-    - LOCAL_MONGODB=true
-    - ISOLATED_ENV=true
-    - MONGO_2_6_LINUX=2.6.11
-    - MONGO_2_6_PORT=27018
-    - MONGO_2_6_AUTH=""
-    - MONGO_3_0_LINUX=3.0.12
-    - MONGO_3_0_PORT=27019
-    - MONGO_3_0_AUTH=""
-    - MONGO_3_0_RO_LINUX=3.0.12
-    - MONGO_3_0_RO_PORT=27019
-    - MONGO_3_0_RO_AUTH="--auth"
-    - MONGO_3_2_LINUX=3.2.9
-    - MONGO_3_2_PORT=27020
-    - MONGO_3_2_AUTH=""
-    - TEST_CONFIG_FILE=it/testing.conf

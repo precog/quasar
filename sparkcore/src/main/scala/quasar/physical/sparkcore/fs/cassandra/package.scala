@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount._, FileSystemDef._
+import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
 
 import scala.sys
@@ -49,15 +49,20 @@ package object cassandra {
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
+  def parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (uri: ConnectionUri) => {
 
-    def error(msg: String): DefinitionError \/ SparkFSConf =
-      NonEmptyList(msg).left[EnvironmentError].left[SparkFSConf]
+    def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
+      NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
 
-    def forge(master: String, cassandraHost: String, rootPath: String): DefinitionError \/ SparkFSConf =
+    def forge(
+      master: String,
+      cassandraHost: String,
+      rootPath: String
+    ): DefinitionError \/ (SparkConf, SparkFSConf) =
       posixCodec.parseAbsDir(rootPath)
         .map { prefix =>
-        SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar").set("spark.cassandra.connection.host", cassandraHost), sandboxAbs(prefix))
+          val sparkConf = new SparkConf().setMaster(master).setAppName("quasar").set("spark.cassandra.connection.host", cassandraHost)
+          (sparkConf, SparkFSConf(sparkConf, unsafeSandboxAbs(prefix)))
       }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
 
     uri.value.split('|').toList match {
@@ -68,16 +73,14 @@ package object cassandra {
     }
   }
 
-  final case class SparkCassandraFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
-
   private def fetchSparkCoreJar: Task[String] = Task.delay {
     sys.env("QUASAR_HOME") + "/sparkcore.jar"
   }
 
-  private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
+  private def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): Free[S, SparkCassandraFSDef[S]] = {
+  ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
     val genSc = fetchSparkCoreJar.map { jar => 
       val sc = new SparkContext(sparkConf)
@@ -101,32 +104,18 @@ package object cassandra {
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-      SparkCassandraFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
   }
 
-  private def fsInterpret(sparkFsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = interpretFileSystem(
+  private def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =
+    (sparkFsConf: SparkFSConf) => interpretFileSystem(
       corequeryfile.chrooted[Eff](queryfile.input, FsType, sparkFsConf.prefix),
       corereadfile.chrooted(readfile.input[Eff], sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix),
       managefile.chrooted[Eff](sparkFsConf.prefix))
 
-	def definition[S[_]](implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] =
-    FileSystemDef.fromPF {
-      case (FsType, uri) =>
-        for {
-          sparkFsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
-          res <- {
-            sparkFsDef(sparkFsConf.sparkConf).map {
-              case SparkCassandraFSDef(run, close) =>
-                FileSystemDef.DefinitionResult[Free[S, ?]](
-                  fsInterpret(sparkFsConf) andThen run,
-                  close)
-            }.liftM[DefErrT]
-          }
-        } yield res
-    }
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): BackendDef[Free[S, ?]] =
+    quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
+
 }

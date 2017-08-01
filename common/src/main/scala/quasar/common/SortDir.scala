@@ -16,6 +16,8 @@
 
 package quasar.common
 
+import quasar.RenderTree
+
 import scalaz._
 
 sealed abstract class SortDir
@@ -29,4 +31,5 @@ object SortDir {
 
   implicit val equal: Equal[SortDir] = Equal.equalRef
   implicit val show: Show[SortDir] = Show.showFromToString
+  implicit val renderTree: RenderTree[SortDir] = RenderTree.fromShow("SortDir")
 }

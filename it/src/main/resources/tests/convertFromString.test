@@ -1,13 +1,14 @@
 {
     "name": "convert values from strings",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "couchbase":         "ignoreFieldOrder",
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "smallZips.data",
-    "query": "select integer(_id) as intId, decimal(_id) as decId from smallZips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from smallZips",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "intId": 1001, "decId": 1001.0 },
         { "intId": 1002, "decId": 1002.0 },

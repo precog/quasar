@@ -17,16 +17,19 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.RenderTree.ops._
+import quasar.specs2.QuasarMatchers._
+import quasar.sql.StatementArbitrary._
 import quasar.sql.fixpoint._
+
+import scala.Predef.$conforms
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._
 import pathy.Path._
-import quasar.specs2.QuasarMatchers._
+import scalaz._, Scalaz._
 
 class SQLParserSpec extends quasar.Qspec {
   import SqlQueries._, ExprArbitrary._
@@ -34,7 +37,7 @@ class SQLParserSpec extends quasar.Qspec {
   implicit def stringToQuery(s: String): Query = Query(s)
 
   def parse(query: Query): ParsingError \/ Fix[Sql] =
-    fixParser.parse(query).map(_.makeTables(Nil))
+    fixParser.parseExpr(query)
 
   "SQLParser" should {
     "parse query1" in {
@@ -232,6 +235,42 @@ class SQLParserSpec extends quasar.Qspec {
       parse(""":`start time`""") should beRightDisjOrDiff(VariR("start time"))
     }
 
+    "parse variable with quoted name starting with '_'" in {
+      parse(""":`_8`""") should beRightDisjOrDiff(VariR("_8"))
+    }
+
+    "not parse variable with '_' as the name" in {
+      parse(""":_""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with digit as the name" in {
+      parse(""":8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with digit at the start of the name" in {
+      parse(""":8_""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with '_' at the start of the name" in {
+      parse(""":_8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "parse simple query with '_' as relation" in {
+      parse("""SELECT * FROM `_`""").toOption should beSome
+    }
+
+    "parse simple query with '_' in relation" in {
+      parse("""SELECT * FROM `/foo/bar/_`""").toOption should beSome
+    }
+
     "parse simple query with variable as relation" in {
       parse("""SELECT * FROM :table""").toOption should beSome
     }
@@ -275,7 +314,7 @@ class SQLParserSpec extends quasar.Qspec {
                   where dt < date("2014-11-16")
                   and tm < time("03:00:00")
                   and ts < timestamp("2014-11-16T03:00:00Z") + interval("PT1H")
-                  and _id != oid("abc123")"""
+                  and `_id` != oid("abc123")"""
 
       parse(q) must beRightDisjunction
     }
@@ -396,7 +435,7 @@ class SQLParserSpec extends quasar.Qspec {
     "should refuse a semicolon not at the end" in {
       val q = "select foo from (select 5 as foo;) where foo = 7"
       parse(q) must beLeftDisjunction(
-        GenericParsingError("operator ')' expected; `;'")
+        GenericParsingError("operator ')' expected; but found `;'")
       )
     }
 
@@ -404,6 +443,36 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := 5; foo""") must
         beRightDisjunction(
           LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
+    }
+
+    "parse basic let with quoted identifier starting with '_'" in {
+      parse("""`_8` := 5; `_8`""") must
+        beRightDisjunction(
+          LetR(CIName("_8"), IntLiteralR(5), IdentR("_8")))
+    }
+
+    "not parse basic let with '_' as the identifier" in {
+      parse("""_ := 5; _""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `*** error: '!' expected but _ found'"))
+    }
+
+    "not parse basic let with digit as the identifier" in {
+      parse("""8 := 5; 8""") must
+        beLeftDisjunction(
+          GenericParsingError("keyword 'except' expected; but found `:='"))
+    }
+
+    "not parse basic let with digit at the start of the identifier" in {
+      parse("""8_ := 5; 8_""") must
+        beLeftDisjunction(
+          GenericParsingError("keyword 'except' expected; but found `*** error: '!' expected but _ found'"))
+    }
+
+    "not parse basic let with '_' at the start of the identifier" in {
+      parse("""_8 := 5; _8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `*** error: '!' expected but _ found'"))
     }
 
     "parse nested lets" in {
@@ -517,6 +586,52 @@ class SQLParserSpec extends quasar.Qspec {
       parse(q) must beLeftDisjunction
     }
 
+    "parse function declaration" in {
+      val funcDeclString = "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END"
+      fixParser.parseWithParser(funcDeclString, fixParser.func_def) must beRightDisjunction(
+        FunctionDecl(CIName("ARRAY_LENGTH"),List(CIName("foo")),Fix(invokeFunction(CIName("count"),List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")),ShiftArrayValues)))))))
+    }
+
+    "parse import statement" in {
+      val importString = "import `/foo/bar/baz/`"
+      fixParser.parseWithParser(importString, fixParser.import_) must beRightDisjunction(
+        Import(rootDir </> dir("foo") </> dir("bar") </> dir("baz")))
+    }
+
+    "parse module" >> {
+      "typical case" in {
+        val moduleString =
+          """
+            |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
+            |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
+            |import `/other/stuff/in/filesystem/`
+          """.stripMargin
+        fixParser.parseModule(moduleString) must beLike {
+          case \/-(List(FunctionDecl(_, _, _), FunctionDecl(_, _, _), Import(_))) => ok
+        }
+      }
+      "does not complain about a trailing semicolon" in {
+        val moduleString = "CREATE FUNCTION FOO(:foo) BEGIN :foo END;"
+        fixParser.parseModule(moduleString) must_===
+          \/-(List(FunctionDecl(CIName("foo"), List(CIName("foo")), sqlE":foo")))
+      }
+    }
+
+    "parse scopedExpr" in {
+      val scopedExprString =
+        """
+          |CREATE FUNCTION USER_DATA(:user_id)
+          |  BEGIN
+          |    SELECT * FROM `/foo` WHERE user_id = :user_id
+          |  END;
+          |USER_DATA("bob")
+        """.stripMargin
+      val invokeAST: Fix[Sql] = Fix(invokeFunction[Fix[Sql]](CIName("USER_DATA"),List(Fix(stringLiteral[Fix[Sql]]("bob")))))
+      fixParser.parse(scopedExprString) must beLike {
+        case \/-(ScopedExpr(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
+      }
+    }
+
     "parse array literal at top level" in {
       parse("""["X", "Y"]""") must beRightDisjunction(
         ArrayLiteralR(List(StringLiteralR("X"), StringLiteralR("Y"))))
@@ -541,7 +656,7 @@ class SQLParserSpec extends quasar.Qspec {
       // NB: Just a stress-test that the parser can handle a deeply
       // left-recursive expression with many unneeded parens, which
       // happens to be exactly what pprint produces.
-      val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
+      val q = """(select distinct topArr, topObj from `/demo/demo/nested` where ((((((((((((((((((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true)))) or (search((((topArr)[:*])[:*]).b, "^.*$", true)))) or (search((((topArr)[:*])[:*]).c, "^.*$", true)))) or (search((((topArr)[:*]).botObj).a, "^.*$", true)))) or (search((((topArr)[:*]).botObj).b, "^.*$", true)))) or (search((((topArr)[:*]).botObj).c, "^.*$", true)))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*]).a, "^.*$", true)))) or (search((((topObj).midArr)[:*]).b, "^.*$", true)))) or (search((((topObj).midArr)[:*]).c, "^.*$", true)))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true)))) or (search((((topObj).midObj).botObj).a, "^.*$", true)))) or (search((((topObj).midObj).botObj).b, "^.*$", true)))) or (search((((topObj).midObj).botObj).c, "^.*$", true))))"""
       parse(q).map(pprint[Fix[Sql]]) must beRightDisjunction(q)
     }
 
@@ -555,7 +670,7 @@ class SQLParserSpec extends quasar.Qspec {
       }.pendingUntilFixed("SD-1536")
     }
 
-    "round-trip to SQL and back" >> prop { (node: Fix[Sql]) =>
+    "round-trip to SQL and back" >> prop { node: Fix[Sql] =>
       val parsed = parse(pprint(node))
 
       parsed.fold(
@@ -563,11 +678,41 @@ class SQLParserSpec extends quasar.Qspec {
         p => if (p != node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)
+    }.set(minTestsOk = 1000) // one cannot test a parser too much
+
+    "round-trip module" >> prop { module: List[Statement[Fix[Sql]]] =>
+      val back = fixParser.parseModule(module.pprint)
+
+      back must beRightDisjOrDiff(module)
     }
 
-    "round-trip quoted variable names through the pretty-printer" >> {
-      val q = "select * from :`A.results`"
-      (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
+    "pprint an import statement should escpae backticks" >> {
+      val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
+      val string = List(`import`).pprint
+      string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
+      fixParser.parseModule(string) must_=== List(`import`).right
+    }
+
+    "round-trip through the pretty-printer" >> {
+      def roundTrip(q: String) = {
+        val ast = parse(q)
+
+        ast should beRightDisjunction
+
+        ((ast ∘ ((pprint[Fix[Sql]] _) >>> (Query(_)))) >>= (parse(_))) must_=== ast
+      }
+
+      "quoted variable names" in
+        roundTrip("select * from :`A.results`")
+
+      "field deref with string literal" in
+        roundTrip("select a.`_id` from z as a")
+
+      "let binding" in
+        roundTrip("a := 42; SELECT * FROM z")
+
+      "union all" in
+        roundTrip("""SELECT * FROM (SELECT 1 as v UNION ALL SELECT 2 as v) as o""")
     }
   }
 }

@@ -18,99 +18,55 @@ package quasar.physical.couchbase.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
-import quasar.effect.{MonotonicSeq, Read}
+import quasar.contrib.scalaz._, eitherT._
+import quasar.effect.MonotonicSeq
 import quasar.fp.free._
-import quasar.fs._
-import quasar.physical.couchbase.common._
+import quasar.fs._, ManageFile._
+import quasar.physical.couchbase._, common._, Couchbase._
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-object managefile {
-  import ManageFile._
-
-  def interpret[S[_]](implicit
-    S0: MonotonicSeq :<: S,
-    S1: Read[Context, ?] :<:  S,
-    S2: Task :<: S
-  ): ManageFile ~> Free[S, ?] = λ[ManageFile ~> Free[S, ?]] {
-    case Move(scenario, semantics) => move(scenario, semantics)
-    case Delete(path)              => delete(path)
-    case TempFile(path)            => tempFile(path)
-  }
-
-  def move[S[_]](
-    scenario: MoveScenario, semantics: MoveSemantics
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Unit] =
-    (for {
-      ctx       <- context.ask.liftM[FileSystemErrT]
-      src       <- EitherT(bucketCollectionFromPath(scenario.src).η[Free[S, ?]])
-      dst       <- EitherT(bucketCollectionFromPath(scenario.dst).η[Free[S, ?]])
-      _         <- EitherT((
-                     if (src.bucket =/= dst.bucket) FileSystemError.pathErr(
-                       PathError.invalidPath(scenario.dst, "different bucket from src path")).left
-                     else
-                       ().right
-                   ).η[Free[S, ?]])
-      bkt       <- EitherT(getBucket(src.bucket))
-      srcExists <- lift(existsWithPrefix(bkt, src.collection)).into.liftM[FileSystemErrT]
-      _         <- EitherT((
-                     if (!srcExists)
-                       FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
-                     else
-                       ().right
-                   ).η[Free[S, ?]])
-      dstExists <- lift(existsWithPrefix(bkt, dst.collection)).into.liftM[FileSystemErrT]
-      _         <- EitherT((semantics match {
+abstract class managefile {
+  def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] =
+    for {
+      ctx       <- MR.asks(_.ctx)
+      src       =  docTypeValueFromPath(scenario.src)
+      dst       =  docTypeValueFromPath(scenario.dst)
+      srcExists <- ME.unattempt(lift(existsWithPrefix(ctx, src.v)).into[Eff].liftB)
+      _         <- srcExists.unlessM(
+                     ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.src))))
+      dstExists <- ME.unattempt(lift(existsWithPrefix(ctx, dst.v)).into[Eff].liftB)
+      _         <- semantics match {
                     case MoveSemantics.FailIfExists if dstExists =>
-                      FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
+                      ME.raiseError(FileSystemError.pathErr(PathError.pathExists(scenario.dst)))
                     case MoveSemantics.FailIfMissing if !dstExists =>
-                      FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)).left
+                      ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(scenario.dst)))
                     case _ =>
-                      ().right[FileSystemError]
-                  }).η[Free[S, ?]])
-      _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
-      qStr      =  s"""update `${bkt.name}`
-                       set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where type like "${src.collection}%""""
-      _         <- lift(Task.delay(
-                     bkt.query(n1qlQuery(qStr))
-                   )).into.liftM[FileSystemErrT]
-    } yield ()).run
+                      ().η[Backend]
+                   }
+      _         <- dstExists.whenM(delete(scenario.dst))
+      qStr      =  s"""update `${ctx.bucket.name}`
+                       set `${ctx.docTypeKey.v}`=("${dst.v}" || REGEXP_REPLACE(`${ctx.docTypeKey.v}`, "^${src.v}", ""))
+                       where `${ctx.docTypeKey.v}` like "${src.v}%""""
+      _         <- ME.unattempt(lift(query(ctx.bucket, qStr)).into[Eff].liftB)
+    } yield ()
 
-  def delete[S[_]](
-    path: APath
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Unit] =
-    (for {
-      ctx       <- context.ask.liftM[FileSystemErrT]
-      bktCol    <- EitherT(bucketCollectionFromPath(path).η[Free[S, ?]])
-      bkt       <- EitherT(getBucket(bktCol.bucket))
-      docsExist <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
-      _         <- EitherT((
-                     if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
-                     else ().right
-                   ).η[Free[S, ?]])
-      _         <- lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[FileSystemErrT]
-    } yield ()).run
+  def delete(path: APath): Backend[Unit] =
+    for {
+      ctx       <- MR.asks(_.ctx)
+      col       =  docTypeValueFromPath(path)
+      docsExist <- ME.unattempt(lift(existsWithPrefix(ctx, col.v)).into[Eff].liftB)
+      _         <- docsExist.unlessM(
+                     ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(path))))
+      _         <- ME.unattempt(lift(deleteHavingPrefix(ctx, col.v)).into[Eff].liftB)
+    } yield ()
 
-  def tempFile[S[_]](
-    path: APath
-  )(implicit
-    S0: MonotonicSeq :<: S
-  ): Free[S, FileSystemError \/ AFile] =
-    MonotonicSeq.Ops[S].next.map { i =>
+  def tempFile(near: APath): Backend[AFile] =
+    MonotonicSeq.Ops[Eff].next.map { i =>
       val tmpFilename = file(s"__quasar_tmp_$i")
-      refineType(path).fold(
+      refineType(near).fold(
         d => d </> tmpFilename,
-        f => fileParent(f) </> tmpFilename
-      ).right
-    }
-
+        f => fileParent(f) </> tmpFilename)
+    }.liftB
 }

@@ -17,21 +17,20 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.fp.ski._
 import quasar.SemanticError._
-import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST, pprint}
+import quasar.frontend.SemanticErrors
+import quasar.sql.{Sql, Query, Select, Vari, VariRelationAST}
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 final case class Variables(value: Map[VarName, VarValue]) {
   def lookup(name: VarName): SemanticError \/ Fix[Sql] =
     value.get(name).fold[SemanticError \/ Fix[Sql]](
       UnboundVariable(name).left)(
-      varValue => sql.fixParser.parse(Query(varValue.value))
+      varValue => sql.fixParser.parseExpr(Query(varValue.value))
         .leftMap(VariableParseError(name, varValue, _)))
 }
 final case class VarName(value: String) {
@@ -49,26 +48,28 @@ object Variables {
       AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
     case Vari(name) =>
       vars.lookup(VarName(name))
-    case sel @ Select(dist, proj, Some(rel), filter, group, order) =>
-      rel.transformM[SemanticError \/ ?, Fix[Sql]]({
-        case VariRelationAST(vari, alias) =>
-          val varName = VarName(vari.symbol)
-          vars.lookup(varName) flatMap {
-            case Fix(Ident(name)) =>
-              posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
-                TableRelationAST(_, alias).right,
-                GenericError(s"bad path: $name (note: absolute file path required)").left)  // FIXME
-            case x =>
-              GenericError(s"not a valid table name: ${pprint(x)}").left  // FIXME
-          }
-        case r => r.right
-      }, _.right[SemanticError]).map(rel =>
-        sel.copy(relations = rel.some).embed)
+    case sel: Select[Fix[Sql]] =>
+      sel.substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v => vars.lookup(VarName(v.symbol))).join.map(_.embed)
     case x => x.embed.right
+  }
+
+  def allVariables: Algebra[Sql, List[VarName]] = {
+    case Vari(name)                                      => List(VarName(name))
+    case sel @ Select(_, _, rel, _, _, _) =>
+      rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol) } ++
+      (sel: Sql[List[VarName]]).fold
+    case other                                           => other.fold
   }
 
   // FIXME: Get rid of this
   def substVars(expr: Fix[Sql], variables: Variables)
-      : SemanticError \/ Fix[Sql] =
-    expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables))
+      : SemanticErrors \/ Fix[Sql] = {
+    val allVars = expr.cata(allVariables)
+    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
+    errors.fold(
+      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
+      errors => errors.left)
+  }
+
+  implicit val equal: Equal[Variables] = Equal.equalA
 }

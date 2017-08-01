@@ -21,14 +21,14 @@ import quasar.contrib.pathy.{ADir}
 import quasar.effect._
 import quasar.fp.liftMT
 import quasar.fp.free, free._
-import quasar.fs.{FileSystem, FileSystemType, PathError}
+import quasar.fs.{BackendEffect, FileSystemType, PathError}
 
 import monocle.function.Field1
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 class FileSystemMountHandlerSpec extends quasar.Qspec {
-  import FileSystemDef._
+  import BackendDef._
 
   type Abort[A]  = Failure[String, A]
   type AbortM[A] = Free[Abort, A]
@@ -68,16 +68,16 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
     }
 
 
-  val abortFs: FileSystem ~> AbortM =
-    new (FileSystem ~> AbortM) {
-      def apply[A](fs: FileSystem[A]) =
+  val abortFs: BackendEffect ~> AbortM =
+    new (BackendEffect ~> AbortM) {
+      def apply[A](fs: BackendEffect[A]) =
         abort.fail("FileSystem")
     }
 
   def fsResult(sig: String): DefinitionResult[AbortM] =
     DefinitionResult[AbortM](abortFs, abort.fail(sig))
 
-  val fsDef = FileSystemDef.fromPF {
+  val fsDef = BackendDef.fromPF {
     case (typ, _) if typ == testType =>
       type X[A] = DefErrT[AbortM, A]
       fsResult("DEF").point[X]
@@ -116,7 +116,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
       "fails when filesystem creation fails" >> {
         val d = rootDir </> dir("create") </> dir("fails")
-        val fsd = Monoid[FileSystemDef[AbortM]].zero
+        val fsd = Monoid[BackendDef[AbortM]].zero
         val fsm = FileSystemMountHandler(fsd)
 
         eval(Mounts.empty)(fsm.mount[Eff](d, testType, testUri))._2 must beLike {

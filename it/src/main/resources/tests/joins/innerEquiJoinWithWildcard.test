@@ -1,16 +1,24 @@
 {
     "name": "perform inner equi-join with wildcard",
+
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mongodb_q_3_2": "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
-    "query": "select * from `../smallZips` join `../zips` on smallZips._id = zips._id",
-    "predicate": "containsAtLeast",
+
+    "query": "select * from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "ignoreFieldOrder": true,
+
     "expected": [
         {"_id":"01001", "city":"AGAWAM",       "loc":[-72.622739,42.070206], "pop":15338, "state":"MA"},
         {"_id":"01002", "city":"CUSHMAN",      "loc":[-72.51565,42.377017],  "pop":36963, "state":"MA"},

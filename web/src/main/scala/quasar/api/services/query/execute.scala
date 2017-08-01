@@ -20,14 +20,14 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
-import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.mount.Mounting
 import quasar.main.FilesystemQueries
-import quasar.sql.{Query, Sql}
+import quasar.sql.{ScopedExpr, Query, Sql}
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -49,14 +49,11 @@ object execute {
     Q: QueryFile.Ops[S],
     M: ManageFile :<: S,
     S1: Task :<: S,
-    S2: FileSystemFailure :<: S
+    S2: FileSystemFailure :<: S,
+    S3: Mounting :<: S
   ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
-
-    val removePhaseResults = new (FileSystemErrT[PhaseResultT[Free[S,?], ?], ?] ~> FileSystemErrT[Free[S,?], ?]) {
-      def apply[A](t: FileSystemErrT[PhaseResultT[Free[S,?], ?], A]): FileSystemErrT[Free[S,?], A] =
-        EitherT[Free[S,?],FileSystemError,A](t.run.value)
-    }
+    val xform = QueryFile.Transforms[Free[S, ?]]
 
     def destinationFile(fileStr: String): ApiError \/ (Path[Abs,File,Unsandboxed] \/ Path[Rel,File,Unsandboxed]) = {
       val err = -\/(ApiError.apiError(
@@ -68,12 +65,15 @@ object execute {
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
-        respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, basePath, off, lim) =>
+        respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          queryPlan(xpr, requestVars(req), basePath, Nil, off, lim)
-            .run.value map (lp => formattedDataResponse(
-              MessageFormat.fromAccept(req.headers.get(Accept)),
-              lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
+          resolveImports[S](xpr, basePath).run.map { block =>
+            block.leftMap(_.wrapNel).flatMap(block =>
+              queryPlan(block, requestVars(req), basePath, off, lim)
+                .run.value map (lp => formattedDataResponse(
+                MessageFormat.fromAccept(req.headers.get(Accept)),
+                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases))))
+          }
         })
 
       case req @ POST -> AsDirPath(path) =>
@@ -82,25 +82,27 @@ object execute {
             respond_(bodyMustContainQuery)
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
-              val parseRes: ApiError \/ Fix[Sql] =
+              val parseRes: ApiError \/ ScopedExpr[Fix[Sql]] =
                 sql.fixParser.parse(Query(query)).leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =
                 destinationFile(destination.value) map (res =>
-                  sandboxAbs(res.map(unsandbox(path) </> _).merge))
+                  unsafeSandboxAbs(res.map(unsandbox(path) </> _).merge))
 
               val basePath: ApiError \/ ADir =
                 decodedDir(req.uri.path)
 
               parseRes tuple absDestination tuple basePath
             } traverse { case ((expr, out), basePath) =>
-              fsQ.executeQuery(expr, requestVars(req), basePath, out).run.run.run map {
-                case (phases, result) =>
-                  result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
-                    .bimap(_ :+ ("phases" := phases), f => Json(
-                      "out"    := posixCodec.printPath(f),
-                      "phases" := phases))
-              }
+              resolveImports(expr, basePath).leftMap(_.toApiError).flatMap { block =>
+                  EitherT(fsQ.executeQuery(block, requestVars(req), basePath, out).run.run.run map {
+                    case (phases, result) =>
+                      result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
+                        .bimap(_ :+ ("phases" := phases), f => Json(
+                          "out"    := posixCodec.printPath(f),
+                          "phases" := phases))
+                  })
+              }.run
             })
           }
         }

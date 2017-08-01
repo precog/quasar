@@ -2,17 +2,14 @@
     "name": "filter by JS expression, with only reducing projections",
 
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "spark_local":       "pending",
-        "spark_hdfs":        "pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
 
     "data": "largeZips.data",
 
     "query": "select max(pop) as max_pop, min(city) as min_city from largeZips where length(city) < 6",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "max_pop": 85710, "min_city": "ABAC" }]
 }

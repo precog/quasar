@@ -51,9 +51,9 @@ sealed abstract class MonadReader_Instances {
       def local[A](f: R => R)(fa: WriterT[F, W, A]) = WriterT(R.local(f)(fa.run))
     }
 
-  implicit def readerTInnerMonadReader_[F[_], R1, R2](implicit R: MonadReader_[F, R1]): MonadReader_[ReaderT[F, R2, ?], R1] =
-    new MonadReader_[ReaderT[F, R2, ?], R1] {
-      def ask = ReaderT(_ => R.ask)
-      def local[A](f: R1 => R1)(fa: ReaderT[F, R2, A]) = ReaderT(r2 => R.local(f)(fa.run(r2)))
+  implicit def kleisliInnerMonadReader_[F[_], R1, R2](implicit R: MonadReader_[F, R1]): MonadReader_[Kleisli[F, R2, ?], R1] =
+    new MonadReader_[Kleisli[F, R2, ?], R1] {
+      def ask = Kleisli(_ => R.ask)
+      def local[A](f: R1 => R1)(fa: Kleisli[F, R2, A]) = Kleisli(r2 => R.local(f)(fa.run(r2)))
     }
 }

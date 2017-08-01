@@ -2,14 +2,15 @@
   "name": "filter with negated regex selector",
 
   "backends": {
-    "postgresql": "pending"
+        "mimir":"ignoreFieldOrder"
   },
 
   "data": "zips.data",
 
   "query": "select city, state from zips where city not like \"BOULD%\" and pop = 18174",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
   "expected": [
     { "city": "ESCONDIDO", "state": "CA" }
   ]

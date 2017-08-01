@@ -17,14 +17,12 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.queryPlan
 import quasar.effect._
-import quasar.fs.FileSystem
+import quasar.fs.BackendEffect
 import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
 import monocle.function.Field1
-import pathy.Path.fileParent
 import scalaz._, Scalaz._
 
 /** Handles mount requests, validating them and updating a hierarchical
@@ -34,19 +32,19 @@ import scalaz._, Scalaz._
   * @tparam S the composite effect, supporting the base and hierarchical effects
   */
 final class MountRequestHandler[F[_], S[_]](
-  fsDef: FileSystemDef[F]
+  fsDef: BackendDef[F]
 )(implicit
   S0: F :<: S,
   S1: MountedResultH :<: S,
   S2: MonotonicSeq :<: S
 ) {
-  import MountRequest._, MountingError._, MountConfig._
+  import MountRequest._
 
-  type HierarchicalFsRef[A] = AtomicRef[FileSystem ~> Free[S, ?], A]
+  type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[S, ?], A]
 
   object HierarchicalFsRef {
     def Ops[G[_]](implicit G: HierarchicalFsRef :<: G) =
-      AtomicRef.Ops[FileSystem ~> Free[S, ?], G]
+      AtomicRef.Ops[BackendEffect ~> Free[S, ?], G]
   }
 
   def mount[T[_]](
@@ -59,13 +57,13 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
-        case MountView(f, qry, vars) =>
-          queryPlan(qry, vars, fileParent(f), Nil, 0L, None).run.value
-            .leftMap(e => invalidConfig(viewConfig(qry, vars), e.map(_.shows)))
-            .void.point[Free[T, ?]]
-
-        case MountFileSystem(d, typ, uri) =>
-          fsm.mount[T](d, typ, uri)
+        case MountFileSystem(d, typ, uri) => fsm.mount[T](d, typ, uri)
+        // Previously we would validate at this point that a view's Sql could be compiled
+        // to `LogicalPlan` but now that views can contain Imports, that's no longer easy or very
+        // valuable. Validation can once again be performed once `LogicalPlan` has a representation
+        // for functions and imports
+        // See https://github.com/quasar-analytics/quasar/issues/2398
+        case _ => ().right.point[Free[T, ?]]
       })
 
     (handleMount *> updateHierarchy[T].liftM[MntErrT]).run
@@ -108,14 +106,14 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-                 (mnts => hierarchical.fileSystem[F, S](mnts.map(_.run)))
+                 (mnts => hierarchical.backendEffect[F, S](mnts.map(_.run)))
       _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }
 
 object MountRequestHandler {
   def apply[F[_], S[_]](
-    fsDef: FileSystemDef[F]
+    fsDef: BackendDef[F]
   )(implicit
     S0: F :<: S,
     S1: MountedResultH :<: S,

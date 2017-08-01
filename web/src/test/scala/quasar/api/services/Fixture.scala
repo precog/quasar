@@ -17,16 +17,22 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import argonaut.{JsonObject, JsonNumber, Json, Argonaut}
-import Argonaut._
-import jawn.{FContext, Facade}
-import org.http4s.{MediaType, Charset, EntityEncoder}
-import org.http4s.headers.`Content-Type`
-import org.scalacheck.Arbitrary
-
+import quasar.contrib.pathy.APath
+import quasar.effect._
+import quasar.fp._
+import quasar.fp.free._
+import quasar.fs.mount._
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
+
+import argonaut.{Json, Argonaut}
+import Argonaut._
+import org.http4s.{MediaType, Charset, EntityEncoder}
+import org.http4s.headers.`Content-Type`
+import org.scalacheck.Arbitrary
+import scalaz._
+import scalaz.concurrent.Task
 
 object Fixture {
 
@@ -36,47 +42,6 @@ object Fixture {
   val jsonPreciseLine = JsonContentType(Precise,LineDelimited)
   val jsonReadableArray = JsonContentType(Readable,SingleArray)
   val jsonPreciseArray = JsonContentType(Precise,SingleArray)
-
-  // See: https://github.com/non/jawn/pull/43
-  implicit val bugFreeArgonautFacade: Facade[Json] =
-    new Facade[Json] {
-      def jnull() = Json.jNull
-      def jfalse() = Json.jFalse
-      def jtrue() = Json.jTrue
-      def jnum(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jint(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jstring(s: String) = Json.jString(s)
-
-      def singleContext() = new FContext[Json] {
-        var value: Json = null
-        def add(s: String) = { value = jstring(s) }
-        def add(v: Json) = { value = v }
-        def finish: Json = value
-        def isObj: Boolean = false
-      }
-
-      def arrayContext() = new FContext[Json] {
-        val vs = scala.collection.mutable.ListBuffer.empty[Json]
-        def add(s: String) = { vs += jstring(s); () }
-        def add(v: Json) = { vs += v; () }
-        def finish: Json = Json.jArray(vs.toList)
-        def isObj: Boolean = false
-      }
-
-      def objectContext() = new FContext[Json] {
-        var key: String = null
-        var vs = JsonObject.empty
-        def add(s: String): Unit =
-          if (key == null) { key = s } else { vs = vs + (key, jstring(s)); key = null }
-        def add(v: Json): Unit =
-        { vs = vs + (key, v); key = null }
-        def finish = Json.jObject(vs)
-        def isObj = true
-      }
-    }
-
-  // Remove once version 0.8.4 or higher of jawn is realeased.
-  implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
 
   sealed abstract class JsonType
 
@@ -114,5 +79,18 @@ object Fixture {
       EntityEncoder.encodeBy(`Content-Type`(MediaType.`text/csv`, Charset.`UTF-8`)) { csv =>
         EntityEncoder.stringEncoder(Charset.`UTF-8`).toEntity(csv.value)
       }
+  }
+
+  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
+    type MEff[A] = Coproduct[Task, MountConfigs, A]
+    TaskRef(mounts).map { configsRef =>
+
+      val mounter: Mounting ~> Free[MEff, ?] = Mounter.trivial[MEff]
+
+      val meff: MEff ~> Task =
+        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
+
+      foldMapNT(meff) compose mounter
+    }
   }
 }

@@ -40,6 +40,7 @@ sealed abstract class Selector {
 
   private def mapUp0(f: BsonField => BsonField): Selector = mapUpFieldsM[Id](f(_).point[Id])
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def mapUpFieldsM[M[_]: Monad](f: BsonField => M[BsonField]): M[Selector] =
     this match {
       case Doc(pairs)       => pairs.toList.traverse { case (field, expr) => f(field).map(_ -> expr) }.map(ps => Doc(ps.toListMap))
@@ -55,6 +56,7 @@ sealed abstract class Selector {
       case Selector.NotExpr(cond) => Selector.Expr(cond)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(s: Selector): Selector = s match {
       case Selector.Doc(pairs) =>
         pairs.toList
@@ -76,6 +78,7 @@ object Selector {
     new RenderTree[Selector] {
       val SelectorNodeType = List("Selector")
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def render(sel: Selector) = sel match {
         case and: And     => NonTerminal("And" :: SelectorNodeType, None, and.flatten.map(render))
         case or: Or       => NonTerminal("Or" :: SelectorNodeType, None, or.flatten.map(render))
@@ -224,6 +227,7 @@ object Selector {
     def left: Selector
     def right: Selector
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flatten: List[Selector] = {
       def loop(sel: Selector) = sel match {
         case sel: CompoundSelector if (this.op == sel.op) => sel.flatten

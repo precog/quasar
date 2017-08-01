@@ -2,6 +2,6 @@
     "name": "reduce a literal set with negatives",
     "data": "cars.data",
     "query": "select max((0, 1, -2, 5)) as maxlit from cars",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "maxlit": 5 }]
 }

@@ -100,25 +100,13 @@ object Failure {
   }
 
   def mapError[D, E](f: D => E): Failure[D, ?] ~> Failure[E, ?] =
-    new (Failure[D, ?] ~> Failure[E, ?]) {
-      def apply[A](fa: Failure[D, A]) = fa match {
-        case Fail(d) => Fail(f(d))
-      }
-    }
+    λ[Failure[D, ?] ~> Failure[E, ?]]{ case Fail(d) => Fail(f(d))}
 
   def toError[F[_], E](implicit F: MonadError[F, E]): Failure[E, ?] ~> F =
-    new (Failure[E, ?] ~> F) {
-      def apply[A](fa: Failure[E, A]) = fa match {
-        case Fail(e) => F.raiseError(e)
-      }
-    }
+    λ[Failure[E, ?] ~> F]{ case Fail(e) => F.raiseError(e)}
 
   def toCatchable[F[_], E <: Throwable](implicit C: Catchable[F]): Failure[E, ?] ~> F =
-    new (Failure[E, ?] ~> F) {
-      def apply[A](fa: Failure[E, A]) = fa match {
-        case Fail(e) => C.fail(e)
-      }
-    }
+    λ[Failure[E, ?] ~> F]{ case Fail(e) => C.fail(e)}
 
   def toRuntimeError[F[_]: Catchable, E: Show]: Failure[E, ?] ~> F =
     toCatchable[F, RuntimeException]

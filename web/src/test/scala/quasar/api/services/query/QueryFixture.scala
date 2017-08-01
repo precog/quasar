@@ -18,11 +18,13 @@ package quasar.api.services.query
 
 import slamdata.Predef._
 import quasar.api._
+import quasar.api.PathUtils._
+import quasar.api.services.Fixture._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.fs._, InMemory._
+import quasar.fs._, InMemory._, mount._
 import quasar.sql._
 import quasar.sql.fixpoint._
 
@@ -31,11 +33,11 @@ import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import quasar.api.PathUtils._
 
 object queryFixture {
   type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff1[A] = Coproduct[Mounting, Eff0, A]
+  type Eff[A]  = Coproduct[Task, Eff1, A]
 
   case class Query(
     q: String,
@@ -43,9 +45,10 @@ object queryFixture {
     limit: Option[Positive] = None,
     varNameAndValue: Option[(String, String)] = None)
 
-  def get[A:EntityDecoder](service: InMemState => HttpService)(path: ADir,
+  def get[A:EntityDecoder](service: (InMemState, Map[APath, MountConfig]) => HttpService)(path: ADir,
             query: Option[Query],
             state: InMemState,
+            mounts: Map[APath, MountConfig] = Map.empty,
             status: Status,
             response: A => MatchResult[scala.Any]) = {
     val offset = query.flatMap(_.offset.map(_.shows))
@@ -58,16 +61,23 @@ object queryFixture {
       baseUri.+?("var."+varName,value)
     }.getOrElse(baseUri)
     val req = Request(uri = uriWithVar)
-    val actualResponse = service(state)(req).unsafePerformSync
+    val actualResponse = service(state, mounts)(req).unsafePerformSync
     response(actualResponse.as[A].unsafePerformSync)
     actualResponse.status must_== status
   }
 
-  def compileService(state: InMemState): HttpService = compile.service[FileSystem].toHttpService(
-      liftMT[Task, ResponseT].compose(runFs(state).unsafePerformSync))
+  def serviceInter(state: InMemState, mounts: Map[APath, MountConfig]): Task[Eff ~> ResponseOr] =
+    (runFs(state) |@| mountingInter(mounts))(effRespOr)
 
-  def executeService(state: InMemState): HttpService =
-    execute.service[Eff].toHttpService(effRespOr(runFs(state).unsafePerformSync))
+  def compileService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
+    HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
+      compile.service[Eff].toHttpService(inter).apply(req)
+    })
+
+  def executeService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
+    HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
+      execute.service[Eff].toHttpService(inter).apply(req)
+    })
 
   def selectAll(from: FPath) = {
     val ast = SelectR(
@@ -87,8 +97,9 @@ object queryFixture {
     pprint(ast)
   }
 
-  def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
+  def effRespOr(fs: FileSystem ~> Task, m: Mounting ~> Task): Eff ~> ResponseOr =
     liftMT[Task, ResponseT]             :+:
+    liftMT[Task, ResponseT].compose(m)  :+:
     failureResponseOr[FileSystemError]  :+:
     liftMT[Task, ResponseT].compose(fs)
 }

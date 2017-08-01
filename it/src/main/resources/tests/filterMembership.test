@@ -1,11 +1,11 @@
 {
     "name": "filter on list membership",
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select count(*) as cnt from zips where state in (\"AZ\", \"CO\")",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{"cnt": 684}]
 }

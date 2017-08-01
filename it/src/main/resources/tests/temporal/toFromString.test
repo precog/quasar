@@ -1,17 +1,20 @@
 {
     "name": "convert dates to/from strings",
     "backends": {
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"pendingIgnoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending"
     },
     "data": "../days.data",
     "query": "select date(substring(str, 0, 10)) as d, time(substring(str, 11, 8)) as t, timestamp(str) as ts, to_string(ts) as s from `../days`",
-    "ignoreFieldOrder": ["couchbase", "marklogic_json"],
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "d": { "$date": "2014-08-17" }, "t": { "$time": "06:00:00.000" }, "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "s": "2014-08-17T06:00:00.000Z" },
         { "d": { "$date": "2014-08-18" }, "t": { "$time": "07:00:00.000" }, "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "s": "2014-08-18T07:00:00.000Z" },

@@ -19,10 +19,11 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -57,6 +58,7 @@ import scalaz._, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
+
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
@@ -101,10 +103,33 @@ package object qscript {
   implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
+  type MapFunc[T[_[_]], A] = (MapFuncCore[T, ?] :/: MapFuncDerived[T, ?])#M[A]
+
+  object MFC {
+    def apply[T[_[_]], A](mfc: MapFuncCore[T, A]): MapFunc[T, A] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
+  object MFD {
+    def apply[T[_[_]], A](mfc: MapFuncDerived[T, A]): MapFunc[T, A] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncDerived[T, A]] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
   type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
+
+  type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
+  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
+  type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
+  type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
@@ -117,41 +142,81 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  def concat[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, A: Equal: Show](
-    l: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+  private def concatNaive[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
+
+    val norml = norm.freeMF(l)
+    val normr = norm.freeMF(r)
 
     // NB: Might be better to do this later, after some normalization, part of
     //     array compaction, but this helps us avoid some autojoins.
-    (norm.freeMF(l) ≟ norm.freeMF(r)).fold(
-      (norm.freeMF(l), HoleF[T], HoleF[T]),
-      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+    (norml ≟ normr).fold(
+      (norml, HoleF[T], HoleF[T]),
+      (Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(r)))))),
+        Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+        Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))))
   }
 
-  def concat3[T[_[_]]: CorecursiveT, A](
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val rewrite = new Rewrite[T]
+    val norm = Normalizable.normalizable[T]
+
+    val norml = norm.freeMF(l)
+    val normr = norm.freeMF(r)
+
+    val leftElems: List[FreeMapA[T, A]] = norml.resume match {
+      case -\/(MFC(array @ ConcatArrays(_, _))) => rewrite.flattenArray[A](array)
+      case _ => Nil
+    }
+
+    val rightElems: List[FreeMapA[T, A]] = normr.resume match {
+      case -\/(MFC(array @ ConcatArrays(_, _))) => rewrite.flattenArray[A](array)
+      case _ => Nil
+    }
+
+    def projectIndex(idx: Int): FreeMap[T] =
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
+
+    def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
+      IList.fromList(elems).indexOf(Free.roll(MFC(MakeArray(value))))
+
+    indexOf(leftElems, normr).cata(
+      idx => (norml, HoleF[T], projectIndex(idx)),
+      indexOf(rightElems, norml).cata(
+        idx => (normr, projectIndex(idx), HoleF[T]),
+        concatNaive(norml, normr)))
+  }
+
+  // FIXME naive - use `concat`
+  def naiveConcat3[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+    (Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(c)))))), Free.roll(MFC(MakeArray(r)))))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
 
-  def concat4[T[_[_]]: CorecursiveT, A](
+  // FIXME naive - use `concat`
+  def naiveConcat4[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+    (Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(ConcatArrays(Free.roll(MFC(MakeArray(l))), Free.roll(MFC(MakeArray(c)))))), Free.roll(MFC(MakeArray(r)))))), Free.roll(MFC(MakeArray(r2)))))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](3)))))
+
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
-  def rebaseBranch[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
-    (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
+  def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT](
+    br: FreeQS[T],
+    fm: FreeMap[T]
+  ): FreeQS[T] = {
     val rewrite = new Rewrite[T]
 
     (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
@@ -178,23 +243,12 @@ package object qscript {
       (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
 
   /** A variant of `repeatedly` that works with `Inject` instances. */
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def injectRepeatedly[F [_], G[_], A]
     (op: F[A] => Option[G[A]])
     (implicit F: F :<: G)
       : F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
-
-  /** Chains multiple transformations together, each of which can fail to change
-    * anything.
-    */
-  def applyTransforms[T[_[_]], F[_], G[_]]
-    (transform: F[T[G]] => Option[F[T[G]]],
-      transforms: (F[T[G]] => Option[F[T[G]]])*)
-      : F[T[G]] => Option[F[T[G]]] =
-    transforms.foldLeft(
-      transform)(
-      (prev, next) => x => prev(x).fold(next(x))(y => next(y).orElse(y.some)))
-
 
   // Helpers for creating `Injectable` instances
 
@@ -217,13 +271,46 @@ package object qscript {
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
 
+  private def pruneArrays0[T[_[_]]: BirecursiveT, S[_[_]], F[_], G[_]: Traverse](
+    state: PATypes.RewriteState)(
+    implicit
+      R: Recursive.Aux[S[F], G],
+      C: Corecursive.Aux[S[F], G],
+      P: PruneArrays[G])
+      : S[F] => S[F] = {
+    val pa = new PAFindRemap[T, G]
+    _.hyloM[State[PATypes.RewriteState, ?], pa.ArrayEnv[G, ?], S[F]](
+      pa.remapIndices[S, State[PATypes.RewriteState, ?], F, G],
+      pa.findIndices[S, State[PATypes.RewriteState, ?], F, G]).run(state)._2
+  }
+
+  private def pruneArrays[T[_[_]]: BirecursiveT, S[_[_]], F[_], G[_]: Traverse](
+    implicit
+      R: Recursive.Aux[S[F], G],
+      C: Corecursive.Aux[S[F], G],
+      P: PruneArrays[G])
+      : S[F] => S[F] =
+    pruneArrays0[T, S, F, G](PATypes.Ignore)
+
   implicit final class BirecursiveOps[T[_[_]], F[_]](val self: T[F]) extends scala.AnyVal {
-    final def pruneArrays
-      (implicit PA: PruneArrays[F], T: BirecursiveT[T], TF: Traverse[F])
-        : T[F] = {
-      val pa = new PAFindRemap[T, F]
-      self.hyloM[State[PATypes.KnownIndices, ?], pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(none)._2
-    }
+    final def pruneArraysF(
+      implicit
+        T: BirecursiveT[T],
+        PA: PruneArrays[F],
+        TF: Traverse[F])
+        : T[F] =
+      pruneArrays[T, T, F, F].apply(self)
+  }
+
+  implicit final class FreeQSOps[T[_[_]]](val self: FreeQS[T]) extends scala.AnyVal {
+    final def pruneArraysBranch(
+      state: PATypes.RewriteState)(
+      implicit
+        T: BirecursiveT[T],
+        PA: PruneArrays[CoEnvQS[T, ?]],
+        TF: Traverse[CoEnvQS[T, ?]])
+        : FreeQS[T] =
+      pruneArrays0[T, Free[?[_], Hole], QScriptTotal[T, ?], CoEnvQS[T, ?]](state).apply(self)
   }
 }
 
@@ -233,7 +320,7 @@ package qscript {
   @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 
   object Ann {
-    implicit def equal[T[_[_]]: OrderT: EqualT]: Equal[Ann[T]] =
+    implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
       Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
 
     implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
@@ -243,9 +330,9 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: OrderT: EqualT, F[_]: Functor]
-      (implicit F: Delay[Equal, F])
-        : Equal[Target[T, F]] =
+    implicit def equal[T[_[_]]: EqualT, F[_]: Functor](
+      implicit F: Delay[Equal, F], J: Equal[T[EJson]]
+    ): Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
 
     implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])

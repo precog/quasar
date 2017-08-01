@@ -1,12 +1,9 @@
 {
     "name": "filter on simple JS",
-    "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
-    },
     "data": "largeZips.data",
     "query": "select city from largeZips where length(city) < 5",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": ["LYNN",
                  "TROY",
                  "ROME",

@@ -1,25 +1,27 @@
 {
     "name": "left key join (Couchbase)",
     "backends": {
+        "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
+        "mimir":             "skip",
         "mongodb_2_6":       "skip",
         "mongodb_3_0":       "skip",
         "mongodb_read_only": "skip",
         "mongodb_3_2":       "skip",
+        "mongodb_3_4":       "skip",
         "mongodb_q_3_2":     "skip",
-        "postgresql":        "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip"
     },
     "data": [],
     "query": "select meta(brewery).id as brewery_meta_id, brewery.name as brewery_name,
                      beer.name as beer_name, beer.brewery_id as beer_brewery_id
-              from `/beer-sample/brewery` as brewery
-              join `/beer-sample/beer` as beer on meta(brewery).id = beer.brewery_id
+              from `brewery` as brewery
+              join `beer` as beer on meta(brewery).id = beer.brewery_id
               where beer.name = \"Pale\"",
-    "ignoreFieldOrder": [ "couchbase" ],
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         {
             "beer_brewery_id": "coastal_fog_brewing", "beer_name": "Pale",

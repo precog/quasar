@@ -23,7 +23,7 @@ import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -50,6 +50,15 @@ object DiscoverPath extends DiscoverPathInstances {
   }
 
   type ListContents[M[_]] = ADir => M[Set[PathSegment]]
+
+  object ListContents {
+    def static[F[_]: Foldable, M[_]: Applicative](paths: F[APath]): ListContents[M] = {
+      def segment(d: ADir): APath => Set[PathSegment] =
+        _.relativeTo(d).flatMap(firstSegmentName).toSet
+
+      dir => paths.foldMap(segment(dir)).point[M]
+    }
+  }
 
   def apply[T[_[_]], IN[_], OUT[_]](implicit ev: DiscoverPath.Aux[T, IN, OUT]) =
     ev
@@ -186,7 +195,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
     (name: String, d: F[T[F]])
     (implicit QC: QScriptCore :<: F)
       : F[T[F]] =
-    QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
+    QC.inj(Map(d.embed, Free.roll(MFC(MakeMap(StrLit(name), HoleF)))))
 
   private val unionDirs: List[ADir] => Option[NonEmptyList[T[O]]] =
     _ ∘ (makeRead[O](_).embed) match {
@@ -232,7 +241,11 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def handleDirs[M[_]: Monad: MonadFsErr](g: ListContents[M], dirs: List[ADir], field: String) =
+      def handleDirs[M[_]: Monad: MonadFsErr](
+        g: ListContents[M],
+        dirs: List[ADir],
+        field: String)
+          : M[List[ADir] \&/ T[OUT]] =
         dirs.traverseM(fileType(g).apply(_, field).fold(
           df => List(df ∘ (file => RF.inj(Const[Read[AFile], T[OUT]](Read(file))).embed)),
           Nil)) ∘ {

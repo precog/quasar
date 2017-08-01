@@ -21,50 +21,50 @@ import quasar.{Variables, VariablesArbitrary}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.effect.KeyValueStore
-import quasar.fp.liftMT
+import quasar.fp._
 import quasar.fp.free, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._
+import quasar.fs.mount.Fixture.runConstantMount
 import quasar.sql._
+import quasar.sql.Arbitraries._
 
-import argonaut._, Argonaut._
+import argonaut._, Argonaut._, EncodeJsonScalaz._
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
-import monocle.Lens
 import org.http4s._
 import org.http4s.argonaut._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
+import scalaz.Scalaz._
 import scalaz.concurrent.Task
+import shapeless.tag.@@
 
 object MetadataFixture {
 
-  type MetadataEff[A] = Coproduct[QueryFile, Mounting, A]
+  type Eff[A] = Coproduct[QueryFile, Mounting, A]
 
   def runQuery(mem: InMemState): QueryFile ~> Task =
-    new (QueryFile ~> Task) {
-      def apply[A](fs: QueryFile[A]) =
-        Task.now(queryFile(fs).eval(mem))
-    }
+    queryFile andThen evalNT[Id, InMemState](mem) andThen pointNT[Task]
 
-  def runMount(mnts: Map[APath, MountConfig]): Mounting ~> Task =
-    new (Mounting ~> Task) {
-      type F[A] = State[Map[APath, MountConfig], A]
-      val mntr = Mounter.trivial[MountConfigs]
-      val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
-      def apply[A](ma: Mounting[A]) =
-        Task.now(mntr(ma).foldMap(kvf).eval(mnts))
-    }
+  def runQueryWithMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
+    val run: Eff ~> Task = runQuery(mem) :+: runConstantMount[Task](mnts)
+    val addViews = view.queryFile[Eff]
+    val addModules = flatMapSNT(transformIn[QueryFile, Eff, Free[Eff, ?]](module.queryFile[Eff], liftFT))
+    addViews andThen addModules andThen foldMapNT(run)
+  }
 
-  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService =
-    metadata.service[MetadataEff].toHttpService(
-      liftMT[Task, ResponseT] compose (runQuery(mem) :+: runMount(mnts)))
+  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService = {
+    metadata.service[Eff].toHttpService(
+      liftMT[Task, ResponseT] compose (runQueryWithMounts(mem, mnts) :+: runConstantMount[Task](mnts)))
+  }
 }
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import metadata.FsNode
-  import VariablesArbitrary._, ExprArbitrary._
+  import VariablesArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
   import MetadataFixture._
   import PathError._
@@ -103,36 +103,66 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
-          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.toIList.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
         .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
       "and mounts when any children happen to be mount points" >> prop { (
-        fName: FileName,
-        dName: DirName,
-        mName: DirName,
-        vName: FileName,
-        vcfg: (Fix[Sql], Variables),
+        fileName: FileName,
+        directoryName: DirName,
+        fsMountName: DirName,
+        viewName: FileName,
+        moduleName: DirName,
+        vcfg: (ScopedExpr[Fix[Sql]], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
-      ) => (fName != vName && dName != mName) ==> {
+      ) => (fileName ≠ viewName &&
+          directoryName ≠ fsMountName &&
+          directoryName ≠ moduleName &&
+          fsMountName ≠ moduleName) ==> {
+        val moduleConfig: List[Statement[Fix[Sql]]] = List(
+          FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
         val parent: ADir = rootDir </> dir("foo")
         val mnts = Map[APath, MountConfig](
-          (parent </> file(vName.value), MountConfig.viewConfig(vcfg)),
-          (parent </> dir(mName.value), MountConfig.fileSystemConfig(fsCfg)))
+          (parent </> file1(viewName), MountConfig.viewConfig(vcfg)),
+          (parent </> dir1(fsMountName), MountConfig.fileSystemConfig(fsCfg)),
+          (parent </> dir1(moduleName), MountConfig.moduleConfig(moduleConfig)))
         val mem = InMemState fromFiles Map(
-          (parent </> file(fName.value), Vector()),
-          (parent </> dir(dName.value) </> file("quux"), Vector()),
-          (parent </> file(vName.value), Vector()),
-          (parent </> dir(mName.value) </> file("bar"), Vector()))
+          (parent </> file1(fileName), Vector()),
+          (parent </> dir1(directoryName) </> file("quux"), Vector()),
+          (parent </> file1(viewName), Vector()),
+          (parent </> dir1(fsMountName) </> file("bar"), Vector()))
 
         service(mem, mnts)(Request(uri = pathUri(parent)))
           .as[Json].unsafePerformSync must_=== Json("children" := List(
-            FsNode(fName.value, "file", None),
-            FsNode(dName.value, "directory", None),
-            FsNode(vName.value, "file", Some("view")),
-            FsNode(mName.value, "directory", Some(fsCfg._1.value))
-          ).sorted)
+            FsNode(fileName.value, "file", None, None),
+            FsNode(directoryName.value, "directory", None, None),
+            FsNode(viewName.value, "file", Some("view"), None),
+            FsNode(fsMountName.value, "directory", Some(fsCfg._1.value), None),
+            FsNode(moduleName.value, "directory", Some("module"), None)
+          ).toIList.sorted)
       }}
+
+      "and functions as files on a module mount with additional info about functions parameters" >> prop { dir: ADir =>
+        val moduleConfig: List[Statement[Fix[Sql]]] = List(
+          FunctionDecl(CIName("FOO"), List(CIName("BAR")), Fix(boolLiteral(true))),
+          FunctionDecl(CIName("BAR"), List(CIName("BAR"), CIName("BAZ")), Fix(boolLiteral(false))))
+        val mnts = Map[APath, MountConfig](
+          (dir, MountConfig.moduleConfig(moduleConfig)))
+        val mem = InMemState.empty
+
+        service(mem, mnts)(Request(uri = pathUri(dir)))
+          .as[Json].unsafePerformSync must_=== Json("children" := List(
+          FsNode("FOO", "file", mount = None, args = Some(List("BAR"))),
+          FsNode("BAR", "file", mount = None, args = Some(List("BAR", "BAZ")))
+        ).toIList.sorted)
+      }
+
+      "support offset and limit" >> prop { (dir: NonEmptyDir, offset: Int @@ NonNegative, limit: Int @@ RPositive) =>
+        val childNodes = dir.ls.map(FsNode(_, None))
+
+        service(dir.state, Map())(Request(uri = pathUri(dir.dir).+?("offset", offset.toString).+?("limit", limit.toString)))
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.toIList.sorted.drop(offset).take(limit))
+      }.set(minTestsOk = 10) // NB: this test is slow because NonEmptyDir instances are still relatively large
 
       "and empty object for existing file" >> prop { s: SingleFileMemState =>
         service(s.state, Map())(Request(uri = pathUri(s.file)))

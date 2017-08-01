@@ -25,40 +25,35 @@ import _root_.matryoshka._
 import _root_.scalaz._
 
 package object argonaut {
-  implicit def jsonRecursive[J[_]]
-    (implicit O: ejson.Obj :<: J, C: ejson.Common :<: J)
-      : Recursive.Aux[Json, J] =
+  private val CJ = Inject[ejson.Common, ejson.Json]
+  private val OJ = Inject[ejson.Obj,    ejson.Json]
+
+  implicit def jsonRecursive: Recursive.Aux[Json, ejson.Json] =
     new Recursive[Json] {
-      type Base[A] = J[A]
+      type Base[A] = ejson.Json[A]
 
       def project(t: Json)(implicit BF: Functor[Base]) =
         t.fold(
-          C.inj(ejson.Null()),
-          b => C.inj(ejson.Bool(b)),
-          d => C.inj(ejson.Dec(d.toBigDecimal)),
-          s => C.inj(ejson.Str(s)),
-          a => C.inj(ejson.Arr(a)),
-          o => O.inj(ejson.Obj(ListMap(o.toList: _*))))
+          CJ(ejson.Null()),
+          b => CJ(ejson.Bool(b)),
+          d => CJ(ejson.Dec(d.toBigDecimal)),
+          s => CJ(ejson.Str(s)),
+          a => CJ(ejson.Arr(a)),
+          o => OJ(ejson.Obj(ListMap(o.toList: _*))))
     }
 
-  // TODO: It would be nice to define this in terms of the components as well,
-  //       but then I don’t know how to make it total. So, for now, we use the
-  //       predefined Coproduct.
   implicit def jsonCorecursive: Corecursive.Aux[Json, ejson.Json] =
     new Corecursive[Json] {
       type Base[A] = ejson.Json[A]
 
-      val EC = Inject[ejson.Common, ejson.Json]
-      val EO = Inject[ejson.Obj,    ejson.Json]
-
       def embed(ft: ejson.Json[Json])(implicit BF: Functor[Base]) =
         ft match {
-          case EC(ejson.Null())  => jNull
-          case EC(ejson.Bool(b)) => jBool(b)
-          case EC(ejson.Dec(d))  => jNumber(d)
-          case EC(ejson.Str(s))  => jString(s)
-          case EC(ejson.Arr(a))  => jArray(a)
-          case EO(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
+          case CJ(ejson.Null())  => jNull
+          case CJ(ejson.Bool(b)) => jBool(b)
+          case CJ(ejson.Dec(d))  => jNumber(d)
+          case CJ(ejson.Str(s))  => jString(s)
+          case CJ(ejson.Arr(a))  => jArray(a)
+          case OJ(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
         }
     }
 }

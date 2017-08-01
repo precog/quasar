@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
+import quasar.ejson.implicits._
 import quasar.std._
 
 import scala.sys
@@ -68,25 +69,25 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
     prg.cata[Free[MapFunc[Fix, ?], A]] {
       case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateUnaryMapping(func)(a1))
+        Free.roll((MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func)(a1))
 
       case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
+        Free.roll((MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]] _)(func)(a1, a2))
 
       case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
+        Free.roll((MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]] _)(func)(a1, a2, a3))
 
       case lp.Free(sym) => Free.pure(args(sym))
 
       case lp.Constant(data) =>
         qsr.fromData(data).fold(
           _ => sys.error("invalid Data"),
-          ej => Free.roll(MapFuncs.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej)))
+          ej => Free.roll(MFC(MapFuncsCore.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej))))
 
       case lp.TemporalTrunc(part, src) =>
-        Free.roll(MapFuncs.TemporalTrunc(part, src))
+        Free.roll(MFC(MapFuncsCore.TemporalTrunc(part, src)))
     }
 
   def absurd[A, B](a: A): B = sys.error("impossible!")

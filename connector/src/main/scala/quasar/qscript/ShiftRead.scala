@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -56,7 +56,7 @@ object ShiftRead {
       FreeQS[T] =
     branch.futu[FreeQS[T]](
       _.project.run.fold(
-        h => CoEnv(h.left[QScriptTotal[T, Free[CoEnv[Hole, QScriptTotal[T, ?], ?], FreeQS[T]]]]),
+        h => CoEnv(h.left[QScriptTotal[T, Free[CoEnvQS[T, ?], FreeQS[T]]]]),
         ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
   implicit def read[T[_[_]]: BirecursiveT, F[_], A]
@@ -71,8 +71,8 @@ object ShiftRead {
             IncludeId))))),
           NullLit(),
           List(ReduceFuncs.UnshiftMap(
-            Free.roll(ProjectIndex(HoleF, IntLit(0))),
-            Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+            Free.roll(MFC(ProjectIndex(HoleF, IntLit(0)))),
+            Free.roll(MFC(ProjectIndex(HoleF, IntLit(1)))))),
           Free.point(ReduceIndex(0.some)))))
        )
     }

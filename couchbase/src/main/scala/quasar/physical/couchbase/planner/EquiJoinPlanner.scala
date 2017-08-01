@@ -19,15 +19,15 @@ package quasar.physical.couchbase.planner
 import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz.eitherT._
 import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
-  common.BucketCollection,
+  common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
+import quasar.Planner.PlannerErrorME
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
 
 import matryoshka._
 import matryoshka.data._
@@ -37,7 +37,9 @@ import scalaz._, Scalaz._
 
 // NB: Only handling a limited simple set of cases to start
 
-final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+final class EquiJoinPlanner[
+    T[_[_]]: BirecursiveT: ShowT,
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
@@ -51,31 +53,31 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
 
   object MetaGuard {
     def unapply[A](mf: FreeMapA[T, A]): Boolean = (
-      mf.resume.swap.toOption >>= { case mfs.Guard(Meta(), _, _, _) => ().some; case _ => none }
+      mf.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
     ).isDefined
 
     object Meta {
       def unapply[A](mf: FreeMapA[T, A]): Boolean =
-        (mf.resume.swap.toOption >>= { case mfs.Meta(_) => ().some; case _ => none }).isDefined
+        (mf.resume.swap.toOption >>= { case MFC(mfs.Meta(_)) => ().some; case _ => none }).isDefined
     }
   }
 
   val QC = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
-  object BranchBucketCollection {
-    def unapply(qs: FreeQS[T]): Option[BucketCollection] = (qs match {
+  object BranchCollection {
+    def unapply(qs: FreeQS[T]): Option[DocTypeValue] = (qs match {
       case Embed(CoEnv(\/-(CShiftedRead(c))))                              => c.some
       case Embed(CoEnv(\/-(QC(
         qscript.Filter(Embed(CoEnv(\/-(CShiftedRead(c)))),MetaGuard()))))) => c.some
       case _                                                               => none
-    }) >>= (c => BucketCollection.fromPath(c.getConst.path).toOption)
+    }) ∘ (c =>  common.docTypeValueFromPath(c.getConst.path))
   }
 
   object KeyMetaId {
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
-        case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+        case -\/(MFC(mfs.ProjectField(src, field))) => (src.resume, field.resume) match {
+          case (-\/(MFC(mfs.Meta(_))), -\/(MFC(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2))))))) => true
           case _                                                                       => false
         }
         case v => false
@@ -84,63 +86,64 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
     }
   }
 
-  lazy val tPlan: AlgebraM[M, QScriptTotal[T, ?], T[N1QL]] =
+  lazy val tPlan: AlgebraM[F, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[F, MapFunc[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
-  def unimpl[F[_]: Applicative, A] =
-    unimplementedP[F, A]("EquiJoin: Not currently mapped to N1QL's key join")
+  def unimpl[A] =
+    unimplemented[F, A]("EquiJoin: Not currently mapped to N1QL's key join")
 
   def keyJoin(
     branch: FreeQS[T], key: FreeMap[T], combine: JoinFunc[T],
-    bktCol: BucketCollection, side: JoinSide, joinType: LookupJoinType
-  ): M[T[N1QL]] =
+    col: String, side: JoinSide, joinType: LookupJoinType
+  ): F[T[N1QL]] =
     for {
-      id1 <- genId[T[N1QL], M]
-      id2 <- genId[T[N1QL], M]
-      b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[M]), tPlan))
-      k   <- key.cataM(interpretM(κ(id1.embed.η[M]), mfPlan))
+      id1 <- genId[T[N1QL], F]
+      id2 <- genId[T[N1QL], F]
+      ctx <- ContextReader[F].ask
+      b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[F]), tPlan))
+      k   <- key.cataM(interpretM(κ(id1.embed.η[F]), mfPlan))
       c   <- combine.cataM(interpretM({
-               case `side` => id1.embed.η[M]
-               case _      => Arr(List(N1QL.Null[T[N1QL]]().embed, id2.embed)).embed.η[M]
+               case `side` => id1.embed.η[F]
+               case _      => Arr(List(N1QL.Null[T[N1QL]]().embed, id2.embed)).embed.η[F]
              }, mfPlan))
     } yield Select(
       Value(true),
       ResultExpr(c, none).wrapNel,
       Keyspace(b, id1.some).some,
-      LookupJoin(N1QL.Id(bktCol.bucket), id2.some, k, joinType).some,
+      LookupJoin(N1QL.Id(ctx.bucket.v), id2.some, k, joinType).some,
       unnest = none, let = nil,
       Filter(Eq(
-        SelectField(id2.embed, Data[T[N1QL]](quasar.Data.Str("type")).embed).embed,
-        Data[T[N1QL]](quasar.Data.Str(bktCol.collection)).embed).embed).some,
+        SelectField(id2.embed, Data[T[N1QL]](quasar.Data.Str(ctx.docTypeKey.v)).embed).embed,
+        Data[T[N1QL]](quasar.Data.Str(col)).embed).embed).some,
       groupBy = none, orderBy = nil).embed
 
-  def plan: AlgebraM[M, EquiJoin[T, ?], T[N1QL]] = {
+  def plan: AlgebraM[F, EquiJoin[T, ?], T[N1QL]] = {
     case EquiJoin(
         Embed(Unreferenced()),
-        lBranch, BranchBucketCollection(rBktCol),
+        lBranch, BranchCollection(rCol),
         lKey, KeyMetaId(),
         joinType, combine) =>
       joinType match {
         case JoinType.Inner     =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.Inner.right)
+          keyJoin(lBranch, lKey, combine, rCol.v, LeftSide, JoinType.Inner.right)
         case JoinType.LeftOuter =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.LeftOuter.left)
+          keyJoin(lBranch, lKey, combine, rCol.v, LeftSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }
     case EquiJoin(
         Embed(Unreferenced()),
-        BranchBucketCollection(lBktCol), rBranch,
+        BranchCollection(lCol), rBranch,
         KeyMetaId(), rKey,
         joinType, combine) =>
       joinType match {
         case JoinType.Inner     =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.Inner.right)
+          keyJoin(rBranch, rKey, combine, lCol.v, RightSide, JoinType.Inner.right)
         case JoinType.RightOuter =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.LeftOuter.left)
+          keyJoin(rBranch, rKey, combine, lCol.v, RightSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }

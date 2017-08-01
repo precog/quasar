@@ -1,24 +1,23 @@
 {
     "name": "self-join where the left hand side is constant",
 
-    "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
-
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mongodb_q_3_2":     "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": "../largeZips.data",
 
-    "query": "select a.city, b.state from `../largeZips` as a, `../largeZips` as b where a._id = b._id
-            and \"CA\" = b.state",
+    "query": "select a.city, b.state
+              from `../largeZips` as a, `../largeZips` as b
+              where a.`_id` = b.`_id` and \"CA\" = b.state",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
     "expected": [{ "city": "REDONDO BEACH", "state": "CA" }]
 }

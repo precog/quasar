@@ -1,15 +1,14 @@
 {
   "name": "select _id as zip",
 
-  "backends": {
-    "postgresql": "pending"
-  },
+  "backends": {},
 
   "data": "zips.data",
 
-  "query": "select _id as zip from zips where city = \"BOULDER\" and state = \"CO\"",
+  "query": "select `_id` as zip from zips where city = \"BOULDER\" and state = \"CO\"",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "zip": "80301" },

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.fs._, ManageFile.MoveSemantics
+import quasar.fs._
 
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -34,7 +34,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
     case e: Exception => e.getMessage must contain("different format exists")
   }
 
-  def multiFormatFileSystemShould(js: FileSystem ~> Task, xml: FileSystem ~> Task) = {
+  def multiFormatFileSystemShould(js: BackendEffect ~> Task, xml: BackendEffect ~> Task) = {
     "FileSystem operations should respect the mount format" >> {
       "creating a file that already exists in a different format should fail" >> {
         val f: AFile = rootDir </> dir("createconflict") </> file("thefile")

@@ -1,12 +1,12 @@
 {
     "name": "convert null to/from strings",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
     "data": "nulls.data",
     "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["marklogic_json"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "n": null, "s": "null" }]
 }

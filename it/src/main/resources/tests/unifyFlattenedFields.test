@@ -1,13 +1,12 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "couchbase":  "pending"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [-72.622739,
                  -72.51565,
                  -72.108354,

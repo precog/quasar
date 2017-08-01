@@ -1,21 +1,9 @@
 {
     "name": "select aliased field sorted by original name",
-    "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "SELECT state AS `ResultAlias`, COUNT(*) as cnt FROM zips GROUP BY state ORDER BY state",
-    "ignoreFieldOrder": [
-        "couchbase",
-        "marklogic_json",
-        "mongodb_2_6",
-        "mongodb_3_0",
-        "mongodb_3_2",
-        "mongodb_read_only",
-        "mongodb_q_3_2"
-    ],
-    "predicate": "containsAtLeast",
+    "predicate": "initial",
+    "ignoreFieldOrder": true,
     "expected": [{ "ResultAlias": "AK", "cnt":  195 },
                  { "ResultAlias": "AL", "cnt":  567 },
                  { "ResultAlias": "AR", "cnt":  578 },

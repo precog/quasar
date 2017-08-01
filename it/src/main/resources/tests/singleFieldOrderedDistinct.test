@@ -5,7 +5,6 @@
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
         "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending",
 	"spark_hdfs": "pending",
         "spark_local": "pending"
     },
@@ -19,7 +18,7 @@
            in a map.",
 
     "query": "select distinct discipline from olympics order by discipline",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": ["Alpine Skiing",
                  "Biathlon",
                  "Bobsleigh",

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{BackendCapability, Data}
 import quasar.Data
 import quasar.contrib.pathy._
-import quasar.fp._
+import quasar.contrib.scalaz.foldable._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib
 
@@ -29,13 +29,13 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
-class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
+class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT) {
   import FileSystemTest._, FileSystemError._, PathError._, StdLib._
 
-  val query  = QueryFile.Ops[FileSystem]
-  val read   = ReadFile.Ops[FileSystem]
-  val write  = WriteFile.Ops[FileSystem]
-  val manage = ManageFile.Ops[FileSystem]
+  val query  = QueryFile.Ops[BackendEffect]
+  val read   = ReadFile.Ops[BackendEffect]
+  val write  = WriteFile.Ops[BackendEffect]
+  val manage = ManageFile.Ops[BackendEffect]
 
   val queryPrefix: ADir = rootDir </> dir("q")
 
@@ -61,7 +61,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "executing query to an existing file overwrites with results" >> ifSupports(fs,
         BackendCapability.query(),
-        BackendCapability.write()) {
+        BackendCapability.write()) { pendingFor(fs)(Set("mimir")) {
 
         val d = queryPrefix </> dir("execappends")
         val a = d </> file("afile")
@@ -79,9 +79,8 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val p = e.liftM[Process].drain ++ read.scanAll(c)
 
         runLogT(fs.testInterpM, p).runEither must beRight(containTheSameElementsAs(Vector[Data](
-          Data.Obj("c" -> Data._int(2))
-        )))
-      }
+          Data.Obj("c" -> Data._int(2)))))
+      } }
 
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lsch")
@@ -92,6 +91,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
                     write.save(f2, anotherDoc.toProcess).drain
+
         execT(fs.setupInterpM, setup).runVoid
 
         val p = query.ls(d1)
@@ -106,7 +106,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         runT(fs.testInterpM)(query.ls(rootDir)).runEither must beRight
       }
 
-      "listing nonexistent directory returns dir NotFound" >> {
+      "listing nonexistent directory returns dir NotFound" >> pendingFor(fs)(Set("mimir")) {
         val d = queryPrefix </> dir("lsdne")
         runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))
       }

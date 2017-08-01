@@ -1,0 +1,36 @@
+{
+    "name": "select tests that have changed status",
+    "NB": "This is currently disabled on all connectors due to #2110.",
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
+    },
+    "data": ["oldTests.data", "newTests.data"],
+    "query": "select old.name ?? new.name as name,
+                     old.backends{_:} ?? new.backends{_:} as backend,
+                     old.backends{:_} ?? \"success\" as prevStatus,
+                     new.backends{:_} ?? \"success\" as currStatus
+                from oldTests as old full outer join newTests as new
+                  on old.name = new.name and
+                     old.backends{_:} = new.backends{_:} and
+                     old.backends{_:} <> \"mongodb_q_3_2\" and
+                     old.backends{:_} <> new.backends{:_}",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "name": "select count and another field", "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_2",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_3_4",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "select count and another field", "backend": "mongodb_read_only", "prevStatus": "success", "currStatus": "pending" }]
+}

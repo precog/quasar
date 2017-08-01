@@ -27,28 +27,30 @@ import scalaz._, Validation.success
 import scalaz.syntax.bind._
 import shapeless.{Data => _, _}
 
-trait DateLib extends Library {
+sealed abstract class TemporalPart extends Serializable
+
+object TemporalPart {
+  final case object Century     extends TemporalPart
+  final case object Day         extends TemporalPart
+  final case object Decade      extends TemporalPart
+  final case object Hour        extends TemporalPart
+  final case object Microsecond extends TemporalPart
+  final case object Millennium  extends TemporalPart
+  final case object Millisecond extends TemporalPart
+  final case object Minute      extends TemporalPart
+  final case object Month       extends TemporalPart
+  final case object Quarter     extends TemporalPart
+  final case object Second      extends TemporalPart
+  final case object Week        extends TemporalPart
+  final case object Year        extends TemporalPart
+
+  implicit val equal: Equal[TemporalPart] = Equal.equalRef
+  implicit val show: Show[TemporalPart] = Show.showFromToString
+}
+
+
+trait DateLib extends Library with Serializable {
   import TemporalPart._
-
-  sealed abstract class TemporalPart
-  object TemporalPart {
-    final case object Century     extends TemporalPart
-    final case object Day         extends TemporalPart
-    final case object Decade      extends TemporalPart
-    final case object Hour        extends TemporalPart
-    final case object Microsecond extends TemporalPart
-    final case object Millennium  extends TemporalPart
-    final case object Millisecond extends TemporalPart
-    final case object Minute      extends TemporalPart
-    final case object Month       extends TemporalPart
-    final case object Quarter     extends TemporalPart
-    final case object Second      extends TemporalPart
-    final case object Week        extends TemporalPart
-    final case object Year        extends TemporalPart
-
-    implicit val equal: Equal[TemporalPart] = Equal.equalRef
-    implicit val show: Show[TemporalPart] = Show.showFromToString
-  }
 
   def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
     \/.fromTryCatchNonFatal(Instant.parse(str)).bimap(

@@ -37,11 +37,14 @@ package object pathy {
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
   type FPath = Path[scala.Any,File,Sandboxed]
+  type DPath = Path[scala.Any,Dir, Sandboxed]
 
   type PathSegment = DirName \/ FileName
 
   implicit def liftDirName(x: DirName): PathSegment = x.left
   implicit def liftFileName(x: FileName): PathSegment = x.right
+
+  def stringValue(seg: PathSegment) = seg.fold(_.value, _.value)
 
   def pathName(p: APath): Option[PathSegment] =
     refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
@@ -56,10 +59,25 @@ package object pathy {
       pathEncodeJson
   }
 
+  object RPath {
+    import PosixCodecJson._
+
+    // this will be sound so long as we're round-tripping
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+    private def resandbox[R, T](path: Path[R, T, Unsandboxed]): Path[Rel, T, Sandboxed] =
+      Path.sandbox(Path.currentDir, path).get
+
+    implicit val rPathDecodeJson: DecodeJson[RPath] =
+      (relDirDecodeJson.map(resandbox(_)).widen[RPath] ||| relFileDecodeJson.map(resandbox(_))).setName("RPath")
+
+    implicit val rPathEncodeJson: EncodeJson[RPath] =
+      pathEncodeJson
+  }
+
   /** PathCodec with URI-encoded segments. */
   val UriPathCodec: PathCodec = {
     /** This encoder translates spaces into pluses, but we want the
-      *  more rigorous %20 encoding.
+      * more rigorous %20 encoding.
       */
     val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
     val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")
@@ -104,16 +122,19 @@ package object pathy {
         // Remove the `./` from the beginning of the string representation of a relative path
         rel => posixCodec.unsafePrintPath(rel).drop(2)))
 
-  /** Sandboxes an absolute path, needed due to parsing functions producing
-    * unsandboxed paths.
-    *
-    * TODO[pathy]: We know this can't fail, remove once Pathy is refactored to be more precise
+  /** This is completely unsafe and should be phased out.
+    * Sandboxing is meant to prevent ending up with paths such as `/foo/../../..` and by
+    * calling get on the `Option` we are wishful thinking this problem away
     */
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def sandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
+  def unsafeSandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
     root </> apath.relativeTo(root).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
+  // We have to use `asInstanceOf` because there is no easy way to prove
+  // to the compiler that we are returning a T even though we know that we are
+  // since T can only be one of `Abs` or `Rel` and we used `refineTypeAbs`
+  // to check which one it is
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(

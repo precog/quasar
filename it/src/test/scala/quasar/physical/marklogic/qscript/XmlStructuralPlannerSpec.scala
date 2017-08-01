@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalaz.eitherT._
 import quasar.physical.marklogic.DocType
-import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
@@ -34,9 +33,10 @@ final class XmlStructuralPlannerSpec
   import expr._
 
   val SP  = StructuralPlanner[XmlPlan, DocType.Xml]
-  val DP  = Planner[XmlPlan, DocType.Xml, Const[Data, ?]]
   val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
-  def asMapKey(qn: QName) = qn.xqy.point[XmlPlan]
+
+  def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
+    xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
 
   xquerySpec(_ => "XML Specific") { evalM =>
     val eval = evalM.compose[XmlPlan[XQuery]](toM(_))
@@ -80,6 +80,56 @@ final class XmlStructuralPlannerSpec
       }
     }
 
+    "mkObjectEntry" >> {
+      "makes encoded object from encoded element" >> prop { (x: Data) =>
+        val innerObj = lit(x) >>= (SP.mkObjectEntry("1".xs, _))
+        val objEntry = innerObj >>= (SP.mkObjectEntry("2".xs, _))
+        val obj = objEntry >>= (e => SP.mkObject(mkSeq_(e)))
+
+        eval(obj) must resultIn(Data.Obj("2" -> x))
+      }
+
+      "makes non-encoded object from encoded element" >> prop { (x: Data) =>
+        val innerObj = lit(x) >>= (SP.mkObjectEntry("1".xs, _))
+        val objEntry = innerObj >>= (SP.mkObjectEntry(xs.QName("someElem".xs), _))
+        val obj = objEntry >>= (e => SP.mkObject(mkSeq_(e)))
+
+        eval(obj) must resultIn(Data.Obj("someElem" -> x))
+      }
+    }
+
+    "objectMerge" >> {
+      "merges non-QName keys" >> prop { (x: Data, y: Data) =>
+        val obj1 = (lit(x) >>= (SP.mkObjectEntry("1".xs, _))) >>= (e => SP.mkObject(mkSeq_(e)))
+        val obj2 = (lit(y) >>= (SP.mkObjectEntry("2".xs, _))) >>= (e => SP.mkObject(mkSeq_(e)))
+
+        val merged = (obj1 |@| obj2)(SP.objectMerge(_, _)).join
+
+        eval(merged) must resultIn(Data.Obj("1" -> x, "2" -> y))
+      }
+
+      "merges non-QName keys and QName keys" >> prop { (x: Data, y: Data) =>
+        val obj1 = (lit(x) >>= (SP.mkObjectEntry("1".xs, _))) >>= (e => SP.mkObject(mkSeq_(e)))
+        val obj2 = (lit(y) >>= (SP.mkObjectEntry(xs.QName("fd".xs), _))) >>= (e => SP.mkObject(mkSeq_(e)))
+
+        val merged = (obj1 |@| obj2)(SP.objectMerge(_, _)).join
+
+        eval(merged) must resultIn(Data.Obj("1" -> x, "fd" -> y))
+      }
+    }
+
+    "objectDelete" >> {
+      "deletes non-QName keys" >> prop { (x: Data, y: Data) =>
+        val obj = (lit(x) |@| lit(y))((a, b) => for {
+          e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
+          e2 <- SP.mkObjectEntry("12 not qname".xs, b)
+          o  <- SP.mkObject(mkSeq_(e1, e2))
+        } yield o).join
+
+        eval(obj.flatMap(SP.objectDelete(_, "12 not qname".xs))) must resultIn(Data.Obj("bar" -> x))
+      }
+    }
+
     "objectLookup" >> {
       "returns repeated elements as an array" >> prop { (x: Data, y: Data, z: Data) =>
         val obj = (lit(x) |@| lit(y) |@| lit(z))((a, b, c) => for {
@@ -90,6 +140,13 @@ final class XmlStructuralPlannerSpec
                   } yield o).join
 
         eval(obj >>= (SP.objectLookup(_, xs.QName("baz".xs)))) must resultIn(Data._arr(List(y, z)))
+      }
+
+      "returns non-QName keys" >> prop { x: Data =>
+        val obj = lit(x).flatMap(a     => SP.mkObjectEntry("12 not qname".xs, a))
+                        .flatMap(entry => SP.mkObject(mkSeq_(entry)))
+
+        eval(obj >>= (SP.objectLookup(_, "12 not qname".xs))) must resultIn (x)
       }
     }
   }

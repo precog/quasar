@@ -1,24 +1,25 @@
 {
     "name": "perform inner equi-join",
+
     "backends": {
-        "mongodb_read_only": "pending",
+        "couchbase": "skip",
+        "marklogic_json": "pending",
+        "mimir": "ignoreFieldOrder",
+        "mongodb_q_2_6": "pending",
+        "mongodb_q_3_0": "pending",
         "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "mongodb_q_3_4": "pending"
     },
-    "data": ["../smallZips.data", "../zips.data"],
-    "query": "select smallZips.city, zips.state from `../smallZips` join `../zips` on smallZips._id = zips._id",
-    "predicate": "containsAtLeast",
-    "expected": [{"city": "AGAWAM",       "state": "MA"},
-                 {"city": "CUSHMAN",      "state": "MA"},
-                 {"city": "BARRE",        "state": "MA"},
-                 {"city": "BELCHERTOWN",  "state": "MA"},
-                 {"city": "BLANDFORD",    "state": "MA"},
-                 {"city": "BRIMFIELD",    "state": "MA"},
-                 {"city": "CHESTER",      "state": "MA"},
-                 {"city": "CHESTERFIELD", "state": "MA"},
-                 {"city": "CHICOPEE",     "state": "MA"},
-                 {"city": "CHICOPEE",     "state": "MA"}]
+
+    "data": ["../cars.data", "../cars2.data"],
+
+    "query": "select cars.name as c1, cars2.name as c2
+              from `../cars` inner join `../cars2`
+              on cars.`_id` = cars2.`_id`",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "c1": "RangeRover-Evoque", "c2": "Dodge-Caravan" },
+                 { "c1": "BMW-X5",            "c2": "Jeep-Liberty" }]
 }

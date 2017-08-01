@@ -1,12 +1,10 @@
 {
     "name": "select array element",
-    "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
-    },
+    "backends": {},
     "data": "largeZips.data",
     "query": "select city, loc[0] as lat from largeZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "CUSHMAN",          "lat":  -72.51565 },
                  { "city": "CHICOPEE",         "lat": -72.576142 },
                  { "city": "HOLYOKE",          "lat": -72.626193 },

@@ -1,0 +1,15 @@
+{
+    "name": "select count and another field",
+    "backends": {
+        "couchbase": "pending",
+        "mimir":"pendingIgnoreFieldOrder",
+        "mongodb_q_3_2": "pending"
+    },
+    "data": "slamengine_commits.data",
+    "query": "select committer.login, count(*) from slamengine_commits",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "login": "sellout", "1": 30 },
+        { "login": "mossprescott", "1": 30 }]
+}

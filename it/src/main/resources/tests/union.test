@@ -1,24 +1,23 @@
 {
     "name": "union",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "mimir":"ignoreFieldOrder",
+        "couchbase":         "pending",
+        "mongodb_q_3_2":     "pending"
     },
     "data": "zips.data",
-    "query": "select _id as zip from zips union select city, state from zips",
-    "predicate": "containsAtLeast",
+    "query": "select `_id` as zip from zips union select city, state from zips",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "zip": "01001" },
         { "zip": "01002" },
         { "zip": "01005" },
         { "zip": "01007" },
         { "zip": "01008" },
-        { "city" : "AGAWAM",      "state" : "MA" },
-        { "city" : "CUSHMAN",     "state" : "MA" },
-        { "city" : "BARRE",       "state" : "MA" },
-        { "city" : "BELCHERTOWN", "state" : "MA" },
-        { "city" : "BLANDFORD",   "state" : "MA" }
-    ]
+        { "city": "AGAWAM",      "state": "MA" },
+        { "city": "CUSHMAN",     "state": "MA" },
+        { "city": "BARRE",       "state": "MA" },
+        { "city": "BELCHERTOWN", "state": "MA" },
+        { "city": "BLANDFORD",   "state": "MA" }]
 }

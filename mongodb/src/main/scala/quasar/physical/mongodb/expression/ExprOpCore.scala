@@ -303,6 +303,7 @@ object ExprOpCoreF {
       def invoke(x: JsFn, name: String) =
         expr1(x)(x => jscore.Call(jscore.Select(x, name), Nil))
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def const(bson: Bson): PlannerError \/ JsCore = {
         def js(l: Js.Lit) = \/-(jscore.Literal(l))
         bson match {

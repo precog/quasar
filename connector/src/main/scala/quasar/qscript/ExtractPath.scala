@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
 import quasar.fp.ski.κ
 
 import matryoshka._
@@ -113,6 +114,7 @@ sealed abstract class ExtractPathInstances0 {
   //     `ProjectBucket` as we don't want to be able to extract paths from
   //     QScript if it includes them, however QScriptTotal Knows All, so we
   //     must define them for it.
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def qScriptTotalPath[T[_[_]]: RecursiveT]: Lazy[ExtractPath[QScriptTotal[T, ?], APath]] = {
     implicit val constDeadEnd: ExtractPath[Const[DeadEnd, ?], APath] =
       new ExtractPath[Const[DeadEnd, ?], APath] {

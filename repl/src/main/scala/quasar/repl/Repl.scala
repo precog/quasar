@@ -18,21 +18,32 @@ package quasar.repl
 
 import slamdata.Predef._
 
-import quasar.{Data, DataCodec, Variables}
+import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
 import quasar.common.PhaseResults
+import quasar.connector.CompileM
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
+import quasar.frontend.SemanticErrors
+import quasar.frontend.logicalplan.{LogicalPlanR, LogicalPlan}
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main.{FilesystemQueries, Prettify}
+import quasar.main.{analysis, FilesystemQueries, Prettify}
+import quasar.qscript.{DiscoverPath, QScriptRead, qScriptReadToQscriptTotal}
+import quasar.sql.Sql
 import quasar.sql
 
+import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
+import matryoshka.data.Fix
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import spire.std.double._
 
 object Repl {
   import Command.{XDir, XFile}
@@ -50,6 +61,8 @@ object Repl {
       |  [query]
       |  [id] <- [query]
       |  explain [query]
+      |  compile [query]
+      |  schema [query]
       |  ls [path]
       |  save [path] [value]
       |  append [path] [value]
@@ -97,10 +110,11 @@ object Repl {
     W:  WriteFile.Ops[S],
     P:  ConsoleIO.Ops[S],
     T:  Timing.Ops[S],
-    N:  Mounting.Ops[S],
-    S0: RunStateT :<: S,
-    S1: ReplFail :<: S,
-    S2: Task :<: S
+    S0: Mounting :<: S,
+    S1: RunStateT :<: S,
+    S2: ReplFail :<: S,
+    S3: Task :<: S,
+    S4: FileSystemFailure :<: S
   ): Free[S, Unit] = {
     import Command._
 
@@ -134,6 +148,22 @@ object Repl {
               f(a)
         }
       } yield ()
+
+    def compileQuery(expr: Fix[Sql], vars: Variables, basePath: ADir): (PhaseResults, SemanticErrors \/ (FileSystemError \/ Unit)) = {
+      type M[A] = FileSystemErrT[CompileM, A]
+      val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+
+      def absFiles(lp: Fix[LogicalPlan]): List[AFile] =
+        lpr.paths(lp).foldMap(f => refineTypeAbs(f).swap.toList)
+
+      queryPlan(expr, vars, basePath, 0L, None).liftM[FileSystemErrT]
+        .flatMap(_.fold(
+          _  => ().point[M],
+          lp => QueryFile.convertToQScriptRead[Fix, M, QScriptRead[Fix, ?]](
+                  DiscoverPath.ListContents.static[List, M](absFiles(lp)))(
+                  lp).void))
+        .run.run.run
+    }
 
     cmd match {
       case Help =>
@@ -190,7 +220,8 @@ object Repl {
               state <- RS.get
               out   =  state.cwd </> file(name)
               expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
-              query =  fsQ.executeQuery(expr, Variables.fromMap(state.variables), state.cwd, out)
+              block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+              query =  fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
               _     <- runQuery(state, query)(p =>
                         P.println(
                           if (p =/= out) "Source file: " + posixCodec.printPath(p)
@@ -201,13 +232,11 @@ object Repl {
             state <- RS.get
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
-            lim   =  (state.summaryCount > 0).fold(
-                       Positive(state.summaryCount + 1L),
-                       None)
-            query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim) flatMap (enum =>
-                       Q.transforms.execToCompExec(enum.drainTo[Vector]))
-            _     <- runQuery(state, query)(
-                      ds => summarize[S](state.summaryCount, state.format)(ds))
+            lim   =  (state.summaryCount > 0).option(state.summaryCount)
+            block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+            query =  fsQ.queryResults(block, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
+                       .map(_.toVector)
+            _     <- runQuery(state, query)(ds => summarize[S](lim, state.format)(ds))
           } yield ())
 
       case Explain(q) =>
@@ -215,7 +244,8 @@ object Repl {
           state <- RS.get
           expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
-          t     <- fsQ.explainQuery(expr, vars, state.cwd).run.run.run
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+          t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
           (log, result) = t
           _     <- printLog(state.debugLevel, log)
           _     <- result.fold(
@@ -224,6 +254,40 @@ object Repl {
                       perr => DF.fail(perr.shows),
                       κ(().point[Free[S, ?]])))
         } yield ()
+
+      case Compile(q) =>
+        for {
+          state <- RS.get
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+          (log0, result) = compileQuery(block, vars, state.cwd)
+          // TODO: This is a bit brittle, it'd be nice if we had a way to refer
+          //       to logical sections directly.
+          log   = if (state.debugLevel === DebugLevel.Verbose) log0
+                  else log0.dropWhile(_.name =/= "Logical Plan")
+          _     <- printLog(DebugLevel.Verbose, log)
+          _     <- result.fold(
+                    serr => DF.fail(serr.shows),
+                    _.fold(
+                      perr => DF.fail(perr.shows),
+                      κ(().point[Free[S, ?]])))
+        } yield ()
+
+      case Schema(q) =>
+        for {
+          state <- RS.get
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          r     <- DF.unattemptT(analysis.querySchema[S, Fix[EJson], Double](
+                     expr, vars, state.cwd, 1000L, analysis.CompressionSettings.Default
+                   ).leftMap(_.shows))
+          sst   <- DF.unattempt_(r.leftMap(_.shows))
+          data  =  sst.map(analysis.schemaToData[Fix, Double])
+          js    =  data >>= DataCodec.Precise.encode
+          _     <- P.println(js.fold("{}")(_.spaces2))
+        } yield ()
+
 
       case Save(f, v) =>
         write(W.saveThese(_, _), f, v)
@@ -248,7 +312,9 @@ object Repl {
   def mountType[S[_]](path: APath)(implicit
     M: Mounting.Ops[S]
   ): Free[S, Option[String]] =
-    M.lookupType(path).map(_.fold(_.value, "view")).run
+    M.lookupType(path).run.run.map(_ >>= (_.fold(
+      MountingError.invalidMount.getOption(_) ∘ (_._1.fold(_.value, "view", "module")),
+      _.fold(_.value, "view", "module").some)))
 
   def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
 
@@ -262,7 +328,7 @@ object Repl {
     }
 
   def summarize[S[_]]
-    (max: Int, format: OutputFormat)
+    (max: Option[Int], format: OutputFormat)
     (rows: IndexedSeq[Data])
     (implicit P: ConsoleIO.Ops[S])
       : Free[S, Unit] = {
@@ -271,7 +337,7 @@ object Repl {
 
     if (rows.lengthCompare(0) <= 0) P.println("No results found")
     else {
-      val prefix = rows.take(max).toList
+      val prefix = max.fold(rows)(rows.take).toList
       (format match {
         case OutputFormat.Table =>
           Prettify.renderTable(prefix)
@@ -282,7 +348,7 @@ object Repl {
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
       }).foldMap(P.println) *>
-        (if (rows.lengthCompare(max) > 0) P.println("...")
+        (if (max.fold(false)(rows.lengthCompare(_) > 0)) P.println("...")
         else ().point[Free[S, ?]])
     }
   }

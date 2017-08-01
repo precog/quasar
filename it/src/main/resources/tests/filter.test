@@ -1,17 +1,12 @@
 {
     "name": "filter with pipeline and JS",
 
-    "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
-    },
-
     "data": "smallZips.data",
 
     "query": "select count(*) as cnt from smallZips where pop < 1000 and length(city) < 8",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "cnt": 7 }]
 }

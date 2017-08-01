@@ -72,6 +72,7 @@ object MongoDbPlanner {
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
@@ -156,7 +157,7 @@ object MongoDbPlanner {
       }
 
       ((func, args) match {
-        // NB: this one is missing from MapFunc.
+        // NB: this one is missing from MapFuncCore.
         case (ToId, _) => None
 
         // NB: this would get mapped to the same MapFunc as string.Concat, which
@@ -164,14 +165,14 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
-          JsFuncHandler(mf).map(exp => Arity1(exp.eval))
+          val mf = (MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], UnaryArg].apply _)(func)(UnaryArg._1)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity1(exp.eval))
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
-          JsFuncHandler(mf).map(exp => Arity2(exp.eval))
+          val mf = (MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], BinaryArg] _)(func)(BinaryArg._1, BinaryArg._2)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity2(exp.eval))
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
-          JsFuncHandler(mf).map(exp => Arity3(exp.eval))
+          val mf = (MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], TernaryArg] _)(func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity3(exp.eval))
         case _ => None
       }).getOrElse(func match {
         case Constantly => Arity1(ι)  // FIXME: this cannot possibly be right
@@ -187,6 +188,8 @@ object MongoDbPlanner {
               Call(Select(array, "indexOf"), List(value))))
 
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
+
+        case Concat => Arity2(BinOp(jscore.Add, _, _))
 
         case MakeObject => args match {
           case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
@@ -494,7 +497,7 @@ object MongoDbPlanner {
   import quasar.physical.mongodb.accumulator._
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: MapFunc[Fix, ?] ~> OptionFree[EX, ?])
     (implicit
       ev0: WorkflowOpCoreF :<: F,
       ev1: RenderTree[WorkflowBuilder[F]],
@@ -568,6 +571,7 @@ object MongoDbPlanner {
       }
 
       def groupExpr0(f: AccumOp[Fix[ExprOp]]): Output = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def reduce0(wb: WorkflowBuilder[F])(fʹ: AccumOp[Fix[ExprOp]])
             : WorkflowBuilder[F] =
           wb.unFix match {
@@ -620,7 +624,7 @@ object MongoDbPlanner {
         f.mapSuspension(inj)
 
       ((func, args) match {
-        // NB: this one is missing from MapFunc.
+        // NB: this one is missing from MapFuncCore.
         case (ToId, _) => None
 
         // NB: this would get mapped to the same MapFunc as string.Concat, which
@@ -628,26 +632,26 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          val mf: MapFunc[Fix, UnaryArg] = (MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], UnaryArg].apply _)(func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
-            funcHandler.run(mf)) { (wb1, f) =>
+            funcHandler(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          val mf = (MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], BinaryArg] _)(func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
-            funcHandler.run(mf)) { (wb1, wb2, f) =>
+            funcHandler(mf)) { (wb1, wb2, f) =>
             val exp: Binary[ExprOp] = createOp[BinaryArg](f)
             WB.expr2(wb1, wb2)(exp.eval)
           }
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          val mf = (MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], TernaryArg] _)(func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|
-            funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
+            funcHandler(mf)) { (wb1, wb2, wb3, f) =>
             val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
               case List(_1, _2, _3) => exp.eval[Fix[ExprOp]](_1, _2, _3)
@@ -709,16 +713,18 @@ object MongoDbPlanner {
                 })
           }
         case GroupBy =>
-          lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasKeys) ∘ (WB.groupBy(_, _)).tupled)
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
-        case Count      => groupExpr0($sum($literal(Bson.Int32(1))))
-        case Sum        => groupExpr1($sum(_))
-        case Avg        => groupExpr1($avg(_))
-        case Min        => groupExpr1($min(_))
-        case Max        => groupExpr1($max(_))
+        case Count        => groupExpr0($sum($literal(Bson.Int32(1))))
+        case Sum          => groupExpr1($sum(_))
+        case Avg          => groupExpr1($avg(_))
+        case Min          => groupExpr1($min(_))
+        case Max          => groupExpr1($max(_))
+        case First        => groupExpr1($first(_))
+        case Last         => groupExpr1($last(_))
         case UnshiftArray => groupExpr1($push(_))
-        case Arbitrary  => groupExpr1($first(_))
+        case Arbitrary    => groupExpr1($first(_))
 
         case ArrayLength =>
           lift(Arity2(HasWorkflow, HasInt)).flatMap {
@@ -747,19 +753,20 @@ object MongoDbPlanner {
             case (p, index) => WB.projectIndex(p, index.toInt)
           })
         case DeleteField  =>
-          lift(Arity2(HasWorkflow, HasText).flatMap((WB.deleteField(_, _)).tupled))
-        case FlattenMap   => lift(Arity1(HasWorkflow).map(WB.flattenMap(_)))
-        case FlattenArray => lift(Arity1(HasWorkflow).map(WB.flattenArray(_)))
-        case Squash       => lift(Arity1(HasWorkflow).map(WB.squash))
+          lift(Arity2(HasWorkflow, HasText) >>= (WB.deleteField(_, _)).tupled)
+        case FlattenMap   => lift(Arity1(HasWorkflow) ∘ WB.flattenMap)
+        case FlattenArray => lift(Arity1(HasWorkflow) ∘ WB.flattenArray)
+        case Squash       => lift(Arity1(HasWorkflow))
         case Distinct     =>
-          lift(Arity1(HasWorkflow)).flatMap(WB.distinct(_))
+          lift(Arity1(HasWorkflow)) >>= WB.distinct
         case DistinctBy   =>
-          lift(Arity2(HasWorkflow, HasKeys)).flatMap((WB.distinctBy(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasKeys)) >>= (WB.distinctBy(_, _)).tupled
 
         case _ => fail(UnsupportedFunction(func, "in workflow planner".some))
       })
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
       case InvokeUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
@@ -802,6 +809,10 @@ object MongoDbPlanner {
         def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
+      case JoinSideName(_) =>
+        state(-\/(InternalError fromMsg s"unexpected JoinSideName"))
+      case Join(_, _, _, _) =>
+        state(-\/(InternalError fromMsg s"unexpected Join"))
       case Free(name) =>
         state(-\/(InternalError fromMsg s"variable $name is unbound"))
       case Let(_, _, in) => state(in.head._2)
@@ -816,6 +827,7 @@ object MongoDbPlanner {
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def exprCheck: Type => Option[Fix[ExprOp] => Fix[ExprOp]] =
           generateTypeCheck[Fix[ExprOp], Fix[ExprOp]]($or(_, _)) {
             case Type.Null => check.isNull//((expr: Fix[ExprOp]) => $eq($literal(Bson.Null), expr))
@@ -892,6 +904,7 @@ object MongoDbPlanner {
       condA.contains(tableA) && condB.contains(tableB) &&
         condA.all(_ ≠ tableB) && condB.all(_ ≠ tableA)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alignCondition(lt: Fix[LP], rt: Fix[LP]):
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
@@ -959,7 +972,7 @@ object MongoDbPlanner {
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
+    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: MapFunc[Fix, ?] ~> OptionFree[EX, ?])
     (logical: Fix[LP])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
@@ -1007,24 +1020,27 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+  def plan[M[_]](logical0: Fix[LP], queryContext: fs.QueryContext[M])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
+
+    val logical: Fix[LP] =
+      logical0.cata[Fix[LP]](optimizer.reconstructOldJoins)
 
     queryContext.model match {
       case `3.2` =>
         val joinHandler = JoinHandler.fallback(
           JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
           JoinHandler.mapReduce[Workflow3_2F])
-        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2)(logical)
+        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2[MapFunc[Fix, ?]])(logical)
 
       case `3.0` =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0)(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0[MapFunc[Fix, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6)(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6[MapFunc[Fix, ?]])(logical).map(_.inject[WorkflowF])
     }
   }
 }

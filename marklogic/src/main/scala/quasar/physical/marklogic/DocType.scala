@@ -16,6 +16,9 @@
 
 package quasar.physical.marklogic
 
+import slamdata.Predef._
+
+import monocle.Prism
 import scalaz._
 
 sealed abstract class DocType {
@@ -35,6 +38,15 @@ object DocType {
 
   val json: DocType = JsonDoc
   val xml:  DocType = XmlDoc
+
+  val name: Prism[String, DocType] =
+    Prism.partial[String, DocType] {
+      case "json"  => json
+      case "xml"   => xml
+    } {
+      case JsonDoc => "json"
+      case XmlDoc  => "xml"
+    }
 
   implicit val equal: Equal[DocType] =
     Equal.equalA

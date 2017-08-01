@@ -2,26 +2,21 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
-      "mongodb_2_6":       "pending",
-      "mongodb_3_0":       "pending",
-      "mongodb_read_only": "pending",
-      "mongodb_3_2":       "pending",
-      "mongodb_q_3_2": "pending",
-      "postgresql":        "pending"
     },
 
     "data": "largeZips.data",
 
     "query": "select *, '1' as one, '2' as two from largeZips",
 
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json", "marklogic_xml", "spark_local", "spark_hdfs" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "ignoreFieldOrder": true,
     "expected": [
-        { "_id": "01002", "one": "1", "two": "2", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA" },
-        { "_id": "01020", "one": "1", "two": "2", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA" },
-        { "_id": "01040", "one": "1", "two": "2", "city": "HOLYOKE",          "loc": [-72.626193, 42.202007], "pop": 43704, "state": "MA" },
-        { "_id": "01060", "one": "1", "two": "2", "city": "FLORENCE",         "loc": [-72.654245, 42.324662], "pop": 27939, "state": "MA" },
-        { "_id": "01085", "one": "1", "two": "2", "city": "MONTGOMERY",       "loc": [-72.754318, 42.129484], "pop": 40117, "state": "MA" },
-        { "_id": "01089", "one": "1", "two": "2", "city": "WEST SPRINGFIELD", "loc": [-72.641109, 42.115066], "pop": 27537, "state": "MA" },
-        { "_id": "01108", "one": "1", "two": "2", "city": "SPRINGFIELD",      "loc": [-72.558432, 42.085314], "pop": 25519, "state": "MA" }]
+        { "_id": "01002", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01020", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01040", "city": "HOLYOKE",          "loc": [-72.626193, 42.202007], "pop": 43704, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01060", "city": "FLORENCE",         "loc": [-72.654245, 42.324662], "pop": 27939, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01085", "city": "MONTGOMERY",       "loc": [-72.754318, 42.129484], "pop": 40117, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01089", "city": "WEST SPRINGFIELD", "loc": [-72.641109, 42.115066], "pop": 27537, "state": "MA", "one": "1", "two": "2" },
+        { "_id": "01108", "city": "SPRINGFIELD",      "loc": [-72.558432, 42.085314], "pop": 25519, "state": "MA", "one": "1", "two": "2" }]
 }

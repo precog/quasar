@@ -1,16 +1,15 @@
 {
     "name": "filter on time_of_day",
 
-    "NB": "Couchbase disabled due to heap exhaustion",
-
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_3_4":       "pending",
+        "mongodb_q_3_2":     "pending"
     },
 
     "data": "../days.data",
@@ -18,8 +17,8 @@
     "query": "select day, time_of_day(ts) as tod, time_of_day(day) as notadate, time_of_day(missing) as missing from `../days`
     where time_of_day(ts) >= time(\"08:00\") and time_of_day(ts) < time(\"10:20:30.400\")",
 
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "day": "Tuesday",   "tod": { "$time": "08:00:00.000" } },
         { "day": "Wednesday", "tod": { "$time": "09:00:00.000" } },

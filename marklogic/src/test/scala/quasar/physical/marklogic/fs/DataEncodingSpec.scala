@@ -21,12 +21,12 @@ import quasar.{Data, DataArbitrary}, DataArbitrary._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data._
 import quasar.physical.marklogic.qscript.EJsonTypeKey
-import quasar.physical.marklogic.xml.SecureXML
+import quasar.physical.marklogic.xml._
 
-import scala.xml.Elem
+import scala.xml._
 
 import argonaut._, Argonaut._
-import scalaz._, Scalaz._
+import scalaz.{Node => _, _}, Scalaz._
 
 final class DataEncodingSpec extends quasar.Qspec {
   type Result[A] = ErrorMessages \/ A
@@ -35,13 +35,13 @@ final class DataEncodingSpec extends quasar.Qspec {
     SecureXML.loadString(s).leftMap(_.toString.wrapNel)
 
   "Data <-> XML encoding" >> {
-    "roundtrip" >> prop { xd: XmlSafeData =>
-      (encodeXml[Result](xd.data) >>= decodeXmlStrict[Result] _) must_= xd.data.some.right
+    "roundtrip" >> prop { data: Data =>
+      (encodeXml[Result](data) >>= decodeXmlStrict[Result] _) must_= data.some.right
     }
 
-    "roundtrip through serialization" >> prop { xd: XmlSafeData =>
-      val rt = encodeXml[Result](xd.data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
-      rt must_= xd.data.some.right
+    "roundtrip through serialization" >> prop { data: Data =>
+      val rt = encodeXml[Result](data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
+      rt must_= data.some.right
     }
 
     "None on attempt to decode non-data XML" >> {
@@ -66,13 +66,16 @@ final class DataEncodingSpec extends quasar.Qspec {
       (parseXML(orig) >>= decodeXml[Result](_ => Data._dec(42.0).right)) must_= exp.some.right
     }
 
-    "error when object key is not a valid QName" >> {
+    "encode as an attribute when a key is not a valid QName" >> {
       val k = "42 not qname"
       val d = Data.singletonObj(k, Data.Str("foo"))
 
-      encodeXml[Result](d) must beLike {
-        case -\/(NonEmptyList(msg, _)) => msg must contain(k)
-      }
+      val elem =
+        <ejson:ejson ejson:type="object" xmlns:ejson="http://quasar-analytics.org/ejson">
+          <ejson:key ejson:key-id="42 not qname" ejson:type="string">foo</ejson:key>
+        </ejson:ejson>
+
+      encodeXml[Result](d) must be_\/-(Utility.trim(elem))
     }
 
     "error for Data.Set" >> {

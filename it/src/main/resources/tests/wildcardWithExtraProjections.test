@@ -2,13 +2,13 @@
   "name": "wildcard with additional projections and filtering",
 
   "backends": {
-    "mongodb_read_only": "pending",
-    "postgresql":        "pending"
+        "mimir":"pendingIgnoreFieldOrder"
   },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",
-  "predicate": "containsExactly",
-  "ignoreFieldOrder": [ "*" ],
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "ignoreFieldOrder": true,
   "expected": [
     { "_id": "80301", "city": "BOULDER",          "loc": [ -105.21426, 40.049733 ],  "pop": 18174.0, "state": "CO", "city_state": "BOULDER, CO",          "boulderish": true  },
     { "_id": "80302", "city": "BOULDER",          "loc": [ -105.285131, 40.017235 ], "pop": 29384.0, "state": "CO", "city_state": "BOULDER, CO",          "boulderish": true  },

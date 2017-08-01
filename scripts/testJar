@@ -18,6 +18,10 @@ fi
 QUASAR_SUCCESS_OUTPUT="Server started listening on port"
 QUASAR_LOG_FILE="$TEMP_DIR/quasarout.log"
 
+echo "Initializing Quasar MetaStore..."
+
+java -jar "$QUASAR_WEB_JAR_PATH" initUpdateMetaStore
+
 echo "Launching Quasar JAR..."
 
 java -jar "$QUASAR_WEB_JAR_PATH" &> "$QUASAR_LOG_FILE" &

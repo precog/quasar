@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS_S=$'\n\t'     # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+IFS=$IFS_S
+
+SCRIPTS_DIR=$(dirname "$0")
+
+##########################################
+# methods to intialize various databases
+#
+init_mongo() {
+  # only mongodb_read_only needs to be configured
+  echo "configuring mongodb_read_only..."
+  docker cp $SCRIPTS_DIR/initMongodb quasar_mongodb_read_only:/tmp/initMongodb
+  docker exec quasar_mongodb_read_only /tmp/initMongodb
+}
+
+init_metastore() {
+  # a restart of the container is needed here due to
+  # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
+  echo "configuring metastore..."
+  docker restart quasar_metastore
+  docker cp $SCRIPTS_DIR/initPostgresql quasar_metastore:/tmp/initPostgresql
+  docker exec quasar_metastore /tmp/initPostgresql metastore
+}
+
+init_couchbase() {
+  echo "configuring couchbase..."
+  docker cp $SCRIPTS_DIR/initCouchbase quasar_couchbase:/tmp/initCouchbase
+  docker exec quasar_couchbase /tmp/initCouchbase
+}
+
+init_marklogic() {
+  # marklogic init script is ran from outside
+  # the container due to this curl issue
+  # curl: symbol lookup error: /lib64/libldap-2.4.so.2
+  echo "configuring marklogic..."
+  sleep 20
+  $SCRIPTS_DIR/initMarklogic $1 $2 $3 $4
+}
+
+##########################################
+# parse arguments and run various
+# database configuration scripts
+#
+apply_configuration() {
+  CONTAINER=$1
+  if [[ $CONTAINER == "quasar_mongodb_read_only" ]]; then init_mongo;                                  fi
+  if [[ $CONTAINER == "quasar_couchbase"         ]]; then init_couchbase;                              fi
+  if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
+  if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
+  if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                              fi
+}
+
+configure_containers() {
+  for CONTAINER in $1
+    do
+      apply_configuration $CONTAINER
+  done
+}
+
+
+##########################################
+# attach our shell to docker
+# this allows us to run docker commands
+#
+enable_docker_env() {
+  if [[ "$(command -v docker-machine)" && "$(docker-machine ls | grep default)" ]]
+  then
+    DOCKERIP=$(docker-machine ip default)
+    echo "found docker-machine, adding it to env and using $DOCKERIP as your docker IP..."
+    eval "$(docker-machine env --shell sh/bash default)"
+  elif [[ "$(command -v docker)" ]]
+  then
+    DOCKERIP=localhost
+    cat << EOF 
+We found docker in your path, but we are unsure of your docker host, we will assume your docker IP is $DOCKERIP.
+You may need to set up your own docker host, either by using Docker Toolbox or Docker for Mac or something else.
+If you usually reach your docker containers via $DOCKERIP, things should work just fine.
+EOF
+  else
+    echo "We can't find Docker on your system, please install it before running: $0"
+    exit 1
+  fi
+}
+
+find_containers() {
+  CONTAINERS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}' | grep "quasar_")
+}
+
+configure_all_live_containers() {
+  if [[ ${TRAVIS:-} ]]
+  then
+    echo "in a travis environment, docker is in our path..."
+  else
+    echo "local environment, looking for docker..."
+    find_containers
+    configure_containers "$CONTAINERS"
+  fi
+}
+
+create_database() {
+  if [[ $1 =~ "marklogic" ]]
+  then
+    $(dirname $0)/../Dockerfiles/Marklogic/getMLRpm
+  fi
+  docker-compose -f $(dirname $0)/../docker-compose.yml up -d $1
+}
+
+usage() {
+cat << EOF
+Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
+Create and configure metastore, mongo, couchbase, and marklogic containers
+for integration tests with Quasar.
+
+  -h                   help (also trigged with no parameters): display this help and exit
+  -a                   configure all currently running containers
+  -c CONTAINER-NAME    configure running container named CONTAINER-NAME
+  -u con1[,con2...]    use docker-compose up to create and configure a quoted list of CONTAINER-NAMES
+EOF
+}
+
+# if no args are passed in print usage
+[ $# -eq 0 ] && usage
+
+# command line parsing logic
+while getopts ":hac:u:" opt; do
+  case $opt in
+    a)
+      echo "configuring all containers..." >&2
+      enable_docker_env
+      configure_all_live_containers
+      ;;
+    c)
+      echo "$OPTARG is being configured..." >&2
+      enable_docker_env
+      if [[ $OPTARG =~ "spark" ]]
+      then
+        echo "Will not make a container for spark*: $OPTARG"
+      else
+        apply_configuration $OPTARG
+      fi
+      ;;
+    u)
+      echo "bringing up the following containers: $OPTARG" >&2
+      enable_docker_env
+      set -f
+      IFS=,
+      CONTAINERS=($OPTARG)
+      set +f
+      IFS=$IFS_S
+      for CONTAINER in "${CONTAINERS[@]}"
+      do
+        create_database $CONTAINER
+        sleep 5
+        apply_configuration $CONTAINER
+      done
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+    h | *)
+      usage
+      exit 1
+      ;;
+  esac
+done

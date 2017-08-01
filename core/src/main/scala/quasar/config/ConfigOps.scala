@@ -26,6 +26,7 @@ import java.nio.charset._
 import scala.util.Properties._
 
 import argonaut._
+import monocle.Lens
 import monocle.syntax.fields._
 import pathy._, Path._
 import scalaz.{Lens => _, _}, Scalaz._
@@ -35,32 +36,29 @@ import simulacrum.typeclass
 @typeclass trait ConfigOps[C] {
   import ConfigOps._, ConfigError._
 
-  def default: C
+  def name: String
 
-  def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] = {
-    def attemptReadFile(f: String): CfgTask[String] = {
-      val read = Task.delay {
-        new String(Files.readAllBytes(Paths.get(f)), StandardCharsets.UTF_8)
-      }
+  def metaStoreConfig: Lens[C, Option[MetaStoreConfig]]
 
-      EitherT(read map (_.right[ConfigError]) handle {
-        case ex: java.nio.file.NoSuchFileException =>
-          fileNotFound(path).left
-      })
-    }
+  def default: Task[C]
 
-    for {
-      codec   <- systemCodec.liftM[CfgErrT]
-      strPath =  printFsPath(codec, path)
-      text    <- attemptReadFile(strPath)
-      config  <- EitherT.fromDisjunction[Task](fromString(text))
-                   .leftMap(malformedRsn.modify(rsn => s"Failed to parse $strPath: $rsn"))
-      _       <- Task.delay(println(s"Read config from $strPath")).liftM[CfgErrT]
-    } yield config
+  def fromOptionalFile(configFile: Option[FsFile])(implicit d: DecodeJson[C]): CfgTask[C] = {
+    configFile.fold(fromDefaultPath)(fromFile)
   }
 
+  def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] =
+    for {
+      cfgText <- textFromFile(path.some)
+      config  <- EitherT.fromDisjunction[Task](fromString(cfgText.text))
+                   .leftMap(malformedRsn.modify(rsn =>
+                      s"Failed to parse ${cfgText.displayPath}: $rsn"))
+      _       <- Task.delay(
+                   println(s"Read $name config from ${cfgText.displayPath}")
+                 ).liftM[CfgErrT]
+    } yield config
+
   /** Loads configuration from one of the OS-specific default paths. */
-  def fromDefaultPaths(implicit D: DecodeJson[C]): CfgTask[C] = {
+  def fromDefaultPath(implicit D: DecodeJson[C]): CfgTask[C] = {
     def load(path: Task[FsFile]): CfgTask[C] =
       path.liftM[CfgErrT] flatMap fromFile
 
@@ -77,27 +75,13 @@ import simulacrum.typeclass
   }
 
   def toFile(config: C, path: Option[FsFile])(implicit E: EncodeJson[C]): Task[Unit] =
-    for {
-      codec <- systemCodec
-      pStr  <- path.fold(defaultPath)(Task.now)
-      text  =  asString(config)
-      jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
-      _     <- Task.delay {
-                 Option(jPath.getParent) foreach (Files.createDirectories(_))
-                 Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
-               }
-    } yield ()
-
-  def fromString(value: String)(implicit D: DecodeJson[C]): ConfigError \/ C =
-    \/.fromEither(Parse.decodeEither[C](value).leftMap(malformedConfig(value, _)))
-
-  def asString(config: C)(implicit E: EncodeJson[C]): String =
-    E.encode(config).pretty(quasar.fp.multiline)
-
+    textToFile(asString(config), path)
 }
 
 object ConfigOps {
   import ConfigError._
+
+  final case class ConfigText(text: String, displayPath: String)
 
   /** NB: Paths read from environment/props are assumed to be absolute. */
   def defaultPathForOS(file: RFile)(os: OS): Task[FsFile] = {
@@ -122,6 +106,51 @@ object ConfigOps {
 
     baseDir map (_ </> dirPath </> file)
   }
+
+  def textFromFile(file: Option[FsFile]): CfgTask[ConfigText] = {
+    def attemptReadFile(f: FsFile, fStr: String): CfgTask[String] = {
+      val read = Task.delay {
+        new String(Files.readAllBytes(Paths.get(fStr)), StandardCharsets.UTF_8)
+      }
+
+      EitherT(read map (_.right[ConfigError]) handle {
+        case ex: java.nio.file.NoSuchFileException =>
+          fileNotFound(f).left
+      })
+    }
+
+    for {
+      codec   <- systemCodec.liftM[CfgErrT]
+      f       <- file.fold(defaultPath)(Task.now).liftM[CfgErrT]
+      strPath =  printFsPath(codec, f)
+      text    <- attemptReadFile(f, strPath)
+    } yield ConfigText(text, strPath)
+  }
+
+  def jsonFromFile(path: Option[FsFile]): CfgTask[Json] =
+    textFromFile(path) >>= (cfgText =>
+      EitherT.fromDisjunction[Task](fromString[Json](cfgText.text))
+        .leftMap(malformedRsn.modify(rsn => s"Failed to parse ${cfgText.displayPath}: $rsn")))
+
+  def textToFile(text: String, path: Option[FsFile]): Task[Unit] =
+     for {
+       codec <- systemCodec
+       pStr  <- path.fold(defaultPath)(Task.now)
+       jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
+       _     <- Task.delay {
+                  Option(jPath.getParent) foreach (Files.createDirectories(_))
+                  Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
+                }
+     } yield ()
+
+  def jsonToFile(json: Json, path: Option[FsFile]): Task[Unit] =
+    textToFile(asString(json), path)
+
+  def fromString[A](value: String)(implicit D: DecodeJson[A]): ConfigError \/ A =
+    \/.fromEither(Parse.decodeEither[A](value).leftMap(malformedConfig(value, _)))
+
+  def asString[A](a: A)(implicit E: EncodeJson[A]): String =
+    E.encode(a).pretty(quasar.fp.multiline)
 
   ////
 

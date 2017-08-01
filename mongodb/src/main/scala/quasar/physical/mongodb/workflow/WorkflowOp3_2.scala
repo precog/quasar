@@ -34,6 +34,7 @@ final case class $LookupF[A](
   foreignField: BsonField,
   as: BsonField)
   extends WorkflowOp3_2F[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOp3_2F, A] =
     new PipelineF[WorkflowOp3_2F, A] {
       def wf = self
@@ -61,6 +62,7 @@ object $lookup {
 
 final case class $SampleF[A](src: A, size: Int)
   extends WorkflowOp3_2F[A] { self =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def shapePreserving: ShapePreservingF[WorkflowOp3_2F, A] =
     new ShapePreservingF[WorkflowOp3_2F, A] {
       def wf = self

@@ -89,6 +89,7 @@ private[mongodb] object execution {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def extractRange(pipeline: workflowtask.Pipeline):
       ((workflowtask.Pipeline, workflowtask.Pipeline),
         (Option[Long], Option[Long])) =

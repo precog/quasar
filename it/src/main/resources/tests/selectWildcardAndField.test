@@ -1,12 +1,11 @@
 {
     "name": "select wildcard and field",
-    "backends": {
-        "postgresql":        "pending"
-    },
+    "backends": {},
     "data": "largeZips.data",
     "query": "select *, pop/1000 as popInK from largeZips",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "ignoreFieldOrder": true,
     "expected": [
         {"_id": "01002", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA", "popInK": 36.963},
         {"_id": "01020", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA", "popInK": 31.495},

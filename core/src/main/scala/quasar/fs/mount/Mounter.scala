@@ -33,7 +33,7 @@ object Mounter {
     * additional operation to efficiently look up nested paths. */
   trait PathStore[F[_], V] {
     /** The current value for a path, if any. */
-    def get(path: APath): OptionT[F, V]
+    def get(path: APath): EitherT[OptionT[F, ?], MountingError, V]
     /** All paths which are nested within the given path and for which a value
       * is present. */
     def descendants(dir: ADir): F[Set[APath]]
@@ -55,12 +55,13 @@ object Mounter {
     val merr = MonadError[MntE, MountingError]
 
     def failIfExisting(path: APath): MntE[Unit] =
-      store.get(path).as(pathExists(path)).toLeft(())
+      store.get(path).run.as(pathExists(path)).toLeft(())
 
-    def getType(p: APath): OptionT[F, MountType] =
+    def getType(p: APath): EitherT[OptionT[F, ?], MountingError, MountType] =
       store.get(p).map {
         case ViewConfig(_, _)         => MountType.viewMount()
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
+        case ModuleConfig(_)          => MountType.moduleMount()
       }
 
     def handleMount(req: MountRequest): MntE[Unit] = {
@@ -75,8 +76,8 @@ object Mounter {
     }
 
     def handleUnmount(path: APath): OptionT[F, Unit] =
-      store.get(path)
-        .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[F]))
+      store.get(path).run
+        .flatMap(i => OptionT((i.toOption >>= (cfg => mkMountRequest(path, cfg))).η[F]))
         .flatMapF(req => store.delete(path) *> unmount(req))
 
     def handleRemount(src: APath, dst: APath): MntE[Unit] = {
@@ -85,7 +86,7 @@ object Mounter {
           .toRight(MountingError.invalidConfig(cfg, "config type mismatch".wrapNel))
 
       for {
-        cfg    <- store.get(src).toRight(pathNotFound(src))
+        cfg    <- EitherT(store.get(src).run.run ∘ (i => (i \/> pathNotFound(src)).join))
         srcReq <- reqOrFail(src, cfg)
         dstReq <- reqOrFail(dst, cfg)
 
@@ -102,20 +103,23 @@ object Mounter {
       case HavingPrefix(dir) =>
         for {
           paths <- store.descendants(dir)
-          pairs <- paths.toList.traverse(p => getType(p).strengthL(p).run)
+          pairs <- paths.toList.traverse(p => getType(p).run.strengthL(p).run)
         } yield pairs.flatMap(_.toList).toMap
 
       case LookupType(path) =>
-        getType(path).run
+        getType(path).run.run
 
       case LookupConfig(path) =>
-        store.get(path).run
+        store.get(path).run.run
 
       case MountView(loc, query, vars) =>
         handleMount(MountRequest.mountView(loc, query, vars)).run
 
       case MountFileSystem(loc, typ, uri) =>
         handleMount(MountRequest.mountFileSystem(loc, typ, uri)).run
+
+      case MountModule(loc, statements) =>
+        handleMount(MountRequest.mountModule(loc, statements)).run
 
       case Unmount(path) =>
         handleUnmount(path)
@@ -127,7 +131,7 @@ object Mounter {
 
       case Remount(src, dst) =>
         if (src ≟ dst)
-          store.get(src).void.toRight(pathNotFound(src)).run
+          store.get(src).run.void.toRight(pathNotFound(src)).run
         else {
           def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): F[Unit] =
             p.relativeTo(srcDir)
@@ -164,7 +168,7 @@ object Mounter {
       req => free.lift(unmount(req)).into[S],
       new PathStore[Free[S, ?], MountConfig] {
         def get(path: APath) =
-          mountConfigs.get(path)
+          EitherT.right(mountConfigs.get(path))
         def descendants(dir: ADir) =
           mountConfigs.keys.map(_
             .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
@@ -194,6 +198,8 @@ object Mounter {
     refineType(path).fold(
       d => fileSystemConfig.getOption(cfg) map { case (t, u) =>
         MountRequest.mountFileSystem(d, t, u)
+      } orElse {
+        moduleConfig.getOption(cfg) map (MountRequest.mountModule(d, _))
       },
       f => viewConfig.getOption(cfg) map { case (q, vs) =>
         MountRequest.mountView(f, q, vs)

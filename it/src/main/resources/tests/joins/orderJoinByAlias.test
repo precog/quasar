@@ -1,16 +1,26 @@
 {
     "name": "order join by alias",
+
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mimir":"ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+    "NB": "Technically, mimir should be pendingIgnoreFieldOrder, but that oddly doesn't work",
+
     "data": ["../smallZips.data", "../zips.data"],
-    "query": "select z1._id as zip, z2.pop / 1000 as popK from `../smallZips` as z1 inner join `../zips` as z2 on z1._id = z2._id order by popK desc",
-    "predicate": "equalsInitial",
+
+    "query": "select z1.`_id` as zip, z2.pop / 1000 as popK
+              from `../smallZips` as z1 inner join `../zips` as z2
+              on z1.`_id` = z2.`_id`
+              order by popK desc",
+
+    "predicate": "initial",
+
     "expected": [{ "zip": "01201", "popK": 50.655 },
                  { "zip": "01040", "popK": 43.704 },
                  { "zip": "01085", "popK": 40.117 },

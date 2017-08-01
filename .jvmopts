@@ -1,3 +1,3 @@
 -Xms512m
--Xmx2g
+-Xmx4g
 -Xss2m

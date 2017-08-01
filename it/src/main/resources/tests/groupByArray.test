@@ -1,12 +1,13 @@
 {
     "name": "group by array",
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "mimir":"pending",
+        "mongodb_q_3_2": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct count(*) as cnt from slamengine_commits group by parents",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "cnt": 3 },
                  { "cnt": 2 },
                  { "cnt": 1 }]

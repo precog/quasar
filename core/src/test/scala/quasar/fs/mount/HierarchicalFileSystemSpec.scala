@@ -38,10 +38,10 @@ import shapeless.{Data => _, Coproduct => _, _}
 class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
-  import ManageFile.MoveSemantics, QueryFile.ResultHandle
+  import QueryFile.ResultHandle
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
-  val transforms = QueryFile.Transforms[F]
+  val transforms = QueryFile.Transforms[FreeFS]
   val unsafeq = QueryFile.Unsafe[FileSystem]
 
   type ExecM[A] = transforms.ExecM[A]
@@ -90,10 +90,10 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
     )).toOption.get)
 
-  val runMntd: F ~> MountedFs =
+  val runMntd: FreeFS ~> MountedFs =
     foldMapNT(foldMapNT(interpHEff).compose[FileSystem](interpretMnted))
 
-  val runEmpty: F ~> MountedFs = {
+  val runEmpty: FreeFS ~> MountedFs = {
     val interpEmpty: FileSystem ~> HEffM =
       hierarchical.fileSystem[MountedFs, HEff](Mounts.empty)
     foldMapNT(foldMapNT(interpHEff) compose interpEmpty)
@@ -125,8 +125,8 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       val joinQry =
         "select f.x, q.y from `/bar/mntA/foo` as f inner join `/foo/mntC/quux` as q on f.id = q.id"
 
-      val lp = fixParser.parse(Query(joinQry)).toOption
-        .flatMap(queryPlan(_, Variables(Map()), rootDir, Nil, 0L, None).run.value.toOption)
+      val lp = fixParser.parseExpr(Query(joinQry)).toOption
+        .flatMap(expr => queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
         .get
 
       runMntd(f(lp.valueOr(_ => scala.sys.error("impossible constant plan")), mntA </> file("out0")).run.value)

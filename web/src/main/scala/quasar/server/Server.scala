@@ -19,17 +19,16 @@ package quasar.server
 import slamdata.Predef._
 import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
+import quasar.cli.Cmd
 import quasar.config._
-import quasar.console.{logErrors, stderr}
-import quasar.contrib.scalaz.catchable._
-import quasar.effect.Failure
+import quasar.console.logErrors
+import quasar.contrib.scopt._
+import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.{Empty, PhysicalError}
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
+import quasar.server.Http4sUtils.openBrowser
 
-import argonaut.DecodeJson
 import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
@@ -40,51 +39,33 @@ import scalaz.concurrent.Task
 object Server {
   type ServiceStarter = (Int => Task[Unit]) => HttpService
 
-  final case class QuasarConfig(
+  final case class WebCmdLineConfig(
+    cmd: Cmd,
     staticContent: List[StaticContent],
     redirect: Option[String],
     port: Option[Int],
     configPath: Option[FsFile],
-    openClient: Boolean)
+    openClient: Boolean) {
+    def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, cmd)
+  }
 
-  object QuasarConfig {
-    def fromArgs(args: Array[String]): MainTask[QuasarConfig] =
-      CliOptions.parser.parse(args.toSeq, CliOptions.default)
-        .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
-        .flatMap(fromCliOptions)
+  object WebCmdLineConfig {
+    def fromArgs(args: Vector[String]): MainTask[WebCmdLineConfig] =
+      CliOptions.parser.safeParse(args, CliOptions.default)
+        .flatMap(fromCliOptions(_))
 
-    def fromCliOptions(opts: CliOptions): MainTask[QuasarConfig] =
+    def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] =
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>
           FsPath.parseSystemFile(cfg)
             .toRight(s"Invalid path to config file: $cfg")
             .map(some))) ((content, cfgPath) =>
-        QuasarConfig(content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
-  }
-
-  /** Attempts to load the specified config file or one found at any of the
-    * default paths. If an error occurs, it is logged to STDERR and the
-    * default configuration is returned.
-    */
-  def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(implicit cfgOps: ConfigOps[C]): Task[C] = {
-    import ConfigError._
-    configFile.fold(cfgOps.fromDefaultPaths)(cfgOps.fromFile).run flatMap {
-      case \/-(c) => c.point[Task]
-
-      case -\/(FileNotFound(f)) => for {
-        codec <- FsPath.systemCodec
-        fstr  =  FsPath.printFsPath(codec, f)
-        _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
-      } yield cfgOps.default
-
-      case -\/(MalformedConfig(_, rsn)) =>
-        stderr(s"Error in configuration file, using default configuration: $rsn")
-          .as(cfgOps.default)
-    }
+        WebCmdLineConfig(
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
   }
 
   def nonApiService(
-    initialPort: Int,
+    defaultPort: Int,
     reload: Int => Task[Unit],
     staticContent: List[StaticContent],
     redirect: Option[String]
@@ -96,90 +77,98 @@ object Server {
     Router(staticRoutes ::: List(
       "/"            -> redirectService(redirect getOrElse "/welcome"),
       "/server/info" -> info.service,
-      "/server/port" -> control.service(initialPort, reload)
+      "/server/port" -> control.service(defaultPort, reload)
     ): _*)
 
   }
 
-  
-  private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
-    val tranform: PhysFsEffM ~> Task =
-      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
-
-    dr.translate(tranform).close
-  }
-    
-
-  private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] = 
-    mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
-
-  def service(
-    initialPort: Int,
+  def serviceStarter(
+    defaultPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    eval: CoreEff ~> ResponseOr
+    eval: CoreEff ~> QErrs_TaskM,
+    persistPortChange: Int => Task[Unit]
   ): ServiceStarter = {
     import RestApi._
 
+    val f: QErrs_Task ~> ResponseOr =
+      liftMT[Task, ResponseT] :+:
+        qErrsToResponseOr
+
     (reload: Int => Task[Unit]) =>
       finalizeServices(
-        toHttpServices(liftMT[Task, ResponseT] :+: eval, coreServices[CoreEffIO]) ++
+        toHttpServices(liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval), coreServices[CoreEffIO]) ++
         additionalServices
-      ) orElse nonApiService(initialPort, reload, staticContent, redirect)
+      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange) >> Kleisli(reload), staticContent, redirect)
   }
 
-  def durableService(
-    qConfig: QuasarConfig,
-    webConfig: WebConfig)(
-    implicit
-    ev1: ConfigOps[WebConfig]
-  ): MainTask[(ServiceStarter, Task[Unit])] =
+  /**
+    * Start the Quasar server and shutdown once the command line user presses "Enter"
+    */
+  def startServerUntilUserInput(
+    quasarInter: CoreEff ~> QErrs_TaskM,
+    port: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String],
+    persistPortChange: Int => Task[Unit]
+  ): Task[Unit] = {
+    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
+    PortChangingServer.start(initialPort = port, starter).flatMap(_.shutdownOnUserInput)
+  }
+
+  /**
+    * Start Quasar server
+    * @return A `Task` that can be used to shutdown the server
+    */
+  def startServer(
+    quasarInter: CoreEff ~> QErrs_TaskM,
+    port: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String],
+    persistPortChange: Int => Task[Unit]
+  ): Task[Task[Unit]] = {
+    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
+    PortChangingServer.start(initialPort = port, starter).map(_.shutdown)
+  }
+
+  def persistMetaStore(configPath: Option[FsFile]): DbConnectionConfig => MainTask[Unit] =
+    persistWebConfig(configPath, conn => _.copy(metastore = MetaStoreConfig(conn).some))
+
+  def persistPortChange(configPath: Option[FsFile]): Int => MainTask[Unit] =
+    persistWebConfig(configPath, port => _.copy(server = ServerConfig(port)))
+
+  def persistWebConfig[A](configPath: Option[FsFile], modify: A => (WebConfig => WebConfig)): A => MainTask[Unit] = { a =>
     for {
-      cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
+      diskConfig <- EitherT(ConfigOps[WebConfig].fromOptionalFile(configPath).run.flatMap {
+                      // Great, we were able to load the config file from disk
+                      case \/-(config) => config.right.point[Task]
+                      // The config file is malformed, let's warn the user and not make any changes
+                      case -\/(configErr@ConfigError.MalformedConfig(_,_)) =>
+                        (configErr: ConfigError).shows.left.point[Task]
+                      // There is no config file, so let's create a new one with the default configuration
+                      // to which we will apply this change
+                      case -\/(ConfigError.FileNotFound(_)) => WebConfig.configOps.default.map(_.right)
+                    })
+      newConfig  =  modify(a)(diskConfig)
+      _          <- EitherT(ConfigOps[WebConfig].toFile(newConfig, configPath).attempt).leftMap(_.getMessage)
+    } yield ()
+  }
 
-      ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](
-                        KvsMounter.ephemeralMountConfigs[Task],
-                        hfsRef, mntdRef)
-      initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
-
-      // TODO: Still need to expose these in the HTTP API, see SD-1131
-      failedMnts   <- attemptMountAll[Mounting](webConfig.mountings) foldMap initMnts
-      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-
-      durableMnt   =  KvsMounter.interpreter[Task, QErrsIO](
-                        writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath),
-                        hfsRef, mntdRef)
-      toQErrsIOM   =  injectFT[Task, QErrsIO] :+: durableMnt :+: injectFT[QErrs, QErrsIO]
-      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
-
-      qErrsIORor   =  liftMT[Task, ResponseT] :+: qErrsToResponseOr
-      coreApi      =  foldMapNT(qErrsIORor) compose foldMapNT(toQErrsIOM) compose runCore
-    } yield {
-      val serv = service(
-        webConfig.server.port,
-        qConfig.staticContent,
-        qConfig.redirect,
-        coreApi)
-      val closeMnts = mntdRef.read >>= closeAllMounts _
-      (serv, closeMnts)
-    }
-
-  def launchServer(
-    args: Array[String],
-    builder: (QuasarConfig, WebConfig) => MainTask[(ServiceStarter, Task[Unit])])(
-    implicit configOps: ConfigOps[WebConfig]
-  ): Task[Unit] =
+  def safeMain(args: Vector[String]): Task[Unit] = {
     logErrors(for {
-      qCfg      <- QuasarConfig.fromArgs(args)
-      wCfg      <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
-                 // TODO: Find better way to do this
-      updWCfg   =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
-      (srvc, _) <- builder(qCfg, updWCfg)
-      _         <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
+      webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
+      _ <- initMetaStoreOrStart[WebConfig](
+             webCmdLineCfg.toCmdLineConfig,
+             (wCfg, quasarInter) => {
+               val port = webCmdLineCfg.port | wCfg.server.port
+               val persistPort = persistPortChange(webCmdLineCfg.configPath) andThen (_.foldM(s => Task.fail(new Exception(s)), Task.now))
+               (startServerUntilUserInput(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort) <*
+                openBrowser(port).whenM(webCmdLineCfg.openClient)).liftM[MainErrT]
+             },
+             persistMetaStore(webCmdLineCfg.configPath))
     } yield ())
+  }
 
   def main(args: Array[String]): Unit =
-    launchServer(args, durableService(_, _)).unsafePerformSync
+    safeMain(args.toVector).unsafePerformSync
 }

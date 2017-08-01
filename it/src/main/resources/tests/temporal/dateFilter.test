@@ -2,15 +2,15 @@
   "name": "filter on date part",
 
   "backends": {
-    "mongodb_q_3_2":  "pending",
-    "postgresql":     "pending"
+    "mongodb_q_3_2":  "pending"
   },
 
   "data": "../days.data",
 
   "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": ["Wednesday", "Thursday", "Friday", "Saturday"]
 }

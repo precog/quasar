@@ -2,15 +2,15 @@
     "name": "implicitly grouped, with filtering",
 
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
 
     "data": "zips.data",
 
     "query": "select avg(pop) as avg_pop, sum(pop) as tot_pop from zips where city = \"BOULDER\" and state = \"CO\"",
 
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["marklogic_json"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "avg_pop": 27242.0, "tot_pop": 108968 }]
 }

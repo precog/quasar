@@ -1,19 +1,28 @@
 {
     "name": "flattening both sides of a join condition",
+
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "skip",
-        "postgresql":        "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
-    "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
+
+    "NB": "#2110: Disabled in all qscript-based connectors due to qscript bug.",
+
     "data": ["../zips.data", "../largeZips.data"],
-    "query": "select z1.city as city1, z1.loc as loc1, z2.city as city2, z2.loc as loc2 from `../zips` as z1 join `../largeZips` as z2 on z1.loc[*] = z2.loc[*] where z1.city < z2.city",
-    "predicate": "containsExactly",
+
+    "query": "select z1.city as city1, z1.loc as loc1, z2.city as city2, z2.loc as loc2
+              from `../zips` as z1 join `../largeZips` as z2
+              on z1.loc[*] = z2.loc[*]
+              where z1.city < z2.city",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
     "expected": [
         { "city1": "GERLAW",    "loc1": [-90.622765, 40.999519], "city2": "SAINT PETERS", "loc2": [-90.622765, 38.78024]  },
         { "city1": "GLEN DALE", "loc1": [-80.732263, 39.959732], "city2": "PHILADELPHIA", "loc2": [-75.202445, 39.959732] }]

@@ -1,25 +1,33 @@
 {
     "name": "count grouped joined tables",
+
     "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase":         "timeout",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_q_3_2":     "pending",
+        "spark_local":       "pending",
+        "spark_hdfs":        "pending"
     },
+
+    "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",
+
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+
     "query": "SELECT p.author.login, COUNT(*) as count
-              FROM `../slamengine_commits` as p INNER JOIN `../slamengine_commits_dup` as c ON p.sha = c.sha
+              FROM `../slamengine_commits` as p INNER JOIN `../slamengine_commits_dup` as c
+              ON p.sha = c.sha
               GROUP BY p.author.login",
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["mongodb_2_6",
-                         "mongodb_3_0",
-                         "mongodb_read_only",
-                         "mongodb_3_2",
-                         "mongodb_q_3_2"],
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
     "expected": [{ "login": "mossprescott", "count": 15 },
                  { "login": "sellout"     , "count":  9 },
                  { "login": "jdegoes"     , "count":  6 }]

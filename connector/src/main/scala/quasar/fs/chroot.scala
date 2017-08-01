@@ -39,6 +39,10 @@ object chroot {
   def queryFile[S[_]](prefix: ADir)(implicit S: QueryFile :<: S): S ~> Free[S, ?] =
     transformPaths.queryFile[S](rebaseA(prefix), stripPrefixA(prefix), refl)
 
+    /** Rebases paths in `Analyze` onto the given prefix. */
+  def analyze[S[_]](prefix: ADir)(implicit S: Analyze :<: S): S ~> Free[S, ?] =
+    transformPaths.analyze[S](rebaseA(prefix), stripPrefixA(prefix), refl)
+
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
   def fileSystem[S[_]](
     prefix: ADir
@@ -52,5 +56,18 @@ object chroot {
     flatMapSNT(writeFile[S](prefix))  compose
     flatMapSNT(manageFile[S](prefix)) compose
     queryFile[S](prefix)
+  }
+
+  /** Rebases all paths in `FileSystem` operations onto the given prefix. */
+  def backendEffect[S[_]](
+    prefix: ADir
+  )(implicit
+    S0: ReadFile :<: S,
+    S1: WriteFile :<: S,
+    S2: ManageFile :<: S,
+    S3: QueryFile :<: S,
+    S4: Analyze :<: S
+  ): S ~> Free[S, ?] = {
+    flatMapSNT(fileSystem[S](prefix)) compose analyze[S](prefix)
   }
 }

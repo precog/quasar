@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 
@@ -29,6 +30,48 @@ sealed trait Unicoalesce[T[_[_]], C <: CoM] {
 
 object Unicoalesce {
 
+  /**
+   * Provides a convenient way of capturing all of the Unicoalesce
+   * dependencies in a single implicit, which can then be passed
+   * along as a value (e.g. in BackendModule).
+   */
+  trait Capture[T[_[_]], C <: CoM] {
+    val C: Coalesce.Aux[T, C#M, C#M]
+    val F: Functor[C#M]
+    val QC: UnicoalesceQC[T, C]
+    val SR: UnicoalesceSR[T, C]
+    val EJ: UnicoalesceEJ[T, C]
+    val TJ: UnicoalesceTJ[T, C]
+    val N: Normalizable[C#M]
+
+    def run: C#M[T[C#M]] => C#M[T[C#M]] =
+      apply[T, C](C, F, QC, SR, EJ, TJ, N)
+  }
+
+  object Capture {
+
+    implicit def materialize[T[_[_]], C <: CoM](
+      implicit
+        _C: Coalesce.Aux[T, C#M, C#M],
+        _F: Functor[C#M],
+        _QC: UnicoalesceQC[T, C],
+        _SR: UnicoalesceSR[T, C],
+        _EJ: UnicoalesceEJ[T, C],
+        _TJ: UnicoalesceTJ[T, C],
+        _N: Normalizable[C#M]): Capture[T, C] = new Capture[T, C] {
+
+      val C = _C
+      val F = _F
+      val QC = _QC
+      val SR = _SR
+      val EJ = _EJ
+      val TJ = _TJ
+      val N = _N
+    }
+
+    def apply[T[_[_]], C <: CoM](implicit C: Capture[T, C]) = C
+  }
+
   def apply[T[_[_]], C <: CoM](
     implicit
       C: Coalesce.Aux[T, C#M, C#M],
@@ -37,23 +80,14 @@ object Unicoalesce {
       SR: UnicoalesceSR[T, C],
       EJ: UnicoalesceEJ[T, C],
       TJ: UnicoalesceTJ[T, C],
-      N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] = {
-
-    val cs = List(
-      QC(C),
-      SR(C),
-      EJ(C),
-      TJ(C),
-      N.normalizeF(_: C#M[T[C#M]]))
-
-    cs match {
-      case hd :: tl =>
-        repeatedly(
-          applyTransforms[T, C#M, C#M](hd, tl: _*))
-
-      case Nil => (x => x)
-    }
-  }
+      N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] =
+    repeatedly(
+      applyTransforms(
+        QC(C),
+        SR(C),
+        EJ(C),
+        TJ(C),
+        N.normalizeF(_: C#M[T[C#M]])))
 }
 
 sealed trait UnicoalesceQC[T[_[_]], C <: CoM] extends Unicoalesce[T, C]

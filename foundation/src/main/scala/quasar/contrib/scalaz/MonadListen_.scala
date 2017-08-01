@@ -44,6 +44,13 @@ sealed abstract class MonadListen_Instances extends MonadListen_Instances0 {
       def listen[A](fa: WriterT[F, W2, A]) =
         WriterT(L.listen(fa.run) map { case ((w2, a), w1) => (w2, (a, w1)) })
     }
+
+  implicit def kleisliMonadListen[F[_], R, W](
+      implicit F: MonadListen_[F, W]): MonadListen_[Kleisli[F, R, ?], W] =
+    new MonadListen_[Kleisli[F, R, ?], W] {
+      def listen[A](fa: Kleisli[F, R, A]): Kleisli[F, R, (A, W)] =
+        fa.mapK(MonadListen_[F, W].listen[A])
+    }
 }
 
 sealed abstract class MonadListen_Instances0 {

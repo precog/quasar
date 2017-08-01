@@ -55,6 +55,7 @@ object KeyValueStore {
       * of applying the given function to the value currently associated with
       * the key, returning the second part of the result.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alterS[A](k: K, f: Option[V] => (V, A)): FreeS[A] =
       for {
         cur       <- get(k).run
@@ -94,6 +95,7 @@ object KeyValueStore {
     /** Atomically updates the value associated with the given key with the
       * result of applying the given function to the current value, if defined.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modify(k: K, f: V => V): FreeS[Unit] =
       get(k) flatMapF { v =>
         compareAndPut(k, Some(v), f(v)).ifM(().point[FreeS], modify(k, f))
@@ -111,8 +113,17 @@ object KeyValueStore {
 
   object impl {
 
-    def empty[K, V]: Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
-      val state = scala.collection.concurrent.TrieMap.empty[K, V]
+    /** The default implementation of an in-memory KeyValueStore.
+      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+      */
+    def default[K, V]: Task[KeyValueStore[K, V, ?] ~> Task] = defaultWith(Map.empty)
+
+    /** The default implementation of an in-memory KeyValueStore.
+      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+      * @param initialState The initial state of the key value store to begin with
+      */
+    def defaultWith[K, V](initialState: Map[K, V]) : Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
+      val state = scala.collection.concurrent.TrieMap(initialState.toList: _*)
       new (KeyValueStore[K, V, ?] ~> Task) {
         def apply[A](fa: KeyValueStore[K, V, A]): Task[A] = fa match {
           case Keys() => Task.delay(state.keys.toVector)

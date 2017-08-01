@@ -23,6 +23,8 @@ import quasar.fp.ski._
 import monocle.{Lens, Prism}
 import pathy.Path._
 import scalaz._
+import scalaz.std.string._
+import scalaz.syntax.equal._
 
 sealed abstract class PathError
 
@@ -70,5 +72,12 @@ object PathError {
       case InvalidPath(p, r) =>
         s"${typeStr(p)} ${posixCodec.printPath(p)} is invalid: $r"
     }
+  }
+
+  implicit val equal: Equal[PathError] = Equal.equal {
+    case (PathExists(a), PathExists(b))         => a ≟ b
+    case (PathNotFound(a), PathNotFound(b))     => a ≟ b
+    case (InvalidPath(a, b), InvalidPath(c, d)) => a ≟ c && b ≟ d
+    case _                                      => false
   }
 }

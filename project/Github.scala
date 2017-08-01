@@ -1,8 +1,9 @@
 package github
 
-import java.lang.{String, System}
+import java.lang.{RuntimeException, String, System}
 import scala.{Boolean, Option, Predef}
 import scala.collection.{JavaConversions, Seq}, JavaConversions._
+import scala.util.{Failure, Success, Try}
 
 import org.kohsuke.github._
 import sbt._, Keys._
@@ -35,8 +36,7 @@ object GithubPlugin extends Plugin {
   lazy val githubSettings: Seq[Setting[_]] = Seq(
     repoSlug    := Travis.RepoSlug.fold(organization.value + "/" + normalizedName.value)(Predef.identity),
     tag         := "v" + version.value +
-                   (if (prerelease.value) Travis.BuildNumber.fold("")("-" + _) else "") +
-                   "-" + normalizedName.value,
+                   (if (prerelease.value) Travis.BuildNumber.fold("")("-" + _) else ""),
     releaseName := name.value +
                    (" " + tag.value) +
                    (if (draft.value) " (draft)" else ""),
@@ -62,26 +62,43 @@ object GithubPlugin extends Plugin {
 
       val github = githubAuth.value
 
-      log.info("repoSlug    = " + repoSlug.value)
-      log.info("tag         = " + tag.value)
-      log.info("releaseName = " + releaseName.value)
-      log.info("draft       = " + draft.value)
-      log.info("prerelease  = " + prerelease.value)
-      log.info("commitish   = " + commitish.value)
+      val release = Try {
+        val repo = github.getRepository(repoSlug.value)
 
-      val release = Option({
-        val repo = github.getRepository(repoSlug.value).
-                    createRelease(tag.value).
-                    name(releaseName.value).
-                    draft(draft.value).
-                    //body(body). // TODO: Build release notes from fixed issues
-                    prerelease(prerelease.value)
+        val body =
+          repo.listTags.find(_.getName == tag.value).map { tagUnpopulated =>
+            repo.getCommit(tagUnpopulated.getCommit.getSHA1).getCommitShortInfo.getMessage
+          }.getOrElse(scala.sys.error("Tag not found"))
 
-        commitish.value match {
-          case "" => repo
-          case v  => repo.commitish(v)
+        log.info("repoSlug    = " + repoSlug.value)
+        log.info("tag         = " + tag.value)
+        log.info("releaseName = " + releaseName.value)
+        log.info("draft       = " + draft.value)
+        log.info("body        = " + body)
+        log.info("prerelease  = " + prerelease.value)
+        log.info("commitish   = " + commitish.value)
+
+        val existingRelease =
+          repo.listReleases.find(_.getName == releaseName.value)
+
+        existingRelease.getOrElse {
+          val releaseBuilder = repo
+            .createRelease(tag.value)
+            .name(releaseName.value)
+            .draft(draft.value)
+            .body(body)
+            .prerelease(prerelease.value)
+
+          (commitish.value match {
+            case "" => releaseBuilder
+            case v  => releaseBuilder.commitish(v)
+          }).create
         }
-      }.create).getOrElse(scala.sys.error("Could not create the Github release"))
+      } match {
+        case Success(v) => v
+        case Failure(e) =>
+          throw new RuntimeException("Could not access or create the Github release", e)
+      }
 
       log.info("Created Github release: " + release)
 

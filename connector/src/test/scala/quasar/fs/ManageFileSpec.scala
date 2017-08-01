@@ -19,14 +19,10 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalaz.eitherT._
-import quasar.contrib.scalaz.stateT._
-import quasar.fp.ski._
-
-import scala.Predef.$conforms
+import quasar.contrib.scalaz.stream._
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.stream._
 
 class ManageFileSpec extends quasar.Qspec with FileSystemFixture {
 
@@ -34,17 +30,13 @@ class ManageFileSpec extends quasar.Qspec with FileSystemFixture {
     "renameFile" >> {
       "moves the existing file to a new name in the same directory" >> prop {
         (s: SingleFileMemState, name: String) => {
-          val rename =
-            manage.renameFile(s.file, name).liftM[Process]
-          val existsP: Process[manage.M, Boolean] =
-            query.fileExistsM(s.file).liftM[Process]
-          val existsAndData: Process[manage.M, (Boolean, Data)] =
-            existsP tuple read.scanAll(fileParent(s.file) </> file(name))
+          val rename = manage.renameFile(s.file, name)
+          val exists = query.fileExistsM(s.file)
+          val data: manage.M[Throwable \/ Vector[Data]] =
+            read.scanAll(fileParent(s.file) </> file(name)).runLogCatch
 
-          MemTask.runLogT(rename.drain ++ existsAndData)
-            .map(_.unzip.leftMap(_ exists ι))
-            .run.eval(s.state)
-            .unsafePerformSync.toEither must beRight((false, s.contents))
+          Mem.interpret((rename *> (exists |@| data).tupled).run).eval(s.state)
+            .toEither must beRight((false, s.contents.right))
         }
       }
     }

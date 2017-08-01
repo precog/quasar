@@ -1,16 +1,16 @@
 {
     "name": "triple flatten with mixed content",
     "backends": {
+        "mimir":"pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}{*}{*} from nested",
-    "NB": "containsExactly has a bug that gets confused on duplicate results (#732).",
-    "predicate": "equalsExactly",
+    "NB": "`exactly` with `ignoreResultOrder` has a bug that gets confused on duplicate results (#732).",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["m", "n", "o"]
 }

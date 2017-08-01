@@ -19,12 +19,11 @@ package quasar
 import slamdata.Predef._
 
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Lens
-import scalaz.{Lens => _, _}, Liskov._, Scalaz._
-import scalaz.iteratee.EnumeratorT
-import scalaz.stream._
+import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
 
 sealed abstract class ListMapInstances {
@@ -116,13 +115,6 @@ trait JsonOps {
   )
 }
 
-trait QFoldableOps {
-  final implicit class ToQFoldableOps[F[_]: Foldable, A](val self: F[A]) {
-    final def toProcess: Process0[A] =
-      self.foldRight[Process0[A]](Process.halt)((a, p) => Process.emit(a) ++ p)
-  }
-}
-
 trait DebugOps {
   final implicit class ToDebugOps[A](val self: A) {
     /** Applies some operation to a value and returns the original value. Useful
@@ -141,12 +133,9 @@ package object fp
     with PartialFunctionOps
     with JsonOps
     with ProcessOps
-    with QFoldableOps
     with DebugOps {
 
   import ski._
-
-  type EnumT[F[_], A] = EnumeratorT[A, F]
 
   /** An endomorphism is a mapping from a category to itself.
    *  It looks like scalaz already staked out "Endo" for the
@@ -165,7 +154,7 @@ package object fp
     */
   def ignore[A](a: A): Unit = ()
 
-  def reflNT[F[_]] = λ[F ~> F](x => x)
+  def reflNT[F[_]]: F ~> F = NaturalTransformation.refl[F]
 
   /** `liftM` as a natural transformation
     *
@@ -242,15 +231,13 @@ package object fp
     Show.showFromToString
 
   implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
-
   implicit def natShow[N <: Nat]: Show[N] = Show.showFromToString
 
-  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
-    Equal.equal((a, b) => true)
-
+  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] = Equal.equal((a, b) => true)
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
   implicit val symbolEqual: Equal[Symbol] = Equal.equalA
+  implicit val symbolShow: Show[Symbol] = Show.showFromToString
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]
@@ -260,14 +247,13 @@ package object fp
       self.resume leftMap (_ map (_.resume))
   }
 
+  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A, B](f: F[B] => M[CoEnv[A, F, B]])
+      : CoEnv[A, F, B] => M[CoEnv[A, F, B]] =
+    co => co.run.fold(κ(co.point[M]), f)
+
   def liftCo[T[_[_]], F[_], A, B](f: F[B] => CoEnv[A, F, B])
       : CoEnv[A, F, B] => CoEnv[A, F, B] =
-    co => co.run.fold(κ(co), f)
-
-  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A]
-    (f: F[T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]])
-      : CoEnv[A, F, T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]] =
-    co => co.run.fold(κ(co.point[M]), f)
+    liftCoM[T, Id, F, A, B](f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),
@@ -276,6 +262,20 @@ package object fp
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
     λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A])))
+
+  def coenvBijection[T[_[_]]: BirecursiveT, F[_]: Functor, A]:
+      Bijection[Free[F, A], T[CoEnv[A, F, ?]]] =
+    bijection[Id, Id, Free[F, A], T[CoEnv[A, F, ?]]](
+      _.convertTo[T[CoEnv[A, F, ?]]],
+      _.convertTo[Free[F, A]])
+
+  def applyFrom[A, B](bij: Bijection[A, B])(modify: B => B): A => A =
+    bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK
+
+  def applyCoEnvFrom[T[_[_]]: BirecursiveT, F[_]: Functor, A](
+    modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
+      Free[F, A] => Free[F, A] =
+    applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
 }
 
 package fp {

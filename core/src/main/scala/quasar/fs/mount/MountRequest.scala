@@ -16,11 +16,11 @@
 
 package quasar.fs.mount
 
-import slamdata.Predef.{Some, None}
+import slamdata.Predef.List
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.FileSystemType
-import quasar.sql.Sql
+import quasar.sql.{ScopedExpr, Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -32,19 +32,21 @@ sealed abstract class MountRequest {
     this match {
       case MountView(f, _, _)       => f
       case MountFileSystem(d, _, _) => d
+      case MountModule(d, _)        => d
     }
 
   def toConfig: MountConfig =
     this match {
       case MountView(_, q, vs)      => MountConfig.viewConfig(q, vs)
       case MountFileSystem(_, t, u) => MountConfig.fileSystemConfig(t, u)
+      case MountModule(_, s)        => MountConfig.moduleConfig(s)
     }
 }
 
 object MountRequest {
   final case class MountView private[mount] (
     file: AFile,
-    query: Fix[Sql],
+    scopedExpr: ScopedExpr[Fix[Sql]],
     vars: Variables
   ) extends MountRequest
 
@@ -54,13 +56,20 @@ object MountRequest {
     uri: ConnectionUri
   ) extends MountRequest
 
-  val mountView = Prism[MountRequest, (AFile, Fix[Sql], Variables)] {
-    case MountView(f, q, vs) => Some((f, q, vs))
-    case _                   => None
+  final case class MountModule private[mount] (
+    dir: ADir,
+    statements: List[Statement[Fix[Sql]]]
+  ) extends MountRequest
+
+  val mountView = Prism.partial[MountRequest, (AFile, ScopedExpr[Fix[Sql]], Variables)] {
+    case MountView(f, q, vs) => (f, q, vs)
   } ((MountView(_, _, _)).tupled)
 
-  val mountFileSystem = Prism[MountRequest, (ADir, FileSystemType, ConnectionUri)] {
-    case MountFileSystem(d, t, u) => Some((d, t, u))
-    case _                        => None
+  val mountFileSystem = Prism.partial[MountRequest, (ADir, FileSystemType, ConnectionUri)] {
+    case MountFileSystem(d, t, u) => (d, t, u)
   } ((MountFileSystem(_, _, _)).tupled)
+
+  val mountModule = Prism.partial[MountRequest, (ADir, List[Statement[Fix[Sql]]])] {
+    case MountModule(d, s) => (d, s)
+  } ((MountModule(_, _)).tupled)
 }

@@ -62,6 +62,7 @@ object AtomicRef {
     /** Atomically updates the ref with the first part of the result of applying
       * the given function to the current value, returning the second part.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modifyS[A](f: V => (V, A)): FreeS[A] =
       for {
         cur       <- get
@@ -76,45 +77,41 @@ object AtomicRef {
   }
 
   object Ops {
-    def apply[V, S[_]](implicit S: AtomicRef[V, ?] :<: S): Ops[V, S] =
+    implicit def apply[V, S[_]](implicit S: AtomicRef[V, ?] :<: S): Ops[V, S] =
       new Ops[V, S]
   }
 
   def fromTaskRef[A](tr: TaskRef[A]): AtomicRef[A, ?] ~> Task =
-    new (AtomicRef[A, ?] ~> Task) {
-      def apply[B](fb: AtomicRef[A, B]) = fb match {
-        case Get(f) =>
-          tr.read map f
+    λ[AtomicRef[A, ?] ~> Task]{
+      case Get(f) =>
+        tr.read map f
 
-        case Set(a) =>
-          tr.write(a)
+      case Set(a) =>
+        tr.write(a)
 
-        case CompareAndSet(expect, update) =>
-          tr.compareAndSet(expect, update)
-      }
+      case CompareAndSet(expect, update) =>
+        tr.compareAndSet(expect, update)
     }
 
   // FIXME
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def toState[F[_], S](implicit F: MonadState[F, S])
                          : AtomicRef[S, ?] ~> F =
-    new (AtomicRef[S, ?] ~> F) {
-      def apply[A](fa: AtomicRef[S, A]) = fa match {
-        case Get(f) =>
-          F.gets(f)
+    λ[AtomicRef[S, ?] ~> F]{
+      case Get(f) =>
+        F.gets(f)
 
-        case Set(s) =>
-          F.put(s)
+      case Set(s) =>
+        F.put(s)
 
-        case CompareAndSet(expect, update) =>
-          F.bind(F.get) { s =>
-            if (s == expect)
-              F.put(update).as(true)
-            else
-              F.point(false)
-          }
-      }
-    }
+      case CompareAndSet(expect, update) =>
+        F.bind(F.get) { s =>
+          if (s == expect)
+            F.put(update).as(true)
+          else
+            F.point(false)
+        }
+     }
 
   /** Decorate AtomicRef operations by running an effect after each successful
     * update. Usage: `onSet[V](effect)`
@@ -133,22 +130,20 @@ object AtomicRef {
           ): AtomicRef[V, ?] ~> Free[S, ?] = {
         val R = Ops[V, S]
 
-        new (AtomicRef[V, ?] ~> Free[S, ?]) {
-          def apply[A](r: AtomicRef[V, A]) = r match {
-            case Get(f) =>
-              R.get.map(f)
+        λ[AtomicRef[V, ?] ~> Free[S, ?]] {
+          case Get(f) =>
+            R.get.map(f)
 
-            case Set(value) =>
-              R.set(value) *> free.lift(f(value)).into[S]
+          case Set(value) =>
+            R.set(value) *> free.lift(f(value)).into[S]
 
-            case CompareAndSet(expect, update) =>
-              for {
-                upd <- R.compareAndSet(expect, update)
-                _   <- free.lift {
-                          if (upd) f(update) else ().point[F]
-                        }.into[S]
-              } yield upd
-          }
+          case CompareAndSet(expect, update) =>
+            for {
+              upd <- R.compareAndSet(expect, update)
+              _   <- free.lift {
+                        if (upd) f(update) else ().point[F]
+                      }.into[S]
+            } yield upd
         }
       }
     }
@@ -158,29 +153,25 @@ object AtomicRef {
     * providing AtomicRef[A, ?]. Usage: `zoom(aLens).into[S]`.
     */
   object zoom {
-    def apply[A, B](lens: Lens[A, B]) = new Aux(lens)
+    def apply[A, B: Equal](lens: Lens[A, B]) = new Aux(lens)
 
-    // FIXME
-    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-    final class Aux[A, B](lens: Lens[A, B]) {
+    final class Aux[A, B: Equal](lens: Lens[A, B]) {
       def into[S[_]](implicit S: AtomicRef[A, ?] :<: S)
           : AtomicRef[B, ?] ~> Free[S, ?] = {
 
         val R = AtomicRef.Ops[A, S]
 
-        new (AtomicRef[B, ?] ~> Free[S, ?]) {
-          def apply[C](r: AtomicRef[B, C]) = r match {
-            case Get(f) =>
-              R.get.map(v => f(lens.get(v)))
+        λ[AtomicRef[B, ?] ~> Free[S, ?]] {
+          case Get(f) =>
+            R.get.map(v => f(lens.get(v)))
 
-            case Set(v) =>
-              R.modify(u => lens.set(v)(u)).void
+          case Set(v) =>
+            R.modify(u => lens.set(v)(u)).void
 
-            case CompareAndSet(expect, update) =>
-              R.modifyS(v =>
-                if (lens.get(v) == expect) (lens.set(update)(v), true)
-                else (v, false))
-          }
+          case CompareAndSet(expect, update) =>
+            R.modifyS(v =>
+              if (lens.get(v) ≟ expect) (lens.set(update)(v), true)
+              else (v, false))
         }
       }
     }

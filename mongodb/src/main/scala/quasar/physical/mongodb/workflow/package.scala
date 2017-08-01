@@ -268,6 +268,7 @@ package object workflow {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: Workflow3_2F): Option[List[BsonField.Name]] = {
     I.inj(op.unFix).run.fold[Option[List[BsonField.Name]]](
       {
@@ -281,6 +282,7 @@ package object workflow {
           (if (id == IncludeId) IdName :: value.keys.toList
           else value.keys.toList).some
         case sm @ $SimpleMapF(_, _, _)        =>
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def loop(expr: JsCore): Option[List[jscore.Name]] =
             expr.simplify match {
               case jscore.Obj(value)      => value.keys.toList.some
@@ -324,6 +326,7 @@ package object workflow {
         : T =
       reparent(newSrc).wf.embed
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def fmap[G[_], B](f: A => B, g: F ~> G): SingleSourceF[G, B] =
       new SingleSourceF[G, B] {
         val src = f(self.src)
@@ -350,6 +353,7 @@ package object workflow {
     def bson: Bson.Doc = Bson.Doc(ListMap(op -> rhs))
 
     // NB: narrows the result type
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override def fmap[G[_], B](f: A => B, g: F ~> G): PipelineF[G, B] =
       new PipelineF[G, B] {
         val src = f(self.src)
@@ -376,6 +380,7 @@ package object workflow {
     def reparent[B](newSrc: B): ShapePreservingF[F, B]
 
     // NB: narrows the result type
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override def fmap[G[_], B](f: A => B, g: F ~> G): ShapePreservingF[G, B] =
       new ShapePreservingF[G, B] {
         val src = f(self.src)
@@ -414,6 +419,7 @@ package object workflow {
   implicit def workflowFCrush(implicit I: WorkflowOpCoreF :<: WorkflowF):
       Crush[WorkflowF] =
     new Crush[WorkflowF] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def crush[T[_[_]]: BirecursiveT](
         op: WorkflowF[(T[WorkflowF], (DocVar, WorkflowTask))]) = op match {
         case I($PureF(value)) => (DocVar.ROOT(), PureTask(value))
@@ -523,11 +529,13 @@ package object workflow {
               })))
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def pipeline[T[_[_]]: BirecursiveT](
         op: PipelineF[WorkflowF, T[WorkflowF]]):
           Option[(DocVar, WorkflowTask, List[PipelineOp])] =
         op.wf match {
           case I($MatchF(src, selector)) =>
+            @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
             def pipelinable(sel: Selector): Boolean = sel match {
               case Selector.Where(_) => false
               case comp: Selector.CompoundSelector =>
@@ -592,6 +600,7 @@ package object workflow {
       // NB: We don’t convert a $ProjectF after a map/reduce op because it could
       //     affect the final shape unnecessarily.
       def crystallize(op: Fix[F]) = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
           uw.src.project match {
             case I(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
@@ -637,6 +646,7 @@ package object workflow {
             finished)(
             n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
 
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.project match {
           case I($SimpleMapF(_, _, _))   => fixShape(wf)
           case IsShapePreserving(sp) => promoteKnownShape(sp.src)
@@ -658,12 +668,14 @@ package object workflow {
     new RenderTree[T[F]] {
       val wfType = "Workflow" :: Nil
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def chain(op: T[F]): List[RenderedTree] = op.project match {
         case IsSingleSource(ss) =>
           chain(ss.src) :+ Traverse[F].void(ss.wf).render
         case _ => List(render(op))
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def render(v: T[F]) = v.project match {
         case IsSource(s)       => s.op.render
         case IsSingleSource(_) =>

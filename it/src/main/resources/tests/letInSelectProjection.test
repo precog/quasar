@@ -1,15 +1,14 @@
 {
     "name": "handle let as project of select",
 
-    "backends": {
-        "postgresql": "pending"
-    },
+    "backends": {},
 
     "data": ["cars.data", "smallZips.data"],
 
     "query": "select (smallZips := select * from cars; select * from smallZips) as result from smallZips",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "result": { "_id": "1", "year": [2012], "name": "RangeRover-Evoque" } },
                  { "result": { "_id": "2", "year": [2010], "name": "Honda-civic" } },

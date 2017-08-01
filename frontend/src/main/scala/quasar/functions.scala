@@ -35,7 +35,7 @@ final case object Reduction extends DimensionalEffect
   * an operation.
   */
 final case object Expansion extends DimensionalEffect
-/** Describes a function that each individual value. */
+/** Describes a function that maps each individual value. */
 final case object Mapping extends DimensionalEffect
 /** Describes a function that compresses the identity information. */
 final case object Squashing extends DimensionalEffect
@@ -146,6 +146,8 @@ trait GenericFuncInstances {
       case agg.Min                        => "Min"
       case agg.Max                        => "Max"
       case agg.Avg                        => "Avg"
+      case agg.First                      => "First"
+      case agg.Last                       => "Last"
       case agg.Arbitrary                  => "Arbitrary"
       case array.ArrayLength              => "ArrayLength"
       case date.ExtractCentury            => "ExtractCentury"
@@ -180,12 +182,16 @@ trait GenericFuncInstances {
       case identity.Squash                => "Squash"
       case identity.ToId                  => "ToId"
       case math.Add                       => "Add"
+      case math.Abs                       => "Abs"
       case math.Multiply                  => "Multiply"
       case math.Power                     => "Power"
       case math.Subtract                  => "Subtract"
       case math.Divide                    => "Divide"
       case math.Negate                    => "Negate"
       case math.Modulo                    => "Modulo"
+      case math.Ceil                      => "Ceil"
+      case math.Floor                     => "Floor"
+      case math.Trunc                     => "Trunc"
       case relations.Eq                   => "Eq"
       case relations.Neq                  => "Neq"
       case relations.Lt                   => "Lt"

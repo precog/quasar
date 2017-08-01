@@ -1,10 +1,8 @@
 {
     "name": "match regex pattern",
-    "backends": {
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "select city from zips where city ~ \"OULD.{0,2} CIT\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["GOULD CITY", "BOULDER CITY"]
 }

@@ -2,8 +2,9 @@
     "name": "constant and a grouped value",
 
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "couchbase":      "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":          "ignoreFieldOrder"
     },
 
     "data": "zips.data",
@@ -14,7 +15,7 @@
 
     "query": "select :state as state, count(*) as `count` from zips where state = :state",
 
-    "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase", "marklogic_json"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "state": "CO", "count": 414 }]
 }

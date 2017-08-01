@@ -1,11 +1,9 @@
 {
     "name": "match on ObjectId",
     "NB": "This test isn’t really valid. This is neither the correct way to represent an OID (there is no generic way to do so), nor should the `_id` field even be in the data. But this is a reasonable placeholder until we actually expose the correct way to do more or less what this intends.",
-    "backends": {
-        "postgresql": "pending"
-    },
     "data": "days.data",
-    "query": "select day from days where _id = oid(\"54b6f430d4c654959e963a62\")",
-    "predicate": "containsExactly",
+    "query": "select day from days where `_id` = oid(\"54b6f430d4c654959e963a62\")",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Sunday"]
 }

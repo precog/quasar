@@ -1,14 +1,11 @@
-# This property is never used, but it's here so that Knobs doesn't fail to parse the file if all other
-# parameters are commented out
-# TODO: Remove once PR #49 of Knobs gets merged and released (https://github.com/Verizon/knobs/pull/49)
-bogus = true
+#postgresql_metastore = "{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore_test\",\"userName\":\"postgres\",\"password\":\"postgres\"}"
 #mongodb_2_6       ="mongodb://<host>:<port>"
 #mongodb_3_0       ="mongodb://<host>:<port>"
 #mongodb_3_2       ="mongodb://<host>:<port>"
 #mongodb_read_only ="mongodb://<host>:<port>"
-#postgresql        ="jdbc:postgresql://<host>/<database>?user=<user>&password=<password>"
 #spark_local       ="<path_to_folder>"
 #spark_hdfs        ="spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>"
+#spark_elastic     ="spark://<spark_host>:<spark_port>?rootPath=<root_path>"
 #marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
-#couchbase         ="couchbase://<host>[:<port>]?username=<username>&password=<password>[&queryTimeoutSeconds=<seconds>]"
+#couchbase         ="couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]"
 #spark_cassandra    ="local[*]|localhost|/q/"

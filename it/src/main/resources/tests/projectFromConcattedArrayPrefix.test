@@ -1,12 +1,11 @@
 {
     "name": "project from static concatted array prefix",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select ([6, 7] || loc)[1] from largeZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [7,
                  7,
                  7,

@@ -18,107 +18,55 @@ package quasar.physical.couchbase.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._, eitherT._
 import quasar.{Data, DataCodec}
-import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp.free._
-import quasar.fs._
-import quasar.physical.couchbase.common._
+import quasar.fs._, WriteFile.WriteHandle
+import quasar.physical.couchbase._, common._, Couchbase._
 
-import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.transcoder.JsonTranscoder
 import rx.lang.scala._, JavaConverters._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object writefile {
-  import WriteFile._
+abstract class writefile {
+  val wh = KeyValueStore.Ops[WriteHandle, Collection, Eff]
 
-  implicit val codec: DataCodec = CBDataCodec
+  def open(file: AFile): Backend[WriteHandle] =
+    for {
+      ctx    <- MR.asks(_.ctx)
+      col    =  docTypeValueFromPath(file)
+      i      <- MonotonicSeq.Ops[Eff].next.liftB
+      handle =  WriteHandle(file, i)
+      _      <- wh.put(handle, Collection(ctx.bucket, col)).liftB
+    } yield handle
 
-  final case class State(bucket: Bucket, collection: String)
-
-  def interpret[S[_]](
-    implicit
-    S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: MonotonicSeq :<: S,
-    S2: Read[Context, ?] :<:  S,
-    S3: GenUUID :<: S,
-    S4: Task :<: S
-  ): WriteFile ~> Free[S, ?] = λ[WriteFile ~> Free[S, ?]] {
-    case Open(file)     => open(file)
-    case Write(h, data) => write(h, data)
-    case Close(h)       => close(h)
-  }
-
-  def writeHandles[S[_]](
-    implicit
-    S0: KeyValueStore[WriteHandle, State, ?] :<: S
-  ) = KeyValueStore.Ops[WriteHandle, State, S]
-
-  val jsonTranscoder = new JsonTranscoder
-
-  def open[S[_]](
-    file: AFile
-  )(implicit
-    S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: MonotonicSeq :<: S,
-    S2: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ WriteHandle] =
+  def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
     (for {
-      ctx      <- context.ask.liftM[FileSystemErrT]
-      bktCol   <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      _        <- EitherT(lift(
-                    Task.delay(ctx.manager.hasBucket(bktCol.bucket).booleanValue).ifM(
-                      Task.now(().right),
-                      Task.now(FileSystemError.pathErr(PathError.pathNotFound(file)).left)
-                  )).into)
-      bkt      <- lift(Task.delay(
-                    ctx.cluster.openBucket(bktCol.bucket)
-                  )).into.liftM[FileSystemErrT]
-      i        <- MonotonicSeq.Ops[S].next.liftM[FileSystemErrT]
-      handle   =  WriteHandle(file, i)
-      _        <- writeHandles.put(handle, State(bkt, bktCol.collection)).liftM[FileSystemErrT]
-    } yield handle).run
-
-  def write[S[_]](
-    h: WriteHandle,
-    chunk: Vector[Data]
-  )(implicit
-    S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: GenUUID :<: S,
-    S2: Task :<: S
-  ): Free[S, Vector[FileSystemError]] =
-    (for {
-      st   <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
+      ctx  <- MR.asks(_.ctx)
+      col  <- ME.unattempt(wh.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
       data <- lift(Task.delay(chunk.map(DataCodec.render).unite
                 .map(str =>
                   JsonObject
                     .create()
-                    .put("type", st.collection)
-                    .put("value", jsonTranscoder.stringToJsonObject(str))))).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
-      docs <- data.traverse(d => GenUUID.Ops[S].asks(uuid =>
+                    .put(ctx.docTypeKey.v, col.docTypeValue.v)
+                    .put("value", jsonTranscoder.stringToJsonObject(str))))
+              ).into[Eff].liftB
+      docs <- data.traverse(d => GenUUID.Ops[Eff].asks(uuid =>
                 JsonDocument.create(uuid.toString, d)
-              )).liftM[EitherT[?[_], Vector[FileSystemError], ?]]
+              )).liftB
       _    <- lift(Task.delay(
                 Observable
                   .from(docs)
-                  .flatMap(st.bucket.async.insert(_).asScala)
+                  .flatMap(ctx.bucket.async.insert(_).asScala)
                   .toBlocking
                   .last
-              )).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
-    } yield Vector.empty).merge
+              )).into[Eff].liftB
+    } yield Vector()).run.value ∘ (_.valueOr(Vector(_)))
 
-  def close[S[_]](
-    h: WriteHandle
-  )(implicit
-    S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, Unit] =
-    writeHandles.delete(h)
-
+  def close(h: WriteHandle): Configured[Unit] =
+    wh.delete(h).liftM[ConfiguredT]
 }

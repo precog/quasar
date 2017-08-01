@@ -2,16 +2,23 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
-        "couchbase":  "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_q_3_2": "skip",
-        "postgresql": "pending",
+        "mimir":"skip",
+        "couchbase":  "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml":  "pending",
+        "mongodb_q_3_2": "pending",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
 
-    "NB": "Skipped for all connectors due to QScript bug #1915.",
+    "NB": "this actually works on mimir locally, it just doesn't work on Travis for... reasons",
+
+    "NB": "Disabled for all connectors due to reduce/sort ordering bug.
+           Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.
+
+           This is tricky because the sort key does not appear in the result.
+           The result can be verified by running a similar query with
+          `select city, pop`.",
 
     "data": "zips.data",
 
@@ -39,7 +46,7 @@
                 where pop <= 10
                 order by pop",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [
       { "cardinal": "nobody",   "power": null, "parity": "even" , "grade": null },
       { "cardinal": "one",      "power": 0   , "parity": "odd"  , "grade": null },

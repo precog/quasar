@@ -17,70 +17,74 @@
 package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
-import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.physical.couchbase._
+import quasar.physical.couchbase._, common._
+import quasar.Planner.PlannerErrorME
 import quasar.qscript._
 
 import matryoshka._
 import scalaz._
 
 abstract class Planner[T[_[_]], F[_], QS[_]] {
-  type M[A]  = CBPhaseLog[F, A]
-  type PR[A] = PhaseResultT[F, A]
-
-  def plan: AlgebraM[M, QS, T[N1QL]]
+  def plan: AlgebraM[F, QS, T[N1QL]]
 }
 
 object Planner {
   def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
-  implicit def coproduct[T[_[_]], N[_]: Monad, F[_], G[_]](
+  implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
     implicit F: Planner[T, N, F], G: Planner[T, N, G]
   ): Planner[T, N, Coproduct[F, G, ?]] =
     new Planner[T, N, Coproduct[F, G, ?]] {
-      val plan: AlgebraM[M, Coproduct[F, G, ?], T[N1QL]] =
+      val plan: AlgebraM[N, Coproduct[F, G, ?], T[N1QL]] =
         _.run.fold(F.plan, G.plan)
     }
 
-  implicit def constDeadEndPlanner[T[_[_]], F[_]: Monad]
+  implicit def constDeadEndPlanner[T[_[_]], F[_]: PlannerErrorME]
     : Planner[T, F, Const[DeadEnd, ?]] =
     new UnreachablePlanner[T, F, Const[DeadEnd, ?]]
 
-  implicit def constReadPlanner[T[_[_]], F[_]: Monad, A]
+  implicit def constReadPlanner[T[_[_]], F[_]: PlannerErrorME, A]
     : Planner[T, F, Const[Read[A], ?]] =
     new UnreachablePlanner[T, F, Const[Read[A], ?]]
 
-  implicit def constShiftedReadDirPlanner[T[_[_]], F[_]: Monad]
+  implicit def constShiftedReadDirPlanner[T[_[_]], F[_]: PlannerErrorME]
     : Planner[T, F, Const[ShiftedRead[ADir], ?]] =
     new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
-  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
+  implicit def constShiftedReadFilePlanner[
+    T[_[_]]: CorecursiveT,
+    F[_]: Applicative: ContextReader: NameGenerator]
     : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
     new ShiftedReadFilePlanner[T, F]
 
-  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+  implicit def equiJoinPlanner[
+    T[_[_]]: BirecursiveT: ShowT,
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
-    : Planner[T, F, MapFunc[T, ?]] =
-    new MapFuncPlanner[T, F]
+  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
+    : Planner[T, F, MapFunc[T, ?]] = {
+    val core = new MapFuncCorePlanner[T, F]
+    coproduct(core, new MapFuncDerivedPlanner(core))
+  }
 
-  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
+  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
     : Planner[T, F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+  implicit def qScriptCorePlanner[
+    T[_[_]]: BirecursiveT: ShowT,
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 
-  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad]
+  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative]
     : Planner[T, F, ReduceFunc] =
     new ReduceFuncPlanner[T, F]
 
-  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
+  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
     : Planner[T, F, ThetaJoin[T, ?]] =
     new UnreachablePlanner[T, F, ThetaJoin[T, ?]]
-
 }

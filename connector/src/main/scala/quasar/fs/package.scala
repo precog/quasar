@@ -26,6 +26,8 @@ import scalaz.{Failure => _, _}
 package object fs extends PhysicalErrorPrisms {
   type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
 
+  type BackendEffect[A] = Coproduct[Analyze, FileSystem, A]
+
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
@@ -44,4 +46,14 @@ package object fs extends PhysicalErrorPrisms {
     m: ManageFile ~> M
   ): FileSystem ~> M =
     q :+: r :+: w :+: m
+
+  def interpretBackendEffect[M[_]](
+    a: Analyze ~> M,
+    q: QueryFile ~> M,
+    r: ReadFile ~> M,
+    w: WriteFile ~> M,
+    m: ManageFile ~> M
+  ): BackendEffect ~> M =
+    a :+: q :+: r :+: w :+: m
+
 }

@@ -1,0 +1,32 @@
+{
+    "name": "select reduction from nested select",
+    "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase": "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_q_3_2": "pending"
+    },
+    "data": "patients.data",
+    "query": "SELECT AVG(cnt) as measure, state as category FROM
+                (SELECT COUNT(*) as cnt, state, gender FROM patients
+                WHERE codes[*].desc LIKE \"%flu%\"
+                GROUP BY state, gender
+                ORDER BY COUNT(*) DESC) as meh",
+    "predicate": "initial",
+    "expected": [{ "measure": 1.238095238095, "category": "NE" },
+                 { "measure": 1.238095238095, "category": "MS" },
+                 { "measure": 1.238095238095, "category": "AL" },
+                 { "measure": 1.238095238095, "category": "NY" },
+                 { "measure": 1.238095238095, "category": "AZ" },
+                 { "measure": 1.238095238095, "category": "SC" },
+                 { "measure": 1.238095238095, "category": "IA" },
+                 { "measure": 1.238095238095, "category": "TX" },
+                 { "measure": 1.238095238095, "category": "IN" },
+                 { "measure": 1.238095238095, "category": "RI" }]
+}

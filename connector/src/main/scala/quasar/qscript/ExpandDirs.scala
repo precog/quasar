@@ -23,12 +23,11 @@ import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.CoEnv
 import pathy.Path.{dir1, file1}
 import scalaz._, Scalaz._
 
@@ -149,8 +148,9 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
         acc.embed.cata[Free[QScriptTotal, Hole]](g => Free.roll(FI.inject(g))))))
 
   def wrapDir(name: String, d: O[T[O]]): O[T[O]] =
-    QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
+    QC.inj(Map(d.embed, Free.roll(MFC(MakeMap(StrLit(name), HoleF)))))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def allDescendents[M[_]: Monad: MonadFsErr]
     (listContents: DiscoverPath.ListContents[M], wrapFile: AFile => O[T[O]])
       : ADir => M[List[O[T[O]]]] =
@@ -209,8 +209,8 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
   def applyToBranch[M[_]: Monad: MonadFsErr]
     (listContents: DiscoverPath.ListContents[M], branch: FreeQS)
       : M[FreeQS] =
-    branch.transCataM[M, T[CoEnv[Hole, QScriptTotal, ?]], CoEnv[Hole, QScriptTotal, ?]](
-      liftCoM[T, M, QScriptTotal, Hole](
+    branch.transCataM[M, T[CoEnvQS], CoEnvQS](
+      liftCoM[T, M, QScriptTotal, Hole, T[CoEnvQS]](
         ExpandDirsTotal.expandDirs(
           coenvPrism[QScriptTotal, Hole].reverseGet,
           listContents))

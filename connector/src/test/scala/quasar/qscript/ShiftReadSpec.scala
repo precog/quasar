@@ -18,9 +18,10 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.{Data, TreeMatchers}
-import quasar.fp._
 import quasar.contrib.pathy.AFile
-import quasar.qscript.MapFuncs._
+import quasar.ejson.implicits._
+import quasar.fp._
+import quasar.qscript.MapFuncsCore._
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -50,7 +51,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       beTreeEqual(
         Fix(QCT.inj(Map(
           Fix(SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
-          Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+          Free.roll(MFC(ProjectIndex(HoleF, IntLit(1))))))))
     }
 
     "shift a simple aggregated read" in {
@@ -66,8 +67,8 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
         QCT.inj(Reduce((),
           NullLit(),
-          List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some))))))).some)
+          List(ReduceFuncs.Count(Free.roll(MFC(ProjectIndex(HoleF, IntLit[Fix, Hole](1)))))),
+          Free.roll(MFC(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some)))))))).some)
     }
   }
 }

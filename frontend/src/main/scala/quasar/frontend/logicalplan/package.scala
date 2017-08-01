@@ -18,10 +18,10 @@ package quasar.frontend
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 
 import scala.Symbol
 
@@ -42,6 +42,14 @@ package object logicalplan {
     Prism.partial[LogicalPlan[A], (GenericFunc[Nat], Func.Input[A, Nat])] {
       case Invoke(f, as) => (f, as)
     } ((Invoke[Nat, A](_, _)).tupled)
+
+  def joinSideName[A] =
+    Prism.partial[LogicalPlan[A], Symbol] { case JoinSideName(n) => n } (JoinSideName(_))
+
+  def join[A] =
+    Prism.partial[LogicalPlan[A], (A, A, JoinType, JoinCondition[A])] {
+      case Join(l, r, t, c) => (l, r, t, c)
+    } ((Join[A](_, _, _, _)).tupled)
 
   def free[A] =
     Prism.partial[LogicalPlan[A], Symbol] { case Free(n) => n } (Free(_))

@@ -41,6 +41,7 @@ trait AggLib extends Library {
     noSimplification,
     partialTyper[nat._1] {
       case Sized(Type.Const(Data.Set(xs))) => Type.Const(Data.Int(xs.length))
+      case Sized(Type.Const(_))            => Type.Const(Data.Int(1))
       case Sized(_)                        => Type.Int
     },
     basicUntyper)
@@ -104,6 +105,28 @@ trait AggLib extends Library {
 
       case Sized(t) =>
         success(t)
+    },
+    reflexiveUntyper)
+
+  val First = UnaryFunc(
+    Reduction,
+    "Finds the first value in a set.",
+    Type.Top,
+    Func.Input1(Type.Top),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(t) => success(t)
+    },
+    reflexiveUntyper)
+
+  val Last = UnaryFunc(
+    Reduction,
+    "Finds the last value in a set.",
+    Type.Top,
+    Func.Input1(Type.Top),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(t) => success(t)
     },
     reflexiveUntyper)
 

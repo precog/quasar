@@ -1,18 +1,25 @@
 {
     "name": "join with multiple conditions",
+
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mimir": "ignoreFieldOrder",
+        "mongodb_q_3_2":     "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
               from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
                 on r.sha = l.parents[0].sha and l.author.login = r.author.login",
-    "predicate": "containsAtLeast",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
     "expected": [
         { "child": "b29d8f254e5df2c4d1792f077625924cd1fde2db", "c_auth": "mossprescott",
           "parent": "166f7337c8fd5db13941abf482de05accb8e9380", "p_auth": "mossprescott" },

@@ -39,7 +39,7 @@ trait DataCursor[F[_], C] {
   def process(cursor: C)(implicit F: Applicative[F]): Process[F, Data] = {
     def closeCursor(c: C): Process[F, Nothing] =
       Process.eval_[F, Unit](close(c))
-
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def readUntilEmpty(c: C): Process[F, Data] =
       Process.await(nextChunk(c)) { data =>
         if (data.isEmpty)

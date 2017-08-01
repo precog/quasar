@@ -2,22 +2,22 @@
   "name": "convert epoch milliseconds value to timestamp",
 
   "backends": {
-    "mongodb_q_3_2": "pending",
-    "postgresql":    "pending"
+        "couchbase": "ignoreFieldOrder",
+        "mimir":"pendingIgnoreFieldOrder",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
+        "mongodb_q_3_2": "pending"
   },
 
   "data": "../days.data",
 
   "query": "select day, ts, to_timestamp(epoch) as converted from `../days` where ts = to_timestamp(1408255200000) or to_timestamp(epoch) = timestamp(\"2014-08-18T07:00:00Z\")",
 
-  "predicate": "containsExactly",
-  "ignoreFieldOrder": [
-    "couchbase",
-    "mongodb_2_6",
-    "mongodb_3_0",
-    "mongodb_3_2",
-    "mongodb_read_only"
-  ],
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
   "expected": [
     { "day": "Sunday", "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "converted": { "$timestamp": "2014-08-17T06:00:00.000Z" } },
     { "day": "Monday", "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "converted": { "$timestamp": "2014-08-18T07:00:00.000Z" } }

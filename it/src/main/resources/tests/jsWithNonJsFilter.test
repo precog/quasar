@@ -1,12 +1,12 @@
 {
     "name": "filter on JS with non-JS",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, pop from largeZips where length(city) < 5 and pop < 30000",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{"city": "EDEN" , "pop": 26675},
                  {"city": "ABAC" , "pop": 27906},
                  {"city": "TICE" , "pop": 25029},

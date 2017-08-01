@@ -16,7 +16,7 @@
 
 package quasar.contrib.scalaz
 
-import slamdata.Predef.Throwable
+import slamdata.Predef._
 
 import scalaz._, Scalaz._
 
@@ -33,6 +33,14 @@ trait EitherTInstances extends EitherTInstances0 {
 
       def fail[A](t: Throwable) =
         EitherT[F, E, A](Catchable[F].fail(t))
+    }
+
+  implicit def eitherTThrowableCatchable[M[_]: Monad]: Catchable[EitherT[M, Throwable, ?]] =
+    new Catchable[EitherT[M, Throwable, ?]] {
+      def attempt[A](f: EitherT[M, Throwable, A]): EitherT[M, Throwable, Throwable \/ A] =
+        EitherT.right(f.run)
+      def fail[A](err: Throwable): EitherT[M, Throwable, A] =
+        EitherT.left(err.point[M])
     }
 
   implicit def eitherTMonadState[F[_], S, E](implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
@@ -67,4 +75,9 @@ trait EitherTInstances2 {
     EitherT.monadTell[F, W, E]
 }
 
-object eitherT extends EitherTInstances
+object eitherT extends EitherTInstances {
+  implicit class NestedEitherT[E,F[_]: Monad, A](a: EitherT[EitherT[F, E, ?], E, A]) {
+    def flattenLeft: EitherT[F, E, A] =
+      a.run.flatMapF(_.point[F])
+  }
+}

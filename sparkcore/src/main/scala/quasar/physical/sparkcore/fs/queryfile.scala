@@ -19,13 +19,15 @@ package quasar.physical.sparkcore.fs
 import slamdata.Predef._
 import quasar.Data
 import quasar.Planner._
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults}
 import quasar.connector.PlannerErrT
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
-import quasar.fp._
+import quasar.ejson.implicits._
 import quasar.fp.free._
+import quasar.fp.ignore
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._, FileSystemError._, QueryFile._
 import quasar.qscript._
@@ -40,19 +42,11 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScriptCP = QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?]
-  type SparkQScript[A] = SparkQScriptCP#M[A]
-
-  implicit val sparkQScriptToQSTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
-    ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
-
-  type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
-
   final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Free[S, Unit],
     fileExists: AFile => Free[S, Boolean],
-    listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
+    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]],
     readChunkSize: () => Int
   )
 
@@ -73,26 +67,11 @@ object queryfile {
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] = {
 
-    def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
-      val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
-        (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-      val rewrite = new Rewrite[Fix]
-      for {
-        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
-                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript0].apply(_))
-                   .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
-        optQS =  qs.transHylo(
-                   rewrite.optimize(reflNT[SparkQScript]),
-                   Unicoalesce[Fix, SparkQScriptCP])
-        _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
-      } yield optQS
-    }
-
     def qsToProgram[T](
       exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
       lp: Fix[LogicalPlan]
     ): Free[S, (PhaseResults, FileSystemError \/ T)] = {
-          val qs = toQScript(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
+          val qs = toQScript[Free[S, ?]](listContents(input, _))(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
           qs.run.run
         }
 
@@ -155,10 +134,10 @@ object queryfile {
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
 
-        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
-          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
-      
+      sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
+        planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
+        rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+
     }.join
   }
 
@@ -179,7 +158,7 @@ object queryfile {
       rdd <- EitherT(read.asks { sc =>
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
       }.join)
-      _ <- kvs.put(h, RddState(rdd.zipWithIndex.some, 0)).liftM[PlannerErrT]
+      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
 
     open
@@ -206,21 +185,25 @@ object queryfile {
               .filter(d => d._2 >= p && d._2 < (p + step))
               .map(_._1).collect.toVector
           }).into[S].liftM[FileSystemErrT]
-          rddState = if(collected.isEmpty) RddState(None, 0) else RddState(Some(rdd), p + step)
+          rddState <- lift(Task.delay {
+            if(collected.isEmpty) {
+              ignore(rdd.unpersist())
+              RddState(None, 0)
+            } else RddState(Some(rdd), p + step)
+          }).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
-        } yield(collected)
+        } yield collected
     }.run
   }
 
   private def close[S[_]](h: ResultHandle)(implicit
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
-     ): Free[S, Unit] = kvs.delete(h)
+  ): Free[S, Unit] = kvs.delete(h)
 
   private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
-    s0: Task :<: S): Free[S, Boolean] =
-    input.fileExists(f)
+    s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)
 
   private def listContents[S[_]](input: Input[S], d: ADir)(implicit
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    input.listContents(d)
+    input.listContents(d).run
 }

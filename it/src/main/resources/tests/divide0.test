@@ -1,0 +1,26 @@
+{
+    "name": "divide by 0",
+    "backends": {
+        "couchbase": "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending"
+    },
+    "data": "divide.data",
+    "query": "select nr, val1 / 0 as d from divide",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "nr":  1 },
+        { "nr":  2 },
+        { "nr":  3 },
+        { "nr":  4 },
+        { "nr":  5 },
+        { "nr":  6 },
+        { "nr":  7 },
+        { "nr":  8 },
+        { "nr":  9 },
+        { "nr": 10 },
+        { "nr": 11 },
+        { "nr": 12 }
+    ]
+}

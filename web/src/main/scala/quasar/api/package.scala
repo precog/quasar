@@ -176,7 +176,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound // note: This needs to change to `Response.fallthrough` when http4s is upgraded
+          case None       => Response.fallthrough
         }
       }
     }
@@ -189,13 +189,13 @@ package object api {
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
-      UriPathCodec.parseAbsDir(pathString(p)) map sandboxAbs
+      UriPathCodec.parseAbsDir(pathString(p)) map unsafeSandboxAbs
     }
   }
 
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
-      UriPathCodec.parseAbsFile(pathString(p)) map sandboxAbs
+      UriPathCodec.parseAbsFile(pathString(p)) map unsafeSandboxAbs
     }
   }
 
@@ -210,6 +210,14 @@ package object api {
       refineType(path).swap.leftAs(ApiError.fromMsg(
         BadRequest withReason "Directory path expected.",
         s"Expected '${posixCodec.printPath(path)}' to be a directory.",
+        "path" := path))
+    }
+
+  def decodedFile(encodedPath: String): ApiError \/ AFile =
+    decodedPath(encodedPath) flatMap { path =>
+      refineType(path).leftAs(ApiError.fromMsg(
+        BadRequest withReason "File path expected.",
+        s"Expected '${posixCodec.printPath(path)}' to be a file.",
         "path" := path))
     }
 

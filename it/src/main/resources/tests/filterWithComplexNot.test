@@ -1,20 +1,15 @@
 {
     "name": "filter with complex query involving not",
 
-    "NB": "Couchbase disabled due to heap exhaustion",
-
-    "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
-    },
-
     "data": "largeZips.data",
 
-    "query": "select _id as zip from largeZips
-              where not (city not like \"BOULD%\" or state != \"CO\" or (pop between 20000 and 40000 and loc[1] != 40.017235))",
+    "query": "select `_id` as zip from largeZips where
+                not (city not like \"BOULD%\" or
+                state != \"CO\" or
+                (pop between 20000 and 40000 and loc[1] != 40.017235))",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "zip": "80301" },
                  { "zip": "80302" }]
 }

@@ -1,15 +1,11 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "mongodb_q_3_2": "skip",
-        "postgresql": "pending",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "couchbase":  "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase": "pending",
+        "marklogic_json": "pending",
+        "mongodb_q_3_2":  "pending"
     },
-    "NB": "Skipped for all connectors due to QScript provenance bug #1951.",
     "data": "user_comments.data",
     "query": "select profile from user_comments where (
                 userId                 LIKE \"%Dr%\" OR
@@ -20,8 +16,10 @@
                 comments[*].text       LIKE \"%Dr%\" OR
                 comments[*].replyTo[*] LIKE \"%Dr%\" OR
                 comments[*].`time`     LIKE \"%Dr%\")",
-    "predicate": "equalsExactly",
-    "TODO": "There should be only one result once MRA is fully implemented.",
+     "NB": "`exactly` with `ignoreResultOrder` has a bug that gets confused on
+          duplicate results (#732), so we currently don’t ignore the result
+          order.",
+    "predicate": "exactly",
     "expected": [{ "name": "Mary Jane", "age": 29, "title": "Dr" },
                  { "name": "Mary Jane", "age": 29, "title": "Dr" },
                  { "name": "Mary Jane", "age": 29, "title": "Dr" },

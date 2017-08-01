@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.Planner._
 import quasar.contrib.matryoshka._
+import quasar.ejson.implicits._
 import quasar.fp.{ ExternallyManaged => EM, _ }
 
 import matryoshka._
@@ -27,7 +28,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
+class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   case class ZipperSides(
     lSide: FreeMap,
     rSide: FreeMap)
@@ -45,17 +46,11 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
   private def linearize[G[_]: Traverse]: Algebra[G, List[G[EM]]] =
     fl => fl.as[EM](Extern) :: fl.fold
 
-  private def delinearizeInner[G[_]: Traverse, A](
-    implicit DE: Const[DeadEnd, ?] :<: G):
+  private def delinearizeInner[G[_]: Functor, H[_], A]
+    (HtoG: H ~> G)
+    (implicit DE: Const[DeadEnd, ?] :<: H):
       Coalgebra[G, List[G[A]]] = {
-    case Nil    => DE.inj(Const[DeadEnd, List[G[A]]](Root))
-    case h :: t => h.as(t)
-  }
-
-  private def delinearizeInnerCoEnv[A](
-    implicit DE: Const[DeadEnd, ?] :<: QScriptTotal):
-      Coalgebra[CoEnv[Hole, QScriptTotal, ?], List[CoEnv[Hole, QScriptTotal, A]]] = {
-    case Nil    => CoEnv(\/-(DE.inj(Const[DeadEnd, List[CoEnv[Hole, QScriptTotal, A]]](Root))))
+    case Nil    => HtoG(DE.inj(Const[DeadEnd, List[G[A]]](Root)))
     case h :: t => h.as(t)
   }
 
@@ -65,8 +60,9 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
     case h :: t => h.as(t).right
   }
 
+  // FIXME unify with more general target delinearization
   private def delinearizeTargetsCoEnv[A]:
-      Coalgebra[CoEnv[Hole, QScriptTotal, ?], List[CoEnv[Hole, QScriptTotal, A]]] = {
+      Coalgebra[CoEnvQS, List[CoEnvQS[A]]] = {
     case Nil    => CoEnv(-\/(SrcHole))
     case h :: t => h.as(t)
   }
@@ -94,53 +90,75 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
       ZipperAcc(Nil, sides, tails).left
   }
 
+  private def makeList[S[_[_]], G[_]: Traverse, H[_]]
+    (input: S[H])
+    (implicit R: Recursive.Aux[S[H], G])
+      : List[G[EM]] =
+    R.cata(input)(linearize[G]).reverse
+
+  private def makeZipper[S[_[_]], G[_]: Traverse, H[_]]
+    (left: S[H], right: S[H])
+    (implicit
+      mergeable: Mergeable.Aux[T, G],
+      R: Recursive.Aux[S[H], G])
+      : ZipperAcc[G] =
+    elgot((
+      ZipperSides(HoleF[T], HoleF[T]),
+      ZipperTails(makeList[S, G, H](left), makeList[S, G, H](right))))(consZipped[G], zipper[G])
+
+  def mergePair[S[_[_]], G[_]: Traverse, H[_]]
+    (left: S[H], right: S[H])
+    (HtoG: H ~> G, unify: List[G[EM]] => FreeQS)
+    (implicit
+      mergeable: Mergeable.Aux[T, G],
+      C: Corecursive.Aux[S[H], G],
+      R: Recursive.Aux[S[H], G],
+      DE: Const[DeadEnd, ?] :<: H)
+      : SrcMerge[S[H], FreeQS] = {
+
+    val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
+      makeZipper[S, G, H](left, right)
+
+    SrcMerge[S[H], FreeQS](
+      common.reverse.ana[S[H]](delinearizeInner[G, H, EM](HtoG)),
+      rebaseBranch(unify(lTail), lMap),
+      rebaseBranch(unify(rTail), rMap))
+  }
+
   def mergeT[G[_]: Traverse](left: T[G], right: T[G])(
     implicit
       mergeable: Mergeable.Aux[T, G],
+      coalesce: Coalesce.Aux[T, G, G],
+      N: Normalizable[G],
       DE: Const[DeadEnd, ?] :<: G,
+      QC: QScriptCore :<: G,
       FI: Injectable.Aux[G, QScriptTotal]):
       SrcMerge[T[G], FreeQS] = {
-    val lLin: List[G[EM]] = left.cata(linearize[G]).reverse
-    val rLin: List[G[EM]] = right.cata(linearize[G]).reverse
 
-    val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
-      elgot(
-        (ZipperSides(HoleF[T], HoleF[T]), ZipperTails(lLin, rLin)))(
-        consZipped[G], zipper[G])
+    def insertIdentityMap: G[T[G]] => G[T[G]] = in => {
+      QC.prj(in).cata({
+        case qs @ Filter(_, _) => QC.inj(Map(QC.inj(qs).embed, HoleF))
+        case qs @ Sort(_, _, _) => QC.inj(Map(QC.inj(qs).embed, HoleF))
+        case qs => QC.inj(qs)
+      }, in)
+    }
 
-    val leftF: FreeQS =
-      lTail.reverse.ana[Free[G, Hole]](delinearizeTargets[G, EM] >>> (CoEnv(_))).mapSuspension(FI.inject)
+    def norm: T[G] => T[G] = _.transCata[T[G]](
+      insertIdentityMap >>> repeatedly(coalesce.coalesceQCNormalize[G](idPrism[G])))
 
-    val rightF: FreeQS =
-      rTail.reverse.ana[Free[G, Hole]](delinearizeTargets[G, EM] >>> (CoEnv(_))).mapSuspension(FI.inject)
+    def unify: List[G[EM]] => FreeQS =
+      _.reverse.ana[Free[G, Hole]](delinearizeTargets[G, EM] >>> (CoEnv(_))).mapSuspension(FI.inject)
 
-    SrcMerge[T[G], FreeQS](common.reverse.ana[T[G]](delinearizeInner[G, EM]),
-      rebaseBranch(leftF, lMap),
-      rebaseBranch(rightF, rMap))
+    mergePair[T, G, G](norm(left), norm(right))(NaturalTransformation.refl, unify)
   }
 
-  // TODO remove duplication between `mergeFreeQS` and `mergeT`
   private def mergeFreeQS(left: FreeQS, right: FreeQS): SrcMerge[FreeQS, FreeQS] = {
-    val lLin: List[CoEnv[Hole, QScriptTotal, EM]] = left.cata(linearize).reverse
-    val rLin: List[CoEnv[Hole, QScriptTotal, EM]] = right.cata(linearize).reverse
+    def trans = λ[QScriptTotal ~> CoEnvQS](qs => CoEnv(qs.right[Hole]))
 
-    val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
-      elgot(
-        (ZipperSides(HoleF[T], HoleF[T]), ZipperTails(lLin, rLin)))(
-        consZipped[CoEnv[Hole, QScriptTotal, ?]], zipper[CoEnv[Hole, QScriptTotal, ?]])
+    def unify: List[CoEnvQS[EM]] => FreeQS =
+      _.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
 
-    val leftF: FreeQS =
-      lTail.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
-    val rightF: FreeQS =
-      rTail.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
-
-    val mergeSrc: FreeQS =
-      common.reverse.ana[FreeQS](delinearizeInnerCoEnv[EM])
-
-    SrcMerge[FreeQS, FreeQS](
-      mergeSrc,
-      rebaseBranch(leftF, lMap),
-      rebaseBranch(rightF, rMap))
+    mergePair[Free[?[_], Hole], CoEnvQS, QScriptTotal](left, right)(trans, unify)
   }
 
   private def mergeBranches(rewrite: Rewrite[T])(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] =
@@ -151,7 +169,7 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
 
         def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] = rebase(l, r).some
 
-        val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
+        val baseSrc: Option[CoEnvQS[FreeQS]] =
           rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
 
         baseSrc.cata(src =>

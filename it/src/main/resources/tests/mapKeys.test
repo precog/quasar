@@ -1,0 +1,28 @@
+{
+    "name": "select map keys",
+    "backends": {
+        "marklogic_xml":     "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending"
+    },
+    "data": "newTests.data",
+    "query": "select distinct backends{_:} from newTests",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": ["couchbase",
+                 "marklogic_json",
+                 "marklogic_xml",
+                 "mimir",
+                 "mongodb_2_6",
+                 "mongodb_3_0",
+                 "mongodb_3_2",
+                 "mongodb_3_4",
+                 "mongodb_read_only",
+                 "postgresql",
+                 "spark_hdfs",
+                 "spark_local"]
+}

@@ -40,6 +40,7 @@ final case class fixpoint[R](embed: JsCoreF[R] => R) {
 
   def ident(name: String): R = Ident(Name(name))
   def select(expr: R, name: String): R = Access(expr, Literal(Js.Str(name)))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def binop(op: BinaryOperator, a1: R, args: R*): R = args.toList match {
     case Nil    => a1
     case h :: t => BinOp(op, a1, binop(op, h, t: _*))

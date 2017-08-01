@@ -24,6 +24,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.fs.mount.module.Module
 import quasar.sql._
 
 import argonaut._, Argonaut._
@@ -126,6 +127,17 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
     }
   }
 
+  implicit def moduleErrorToApiError: ToApiError[Module.Error] =
+    error {
+      case Module.Error.FSError(fsErr)            => fsErr.toApiError
+      case Module.Error.SemErrors(semErrs)        => semErrs.toApiError
+      case Module.Error.ArgumentsMissing(missing) =>
+        apiError(
+          BadRequest withReason "Arguments missing to function call",
+          "missing arguments" := missing)
+      case Module.Error.ParsingErr(parsingErr)    => parsingErr.toApiError
+    }
+
   implicit def physicalErrorToApiError: ToApiError[PhysicalError] =
     error(err => fromMsg_(
       InternalServerError withReason "Physical filesystem error.",
@@ -144,6 +156,9 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         apiError(
           BadRequest withReason "Invalid mount configuration.",
           "reasons" := rsns)
+
+      case InvalidMount(_, e) =>
+        fromMsg_(InternalServerError withReason "Invalid mount.", e)
 
       case PError(e) => e.toApiError
       case EError(e) => e.toApiError
@@ -227,6 +242,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Invalid ObjectId.",
           err.message,
           "objectId" := oid)
+      case CompilationFailed(semErrs) =>
+        fromMsg(
+          BadRequest withReason "Compilation failed",
+          err.message,
+          "compilation errors" := semErrs.map(_.toApiError)
+        )
       case NonRepresentableInJS(value) =>
         fromMsg(
           InternalServerError withReason "Unable to compile to JavaScript.",
@@ -329,6 +350,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           err.message,
           "functionName" := fn.shows,
           "input"        := str)
+      case e@AmbiguousFunctionInvoke(name, funcs) =>
+        fromMsg(
+          BadRequest withReason "Ambiguous function call",
+          err.message,
+          "invoke"              := name.value,
+          "ambiguous functions" := e.fullyQualifiedFuncs)
       case other =>
         fromMsg_(
           InternalServerError withReason "Compilation error.",
@@ -378,7 +405,10 @@ sealed abstract class ToApiErrorInstances0 {
   implicit def nonEmptyListToApiError[A: ToApiError]: ToApiError[NonEmptyList[A]] =
     error { nel =>
       val herr = nel.head.toApiError
-      val stat = Status.fromInt(herr.status.code) getOrElse herr.status
-      apiError(stat, "errors" := nel.map(_.toApiError))
+      if (nel.size ≟ 1) herr
+      else {
+        val stat = (Status.fromInt(herr.status.code) getOrElse herr.status) withReason "Multiple errors"
+        apiError(stat, "errors" := nel.map(_.toApiError))
+      }
     }
 }

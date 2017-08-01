@@ -1,10 +1,8 @@
 {
     "name": "match like pattern",
-    "backends": {
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "select city from zips where city like \"%OULD%CIT%\"",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": ["GOULD CITY", "BOULDER CITY"]
 }

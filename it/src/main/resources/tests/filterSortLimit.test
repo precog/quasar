@@ -1,17 +1,13 @@
 {
     "name": "filter, sort, and limit",
 
-    "backends": {
-        "postgresql": "pending"
-    },
-
     "data": "zips.data",
 
     "query": "select * from zips where city like \"BOU%\" order by pop limit 10",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "ignoredFields": ["_id"],
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
     "expected": [
         { "city": "BOULDER",         "loc": [-109.540105, 42.688146], "pop":  112, "state": "WY"  },
         { "city": "BOULDER",         "loc": [-111.426646, 37.916606], "pop":  131, "state": "UT"  },

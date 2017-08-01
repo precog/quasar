@@ -16,17 +16,43 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Data
+import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.qscript._
+import quasar.fp.ski.κ
 
 import matryoshka._
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import shapeless.Lazy
 
 trait Planner[M[_], FMT, F[_]] {
-  def plan: AlgebraM[M, F, XQuery]
+  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[M, F, Search[Q] \/ XQuery]
+
+  def planXQuery(
+    implicit
+    M0: Monad[M],
+    M1: PrologW[M],
+    O : SearchOptions[FMT],
+    SP: StructuralPlanner[M, FMT],
+    F : Functor[F]
+  ): AlgebraM[M, F, XQuery] = {
+    type Q = Fix[Query[Unit, ?]]
+    Kleisli(elimSearch[Q, Unit] _) <==< (plan[Q, Unit] <<< F.lift((_: XQuery).right[Search[Q]]))
+  }
+
+  protected def elimSearch[Q, V](x: Search[Q] \/ XQuery)(
+    implicit
+    Q: Recursive.Aux[Q, Query[V, ?]],
+    M0: Monad[M],
+    M1: PrologW[M],
+    O : SearchOptions[FMT],
+    SP: StructuralPlanner[M, FMT]
+  ): M[XQuery] =
+    x.fold(Search.plan[M, Q, V, FMT](_, κ(emptySeq.point[M])), _.point[M])
 }
 
 object Planner extends PlannerInstances {
@@ -38,48 +64,36 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
     implicit F: Lazy[Planner[M, FMT, F]], G: Lazy[Planner[M, FMT, G]]
   ): Planner[M, FMT, Coproduct[F, G, ?]] =
     new Planner[M, FMT, Coproduct[F, G, ?]] {
-      val plan: AlgebraM[M, Coproduct[F, G, ?], XQuery] =
+      def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[M, Coproduct[F, G, ?], Search[Q] \/ XQuery] =
         _.run.fold(F.value.plan, G.value.plan)
     }
-
-  implicit def constDataPlanner[M[_]: Monad, FMT](
-    implicit SP: StructuralPlanner[M, FMT]
-  ): Planner[M, FMT, Const[Data, ?]] =
-    new DataPlanner[M, FMT]
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {
-  implicit def mapFunc[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
-    implicit
-    DP: Planner[M, FMT, Const[Data, ?]],
-    SP: StructuralPlanner[M, FMT]
-  ): Planner[M, FMT, MapFunc[T, ?]] =
-    new MapFuncPlanner[M, FMT, T]
-}
 
-sealed abstract class PlannerInstances1 extends PlannerInstances2 {
-  implicit def constReadFile[F[_]: Applicative, FMT: SearchOptions]: Planner[F, FMT, Const[Read[AFile], ?]] =
+  implicit def constReadFile[F[_]: Applicative: MonadPlanErr, FMT](
+    implicit SP: StructuralPlanner[F, FMT]
+  ): Planner[F, FMT, Const[Read[AFile], ?]] =
     new ReadFilePlanner[F, FMT]
 
-  implicit def constShiftedReadDir[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
+  implicit def constShiftedReadDir[F[_]: Applicative: MonadPlanErr, FMT](
     implicit SP: StructuralPlanner[F, FMT]
   ): Planner[F, FMT, Const[ShiftedRead[ADir], ?]] =
     new ShiftedReadDirPlanner[F, FMT]
 
-  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
+  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions, T[_[_]]: BirecursiveT](
     implicit
     SP : StructuralPlanner[F, FMT],
-    QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]]
   ): Planner[F, FMT, QScriptCore[T, ?]] = {
     implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new QScriptCorePlanner[F, FMT, T]
   }
 
-  implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
+  implicit def thetaJoin[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions, T[_[_]]: BirecursiveT](
     implicit
-    QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    SP : StructuralPlanner[F, FMT],
+    QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]]
   ): Planner[F, FMT, ThetaJoin[T, ?]] = {
     implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new ThetaJoinPlanner[F, FMT, T]
@@ -104,16 +118,16 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     new UnreachablePlanner[F, FMT, ProjectBucket[T, ?]]("ProjectBucket")
 }
 
-sealed abstract class PlannerInstances2 {
+sealed abstract class PlannerInstances1 {
   implicit def eitherTPlanner[M[_]: Functor, FMT, F[_], E](implicit P: Planner[M, FMT, F]): Planner[EitherT[M, E, ?], FMT, F] =
     new Planner[EitherT[M, E, ?], FMT, F] {
-      val plan: AlgebraM[EitherT[M, E, ?], F, XQuery] =
-        fx => EitherT(P.plan(fx) map (_.right[E]))
+      def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]) =
+        fx => EitherT(P.plan.apply(fx) map (_.right[E]))
     }
 
   implicit def writerTPlanner[M[_]: Functor, FMT, F[_], W: Monoid](implicit P: Planner[M, FMT, F]): Planner[WriterT[M, W, ?], FMT, F] =
     new Planner[WriterT[M, W, ?], FMT, F] {
-      val plan: AlgebraM[WriterT[M, W, ?], F, XQuery] =
-        fx => WriterT(P.plan(fx) strengthL mzero[W])
+      def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]) =
+        fx => WriterT(P.plan.apply(fx) strengthL mzero[W])
     }
 }

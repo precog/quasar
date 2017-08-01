@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'
+
+##########################################
+# injects spark_local path into
+# it/testing.conf
+# need to call it like this if running locally
+# buildtestingconfig.sh spark
+#
+configure_spark() {
+  echo "spark_local=\"${HOME}/spark_local_test/\"" >> $CONFIGFILE
+}
+
+##########################################
+# injects mimir path into
+# it/testing.conf
+#
+configure_mimir() {
+  echo "mimir=\"/tmp/precog/\"" >> $CONFIGFILE
+}
+
+##########################################
+# injects marklogic xml and json url
+# into it/testing.conf
+#
+configure_marklogic_xml() {
+  CONTAINERNAME=$1
+  echo "${CONTAINERNAME}=\"xcc://marklogic:marklogic@${DOCKERIP}:8000/Documents?format=xml\"" >> $CONFIGFILE
+}
+
+configure_marklogic_json() {
+  CONTAINERNAME=$1
+  echo "${CONTAINERNAME}=\"xcc://marklogic:marklogic@${DOCKERIP}:9000/Documents?format=json\"" >> $CONFIGFILE
+}
+
+##########################################
+# injects couchbase url into
+# it/testing.conf
+#
+configure_couchbase() {
+  CONTAINERNAME=$1
+  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
+}
+
+##########################################
+# injects metastore conf into
+# it/testing.conf
+#
+configure_metastore() {
+  echo 'postgresql_metastore="{\"host\":\"'$DOCKERIP'\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' >> $CONFIGFILE
+}
+
+##########################################
+# injects various mongodb urls into
+# it/testing.conf depending on argument
+#
+configure_mongo() {
+  CONTAINERNAME=$1
+  if [[ $CONTAINERNAME == "mongodb_2_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27018\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_0"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27019\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_read_only" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27020\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; echo "mongodb_q_3_2=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi
+}
+
+
+container_lookup() {
+  CONTAINER=$(echo "$1" | cut -d_ -f2-)
+  if [[ $CONTAINER =~ "mongodb"          ]]; then configure_mongo          $CONTAINER;      fi
+  if [[ $CONTAINER == "marklogic_xml"    ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
+  if [[ $CONTAINER == "marklogic_json"   ]]; then configure_marklogic_json $CONTAINER 9001; fi
+  if [[ $CONTAINER == "couchbase"        ]]; then configure_couchbase      $CONTAINER;      fi
+  if [[ $CONTAINER == "spark_local_test" ]]; then configure_spark;                          fi
+  if [[ $CONTAINER == "metastore"        ]]; then configure_metastore;                      fi
+  if [[ $CONTAINER == "mimir"            ]]; then configure_mimir;                          fi
+}
+
+
+define_needed_evn_vars() {
+  if [[ ${TRAVIS:-} ]]
+  then
+    CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
+    DOCKERIP="localhost"
+  elif [[ "$(command -v docker-machine)" && "$(docker-machine ls | grep default)" ]]
+  then
+    CONFIGFILE=$(dirname $0)/../../it/testing.conf
+    eval "$(docker-machine env --shell sh/bash default)"
+    DOCKERIP=$(docker-machine ip default)
+  else
+    CONFIGFILE=$(dirname $0)/../../it/testing.conf
+    DOCKERIP="localhost"
+  fi
+}
+
+cleanup_testing_conf_file() {
+  rm -f $CONFIGFILE
+}
+
+usage() {
+cat << EOF
+Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
+Assembles Quasar integration configuration file, it/testing.conf, from currently running
+continers. Works for local development and within travis-ci.
+
+  -h                   help (also trigged with no parameters): display this help and exit
+  -a                   cleans existing testing.conf and adds testing.conf entries for all currently running quasar test containers
+  -i CONTAINER-NAME    add CONTAINER-NAME entry to existing testing.conf file
+  -c CONTAINER-NAME    cleans exisitng testing.conf and adds a entry for CONTAINER-NAME
+  -t                   add spark local entry to testing.conf
+EOF
+}
+
+# if no args are passed in print usage
+[ $# -eq 0 ] && usage
+
+# initialize our env
+define_needed_evn_vars
+
+# command line parsing logic
+while getopts ":hastpc:i:" opt; do
+  case $opt in
+    a)
+      echo "cleaning existing testing.conf and adding testing.conf entries for all currently running quasar test containers..." >&2
+      cleanup_testing_conf_file
+      CONTAINERS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}' | grep "quasar_")
+      for CONTAINER in $CONTAINERS
+      do
+        container_lookup $CONTAINER
+      done
+      ;;
+    i)
+      echo "adding $OPTARG entry to existing testing.conf file..." >&2
+      container_lookup $OPTARG
+      ;;
+    c)
+      echo "cleaning exisitng testing.conf and adding a entry for $OPTARG..." >&2
+      cleanup_testing_conf_file
+      container_lookup $OPTARG
+      ;;
+    t)
+      echo "adding spark local entry to testing.conf..." >&2
+      ./$0 -i quasar_spark_local_test
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+    h | *)
+      usage
+      exit 1
+      ;;
+  esac
+done

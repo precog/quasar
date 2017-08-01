@@ -1,22 +1,20 @@
 {
     "name": "project index from group",
     "backends": {
-        "couchbase":         "skip",
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending"
+        "mongodb_q_3_2": "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0].sha, count(*) as count from slamengine_commits group by parents[0].sha",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [
-      "marklogic_json",
-      "mongodb_2_6",
-      "mongodb_3_0",
-      "mongodb_read_only",
-      "mongodb_3_2",
-      "mongodb_q_3_2"
-    ],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "sha": "b812837ee2f72be3aaee582b42e3ad901d1f7371", "count": 1 },
         { "sha": "9897104b5a22571a5940f4ba2ba89addaef81ed0", "count": 1 },

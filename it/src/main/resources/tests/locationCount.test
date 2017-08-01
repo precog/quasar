@@ -1,0 +1,29 @@
+{
+    "name": "job postings by city ",
+    "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "timeout",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
+    },
+    "NB": "Skipped for marklogic_xml because it times out.",
+    "data": "jobs_jobinfo.data",
+    "query": "select count(PositionHeader.PositionLocation.LocationCity) as counter,
+              PositionHeader.PositionLocation.LocationCity as location
+              from jobs_jobinfo
+              group by location
+              order by counter desc
+              limit 10",
+    "predicate": "initial",
+    "expected": [{ "counter": 3, "location": "Boston"  },
+                 { "counter": 2, "location": "Denver"  },
+                 { "counter": 1, "location": "Boulder" }]
+}

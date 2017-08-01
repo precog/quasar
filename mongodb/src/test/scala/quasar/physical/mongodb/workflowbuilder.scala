@@ -353,7 +353,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       val read = builder.read(collection("db", "zips"))
       val op = (for {
         one <- expr1(read)(κ($literal(Bson.Int32(1))))
-        obj =  makeObject(reduce(groupBy(one, List(one)))($sum(_)), "total")
+        grouped = groupBy(one, List(one))
+        obj =  makeObject(reduce(grouped)($sum(_)), "total")
         rez <- build(obj)
       } yield rez).evalZero
 
@@ -432,9 +433,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
 
     "group in expression" in {
       val read    = builder.read(collection("db", "zips"))
-      val grouped = groupBy(read, List(pure(Bson.Int32(1))))
       val op = (for {
-        pop     <- lift(projectField(grouped, "pop"))
+        pop     <- lift(projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop"))
         total   =  reduce(pop)($sum(_))
         expr    <- expr2(total, pure(Bson.Int32(1000)))($divide(_, _))
         inK     =  makeObject(expr, "totalInK")
@@ -644,9 +644,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
     val read = builder.read(collection("db", "zips"))
 
     "render in-process group" in {
-      val grouped = groupBy(read, List(pure(Bson.Int32(1))))
       val op = for {
-        pop <- projectField(grouped, "pop")
+        pop     <- projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop")
       } yield reduce(pop)($sum(_))
       op.map(render) must beRightDisjunction(
         """GroupBuilder

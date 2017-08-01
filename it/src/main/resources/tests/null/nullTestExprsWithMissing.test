@@ -1,24 +1,26 @@
 {
     "name": "expressions with `= null` and `is null`, with missing fields (pending #465)",
     "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_q_3_2":     "skip",
-        "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "mongodb_3_4":       "pending",
+        "mongodb_q_3_2":     "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "couchbase":         "pending",
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "nullsWithMissing.data",
     "query": "select name,
                      val, val = null, val is null, val is not null,
                      nested.val as nval, nested.val = null, nested.val is null, nested.val is not null
               from nulls",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "name": "missing parent",              "2": true,  "3": true,  "4": false,               "6": true,  "7": true,  "8": false },
         { "name": "missing",                     "2": true,  "3": true,  "4": false,               "6": true,  "7": true,  "8": false },

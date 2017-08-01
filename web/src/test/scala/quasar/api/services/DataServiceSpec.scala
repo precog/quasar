@@ -24,6 +24,7 @@ import quasar.RepresentableDataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
+import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.csv.CsvParser
 import quasar.fp._
@@ -34,6 +35,7 @@ import quasar.fs._
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
 import org.http4s._
+import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
 import org.specs2.specification.core.Fragment
@@ -46,9 +48,7 @@ import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
-import scodec.bits.ByteVector
-
-import quasar.api.MessageFormatGen._
+import scodec.bits._
 
 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
@@ -115,9 +115,9 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       "respond with file data" >> {
         def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
           val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-          response.as[String].unsafePerformSync must_== expectedBody.runLog.unsafePerformSync.mkString("")
-          response.status must_== Status.Ok
-          response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
+          response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync.mkString("")
+          response.status must_=== Status.Ok
+          response.contentType must_=== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
         }
         "in correct format" >> {
           "readable and line delimited json by default" >> prop { filesystem: SingleFileMemState =>
@@ -175,24 +175,26 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             uri = pathUri(filesystem.file),
             headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
           val response = GZip(service(filesystem.state))(request).unsafePerformSync
-          response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
-          response.status must_== Status.Ok
+          response.headers.get(headers.`Content-Encoding`) must_=== Some(`Content-Encoding`(ContentCoding.gzip))
+          response.status must_=== Status.Ok
         }
         "support disposition" >> prop { filesystem: SingleFileMemState =>
           val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
           val request = Request(
             uri = pathUri(filesystem.file),
-            headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
+            headers = Headers(Accept(jsonReadableLine.mediaType.withExtensions(Map("disposition" -> disposition.value)))))
           val response = service(filesystem.state)(request).unsafePerformSync
-          response.headers.get(`Content-Disposition`.name) must_== Some(disposition)
+          isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
         }
         "support disposition non-ascii filename" >> prop { filesystem: SingleFileMemState =>
           val disposition = `Content-Disposition`("attachement", Map("filename*" -> "UTF-8''Na%C3%AFve%20file.txt"))
           val request = Request(
             uri = pathUri(filesystem.file),
-            headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
+            headers = Headers(Accept(jsonReadableLine.mediaType.withExtensions(Map("disposition" -> disposition.value)))))
           val response = service(filesystem.state)(request).unsafePerformSync
-          response.headers.get(`Content-Disposition`.name) must_== Some(disposition)
+          isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" >> prop {
@@ -225,16 +227,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limits.map(_.shows)))
               val response = service(InMemState.empty)(request).unsafePerformSync
-              response.status must_== Status.BadRequest
-              response.as[Json].unsafePerformSync must_== Json("error" := s"Two limits were provided, only supply one limit")
+              response.status must_=== Status.BadRequest
+              response.as[Json].unsafePerformSync must_=== Json("error" := s"Two limits were provided, only supply one limit")
             }.pendingUntilFixed("SD-1082")
             "if provided with multiple offsets?" >> prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
               (offsets.length >= 2) ==> {
                 val request = Request(
                   uri = pathUri(path).+?("offset", offsets.map(_.shows)).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).unsafePerformSync
-                response.status must_== Status.BadRequest
-                response.as[Json].unsafePerformSync must_== Json("error" := s"Two limits were provided, only supply one limit")
+                response.status must_=== Status.BadRequest
+                response.as[Json].unsafePerformSync must_=== Json("error" := s"Two limits were provided, only supply one limit")
                 todo // Confirm this is the expected behavior because http4s defaults to just grabbing the first one
                      // and going against that default behavior would be more work
               }
@@ -249,8 +251,8 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               (limit < 1) ==> {
                 val request = Request(uri = pathUri(path).+?("limit", limit.shows).+?("offset", offset.shows))
                 val response = service(InMemState.empty)(request).unsafePerformSync
-                response.status must_== Status.BadRequest
-                response.as[Json].unsafePerformSync must_== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)")
+                response.status must_=== Status.BadRequest
+                response.as[Json].unsafePerformSync must_=== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)")
               }
             }.pendingUntilFixed("SD-1083")
           }
@@ -274,6 +276,48 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             isExpectedResponse(data, response, MessageFormat.Default)
           }
+          "zipped json" >> {
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.json.zip"))
+            val sampleFile = rootDir[Sandboxed] </> file("foo")
+            val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
+            val request = Request(
+              uri = pathUri(sampleFile),
+              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.json.zip\"")))
+            val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
+            val zipfile = response.as[ByteVector].unsafePerformSync
+            val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
+            zipfile.take(2) must_=== zipMagicByte
+            response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
+            response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+            response.status must_=== Status.Ok
+          }
+          "zipped csv" >> {
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
+            val sampleFile = rootDir[Sandboxed] </> file("foo")
+            val data = Vector(Data.Str("a,b\n1,2"))
+            val request = Request(
+              uri = pathUri(sampleFile),
+              headers = Headers(
+                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.csv.zip\"")))
+            val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
+            val zipfile = response.as[ByteVector].unsafePerformSync
+            val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
+            zipfile.take(2) must_=== zipMagicByte
+            response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
+            response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+            response.status must_=== Status.Ok
+          }
+          "zipped via request headers" >> {
+            val sampleFile = rootDir[Sandboxed] </> file("foo")
+            val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
+            val request = Request(uri = pathUri(sampleFile).+?("request-headers", s"""{"Accept-Encoding":"gzip","Accept":"application/zip,application/json"}"""))
+            val response = HeaderParam(service(fileSystemWithSampleFile(data)))(request).unsafePerformSync
+            val zipfile = response.as[ByteVector].unsafePerformSync
+            val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
+            zipfile.take(2) must_=== zipMagicByte
+            response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+            response.status must_=== Status.Ok
+          }
         }
       }
       "download as zipped directory" >> prop { filesystem: NonEmptyDir =>
@@ -283,11 +327,13 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           uri = pathUri(filesystem.dir),
           headers = Headers(Accept(requestMediaType)))
         val response = service(filesystem.state)(request).unsafePerformSync
-        response.status must_== Status.Ok
-        response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
-        response.headers.get(`Content-Disposition`) must_== Some(disposition)
+        response.status must_=== Status.Ok
+        response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+        response.headers.get(`Content-Disposition`) must_=== Some(disposition)
       }.set(minTestsOk = 10).flakyTest("scalacheck: Gave up after only 2 passed tests. 12 tests were discarded.")  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
+      "description of the function if the file is a module function" in todo
+      "description of the module if the directory is a module" in todo
     }
     "POST and PUT" >> {
       def testBoth[A](test: org.http4s.Method => Fragment) = {
@@ -331,7 +377,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val (service, ref) = serviceRef(emptyMem)
             val response = service(request).unsafePerformSync
             expectBody(response.as[A].unsafePerformSync)
-            ref.unsafePerformSync must_== emptyMem
+            ref.unsafePerformSync must_=== emptyMem
           }
           "invalid body" >> {
             "no body" >> prop { file: AFile =>
@@ -376,7 +422,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
           "if path is invalid (parent directory does not exist)" >> prop { (file: AFile, json: Json) =>
             Path.depth(file) != 1 ==> {
-              be400(file, reqBody = json.spaces4, (_: Json) must_== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
+              be400(file, reqBody = json.spaces4, (_: Json) must_=== Json("error" := s"Invalid path: ${posixCodec.printPath(file)}"))
             }
           }.pendingUntilFixed("What do we want here, create it or not?")
           "produce two errors with partially invalid JSON" >> prop { file: AFile =>
@@ -403,14 +449,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               val overrideContentType = mediaType.cata(mt => request.withContentType(`Content-Type`(mt).some), request)
               val (service, ref) = serviceRef(InMemState.fromFiles(Map(sampleFile -> preExistingContent)))
               val response = service(overrideContentType).unsafePerformSync
-              response.as[String].unsafePerformSync must_== ""
-              response.status must_== Status.Ok
+              response.as[String].unsafePerformSync must_=== ""
+              response.status must_=== Status.Ok
               val expectedWithPreExisting =
                 // PUT has override semantics
                 if (method == Method.PUT) Map(sampleFile -> expected.toVector)
                 // POST has append semantics
                 else /*method == Method.POST*/ Map(sampleFile -> (preExistingContent ++ expected.toVector))
-              ref.unsafePerformSync.contents must_== expectedWithPreExisting
+              ref.unsafePerformSync.contents must_=== expectedWithPreExisting
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
@@ -467,7 +513,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               InMemState.empty,
               FileSystemError.writeFailed(Data.Int(4), "anything but 4"))
             val response = request.flatMap(service(_)).unsafePerformSync
-            response.status must_== Status.InternalServerError
+            response.status must_=== Status.InternalServerError
             response.as[String].unsafePerformSync must contain("anything but 4")
         }
       }
@@ -489,9 +535,9 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         val (emptyService, getState) = serviceRef(InMemState.empty)
         val uploadResponse = emptyService(uploadRequest).unsafePerformSync
 
-        uploadResponse.as[String].unsafePerformSync must_== ""
-        uploadResponse.status must_== Status.Ok
-        getState.unsafePerformSync.contents must_== initialContent
+        uploadResponse.as[String].unsafePerformSync must_=== ""
+        uploadResponse.status must_=== Status.Ok
+        getState.unsafePerformSync.contents must_=== initialContent
       }
 
       def utf8Bytes(str: String): Process[Task, ByteVector] =
@@ -527,9 +573,9 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             body <- response.as[String]
             state <- ref
           } yield {
-            body must_== ""
-            response.status must_== Status.Ok
-            state.contents must_== contentMap
+            body must_=== ""
+            response.status must_=== Status.Ok
+            state.contents must_=== contentMap
           }).unsafePerformSync
         }
       }
@@ -553,10 +599,10 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           error    <- response.as[ApiError]
           state    <- ref
         } yield {
-          response.status must_== Status.BadRequest
+          response.status must_=== Status.BadRequest
           error must beApiErrorLike[DecodeFailure](
             InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)))
-          state.contents must_== Map.empty
+          state.contents must_=== Map.empty
         }).unsafePerformSync
       }
     }
@@ -632,7 +678,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             to = file,
             state = fs.state,
             status = Status.Created,
-            body = (str: String) => str must_== "",
+            body = (str: String) => str must_=== "",
             newState = Changed(Map(file -> fs.contents)))
       }
       "be 201 with dir" >> prop {(fs: NonEmptyDir, dir: ADir) =>
@@ -642,7 +688,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             to = dir,
             state = fs.state,
             status = Status.Created,
-            body = (str: String) => str must_== "",
+            body = (str: String) => str must_=== "",
             newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 409 with file to same location" >> prop {(fs: SingleFileMemState) =>
@@ -661,7 +707,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           state = fs.state,
           status = Status.Conflict,
           body = { err: ApiError =>
-            (err.status.reason must_== "Path exists.") and
+            (err.status.reason must_=== "Path exists.") and
             (err.detail("path") must beSome)
           },
           newState = Unchanged)
@@ -673,15 +719,15 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         val request = Request(uri = pathUri(filesystem.file), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
-        response.status must_== Status.NoContent
-        ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that file
+        response.status must_=== Status.NoContent
+        ref.unsafePerformSync.contents must_=== Map() // The filesystem no longer contains that file
       }
       "be 204 with existing dir" >> prop { filesystem: NonEmptyDir =>
         val request = Request(uri = pathUri(filesystem.dir), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
-        response.status must_== Status.NoContent
-        ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
+        response.status must_=== Status.NoContent
+        ref.unsafePerformSync.contents must_=== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
        .flakyTest("scalacheck: 'Gave up after only 1 passed tests. 11 tests were discarded.'")
 

@@ -18,16 +18,18 @@ package quasar.repl
 
 import slamdata.Predef._
 import quasar.build.BuildInfo
+import quasar.cli.Cmd, Cmd._
 
 import scopt.OptionParser
 
 /** Command-line options supported by the Quasar REPL. */
 final case class CliOptions(
+  cmd: Cmd,
   config: Option[String])
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(None)
+    CliOptions(Start, None)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser: OptionParser[CliOptions] = new OptionParser[CliOptions]("quasar") {
@@ -37,6 +39,11 @@ object CliOptions {
       c.copy(config = Some(x))
     } text("path to the config file to use")
 
-    help("help") text("prints this usage text")
+    help("help") text("prints this usage text\n")
+
+    cmd("initUpdateMetaStore")
+      .text("Initialize and update the metastore\n")
+      .action((_, c) => c.copy(cmd = InitUpdateMetaStore))
+
   }
 }

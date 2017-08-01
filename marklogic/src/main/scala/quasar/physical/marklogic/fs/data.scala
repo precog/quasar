@@ -18,6 +18,7 @@ package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.fp.ski._
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.qscript.{EJsonTypeKey, EJsonValueKey}
@@ -31,6 +32,7 @@ import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
 import monocle.Prism
 import scalaz.{Node => _, _}, Scalaz._
+import xml.name._
 
 object data {
   val encodeJson: Data => Json = {
@@ -59,10 +61,23 @@ object data {
 
   def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: DataType): Attribute =
-      Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe.shows, Null)
+      Attribute(ejsBinding.prefix, ejsonType.localPart.shows, tpe.shows, Null)
 
     def ejsElem(name: QName, tpe: DataType, ns: NamespaceBinding, children: Seq[Node]): Elem =
-      Elem(name.prefix.map(_.shows).orNull, name.local.shows, typeAttr(tpe), ns, true, children: _*)
+      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, typeAttr(tpe), ns, true, children: _*)
+
+    def keyElem(label: String): (QName, Option[Attribute]) =
+      NCName.fromString(label).fold(κ(wrappedKey(label)), unwrappedKey(_))
+
+    def unwrappedKey(label: NCName): (QName, Option[Attribute]) =
+      (QName.unprefixed(label), None)
+
+    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) = {
+      (ejsonEncodedName, Attribute(
+        ejsonNs.prefix.shows,
+        ejsonEncodedAttr.localPart.shows,
+        unwrappedLabel, Null).some)
+    }
 
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, tpe, TopScope, children)
@@ -75,10 +90,10 @@ object data {
       loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
-        case (k, v) => for {
-          nc <- NCName.fromString(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
-          el <- loop(QName.local(nc))(v).disjunction
-        } yield el
+        case (k, v) => {
+          val (name, attr) = keyElem(k)
+          loop(name)(v).map(_ % attr.getOrElse(Null)).disjunction
+        }
       }
 
       elementName => {
@@ -105,6 +120,7 @@ object data {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner: QName => Data => Validation[ErrorMessages, Elem] =
       name => encodeXml0(innerElem, inner)(name)
 
@@ -112,6 +128,7 @@ object data {
       .fold(_.raiseError[F, Elem], _.point[F])
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def decodeJson[F[_]: MonadErrMsgs](json: Json): F[Data] = {
     val error: String => F[Data] = _.wrapNel.raiseError[F, Data]
 
@@ -184,6 +201,12 @@ object data {
 
     implicit val G: Applicative[G] = Applicative[F].compose[V]
 
+    def qname[A](e: Elem): G[String] =
+      encodedQualifiedName(e)
+        .toSuccessNel(s"Expected a ${ejsonEncodedAttr.shows} for an ${ejsonEncodedName.shows} element")
+        .point[F]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def decodeXml0: Node => G[Data] = {
       case DataNode(DT.Array, children) =>
         elements(children).toList traverse decodeXml0 map (Data._arr(_))
@@ -232,7 +255,7 @@ object data {
 
       case DataNode(DT.Object, children) =>
         elements(children).toList
-          .traverse(el => decodeXml0(el) strengthL qualifiedName(el))
+          .traverse(el => (qname(el) |@| decodeXml0(el))((_, _)))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
@@ -332,11 +355,7 @@ object data {
 
   private object DataNode {
     def unapply(node: Node): Option[(DataType, Seq[Node])] = {
-      val tpe = node.attributes collectFirst {
-        case PrefixedAttribute(p, n, Seq(Text(t)), _) if s"$p:$n" === ejsonType.shows => t
-      }
-
-      tpe flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
+      attribute(node, ejsonType) flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
     }
   }
 
@@ -355,6 +374,29 @@ object data {
       (EJsType.unapply(jobj) |@| EJsValue.unapply(jobj)).tupled
   }
 
+  private object ElemName {
+    def unapply(elem: Elem): Option[QName] =
+      (Option(elem.prefix), elem.label) match {
+        case (Some(prefix), label) =>
+          (NCName.fromString(prefix) ⊛ NCName.fromString(label))((p, l) =>
+            QName(NSPrefix(p).some, l)).toOption
+        case (None, label) =>
+          NCName.fromString(label).toOption.flatMap(QName.unprefixed(_).some)
+      }
+  }
+
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
+
+  private def attribute(elem: Node, qn: QName): Option[String] =
+    elem.attributes collectFirst {
+      case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === qn.shows => label
+    }
+
+  private def encodedQualifiedName(elem: Elem): Option[String] = {
+    elem match {
+      case ElemName(qn) if qn === ejsonEncodedName => attribute(elem, ejsonEncodedAttr)
+      case _                                       => qualifiedName(elem).some
+    }
+  }
 }

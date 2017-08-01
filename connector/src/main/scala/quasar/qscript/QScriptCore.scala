@@ -22,8 +22,6 @@ import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.data._
 import monocle.macros.Lenses
@@ -68,7 +66,7 @@ object ReduceIndex {
   * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then
   * that’s what [[LeftSide]] is. And [[RightSide]] is values like `1`, `2`, and
   * `3`, because that’s what you get from flattening the struct.So then our
-  * right-biased [[quasar.qscript.MapFuncs.ConcatMaps]] says to concat
+  * right-biased [[quasar.qscript.MapFuncsCore.ConcatMaps]] says to concat
   * `{ foo: 7, bar: [1, 2, 3] }` with `{ bar: 1 }`, resulting in
   * `{ foo: 7, bar: 1 }` (then again with `{ foo: 7, bar: 2 }` and
   * `{ foo: 7, bar: 3 }`, finishing up the handling of that one element in the
@@ -82,7 +80,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
-  * result of the bucket MapFunc. So, rather than many-to-one, this is many-to-fewer.
+  * result of the bucket MapFuncCore. So, rather than many-to-one, this is many-to-fewer.
   *
   * `bucket` partitions the values into buckets based on the result of the
   * expression, `reducers` applies the provided reduction to each expression,
@@ -142,15 +140,16 @@ object ReduceIndex {
 
 /** A placeholder value that can appear in plans, but will never be referenced
   * in the result. We consider this a wart. It should be implemented as an
-  * arbitrary value with minimal cost to generate (since it will simply be
-  * discarded).
+  * arbitrary value (of cardinality 1) with minimal cost to generate (since it
+  * will simply be discarded).
   */
 @Lenses final case class Unreferenced[T[_[_]], A]()
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  implicit def equal[T[_[_]]: OrderT: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
@@ -188,8 +187,7 @@ object QScriptCore {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
-      val f1: Show[JoinFunc[T]] = implicitly
-
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++
@@ -232,9 +230,10 @@ object QScriptCore {
         new RenderTree[QScriptCore[T, A]] {
           val nt = List("QScriptCore")
 
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def nested[A: RenderTree](label: String, a: A) =
             NonTerminal(label :: nt, None, a.render :: Nil)
-
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def render(v: QScriptCore[T, A]) =
             v match {
               case Map(src, f) =>
@@ -280,7 +279,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]
@@ -314,46 +313,63 @@ object QScriptCore {
             (mapL ≟ mapR).option {
               val funcL = func1 ∘ (_ ∘ (_ >> left))
               val funcR = func2 ∘ (_ ∘ (_ >> right))
-              val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
 
-              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                Reduce(Extern, mapL, funcL ++ funcR, newRep),
-                lrep,
-                rrep)
+              (funcL ≟ funcR && rep1 ≟ rep2).fold(
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, mapL, funcL, rep1),
+                  HoleF,
+                  HoleF),
+              {
+                val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
+
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, mapL, funcL ++ funcR, newRep),
+                  lrep,
+                  rrep)
+              })
             }
 
           case (
             LeftShift(_, struct1, id1, repair1),
             LeftShift(_, struct2, id2, repair2)) =>
-            val (repair, repL, repR) = concat(repair1, repair2)
 
             val lFunc: FreeMap[IT] = norm.freeMF(struct1 >> left)
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
-            val proj0: FreeMap[IT] =
-              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](0)))
-            val proj1: FreeMap[IT] =
-              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](1)))
+            val idAccess: IdStatus => JoinFunc[IT] = {
+              case ExcludeId =>
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                  RightSideF[IT],
+                  MapFuncsCore.IntLit[IT, JoinSide](1))))
+              case IdOnly =>
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                  RightSideF[IT],
+                  MapFuncsCore.IntLit[IT, JoinSide](0))))
+              case IncludeId => RightSideF
+            }
 
-            def constructMerge(
-              struct: FreeMap[IT],
-              projL: Option[FreeMap[IT]],
-              projR: Option[FreeMap[IT]]) =
-              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                LeftShift(Extern, struct, id1 |+| id2, repair),
-                projL.fold(repL)(repL >> _),
-                projR.fold(repR)(repR >> _))
+            (lFunc ≟ rFunc).option {
+              def constructMerge(access1: JoinFunc[IT], access2: JoinFunc[IT]) = {
+                val (repair, repL, repR) =
+                  concat(
+                    norm.freeMF(repair1 >>= {
+                      case LeftSide  => left >> LeftSideF
+                      case RightSide => access1
+                    }),
+                    norm.freeMF(repair2 >>= {
+                      case LeftSide  => right >> LeftSideF
+                      case RightSide => access2
+                    }))
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  LeftShift(Extern, lFunc, id1 |+| id2, repair),
+                  repL,
+                  repR)
+              }
 
-            (lFunc ≟ rFunc).option(
-              (id1, id2) match {
-                case (ExcludeId, IncludeId) => constructMerge(lFunc, proj1.some, None)
-                case (IncludeId, ExcludeId) => constructMerge(lFunc, None, proj1.some)
-                case (ExcludeId, IdOnly)    => constructMerge(lFunc, proj1.some, proj0.some)
-                case (IdOnly,    ExcludeId) => constructMerge(lFunc, proj0.some, proj1.some)
-                case (IdOnly,    IncludeId) => constructMerge(lFunc, proj0.some, None)
-                case (IncludeId, IdOnly)    => constructMerge(lFunc, None, proj0.some)
-                case (_,         _)         => constructMerge(lFunc, None, None)
-              })
+              (id1 ≟ id2).fold(
+                constructMerge(RightSideF,    RightSideF),
+                constructMerge(idAccess(id1), idAccess(id2)))
+            }
 
           case (Filter(s1, c1), Filter(_, c2)) =>
             val lCond = norm.freeMF(c1 >> left)

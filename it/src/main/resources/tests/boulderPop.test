@@ -1,11 +1,8 @@
 {
     "name": "population of Boulder",
-    "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
-    },
     "data": "zips.data",
     "query": "select sum(pop) as Population from zips where city=\"BOULDER\" and state=\"CO\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "Population": 108968 }]
 }

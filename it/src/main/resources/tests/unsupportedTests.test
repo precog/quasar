@@ -1,0 +1,24 @@
+{
+    "name": "show tests that likely have a bug prior to the connector",
+    "backends": {
+        "couchbase":         "pending",
+        "mimir":             "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
+    },
+    "data": "newTests.data",
+    "TODO": "Change query to skip cases where the backend status is “ignore*”.",
+    "query":
+        "allBackends := 12;
+         select name from newTests where count(backends{_}) = allBackends",
+    "TODO2": "Collect the actual results and change this to “exactly”.",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": ["cities with largest individual zip codes"]
+}

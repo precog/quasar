@@ -36,8 +36,8 @@ object RenderQuery {
     val q = a.cataM(alg)
 
     a.project match {
-      case s: Select[T[N1QL]] => q ∘ (s => s"select value v from $s v")
-      case _                  => q ∘ ("select value " ⊹ _)
+      case s: Select[T[N1QL]] => q ∘ (s => s"select v from $s v")
+      case _                  => q ∘ ("select " ⊹ _)
     }
   }
 

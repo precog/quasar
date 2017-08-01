@@ -46,7 +46,10 @@ private[qscript] final class FilterPlanner[
              P: FormatFilterPlanner[FMT]
   ): F[Search[Q] \/ XQuery] = {
     src0 match {
-      case (\/-(src)) => xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (\/-(src)) =>
+        xqueryFilter(src, f) map (_.right[Search[Q]])
+      case (-\/(src)) if anyDocument(src.query) =>
+        fallbackFilter(src, f) map (_.right[Search[Q]])
       case (-\/(src)) =>
         P.plan[F, FMT, T, Q](src, f) >>= {
           case Some(search) => search.left[XQuery].point[F]
@@ -80,6 +83,17 @@ private[qscript] final class FilterPlanner[
       case _ =>
         for_(x in src) where_ p return_ ~x
     }
+
+  private def anyDocument[T[_[_]]: BirecursiveT, Q](q: Q)(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Boolean = {
+    val f: Algebra[Query[T[EJson], ?], Boolean] = {
+      case Query.Document(_) => true
+      case other             => false
+    }
+
+    Q.cata(q)(f)
+  }
 
   private object PathProjection {
     object MFComp {

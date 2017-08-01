@@ -119,6 +119,8 @@ object Dependencies {
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
+    "org.apache.spark" %% "spark-sql" % "2.1.0" % (if(sparkProvided) "provided" else "compile"),
+    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.0-M3",
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",

@@ -164,7 +164,8 @@ object FileSystemTest {
       fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition) orElse
       fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition) orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition) orElse
-      fsTestConfig(sparkcore.fs.elastic.FsType, sparkcore.fs.elastic.definition)
+      fsTestConfig(sparkcore.fs.elastic.FsType, sparkcore.fs.elastic.definition) orElse
+      fsTestConfig(sparkcore.fs.cassandra.FsType,  sparkcore.fs.cassandra.definition)
     }
   }
 

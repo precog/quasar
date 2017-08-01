@@ -35,7 +35,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
   val write  = WriteFile.Ops[BackendEffect]
   val manage = ManageFile.Ops[BackendEffect]
 
-  val managePrefix: ADir = rootDir </> dir("formanage")
+  val managePrefix: ADir = rootDir </> dir("m")
 
   def deleteForManage(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(managePrefix))
@@ -161,16 +161,16 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
         // TODO: folder filenames have been shortened to workaround PostgreSQL table name length restriction — revisit
-        val pnt = managePrefix </> dir("SD-1846")
+        val pnt = managePrefix </> dir("SD1846")
         val uf1 = pnt </> dir("UF")   </> file("one")
-        val uf2 = pnt </> dir("UF 1") </> file("two")
-        val uf3 = pnt </> dir("UF 2") </> file("three")
+        val uf2 = pnt </> dir("UF1") </> file("two")
+        val uf3 = pnt </> dir("UF2") </> file("three")
 
         val thirdDoc: Vector[Data] =
           Vector(Data.Obj(ListMap("c" -> Data.Int(1))))
 
         val src = pnt </> dir("UF")
-        val dst = pnt </> dir("UF 1") </> dir("UF")
+        val dst = pnt </> dir("UF1") </> dir("UF")
 
         val setupAndMove =
           write.saveThese(uf1, oneDoc)     *>

@@ -21,8 +21,8 @@ import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
-import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
+import quasar.fs.FileSystemErrT
 import quasar.fs.PathError._
 import quasar.fp.free._
 import quasar.contrib.pathy._

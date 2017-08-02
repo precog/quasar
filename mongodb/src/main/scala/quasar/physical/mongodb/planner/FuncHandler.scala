@@ -211,7 +211,7 @@ object FuncHandler {
 
               case ToTimestamp(a1) =>
                $add($literal(Bson.Date(0)), a1)
-
+              case Now() => $now()
               case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
               // TODO: With type info, we could reduce the number of comparisons necessary.
               case TypeOf(a1) =>

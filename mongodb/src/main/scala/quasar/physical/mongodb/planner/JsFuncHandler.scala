@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.Data
 import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
@@ -36,6 +37,7 @@ trait JsFuncHandler[IN[_]] {
 }
 
 object JsFuncHandler {
+
   implicit def mapFuncCore[T[_[_]]: BirecursiveT, J, E]
       : JsFuncHandler[MapFuncCore[T, ?]] =
     new JsFuncHandler[MapFuncCore[T, ?]] {
@@ -143,7 +145,7 @@ object JsFuncHandler {
                       BinOp(jscore.Add, litStr("0"), ident("x")),
                       ident("x")))))
 
-            mfc.some collect {
+            def partial(mfc: MapFuncCore[T, A]): OptionFree[JsCoreF, A] = mfc.some collect {
               case Add(a1, a2)      => BinOp(jscore.Add, a1, a2)
               case Multiply(a1, a2) => BinOp(jscore.Mult, a1, a2)
               case Power(a1, a2) =>
@@ -360,7 +362,15 @@ object JsFuncHandler {
                         Literal(Js.Str("array")),
                         Literal(Js.Str("map")))),
                     ident("typ")))
+
+              case Cond(i, t, e) => If(i, t, e)
             }
+
+            partial(mfc) orElse (mfc match {
+              case Constant(v1)     =>
+                v1.cata(Data.fromEJson).toJs.map(_.transCata[Free[JsCoreF, A]](js => CoEnv(js.right[A])))
+              case _                => None
+            })
           }
         }
     }

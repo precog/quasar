@@ -45,10 +45,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
       Pending("Infinity is not translated properly?").left
-    case (math.Abs, _) => Pending("not on par with master").left
-    case (math.Floor, _) => Pending("not on par with master").left
-    case (math.Ceil, _) => Pending("not on par with master").left
-    case (math.Trunc, _) => Pending("not on par with master").left
 
     case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
 

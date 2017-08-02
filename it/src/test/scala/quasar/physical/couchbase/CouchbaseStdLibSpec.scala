@@ -38,7 +38,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import org.specs2.execute.Result
+import org.specs2.execute._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -50,13 +50,27 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   type F[A] = Free[Eff, A]
   type M[A] = EitherT[F, PlannerError, A]
 
-  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
+  def ignoreSomeUnary(prg: FreeMapA[Fix, UnaryArg], arg: QData)(run: => Result): Result =
+    (prg, arg) match {
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Length(_))))), QData.Str(s)) if !isPrintableAscii(s) =>
+        Pending("only printable ascii supported")
+      case _ => run
+    }
+
+  def ignoreSomeBinary(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
     (prg, arg1, arg2) match {
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lt(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lte(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gt(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gte(_,_))))), QData.Date(_), QData.Timestamp(_)) => pending
+      case _ => run
+    }
+
+  def ignoreSomeTernary(prg: FreeMapA[Fix, TernaryArg], arg1: QData, arg2: QData, arg3: QData)(run: => Result): Result =
+    (prg, arg1, arg2, arg3) match {
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Substring(_,_,_))))), QData.Str(s), _, _) if !isPrintableAscii(s) =>
+        Pending("only printable ascii supported")
       case _ => run
     }
 
@@ -111,21 +125,21 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       arg: QData,
       expected: QData
     ): Result =
-      run(prg, κ(arg), expected, cfg)
+      ignoreSomeUnary(prg, arg)(run(prg, κ(arg), expected, cfg))
 
     def binaryMapFunc(
       prg: FreeMapA[Fix, BinaryArg],
       arg1: QData, arg2: QData,
       expected: QData
     ): Result =
-      ignoreSome(prg, arg1, arg2)(run[BinaryArg](prg, _.fold(arg1, arg2), expected, cfg))
+      ignoreSomeBinary(prg, arg1, arg2)(run[BinaryArg](prg, _.fold(arg1, arg2), expected, cfg))
 
     def ternaryMapFunc(
       prg: FreeMapA[Fix, TernaryArg],
       arg1: QData, arg2: QData, arg3: QData,
       expected: QData
     ): Result =
-      run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected, cfg)
+      ignoreSomeTernary(prg, arg1, arg2, arg3)(run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected, cfg))
 
     // TODO: remove let once '\\' is fixed in N1QL
     val genPrintableAsciiSansBackslash: Gen[String] =

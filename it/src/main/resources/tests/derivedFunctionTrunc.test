@@ -1,12 +1,8 @@
 {
     "name": "derived function trunc",
     "backends": {
-      "mimir": "pending",
-      "mongodb_2_6": "pending",
-      "mongodb_3_0": "pending",
-      "mongodb_read_only": "pending"
+      "mimir": "pending"
     },
-    "NB": "mongo backends not on par with master",
     "data": "divide.data",
     "query": "select nr, trunc(val3) as trunc1 from divide",
     "predicate": "exactly",

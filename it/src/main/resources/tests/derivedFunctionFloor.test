@@ -2,12 +2,8 @@
     "name": "derived function floor",
     "backends": {
       "couchbase": "ignoreFieldOrder",
-      "mimir": "pending",
-      "mongodb_2_6": "pending",
-      "mongodb_3_0": "pending",
-      "mongodb_read_only": "pending"
+      "mimir": "pending"
     },
-    "NB": "mongo backends not on par with master",
     "data": "divide.data",
     "query": "select nr, floor(val3) as floor1 from divide",
     "predicate": "exactly",

@@ -91,6 +91,7 @@ object ExprOpCoreF {
   final case class $condF[A](predicate: A, ifTrue: A, ifFalse: A)
       extends ExprOpCoreF[A]
   final case class $ifNullF[A](expr: A, replacement: A) extends ExprOpCoreF[A]
+  final case class $nowF[A]() extends ExprOpCoreF[A]
 
   implicit val equal: Delay[Equal, ExprOpCoreF] =
     new Delay[Equal, ExprOpCoreF] {
@@ -144,6 +145,7 @@ object ExprOpCoreF {
           case ($toUpperF(v1), $toUpperF(v2))       => v1 ≟ v2
           case ($weekF(v1), $weekF(v2))             => v1 ≟ v2
           case ($yearF(v1), $yearF(v2))             => v1 ≟ v2
+          case ($nowF(), $nowF())                   => true
           case _                                    => true
         }
       }
@@ -200,6 +202,7 @@ object ExprOpCoreF {
         case $toUpperF(a)         => G.map(f(a))($toUpperF(_))
         case $weekF(a)            => G.map(f(a))($weekF(_))
         case $yearF(a)            => G.map(f(a))($yearF(_))
+        case $nowF()             => G.point($nowF())
       }
   }
 
@@ -281,6 +284,10 @@ object ExprOpCoreF {
       case $condF(predicate, ifTrue, ifFalse) =>
         Bson.Doc("$cond" -> Bson.Arr(predicate, ifTrue, ifFalse))
       case $ifNullF(expr, replacement)   => Bson.Doc("$ifNull" -> Bson.Arr(expr, replacement))
+      case $nowF()                       =>
+        //FIXME
+        Bson.Doc("$literal" -> Bson.Date(java.lang.System.currentTimeMillis))
+
     }
 
     def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = {
@@ -372,6 +379,7 @@ object ExprOpCoreF {
                                          = convert($condF(predicate, ifTrue, ifFalse))
     def $ifNull(expr: T, replacement: T): T
                                          = convert($ifNullF(expr, replacement))
+    def $now(): T                        = convert($nowF[T]())
 
     val $$ROOT: T    = $var(DocVar.ROOT())
     val $$CURRENT: T = $var(DocVar.CURRENT())
@@ -654,4 +662,9 @@ object $add {
 object $literal {
   def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[Bson] =
     $literalF.unapply(T.project(expr))
+}
+
+object $nowF {
+  def apply[EX[_], A]()(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$nowF[A]())
 }

@@ -1,0 +1,24 @@
+{
+  "name": "use now function (subtract)",
+
+  "backends": {
+  },
+
+  "data": "../days.data",
+
+  "query": "select now() - ts > 0 as past, ts - now() > 0 as future from `../days`",
+
+  "predicate": "exactly",
+
+  "expected": [
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false }
+  ]
+}

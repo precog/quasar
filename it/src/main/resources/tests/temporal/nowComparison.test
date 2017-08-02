@@ -1,0 +1,24 @@
+{
+  "name": "use now function (comparison)",
+
+  "backends": {
+  },
+
+  "data": "../days.data",
+
+  "query": "select now() > ts as past, ts > now() as future from `../days`",
+
+  "predicate": "exactly",
+
+  "expected": [
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false },
+    { "past": true, "future": false }
+  ]
+}

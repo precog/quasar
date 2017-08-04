@@ -376,6 +376,35 @@ object ExprOpCoreF {
     val $$ROOT: T    = $var(DocVar.ROOT())
     val $$CURRENT: T = $var(DocVar.CURRENT())
 
+    def mkToString(a1: T, func: (T, T, T) => T): T =
+      $cond(
+        $eq(a1, $literal(Bson.Null)),
+        $literal(Bson.Text("null")),
+        $cond(
+          $eq(a1, $literal(Bson.Bool(false))),
+          $literal(Bson.Text("false")),
+          $cond(
+            $eq(a1, $literal(Bson.Bool(true))),
+            $literal(Bson.Text("true")),
+            func(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1))))))
+
+    def mkTypeOf(a1: T, func: T => T): T =
+      // TODO: With type info, we could reduce the number of comparisons necessary.
+      $cond($lt(a1, $literal(Bson.Null)),                          $literal(Bson.Undefined),
+        $cond($eq(a1, $literal(Bson.Null)),                        $literal(Bson.Text("null")),
+          // TODO: figure out how to distinguish integer
+          $cond($lt(a1, $literal(Bson.Text(""))),                  $literal(Bson.Text("decimal")),
+            // TODO: Once we’re encoding richer types, we need to check for metadata here.
+            $cond($lt(a1, $literal(Bson.Doc())),                   $literal(Bson.Text("array")),
+              $cond($lt(a1, $literal(Bson.Arr())),                 $literal(Bson.Text("map")),
+                $cond(func(a1),                                    $literal(Bson.Text("array")),
+                  $cond($lt(a1, $literal(Bson.Bool(false))),       $literal(Bson.Text("_bson.objectid")),
+                    $cond($lt(a1, $literal(Check.minDate)),        $literal(Bson.Text("boolean")),
+                      $cond($lt(a1, $literal(Check.minTimestamp)), $literal(Bson.Text("_ejson.timestamp")),
+                        // FIXME: This only sorts distinct from Date in 3.0+, so we have to be careful … somehow.
+                        $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
+                          $literal(Bson.Text("_bson.regularexpression"))))))))))))
+
     // FIXME: used only by tests and should live in src/test somewhere
     def $field(field: String, others: String*): T =
       $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))

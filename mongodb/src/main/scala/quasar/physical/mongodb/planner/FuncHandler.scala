@@ -149,6 +149,7 @@ object FuncHandler {
               case Lower(a1)             => $toLower(a1)
               case Upper(a1)             => $toUpper(a1)
               case Substring(a1, a2, a3) => $substr(a1, a2, a3)
+              case ToString(a1)          => mkToString(a1, $substr)
               case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
 
               case Or(a1, a2)            => $or(a1, a2)
@@ -213,22 +214,7 @@ object FuncHandler {
                $add($literal(Bson.Date(0)), a1)
 
               case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
-              // TODO: With type info, we could reduce the number of comparisons necessary.
-              case TypeOf(a1) =>
-               $cond($lt(a1, $literal(Bson.Null)),                             $literal(Bson.Undefined),
-                 $cond($eq(a1, $literal(Bson.Null)),                           $literal(Bson.Text("null")),
-                   // TODO: figure out how to distinguish integer
-                   $cond($lt(a1, $literal(Bson.Text(""))),                     $literal(Bson.Text("decimal")),
-                     // TODO: Once we’re encoding richer types, we need to check for metadata here.
-                     $cond($lt(a1, $literal(Bson.Doc())),                      $literal(Bson.Text("array")),
-                       $cond($lt(a1, $literal(Bson.Arr())),                    $literal(Bson.Text("map")),
-                         $cond($lt(a1, $literal(Bson.ObjectId(Check.minOid))), $literal(Bson.Text("array")),
-                           $cond($lt(a1, $literal(Bson.Bool(false))),          $literal(Bson.Text("_bson.objectid")),
-                             $cond($lt(a1, $literal(Check.minDate)),           $literal(Bson.Text("boolean")),
-                               $cond($lt(a1, $literal(Check.minTimestamp)),    $literal(Bson.Text("_ejson.timestamp")),
-                                 // FIXME: This only sorts distinct from Date in 3.0+, so we have to be careful … somehow.
-                                 $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
-                                                                               $literal(Bson.Text("_bson.regularexpression"))))))))))))
+              case TypeOf(a1) => mkTypeOf(a1, $lt(_, $literal(Bson.ObjectId(Check.minOid))))
             }
 
             partial(mfc) orElse (mfc match {
@@ -274,20 +260,8 @@ object FuncHandler {
                     $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
                       $concatArrays(List($field("$a1"), $field("$a2"))),
                       $concat($field("$a1"), $field("$a2"))))
-                case TypeOf(a1) => // NB: Identical to the one in Core, but uses $isArray
-                  $cond($lt(a1, $literal(Bson.Null)),                          $literal(Bson.Undefined),
-                    $cond($eq(a1, $literal(Bson.Null)),                        $literal(Bson.Text("null")),
-                      // TODO: figure out how to distinguish integer
-                      $cond($lt(a1, $literal(Bson.Text(""))),                  $literal(Bson.Text("decimal")),
-                        // TODO: Once we’re encoding richer types, we need to check for metadata here.
-                        $cond($lt(a1, $literal(Bson.Doc())),                   $literal(Bson.Text("array")),
-                          $cond($lt(a1, $literal(Bson.Arr())),                 $literal(Bson.Text("map")),
-                            $cond($isArray(a1),                                $literal(Bson.Text("array")),
-                              $cond($lt(a1, $literal(Bson.Bool(false))),       $literal(Bson.Text("_bson.objectid")),
-                                $cond($lt(a1, $literal(Check.minDate)),        $literal(Bson.Text("boolean")),
-                                  $cond($lt(a1, $literal(Check.minTimestamp)), $literal(Bson.Text("_ejson.timestamp")),
-                                    $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
-                                      $literal(Bson.Text("_bson.regularexpression"))))))))))))}
+                case TypeOf(a1) => mkTypeOf(a1, $isArray)
+              }
             }
           }
 
@@ -318,6 +292,8 @@ object FuncHandler {
                         $substrCP(a1, a2, a3)
                       )
                     )
+                  case ToString(a1) =>
+                    mkToString(a1, $substrBytes)
                 }
               }
             }

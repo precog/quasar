@@ -22,6 +22,7 @@ import quasar.fs.FileSystemError
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
+import quasar.fp.free._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp.free._

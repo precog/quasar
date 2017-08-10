@@ -38,7 +38,7 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
   val write  = WriteFile.Ops[BackendEffect]
   val manage = ManageFile.Ops[BackendEffect]
 
-  val writesPrefix: ADir = rootDir </> dir("forwriting")
+  val writesPrefix: ADir = rootDir </> dir("w")
 
   def deleteForWriting(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(writesPrefix))

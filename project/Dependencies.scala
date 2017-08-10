@@ -115,10 +115,19 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      .exclude("org.scalatest", "scalatest_2.11"),
+      .exclude("org.spark-project.spark", "unused"),          // anytime the Spark dependency itselft is updated
+    ("org.apache.spark" %% "spark-sql" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
+      .exclude("aopalliance", "aopalliance")                  // Same limitation
+      .exclude("javax.inject", "javax.inject")                // as above for
+      .exclude("commons-collections", "commons-collections")  // spark-sql dependency.
+      .exclude("commons-beanutils", "commons-beanutils-core") // This hopefully will go away
+      .exclude("commons-logging", "commons-logging")          // in near future with
+      .exclude("commons-logging", "commons-logging")          // classloaders magic
+      .exclude("com.esotericsoftware.minlog", "minlog")       // Keep calm and
+      .exclude("org.spark-project.spark", "unused"),          // ignore Spark.
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
+    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.0-M3",
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",

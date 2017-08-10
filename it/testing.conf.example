@@ -8,3 +8,4 @@
 #spark_elastic     ="spark://<spark_host>:<spark_port>?rootPath=<root_path>"
 #marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
 #couchbase         ="couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]"
+#spark_cassandra   ="spark://<spark_host>:<spark_port>|<cassandra_host>|<root_path>"

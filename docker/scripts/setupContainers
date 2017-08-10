@@ -40,10 +40,22 @@ init_marklogic() {
   $SCRIPTS_DIR/initMarklogic $1 $2 $3 $4
 }
 
-init_spark_local() {
-    mkdir ${HOME}/spark_local_test
-    ls ${HOME}
+init_hdfs() {
+  # Need to start datanode and nodemanager
+  # within hadoop container
+  HAD0OPCONTAINER=$1
+  echo "configuring hdfs..."
+  docker exec $HAD0OPCONTAINER /hadoop-2.7.2/sbin/hadoop-daemon.sh start datanode
+  sleep 5
+  docker exec $HAD0OPCONTAINER /hadoop-2.7.2/sbin/yarn-daemon.sh start nodemanager
 }
+
+init_spark_connector() {
+  # Just in case we have to configure
+  # the spark companion connectors
+  echo "nothing to configure, yet"
+}
+
 
 ##########################################
 # parse arguments and run various
@@ -51,13 +63,18 @@ init_spark_local() {
 #
 apply_configuration() {
   CONTAINER=$1
-  if [[ $CONTAINER == "quasar_mongodb_read_only" ]]; then init_mongo;                                  fi
-  if [[ $CONTAINER == "quasar_couchbase"         ]]; then init_couchbase;                              fi
-  if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
-  if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
-  if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                              fi
-  if [[ $CONTAINER == "quasar_spark_local_test"  ]]; then init_spark_local;                            fi
+  if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
+  if [[ $CONTAINER == "quasar_couchbase"           ]]; then init_couchbase;                              fi
+  if [[ $CONTAINER == "quasar_marklogic_xml"       ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
+  if [[ $CONTAINER == "quasar_marklogic_json"      ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
+  if [[ $CONTAINER == "quasar_postgresql"          ]]; then init_postgresql;                             fi
+  if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
+  if [[ $CONTAINER == "quasar_spark_cassandra"     ]]; then init_spark_connector;                        fi
+  if [[ $CONTAINER == "quasar_spark_elasticsearch" ]]; then init_spark_connector;                        fi
+  if [[ $CONTAINER == "quasar_spark_hdfs"          ]]; then init_hdfs $CONTAINER;                        fi
+  if [[ $CONTAINER == "quasar_spark_ftp"           ]]; then init_spark_connector;                        fi
 }
+
 
 configure_containers() {
   for CONTAINER in $1

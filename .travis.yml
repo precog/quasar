@@ -11,7 +11,7 @@ services:
 # needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
- 
+
 # create all the docker containers we need for IT testing
 install:
   - docker/scripts/initContainer quasar_metastore
@@ -77,6 +77,11 @@ env:
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=spark_local_test
+  # - CONNECTOR=spark_hdfs
+  # - CONNECTOR=spark_cassandra
+  # - CONNECTOR=spark_elasticsearch
+  # - CONNECTOR=spark_ftp
+  # - CONNECTOR=spark_s3
 
   global:
     - COURSIER_PROGRESS=0

@@ -57,6 +57,6 @@ object readfile {
     read: Read.Ops[SparkContext, S],
     E: ElasticCall :<: S,
     S: Task :<: S
-  ): Input[S] = Input(rddFrom[S] _, queryfile.fileExists[S] _, queryfile.readChunkSize _)
+  ): Input[S] = Input(rddFrom[S] _)
 
 }

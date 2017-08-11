@@ -75,16 +75,8 @@ object readfile {
       fileSystem.map(fs => fs.exists(new Path(pathStr)))
     }).into[S]
 
-  // TODO arbitrary value, more or less a good starting point
-  // but we should consider some measuring
-  def readChunkSize: Int = 5000
-
   def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(implicit
     read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input(
-      (f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr),
-      f => fileExists(f)(hdfsPathStr, fileSystem),
-      readChunkSize _
-    )
+    Input((f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr))
 
 }

@@ -95,19 +95,25 @@ package object cassandra {
       TaskRef(Map.empty[WriteHandle, AFile]) |@|
       genSc) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, writehandlers, sc) =>
-      val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter[CassandraDDL] andThen foldMapNT(CassandraDDL.interpreter[S](sc)) andThen injectNT[Task, S]) :+:
-      (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-      (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
-      injectNT[PhysErr, S] :+:
-      injectNT[Task, S]  :+:
-      (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:
-      (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-      (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
-      (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+      (genState, rddStates, sparkCursors, writehandlers, sc) => {
 
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+        type Temp[A] = Coproduct[CassandraDDL, Task, A]
+        def temp: Free[Temp, ?] ~> Task =
+          foldMapNT(CassandraDDL.interpreter[S](sc) :+: injectNT[Task, Task])
+
+        val interpreter: Eff ~> S =
+          (queryfile.detailsInterpreter[Temp] andThen temp  andThen injectNT[Task, S]) :+:
+        (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+        (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
+        injectNT[PhysErr, S] :+:
+        injectNT[Task, S]  :+:
+        (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:
+        (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
+        (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+        (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+
+        SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      }
     }).into[S]
   }
 

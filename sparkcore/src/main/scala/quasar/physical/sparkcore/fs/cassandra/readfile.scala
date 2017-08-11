@@ -47,19 +47,7 @@ object readfile {
         }
     }
 
-  def fileExists[S[_]](f: AFile)(implicit
-    cass: CassandraDDL.Ops[S]
-  ): Free[S, Boolean] =
-    cass.tableExists(keyspace(fileParent(f)), tableName(f))
-
-  // TODO arbitrary value, more or less a good starting point
-  // but we should consider some measuring
-  def readChunkSize: Int = 5000
-
   def input[S[_]](implicit cass: CassandraDDL.Ops[S], s0: Task :<: S) =
-    Input(
-      rddFrom(_, _, _),
-      fileExists(_),
-      readChunkSize _)
+    Input(rddFrom(_, _, _))
 
 }

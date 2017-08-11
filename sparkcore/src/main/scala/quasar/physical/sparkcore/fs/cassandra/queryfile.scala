@@ -25,7 +25,7 @@ import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
-import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 import quasar.fs._,
   FileSystemError._, 
   PathError._
@@ -81,7 +81,6 @@ object queryfile {
     } yield tableExists
 
   def listContents[S[_]](d: ADir)(implicit
-    read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
   ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT{
     val ks = keyspace(d)
@@ -109,13 +108,17 @@ object queryfile {
     read: Read.Ops[SparkContext, S],
     S0: Task :<: S
   ): Input[S] =
-    Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+    Input(fromFile _)
 
   def detailsInterpreter[S[_]](implicit
-    cass: CassandraDDL.Ops[S]
+    cass: CassandraDDL.Ops[S],
+    S: Task :<: S
   ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
     def apply[A](from: SparkConnectorDetails[A]) = from match {
-      case FileExists(f) => fileExists(f)
+      case FileExists(f)       => fileExists(f)
+      case ReadChunkSize       => 5000.point[Free[S, ?]]
+      case StoreData(rdd, out) => store(rdd, out)
+      case ListContents(d)   => listContents(d).run
     }
   }
 }

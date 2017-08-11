@@ -37,9 +37,7 @@ object readfile {
   type Limit = Option[Positive]
 
   final case class Input[S[_]](
-    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]],
-    fileExists: AFile => Free[S, Boolean],
-    readChunkSize: () => Int
+    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]]
   )
 
   import ReadFile.ReadHandle
@@ -48,7 +46,8 @@ object readfile {
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    s4: SparkConnectorDetails :<: S
   ): ReadFile ~> Free[S, ?] =
     flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
@@ -56,12 +55,13 @@ object readfile {
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    details: SparkConnectorDetails.Ops[S]
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
         case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
-        case ReadFile.Read(h) => read[S](h, input.readChunkSize())
+        case ReadFile.Read(h) => details.readChunkSize >>= (step => read[S](h, step))
         case ReadFile.Close(h) => close[S](h)
       }
   }
@@ -69,7 +69,8 @@ object readfile {
   private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
-    gen: MonotonicSeq.Ops[S]
+    gen: MonotonicSeq.Ops[S],
+    details: SparkConnectorDetails.Ops[S]
   ): Free[S, FileSystemError \/ ReadHandle] = {
 
     def freshHandle: Free[S, ReadHandle] =
@@ -88,7 +89,7 @@ object readfile {
       _ <- kvs.put(h, cur)
     } yield h
 
-    input.fileExists(f).ifM(
+    details.fileExists(f).ifM(
       _open map (_.right[FileSystemError]),
      _empty map (_.right[FileSystemError])
     )

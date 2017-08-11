@@ -22,12 +22,10 @@ import quasar.fs.FileSystemError
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
-import quasar.fp.free._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
-import quasar.fp.free._
 import quasar.effect.Capture
-import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -44,22 +42,19 @@ object queryfile {
       .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Unit] = lift(Task.delay {
+  def store[F[_]:Capture](rdd: RDD[Data], out: AFile): F[Unit] = Capture[F].capture {
     val ioFile = new File(posixCodec.printPath(out))
     val pw = new PrintWriter(new FileOutputStream(ioFile, false))
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
     pw.close()
-  }).into[S]
+  }
 
   def fileExists[F[_]:Capture](f: AFile): F[Boolean] = Capture[F].capture {
       Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
   }
 
-  def listContents[S[_]](d: ADir)(implicit
-    S: Task :<: S
-  ): EitherT[Free[S, ?], FileSystemError, Set[PathSegment]] = EitherT(lift(Task.delay {
+  def listContents[F[_]:Capture](d: ADir): EitherT[F, FileSystemError, Set[PathSegment]] =
+    EitherT(Capture[F].capture {
     val directory = new File(posixCodec.unsafePrintPath(d))
     if(directory.exists()) {
       \/.fromTryCatchNonFatal{
@@ -73,18 +68,19 @@ object queryfile {
           pathErr(invalidPath(d, e.getMessage()))
       }
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-  }).into[S])
-
-  def readChunkSize: Int = 5000
+  })
 
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[Free[S, ?]] _, listContents[S] _, readChunkSize _)
+  ): Input[S] = Input[S](fromFile _)
 
-  def detailsInterpreter[F[_] : Capture]: SparkConnectorDetails ~> F =
+  def detailsInterpreter[F[_]:Capture:Applicative]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f) => fileExists[F](f)
+        case FileExists(f)       => fileExists[F](f)
+        case ReadChunkSize       => 5000.point[F]
+        case StoreData(rdd, out) => store(rdd, out)
+        case ListContents(d)   => listContents(d).run
       }
     }
 

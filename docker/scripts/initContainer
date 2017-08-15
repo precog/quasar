@@ -28,6 +28,7 @@ then
 elif ([[ $CONTAINER == "quasar_spark_cassandra" ]] || [[ $CONTAINER == "quasar_spark_hdfs" ]] || [[ $CONTAINER == "quasar_spark_ftp" ]] || [[ $CONTAINER == "quasar_spark_elasticsearch" ]])
 then
   upContainer quasar_spark_cluster
+  docker/scripts/setupContainer -c quasar_spark_cluster
   upContainer $CONTAINER
   sleep 5
 elif [[ $CONTAINER == "quasar_spark_s3" ]]

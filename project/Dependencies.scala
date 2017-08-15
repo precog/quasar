@@ -91,7 +91,7 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.0.42.Final" // This version is set to be the same as Spark
+    val nettyVersion = "4.0.43.Final" // This version is set to be the same as Spark
                                       // to avoid problems in web and it where their classpaths get merged
                                       // In any case, it should be binary compatible with version 4.0.26 that this
                                       // mongo release is expecting
@@ -107,7 +107,7 @@ object Dependencies {
   }
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
@@ -116,7 +116,7 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
       .exclude("org.spark-project.spark", "unused"),          // anytime the Spark dependency itselft is updated
-    ("org.apache.spark" %% "spark-sql" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-sql" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // Same limitation
       .exclude("javax.inject", "javax.inject")                // as above for
       .exclude("commons-collections", "commons-collections")  // spark-sql dependency.
@@ -127,7 +127,7 @@ object Dependencies {
       .exclude("org.spark-project.spark", "unused"),          // ignore Spark.
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
-    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.0-M3",
+    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.3",
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",

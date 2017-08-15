@@ -168,55 +168,55 @@ trait DateLib extends Library with Serializable {
       constTyper[nat._1](Type.Numeric),
       basicUntyper)
 
-  val ExtractCentury      = extract(
+  lazy val ExtractCentury      = extract(
     "Pulls out the century subfield from a date/time value (currently year/100).")
-  val ExtractDayOfMonth   = extract(
+  lazy val ExtractDayOfMonth   = extract(
     "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
-  val ExtractDecade       = extract(
+  lazy val ExtractDecade       = extract(
     "Pulls out the decade subfield from a date/time value (year/10).")
-  val ExtractDayOfWeek    = extract(
+  lazy val ExtractDayOfWeek    = extract(
     "Pulls out the day of week (`dow`) subfield from a date/time value " +
     "(Sunday: 0 to Saturday: 7).")
-  val ExtractDayOfYear    = extract(
+  lazy val ExtractDayOfYear    = extract(
     "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
-  val ExtractEpoch        = extract(
+  lazy val ExtractEpoch        = extract(
     "Pulls out the epoch subfield from a date/time value. For dates and " +
     "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
     "For intervals, the number of seconds in the interval.")
-  val ExtractHour         = extract(
+  lazy val ExtractHour         = extract(
     "Pulls out the hour subfield from a date/time value (0-23).")
-  val ExtractIsoDayOfWeek       = extract(
+  lazy val ExtractIsoDayOfWeek       = extract(
     "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
     "(Monday: 1 to Sunday: 7).")
-  val ExtractIsoYear      = extract(
+  lazy val ExtractIsoYear      = extract(
     "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
     "on the first week containing Jan. 4).")
-  val ExtractMicroseconds = extract(
+  lazy val ExtractMicroseconds = extract(
     "Pulls out the microseconds subfield from a date/time value (including seconds).")
-  val ExtractMillennium    = extract(
+  lazy val ExtractMillennium    = extract(
     "Pulls out the millennium subfield from a date/time value (currently year/1000).")
-  val ExtractMilliseconds = extract(
+  lazy val ExtractMilliseconds = extract(
     "Pulls out the milliseconds subfield from a date/time value (including seconds).")
-  val ExtractMinute       = extract(
+  lazy val ExtractMinute       = extract(
     "Pulls out the minute subfield from a date/time value (0-59).")
-  val ExtractMonth        = extract(
+  lazy val ExtractMonth        = extract(
     "Pulls out the month subfield from a date/time value (1-12).")
-  val ExtractQuarter      = extract(
+  lazy val ExtractQuarter      = extract(
     "Pulls out the quarter subfield from a date/time value (1-4).")
-  val ExtractSecond = extract(
+  lazy val ExtractSecond = extract(
     "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
-  val ExtractTimezone = extract(
+  lazy val ExtractTimezone = extract(
     "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
-  val ExtractTimezoneHour = extract(
+  lazy val ExtractTimezoneHour = extract(
     "Pulls out the hour component of the timezone subfield from a date/time value.")
-  val ExtractTimezoneMinute = extract(
+  lazy val ExtractTimezoneMinute = extract(
     "Pulls out the minute component of the timezone subfield from a date/time value.")
-  val ExtractWeek = extract(
+  lazy val ExtractWeek = extract(
     "Pulls out the week subfield from a date/time value (1-53).")
-  val ExtractYear = extract(
+  lazy val ExtractYear = extract(
     "Pulls out the year subfield from a date/time value.")
 
-  val Date = UnaryFunc(
+  lazy val Date = UnaryFunc(
     Mapping,
     "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Date,
@@ -228,13 +228,13 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  val Now = NullaryFunc(
+  lazy val Now = NullaryFunc(
     Mapping,
     "Returns the current timestamp – this must always return the same value within the same execution of a query.",
     Type.Timestamp,
     noSimplification)
 
-  val Time = UnaryFunc(
+  lazy val Time = UnaryFunc(
     Mapping,
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Time,
@@ -246,7 +246,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  val Timestamp = UnaryFunc(
+  lazy val Timestamp = UnaryFunc(
     Mapping,
     "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Timestamp,
@@ -258,7 +258,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  val Interval = UnaryFunc(
+  lazy val Interval = UnaryFunc(
     Mapping,
     "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval,
@@ -270,7 +270,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  val StartOfDay = UnaryFunc(
+  lazy val StartOfDay = UnaryFunc(
     Mapping,
     "Converts a Date or Timestamp to a Timestamp at the start of that day.",
     Type.Timestamp,
@@ -293,7 +293,7 @@ trait DateLib extends Library with Serializable {
       case t                              => success(Func.Input1(t))
     })
 
-  val TimeOfDay = UnaryFunc(
+  lazy val TimeOfDay = UnaryFunc(
     Mapping,
     "Extracts the time of day from a (UTC) timestamp value.",
     Type.Time,
@@ -305,7 +305,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  val ToTimestamp = UnaryFunc(
+  lazy val ToTimestamp = UnaryFunc(
     Mapping,
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
     Type.Timestamp,

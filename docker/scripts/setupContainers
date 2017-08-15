@@ -49,9 +49,8 @@ init_hdfs() {
   # within hadoop container
   CONTAINER=$1
   echo "configuring hdfs..."
-  docker exec $CONTAINER /hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode
   sleep 5
-  docker exec $CONTAINER /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager
+  docker exec $CONTAINER /bin/bash -c "/hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode; sleep 5; /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager "
 }
 
 init_spark_connector() {

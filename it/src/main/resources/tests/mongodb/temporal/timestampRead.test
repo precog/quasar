@@ -1,0 +1,19 @@
+{
+    "name": "reads timestamps with map reduce",
+    "backends": {
+        "mimir":          "skip",
+        "marklogic_json": "skip",
+        "marklogic_xml":  "skip",
+        "couchbase":      "skip",
+        "spark_local":    "skip",
+        "spark_hdfs":     "skip"
+    },
+    "data": "../../daysWithArray.data",
+
+    "query": "select cc[*], ts from `../../daysWithArray`",
+    "predicate": "exactly",
+
+    "expected": [{"cc": "a", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
+                 {"cc": "b", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
+                 {"cc": "c", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }}]
+}

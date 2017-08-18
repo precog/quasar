@@ -86,6 +86,4 @@ object yggConfig {
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
   def smallSliceSize: Int = 50
-
-  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
 }

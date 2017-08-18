@@ -611,7 +611,10 @@ object $SimpleMapF {
             Js.BinOp("==", Js.Ident("src"), Js.Null)),
           Js.Return(Js.Ident("src")),
           None),
-        Js.VarDef(List("dest" -> Js.New(Js.Select(Js.Ident("src"), "constructor")))),
+        Js.VarDef(List("dest" ->
+          Js.Ternary(Js.BinOp("instanceof", Js.Ident("src"), Js.Ident("Date")),
+            Js.New(Js.Call(Js.Ident("Date"), List(Js.Ident("src")))),
+            Js.New(Js.Select(Js.Ident("src"), "constructor"))))),
         Js.ForIn(Js.Ident("i"), Js.Ident("src"),
           Js.BinOp ("=",
             Js.Access(Js.Ident("dest"), Js.Ident("i")),

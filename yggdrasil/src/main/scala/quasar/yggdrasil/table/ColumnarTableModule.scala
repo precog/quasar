@@ -1434,21 +1434,9 @@ trait ColumnarTableModule[M[+ _]]
         case _                                    => UnknownSize // Bail on anything else for now (see above TODO)
       }
 
-      val newSizeM = newSize match {
-        case ExactSize(s)       => Some(s)
-        case EstimateSize(_, s) => Some(s)
-        case _                  => None
-      }
-
-      val sizeCheck = for (resultSize <- newSizeM) yield resultSize < yggConfig.maxSaneCrossSize && resultSize >= 0
-
-      if (sizeCheck getOrElse true) {
-        Table(StreamT(cross0(composeSliceTransform2(spec)) map { tail =>
-          StreamT.Skip(tail)
-        }), newSize)
-      } else {
-        throw EnormousCartesianException(this.size, that.size)
-      }
+      Table(StreamT(cross0(composeSliceTransform2(spec)) map { tail =>
+        StreamT.Skip(tail)
+      }), newSize)
     }
 
     def leftShift(focus: CPath): Table = {

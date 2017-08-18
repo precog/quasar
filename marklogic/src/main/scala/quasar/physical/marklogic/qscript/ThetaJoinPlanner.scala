@@ -21,6 +21,7 @@ import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
+import quasar.ejson.EJson
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -30,24 +31,26 @@ private[qscript] final class ThetaJoinPlanner[
   FMT: SearchOptions,
   T[_[_]]: BirecursiveT
 ](implicit
-  QTP: Planner[F, FMT, QScriptTotal[T, ?]],
+  QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],
   SP : StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, ThetaJoin[T, ?]] {
+) extends Planner[F, FMT, ThetaJoin[T, ?], T[EJson]] {
   import expr.for_
 
   // FIXME: Handle `JoinType`
   // TODO:  Is it more performant to inline src into each branch than it is to
   //        assign it to a variable? It may be necessary in order to be able to
   //        use the cts:query features, but we'll need to profile otherwise.
-  def plan[Q, V](implicit Q: Birecursive.Aux[Q, Query[V, ?]]): AlgebraM[F, ThetaJoin[T, ?], Search[Q] \/ XQuery] = {
+  def plan[Q](
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): AlgebraM[F, ThetaJoin[T, ?], Search[Q] \/ XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, _, combine) =>
       for {
         l      <- freshName[F]
         r      <- freshName[F]
-        lhs0   <- rebaseXQuery[T, F, FMT, Q, V](lBranch, src)
-        rhs0   <- rebaseXQuery[T, F, FMT, Q, V](rBranch, src)
-        lhs    <- elimSearch[Q, V](lhs0)
-        rhs    <- elimSearch[Q, V](rhs0)
+        lhs0   <- rebaseXQuery[T, F, FMT, Q](lBranch, src)
+        rhs0   <- rebaseXQuery[T, F, FMT, Q](rBranch, src)
+        lhs    <- elimSearch[Q](lhs0)
+        rhs    <- elimSearch[Q](rhs0)
         filter <- mergeXQuery[T, F, FMT](on, ~l, ~r)
         body   <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
       } yield ((lhs, rhs) match {

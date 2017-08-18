@@ -37,6 +37,7 @@ import java.net.URI
 
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions._
+import com.marklogic.xcc.{ContentSource, Session}
 import scalaz.{Failure => _, _}, Scalaz.{ToIdOps => _, _}
 import scalaz.concurrent.Task
 
@@ -69,6 +70,12 @@ package object fs {
     :\: MLWriteHandles
     :/: XccEvalEff
   )#M[A]
+
+  implicit val xccSessionR  = quasar.effect.Read.monadReader_[Session, XccEvalEff]
+  implicit val xccSourceR   = quasar.effect.Read.monadReader_[ContentSource, XccEvalEff]
+  implicit val mlfsSessionR = quasar.effect.Read.monadReader_[Session, MarkLogicFs]
+  implicit val mlfsCSourceR = quasar.effect.Read.monadReader_[ContentSource, MarkLogicFs]
+  implicit val mlfsUuidR    = quasar.effect.Read.monadReader_[UUID, MarkLogicFs]
 
   type MLFS[A]  = PrologT[Free[MarkLogicFs, ?], A]
   type MLFSQ[A] = MarkLogicPlanErrT[MLFS, A]

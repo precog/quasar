@@ -25,7 +25,7 @@ import scalaz.syntax.monad._
   *
   * Cribbed from [doobie](http://github.com/tpolecat/doobie)
   */
-trait Capture[F[_]] {
+trait Capture[F[_]] extends Serializable {
   /** Captures the effect of producing `A`, including any exceptions that may
     * be thrown.
     */
@@ -73,16 +73,16 @@ sealed abstract class CaptureInstances0 {
     new TransCapture[F, WriterT[?[_], W, ?]]
 }
 
-private[effect] class TaskCapture extends Capture[Task] {
+private[effect] class TaskCapture extends Capture[Task] with Serializable {
   def capture[A](a: => A) = Task.delay(a)
 }
 
 private[effect] class TransCapture[F[_]: Monad: Capture, T[_[_], _]: MonadTrans]
-  extends Capture[T[F, ?]] {
+  extends Capture[T[F, ?]] with Serializable{
   def capture[A](a: => A) = Capture[F].capture(a).liftM[T]
 }
 
 private[effect] class FreeCapture[F[_], S[_]](implicit F: Capture[F], I: F :<: S)
-  extends Capture[Free[S, ?]] {
+  extends Capture[Free[S, ?]] with Serializable {
   def capture[A](a: => A) = Free.liftF(I(F.capture(a)))
 }

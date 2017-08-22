@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fs.FileSystemError
 import quasar.fs.PathError._
-import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
@@ -33,15 +32,10 @@ import java.nio.file._
 import org.apache.spark._
 import org.apache.spark.rdd._
 import pathy.Path._
-import scalaz._, Scalaz._, scalaz.concurrent.Task
+import scalaz._, Scalaz._
 
 object queryfile {
-
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
-    sc.textFile(posixCodec.unsafePrintPath(file))
-      .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
-  }
-
+  
   def rddFrom[F[_]](f: AFile) (implicit
     reader: MonadReader[F, SparkContext]): F[RDD[Data]] =
     reader.asks { sc =>
@@ -76,10 +70,6 @@ object queryfile {
       }
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
   })
-
-  def input[S[_]](implicit
-    S: Task :<: S
-  ): Input[S] = Input[S](fromFile _)
 
   def detailsInterpreter[F[_]:Capture:MonadReader[?[_], SparkContext]]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {

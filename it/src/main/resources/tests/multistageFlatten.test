@@ -6,8 +6,8 @@
         "marklogic_json": "pending",
         "marklogic_xml": "timeout",
         "mongodb_q_3_2": "pending",
-        "spark_local": "timeout",
-        "spark_hdfs": "timeout"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (

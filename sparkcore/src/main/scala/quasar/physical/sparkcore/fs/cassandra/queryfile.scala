@@ -17,22 +17,17 @@
 package quasar.physical.sparkcore.fs.cassandra
 
 import slamdata.Predef._
-import quasar.effect._
 import quasar.fp.free._
-import quasar.fp.ski._
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.{Data, DataCodec}
-import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 import quasar.fs._,
   FileSystemError._, 
   PathError._
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
-import com.datastax.spark.connector._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
@@ -41,14 +36,6 @@ import pathy.Path._
 object queryfile {
 
   import common._
-
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
-    sc.cassandraTable[String](keyspace(fileParent(file)), tableName(file))
-      .select("data")
-      .map{ raw =>
-        DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }
-  }
 
   def rddFrom[S[_]](f: AFile)(implicit
     cass: CassandraDDL.Ops[S]
@@ -107,13 +94,6 @@ object queryfile {
   }
 
   def readChunkSize: Int = 5000
-
-  def input[S[_]](implicit
-    cass: CassandraDDL.Ops[S],
-    read: Read.Ops[SparkContext, S],
-    S0: Task :<: S
-  ): Input[S] =
-    Input(fromFile _)
 
   def detailsInterpreter[S[_]](implicit
     cass: CassandraDDL.Ops[S],

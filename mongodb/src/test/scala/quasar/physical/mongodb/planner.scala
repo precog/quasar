@@ -123,7 +123,7 @@ class PlannerSpec extends
 
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]) =
+    indexes: Collection => Option[Set[Index]]): Int =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap(es => scala.sys.error("errors while planning: ${es}"))
       // TODO: Would be nice to error on Constant plans here, but property

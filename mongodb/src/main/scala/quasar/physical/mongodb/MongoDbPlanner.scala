@@ -39,6 +39,7 @@ import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
+import java.time.Instant
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
@@ -98,7 +99,7 @@ object MongoDbPlanner {
           Some(_))
 
   def processMapFuncExpr
-    [T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
+    [T[_[_]]: RecursiveT: ShowT, M[_]: Monad: ExecTime, EX[_]: Traverse, A]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[ExprOp])
@@ -180,10 +181,13 @@ object MongoDbPlanner {
       : M[Expr] =
     exprOrJs(ej)(ejsonToExpression[M, EJ], ejsonToJs[M, EJ](_) ∘ JsFn.const)
 
-  def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
-      : AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
+  def expression[
+    T[_[_]]: RecursiveT: ShowT,
+    M[_]: Applicative: ExecTime,
+    EX[_]: Traverse](funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])(
+    implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp
+  ): AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
+
     import MapFuncsCore._
     import MapFuncsDerived._
 
@@ -871,7 +875,7 @@ object MongoDbPlanner {
     type IT[G[_]]
 
     def plan
-      [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+      [M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
       (joinHandler: JoinHandler[WF, WBM],
         funcHandler: MapFunc[IT, ?] ~> OptionFree[EX, ?])
       (implicit
@@ -892,7 +896,7 @@ object MongoDbPlanner {
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
@@ -933,7 +937,7 @@ object MongoDbPlanner {
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def plan
-          [M[_]: Monad,
+          [M[_]: Monad: ExecTime,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
@@ -1038,7 +1042,7 @@ object MongoDbPlanner {
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
@@ -1073,7 +1077,7 @@ object MongoDbPlanner {
       new Planner[Coproduct[F, G, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
@@ -1095,7 +1099,7 @@ object MongoDbPlanner {
         type IT[G[_]] = T[G]
 
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
@@ -1123,7 +1127,7 @@ object MongoDbPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
@@ -1155,7 +1159,7 @@ object MongoDbPlanner {
     }
 
   def getExprBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, WF[_], EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
@@ -1163,7 +1167,7 @@ object MongoDbPlanner {
     getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, _))(src, fm)
 
   def getReduceBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, WF[_], EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
@@ -1193,19 +1197,19 @@ object MongoDbPlanner {
       _ => merr.handleError[Expr](js.map(-\&/))(_ => expr.map(\&/-)))
   }
 
-  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
-  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTime, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
@@ -1224,7 +1228,7 @@ object MongoDbPlanner {
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
-    [T[_[_]]: EqualT, M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+    [T[_[_]]: EqualT, M[_]: Monad: ExecTime, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
     (joinHandler: JoinHandler[WF, WBM],
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
       free: FreeQS[T],
@@ -1390,9 +1394,13 @@ object MongoDbPlanner {
     } yield opt
   }
 
+  type PhaseW[F[_]]        = MonadTell_[F, PhaseResults]
+  type FileSystemErr[F[_]] = MonadError_[F, FileSystemError]
+  type ExecTime[F[_]]      = MonadReader_[F, Instant]
+
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      M[_]: Monad,
+      M[_]: Monad: PhaseW: FileSystemErr: ExecTime,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
@@ -1400,8 +1408,6 @@ object MongoDbPlanner {
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell_[M, PhaseResults],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
       ev2: EX :<: ExprOp,
@@ -1429,12 +1435,11 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
-    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
-    (implicit
-      merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell_[M, PhaseResults])
-      : M[Crystallized[WorkflowF]] = {
+  def plan[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    M[_]: Monad: PhaseW: FileSystemErr: ExecTime]
+    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M]
+    ): M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {

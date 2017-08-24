@@ -347,8 +347,6 @@ object JsFuncHandler {
               case TemporalTrunc(Year, date) =>
                 dateZ(year(date), litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
 
-              case Now() => Call(ident("ISODate"), Nil)
-
               case ProjectField(obj, field) => Access(obj, field)
               case ProjectIndex(arr, index) => Access(arr, index)
 

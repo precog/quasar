@@ -135,7 +135,7 @@ object MongoDbPlanner {
         selector[T]))
 
 
-  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr, A]
+  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr: ExecTimeR, A]
     (fm: FreeMapA[T, A])(recovery: A => JsCore)
       : M[JsCore] =
     fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
@@ -186,7 +186,6 @@ object MongoDbPlanner {
     (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
       : M[Expr] =
     exprOrJs(ej)(ejsonToExpression[M, EJ], ejsonToJs[M, EJ](_) ∘ JsFn.const)
-
 
   def expression[
     T[_[_]]: RecursiveT: ShowT,
@@ -301,7 +300,7 @@ object MongoDbPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative: FileSystemErr]
+  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative: FileSystemErr: ExecTimeR]
       : AlgebraM[M, MapFunc[T, ?], JsCore] = {
     import jscore.{
       Add => _, In => _,
@@ -322,6 +321,9 @@ object MongoDbPlanner {
           ident("x"),
           BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
 
+    def execTime(implicit ev: ExecTimeR[M]): M[JsCore] =
+      ev.ask map (ts => Literal(Js.Str(ts.toString)))
+
     def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
       JsFuncHandler.handle[MapFunc[T, ?]].apply(mf).map(unpack[Fix, JsCoreF])
 
@@ -330,7 +332,7 @@ object MongoDbPlanner {
       case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
-      case Now() => New(Name("Date"), Nil).point[M]
+      case Now() => execTime map (ts => New(Name("Date"), List(ts)))
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
       case Date(a1) =>
@@ -1134,7 +1136,7 @@ object MongoDbPlanner {
   ) : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
-  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr]
+  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr: ExecTimeR]
     (fm: FreeMap[T])
       : M[JsFn] =
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
@@ -1173,7 +1175,7 @@ object MongoDbPlanner {
       : M[WorkflowBuilder[WF]] =
     getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, _))(src, fm)
 
-  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr]
+  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr: ExecTimeR]
     (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
       : M[JsFn] =
     processMapFunc[T, M, JoinSide](
@@ -1215,7 +1217,7 @@ object MongoDbPlanner {
       i => $field("_id", i.toString),
       i => $field(createFieldName("f", i))))
 
-  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr]
+  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: FileSystemErr: ExecTimeR]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
       : M[JsFn] =
     processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(

@@ -199,7 +199,7 @@ object MongoDbPlanner {
     import MapFuncsDerived._
 
     def execTime(implicit ev: ExecTimeR[M]): M[Bson] =
-      ev.ask map (ts => Bson.Date(ts.getEpochSecond))
+      ev.ask map (ts => Bson.Date(ts.toEpochMilli))
 
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))

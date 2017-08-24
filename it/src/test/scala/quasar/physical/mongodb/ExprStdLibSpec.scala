@@ -23,9 +23,11 @@ import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.FuncHandler
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.physical.mongodb.WorkflowBuilder._
+import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._
 
+import java.time.Instant
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -76,25 +78,34 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
-      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
+    expr: Fix[ExprOp], coll: Collection)(
+    implicit RT: RenderTree[WorkflowBuilder[WF]]
+  ) =
+    WorkflowBuilder.build[PlannerError \/ ?, WF](
+      WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[WF].read(coll),
+        ListMap(BsonField.Name("value") -> \&/-(expr))))
+      .leftMap(qscriptPlanningFailed.reverseGet(_))
+
+  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix]
+  ) : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+    type PlanStdT[A] = ReaderT[FileSystemError \/ ?, Instant, A]
+
     queryModel match {
       case MongoQueryModel.`3.4` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_4](FuncHandler.handle3_4)(mf) >>=
-          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4)(mf).run(Instant.now) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+
       case MongoQueryModel.`3.2` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
-          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2)(mf).run(Instant.now) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+
       case MongoQueryModel.`3.0` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0)(mf) >>=
-          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0)(mf).run(Instant.now) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6)(mf) >>=
-          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6)(mf).run(Instant.now) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
     }

@@ -1131,11 +1131,11 @@ object MongoDbPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR, EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
+  def getExpr[
+    T[_[_]]: BirecursiveT: ShowT,
+    M[_]: Monad: ExecTimeR: FileSystemErr, EX[_]: Traverse: Inject[?[_], ExprOp]]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])(fm: FreeMap[T]
+  ) : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
   def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]

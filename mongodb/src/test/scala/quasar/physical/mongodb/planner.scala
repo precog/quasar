@@ -126,14 +126,16 @@ class PlannerSpec extends
     // TODO: Would be nice to error on Constant plans here, but property
     // tests currently run into that.
 
-    val result = queryPlan(expr, Variables.empty, basePath, 0L, None).run
-    val lp: Fix[LP] =
-      result.value.valueOr(es => scala.sys.error("errors while planning: ${es}"))
-        .getOrElse(scala.sys.error("query evaluated to a constant, this won’t get to the backend"))
+    val lp: PlanTestT[Fix[LP]] =
+      queryPlan(expr, Variables.empty, basePath, 0L, None).run
+        .map(_.valueOr(es => scala.sys.error("errors while planning: ${es}")))
+        .map(_.valueOr(_  => scala.sys.error("query evaluated to a constant, this won’t get to the backend")))
+        .liftM[EitherT[?[_], FileSystemError, ?]]
+        .liftM[ReaderT[?[_], Instant, ?]]
 
     val ctx: fs.QueryContext[PlanTestT] = fs.QueryContext(model, stats, indexes, listContents)
 
-    MongoDbPlanner.plan[Fix, PlanTestT](lp, ctx)
+    lp >>= (MongoDbPlanner.plan[Fix, PlanTestT](_, ctx))
   }
 
   def plan0(query: Fix[Sql], model: MongoQueryModel,

@@ -60,17 +60,15 @@ package object fs {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      Task.delay(Instant.now).liftM[EnvErrT]        |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
+      runM(WorkflowExecutor.mongoDb)                             |@|
+      queryfile.run[BsonCursor, S](client, defDb).liftM[EnvErrT] |@|
+      readfile.run[S](client).liftM[EnvErrT]                     |@|
+      writefile.run[S](client).liftM[EnvErrT]                    |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, execTime, qfile, rfile, wfile, mfile) => {
+    )((execMongo, qfile, rfile, wfile, mfile) => {
       interpretBackendEffect[Free[S, ?]](
         Empty.analyze[Free[S, ?]], // old mongo, will be removed
-        qfile compose queryfile.interpret(execMongo, execTime),
+        qfile compose queryfile.interpret(execMongo),
         rfile compose readfile.interpret,
         wfile compose writefile.interpret,
         mfile compose managefile.interpret)

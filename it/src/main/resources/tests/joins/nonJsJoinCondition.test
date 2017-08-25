@@ -5,14 +5,7 @@
         "couchbase":      "pending",
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
-        "mimir":          "pendingIgnoreFieldOrder",
-        "mongodb_2_6":       "pendingIgnoreFieldOrder",
-        "mongodb_3_0":       "pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pendingIgnoreFieldOrder",
-        "mongodb_3_4":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder",
-        "spark_local":    "pending",
-        "spark_hdfs":     "pending"
+        "mimir":          "ignoreFieldOrder"
     },
 
     "NB": "#2110: Disabled in all qscript-based connectors due to qscript bug.",

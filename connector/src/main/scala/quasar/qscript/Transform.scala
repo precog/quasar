@@ -645,6 +645,48 @@ class Transform
               joinType,
               magicJoinStructure(leftValue, rightValue))).embed).right[PlannerError]
 
+        case QC(LeftShift(Embed(QC(Unreferenced())), struct, id, repair)) =>
+          val repairLeft: JoinFunc = repair >>= {
+            case LeftSide => Free.roll(MFC(ProjectIndex(RightSideF, IntLit(1))))
+            case RightSide => RightSideF
+          }
+
+          val repairRight: JoinFunc = repair >>= {
+            case LeftSide => LeftSideF
+            case RightSide => Free.roll(MFC(ProjectIndex(LeftSideF, IntLit(1))))
+          }
+
+          val replaceLeft: Option[JoinFunc] =
+            ReplaceMapFunc.applyToFunc[T, JoinSide](lName, repairLeft, leftValue.as(LeftSide))
+
+          val replaceRight: Option[JoinFunc] =
+            ReplaceMapFunc.applyToFunc[T, JoinSide](rName, repairRight, rightValue.as(RightSide))
+
+          def branchRepl(branch: FreeQS, name: Symbol, value: FreeMap): FreeQS =
+            Free.roll(QCT(LeftShift(
+              branch,
+              ReplaceMapFunc.applyToFunc[T, Hole](name, struct, value).getOrElse(struct),
+              id,
+              StaticArray(List(LeftSideF, RightSideF)))))
+
+          val resL: Option[(FreeQS, FreeQS, JoinFunc, FreeMap, FreeMap)] =
+            replaceLeft.map(func =>
+              (lBranch, branchRepl(rBranch, rName, rightValue), func, leftValue, rightValue >> Free.roll(MFC(ProjectIndex(HoleF, IntLit(0))))))
+
+          val resR: Option[(FreeQS, FreeQS, JoinFunc, FreeMap, FreeMap)] =
+            replaceRight.map(func =>
+              (branchRepl(lBranch, lName, leftValue), rBranch, func, leftValue >> Free.roll(MFC(ProjectIndex(HoleF, IntLit(0)))), rightValue))
+
+          val res: PlannerError \/ (FreeQS, FreeQS, JoinFunc, FreeMap, FreeMap) =
+            resL.orElse(resR).toRightDisjunction(
+              InternalError.fromMsg(s"Non-supported join condition found: left shift doesn't contain a single join side."))
+
+          res.flatMap {
+            case (lb, rb, func, lv, rv) =>
+              Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
+                TJ.inj(ThetaJoin(src, lb, rb, func, joinType, magicJoinStructure(lv, rv))).embed).right[PlannerError]
+         }
+
         // FIXME we can only ignore the join condition if this `ThetaJoin` is an autojoin
         // consider creating a AutoJoin type that is internal to QScript compilation so we
         // can detect joins that we have created

@@ -71,7 +71,7 @@ object MongoDbPlanner {
 
   type Partial[T[_[_]], In, Out] = (PartialFunction[List[In], Out], List[InputFinder[T]])
 
-  type OutputM[A] = PlannerError \/ A
+  type OutputM[A]          = PlannerError \/ A
   type PhaseW[F[_]]        = MonadTell_[F, PhaseResults]
   type FileSystemErr[F[_]] = MonadError_[F, FileSystemError]
   type ExecTimeR[F[_]]     = MonadReader_[F, Instant]
@@ -189,7 +189,7 @@ object MongoDbPlanner {
 
   def expression[
     T[_[_]]: RecursiveT: ShowT,
-    M[_]: Applicative: ExecTimeR: FileSystemErr,
+    M[_]: Monad: ExecTimeR: FileSystemErr,
     EX[_]: Traverse](funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])(
     implicit inj: EX :<: ExprOp
   ): AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
@@ -197,11 +197,14 @@ object MongoDbPlanner {
     import MapFuncsCore._
     import MapFuncsDerived._
 
-    def execTime(implicit ev: ExecTimeR[M]): M[Bson] =
-      ev.ask map (ts => Bson.Date(ts.toEpochMilli))
-
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
+
+    def execTime(implicit ev: ExecTimeR[M]): M[Bson.Date] =
+      OptionT[M, Bson.Date](ev.ask.map(Bson.Date.fromInstant(_)))
+        .getOrElseF(raiseErr(
+          qscriptPlanningFailed(InternalError.fromMsg("Could not get the current timestamp"))))
+
 
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
@@ -332,7 +335,7 @@ object MongoDbPlanner {
       case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
-      case Now() => execTime map (ts => New(Name("Date"), List(ts)))
+      case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
       case Date(a1) =>

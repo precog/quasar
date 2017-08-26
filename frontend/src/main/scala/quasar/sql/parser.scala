@@ -37,6 +37,7 @@ final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
 
+// format: off
 private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     extends StandardTokenParsers {
   class SqlLexical extends StdLexical with RegexParsers {
@@ -506,3 +507,4 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   private def normalize: T[Sql] => T[Sql] = _.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil)
 }
+// format: on

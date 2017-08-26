@@ -25,6 +25,20 @@ val ExclusiveTest = Tags.Tag("exclusive-test")
 def exclusiveTasks(tasks: Scoped*) =
   tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
 
+/*
+ * - ensure format-on-compile works
+ * - add formatting test to CI
+ */
+
+addCommandAlias("format", "; scalafmt; test:scalafmt")
+
+scalafmtVersion in ThisBuild := "1.2.0"
+
+disablePlugins(ScalafmtSbtPlugin)
+
+scalafmtConfig in ThisBuild := file(".scalafmt.conf")
+scalafmtOnCompile in ThisBuild := true
+
 lazy val buildSettings = commonBuildSettings ++ Seq(
   organization := "org.quasar-analytics",
   initialize := {

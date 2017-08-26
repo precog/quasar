@@ -169,6 +169,9 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
+  def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run(time).run.value.toEither
+
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit("Input",      logical)
@@ -423,6 +426,17 @@ class PlannerSpec extends
                $field("baz"),
                $field("bar"))),
            ExcludeId)))
+    }
+
+    "plan NOW() with a literal timestamp" in {
+      val time = Instant.parse("2016-08-25T00:00:00.000Z")
+      val bsTime = Bson.Date.fromInstant(time).get
+
+      planAt(time, sqlE"""select NOW(), bar from foo""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "foo")),
+         $project(
+           reshape("0" -> $literal(bsTime), "bar" -> $field("bar")))))
     }
 
     "plan date field extraction" in {

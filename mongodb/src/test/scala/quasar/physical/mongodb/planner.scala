@@ -428,7 +428,7 @@ class PlannerSpec extends
            ExcludeId)))
     }
 
-    "plan NOW() with a literal timestamp" in {
+    "plan now() with a literal timestamp" in {
       val time = Instant.parse("2016-08-25T00:00:00.000Z")
       val bsTime = Bson.Date.fromInstant(time).get
 

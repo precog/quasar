@@ -206,7 +206,7 @@ object MongoDbPlanner {
 
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
-      case Now() => execTime map (bsn => Fix($literalF[ExprOp, Fix[ExprOp]](bsn)))
+      case Now() => execTime map ($literal(_))
 
       // FIXME: Will only work for Arrays, not Strings
       // case Length(a1) => $size(a1).point[M]

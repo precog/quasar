@@ -2,8 +2,9 @@
   "name": "now() function is referentially transparent",
 
   "backends": {
-    "marklogic_xml": "pending",
-    "marklogic_json": "pending"
+      "couchbase": "pending",
+      "mimir": "pending",
+      "spark_local": "pending"
   },
 
   "data": "../zips.data",

@@ -25,30 +25,27 @@ import quasar.qscript._
 
 import scala.math.{Ordering => SOrdering}, SOrdering.Implicits._
 
-import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT]  extends Planner[EquiJoin[T, ?]] {
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, S[_]] extends Planner[EquiJoin[T, ?], S] {
 
   import Planner.{SparkState, SparkStateT}
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
+  def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S, Data]): AlgebraM[SparkState[S, ?], EquiJoin[T, ?], RDD[Data]] = {
     case EquiJoin(src, lBranch, rBranch, key, jt, combine) =>
-      val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-      val srcState = src.point[SparkState]
+      val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
+      val srcState = src.point[SparkState[S, ?]]
 
-      def genKey(kf: FreeMap[T]): SparkState[Data => Data] =
-        EitherT(CoreMap.changeFreeMap(kf).point[Task]).liftM[SparkStateT]
+      def genKey(kf: FreeMap[T]): SparkState[S, Data => Data] =
+        EitherT(CoreMap.changeFreeMap(kf).point[Free[S, ?]]).liftM[SparkStateT]
 
-      val merger: SparkState[(Data, Data) => Data] =
-        EitherT(CoreMap.changeJoinFunc(combine).point[Task]).liftM[SparkStateT]
+      val merger: SparkState[S, (Data, Data) => Data] =
+        EitherT(CoreMap.changeJoinFunc(combine).point[Free[S, ?]]).liftM[SparkStateT]
 
       for {
         k <- key.traverse(_.bitraverse(genKey, genKey))

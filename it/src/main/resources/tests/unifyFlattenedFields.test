@@ -1,7 +1,8 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":  "pending"
+        "couchbase":  "pending",
+	 "marklogic_xml":     "skip"
     },
     "NB": "this doesn't actually timeout for mimir, but it takes a long time and possibly causing overall build on next-major to timeout.",
     "data": "zips.data",

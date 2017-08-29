@@ -231,15 +231,18 @@ package object api {
     from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
 
   def staticFileService(basePath: String): HttpService = {
-    def pathCollector(file: jFile, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
-      if (file.isDirectory) StaticFile.fromFile(new jFile(file, "index.html"), Some(req))
-      else if (!file.isFile) None
-      else StaticFile.fromFile(file, Some(req))
-    }
+    val fsConfig = FileService.Config(systemPath = basePath)
 
-    fileService(FileService.Config(
-      systemPath = basePath,
-      pathCollector = pathCollector))
+    // This can be changed to simply `fileService(fsConfig)` once we upgrade to
+    // http4s 0.16.0 or higher as this will become the new default behavior in http4s
+    // This is because the behavior prior to 0.16.0 is to serve a `Unauthorized` response
+    // if the path is a directory
+    fileService(fsConfig.copy(
+      pathCollector = (file, config, req) =>
+        // If the path is a directory serve the index.html file if present
+        if (file.isDirectory) Task.delay(StaticFile.fromFile(new jFile(file, "index.html"), Some(req)))
+        // otherwise delegate to the default implementation
+        else fsConfig.pathCollector(file, config, req)))
   }
 
   def redirectService(basePath: String) = HttpService {

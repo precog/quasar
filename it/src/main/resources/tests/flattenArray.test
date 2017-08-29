@@ -3,7 +3,8 @@
     "backends": {
         "mongodb_2_6": "pending",
         "mongodb_3_0": "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_read_only": "pending",
+        "marklogic_xml":     "skip"
     },
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips",

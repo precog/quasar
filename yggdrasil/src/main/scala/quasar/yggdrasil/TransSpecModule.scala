@@ -131,6 +131,7 @@ trait TransSpecModule extends FNModule {
     type TransSpec1 = TransSpec[Source1]
 
     object TransSpec {
+
       import CPath._
 
       def concatChildren[A <: SourceType](tree: CPathTree[Int], leaf: TransSpec[A] = Leaf(Source)): TransSpec[A] = {
@@ -176,7 +177,7 @@ trait TransSpecModule extends FNModule {
           case trans.Map1(source, f1)      => trans.Map1(mapSources(source)(f), f1)
           case trans.DeepMap1(source, f1)  => trans.DeepMap1(mapSources(source)(f), f1)
           case trans.Map2(left, right, f2) => trans.Map2(mapSources(left)(f), mapSources(right)(f), f2)
-          case trans.MapN(contents, f1) => trans.MapN(mapSources(contents)(f), f1)
+          case trans.MapN(contents, f1)    => trans.MapN(mapSources(contents)(f), f1)
 
           case trans.OuterObjectConcat(objects @ _ *) => trans.OuterObjectConcat(objects.map(mapSources(_)(f)): _*)
           case trans.InnerObjectConcat(objects @ _ *) => trans.InnerObjectConcat(objects.map(mapSources(_)(f)): _*)
@@ -211,7 +212,7 @@ trait TransSpecModule extends FNModule {
       def deepMap[A <: SourceType](spec: TransSpec[A])(f: PartialFunction[TransSpec[A], TransSpec[A]]): TransSpec[A] = spec match {
         case x if f isDefinedAt x => f(x)
 
-        case x @ Leaf(source)                  => x
+        case x @ Leaf(_)                       => x
         case trans.ConstLiteral(value, target) => trans.ConstLiteral(value, deepMap(target)(f))
 
         case trans.Filter(source, pred) => trans.Filter(deepMap(source)(f), deepMap(pred)(f))
@@ -253,6 +254,291 @@ trait TransSpecModule extends FNModule {
         case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(deepMap(source)(f), value, invert)
 
         case trans.Cond(pred, left, right) => trans.Cond(deepMap(pred)(f), deepMap(left)(f), deepMap(right)(f))
+      }
+
+      // reduce the TransSpec to a "normal form", in which nested *Concats are flattened into
+      // single vararg calls and statically-known *DerefStatics are performed
+      def normalize[A <: SourceType](ts: TransSpec[A], undef: TransSpec[A]): TransSpec[A] = {
+        import scalaz.syntax.std.option._, scalaz.std.option._
+        def flattenConcats: Option[TransSpec[A]] = {
+          def flattenOuterArrayConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+            case OuterArrayConcat(ls@_*) =>
+              Some(ls.toList.flatMap(a => flattenOuterArrayConcats(a).getOrElse(a :: Nil)))
+            case _ => None
+          }
+
+          def flattenOuterObjectConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+            case OuterObjectConcat(ls@_*) =>
+              Some(ls.toList.flatMap(a => flattenOuterObjectConcats(a).getOrElse(a :: Nil)))
+            case _ => None
+          }
+
+          def flattenInnerArrayConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+            case InnerArrayConcat(ls@_*) =>
+              Some(ls.toList.flatMap(a => flattenInnerArrayConcats(a).getOrElse(a :: Nil)))
+            case _ => None
+          }
+          def flattenInnerObjectConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+            case InnerObjectConcat(ls@_*) =>
+              Some(ls.toList.flatMap(a => flattenInnerObjectConcats(a).getOrElse(a :: Nil)))
+            case _ => None
+          }
+          flattenOuterArrayConcats(ts).map(ks => OuterArrayConcat(ks.map(normalize(_, undef)): _*))
+            .orElse(flattenOuterObjectConcats(ts).map(ks => OuterObjectConcat(ks.map(normalize(_, undef)): _*)))
+            .orElse(flattenInnerArrayConcats(ts).map(ks => InnerArrayConcat(ks.map(normalize(_, undef)): _*)))
+            .orElse(flattenInnerObjectConcats(ts).map(ks => InnerObjectConcat(ks.map(normalize(_, undef)): _*)))
+        }
+
+        flattenConcats.getOrElse {
+          ts match {
+            case WrapArray(t) =>
+              WrapArray(normalize(t, undef))
+            case WrapObject(t, f) =>
+              WrapObject(normalize(t, undef), f)
+            case WrapObjectDynamic(t, f) =>
+              WrapObjectDynamic(normalize(t, undef), normalize(f, undef))
+            case ConstLiteral(t, f) =>
+              ConstLiteral(t, normalize(f, undef))
+            case DerefArrayStatic(t, f@CPathIndex(i)) =>
+              normalize[A](t, undef) match {
+              case n@OuterArrayConcat(ks@_*) =>
+                if (ks.length < (i + 1) && ks.forall(_.isInstanceOf[WrapArray[_]])) {
+                  undef
+                } else {
+                  ks.foldLeft((0.some, none[TransSpec[A]])) {
+                    case ((Some(a), b), WrapArray(nt)) =>
+                      ((a + 1).some, if (a == i) normalize(nt, undef).some else b)
+                    case ((_, b), _) => (none, b)
+                  }._2.getOrElse(DerefArrayStatic(n, f))
+                }
+              case WrapArray(k) =>
+                if (i == 0) {
+                  k
+                } else {
+                  undef
+                }
+              case `undef` => undef
+              case n@_ => DerefArrayStatic(n, f)
+            }
+            case DerefObjectStatic(t, f@CPathField(k)) =>
+              normalize[A](t, undef) match {
+              // ks is reversed before being folded, because keys are overriden
+              // by operands on the right, not the left
+              case n@OuterObjectConcat(ks@_*) =>
+                ks.reverse.foldRight(undef) {
+                case (WrapObject(s, k2), o) =>
+                  if (k == k2) {
+                    normalize(s, undef)
+                  } else {
+                    o
+                  }
+                case _ => DerefObjectStatic(n, f)
+              }
+              case WrapObject(s, `k`) => normalize(s, undef)
+              case WrapObject(_, _) => undef
+              case `undef` => undef
+              case n@_ => DerefObjectStatic(n, f)
+            }
+            case DerefMetadataStatic(t, f) =>
+              DerefMetadataStatic(normalize[A](t, undef), f)
+            case DerefObjectDynamic(s, f) =>
+              normalize(s, undef) match {
+                case `undef` => undef
+                case sn => normalize(f, undef) match {
+                  case `undef` => undef
+                  case fn => DerefObjectDynamic(sn, fn)
+                }
+              }
+            case DerefArrayDynamic(s, f) =>
+              normalize(s, undef) match {
+                case `undef` => undef
+                case sn => normalize(f, undef) match {
+                  case `undef` => undef
+                  case fn => DerefArrayDynamic(sn, fn)
+                }
+              }
+            case IsType(s, t)            => IsType(normalize(s, undef), t)
+            case Equal(f, s)             => Equal(normalize(f, undef), normalize(s, undef))
+            case EqualLiteral(f, v, i)   => EqualLiteral(normalize(f, undef), v, i)
+            case Cond(p, l, r)           => Cond(normalize(p, undef), normalize(l, undef), normalize(r, undef))
+            case Filter(s, t)            => Filter(normalize(s, undef), normalize(t, undef))
+            case FilterDefined(s, df, t) => FilterDefined(normalize(s, undef), normalize(df, undef), t)
+            case Typed(s, t)             => Typed(normalize(s, undef), t)
+            case TypedSubsumes(s, t)     => TypedSubsumes(normalize(s, undef), t)
+            case Map1(s, fun)            => Map1(normalize(s, undef), fun)
+            case DeepMap1(s, fun)        => DeepMap1(normalize(s, undef), fun)
+            case Map2(s, f, fun)         => Map2(normalize(s, undef), normalize(f, undef), fun)
+            case MapN(s, fun)            => MapN(normalize(s, undef), fun)
+            case ArraySwap(s, i)         => ArraySwap(normalize(s, undef), i)
+            case _                       => ts
+          }
+        }
+      }
+
+      // rephrase(p, r)(p(a)) --> r(a), if this is possible.
+      // rephrase(p, r) "pulls back" r from p.
+
+      // selectors:
+      // rephrase(.a.b, .a.b.c)(x) --> x.c
+      // ==> rephrase(.a.b, .a.b.c)(x.a.b) --> x.a.b.c
+
+      // rephrase(.[0], .[0].[1])(x) --> [[undef] ++ [x]].[0].[1]
+      // ==> rephrase(.[0], .[0].[1])(x.[0]) --> x.[0].[1]
+
+      // rephrase({k: f}, f)(x) --> x.k
+      // ==> rephrase({k: f}, f)({k: f(x))) --> f(x)
+
+      // arrays:
+      // rephrase([a] ++ [b] ++ [c] ++ [d], a)(x) --> x.[0]
+      // rephrase([a] ++ [b] ++ ([c] ++ [d], d)(x) --> x.[3]
+
+      // constants:
+      // rephrase(1, f) --> none
+      // rephrase(f, 1) --> 1
+
+      def rephrase[A <: SourceType](projection: TransSpec[A],
+                                    rootSource: A,
+                                    root: TransSpec1): Option[TransSpec1] = {
+        import scalaz.syntax.std.option._, scalaz.std.option._
+        // every iteration of peelInvert returns:
+        // - a change in the current index inside a nested *ArrayConcat, or None if the index information has been lost
+        //   (e.g., by concatting with Leaf(Source))
+        // - a change in the set of keys known to be inside a nested *ObjectConcat, or None if the key information has been lost
+        //   (e.g., by concatting with Leaf(Source))
+        // - a map of substitutions, which maps from subtrees of `root` that have been found in `projection`
+        //   to the accumulated inverse of the TransSpec layers seen inside `projection` upwards of that point
+        final case class PeelState(delta: Option[Int], keys: Option[Set[String]], substitutions: Map[TransSpec1, TransSpec1])
+
+        val rootWithSourceReplaced = TransSpec.mapSources(root)(_ => rootSource)
+
+        // find all paths (subtrees) through a `TransSpec[A]`
+        // note we don't need to include `r` in the set of paths when `r` is a `WrapArray`, `WrapObject`, or `*Concat`,
+        // because actually substituting that subtree messes up the index handling while traversing `projection`.
+        def paths(r: TransSpec[A]): Set[TransSpec[A]] = r match {
+          case OuterArrayConcat(rs@_*)   => rs.flatMap(paths).toSet
+          case InnerArrayConcat(rs@_*)   => rs.flatMap(paths).toSet
+          case OuterObjectConcat(rs@_*)  => rs.flatMap(paths).toSet
+          case InnerObjectConcat(rs@_*)  => rs.flatMap(paths).toSet
+          case WrapArray(s)              => paths(s)
+          case WrapObject(s, _)          => paths(s)
+          case DerefObjectStatic(s, _)   => paths(s) + r
+          case DerefObjectDynamic(f, s)  => paths(f) ++ paths(s) + r
+          case DerefArrayStatic(s, _)    => paths(s) + r
+          case DerefArrayDynamic(f, s)   => paths(f) ++ paths(s) + r
+          case DerefMetadataStatic(s, _) => paths(s) + r
+          case ArraySwap(s, _)           => paths(s)
+          case Cond(f, s, _)             => paths(f) ++ paths(s) + r
+          case ConstLiteral(_, s)        => paths(s) + r
+          case Equal(f, s)               => paths(f) ++ paths(s) + r
+          case EqualLiteral(s, _, _)     => paths(s) + r
+          case Filter(f, p)              => paths(f) ++ paths(p) + r
+          case FilterDefined(s, p, _)    => paths(s) ++ paths(p) + r
+          case IsType(s, _)              => paths(s) + r
+          case Map1(s, _)                => paths(s) + r
+          case Map2(f, s, _)             => paths(f) ++ paths(s) + r
+          case MapN(s, _)                => paths(s) + r
+          case DeepMap1(s, _)            => paths(s) + r
+          case MapWith(s, _)             => paths(s) + r
+          case ObjectDelete(s, _)        => paths(s) + r
+          case Scan(s, _)                => paths(s) + r
+          case Typed(s, _)               => paths(s) + r
+          case TypedSubsumes(s, _)       => paths(s) + r
+          case WrapObjectDynamic(f, s)   => paths(f) ++ paths(s) + r
+          case Leaf(`rootSource`)        => Set(r)
+          case Leaf(_)                   => sys.error("impossible")
+        }
+
+        // find all subtrees of `root`, so that they can be substituted with inverses of the
+        // outer layers of `projection` from inside `root` when they're encountered inside `projection`.
+        val allRootPaths = paths(rootWithSourceReplaced)
+
+        // peels layers off of `projection`, building up the inverses of every layer and substituting those layers for common
+        // occurrences of subtrees of `root` inside `projection` when they're reached.
+        def peelInvert(projection: TransSpec[A], currentIndex: Int, keys: Set[String], inverseLayers: TransSpec1 => TransSpec1): PeelState = {
+
+          // folds over every branch in a *ArrayConcat, from the *left*, collecting substitutions.
+          // the state carried along consists of:
+          // a) the index into the array formed by the *ArrayConcat (and outer *ArrayConcats, because it's passed into peelInvert)
+          // b) the Option[TransSpec1] returned by the first successfully rephrased branch of the *ArrayConcat.
+          // If the index returned by any rephrase call is none before a branch is successfully rephrased,
+          // we have insufficient information to continue searching for a successful branch,
+          // so we have to halt and return none. Otherwise, the first successfully rephrased branch is returned.
+          def arrayConcat(rs: Seq[TransSpec[A]]) = {
+            val (delta, substsOut) = rs.foldLeft((0.some, Map.empty[TransSpec1, TransSpec1])) {
+              case ((Some(i), substs), ts) =>
+                val PeelState(newDelta, _, newSubsts) = peelInvert(ts, currentIndex = currentIndex + i, keys = Set.empty, inverseLayers)
+                (newDelta.map(_ + i), newSubsts ++ substs)
+              case ((None, substs), _) => (none, substs)
+            }
+            PeelState(delta, Set.empty[String].some, substsOut)
+          }
+
+          // folds over every branch in a *ObjectConcat, from the *right*, collecting substitutions.
+          // the state carried along consists of:
+          // a) the set of keys which have been observed in the *ObjectConcat (and outer *ObjectConcats, because it's passed into peelInvert)
+          // b) the Option[TransSpec1] returned by the first successfully rephrased branch of the *ObjectConcat.
+          // if the set of keys returned by any rephrase call is none before a branch is successfully rephrased,
+          // we have insufficient information to continue searching for a successful branch,
+          // so we have to halt and return none. Otherwise, the first successfully rephrased branch is returned.
+          def objectConcat(rs: Seq[TransSpec[A]]) = {
+            val (resultKeys, out) = rs.foldRight((Set.empty[String].some, Map.empty[TransSpec1, TransSpec1])) {
+              case (ts, (Some(ks), substs)) =>
+                val PeelState(_, newKeys, newSubsts) = peelInvert(ts, currentIndex = 0, keys = keys ++ ks, inverseLayers)
+                (newKeys.map(_ ++ ks), newSubsts ++ substs)
+              case (_, (None, substs)) => (none, substs)
+            }
+            PeelState(0.some, resultKeys, out)
+          }
+
+          projection match {
+            // if the key has already been spotted (to the right in a nested *ObjectConcat of this WrapObject),
+            // the object resulting from the *ObjectConcat has had this WrapObject call's result overriden.
+            // so this branch's value is inaccessible, so we return none.
+            case WrapObject(s, k) =>
+              if (keys(k)) {
+                PeelState(none, Set.empty[String].some, Map.empty)
+              } else {
+                val PeelState(_, _, nestedSubstitutions) =
+                  peelInvert(s, currentIndex = 0, Set.empty, inverseLayers andThen (DerefObjectStatic(_, CPathField(k))))
+                PeelState(0.some, Set(k).some, nestedSubstitutions)
+              }
+            // encountering a WrapArray inside a *ArrayConcat requires shifting the index by 1.
+            // however inside the WrapArray, the index is reset to 0.
+            case WrapArray(s) =>
+              val PeelState(_, _, nestedSubstitutions) = peelInvert(s, currentIndex = 0, Set.empty, inverseLayers andThen (DerefArrayStatic(_, CPathIndex(currentIndex))))
+              PeelState(1.some, none, nestedSubstitutions)
+            case OuterArrayConcat(rs@_*)  => arrayConcat(rs)
+            case InnerArrayConcat(rs@_*)  => arrayConcat(rs)
+            case OuterObjectConcat(rs@_*) => objectConcat(rs)
+            case InnerObjectConcat(rs@_*) => objectConcat(rs)
+            case ArraySwap(s, i)          => peelInvert(s, currentIndex = 0, Set.empty, inverseLayers andThen (ArraySwap(_, i)))
+            // this branch of `projection` is a subtree of `root`, so we can substitute it with the inverted layers of
+            // `projection` we've encountered so far.
+            case rootSubtree if allRootPaths(rootSubtree) =>
+              val rootSubtreeAsTransSpec1 =
+                if (rootSource == Source) {
+                  rootSubtree.asInstanceOf[TransSpec1]
+                } else {
+                  TransSpec.mapSources(rootSubtree)(_ => Source)
+                }
+              PeelState(0.some, Set.empty[String].some, Map(rootSubtreeAsTransSpec1 -> inverseLayers(Leaf(Source))))
+            // this won't be Leaf(rootSource), because that would be a subtree of root
+            case Leaf(_) => PeelState(none, none, Map.empty)
+            case _       => PeelState(none, none, Map.empty)
+          }
+        }
+        val peelSubstitutions =
+          peelInvert(projection, currentIndex = 0, keys = Set.empty, inverseLayers = identity[TransSpec1]).substitutions
+        if (peelSubstitutions.isEmpty) {
+          // there wasn't even an occurrence of `Leaf(rootSource)` in `projection`,
+          // so `projection` has definitely destroyed the information necessary to get back to root
+          none
+        } else {
+          // deepMap takes care of running substitutions over the largest subtrees first
+          val substitutedRoot = TransSpec.deepMap(root)(peelSubstitutions)
+          // normalize the output, so that equivalent sort orders are more likely to be comparable
+          normalize(substitutedRoot, TransSpec1.Undef).some
+        }
       }
     }
 

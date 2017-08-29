@@ -1,9 +1,9 @@
 {
     "name": "flatten a grouped object with filter",
     "backends": {
+        "mimir":             "ignoreFieldOrder",
         "couchbase":         "pending",
         "marklogic_json":    "pending",
-        "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_2_6":       "ignoreFieldOrder",
         "mongodb_3_0":       "ignoreFieldOrder",
         "mongodb_3_2":       "ignoreFieldOrder",

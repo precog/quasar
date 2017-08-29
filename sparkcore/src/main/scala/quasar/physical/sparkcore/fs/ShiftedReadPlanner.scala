@@ -21,20 +21,25 @@ import quasar._, quasar.Planner._
 import quasar.contrib.pathy.AFile
 import quasar.qscript._
 
+import matryoshka.{Hole => _, _}
 import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-object ShiftedReadPlanner extends Planner[Const[ShiftedRead[AFile], ?]] {
+class ShiftedReadPlanner[S[_]] extends Planner[Const[ShiftedRead[AFile], ?], S] {
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]) =
+  import Planner.SparkState
+
+  def plan(
+    fromFile: AFile => Free[S, RDD[Data]],
+    first: RDD[Data] => Free[S, Data]
+  ): AlgebraM[SparkState[S, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
         val filePath = qs.getConst.path
         val idStatus = qs.getConst.idStatus
 
-        EitherT(fromFile(sc, filePath).map { rdd =>
+        EitherT(fromFile(filePath).map { rdd =>
           (sc,
             idStatus match {
               case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))

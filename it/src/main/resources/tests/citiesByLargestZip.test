@@ -2,23 +2,15 @@
     "name": "cities with largest individual zip codes",
     "backends": {
         "couchbase":      "pending",
-        "marklogic_json": "pending",
-        "marklogic_xml":  "pending",
         "mimir":          "pending",
         "mongodb_2_6":    "pending",
         "mongodb_3_0":    "pending",
         "mongodb_3_2":    "pending",
         "mongodb_3_4":    "pending",
-        "mongodb_read_only": "pending",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "mongodb_read_only": "pending"
     },
-    "NB": "Skipped for all connectors due to reduce/sort ordering bug.
-           Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.
 
-           This is tricky because the sort key does not appear in the result.
-           The result can be verified by running a similar query with
-          `select city, pop`.",
+    "NB": "I had to turn mimir back off because this query seems to be affected by the array undefinedness issue pretty severely.",
 
     "data": "zips.data",
 
@@ -26,9 +18,9 @@
 
     "predicate": "exactly",
 
-    "expected": ["CHICAGO",
-                 "BROOKLYN",
-                 "NEW YORK",
-                 "BELL GARDENS",
-                 "LOS ANGELES"]
+    "expected": [{ "city": "CHICAGO" },
+                 { "city": "BROOKLYN" },
+                 { "city": "NEW YORK" },
+                 { "city": "BELL GARDENS" },
+                 { "city": "LOS ANGELES" }]
 }

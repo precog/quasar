@@ -51,7 +51,7 @@ package object metastore {
     def message: String = "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
   }
   final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreFailure {
-    def message: String = "MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'."
+    def message: String = s"MetaStore schema requires migrating, current version is '$current' latest version is '$latest'."
   }
   final case class UnknownError(causedBy: scala.Throwable, `while`: String) extends MetastoreFailure {
     private val metastorePrompt: String = "Is the metastore database running?"

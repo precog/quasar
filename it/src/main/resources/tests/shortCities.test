@@ -2,12 +2,14 @@
     "name": "shortest city names",
     "backends": {
         "couchbase":         "pending",
+        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending"
     },
+    "NB": "This query will fail due to misaligned array offsets on any backend which packs arrays (i.e. eliminates undefineds).  It needs a change from qscript to use objects rather than arrays to carry contextual information.",
     "data": "largeZips.data",
     "query": "select distinct city from largeZips order by length(city), city limit 5",
     "predicate": "exactly",

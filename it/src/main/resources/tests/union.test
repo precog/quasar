@@ -1,8 +1,8 @@
 {
     "name": "union",
     "backends": {
-        "couchbase":         "pending",
-        "mimir":             "pending"
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase":         "pending"
     },
     "NB": "The qscript for this query contains some nonsensical structures and the fact that it passes on any connector is based purely on how nonsense-tolerant that connector is, this isn't expected to work in general.",
     "data": "zips.data",

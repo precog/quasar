@@ -42,6 +42,7 @@ trait FNDummyModule extends FNModule {
   import table.CFId
   type F1 = table.CF1
   type F2 = table.CF2
+  type FN = table.CFN
 
   implicit def liftF1(f: F1) = new F1Like {
     def compose(f1: F1) = f compose f1

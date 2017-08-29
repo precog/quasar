@@ -191,7 +191,7 @@ package object hdfs {
     val fileSystem = generateHdfsFS(sparkFsConf)
 
     interpretFileSystem(
-      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),
+      corequeryfile.chrooted[Eff](FsType, sparkFsConf.prefix),
       corereadfile.chrooted(sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))

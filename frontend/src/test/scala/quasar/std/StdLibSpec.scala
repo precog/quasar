@@ -1375,6 +1375,32 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "DeleteField" >> {
+        "{a:1, b:2} delete .a" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("a"),
+            Data.Obj(ListMap("b" -> Data.Int(2))))
+        }
+
+        "{a:1, b:2} delete .b" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("b"),
+            Data.Obj(ListMap("a" -> Data.Int(1))))
+        }
+
+        "{a:1, b:2} delete .c" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("c"),
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))))
+        }
+      }
+
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
         "returns metadata associated with a value" >> pending("Requires EJson.")

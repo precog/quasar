@@ -172,7 +172,7 @@ package object elastic {
 
     type FreeEff[A]  = Free[Eff, A]
     interpretFileSystem(
-      corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
+      corequeryfile.interpreter[Eff](FsType),
       corereadfile.interpret[Eff],
       writefile.interpreter[Eff],
       managefile.interpreter[Eff])

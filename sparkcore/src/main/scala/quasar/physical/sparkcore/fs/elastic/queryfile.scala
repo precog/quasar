@@ -18,7 +18,6 @@ package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
-import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
@@ -39,7 +38,7 @@ object queryfile {
 
   private def parseIndex(adir: ADir) = posixCodec.unsafePrintPath(adir).replace("/", "") // TODO_ES handle invalid paths
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
+  private def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
     sc
       .esJsonRDD(file2ES(file).shows)
       .map(_._2)
@@ -95,12 +94,6 @@ object queryfile {
   }
 
   def readChunkSize: Int = 5000
-
-  def input[S[_]](implicit
-    s0: Task :<: S,
-    elastic: ElasticCall :<: S
-  ): Input[S] =
-    Input[S](fromFile _)
 
   def detailsInterpreter[S[_]](implicit
     read: Read.Ops[SparkContext, S],

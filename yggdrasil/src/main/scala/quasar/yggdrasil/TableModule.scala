@@ -270,7 +270,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       */
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]]
 
-    def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
+    def partitionMerge(partitionBy: TransSpec1, keepKey: Boolean = false)(f: Table => M[Table]): M[Table]
 
     @deprecated("use drop/take directly")
     def takeRange(startIndex: Long, numberToTake: Long): Table = {

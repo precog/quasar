@@ -49,9 +49,8 @@ init_hdfs() {
   # within hadoop container
   CONTAINER=$1
   echo "configuring hdfs..."
-  docker exec $CONTAINER /hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode
   sleep 5
-  docker exec $CONTAINER /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager
+  docker exec $CONTAINER /bin/bash -c "/hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode; sleep 5; /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager "
 }
 
 init_spark_connector() {
@@ -60,6 +59,11 @@ init_spark_connector() {
   echo "nothing to configure, yet"
 }
 
+init_spark_cluster() {
+  echo "running sbt command for sparkcore assembly..."
+  source ${TRAVIS_BUILD_DIR}/scripts/constants
+  $SBT 'set every sparkDependencyProvided := true' sparkcore/assembly
+}
 
 ##########################################
 # parse arguments and run various
@@ -78,6 +82,7 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_spark_elasticsearch" ]]; then init_spark_connector;                        fi
   if [[ $CONTAINER == "quasar_spark_hdfs"          ]]; then init_hdfs $CONTAINER;                        fi
   if [[ $CONTAINER == "quasar_spark_ftp"           ]]; then init_spark_connector;                        fi
+  if [[ $CONTAINER == "quasar_spark_cluster"       ]]; then init_spark_cluster;                          fi
 }
 
 

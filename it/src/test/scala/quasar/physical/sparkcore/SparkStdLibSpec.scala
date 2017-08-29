@@ -49,6 +49,7 @@ class SparkStdLibSpec extends StdLibSpec {
     case MFD(Trunc(_))           => TODO
     case MFC(Power(_, _))        => Pending("TODO: handle large value").left
     case MFC(ConcatArrays(_, _)) => Pending("TODO: handle mixed string/array").left
+    case MFC(DeleteField(_, _))  => Pending("TODO: deleting a non-existent field should be the original object, NOT undefined").left
     case _                       => ().right
   }
 

@@ -1,7 +1,7 @@
 {
     "name": "select reduction from nested select",
     "backends": {
-        "mimir":"skip",
+        "mimir":"ignoreFieldOrder",
         "couchbase": "skip",
         "marklogic_json": "skip",
         "marklogic_xml": "skip",
@@ -22,13 +22,6 @@
                 ORDER BY COUNT(*) DESC) as meh",
     "predicate": "initial",
     "expected": [{ "measure": 1.238095238095, "category": "NE" },
-                 { "measure": 1.238095238095, "category": "MS" },
-                 { "measure": 1.238095238095, "category": "AL" },
                  { "measure": 1.238095238095, "category": "NY" },
-                 { "measure": 1.238095238095, "category": "AZ" },
-                 { "measure": 1.238095238095, "category": "SC" },
-                 { "measure": 1.238095238095, "category": "IA" },
-                 { "measure": 1.238095238095, "category": "TX" },
-                 { "measure": 1.238095238095, "category": "IN" },
-                 { "measure": 1.238095238095, "category": "RI" }]
+                 { "measure": 1.238095238095, "category": "MS" }]
 }

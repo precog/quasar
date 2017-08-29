@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
+package quasar.physical.marklogic.qscript
 
-case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
-  override def getMessage =
-    "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
-}
+import slamdata.Predef._
+
+final case class IndexPlan[Q](src: Search[Q], postfilter: Boolean)

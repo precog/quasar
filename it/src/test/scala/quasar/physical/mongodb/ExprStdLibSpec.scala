@@ -72,6 +72,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
 
     case (structural.ConcatOp, _)   => notHandled.left
+    case (structural.DeleteField, _) => notHandled.left
 
     case _                  => ().right
   }

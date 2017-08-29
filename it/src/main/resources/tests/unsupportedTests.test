@@ -2,7 +2,6 @@
     "name": "show tests that likely have a bug prior to the connector",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",

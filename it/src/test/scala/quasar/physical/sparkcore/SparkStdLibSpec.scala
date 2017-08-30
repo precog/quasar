@@ -70,7 +70,7 @@ class SparkStdLibSpec extends StdLibSpec {
       prg: FreeMapA[Fix, Nothing],
       expected: Data
     ): Result =
-      failure
+      pending
 
     def unaryMapFunc(
       prg: FreeMapA[Fix, UnaryArg],

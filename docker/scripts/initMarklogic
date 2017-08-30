@@ -38,6 +38,11 @@ curl -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: appli
   -d '{"in-memory-list-size": 64, "in-memory-tree-size": 64}' \
   ${ML_MANAGE_PREFIX}/databases/Documents/properties
 
+# Increase request-timeout
+curl -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: application/json" \
+  -d '{"request-timeout": 120}' \
+  ${ML_MANAGE_PREFIX}/servers/App-Services/properties?group-id=Default
+
 # Disable the URI lexicon, if requested.
 if [[ "${URILEX_DISABLED:-enabled}" == "disabled" ]]; then
   curl -X PUT --anyauth -u "${ML_USERNAME}:${ML_PASSWORD}" -H "Content-Type: application/json" \

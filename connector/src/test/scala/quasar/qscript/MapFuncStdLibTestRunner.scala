@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+import quasar.{Data, NullaryFunc, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
@@ -67,6 +67,10 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
+      case lp.InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized())
+          if func.effect ≟ Mapping =>
+        Free.roll((MapFunc.translateNullaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func))
+
       case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
         Free.roll((MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func)(a1))

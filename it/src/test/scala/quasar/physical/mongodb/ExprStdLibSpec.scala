@@ -94,19 +94,19 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     queryModel match {
       case MongoQueryModel.`3.4` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4)(mf).run(Instant.now) >>= (build[Workflow3_2F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case MongoQueryModel.`3.2` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2)(mf).run(Instant.now) >>= (build[Workflow3_2F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case MongoQueryModel.`3.0` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0)(mf).run(Instant.now) >>= (build[Workflow2_6F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6)(mf).run(Instant.now) >>= (build[Workflow2_6F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
     }

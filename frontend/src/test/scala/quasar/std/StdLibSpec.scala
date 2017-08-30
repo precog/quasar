@@ -656,6 +656,14 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Now" >> {
+        import MathLib.Subtract
+
+        "now" >> prop { (_: Int) =>
+          nullary(Fix(Subtract(Fix(Now()), Fix(Now()))), Data.Int(0))
+        }
+      }
+
       "TemporalTrunc" >> {
         def truncZonedDateTimeTimestamp(p: TemporalPart, i: Instant): Result =
           truncZonedDateTime(p, i.atZone(UTC)).fold(

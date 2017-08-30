@@ -32,6 +32,7 @@ import quasar.std._
 
 import scala.sys
 
+import java.time.Instant
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -48,6 +49,8 @@ import shapeless.{Nat}
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
   val lpf = new lp.LogicalPlanR[Fix[LP]]
+
+  val runAt = Instant.parse("2015-01-26T00:00:00Z")
 
   args.report(showtimes = ArgProperty(true))
 

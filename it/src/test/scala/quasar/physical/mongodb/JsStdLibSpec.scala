@@ -71,7 +71,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-    MongoDbPlanner.getJsFn[Fix, ReaderT[FileSystemError \/ ?, Instant, ?]](mf).run(Instant.now) ∘
+    MongoDbPlanner.getJsFn[Fix, ReaderT[FileSystemError \/ ?, Instant, ?]](mf).run(runAt) ∘
       (js =>
         (Crystallize[WorkflowF].crystallize(
           chain[Fix[WorkflowF]](

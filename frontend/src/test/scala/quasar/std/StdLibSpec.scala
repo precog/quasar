@@ -1352,5 +1352,49 @@ abstract class StdLibSpec extends Qspec {
         "returns metadata associated with a value" >> pending("Requires EJson.")
       }
     }
+
+    "SetLib" >> {
+      import SetLib._
+
+      "Within" >> {
+        "0 in [1, 2, 3]" >> {
+          binary(Within(_, _).embed, Data.Int(0), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.False)
+        }
+
+        "1 in [1, 2, 3]" >> {
+          binary(Within(_, _).embed, Data.Int(1), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.True)
+        }
+
+        "0 in []" >> {
+          binary(Within(_, _).embed, Data.Int(0), Data.Arr(Nil), Data.False)
+        }
+
+        "[0] in [[1], 2, {a:3}, [0]]" >> {
+          binary(
+            Within(_, _).embed,
+            Data.Arr(List(Data.Int(0))),
+            Data.Arr(
+              List(
+                Data.Arr(List(Data.Int(1))),
+                Data.Int(2),
+                Data.Obj(ListMap("a" -> Data.Int(3))),
+                Data.Arr(List(Data.Int(0))))),
+            Data.True)
+        }
+
+        "[0, 1] in [[1], 2, {a:3}, [0, 1]]" >> {
+          binary(
+            Within(_, _).embed,
+            Data.Arr(List(Data.Int(0), Data.Int(1))),
+            Data.Arr(
+              List(
+                Data.Arr(List(Data.Int(1))),
+                Data.Int(2),
+                Data.Obj(ListMap("a" -> Data.Int(3))),
+                Data.Arr(List(Data.Int(0), Data.Int(1))))),
+            Data.True)
+        }
+      }
+    }
   }
 }

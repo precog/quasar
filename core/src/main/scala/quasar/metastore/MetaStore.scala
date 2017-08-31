@@ -22,8 +22,11 @@ import quasar.db._
 import quasar.fs.mount.MountingsConfig
 
 import argonaut._
-import doobie.imports._
-import scalaz._, Scalaz._
+import doobie.util.transactor.Transactor
+import doobie.free.connection.ConnectionIO
+import doobie.syntax.connectionio._
+import scalaz._
+import Scalaz._
 import scalaz.concurrent.Task
 
 final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor, schemas: List[Schema[Int]]) {
@@ -86,7 +89,7 @@ object MetaStore {
         jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
 
-    EitherT(transactor.trans(op).attempt ∘ (
+    EitherT(transactor.trans.apply(op).attempt ∘ (
       _.leftMap(t => UnknownError(t, "While initializing or updating"))))
   }
 

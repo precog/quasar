@@ -45,6 +45,7 @@ class MongoDbQExprStdLibSpec extends MongoDbQStdLibSpec {
     case (string.Decimal, _)  => notHandled.left
     case (string.ToString, _) => notHandled.left
     case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
+    case (quasar.std.SetLib.Within, _) => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left

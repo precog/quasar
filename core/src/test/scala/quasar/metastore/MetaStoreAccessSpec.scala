@@ -18,16 +18,17 @@ package quasar.metastore
 
 import quasar.fs.FileSystemType
 import quasar.fs.mount.{ConnectionUri, MountConfig}
-
-import doobie.contrib.specs2.analysisspec.AnalysisSpec
 import doobie.util.transactor.Transactor
 import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.refineMV
 import org.specs2.mutable._
-import pathy.Path, Path._
+import pathy.Path
+import Path._
+import doobie.specs2.analysisspec.TaskChecker
+
 import scalaz.concurrent.Task
 
-abstract class MetaStoreAccessSpec extends Specification with AnalysisSpec {
+abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
   val schema = Schema.schema
 
   def rawTransactor: Transactor[Task]

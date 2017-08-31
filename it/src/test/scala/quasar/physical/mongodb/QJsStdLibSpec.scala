@@ -35,6 +35,8 @@ import shapeless.Nat
 class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (quasar.std.SetLib.Within, _)  => Pending("TODO").left
+
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
     case (string.ToString, Data.Date(_) :: Nil) =>
@@ -43,7 +45,6 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
       Skipped("Interval prints numeric representation").left
     case (string.Search, _) =>
       Skipped("compiles to a map/reduce, so can't be run in tests").left
-
 
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>

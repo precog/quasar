@@ -57,7 +57,7 @@ object ArrayHomogeneousArrayColumn {
   }
 }
 
-class ArrayBoolColumn(val defined: BitSet, values: BitSet) extends ArrayColumn[Boolean] with BoolColumn {
+class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColumn[Boolean] with BoolColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Boolean) = {

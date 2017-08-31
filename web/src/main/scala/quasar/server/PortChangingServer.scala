@@ -23,6 +23,8 @@ import quasar.server.Http4sUtils._
 
 import scala.concurrent.duration._
 
+import java.lang.{Runnable, Thread}
+import java.util.concurrent.{Executors, ThreadFactory}
 import org.http4s
 import org.http4s.HttpService
 import scalaz._, Scalaz._
@@ -36,16 +38,31 @@ import scalaz.stream.{async, Process}
   * @param shutdownImpl Should be called to cleanly shutdown this server
   */
 final case class PortChangingServer(servers: Process[Task, (http4s.server.Server,Int)], shutdownImpl: Task[Unit]) {
+
   /** Wait for the command line user to press enter before shutting down the server */
-  def shutdownOnUserInput: Task[Unit] =
-    stdout("Press Enter to stop.") <*
-    Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdownImpl.unsafePerformSync)) <*
-     servers.run
+  def shutdownOnUserInput: Task[Unit] = for {
+    _ <- stdout("Press Enter to stop.")
+    // TODO this ignores errors all over the place
+    _ <- servers.run
+    _ <- Task.fork(waitForInput)(PortChangingServer.AwaitingPool)
+    _ <- shutdownImpl
+  } yield ()
+
   def shutdown: Task[Unit] =
-    shutdownImpl *> servers.run // We need to run the servers in order to make sure everything is cleaned up properly
+    shutdownImpl >> servers.run // We need to run the servers in order to make sure everything is cleaned up properly
 }
 
 object PortChangingServer {
+
+  private val AwaitingPool = Executors.newFixedThreadPool(1, new ThreadFactory {
+    def newThread(r: Runnable): Thread = {
+      val back = new Thread(r)
+      back.setName("AWAITING_INPUT_THREAD")
+      back.setPriority(Thread.MIN_PRIORITY)
+      back
+    }
+  })
+
   /** Produce a stream of servers that can be restarted on a supplied port
     * @param initialPort The port on which to start the initial server
     * @param produceService A function that given a function to restart a server

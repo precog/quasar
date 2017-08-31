@@ -760,6 +760,83 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     }
   }
 
+  def checkWithinSelf = {
+    implicit val gen = sample(schema)
+    prop { (sample: SampleData) =>
+      val table = fromSample(sample)
+      val results = toJson(table.transform {
+        Within(Leaf(Source), WrapArray(Leaf(Source)))
+      })
+
+      results.copoint must_== (Stream.tabulate(sample.data.size) { _ => JBool(true) })
+    }
+  }
+
+  def checkNotWithin = {
+    implicit val gen = sample(schema)
+    prop { (sample: SampleData) =>
+      val table = fromSample(sample)
+      val results = toJson(table.transform {
+        Within(Leaf(Source), WrapArray(ConstLiteral(CString("derp!!"), Leaf(Source))))
+      })
+
+      results.copoint must_== (Stream.tabulate(sample.data.size) { _ => JBool(false) })
+    }
+  }
+
+  def testNonTrivialWithin = {
+    val JArray(elements) = JParser.parseUnsafe("""[
+      {
+        "item":42,
+        "in":[42.0, false, {"a":true, "b":false}]
+      },
+      {
+        "item":[[-1],[],["p",-3.875484961198970156E-18930]]
+      },
+      {
+        "item":{
+          "a":42
+        },
+        "in":[42]
+      },
+      {
+        "item":{
+          "a":42
+        },
+        "in":"not-an-array"
+      },
+      {
+        "item":{
+          "a":42
+        },
+        "in":[[]]
+      },
+      {
+        "item":0,
+        "in":[]
+      }
+    ]""")
+
+    val sample = SampleData(elements.toStream)
+
+    val table = fromSample(sample)
+
+    val results = toJson(
+      table.transform(
+        Within(
+          DerefObjectStatic(Leaf(Source), CPathField("item")),
+          DerefObjectStatic(Leaf(Source), CPathField("in")))))
+
+    val JArray(expected) = JParser.parseUnsafe("""[
+      true,
+      false,
+      false,
+      false
+    ]""")
+
+    results.copoint must_== expected.toStream
+  }
+
   def checkWrapObject = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>

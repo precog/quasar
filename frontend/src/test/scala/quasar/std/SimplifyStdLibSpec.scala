@@ -65,6 +65,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (date.ExtractSecond, _) => notHandled
     case (date.ExtractWeek, _) => notHandled
     case (date.ExtractYear, _) => notHandled
+    case (date.Now, _) => notHandled
 
     case _ => ().right
   }

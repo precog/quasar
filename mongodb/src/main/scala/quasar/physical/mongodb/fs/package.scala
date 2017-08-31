@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar.{NameGenerator => NG}
 import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
+import quasar.common.PhaseResultT
 import quasar.config._
 import quasar.effect.Failure
 import quasar.contrib.pathy._
@@ -28,6 +29,7 @@ import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
 
 import com.mongodb.async.client.MongoClient
+import java.time.Instant
 import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -35,6 +37,7 @@ import scalaz.stream.{Writer => _, _}
 
 package object fs {
   import BackendDef.{DefinitionError, DefErrT}
+  type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
 
   val FsType = FileSystemType("mongodb")
 
@@ -57,11 +60,10 @@ package object fs {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
+      runM(WorkflowExecutor.mongoDb)                             |@|
+      queryfile.run[BsonCursor, S](client, defDb).liftM[EnvErrT] |@|
+      readfile.run[S](client).liftM[EnvErrT]                     |@|
+      writefile.run[S](client).liftM[EnvErrT]                    |@|
       managefile.run[S](client).liftM[EnvErrT]
     )((execMongo, qfile, rfile, wfile, mfile) => {
       interpretBackendEffect[Free[S, ?]](

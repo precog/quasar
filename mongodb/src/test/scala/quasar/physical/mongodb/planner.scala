@@ -58,14 +58,12 @@ class PlannerSpec extends
   import jscore._
   import CollectionUtil._
 
-  type EitherWriter[A] =
-    EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
+  type PlanTestT[A] = ReaderT[EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, ?], Instant, A]
 
   val notOnPar = "Not on par with old (LP-based) connector."
 
-  def emit[A: RenderTree](label: String, v: A)
-      : EitherWriter[A] =
-    EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
+  def emit[A: RenderTree](label: String, v: A): PlanTestT[A] =
+    ReaderT(_ => EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right)))
 
   case class equalToWorkflow(expected: Workflow)
       extends Matcher[Crystallized[WorkflowF]] {
@@ -91,7 +89,7 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  val listContents: DiscoverPath.ListContents[EitherWriter] =
+  val listContents: DiscoverPath.ListContents[PlanTestT] =
     dir => (
       if (dir ≟ rootDir)
         Set(
@@ -115,7 +113,7 @@ class PlannerSpec extends
           FileName("days").right,
           FileName("logs").right,
           FileName("usa_factbook").right,
-          FileName("cities").right)).point[EitherWriter]
+          FileName("cities").right)).point[PlanTestT]
 
   implicit val monadTell: MonadTell[EitherT[PhaseResultT[Id, ?], FileSystemError, ?], PhaseResults] =
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
@@ -123,20 +121,28 @@ class PlannerSpec extends
 
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, 0L, None)
-      .leftMap(es => scala.sys.error("errors while planning: ${es}"))
-      // TODO: Would be nice to error on Constant plans here, but property
-      // tests currently run into that.
-      .flatMap(_.fold(
-        _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
+    indexes: Collection => Option[Set[Index]]
+  ): PlanTestT[Crystallized[WorkflowF]] = {
+    // TODO: Would be nice to error on Constant plans here, but property
+    // tests currently run into that.
+
+    val lp: PlanTestT[Fix[LP]] =
+      queryPlan(expr, Variables.empty, basePath, 0L, None).run
+        .map(_.valueOr(es => scala.sys.error("errors while planning: ${es}")))
+        .map(_.valueOr(_  => scala.sys.error("query evaluated to a constant, this won’t get to the backend")))
+        .liftM[EitherT[?[_], FileSystemError, ?]]
+        .liftM[ReaderT[?[_], Instant, ?]]
+
+    val ctx: fs.QueryContext[PlanTestT] = fs.QueryContext(model, stats, indexes, listContents)
+
+    lp >>= (MongoDbPlanner.plan[Fix, PlanTestT](_, ctx))
+  }
 
   def plan0(query: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes).run.value.toEither
+    queryPlanner(query, model, stats, indexes).run(Instant.now).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
@@ -146,7 +152,8 @@ class PlannerSpec extends
 
   def plan3_2(query: Fix[Sql],
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]) =
+    indexes: Collection => Option[Set[Index]]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, stats, indexes)
 
   val defaultStats: Collection => Option[CollectionStatistics] =
@@ -162,16 +169,19 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
+  def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run(time).run.value.toEither
+
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit("Input",      logical)
       simplified <- emit("Simplified", optimizer.simplify(logical))
-      phys       <- MongoDbPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
-    } yield phys).run.value.toEither
+      phys       <- MongoDbPlanner.plan[Fix, PlanTestT](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+    } yield phys).run(Instant.now).run.value.toEither
   }
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run.written
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run(Instant.now).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -416,6 +426,17 @@ class PlannerSpec extends
                $field("baz"),
                $field("bar"))),
            ExcludeId)))
+    }
+
+    "plan now() with a literal timestamp" in {
+      val time = Instant.parse("2016-08-25T00:00:00.000Z")
+      val bsTime = Bson.Date.fromInstant(time).get
+
+      planAt(time, sqlE"""select NOW(), bar from foo""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "foo")),
+         $project(
+           reshape("0" -> $literal(bsTime), "bar" -> $field("bar")))))
     }
 
     "plan date field extraction" in {

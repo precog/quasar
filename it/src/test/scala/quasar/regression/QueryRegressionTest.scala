@@ -144,7 +144,7 @@ abstract class QueryRegressionTest[S[_]](
 
       (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
        verifyResults(test.expected, data, run, backendName))
-        .timed(10.minutes)
+        .timed(5.minutes)
         .unsafePerformSync
     }
 

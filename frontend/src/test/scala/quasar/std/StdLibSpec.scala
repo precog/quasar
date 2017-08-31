@@ -660,7 +660,9 @@ abstract class StdLibSpec extends Qspec {
         import MathLib.Subtract
 
         "now" >> prop { (_: Int) =>
-          nullary(Fix(Subtract(Fix(Now()), Fix(Now()))), Data.Interval(Duration.ZERO))
+          val now = Now[Fix[LogicalPlan]]
+
+          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(Duration.ZERO))
         }
       }
 

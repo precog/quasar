@@ -55,7 +55,7 @@ object TestConfig {
   val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), mongodb.fs.QScriptFsType)
   val MONGO_Q_3_4     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_4")    , BackendCapability.All), mongodb.fs.QScriptFsType)
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocalBackendModule.Type)
   val SPARK_ELASTIC     = ExternalBackendRef(BackendRef(BackendName("spark_elastic")      , BackendCapability.All), sparkcore.fs.elastic.FsType)
   val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
 

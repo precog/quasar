@@ -68,7 +68,7 @@ package object main {
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.elastic.definition[PhysFsEff],
     sparkcore.fs.cassandra.definition[PhysFsEff],
-    sparkcore.fs.local.definition[PhysFsEff]
+    sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

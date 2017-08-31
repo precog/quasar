@@ -57,12 +57,12 @@ object readfile {
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
         case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit)
-        case ReadFile.Read(h) => details.readChunkSize >>= (step => read[S](h, step))
+        case ReadFile.Read(h) =>  read[S](h)
         case ReadFile.Close(h) => close[S](h)
       }
   }
 
-  private def open[S[_]](f: AFile, offset: Offset, limit: Limit)(implicit
+  def open[S[_]](f: AFile, offset: Offset, limit: Limit)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
     gen: MonotonicSeq.Ops[S],
@@ -99,16 +99,15 @@ object readfile {
     )
   }
 
-  private def read[S[_]](h: ReadHandle, step: Int)(implicit
+  def read[S[_]](h: ReadHandle)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
-    s1: Task :<: S
-  ): Free[S, FileSystemError \/ Vector[Data]] = {
-
-
-    kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
-        case SparkCursor(None, _) =>
-          Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-        case SparkCursor(Some(rdd), p) =>
+    s1: Task :<: S,
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, FileSystemError \/ Vector[Data]] = 
+    details.readChunkSize >>= (step => kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
+      case SparkCursor(None, _) =>
+        Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
+      case SparkCursor(Some(rdd), p) =>
 
         val collect = lift(Task.delay {
           rdd
@@ -122,10 +121,9 @@ object readfile {
           _ <- kvs.put(h, cur).liftM[FileSystemErrT]
         } yield collected
         
-    }.run
-  }
+    }.run)
 
-  private def close[S[_]](h: ReadHandle)(implicit
+  def close[S[_]](h: ReadHandle)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
   ): Free[S, Unit] = kvs.delete(h)
 }

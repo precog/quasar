@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import slamdata.Predef._
 import quasar.Data
 import quasar.Planner._
-import quasar.common.{PhaseResult, PhaseResults}
+import quasar.common._
 import quasar.connector.PlannerErrT
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -175,7 +175,7 @@ object queryfile {
     }
   }
 
-  private def more[S[_]](h: QueryFile.ResultHandle)(implicit
+  def more[S[_]](h: QueryFile.ResultHandle)(implicit
     s0: Task :<: S,
     kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S],
     details: SparkConnectorDetails.Ops[S]
@@ -202,7 +202,7 @@ object queryfile {
     }).run
   } yield res
 
-  private def close[S[_]](h: QueryFile.ResultHandle)(implicit
+  def close[S[_]](h: QueryFile.ResultHandle)(implicit
       kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S]
   ): Free[S, Unit] = kvs.delete(h)
 }

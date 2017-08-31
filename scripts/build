@@ -101,6 +101,11 @@ else
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION {blueeyes,precog,mimir,yggdrasil}/test:compile
   fi
 
+  if [[ $CONNECTOR =~ "spark" ]]; then
+    echo "Building sparkcore.jar"
+    $SBT 'set every sparkDependencyProvided := true' sparkcore/assembly
+  fi
+
   # Not the first job in Travis; run only integration tests (no sense
   # re-doing work that isn't affected by the available backends)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION "it/testOnly -- xonly" "it/exclusive:testOnly -- xonly"

@@ -25,7 +25,6 @@ import org.http4s.server.{Server => Http4sServer}
 import scalaz.concurrent.Task
 import scalaz._, Scalaz._
 import scala.concurrent.duration._
-import scalaz.stream.Process
 import shapeless._
 import shapeless.Nat
 import shapeless.ops.nat._
@@ -35,20 +34,7 @@ object Http4sUtils {
 
   final case class ServerBlueprint(port: Int, idleTimeout: Duration, svc: HttpService)
 
-  // Lifted from unfiltered.
-  // NB: available() returns 0 when the stream is closed, meaning the server
-  //     will run indefinitely when started from a script.
-  // jedesah (03/04/16):
-  // Consider breaking out of the loop when a script is detected (`Option(System.console).isEmpty == true`?)
-  // as it seems unecessary to constantly poll for user input in such a scenario.
-  def waitForInput: Task[Unit] = {
-    import java.lang.System
-
-    val inputPresent = Task.delay(Option(System.console).nonEmpty && System.in.available() > 0)
-                           .handle { case _ => false }
-
-    Process.eval(inputPresent.after(250.milliseconds)).repeat.takeWhile(!_).run
-  }
+  def waitForInput: Task[Unit] = Task.delay(scala.io.StdIn.readLine).void
 
   def openBrowser(port: Int): Task[Unit] = {
     val url = s"http://localhost:$port/"

@@ -149,7 +149,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
-      case MapFuncsCore.Within(a1, a2) => ???
+      case MapFuncsCore.Within(a1, a2) =>
+        (Within(a1, a2): TransSpec[A]).point[F]
 
       case MapFuncsCore.Lower(a1) =>
         toLowerCase.spec(a1).point[F]

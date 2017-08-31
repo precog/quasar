@@ -289,9 +289,13 @@ object ExprOpCoreF {
       case in                       => I(in).some
     }
 
+    // TODO We can only detect if the variable is a let variable because we
+    // prepend `"$"` to it knowing that this will result in a variable prepended
+    // with `"$$"`. Really we should create a `DocVar` with no `BsonField`
+    // instead of a `DocField` in the case of a let variable.
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
-      case $varF(f) => applyVar.lift(f).map(fp.$var)
-      case _        => None
+      case $varF(f) if !f.isLetVar => applyVar.lift(f).map(fp.$var)
+      case _                       => None
     }
   }
 

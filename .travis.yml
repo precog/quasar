@@ -12,16 +12,14 @@ services:
 before_install:
   - sudo /etc/init.d/postgresql stop
 
-# create all the docker containers we need for IT testing
+# create all the docker containers we need for IT testing per matrix build
 install:
-  - docker/scripts/initContainer quasar_metastore
-  - docker/scripts/initContainer quasar_$CONNECTOR
+  - docker/scripts/setupContainers -u quasar_metastore
+  - docker/scripts/setupContainers -u quasar_$CONNECTOR
   - docker ps
 
-# run db config scripts and populate the it/testing.conf file
+# populate the it/testing.conf file
 before_script:
-  - docker/scripts/setupContainers -c quasar_metastore
-  - docker/scripts/setupContainers -c quasar_$CONNECTOR
   - docker/scripts/assembleTestingConf -c quasar_metastore
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
@@ -52,7 +50,7 @@ branches:
 
 cache:
   directories:
-    - $HOME/.cache/quasar/marklogic
+    - $HOME/.cache/quasar/fileDownloads
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
@@ -77,7 +75,7 @@ env:
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=spark_local_test
-  # - CONNECTOR=spark_hdfs
+    - CONNECTOR=spark_hdfs
   # - CONNECTOR=spark_cassandra
   # - CONNECTOR=spark_elasticsearch
   # - CONNECTOR=spark_ftp

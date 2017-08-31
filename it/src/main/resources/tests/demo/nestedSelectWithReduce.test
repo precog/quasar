@@ -1,17 +1,15 @@
 {
     "name": "select reduction from nested select",
     "backends": {
-        "mimir":"ignoreFieldOrder",
-        "couchbase": "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml": "skip",
-        "mongodb_read_only": "skip",
-        "mongodb_2_6": "skip",
-        "mongodb_3_0": "skip",
-        "mongodb_3_2": "skip",
-        "mongodb_3_4": "skip",
-        "spark_hdfs": "skip",
-        "spark_local": "skip"
+        "mimir": "ignoreFieldOrder",
+        "couchbase": "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
+        "mongodb_read_only": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending"
     },
     "NB": "spark_hdfs and spark_local not on par with master",
     "data": "patients.data",

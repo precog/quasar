@@ -19,8 +19,10 @@ package quasar
 import slamdata.Predef._
 
 import com.zaxxer.hikari.HikariConfig
-import doobie.imports._
-import doobie.contrib.hikari.hikaritransactor._
+import doobie.free.connection.ConnectionIO
+import doobie.hikari.hikaritransactor.HikariTransactor
+import doobie.imports.DriverManagerTransactor
+import doobie.util.transactor.Transactor
 import scalaz._
 import scalaz.concurrent.Task
 
@@ -37,7 +39,7 @@ package object db {
     EitherT((for {
       xa <- HikariTransactor[Task](cxn.driverClassName, cxn.url, cxn.userName, cxn.password)
       _  <- xa.configure(config)
-    } yield StatefulTransactor(xa, xa.shutdown)).attempt.map(_.leftMap(e => metastore.UnknownError(e, "While connecting to MetaStore"))))
+    } yield StatefulTransactor(xa, xa.configure(_.close()))).attempt.map(_.leftMap(e => metastore.UnknownError(e, "While connecting to MetaStore"))))
 
   /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
   def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =

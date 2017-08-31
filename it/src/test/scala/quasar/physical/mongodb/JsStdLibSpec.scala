@@ -36,6 +36,10 @@ import shapeless.Nat
 class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (string.Lower, _)              => Pending("TODO").left
+    case (string.Upper, _)              => Pending("TODO").left
+    case (quasar.std.SetLib.Within, _)  => Pending("TODO").left
+
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Pending("Dec printing doesn't match precisely").left
     case (string.ToString, Data.Date(_) :: Nil) =>

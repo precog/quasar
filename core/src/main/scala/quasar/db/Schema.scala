@@ -18,7 +18,8 @@ package quasar.db
 
 import slamdata.Predef._
 
-import doobie.imports._
+import doobie.free.connection.ConnectionIO
+import doobie.imports.HC
 import scala.collection.immutable.SortedMap
 import scalaz._, Scalaz._
 
@@ -30,7 +31,7 @@ import scalaz._, Scalaz._
 // TODO: expose the individual operation of `updates` as List[Update0], so
 // they could be `check`ed, etc.? That would restrict what updates are
 // allowed to do, though.
-final case class Schema[A: Atom: Order](
+final case class Schema[A: Order](
   readVersion: ConnectionIO[Option[A]],
   writeVersion: A => ConnectionIO[Unit],
   updates: SortedMap[A, ConnectionIO[Unit]]) {

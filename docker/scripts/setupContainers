@@ -41,28 +41,29 @@ init_marklogic() {
 }
 
 init_spark_local() {
+  if [[ ${TRAVIS:-} ]]
+  then
     mkdir ${HOME}/spark_local_test
-}
-
-init_hdfs() {
-  # Need to start datanode and nodemanager
-  # within hadoop container
-  CONTAINER=$1
-  echo "configuring hdfs..."
-  sleep 5
-  docker exec $CONTAINER /bin/bash -c "/hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode; sleep 5; /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager "
+  else
+    mkdir /tmp/spark_local_test
+  fi
 }
 
 init_spark_connector() {
   # Just in case we have to configure
   # the spark companion connectors
-  echo "nothing to configure, yet"
+  echo "no configuration needed for: $1"
 }
 
 init_spark_cluster() {
-  echo "running sbt command for sparkcore assembly..."
-  source ${TRAVIS_BUILD_DIR}/scripts/constants
-  $SBT 'set every sparkDependencyProvided := true' sparkcore/assembly
+  if [[ ${TRAVIS:-} ]]
+  then
+    echo "in travis the scripts/build script builds sparkcore.jar"
+  else
+    echo "building sparkcore.jar"
+    cd $SCRIPTS_DIR/../..
+    ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
+  fi
 }
 
 ##########################################
@@ -78,10 +79,10 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_postgresql"          ]]; then init_postgresql;                             fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
   if [[ $CONTAINER == "quasar_spark_local_test"    ]]; then init_spark_local;                            fi
-  if [[ $CONTAINER == "quasar_spark_cassandra"     ]]; then init_spark_connector;                        fi
-  if [[ $CONTAINER == "quasar_spark_elasticsearch" ]]; then init_spark_connector;                        fi
-  if [[ $CONTAINER == "quasar_spark_hdfs"          ]]; then init_hdfs $CONTAINER;                        fi
-  if [[ $CONTAINER == "quasar_spark_ftp"           ]]; then init_spark_connector;                        fi
+  if [[ $CONTAINER == "quasar_spark_cassandra"     ]]; then init_spark_connector $CONTAINER;             fi
+  if [[ $CONTAINER == "quasar_spark_elasticsearch" ]]; then init_spark_connector $CONTAINER;             fi
+  if [[ $CONTAINER == "quasar_spark_hdfs"          ]]; then init_spark_connector $CONTAINER;             fi
+  if [[ $CONTAINER == "quasar_spark_ftp"           ]]; then init_spark_connector $CONTAINER;             fi
   if [[ $CONTAINER == "quasar_spark_cluster"       ]]; then init_spark_cluster;                          fi
 }
 
@@ -133,12 +134,51 @@ configure_all_live_containers() {
   fi
 }
 
+function upContainer() {
+  docker-compose -f $SCRIPTS_DIR/../docker-compose.yml up -d $1
+}
+
 create_database() {
-  if [[ $1 =~ "marklogic" ]]
+  CONTAINER=$1
+  if [[ $CONTAINER == "quasar_spark_local_test" ]]
   then
-    $(dirname $0)/../Dockerfiles/Marklogic/getMLRpm
+    echo "$CONTAINER: not starting a container for spark_local_test..."
+  elif [[ $CONTAINER == "quasar_mimir" ]]
+  then
+    echo "$CONTAINER: not starting a container for mimir..."
+  elif [[ $CONTAINER =~ "marklogic" ]]
+  then
+    $SCRIPTS_DIR/../Dockerfiles/Marklogic/getMLRpm
+    upContainer $CONTAINER
+  elif [[ $CONTAINER == "quasar_spark_cluster" ]]
+  then
+    upContainer $CONTAINER
+  elif [[ $CONTAINER == "quasar_spark_hdfs" ]]
+  then
+    upContainer $CONTAINER
+    create_database quasar_spark_cluster
+  elif [[ $CONTAINER == "quasar_spark_ftp" ]]
+  then
+    upContainer $CONTAINER
+    create_database quasar_spark_cluster
+  elif [[ $CONTAINER == "quasar_spark_elasticsearch" ]]
+  then
+    upContainer $CONTAINER
+    create_database quasar_spark_cluster
+  elif [[ $CONTAINER == "quasar_spark_cassandra" ]]
+  then
+    upContainer $CONTAINER
+    create_database quasar_spark_cluster
+  elif [[ $CONTAINER == "quasar_spark_s3" ]]
+  then
+    create_database quasar_spark_cluster
+  elif [[ $CONTAINER == "quasar_metastore" ]]
+  then
+    upContainer $CONTAINER
+  else
+    echo "creating $CONTAINER"
+    upContainer $CONTAINER
   fi
-  docker-compose -f $(dirname $0)/../docker-compose.yml up -d $1
 }
 
 usage() {

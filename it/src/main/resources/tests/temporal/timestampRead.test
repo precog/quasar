@@ -2,8 +2,7 @@
     "name": "reads timestamps with flatten",
     "backends": {
         "mimir":          "pending",
-        "couchbase":      "pending",
-        "spark_hdfs":     "pending"
+        "couchbase":      "pending"
     },
     "data": "../daysWithArray.data",
 

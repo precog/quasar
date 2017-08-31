@@ -53,6 +53,141 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
 
     // No transform defined herein may reduce the size of a slice. Be it known!
     def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = {
+
+      def equalsImpl(sl: Slice, sr: Slice): Slice = {
+
+        /*
+         * 1. split each side into numeric and non-numeric columns
+         * 2. cogroup non-numerics by ColumnRef
+         * 3. for each pair of matched columns, compare by cf.std.Eq
+         * 4. when matched column is undefined, return true iff other side is undefined
+         * 5. reduce non-numeric matches by And
+         * 6. analogously for numeric columns, save for the following
+         * 7. for numeric columns with multiple possible types, consider all
+         *    matches and reduce the results by And
+         * 8. reduce numeric and non-numeric results by And
+         * 9. mask definedness on output column by definedness on input columns
+         *
+         * Generally speaking, for each pair of columns cogrouped by path, we
+         * compute a single equality column which is defined everywhere and
+         * definedness behaves according to the following truth table:
+         *
+         * - v1 = v2 == <equality>
+         * - v1 = undefined = false
+         * - undefined = v2 = false
+         * - undefined = undefined = true
+         *
+         * The undefined comparison is required because we are comparing columns
+         * that may be nested inside a larger object.  We don't have the information
+         * at the pair level to determine whether the answer should be
+         * undefined for the entire row, or if the current column pair simply
+         * does not contribute to the final truth value.  Thus, we return a
+         * "non-contributing" value (the zero for boolean And) and mask definedness
+         * as a function of all columns.  A computed result will be overridden
+         * by undefined (masked off) if *either* the LHS or the RHS is fully
+         * undefined (for all columns) at a particular row.
+         */
+
+        new Slice {
+          val size = sl.size
+          val columns: Map[ColumnRef, Column] = {
+            val (leftNonNum, leftNum) = sl.columns partition {
+              case (ColumnRef(_, CLong | CDouble | CNum), _) => false
+              case _                                         => true
+            }
+
+            val (rightNonNum, rightNum) = sr.columns partition {
+              case (ColumnRef(_, CLong | CDouble | CNum), _) => false
+              case _                                         => true
+            }
+
+            val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
+
+            val simplifiedGroupNonNum = groupedNonNum map {
+              case (_, Left3(column))                        => Left(column)
+              case (_, Right3(column))                       => Left(column)
+              case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
+              case (_, x)                                    => abort("Unexpected: " + x)
+            }
+
+            class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
+              val equality = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
+              def isDefinedAt(row: Int) = (left isDefinedAt row) || (right isDefinedAt row)
+              def apply(row: Int)       = equality.isDefinedAt(row) && equality(row)
+            }
+
+            val testedNonNum: Array[BoolColumn] = simplifiedGroupNonNum.map({
+              case Left(column) =>
+                new BoolColumn {
+                  def isDefinedAt(row: Int) = column.isDefinedAt(row)
+                  def apply(row: Int)       = false
+                }
+
+              case Right((left, right)) =>
+                new FuzzyEqColumn(left, right)
+
+            })(collection.breakOut)
+
+            // numeric stuff
+
+            def stripTypes(cols: Map[ColumnRef, Column]) = {
+              cols.foldLeft(Map[CPath, Set[Column]]()) {
+                case (acc, (ColumnRef(path, _), column)) => {
+                  val set = acc get path map { _ + column } getOrElse Set(column)
+                  acc.updated(path, set)
+                }
+              }
+            }
+
+            val leftNumMulti  = stripTypes(leftNum)
+            val rightNumMulti = stripTypes(rightNum)
+
+            val groupedNum = leftNumMulti cogroup rightNumMulti
+
+            val simplifiedGroupedNum = groupedNum map {
+              case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
+              case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
+
+              case (_, Middle3((left, right))) =>
+                Right((left, right)): Either[Column, (Set[Column], Set[Column])]
+            }
+
+            val testedNum: Array[BoolColumn] = simplifiedGroupedNum.map({
+              case Left(column) =>
+                new BoolColumn {
+                  def isDefinedAt(row: Int) = column.isDefinedAt(row)
+                  def apply(row: Int)       = false
+                }
+
+              case Right((left, right)) =>
+                val tests: Array[BoolColumn] = (for (l <- left; r <- right) yield {
+                  new FuzzyEqColumn(l, r)
+                }).toArray
+                new OrLotsColumn(tests)
+            })(collection.breakOut)
+
+            val unifiedNonNum = new AndLotsColumn(testedNonNum)
+            val unifiedNum    = new AndLotsColumn(testedNum)
+            val unified = new BoolColumn {
+              def isDefinedAt(row: Int): Boolean = unifiedNonNum.isDefinedAt(row) || unifiedNum.isDefinedAt(row)
+              def apply(row: Int): Boolean = {
+                val left  = !unifiedNonNum.isDefinedAt(row) || unifiedNonNum(row)
+                val right = !unifiedNum.isDefinedAt(row) || unifiedNum(row)
+                left && right
+              }
+            }
+
+            val mask = sl.definedAt & sr.definedAt
+            val column = new BoolColumn {
+              def isDefinedAt(row: Int) = mask(row) && unified.isDefinedAt(row)
+              def apply(row: Int)       = unified(row)
+            }
+
+            Map(ColumnRef(CPath.Identity, CBoolean) -> column)
+          }
+        }
+      }
+
       //todo missing case WrapObjectDynamic
       val result = spec match {
         case Leaf(source) if source == Source || source == SourceLeft =>
@@ -162,138 +297,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           val l0 = composeSliceTransform2(left)
           val r0 = composeSliceTransform2(right)
 
-          /*
-           * 1. split each side into numeric and non-numeric columns
-           * 2. cogroup non-numerics by ColumnRef
-           * 3. for each pair of matched columns, compare by cf.std.Eq
-           * 4. when matched column is undefined, return true iff other side is undefined
-           * 5. reduce non-numeric matches by And
-           * 6. analogously for numeric columns, save for the following
-           * 7. for numeric columns with multiple possible types, consider all
-           *    matches and reduce the results by And
-           * 8. reduce numeric and non-numeric results by And
-           * 9. mask definedness on output column by definedness on input columns
-           *
-           * Generally speaking, for each pair of columns cogrouped by path, we
-           * compute a single equality column which is defined everywhere and
-           * definedness behaves according to the following truth table:
-           *
-           * - v1 = v2 == <equality>
-           * - v1 = undefined = false
-           * - undefined = v2 = false
-           * - undefined = undefined = true
-           *
-           * The undefined comparison is required because we are comparing columns
-           * that may be nested inside a larger object.  We don't have the information
-           * at the pair level to determine whether the answer should be
-           * undefined for the entire row, or if the current column pair simply
-           * does not contribute to the final truth value.  Thus, we return a
-           * "non-contributing" value (the zero for boolean And) and mask definedness
-           * as a function of all columns.  A computed result will be overridden
-           * by undefined (masked off) if *either* the LHS or the RHS is fully
-           * undefined (for all columns) at a particular row.
-           */
-
-          l0.zip(r0) { (sl, sr) =>
-            new Slice {
-              val size = sl.size
-              val columns: Map[ColumnRef, Column] = {
-                val (leftNonNum, leftNum) = sl.columns partition {
-                  case (ColumnRef(_, CLong | CDouble | CNum), _) => false
-                  case _                                         => true
-                }
-
-                val (rightNonNum, rightNum) = sr.columns partition {
-                  case (ColumnRef(_, CLong | CDouble | CNum), _) => false
-                  case _                                         => true
-                }
-
-                val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
-
-                val simplifiedGroupNonNum = groupedNonNum map {
-                  case (_, Left3(column))                        => Left(column)
-                  case (_, Right3(column))                       => Left(column)
-                  case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
-                  case (_, x)                                    => abort("Unexpected: " + x)
-                }
-
-                class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
-                  val equality = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
-                  def isDefinedAt(row: Int) = (left isDefinedAt row) || (right isDefinedAt row)
-                  def apply(row: Int)       = equality.isDefinedAt(row) && equality(row)
-                }
-
-                val testedNonNum: Array[BoolColumn] = simplifiedGroupNonNum.map({
-                  case Left(column) =>
-                    new BoolColumn {
-                      def isDefinedAt(row: Int) = column.isDefinedAt(row)
-                      def apply(row: Int)       = false
-                    }
-
-                  case Right((left, right)) =>
-                    new FuzzyEqColumn(left, right)
-
-                })(collection.breakOut)
-
-                // numeric stuff
-
-                def stripTypes(cols: Map[ColumnRef, Column]) = {
-                  cols.foldLeft(Map[CPath, Set[Column]]()) {
-                    case (acc, (ColumnRef(path, _), column)) => {
-                      val set = acc get path map { _ + column } getOrElse Set(column)
-                      acc.updated(path, set)
-                    }
-                  }
-                }
-
-                val leftNumMulti  = stripTypes(leftNum)
-                val rightNumMulti = stripTypes(rightNum)
-
-                val groupedNum = leftNumMulti cogroup rightNumMulti
-
-                val simplifiedGroupedNum = groupedNum map {
-                  case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
-                  case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
-
-                  case (_, Middle3((left, right))) =>
-                    Right((left, right)): Either[Column, (Set[Column], Set[Column])]
-                }
-
-                val testedNum: Array[BoolColumn] = simplifiedGroupedNum.map({
-                  case Left(column) =>
-                    new BoolColumn {
-                      def isDefinedAt(row: Int) = column.isDefinedAt(row)
-                      def apply(row: Int)       = false
-                    }
-
-                  case Right((left, right)) =>
-                    val tests: Array[BoolColumn] = (for (l <- left; r <- right) yield {
-                      new FuzzyEqColumn(l, r)
-                    }).toArray
-                    new OrLotsColumn(tests)
-                })(collection.breakOut)
-
-                val unifiedNonNum = new AndLotsColumn(testedNonNum)
-                val unifiedNum    = new AndLotsColumn(testedNum)
-                val unified = new BoolColumn {
-                  def isDefinedAt(row: Int): Boolean = unifiedNonNum.isDefinedAt(row) || unifiedNum.isDefinedAt(row)
-                  def apply(row: Int): Boolean = {
-                    val left  = !unifiedNonNum.isDefinedAt(row) || unifiedNonNum(row)
-                    val right = !unifiedNum.isDefinedAt(row) || unifiedNum(row)
-                    left && right
-                  }
-                }
-
-                val mask = sl.definedAt & sr.definedAt
-                val column = new BoolColumn {
-                  def isDefinedAt(row: Int) = mask(row) && unified.isDefinedAt(row)
-                  def apply(row: Int)       = unified(row)
-                }
-
-                Map(ColumnRef(CPath.Identity, CBoolean) -> column)
-              }
-            }
-          }
+          l0.zip(r0)(equalsImpl)
 
         case EqualLiteral(source, value, invert) => {
           val id = System.currentTimeMillis
@@ -335,6 +339,57 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             }
           }
         }
+
+        case Within(item, in) =>
+          composeSliceTransform2(item).zip(composeSliceTransform2(in)) { (itemS, inS) =>
+            val emptyArrayDefined = inS.columns.get(ColumnRef(CPath.Identity, CEmptyArray)) map { col =>
+              col.definedAt(0, inS.size)
+            } getOrElse (new BitSet)
+
+            val indices: Set[Int] = inS.columns.keySet collect {
+              case ColumnRef(CPath(CPathIndex(i), _*), _) => i
+            }
+
+            // we force the slice, because we're going to re-use it many times
+            val materializedItem = itemS.materialized
+
+            val tests: List[ArrayBoolColumn] = indices.toList map { i =>
+              val s = equalsImpl(materializedItem, inS.deref(CPathIndex(i))).materialized
+
+              // we know this is defined, because of equality
+              s.columns(ColumnRef(CPath.Identity, CBoolean)).asInstanceOf[ArrayBoolColumn]
+            }
+
+            val testDefined = tests.map(_.defined)
+
+            val definedM = testDefined.headOption map { bits =>
+              val target = bits.copy    // it's important to copy, since or is in-place
+              testDefined.drop(1).foreach(target.or)
+              target
+            }
+
+            val testValues = tests.map(_.values)
+
+            val valuesM = testValues.headOption map { bits =>
+              val target = bits.copy    // it's important to copy, since or is in-place
+              testValues.drop(1).foreach(target.or)
+              target
+            }
+
+            val defined = definedM.getOrElse(new BitSet)
+            val values = valuesM.getOrElse(new BitSet)
+
+            // we bring in empty array definedness after the fact
+            // note that the value will always be false
+            defined.or(emptyArrayDefined)
+
+            val results = new ArrayBoolColumn(defined, values)
+
+            new Slice {
+              val size = materializedItem.size
+              val columns = Map(ColumnRef(CPath.Identity, CBoolean) -> results)
+            }
+          }
 
         case ConstLiteral(value, target) =>
           composeSliceTransform2(target) map { _.definedConst(value) }

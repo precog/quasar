@@ -70,6 +70,8 @@ quasar_metastore
 quasar_marklogic_xml
 quasar_marklogic_json
 quasar_couchbase
+quasar_spark_hdfs
+quasar_saprk_cluster
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
@@ -131,13 +133,15 @@ curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": {
 ```
 The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
-| mountKey        | protocol         | uri                                    |
-|-----------------|------------------|----------------------------------------|
-| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
-| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
-| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
-| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
-| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
+| mountKey        | protocol         | uri                          |
+|-----------------|------------------|------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)      |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)      |
+| `mimir`         | `mimir=`         | "\<path-to-directory\>"      |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)  |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark)  |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)       |
+
 
 See [here](#get-mountfspath) for more details on the mount web api service.
 
@@ -864,7 +868,8 @@ An example request body:
     "postgresql": {
         "host": "localhost",
         "port": 9876,
-        "database": "bob",
+        "database": "meta",
+        "userName": "bob",
         "password": "123456"
     }
 }

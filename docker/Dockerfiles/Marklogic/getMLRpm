@@ -22,7 +22,7 @@ function downloadMLRpm() {
   rm $ML_DEV_COOKIES /tmp/url /tmp/json
 }
 
-CACHE_DIR="$HOME/.cache/quasar/marklogic"
+CACHE_DIR="$HOME/.cache/quasar/fileDownloads"
 mkdir -p $CACHE_DIR
 ML_RPM_PATH="$CACHE_DIR/MarkLogic.rpm"
 ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"

@@ -53,6 +53,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gt(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Gte(_,_))))), Data.Date(_), Data.Timestamp(_)) => pending
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Split(_,_))))), _, _) => pending
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Within(_,_))))), _, _) => pending
       case _ => run
     }
 

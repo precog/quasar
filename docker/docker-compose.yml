@@ -70,9 +70,8 @@ services:
 
   quasar_spark_cluster:
     container_name: quasar_spark_cluster
-    build:
-      context: ./Dockerfiles/Spark
-      dockerfile: Spark-Dockerfile
+    image: slamdata/spark-standalone-cluster:2.2.0
+    network_mode: "bridge"
     ports:
       - "8081:8080"
       - "7077:7077"
@@ -118,10 +117,16 @@ services:
   
   quasar_spark_hdfs:
     container_name: quasar_spark_hdfs
-    image: harisekhon/hadoop:2.7
+    image: slamdata/hadoop-singlenode-cluster:2.7.3
+    network_mode: "bridge"
     ports:
-      - 8042:8042
+      - 8030:8030
+      - 8031:8031
+      - 8082:8032
+      - 8033:8033
       - 8088:8088
+      - 9000:9000
+      - 10020:10020
       - 19888:19888
       - 50010:50010
       - 50020:50020

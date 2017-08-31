@@ -1,0 +1,26 @@
+{
+    "name": "select string concatenation",
+    "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
+        "couchbase": "ignoreFieldOrder"
+    },
+    "NB": "Pending for mimir due to Q#2692.",
+    "data": "patients.data",
+    "query": "SELECT
+                COUNT(*) as cnt,
+                TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))
+                    || \"-\" || \"Q\" ||
+                    TO_STRING(DATE_PART(\"quarter\",TIMESTAMP(last_visit))) AS Q
+              FROM patients
+              WHERE SUBSTRING(TO_STRING(last_visit),0,4) IN \"2016\"
+              GROUP BY
+                TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))
+                    || \"-\" || \"Q\" ||
+                    TO_STRING(DATE_PART(\"quarter\",TIMESTAMP(last_visit)))
+              ORDER BY Q ASC",
+    "predicate": "exactly",
+    "expected": [{"cnt": 213, "Q": "2016-Q1" },
+                 {"cnt": 206, "Q": "2016-Q2" },
+                 {"cnt": 229, "Q": "2016-Q3" },
+                 {"cnt": 71,  "Q": "2016-Q4"} ]
+}

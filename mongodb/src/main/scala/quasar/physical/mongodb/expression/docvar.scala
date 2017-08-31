@@ -27,6 +27,8 @@ import scalaz._, Scalaz._
 final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
   def path: List[BsonField.Name] = deref.toList.flatMap(_.flatten.toList)
 
+  def isLetVar: Boolean = deref.exists(_.flatten.head.value.startsWith("$"))
+
   def startsWith(that: DocVar) = (this.name == that.name) && {
     (this.deref |@| that.deref)(_ startsWith (_)) getOrElse (that.deref.isEmpty)
   }

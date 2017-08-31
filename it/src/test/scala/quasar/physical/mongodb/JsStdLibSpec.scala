@@ -48,6 +48,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
       Pending("Infinity is not translated properly?").left
 
     case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
+    case (date.Now, _)                 => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left

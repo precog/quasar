@@ -16,6 +16,7 @@ source "$(dirname $0)/constants"
 # FIXME: Remove travis_wait usages when associated phases produce output
 #        more frequently than Travis's 10 minute imposed window
 TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
+TRAVIS_MAX_REMAINDER_COMPILE_MINS=30
 TRAVIS_MAX_DOC_MINS=30
 
 # if we're building a pull request, DON'T clean and use the cache instead
@@ -99,6 +100,11 @@ else
   echo "Compiling precog — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION {blueeyes,precog,mimir,yggdrasil}/test:compile
+  fi
+
+  echo "Compiling remainder"
+  if [[ ${TRAVIS:-} ]]; then
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION test:compile
   fi
 
   if [[ $CONNECTOR =~ "spark" ]]; then

@@ -25,9 +25,7 @@ object Dependencies {
   private val scalazStreamVersion = "0.8.6a"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
-  // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "3.8.4"
+  private val specsVersion        = "3.9.5"
   private val spireVersion        = "0.14.1"
 
   def foundation = Seq(
@@ -52,9 +50,10 @@ object Dependencies {
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
     "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
+    "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
+    "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6"                                % Test,
-    "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              % Test
+    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6"                                % Test
   )
 
   def frontend = Seq(
@@ -77,8 +76,7 @@ object Dependencies {
     "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
     "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
-    ("org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test)
-      .exclude("org.specs2", "specs2-core_2.11"), // conflicting version
+    "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test,
     "org.tpolecat"               %% "doobie-h2"                 % doobieVersion % Test
   )
   def interface = Seq(
@@ -134,7 +132,9 @@ object Dependencies {
     "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.6",
     ("com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test)
       .exclude("org.scalatest", "scalatest_2.11"),
-    "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
+    "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2",
+    // For unknown reason specs 3.8.7 leads to a ParquetRDDE failure under a full test run
+    ("org.specs2" %% "specs2-core" % "3.8.4" force()) % Test
   )
 
   def marklogic = Seq(

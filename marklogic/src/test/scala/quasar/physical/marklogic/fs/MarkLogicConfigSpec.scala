@@ -71,13 +71,13 @@ final class MarkLogicConfigSpec extends quasar.Qspec with MarkLogicConfigArbitra
       "when the host is not specified" >> {
         MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
           "xcc://someone:somepass@:6643/db"
-        ) must beLeftDisjunction(NonEmptyList("Missing host", "Missing port"))
+        ) must be_-\/(NonEmptyList("Missing host", "Missing port"))
       }
 
       "when the port is not specified" >> {
         MarkLogicConfig.fromUriString[ErrorMessages \/ ?](
         "xcc://ml.example.com/db"
-        ) must beLeftDisjunction(NonEmptyList("Missing port"))
+        ) must be_-\/(NonEmptyList("Missing port"))
       }
     }
   }

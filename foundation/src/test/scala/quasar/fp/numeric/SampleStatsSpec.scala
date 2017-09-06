@@ -18,9 +18,9 @@ package quasar.fp.numeric
 
 import slamdata.Predef._
 import quasar.contrib.algebra._
+import quasar.contrib.specs2.scalaz.{ScalazMatchers, Spec}
 
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
-import org.specs2.scalaz._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import scalaz.{NonEmptyList, Show}
 import scalaz.std.option._

@@ -19,22 +19,20 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data => QData}
 import quasar.common.{JoinType, SortDir}, SortDir._
+import quasar.contrib.specs2.scalaz.Spec
 import quasar.DataArbitrary._
 import quasar.physical.couchbase.N1QL.{Eq, Id, Split, _}, Case._, Select.{Value, _}
 
 import scala.Predef.$conforms
 
 import org.scalacheck._
-import org.specs2.scalaz.Spec
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties, ScalazProperties._
 import scalaz._, Scalaz._
 
 class N1QLSpec extends Spec with N1QLArbitrary {
-
-    checkAll(ScalazProperties.traverse.laws[N1QL])
-
+  checkAll(ScalazProperties.traverse.laws[N1QL])
 }
 
 trait N1QLArbitrary {

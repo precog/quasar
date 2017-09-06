@@ -17,11 +17,11 @@
 package quasar.sst
 
 import slamdata.Predef._
+import quasar.contrib.specs2.scalaz.Spec
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.fp._
 
 import matryoshka._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 

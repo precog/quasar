@@ -74,7 +74,7 @@ class TaskResourceSpec extends QuasarSpecification {
 
         rez  <- rsrc.get.attempt.map(_.swap.as(()))
       } yield {
-        rez must beRightDisjunction
+        rez must be_\/-
       }).timed(1000.milliseconds).unsafePerformSync
     }
 

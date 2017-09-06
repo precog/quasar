@@ -17,6 +17,7 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
+import quasar.contrib.specs2.scalaz.{ScalazMatchers, Spec}
 import quasar.{Data, Func}
 import quasar.DataArbitrary._
 import quasar.fp._
@@ -25,7 +26,7 @@ import quasar.std
 import matryoshka._
 import matryoshka.data.Fix
 import org.scalacheck._
-import org.specs2.scalaz.{ScalazMatchers, Spec}
+import quasar.contrib.specs2.scalaz.{ScalazMatchers, Spec}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties.{equal => _, _}
 import pathy.Path._

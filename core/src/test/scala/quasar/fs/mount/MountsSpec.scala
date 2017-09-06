@@ -26,18 +26,18 @@ class MountsSpec extends quasar.Qspec {
   "Mounts" should {
     "adding entries" >> {
       "fails when dir is a prefix of existing" >> prop { mnt: AbsDir[Sandboxed] =>
-        Mounts.singleton(mnt </> dir("c1"), 1).add(mnt, 2) must beLeftDisjunction
+        Mounts.singleton(mnt </> dir("c1"), 1).add(mnt, 2) must be_-\/
       }
 
       "fails when dir is prefixed by existing" >> prop { mnt: AbsDir[Sandboxed] =>
-        Mounts.singleton(mnt, 1).add(mnt </> dir("c2"), 2) must beLeftDisjunction
+        Mounts.singleton(mnt, 1).add(mnt </> dir("c2"), 2) must be_-\/
       }
 
       "succeeds when dir not a prefix of existing" >> {
         val mnt1: AbsDir[Sandboxed] = rootDir </> dir("one")
         val mnt2: AbsDir[Sandboxed] = rootDir </> dir("two")
 
-        Mounts.fromFoldable(List((mnt1, 1), (mnt2, 2))) must beRightDisjunction
+        Mounts.fromFoldable(List((mnt1, 1), (mnt2, 2))) must be_\/-
       }
 
       "succeeds when replacing value at existing" >> prop { mnt: AbsDir[Sandboxed] =>

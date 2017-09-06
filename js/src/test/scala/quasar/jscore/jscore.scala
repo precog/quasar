@@ -17,12 +17,12 @@
 package quasar.jscore
 
 import slamdata.Predef._
+import quasar.contrib.specs2.scalaz.ScalazMatchers
 import quasar.RenderTree.ops._
 import quasar.TreeMatchers
 import quasar.fp._
 import quasar.javascript.Js
 
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
 class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {

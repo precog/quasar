@@ -215,7 +215,8 @@ lazy val foundation = project
     exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    libraryDependencies ++= Dependencies.foundation)
+    libraryDependencies ++= Dependencies.foundation,
+    excludes := Seq("src/test/scala/quasar/contrib/specs2/scalaz/*.scala"))
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become

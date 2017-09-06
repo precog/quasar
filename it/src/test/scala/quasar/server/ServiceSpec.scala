@@ -87,7 +87,7 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(Ok)
+      r.map(_.status) must be_\/-(Ok)
     }
 
     "PUT view" in {
@@ -107,7 +107,7 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(Ok)
+      r.map(_.status) must be_\/-(Ok)
     }
 
     "[SD-1833] replace view" in {
@@ -159,7 +159,7 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(Ok)
+      r.map(_.status) must be_\/-(Ok)
     }
   }
 
@@ -211,7 +211,7 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(Ok)
+      r.map(_.status) must be_\/-(Ok)
     }
 
     "MOVE a directory containing views and files" in withFileSystemConfigs {
@@ -240,7 +240,7 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(Ok)
+      r.map(_.status) must be_\/-(Ok)
     }
 
     "GET invalid view" in {
@@ -257,7 +257,7 @@ class ServiceSpec extends quasar.Qspec {
         )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(BadRequest withReason "Compilation failed")
+      r.map(_.status) must be_\/-(BadRequest withReason "Compilation failed")
     }
   }
 
@@ -286,7 +286,7 @@ class ServiceSpec extends quasar.Qspec {
           --\ "detail"
           --\ "message" := jEmptyString
         ).up.up.up.up.up.focus >>= (_.array ∘ (_.toSet))
-      ) must beRightDisjunction(
+      ) must be_\/-(
         Set(
           Json("name" := "f1", "type" := "file", "mount" := "view"),
           Json(

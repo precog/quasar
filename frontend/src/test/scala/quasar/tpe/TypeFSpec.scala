@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.specs2.scalaz.Spec
 import quasar.ejson, ejson.{CommonEJson, EJson, EJsonArbitrary}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
@@ -30,7 +31,6 @@ import algebra.laws._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 import scalaz.scalacheck.ScalazArbitrary._

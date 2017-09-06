@@ -17,7 +17,6 @@
 package quasar.db
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.catchable._
 
 import argonaut._
 import doobie.imports._
@@ -30,7 +29,7 @@ trait PostgresTxFixture {
 
   /** Connects to a freshly-created PostgreSQL test DB.
     */
-  def postgreSqlTransactor(dbName: String): OptionT[Task, StatefulTransactor] = {
+  def postgreSqlTransactor(dbName: String): OptionT[Task, Transactor[Task]] = {
     def recreateDb(dbName: String): ConnectionIO[Unit] =
       Update0(s"DROP DATABASE IF EXISTS $dbName", None).run.void *>
         Update0(s"CREATE DATABASE $dbName", None).run.void
@@ -50,7 +49,6 @@ trait PostgresTxFixture {
 
         // Connect to the fresh test DB:
         testCfg =  mainCfg.asInstanceOf[DbConnectionConfig.PostgreSql].copy(database = dbName.some)
-        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig).leftMap(_.causedBy).run.unattempt
-      } yield tr)
+      } yield simpleTransactor(DbConnectionConfig.connectionInfo(testCfg)))
   }
 }

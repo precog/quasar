@@ -49,7 +49,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
     "make simple read" in {
       val op = build(read(collection("db", "zips"))).evalZero
 
-      op must beRightDisjunction($read[WorkflowF](collection("db", "zips")))
+      op must be_\/-($read[WorkflowF](collection("db", "zips")))
     }
 
     "make simple projection" in {
@@ -117,7 +117,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
         state2 <- lift(projectIndex(array, 2))
       } yield (state2: Fix[WorkflowBuilderF[WorkflowF, ?]]).transCata[Fix[WorkflowBuilderF[WorkflowF, ?]]](normalize)).evalZero
 
-      op must beRightDisjunction(ExprBuilder(read, $literal(Bson.Int32(1)).right))
+      op must be_\/-(ExprBuilder(read, $literal(Bson.Int32(1)).right))
     }
 
     "elide array with known projection" in {
@@ -141,7 +141,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
         state2 <- lift(projectIndex(array, 2))
       } yield state2).evalZero
 
-      op must beLeftDisjunction(UnsupportedFunction(
+      op must be_-\/(UnsupportedFunction(
         quasar.std.StdLib.structural.ArrayProject,
         Some("array does not contain index ‘2’.")))
     }
@@ -647,7 +647,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       val op = for {
         pop     <- projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop")
       } yield reduce(pop)($sum(_))
-      op.map(render) must beRightDisjunction(
+      op.map(render) must be_\/-(
         """GroupBuilder
           |├─ ExprBuilder
           |│  ├─ CollectionBuilder(Root())

@@ -16,6 +16,7 @@ source "$(dirname $0)/constants"
 # FIXME: Remove travis_wait usages when associated phases produce output
 #        more frequently than Travis's 10 minute imposed window
 TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
+TRAVIS_MAX_REMAINDER_COMPILE_MINS=30
 TRAVIS_MAX_DOC_MINS=30
 
 # if we're building a pull request, DON'T clean and use the cache instead
@@ -99,6 +100,31 @@ else
   echo "Compiling precog — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION {blueeyes,precog,mimir,yggdrasil}/test:compile
+  fi
+
+  echo "Compiling remainder"
+  if [[ ${TRAVIS:-} ]]; then
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION ejson/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION js/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION common/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION effect/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION frontend/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION niflheim/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION sql/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION core/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION couchbase/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION marklogic/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION mongodb/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION skeleton/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION sparkcore/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION mimir/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION interface/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION repl/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION web/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION it/test:compile
+    "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION test:compile
   fi
 
   if [[ $CONNECTOR =~ "spark" ]]; then

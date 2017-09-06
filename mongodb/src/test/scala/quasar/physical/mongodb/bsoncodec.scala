@@ -37,7 +37,7 @@ class BsonCodecSpecs extends quasar.Qspec {
 
   "fromData" should {
     "fail with bad Id" in {
-      fromData(Data.Id("invalid")) must beLeftDisjunction
+      fromData(Data.Id("invalid")) must be_-\/
     }
 
     "be isomorphic for preserved values" >> prop { (data: Data) =>
@@ -57,7 +57,7 @@ class BsonCodecSpecs extends quasar.Qspec {
       }
 
       preserved(data) ==> {
-        fromData(data).map(toData) must beRightDisjunction(data)
+        fromData(data).map(toData) must be_\/-(data)
       }
     }
 
@@ -65,7 +65,7 @@ class BsonCodecSpecs extends quasar.Qspec {
       // (toData >=> fromData >=> toData) == toData
 
       val data = toData(bson)
-      fromData(data).map(toData _) must beRightDisjunction(data)
+      fromData(data).map(toData _) must be_\/-(data)
     }
   }
 

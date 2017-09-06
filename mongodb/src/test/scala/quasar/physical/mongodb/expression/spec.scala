@@ -156,7 +156,7 @@ class ExpressionSpec extends quasar.Qspec {
     "handle addition with epoch date literal" in {
       $add(
         $literal(Bson.Date(0)),
-        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
+        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must be_\/-(
         JsFn(JsFn.defaultName, New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
     }
   }

@@ -24,7 +24,7 @@ import quasar.fp._
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
-trait ValidationMatchers extends org.specs2.scalaz.ValidationMatchers {
+trait ValidationMatchers {
   def beEqualIfSuccess[E, A](expected: Validation[E, A]) =
     new Matcher[Validation[E, A]] {
       def apply[S <: Validation[E, A]](s: Expectable[S]) = {
@@ -43,7 +43,7 @@ trait ValidationMatchers extends org.specs2.scalaz.ValidationMatchers {
   }
 }
 
-trait DisjunctionMatchers extends org.specs2.scalaz.DisjunctionMatchers {
+trait DisjunctionMatchers {
   def beRightDisjOrDiff[A, B: Equal](expected: B)(implicit rb: RenderTree[B]): Matcher[A \/ B] = new Matcher[A \/ B] {
     def apply[S <: A \/ B](s: Expectable[S]) = {
       val v = s.value

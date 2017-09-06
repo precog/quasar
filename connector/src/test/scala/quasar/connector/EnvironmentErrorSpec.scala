@@ -16,7 +16,8 @@
 
 package quasar.connector
 
-import org.specs2.scalaz.Spec
+import quasar.contrib.specs2.scalaz.Spec
+
 import scalaz.scalacheck.ScalazProperties
 
 class EnvironmentErrorSpec extends Spec {

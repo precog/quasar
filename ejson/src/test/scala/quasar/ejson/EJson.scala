@@ -17,6 +17,7 @@
 package quasar.ejson
 
 import slamdata.Predef.{Int => SInt, _}
+import quasar.contrib.specs2.scalaz.Spec
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson.implicits._
@@ -29,7 +30,6 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 

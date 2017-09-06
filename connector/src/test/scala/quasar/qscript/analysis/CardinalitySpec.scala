@@ -23,13 +23,11 @@ import quasar.qscript._
 import quasar.qscript.MapFuncsCore._
 import quasar.common.{JoinType, SortDir}
 
-
 import matryoshka.data.Fix
 import pathy.Path._
-import org.specs2.scalaz.DisjunctionMatchers
 import scalaz._, Scalaz._
 
-class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+class CardinalitySpec extends quasar.Qspec with QScriptHelpers {
 
   sequential
 

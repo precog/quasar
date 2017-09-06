@@ -30,101 +30,101 @@ class CollectionSpec extends quasar.Qspec {
 
     "handle simple name" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo")) must
-        beRightDisjunction(collection("db", "foo"))
+        be_\/-(collection("db", "foo"))
     }
 
     "handle simple relative path" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar")) must
-        beRightDisjunction(collection("db", "foo.bar"))
+        be_\/-(collection("db", "foo.bar"))
     }
 
     "escape leading '.'" in {
       Collection.fromFile(rootDir </> dir("db") </> file(".hidden")) must
-        beRightDisjunction(collection("db", "\\.hidden"))
+        be_\/-(collection("db", "\\.hidden"))
     }
 
     "escape '.' with path separators" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar.baz")) must
-        beRightDisjunction(collection("db", "foo.bar\\.baz"))
+        be_\/-(collection("db", "foo.bar\\.baz"))
     }
 
     "escape '$'" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo$")) must
-        beRightDisjunction(collection("db", "foo\\d"))
+        be_\/-(collection("db", "foo\\d"))
     }
 
     "escape '\\'" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo\\bar")) must
-        beRightDisjunction(collection("db", "foo\\\\bar"))
+        be_\/-(collection("db", "foo\\\\bar"))
     }
 
     "accept path with 120 characters" in {
       val longName = Stream.continually("A").take(117).mkString
       Collection.fromFile(rootDir </> dir("db") </> file(longName)) must
-        beRightDisjunction(collection("db", longName))
+        be_\/-(collection("db", longName))
     }
 
     "reject path longer than 120 characters" in {
       val longName = Stream.continually("B").take(118).mkString
-      Collection.fromFile(rootDir </> dir("db") </> file(longName)) must beLeftDisjunction
+      Collection.fromFile(rootDir </> dir("db") </> file(longName)) must be_-\/
     }
 
     "reject path that translates to more than 120 characters" in {
       val longName = "." + Stream.continually("C").take(116).mkString
-      Collection.fromFile(rootDir </> dir("db") </> file(longName)) must beLeftDisjunction
+      Collection.fromFile(rootDir </> dir("db") </> file(longName)) must be_-\/
     }
 
     "preserve space" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar baz")) must
-        beRightDisjunction(collection("db", "foo.bar baz"))
+        be_\/-(collection("db", "foo.bar baz"))
     }
 
     "reject path with db but no collection" in {
-      Collection.fromFile(rootDir </> file("db")) must beLeftDisjunction
+      Collection.fromFile(rootDir </> file("db")) must be_-\/
     }
 
     "escape space in db name" in {
       Collection.fromFile(rootDir </> dir("db 1") </> file("foo")) must
-        beRightDisjunction(collection("db+1", "foo"))
+        be_\/-(collection("db+1", "foo"))
     }
 
     "escape leading dot in db name" in {
       Collection.fromFile(rootDir </> dir(".trash") </> file("foo")) must
-        beRightDisjunction(collection("~trash", "foo"))
+        be_\/-(collection("~trash", "foo"))
     }
 
     "escape MongoDB-reserved chars in db name" in {
       Collection.fromFile(rootDir </> dir("db/\\\"") </> file("foo")) must
-        beRightDisjunction(collection("db%div%esc%quot", "foo"))
+        be_\/-(collection("db%div%esc%quot", "foo"))
     }
 
     "escape Windows-only MongoDB-reserved chars in db name" in {
       Collection.fromFile(rootDir </> dir("db*<>:|?") </> file("foo")) must
-        beRightDisjunction(collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
+        be_\/-(collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
     }
 
     "escape escape characters in db name" in {
       Collection.fromFile(rootDir </> dir("db%+~") </> file("foo")) must
-        beRightDisjunction(collection("db%%%add%tilde", "foo"))
+        be_\/-(collection("db%%%add%tilde", "foo"))
     }
 
     "fail with sequence of escapes exceeding maximum length" in {
-      Collection.fromFile(rootDir </> dir("~:?~:?~:?~:") </> file("foo")) must beLeftDisjunction
+      Collection.fromFile(rootDir </> dir("~:?~:?~:?~:") </> file("foo")) must be_-\/
     }
 
     "succeed with db name of exactly 64 bytes when encoded" in {
       val dbName = List.fill(64/4)("💩").mkString
-      Collection.fromFile(rootDir </> dir(dbName) </> file("foo")) must beRightDisjunction
+      Collection.fromFile(rootDir </> dir(dbName) </> file("foo")) must be_\/-
     }
 
     "fail with db name exceeding 64 bytes when encoded" in {
       val dbName = List.fill(64/4 + 1)("💩").mkString
-      Collection.fromFile(rootDir </> dir(dbName) </> file("foo")) must beLeftDisjunction
+      Collection.fromFile(rootDir </> dir(dbName) </> file("foo")) must be_-\/
     }
 
     "succeed with crazy char" in {
       Collection.fromFile(rootDir </> dir("*_") </> dir("_ⶡ\\݅ ᐠ") </> file("儨")) must
-        beRightDisjunction
+        be_\/-
     }
 
     "never emit an invalid db name" >> prop { (db: SpecialStr, c: SpecialStr) =>
@@ -158,15 +158,15 @@ class CollectionSpec extends quasar.Qspec {
 
   "Collection.prefixFromDir" should {
     "return a collection prefix" in {
-      Collection.prefixFromDir(rootDir </> dir("foo") </> dir("bar")) must beRightDisjunction(CollectionName("bar"))
+      Collection.prefixFromDir(rootDir </> dir("foo") </> dir("bar")) must be_\/-(CollectionName("bar"))
     }
 
     "reject path without collection" in {
-      Collection.prefixFromDir(rootDir </> dir("foo")) must beLeftDisjunction
+      Collection.prefixFromDir(rootDir </> dir("foo")) must be_-\/
     }
 
     "reject path without db or collection" in {
-      Collection.prefixFromDir(rootDir) must beLeftDisjunction
+      Collection.prefixFromDir(rootDir) must be_-\/
     }
   }
 
@@ -227,7 +227,7 @@ class CollectionSpec extends quasar.Qspec {
     val name = Collection.dbNameFromPath(rootDir </> dir(db.str))
     // NB: can fail if the path has enough multi-byte chars to exceed 64 bytes
     name.isRight ==> {
-      name.map(Collection.dirNameFromDbName(_)) must beRightDisjunction(DirName(db.str))
+      name.map(Collection.dirNameFromDbName(_)) must be_\/-(DirName(db.str))
     }
   }.set(maxSize = 20)
 }

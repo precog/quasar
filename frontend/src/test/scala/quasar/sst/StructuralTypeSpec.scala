@@ -17,6 +17,7 @@
 package quasar.sst
 
 import slamdata.Predef._
+import quasar.contrib.specs2.scalaz.{ScalazMatchers, Spec}
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.{ejson => ejs}
@@ -31,7 +32,6 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import scalaz.scalacheck.ScalazArbitrary._

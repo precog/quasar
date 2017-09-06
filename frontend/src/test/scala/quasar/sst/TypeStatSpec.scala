@@ -18,8 +18,8 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.algebra._
+import quasar.contrib.specs2.scalaz.{ScalazMatchers, Spec}
 
-import org.specs2.scalaz._
 import scalaz.Show
 import scalaz.scalacheck.{ScalazProperties => propz}
 import spire.laws.arb._

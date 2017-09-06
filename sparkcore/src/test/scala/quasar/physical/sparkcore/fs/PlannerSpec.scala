@@ -33,7 +33,6 @@ import java.math.MathContext
 import matryoshka.{Hole => _, _}
 import org.apache.spark._
 import org.apache.spark.rdd._
-import org.specs2.scalaz.DisjunctionMatchers
 import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
@@ -42,8 +41,7 @@ import matryoshka.data.Fix
 
 class PlannerSpec
     extends quasar.Qspec
-    with QScriptHelpers
-    with DisjunctionMatchers {
+    with QScriptHelpers {
 
   import Planner.SparkState
 
@@ -105,7 +103,7 @@ class PlannerSpec
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
 
         val program: SparkState[Task, RDD[Data]] = compile(Const(ShiftedRead(afile, ExcludeId)))
-        program.eval(sc).run.map(result => result must beRightDisjunction.like {
+        program.eval(sc).run.map(result => result must be_\/-.like {
           case rdd =>
             val results = rdd.collect
             results.size must_= 1
@@ -125,7 +123,7 @@ class PlannerSpec
           val map = quasar.qscript.Map(src, func)
 
           val program: SparkState[Task, RDD[Data]] = compile(map)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               val results = rdd.collect
               results.toList must_= List(
@@ -148,7 +146,7 @@ class PlannerSpec
           val sort = quasar.qscript.Sort(src, bucket, order)
 
           val program: SparkState[Task, RDD[Data]] = compile(sort)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               val results = rdd.collect
               results must_== Array(
@@ -174,7 +172,7 @@ class PlannerSpec
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[Task, RDD[Data]] = compile(reduce)
-            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            program.eval(sc).run.map(result => result must be_\/-.like {
               case rdd =>
                 val results = rdd.collect
                 results.toList must contain(exactly(Data._int(1), Data._int(3), Data._int(1)))
@@ -193,7 +191,7 @@ class PlannerSpec
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[Task, RDD[Data]] = compile(reduce)
-            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            program.eval(sc).run.map(result => result must be_\/-.like {
               case rdd =>
                 val results = rdd.collect
                 results.toList must contain(exactly(Data._int(23), Data._int(84), Data._int(34)))
@@ -212,7 +210,7 @@ class PlannerSpec
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[Task, RDD[Data]] = compile(reduce)
-            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            program.eval(sc).run.map(result => result must be_\/-.like {
               case rdd =>
                 val results = rdd.collect
                 results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
@@ -233,7 +231,7 @@ class PlannerSpec
         //     val reduce = Reduce(src, bucket, reducers, repair)
 
         //     val state: SparkState[Free[S,?], RDD[Data]] = compile(reduce)
-        //     state.eval(sc).run.map(result => result must beRightDisjunction.like{
+        //     state.eval(sc).run.map(result => result must be_\/-.like{
         //       case rdd =>
         //         val results = rdd.collect
         //         results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
@@ -252,7 +250,7 @@ class PlannerSpec
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[Task, RDD[Data]] = compile(reduce)
-            program.eval(sc).run.map(result => result must beRightDisjunction.like {
+            program.eval(sc).run.map(result => result must be_\/-.like {
               case rdd =>
                 val results = rdd.collect
                 results.toList must contain(exactly(Data._int(23), Data._int(32), Data._int(34)))
@@ -278,7 +276,7 @@ class PlannerSpec
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[Task, RDD[Data]] = compile(reduce)
-              program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              program.eval(sc).run.map(result => result must be_\/-.like {
                 case rdd =>
                   val results = rdd.collect
                   results.toList must contain(exactly(Data._dec(28), Data._dec(23)))
@@ -302,7 +300,7 @@ class PlannerSpec
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[Task, RDD[Data]] = compile(reduce)
-              program.eval(sc).run.map(result => result must beRightDisjunction.like {
+              program.eval(sc).run.map(result => result must be_\/-.like {
                 case rdd =>
                   val results = rdd.collect
                   results.toList must contain(exactly(Data._dec(1.71), Data._dec(1.23)))
@@ -342,7 +340,7 @@ class PlannerSpec
           val filter = quasar.qscript.Filter(src, func)
 
           val program: SparkState[Task, RDD[Data]] = compile(filter)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               val results = rdd.collect
               results.size must_= 1
@@ -366,7 +364,7 @@ class PlannerSpec
           val take = quasar.qscript.Subset(src, from, Take, count)
 
           val program: SparkState[Task, RDD[Data]] = compile(take)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               val results = rdd.collect
               results.size must_= 1
@@ -390,7 +388,7 @@ class PlannerSpec
           val drop = quasar.qscript.Subset(src, from, Drop, count)
 
           val program: SparkState[Task, RDD[Data]] = compile(drop)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               val results = rdd.collect
               results.size must_= 1
@@ -417,7 +415,7 @@ class PlannerSpec
           val union = quasar.qscript.Union(src, left, right)
 
           val program: SparkState[Task, RDD[Data]] = compile(union)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),
@@ -440,7 +438,7 @@ class PlannerSpec
           val leftShift = quasar.qscript.LeftShift(src, struct, ExcludeId, repair)
 
           val program: SparkState[Task, RDD[Data]] = compile(leftShift)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like{
+          program.eval(sc).run.map(result => result must be_\/-.like{
             case rdd =>
               rdd.collect.toList must_= List(
                 Data.Str("Poland"),
@@ -474,7 +472,7 @@ class PlannerSpec
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
 
           val program: SparkState[Task, RDD[Data]] = compile(equiJoin)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
@@ -504,7 +502,7 @@ class PlannerSpec
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.LeftOuter, combine)
 
           val program: SparkState[Task, RDD[Data]] = compile(equiJoin)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               rdd.collect.toList must contain(exactly(
                 Data._obj(ListMap(
@@ -540,7 +538,7 @@ class PlannerSpec
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.RightOuter, combine)
 
           val program: SparkState[Task, RDD[Data]] = compile(equiJoin)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               rdd.collect.toList must contain(exactly(
                 Data._obj(ListMap(
@@ -575,7 +573,7 @@ class PlannerSpec
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.FullOuter, combine)
 
           val program: SparkState[Task, RDD[Data]] = compile(equiJoin)
-          program.eval(sc).run.map(result => result must beRightDisjunction.like {
+          program.eval(sc).run.map(result => result must be_\/-.like {
             case rdd =>
               rdd.collect.toList must contain(exactly(
                 Data._obj(ListMap(

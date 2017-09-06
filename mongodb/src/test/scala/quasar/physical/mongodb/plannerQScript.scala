@@ -44,10 +44,10 @@ import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
-import quasar.specs2.QuasarMatchers._
 
 class PlannerQScriptSpec extends
     org.specs2.mutable.Specification with
+    org.specs2.matcher.DisjunctionMatchers with
     org.specs2.ScalaCheck with
     CompilerHelpers with
     TreeMatchers {
@@ -4007,7 +4007,7 @@ class PlannerQScriptSpec extends
   "planner log" should {
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
-        beRightDisjunction(Vector(
+        be_\/-(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
@@ -4017,13 +4017,13 @@ class PlannerQScriptSpec extends
 
     "include correct phases with type error" in {
       planLog("select 'a' + 0 from zips").map(_.map(_.name)) must
-        beRightDisjunction(Vector(
+        be_\/-(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree", "Logical Plan", "Optimized"))
     }.pendingUntilFixed("SD-1249")
 
     "include correct phases with planner error" in {
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
-        beRightDisjunction(Vector(
+        be_\/-(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",

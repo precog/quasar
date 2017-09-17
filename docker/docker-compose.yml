@@ -37,10 +37,11 @@ services:
 
   quasar_metastore:
     container_name: quasar_metastore
-    image: postgres:9.6
+    image: postgres:9.6.5-alpine
     privileged: true
     ports:
       - "5432:5432"
+    mem_limit: 1024m
 
   quasar_marklogic_xml:
     container_name: quasar_marklogic_xml

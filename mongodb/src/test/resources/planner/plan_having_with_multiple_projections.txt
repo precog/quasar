@@ -298,16 +298,11 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ JsCore([_.left, _.right])
+│  │  ╰─ Obj
+│  │     ├─ Key(city: [_.left, _.right][0])
+│  │     ╰─ Key(1: [_.left, _.right][1])
 │  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("city" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-   ├─ Name("1" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] })
+   ├─ Name("city" -> true)
+   ├─ Name("1" -> true)
    ╰─ IgnoreId

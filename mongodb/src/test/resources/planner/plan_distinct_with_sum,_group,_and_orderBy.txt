@@ -81,32 +81,25 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ JsCore([_.left, _.right])
-│  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
-├─ $SimpleMapF
-│  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0)
-│  │     │  ╰─ SpliceObjects
-│  │     │     ├─ SpliceObjects
-│  │     │     │  ├─ JsCore(_.src[0][1])
-│  │     │     │  ╰─ JsCore(_.src[0][2])
-│  │     │     ╰─ Obj
-│  │     │        ╰─ Key(state: _.src[1][1].state)
+│  │     │  ╰─ Let(__val)
+│  │     │     ├─ JsCore([_.left, _.right])
+│  │     │     ╰─ SpliceObjects
+│  │     │        ├─ SpliceObjects
+│  │     │        │  ├─ JsCore(__val[0][1])
+│  │     │        │  ╰─ JsCore(__val[0][2])
+│  │     │        ╰─ Obj
+│  │     │           ╰─ Key(state: __val[1][1].state)
 │  │     ╰─ Key(b0)
-│  │        ╰─ SpliceObjects
-│  │           ├─ SpliceObjects
-│  │           │  ├─ JsCore(_.src[0][1])
-│  │           │  ╰─ JsCore(_.src[0][2])
-│  │           ╰─ Obj
-│  │              ╰─ Key(state: _.src[1][1].state)
+│  │        ╰─ Let(__val)
+│  │           ├─ JsCore([_.left, _.right])
+│  │           ╰─ SpliceObjects
+│  │              ├─ SpliceObjects
+│  │              │  ├─ JsCore(__val[0][1])
+│  │              │  ╰─ JsCore(__val[0][2])
+│  │              ╰─ Obj
+│  │                 ╰─ Key(state: __val[1][1].state)
 │  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped

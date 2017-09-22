@@ -136,20 +136,11 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ JsCore([_.left, _.right])
+│  │  ╰─ Obj
+│  │     ├─ Key(0: [_.left, _.right][0])
+│  │     ╰─ Key(1: [_.left, _.right][1][1])
 │  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("0" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-   ├─ Name("1" -> {
-   │       "$arrayElemAt": [
-   │         { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-   │         { "$literal": NumberInt("1") }]
-   │     })
+   ├─ Name("0" -> true)
+   ├─ Name("1" -> true)
    ╰─ IgnoreId

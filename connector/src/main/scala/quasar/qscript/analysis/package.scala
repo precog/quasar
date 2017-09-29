@@ -21,30 +21,32 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{AFile, APath, FPath}
 import quasar.Data
 import quasar.Data._int
-import quasar.fs.{FileSystemError, FileSystemErrT, QueryFile}
+import quasar.fs.{FileSystemErrT, FileSystemError, QueryFile}
 import quasar.fs.PathError.invalidPath
 import quasar.frontend.logicalplan.{Read => LPRead, LogicalPlan}
 import quasar.std.StdLib.agg
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
-import pathy.Path.{file, peel, file1}
+import pathy.Path.{file, file1, peel}
 import scalaz._, Scalaz._
 
 package object analysis {
   def pathCard[S[_]](
-    implicit queryOps: QueryFile.Ops[S]
+      implicit queryOps: QueryFile.Ops[S]
   ): APath => FileSystemErrT[Free[S, ?], Int] = (apath: APath) => {
     val afile: Option[AFile] = peel(apath).map {
       case (dirPath, \/-(fileName)) => dirPath </> file1(fileName)
-      case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
+      case (dirPath, -\/(dirName)) => dirPath </> file(dirName.value)
     }
 
     def lpFromPath[LP](p: FPath)(implicit LP: Corecursive.Aux[LP, LogicalPlan]): LP =
       LP.embed(agg.Count(LP.embed(LPRead(p))))
 
     val lp: FileSystemErrT[Free[S, ?], Fix[LogicalPlan]] =
-      EitherT.fromDisjunction(afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
+      EitherT.fromDisjunction(
+        afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(
+          invalidPath(apath, "Cardinality unsupported")))
     val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
       (lp: Fix[LogicalPlan]) => queryOps.first(lp).mapT(_.value)
 

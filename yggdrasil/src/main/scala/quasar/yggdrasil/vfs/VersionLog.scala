@@ -56,7 +56,8 @@ object VersionLog {
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
+  def init[S[_]](
+      baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
     for {
       exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
@@ -120,7 +121,9 @@ object VersionLog {
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
   // TODO add symlink
-  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def commit[S[_]](v: Version)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
@@ -136,12 +139,14 @@ object VersionLog {
           writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
           _ <- POSIXWithTask.generalize(writer).liftM[ST]
 
-          _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
+          _ <- POSIX
+            .move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson)
+            .liftM[ST]
 
           _ <- POSIX.delete[S](log.baseDir </> Head).liftM[ST]
-          _ <- POSIX.linkDir[S](
-            log.baseDir </> Path.dir(v.value.toString),
-            log.baseDir </> Head).liftM[ST]
+          _ <- POSIX
+            .linkDir[S](log.baseDir </> Path.dir(v.value.toString), log.baseDir </> Head)
+            .liftM[ST]
         } yield ()
       } else {
         ().point[StateT[Free[S, ?], VersionLog, ?]]

@@ -25,10 +25,10 @@ import matryoshka._
 import scalaz._
 
 private[qscript] final class UnreachablePlanner[M[_]: MonadPlanErr, FMT, F[_], J](
-  name: String
+    name: String
 ) extends Planner[M, FMT, F, J] {
 
-  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]
-  ): AlgebraM[M, F, Search[Q] \/ XQuery] =
+  def plan[Q](
+      implicit Q: Birecursive.Aux[Q, Query[J, ?]]): AlgebraM[M, F, Search[Q] \/ XQuery] =
     κ(MonadPlanErr[M].raiseError(MarkLogicPlannerError.unreachable(name)))
 }

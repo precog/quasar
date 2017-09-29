@@ -28,7 +28,8 @@ object WebConfig {
   implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
     val name = "web"
     def metaStoreConfig = WebConfig.metastore
-    val default = MetaStoreConfig.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
+    val default = MetaStoreConfig.default ∘ (ms =>
+      WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
   }
 
   implicit val codecJson: CodecJson[WebConfig] =

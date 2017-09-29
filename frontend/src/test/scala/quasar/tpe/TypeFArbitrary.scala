@@ -33,16 +33,16 @@ trait TypeFArbitrary {
     new PatternArbitrary[TypeF[J, ?]] {
       def leafGenerators[A] =
         uniformly(
-          Gen.const(                bottom[J, A]() ),
-          Gen.const(                   top[J, A]() ),
+          Gen.const(bottom[J, A]()),
+          Gen.const(top[J, A]()),
           arbitrary[SimpleType] ^^ (simple[J, A](_)),
-          arbitrary[J]          ^^ ( const[J, A](_)))
+          arbitrary[J] ^^ (const[J, A](_)))
 
       def branchGenerators[A: Arbitrary] =
         uniformly(
-          arbitrary[IList[A] \/ A]                ^^ (      arr[J, A](_)),
-          arbitrary[(IMap[J, A], Option[(A, A)])] ^^ (      map[J, A](_)),
-          arbitrary[(A, A)]                       ^^ (coproduct[J, A](_)))
+          arbitrary[IList[A] \/ A] ^^ (arr[J, A](_)),
+          arbitrary[(IMap[J, A], Option[(A, A)])] ^^ (map[J, A](_)),
+          arbitrary[(A, A)] ^^ (coproduct[J, A](_)))
     }
 }
 

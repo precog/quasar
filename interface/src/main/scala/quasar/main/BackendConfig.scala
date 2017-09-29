@@ -21,7 +21,7 @@ import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.contrib.scalaz._
 
 import java.io.File
-import scala.collection.Seq   // uh, yeah
+import scala.collection.Seq // uh, yeah
 
 import scalaz.IList
 import scalaz.concurrent.Task

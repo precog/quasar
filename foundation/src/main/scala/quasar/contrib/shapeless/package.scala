@@ -43,9 +43,11 @@ package object shapeless {
     def zip[B](input: Sized[List[B], N]): Sized[List[(A, B)], N] =
       Sized.wrap[List[(A, B)], N](self.unsized.zip(input))
 
-    def unzip3[X, Y, Z](implicit ev: A === (X, (Y, Z))): (Sized[List[X], N], Sized[List[Y], N], Sized[List[Z], N]) =
+    def unzip3[X, Y, Z](implicit ev: A === (X, (Y, Z)))
+      : (Sized[List[X], N], Sized[List[Y], N], Sized[List[Z], N]) =
       Unzip[List].unzip3[X, Y, Z](ev.subst(self.unsized)) match {
-        case (x, y, z) => (Sized.wrap[List[X], N](x), Sized.wrap[List[Y], N](y), Sized.wrap[List[Z], N](z))
+        case (x, y, z) =>
+          (Sized.wrap[List[X], N](x), Sized.wrap[List[Y], N](y), Sized.wrap[List[Z], N](z))
       }
   }
 }

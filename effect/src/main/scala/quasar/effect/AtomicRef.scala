@@ -26,26 +26,27 @@ import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 /** A reference to a value that may be updated atomically.
-  *
-  * @tparam V the type of value referenced
-  */
+ *
+ * @tparam V the type of value referenced
+ */
 sealed abstract class AtomicRef[V, A]
 
 object AtomicRef {
+
   /** NB: Attempted to define this as `Get[V]() extends AtomicRef[V, V]` but
-    *     when pattern matching `(x: AtomicRef[A, B]) match { case Get() => }`
-    *     scalac doesn't recognize that A =:= B.
-    */
+   *     when pattern matching `(x: AtomicRef[A, B]) match { case Get() => }`
+   *     scalac doesn't recognize that A =:= B.
+   */
   final case class Get[V, A](f: V => A) extends AtomicRef[V, A]
   final case class Set[V](v: V) extends AtomicRef[V, Unit]
   final case class CompareAndSet[V](expect: V, update: V) extends AtomicRef[V, Boolean]
 
   final class Ops[V, S[_]](implicit S: AtomicRef[V, ?] :<: S)
-    extends LiftedOps[AtomicRef[V, ?], S] {
+      extends LiftedOps[AtomicRef[V, ?], S] {
 
     /** Set the value of the ref to `update` if the current value is `expect`,
-      * returns whether the value was updated.
-      */
+     * returns whether the value was updated.
+     */
     def compareAndSet(expect: V, update: V): FreeS[Boolean] =
       lift(CompareAndSet(expect, update))
 
@@ -54,21 +55,21 @@ object AtomicRef {
       lift(Get(ι))
 
     /** Atomically updates the ref with the result of applying the given
-      * function to the current value, returning the updated value.
-      */
+     * function to the current value, returning the updated value.
+     */
     def modify(f: V => V): FreeS[V] =
       modifyS(v => f(v).squared)
 
     /** Atomically updates the ref with the first part of the result of applying
-      * the given function to the current value, returning the second part.
-      */
+     * the given function to the current value, returning the second part.
+     */
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modifyS[A](f: V => (V, A)): FreeS[A] =
       for {
-        cur       <- get
-        (nxt, a0) =  f(cur)
-        updated   <- compareAndSet(cur, nxt)
-        a         <- if (updated) a0.point[FreeS] else modifyS(f)
+        cur <- get
+        (nxt, a0) = f(cur)
+        updated <- compareAndSet(cur, nxt)
+        a <- if (updated) a0.point[FreeS] else modifyS(f)
       } yield a
 
     /** Sets the value of the ref to the given value. */
@@ -82,7 +83,7 @@ object AtomicRef {
   }
 
   def fromTaskRef[A](tr: TaskRef[A]): AtomicRef[A, ?] ~> Task =
-    λ[AtomicRef[A, ?] ~> Task]{
+    λ[AtomicRef[A, ?] ~> Task] {
       case Get(f) =>
         tr.read map f
 
@@ -95,9 +96,8 @@ object AtomicRef {
 
   // FIXME
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-  def toState[F[_], S](implicit F: MonadState[F, S])
-                         : AtomicRef[S, ?] ~> F =
-    λ[AtomicRef[S, ?] ~> F]{
+  def toState[F[_], S](implicit F: MonadState[F, S]): AtomicRef[S, ?] ~> F =
+    λ[AtomicRef[S, ?] ~> F] {
       case Get(f) =>
         F.gets(f)
 
@@ -111,23 +111,21 @@ object AtomicRef {
           else
             F.point(false)
         }
-     }
+    }
 
   /** Decorate AtomicRef operations by running an effect after each successful
-    * update. Usage: `onSet[V](effect)`
-    */
+   * update. Usage: `onSet[V](effect)`
+   */
   object onSet {
     def apply[V]: Aux[V] = new Aux[V]
 
     final class Aux[V] {
       type Ref[A] = AtomicRef[V, A]
 
-      def apply[S[_], F[_]: Applicative]
-          (f: V => F[Unit])
-          (implicit
-            S0: F :<: S,
-            S1: Ref :<: S
-          ): AtomicRef[V, ?] ~> Free[S, ?] = {
+      def apply[S[_], F[_]: Applicative](f: V => F[Unit])(
+          implicit
+          S0: F :<: S,
+          S1: Ref :<: S): AtomicRef[V, ?] ~> Free[S, ?] = {
         val R = Ops[V, S]
 
         λ[AtomicRef[V, ?] ~> Free[S, ?]] {
@@ -140,9 +138,9 @@ object AtomicRef {
           case CompareAndSet(expect, update) =>
             for {
               upd <- R.compareAndSet(expect, update)
-              _   <- free.lift {
-                        if (upd) f(update) else ().point[F]
-                      }.into[S]
+              _ <- free.lift {
+                if (upd) f(update) else ().point[F]
+              }.into[S]
             } yield upd
         }
       }
@@ -150,14 +148,13 @@ object AtomicRef {
   }
 
   /** Given a lens A -> B, lifts AtomicRef[B, ?] into any effect type
-    * providing AtomicRef[A, ?]. Usage: `zoom(aLens).into[S]`.
-    */
+   * providing AtomicRef[A, ?]. Usage: `zoom(aLens).into[S]`.
+   */
   object zoom {
     def apply[A, B: Equal](lens: Lens[A, B]) = new Aux(lens)
 
     final class Aux[A, B: Equal](lens: Lens[A, B]) {
-      def into[S[_]](implicit S: AtomicRef[A, ?] :<: S)
-          : AtomicRef[B, ?] ~> Free[S, ?] = {
+      def into[S[_]](implicit S: AtomicRef[A, ?] :<: S): AtomicRef[B, ?] ~> Free[S, ?] = {
 
         val R = AtomicRef.Ops[A, S]
 
@@ -169,9 +166,10 @@ object AtomicRef {
             R.modify(u => lens.set(v)(u)).void
 
           case CompareAndSet(expect, update) =>
-            R.modifyS(v =>
-              if (lens.get(v) ≟ expect) (lens.set(update)(v), true)
-              else (v, false))
+            R.modifyS(
+              v =>
+                if (lens.get(v) ≟ expect) (lens.set(update)(v), true)
+                else (v, false))
         }
       }
     }

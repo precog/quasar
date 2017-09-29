@@ -40,7 +40,7 @@ class RestApiSpecs extends quasar.Qspec {
 
   type Eff[A] = (
     Task :\: Timing :\: VCache :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\:
-    Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem
+      Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem
   )#M[A]
 
   type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
@@ -55,42 +55,47 @@ class RestApiSpecs extends quasar.Qspec {
     val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
     val eff: Task[Eff ~> Task] =
-      (fsInterp ⊛ createNewTestMetaStoreConfig ⊛ vcacheInterp)((fs, metaConf, vci) =>
-        NaturalTransformation.refl[Task]                                          :+:
-        Timing.toTask                                                             :+:
-        vci                                                                       :+:
-        Failure.toRuntimeError[Task, PathTypeMismatch]                            :+:
-        Failure.toRuntimeError[Task, MountingError]                               :+:
-        Failure.toRuntimeError[Task, FileSystemError]                             :+:
-        Failure.toRuntimeError[Task, Module.Error]                                :+:
-        MetaStoreLocation.impl.constant(metaConf)                                 :+:
-        (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
-        mount                                                                     :+:
-        analyze                                                                   :+:
-        fs)
+      (fsInterp ⊛ createNewTestMetaStoreConfig ⊛ vcacheInterp)(
+        (fs, metaConf, vci) =>
+          NaturalTransformation.refl[Task] :+:
+            Timing.toTask :+:
+            vci :+:
+            Failure.toRuntimeError[Task, PathTypeMismatch] :+:
+            Failure.toRuntimeError[Task, MountingError] :+:
+            Failure.toRuntimeError[Task, FileSystemError] :+:
+            Failure.toRuntimeError[Task, Module.Error] :+:
+            MetaStoreLocation.impl.constant(metaConf) :+:
+            (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
+            mount :+:
+            analyze :+:
+          fs)
 
     val service = eff map { runEff =>
-      RestApi.finalizeServices(RestApi.toHttpServices(
-        liftMT[Task, ResponseT] compose runEff,
-        RestApi.coreServices[Eff])).orNotFound
+      RestApi
+        .finalizeServices(
+          RestApi
+            .toHttpServices(liftMT[Task, ResponseT] compose runEff, RestApi.coreServices[Eff]))
+        .orNotFound
     }
 
     def testAdvertise(
-      path: String,
-      additionalHeaders: List[Header],
-      resultHeaderKey: HeaderKey.Extractable,
-      expected: List[String]
+        path: String,
+        additionalHeaders: List[Header],
+        resultHeaderKey: HeaderKey.Extractable,
+        expected: List[String]
     ) = {
       val req = Request(
         uri = Uri(path = path),
         method = OPTIONS,
         headers = Headers(Header("Origin", "") :: additionalHeaders))
 
-      service.flatMap(_(req)).map { response =>
-        response.headers.get(resultHeaderKey)
-          .get.value.split(", ")
-          .toList must contain(allOf(expected: _*))
-      }.unsafePerformSync
+      service
+        .flatMap(_(req))
+        .map { response =>
+          response.headers.get(resultHeaderKey).get.value.split(", ").toList must contain(
+            allOf(expected: _*))
+        }
+        .unsafePerformSync
     }
 
     def advertisesMethodsCorrectly(path: String, expected: List[Method]) =
@@ -101,7 +106,8 @@ class RestApiSpecs extends quasar.Qspec {
         path = path,
         additionalHeaders = List(Header("Access-Control-Request-Method", method.name)),
         resultHeaderKey = `Access-Control-Allow-Headers`,
-        expected = expected.map(_.name.value))
+        expected = expected.map(_.name.value)
+      )
 
     "advertise GET and POST for /query path" >> {
       advertisesMethodsCorrectly("/query/fs", List(GET, POST))

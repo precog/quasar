@@ -24,29 +24,28 @@ import scalaz._
  *  type classes required for many operations. This is for
  *  compilation performance.
  */
-
 trait TTypes[T[_[_]]] {
   // Partially applying types with the known T.
   // In this context we shouldn't often need to refer to the original type
   // any longer, so reuse the name.
-  type EquiJoin[A]       = quasar.qscript.EquiJoin[T, A]
-  type QScriptCore[A]    = quasar.qscript.QScriptCore[T, A]
-  type QScriptTotal[A]   = quasar.qscript.QScriptTotal[T, A]
-  type ProjectBucket[A]  = quasar.qscript.ProjectBucket[T, A]
-  type ThetaJoin[A]      = quasar.qscript.ThetaJoin[T, A]
-  type MapFuncCore[A]    = quasar.qscript.MapFuncCore[T, A]
+  type EquiJoin[A] = quasar.qscript.EquiJoin[T, A]
+  type QScriptCore[A] = quasar.qscript.QScriptCore[T, A]
+  type QScriptTotal[A] = quasar.qscript.QScriptTotal[T, A]
+  type ProjectBucket[A] = quasar.qscript.ProjectBucket[T, A]
+  type ThetaJoin[A] = quasar.qscript.ThetaJoin[T, A]
+  type MapFuncCore[A] = quasar.qscript.MapFuncCore[T, A]
   type MapFuncDerived[A] = quasar.qscript.MapFuncDerived[T, A]
-  type MapFunc[A]        = quasar.qscript.MapFunc[T, A]
-  type FreeMapA[A]       = quasar.qscript.FreeMapA[T, A]
-  type FreeMap           = quasar.qscript.FreeMap[T]
-  type JoinFunc          = quasar.qscript.JoinFunc[T]
-  type CoEnvQS[A]        = quasar.qscript.CoEnvQS[T, A]
-  type CoEnvMapA[A, B]   = quasar.qscript.CoEnvMapA[T, A, B]
-  type CoEnvMap[A]       = quasar.qscript.CoEnvMap[T, A]
-  type CoEnvJoin[A]      = quasar.qscript.CoEnvJoin[T, A]
-  type FreeQS            = quasar.qscript.FreeQS[T]
-  type Ann               = quasar.qscript.Ann[T]
-  type Target[F[_]]      = quasar.qscript.Target[T, F]
+  type MapFunc[A] = quasar.qscript.MapFunc[T, A]
+  type FreeMapA[A] = quasar.qscript.FreeMapA[T, A]
+  type FreeMap = quasar.qscript.FreeMap[T]
+  type JoinFunc = quasar.qscript.JoinFunc[T]
+  type CoEnvQS[A] = quasar.qscript.CoEnvQS[T, A]
+  type CoEnvMapA[A, B] = quasar.qscript.CoEnvMapA[T, A, B]
+  type CoEnvMap[A] = quasar.qscript.CoEnvMap[T, A]
+  type CoEnvJoin[A] = quasar.qscript.CoEnvJoin[T, A]
+  type FreeQS = quasar.qscript.FreeQS[T]
+  type Ann = quasar.qscript.Ann[T]
+  type Target[F[_]] = quasar.qscript.Target[T, F]
 }
 
 object TTypes {
@@ -61,8 +60,10 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
-      case BucketField(src, value, field) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectField(value, field)))))
-      case BucketIndex(src, value, index) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
+      case BucketField(src, value, field) =>
+        QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectField(value, field)))))
+      case BucketIndex(src, value, index) =>
+        QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
     }
   )
 
@@ -74,31 +75,30 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
         case Subset(src, lb, sel, rb) =>
           Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
         case _ => fa
-      })
-    )
+      }))
   )
   def ThetaJoin[G[_]](implicit TJ: ThetaJoin :<: G) = make(
-    λ[ThetaJoin ~> G](tj =>
-      TJ inj quasar.qscript.ThetaJoin(
-        tj.src,
-        applyToBranch(tj.lBranch),
-        applyToBranch(tj.rBranch),
-        tj.on,
-        tj.f,
-        tj.combine
-      )
-    )
+    λ[ThetaJoin ~> G](
+      tj =>
+        TJ inj quasar.qscript.ThetaJoin(
+          tj.src,
+          applyToBranch(tj.lBranch),
+          applyToBranch(tj.rBranch),
+          tj.on,
+          tj.f,
+          tj.combine
+      ))
   )
   def EquiJoin[G[_]](implicit EJ: EquiJoin :<: G) = make(
-    λ[EquiJoin ~> G](ej =>
-      EJ inj quasar.qscript.EquiJoin(
-        ej.src,
-        applyToBranch(ej.lBranch),
-        applyToBranch(ej.rBranch),
-        ej.key,
-        ej.f,
-        ej.combine
-      )
-    )
+    λ[EquiJoin ~> G](
+      ej =>
+        EJ inj quasar.qscript.EquiJoin(
+          ej.src,
+          applyToBranch(ej.lBranch),
+          applyToBranch(ej.rBranch),
+          ej.key,
+          ej.f,
+          ej.combine
+      ))
   )
 }

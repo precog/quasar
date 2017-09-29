@@ -52,7 +52,7 @@ object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
 
   def deserialize(in: DataInput): Array[Byte] = {
     val length = readPackedInt(in)
-    val bytes  = new Array[Byte](length)
+    val bytes = new Array[Byte](length)
     in.readFully(bytes)
     bytes
   }

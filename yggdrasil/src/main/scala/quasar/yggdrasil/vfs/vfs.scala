@@ -29,7 +29,7 @@ import fs2.util.Async
 
 import pathy.Path
 
-import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{:<:, ~>, Coproduct, Free, Monad, NaturalTransformation, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.map._
@@ -50,7 +50,7 @@ final case class VFS(
     metaLog: VersionLog,
     paths: Map[AFile, Blob],
     index: Map[ADir, Vector[RPath]],
-    versions: Map[Blob, VersionLog],    // always getOrElse this with VersionLog.init
+    versions: Map[Blob, VersionLog], // always getOrElse this with VersionLog.init
     blobs: Set[Blob])
 
 object FreeVFS {
@@ -120,7 +120,9 @@ object FreeVFS {
     } yield VFS(baseDir, metaLog, paths, index, Map(), blobs.toSet)
   }
 
-  private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       v <- VersionLog.fresh[S]
       target <- VersionLog.underlyingDir[Free[S, ?]](v)
@@ -150,7 +152,8 @@ object FreeVFS {
     } yield ()
   }
 
-  private def readMeta[S[_]](dir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, (Map[AFile, Blob], Map[ADir, Vector[RPath]])] = {
+  private def readMeta[S[_]](dir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S)
+    : StateT[Free[S, ?], VersionLog, (Map[AFile, Blob], Map[ADir, Vector[RPath]])] = {
     for {
       maybeDir <- VersionLog.underlyingHeadDir[Free[S, ?]]
 
@@ -159,10 +162,13 @@ object FreeVFS {
           for {
             pathsStream <- POSIX.openR[S](dir </> PathsFile).liftM[StateT[?[_], VersionLog, ?]]
             pathsString = pathsStream.map(_.toArray).map(new String(_)).foldMonoid
-            pathsJson <- POSIXWithTask.generalize[S](pathsString.runLast).liftM[StateT[?[_], VersionLog, ?]]
+            pathsJson <- POSIXWithTask
+              .generalize[S](pathsString.runLast)
+              .liftM[StateT[?[_], VersionLog, ?]]
 
-            pathsFromStrings =
-              pathsJson.flatMap(Parse.decodeOption[Map[String, Blob]]).getOrElse(Map())
+            pathsFromStrings = pathsJson
+              .flatMap(Parse.decodeOption[Map[String, Blob]])
+              .getOrElse(Map())
 
             paths = pathsFromStrings flatMap {
               case (k, v) =>
@@ -172,10 +178,13 @@ object FreeVFS {
 
             indexStream <- POSIX.openR[S](dir </> IndexFile).liftM[StateT[?[_], VersionLog, ?]]
             indexString = indexStream.map(_.toArray).map(new String(_)).foldMonoid
-            indexJson <- POSIXWithTask.generalize[S](indexString.runLast).liftM[StateT[?[_], VersionLog, ?]]
+            indexJson <- POSIXWithTask
+              .generalize[S](indexString.runLast)
+              .liftM[StateT[?[_], VersionLog, ?]]
 
-            indexFromStrings =
-              indexJson.flatMap(Parse.decodeOption[Map[String, Vector[RPath]]](_)).getOrElse(Map())
+            indexFromStrings = indexJson
+              .flatMap(Parse.decodeOption[Map[String, Vector[RPath]]](_))
+              .getOrElse(Map())
 
             index = indexFromStrings flatMap {
               case (k, v) =>
@@ -186,12 +195,15 @@ object FreeVFS {
           } yield (paths, index)
 
         case None =>
-          (Map[AFile, Blob](), Map[ADir, Vector[RPath]]()).point[StateT[Free[S, ?], VersionLog, ?]]
+          (Map[AFile, Blob](), Map[ADir, Vector[RPath]]())
+            .point[StateT[Free[S, ?], VersionLog, ?]]
       }
     } yield back
   }
 
-  def scratch[S[_]](implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Blob] = {
+  def scratch[S[_]](
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Blob] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
       uuid <- POSIX.genUUID[S].liftM[ST]
@@ -213,9 +225,11 @@ object FreeVFS {
   }
 
   def exists[F[_]: Monad](path: APath): StateT[F, VFS, Boolean] = {
-    Path.refineType(path).fold(
-      dir => StateTContrib.get[F, VFS].map(_.index.contains(dir)),
-      file => StateTContrib.get[F, VFS].map(_.paths.contains(file)))
+    Path
+      .refineType(path)
+      .fold(
+        dir => StateTContrib.get[F, VFS].map(_.index.contains(dir)),
+        file => StateTContrib.get[F, VFS].map(_.paths.contains(file)))
   }
 
   def ls[F[_]: Monad](parent: ADir): StateT[F, VFS, List[RPath]] = {
@@ -224,7 +238,9 @@ object FreeVFS {
     }
   }
 
-  def link[S[_]](from: Blob, to: AFile)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  def link[S[_]](from: Blob, to: AFile)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
@@ -243,7 +259,9 @@ object FreeVFS {
     } yield success
   }
 
-  def moveFile[S[_]](from: AFile, to: AFile, semantics: MoveSemantics)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  def moveFile[S[_]](from: AFile, to: AFile, semantics: MoveSemantics)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
@@ -264,7 +282,9 @@ object FreeVFS {
     } yield success
   }
 
-  def moveDir[S[_]](from: ADir, to: ADir, semantics: MoveSemantics)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  def moveDir[S[_]](from: ADir, to: ADir, semantics: MoveSemantics)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
@@ -284,8 +304,7 @@ object FreeVFS {
 
           metaLog2 <- persistMeta[S](vfs2.paths, index2).exec(vfs2.metaLog).liftM[ST]
 
-          _ <- StateTContrib.put[Free[S, ?], VFS](
-            vfs2.copy(index = index2, metaLog = metaLog2))
+          _ <- StateTContrib.put[Free[S, ?], VFS](vfs2.copy(index = index2, metaLog = metaLog2))
         } yield true
       } else {
         false.point[ST[Free[S, ?], ?]]
@@ -298,27 +317,33 @@ object FreeVFS {
       vfs <- StateTContrib.get[F, VFS]
 
       _ <- vfs.index.getOrElse(from, Vector.empty) traverse { child =>
-        Path.refineType(child).fold[StateT[F, VFS, Unit]](
-          d => reparentLeaves(from </> d, to </> d),
-          { f =>
-            val source = from </> f
-            val result = to </> f
+        Path
+          .refineType(child)
+          .fold[StateT[F, VFS, Unit]](
+            d => reparentLeaves(from </> d, to </> d), { f =>
+              val source = from </> f
+              val result = to </> f
 
-            for {
-              vfs <- StateTContrib.get[F, VFS]
-              blob = vfs.paths(source)
-              paths2 = vfs.paths - source + (result -> blob)
-              _ <- StateTContrib.put[F, VFS](vfs.copy(paths = paths2))
-            } yield ()
-          })
+              for {
+                vfs <- StateTContrib.get[F, VFS]
+                blob = vfs.paths(source)
+                paths2 = vfs.paths - source + (result -> blob)
+                _ <- StateTContrib.put[F, VFS](vfs.copy(paths = paths2))
+              } yield ()
+            }
+          )
       }
     } yield ()
   }
 
-  def delete[S[_]](target: APath)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] =
+  def delete[S[_]](target: APath)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] =
     Path.refineType(target).fold(deleteDir[S](_), deleteFile[S](_))
 
-  private def deleteFile[S[_]](target: AFile)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  private def deleteFile[S[_]](target: AFile)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
@@ -337,20 +362,24 @@ object FreeVFS {
     } yield success
   }
 
-  private def deleteDir[S[_]](dir: ADir, persist: Boolean = true)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  private def deleteDir[S[_]](dir: ADir, persist: Boolean = true)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
       _ <- vfs.index.getOrElse(dir, Vector.empty) traverse { child =>
-        Path.refineType(child).fold[StateT[Free[S, ?], VFS, Boolean]](
-          d => deleteDir(dir </> d),
-          { f =>
-            for {
-              vfs <- StateTContrib.get[Free[S, ?], VFS]
-              paths2 = vfs.paths - (dir </> f)
-              _ <- StateTContrib.put[Free[S, ?], VFS](vfs.copy(paths = paths2))
-            } yield true
-          })
+        Path
+          .refineType(child)
+          .fold[StateT[Free[S, ?], VFS, Boolean]](
+            d => deleteDir(dir </> d), { f =>
+              for {
+                vfs <- StateTContrib.get[Free[S, ?], VFS]
+                paths2 = vfs.paths - (dir </> f)
+                _ <- StateTContrib.put[Free[S, ?], VFS](vfs.copy(paths = paths2))
+              } yield true
+            }
+          )
       }
 
       _ <- if (persist) {
@@ -366,16 +395,20 @@ object FreeVFS {
       } else {
         ().point[ST[Free[S, ?], ?]]
       }
-    } yield true    // TODO failure modes
+    } yield true // TODO failure modes
   }
 
   def readPath[F[_]: Monad](path: AFile): StateT[F, VFS, Option[Blob]] =
     StateTContrib.get[F, VFS].map(_.paths.get(path))
 
-  def underlyingDir[S[_]](blob: Blob, version: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[ADir]] =
+  def underlyingDir[S[_]](blob: Blob, version: Version)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Option[ADir]] =
     withVLog(blob)(VersionLog.underlyingDir[Free[S, ?]](version))
 
-  private def blobVLog[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, VersionLog] = {
+  private def blobVLog[S[_]](blob: Blob)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, VersionLog] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
@@ -392,7 +425,7 @@ object FreeVFS {
   }
 
   private def withVLog[S[_], A](blob: Blob)(st: StateT[Free[S, ?], VersionLog, A])(
-    implicit
+      implicit
       IP: POSIXOp :<: S,
       IT: Task :<: S): StateT[Free[S, ?], VFS, Option[A]] = {
 
@@ -415,13 +448,19 @@ object FreeVFS {
     } yield back
   }
 
-  def headOfBlob[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
+  def headOfBlob[S[_]](blob: Blob)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
     blobVLog[S](blob).map(_.head)
 
-  def fresh[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
+  def fresh[S[_]](blob: Blob)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
     withVLog(blob)(VersionLog.fresh[S])
 
-  def commit[S[_]](blob: Blob, version: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Unit] =
+  def commit[S[_]](blob: Blob, version: Version)(
+      implicit IP: POSIXOp :<: S,
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Unit] =
     withVLog(blob)(VersionLog.commit[S](version)).map(_ => ())
 
   private def computeIndex(paths: List[APath]): Map[ADir, Vector[RPath]] =
@@ -448,7 +487,7 @@ object FreeVFS {
 final class SerialVFS private (
     root: File,
     @volatile private var current: VFS,
-    worker: mutable.Queue[Task, Task[Unit]],    // this exists solely for #serialize
+    worker: mutable.Queue[Task, Task[Unit]], // this exists solely for #serialize
     interp: POSIXWithTask ~> Task) {
 
   import SerialVFS.S

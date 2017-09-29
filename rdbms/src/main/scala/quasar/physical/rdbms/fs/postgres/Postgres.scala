@@ -29,7 +29,7 @@ import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import java.net.URI
 
 import doobie.util.meta.Meta
-import scalaz.{-\/, NonEmptyList, \/, \/-}
+import scalaz.{-\/, \/, \/-, NonEmptyList}
 import scalaz.syntax.either._
 
 object Postgres
@@ -47,23 +47,25 @@ object Postgres
   val jdbcPrefixLength = "jdbc".length
 
   private def parsingErr(uri: ConnectionUri) =
-    -\/(NonEmptyList(
-      s"Cannot extract credentials from URI [${uri.value}]. Expected format: $formatHint"))
+    -\/(
+      NonEmptyList(
+        s"Cannot extract credentials from URI [${uri.value}]. Expected format: $formatHint"))
 
   override def parseConnectionUri(
       uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo] = {
 
     val jUri = new URI(uri.value.substring(jdbcPrefixLength + 1))
-    val connectionInfo = (Option(jUri.getScheme),
-                          Option(jUri.getAuthority),
-                          Option(jUri.getPath),
-                          Option(jUri.getQuery)) match {
+    val connectionInfo = (
+      Option(jUri.getScheme),
+      Option(jUri.getAuthority),
+      Option(jUri.getPath),
+      Option(jUri.getQuery)) match {
       case (Some("postgresql"), Some(authority), Some(db), Some(query)) =>
         val url = s"jdbc:postgresql://$authority$db"
         val userPass = query.split("&").flatMap(_.split("=")).toList match {
           case "user" :: u :: "password" :: p :: _ => \/-((u, Some(p)))
-          case "user" :: u :: _                    => \/-((u, None))
-          case _                                   => parsingErr(uri)
+          case "user" :: u :: _ => \/-((u, None))
+          case _ => parsingErr(uri)
         }
         userPass.map {
           case (u, p) => JdbcConnectionInfo(driverClass, url, u, p)

@@ -22,7 +22,9 @@ import scalaz.{NonEmptyList, Semigroup, Show}
 import scalaz.NonEmptyList.nels
 
 sealed trait ResourceError {
-  def fold[A](fatalError: ResourceError.FatalError => A, userError: ResourceError.UserError => A): A
+  def fold[A](
+      fatalError: ResourceError.FatalError => A,
+      userError: ResourceError.UserError => A): A
   def messages: NonEmptyList[String]
 }
 
@@ -33,17 +35,19 @@ object ResourceError {
 
   implicit val show = Show.showFromToString[ResourceError]
 
-  def corrupt(message: String): ResourceError with FatalError         = Corrupt(message)
-  def ioError(ex: Throwable): ResourceError with FatalError           = IOError(ex)
-  def permissionsError(message: String): ResourceError with UserError = PermissionsError(message)
-  def notFound(message: String): ResourceError with UserError         = NotFound(message)
+  def corrupt(message: String): ResourceError with FatalError = Corrupt(message)
+  def ioError(ex: Throwable): ResourceError with FatalError = IOError(ex)
+  def permissionsError(message: String): ResourceError with UserError =
+    PermissionsError(message)
+  def notFound(message: String): ResourceError with UserError = NotFound(message)
 
-  def all(errors: NonEmptyList[ResourceError]): ResourceError with FatalError with UserError = new ResourceErrors(
-    errors flatMap {
-      case ResourceErrors(e0) => e0
-      case other              => NonEmptyList(other)
-    }
-  )
+  def all(errors: NonEmptyList[ResourceError]): ResourceError with FatalError with UserError =
+    new ResourceErrors(
+      errors flatMap {
+        case ResourceErrors(e0) => e0
+        case other => NonEmptyList(other)
+      }
+    )
 
   def fromExtractorError(msg: String): Extractor.Error => ResourceError = { error =>
     Corrupt("%s:\n%s" format (msg, error.message))
@@ -77,7 +81,10 @@ object ResourceError {
     def messages = nels(message)
   }
 
-  case class ResourceErrors private[ResourceError] (errors: NonEmptyList[ResourceError]) extends ResourceError with FatalError with UserError { self =>
+  case class ResourceErrors private[ResourceError] (errors: NonEmptyList[ResourceError])
+      extends ResourceError
+      with FatalError
+      with UserError { self =>
     override def fold[A](fatalError: FatalError => A, userError: UserError => A) = {
       val hasFatal = errors.list.toList.exists(_.fold(_ => true, _ => false))
       if (hasFatal) fatalError(self) else userError(self)

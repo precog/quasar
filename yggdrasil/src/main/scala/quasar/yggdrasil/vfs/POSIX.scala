@@ -32,10 +32,12 @@ object POSIX {
   def genUUID[S[_]](implicit S: POSIXOp :<: S): Free[S, UUID] =
     Free.liftF(S.inj(GenUUID))
 
-  def openW[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
+  def openW[S[_]](target: AFile)(
+      implicit S: POSIXOp :<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenW(target)))
 
-  def openR[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
+  def openR[S[_]](target: AFile)(
+      implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenR(target)))
 
   def ls[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, List[RPath]] =

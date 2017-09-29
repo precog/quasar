@@ -25,7 +25,7 @@ import BigDecimal.RoundingMode
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
     import trans._
-    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }
+    import StdLib.{doubleIsDefined, BoolFrom, DoubleFrom, LongFrom, NumFrom}
 
     object Unary {
       val UnaryNamespace = Vector("std", "unary")
@@ -45,8 +45,8 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::neg") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, -_)
-          case c: LongColumn   => new LongFrom.L(c, n => true, -_)
-          case c: NumColumn    => new NumFrom.N(c, n => true, -_)
+          case c: LongColumn => new LongFrom.L(c, n => true, -_)
+          case c: NumColumn => new NumFrom.N(c, n => true, -_)
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -61,8 +61,8 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def f1: F1 = CF1P("builtin::unary::ceil") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.ceil)
 
-          case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.CEILING))
+          case c: LongColumn => new LongFrom.L(c, n => true, x => x)
+          case c: NumColumn => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.CEILING))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -74,8 +74,8 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::floor") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.floor)
-          case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.FLOOR))
+          case c: LongColumn => new LongFrom.L(c, n => true, x => x)
+          case c: NumColumn => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.FLOOR))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -86,13 +86,14 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       object Trunc extends Op1F1(UnaryNamespace, "trunc") {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::trunc") {
-          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
-            val result = math.round(d)
-            // the JVM uses half-over rounding semantics by default
-            if (result > d) math.floor(d) else result
-          })
-          case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
+          case c: DoubleColumn =>
+            new DoubleFrom.D(c, doubleIsDefined, { d =>
+              val result = math.round(d)
+              // the JVM uses half-over rounding semantics by default
+              if (result > d) math.floor(d) else result
+            })
+          case c: LongColumn => new LongFrom.L(c, n => true, x => x)
+          case c: NumColumn => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -150,10 +151,12 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             case _ => sys.error("impossible")
           }
 
-          pairs.groupBy(_._1).map({
-            case (ref, cols) =>
-              ref -> cols.map(_._2).reduce(cf.util.UnionRight(_, _).get)
-          })(collection.breakOut)
+          pairs
+            .groupBy(_._1)
+            .map({
+              case (ref, cols) =>
+                ref -> cols.map(_._2).reduce(cf.util.UnionRight(_, _).get)
+            })(collection.breakOut)
         }
       }
     }

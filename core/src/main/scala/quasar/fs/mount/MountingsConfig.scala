@@ -40,12 +40,16 @@ object MountingsConfig {
     Iso((_: MountingsConfig).toMap)(MountingsConfig(_))
 
   implicit val mountingsConfigEncodeJson: EncodeJson[MountingsConfig] =
-    EncodeJson.of[Map[String, MountConfig]]
+    EncodeJson
+      .of[Map[String, MountConfig]]
       .contramap(_.toMap.map(_.leftMap(posixCodec.printPath(_))))
 
   implicit val mountingsConfigDecodeJson: DecodeJson[MountingsConfig] =
-    DecodeJson.of[Map[String, MountConfig]]
-      .flatMap(m0 => DecodeJson(κ(m0.toList.foldLeftM(Map[APath, MountConfig]()) {
-        case (m, (s, mc)) => jString(s).as[APath].map(p => m + (p -> mc))
-      }))).map(MountingsConfig(_))
+    DecodeJson
+      .of[Map[String, MountConfig]]
+      .flatMap(m0 =>
+        DecodeJson(κ(m0.toList.foldLeftM(Map[APath, MountConfig]()) {
+          case (m, (s, mc)) => jString(s).as[APath].map(p => m + (p -> mc))
+        })))
+      .map(MountingsConfig(_))
 }

@@ -20,13 +20,16 @@ import quasar.yggdrasil.bytecode._
 import quasar.precog.util.Identifier
 
 trait TypeInferencer extends DAG {
-  import instructions.{ BinaryOperation, ArraySwap, WrapObject, DerefArray, DerefObject }
+  import instructions.{ArraySwap, BinaryOperation, DerefArray, DerefObject, WrapObject}
   import dag._
 
   def inferTypes(jtpe: JType)(graph: DepGraph): DepGraph = {
 
     def collectTypes(universe: JType, graph: DepGraph): Map[DepGraph, Set[JType]] = {
-      def collectSpecTypes(typing: Map[DepGraph, Set[JType]], splits: Map[Identifier, Split], spec: BucketSpec): Map[DepGraph, Set[JType]] = spec match {
+      def collectSpecTypes(
+          typing: Map[DepGraph, Set[JType]],
+          splits: Map[Identifier, Split],
+          spec: BucketSpec): Map[DepGraph, Set[JType]] = spec match {
         case UnionBucketSpec(left, right) =>
           collectSpecTypes(collectSpecTypes(typing, splits, left), splits, right)
 
@@ -43,7 +46,11 @@ trait TypeInferencer extends DAG {
           inner(Some(universe), typing, splits, target)
       }
 
-      def inner(jtpe: Option[JType], typing: Map[DepGraph, Set[JType]], splits: Map[Identifier, Split], graph: DepGraph): Map[DepGraph, Set[JType]] = {
+      def inner(
+          jtpe: Option[JType],
+          typing: Map[DepGraph, Set[JType]],
+          splits: Map[Identifier, Split],
+          graph: DepGraph): Map[DepGraph, Set[JType]] = {
         graph match {
           case _: Root => typing
 
@@ -74,12 +81,17 @@ trait TypeInferencer extends DAG {
           case Reduce(red, parent) => inner(Some(red.tpe.arg), typing, splits, parent)
 
           case MegaReduce(_, _) =>
-            sys.error("Cannot infer type of MegaReduce. MegaReduce optimization must come after inferTypes.")
+            sys.error(
+              "Cannot infer type of MegaReduce. MegaReduce optimization must come after inferTypes.")
 
           case Morph1(m, parent) => inner(Some(m.tpe.arg), typing, splits, parent)
 
           case Morph2(m, left, right) =>
-            inner(Some(m.tpe.arg1), inner(Some(m.tpe.arg0), typing, splits, left), splits, right)
+            inner(
+              Some(m.tpe.arg1),
+              inner(Some(m.tpe.arg0), typing, splits, left),
+              splits,
+              right)
 
           case Join(DerefObject, Cross(_), left, right @ ConstString(str)) =>
             inner(jtpe map { jtpe0 =>
@@ -105,25 +117,33 @@ trait TypeInferencer extends DAG {
           case Join(ArraySwap, Cross(_), left, right) => {
             val jtpe2 = jtpe flatMap {
               case JArrayFixedT(_) => jtpe
-              case _               => Some(JArrayUnfixedT)
+              case _ => Some(JArrayUnfixedT)
             }
 
             inner(Some(JNumberT), inner(jtpe2, typing, splits, left), splits, right)
           }
 
           case Join(op: BinaryOperation, _, left, right) =>
-            inner(Some(op.tpe.arg1), inner(Some(op.tpe.arg0), typing, splits, left), splits, right)
+            inner(
+              Some(op.tpe.arg1),
+              inner(Some(op.tpe.arg0), typing, splits, left),
+              splits,
+              right)
 
-          case Assert(pred, child) => inner(jtpe, inner(jtpe, typing, splits, pred), splits, child)
+          case Assert(pred, child) =>
+            inner(jtpe, inner(jtpe, typing, splits, pred), splits, child)
 
           case graph @ Cond(pred, left, _, right, _) =>
             inner(jtpe, typing, splits, graph.peer)
 
-          case Observe(data, samples) => inner(jtpe, inner(jtpe, typing, splits, data), splits, samples)
+          case Observe(data, samples) =>
+            inner(jtpe, inner(jtpe, typing, splits, data), splits, samples)
 
-          case IUI(_, left, right) => inner(jtpe, inner(jtpe, typing, splits, left), splits, right)
+          case IUI(_, left, right) =>
+            inner(jtpe, inner(jtpe, typing, splits, left), splits, right)
 
-          case Diff(left, right) => inner(jtpe, inner(jtpe, typing, splits, left), splits, right)
+          case Diff(left, right) =>
+            inner(jtpe, inner(jtpe, typing, splits, left), splits, right)
 
           case Filter(_, target, boolean) =>
             inner(Some(JBooleanT), inner(jtpe, typing, splits, target), splits, boolean)
@@ -170,29 +190,29 @@ trait TypeInferencer extends DAG {
     }
 
     def findGroup(spec: BucketSpec, id: Int): Option[DepGraph] = spec match {
-      case UnionBucketSpec(left, right)     => findGroup(left, id) orElse findGroup(right, id)
+      case UnionBucketSpec(left, right) => findGroup(left, id) orElse findGroup(right, id)
       case IntersectBucketSpec(left, right) => findGroup(left, id) orElse findGroup(right, id)
 
       case Group(`id`, target, _) => Some(target)
-      case Group(_, _, _)         => None
+      case Group(_, _, _) => None
 
       case UnfixedSolution(_, _) => None
-      case Extra(_)              => None
+      case Extra(_) => None
     }
 
     def findParams(spec: BucketSpec, id: Int): Set[DepGraph] = spec match {
-      case UnionBucketSpec(left, right)     => findParams(left, id) ++ findParams(right, id)
+      case UnionBucketSpec(left, right) => findParams(left, id) ++ findParams(right, id)
       case IntersectBucketSpec(left, right) => findParams(left, id) ++ findParams(right, id)
 
       case Group(_, _, child) => findParams(child, id)
 
       case UnfixedSolution(`id`, child) => Set(child)
-      case UnfixedSolution(_, _)        => Set()
-      case Extra(_)                     => Set()
+      case UnfixedSolution(_, _) => Set()
+      case Extra(_) => Set()
     }
 
     val collectedTypes = collectTypes(jtpe, graph)
-    val typing         = collectedTypes.mapValues(_.reduce(JUnionT))
+    val typing = collectedTypes.mapValues(_.reduce(JUnionT))
     applyTypes(typing, graph)
   }
 }

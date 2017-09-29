@@ -23,7 +23,7 @@ import org.specs2._
 
 import _root_.scalaz._, Scalaz._
 
-trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike {
+trait LeftShiftSpec[M[+ _]] extends TableModuleTestSupport[M] with SpecificationLike {
 
   def testTrivialArrayLeftShift = {
     val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil))
@@ -62,7 +62,8 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(0), JArray(JString("bar"), JNum(13))),
         toRecord(Array(0), JArray(JString("foo"), JNum(12))),
         toRecord(Array(1), JArray(JNum(0), JNum(42))),
-        toRecord(Array(1), JArray(JNum(1), JNum(43))))
+        toRecord(Array(1), JArray(JNum(1), JNum(43)))
+      )
 
     toJson(table.leftShift(CPath.Identity \ 1)).copoint.toVector mustEqual expected
   }
@@ -91,7 +92,8 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
             toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil)),
             toRecord(Array(1), JArray(JNum(22) :: JNum(23) :: JNum(24) :: JNum(25) :: Nil)),
             toRecord(Array(2), JArray(Nil)),
-            toRecord(Array(3), JString("psych!")))))
+            toRecord(Array(3), JString("psych!"))
+          )))
 
     val expected =
       Vector(
@@ -100,20 +102,23 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(0), JNum(22))),
         toRecord(Array(1), JArray(JNum(1), JNum(23))),
         toRecord(Array(1), JArray(JNum(2), JNum(24))),
-        toRecord(Array(1), JArray(JNum(3), JNum(25))))
+        toRecord(Array(1), JArray(JNum(3), JNum(25)))
+      )
 
     toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
   }
 
   def testTrivialArrayLeftShiftWithInnerObject = {
-    val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: JObject(JField("a", JNum(42))) :: Nil))
+    val rec =
+      toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: JObject(JField("a", JNum(42))) :: Nil))
     val table = fromSample(SampleData(Stream(rec)))
 
     val expected =
       Vector(
         toRecord(Array(0), JArray(JNum(0), JNum(12))),
         toRecord(Array(0), JArray(JNum(1), JNum(13))),
-        toRecord(Array(0), JArray(JNum(2), JObject(JField("a", JNum(42))))))
+        toRecord(Array(0), JArray(JNum(2), JObject(JField("a", JNum(42)))))
+      )
 
     toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
   }

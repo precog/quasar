@@ -39,7 +39,9 @@ object Tagged {
 
   implicit val encodeEJsonK: EncodeEJsonK[Tagged] =
     new EncodeEJsonK[Tagged] {
-      def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[Tagged, J] = {
+      def encodeK[J](
+          implicit JC: Corecursive.Aux[J, EJson],
+          JR: Recursive.Aux[J, EJson]): Algebra[Tagged, J] = {
         case Tagged(t, j) => E(ejs.Meta(j, ejs.Type(t))).embed
       }
     }

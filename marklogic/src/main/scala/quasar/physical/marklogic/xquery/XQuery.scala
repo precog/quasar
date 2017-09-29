@@ -36,7 +36,7 @@ sealed abstract class XQuery {
   def apply(predicate: XQuery): XQuery =
     this match {
       case XQuery.Step(s) => XQuery.Step(s"$s[$predicate]")
-      case _              => XQuery(s"$this[$predicate]")
+      case _ => XQuery(s"$this[$predicate]")
     }
 
   def fnapply(args: XQuery*): XQuery =
@@ -55,15 +55,15 @@ sealed abstract class XQuery {
   def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
 
   def `/`(xqy: XQuery): XQuery = xqy match {
-    case Step(s)      => XQuery(s"$this/$s")
+    case Step(s) => XQuery(s"$this/$s")
     case StringLit(s) => XQuery(s"""$this/"$s"""")
-    case other        => XQuery(s"""$this/xdmp:value("$other")""")
+    case other => XQuery(s"""$this/xdmp:value("$other")""")
   }
 
   def `//`(xqy: XQuery): XQuery = xqy match {
-    case Step(s)      => XQuery(s"$this//$s")
+    case Step(s) => XQuery(s"$this//$s")
     case StringLit(s) => XQuery(s"""$this//"$s"""")
-    case other        => XQuery(s"""$this//xdmp:value("$other")""")
+    case other => XQuery(s"""$this//xdmp:value("$other")""")
   }
 
   // Value Comparisons
@@ -79,7 +79,7 @@ sealed abstract class XQuery {
   // General Comparisons
   def ===(other: XQuery): XQuery = this match {
     case Step(s) => Step(s"$s = $other")
-    case xpr     => XQuery(s"$xpr = $other")
+    case xpr => XQuery(s"$xpr = $other")
   }
 
   def =/=(other: XQuery): XQuery = XQuery(s"$this != $other")
@@ -114,11 +114,11 @@ object XQuery {
   final case class Step(val render: String) extends XQuery
 
   final case class Flwor(
-    bindingClauses: NonEmptyList[BindingClause],
-    filterExpr: Option[XQuery],
-    orderSpecs: IList[(XQuery, SortDirection)],
-    orderIsStable: Boolean,
-    resultExpr: XQuery
+      bindingClauses: NonEmptyList[BindingClause],
+      filterExpr: Option[XQuery],
+      orderSpecs: IList[(XQuery, SortDirection)],
+      orderIsStable: Boolean,
+      resultExpr: XQuery
   ) extends XQuery {
     def render: String = {
       val bindings =
@@ -148,15 +148,23 @@ object XQuery {
 
   val stringLit = Prism.partial[XQuery, String] {
     case StringLit(s) => s
-  } (StringLit)
+  }(StringLit)
 
   val step = Prism.partial[XQuery, String] {
     case Step(s) => s
-  } (Step)
+  }(Step)
 
-  val flwor = Prism.partial[XQuery, (NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] {
-    case Flwor(bindings, filter, order, isStable, result) => (bindings, filter, order, isStable, result)
-  } (Flwor.tupled)
+  val flwor = Prism.partial[
+    XQuery,
+    (
+        NonEmptyList[BindingClause],
+        Option[XQuery],
+        IList[(XQuery, SortDirection)],
+        Boolean,
+        XQuery)] {
+    case Flwor(bindings, filter, order, isStable, result) =>
+      (bindings, filter, order, isStable, result)
+  }(Flwor.tupled)
 
   implicit val equal: Equal[XQuery] =
     Equal.equalBy(_.render)

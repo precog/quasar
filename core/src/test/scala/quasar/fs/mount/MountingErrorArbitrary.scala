@@ -28,15 +28,17 @@ import scalaz.scalacheck.ScalazArbitrary._
 
 trait MountingErrorArbitrary
     extends EnvironmentErrorArbitrary
-    with    MountConfigArbitrary
-    with    MountTypeArbitrary
-    with    PathErrorArbitrary {
+    with MountConfigArbitrary
+    with MountTypeArbitrary
+    with PathErrorArbitrary {
   implicit val arbMountingError: Arbitrary[MountingError] =
-    Arbitrary(Gen.oneOf(
-      arb[PathError] ∘ (MountingError.PError(_)),
-      arb[EnvironmentError] ∘ (MountingError.EError(_)),
-      (arb[MountConfig] ⊛ arb[NonEmptyList[String]])(MountingError.InvalidConfig(_, _)),
-      (arb[MountType] ⊛ arb[String])(MountingError.InvalidMount(_, _))))
+    Arbitrary(
+      Gen.oneOf(
+        arb[PathError] ∘ (MountingError.PError(_)),
+        arb[EnvironmentError] ∘ (MountingError.EError(_)),
+        (arb[MountConfig] ⊛ arb[NonEmptyList[String]])(MountingError.InvalidConfig(_, _)),
+        (arb[MountType] ⊛ arb[String])(MountingError.InvalidMount(_, _))
+      ))
 }
 
 object MountingErrorArbitrary extends MountingErrorArbitrary

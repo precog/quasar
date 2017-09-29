@@ -21,11 +21,11 @@ import slamdata.Predef._
 import scalaz._, Scalaz._
 
 /** Provides the ability to read, write and delete from a store of values
-  * indexed by keys.
-  *
-  * @tparam K the type of keys used to index values
-  * @tparam V the type of values in the store
-  */
+ * indexed by keys.
+ *
+ * @tparam K the type of keys used to index values
+ * @tparam V the type of values in the store
+ */
 trait Kvs[F[_], K, V] {
   def keys: F[Vector[K]]
   def get(k: K): F[Option[V]]
@@ -37,33 +37,36 @@ trait Kvs[F[_], K, V] {
 object Kvs extends KvsInstances {
   def apply[F[_], K, V](implicit K: Kvs[F, K, V]): Kvs[F, K, V] = K
 
-  def forTrans[F[_]: Monad, K, V, T[_[_], _]: MonadTrans](implicit K: Kvs[F, K, V]): Kvs[T[F, ?], K, V] =
+  def forTrans[F[_]: Monad, K, V, T[_[_], _]: MonadTrans](
+      implicit K: Kvs[F, K, V]): Kvs[T[F, ?], K, V] =
     new Kvs[T[F, ?], K, V] {
-      def keys                                    = K.keys.liftM[T]
-      def get(k: K)                               = K.get(k).liftM[T]
-      def put(k: K, v: V)                         = K.put(k, v).liftM[T]
+      def keys = K.keys.liftM[T]
+      def get(k: K) = K.get(k).liftM[T]
+      def put(k: K, v: V) = K.put(k, v).liftM[T]
       def compareAndPut(k: K, e: Option[V], u: V) = K.compareAndPut(k, e, u).liftM[T]
-      def delete(k: K)                            = K.delete(k).liftM[T]
+      def delete(k: K) = K.delete(k).liftM[T]
     }
 }
 
 sealed abstract class KvsInstances extends KvsInstances0 {
   implicit def keyValueStoreKvs[K, V]: Kvs[KeyValueStore[K, V, ?], K, V] =
     new Kvs[KeyValueStore[K, V, ?], K, V] {
-      def keys                                    = KeyValueStore.Keys()
-      def get(k: K)                               = KeyValueStore.Get(k)
-      def put(k: K, v: V)                         = KeyValueStore.Put(k, v)
+      def keys = KeyValueStore.Keys()
+      def get(k: K) = KeyValueStore.Get(k)
+      def put(k: K, v: V) = KeyValueStore.Put(k, v)
       def compareAndPut(k: K, e: Option[V], u: V) = KeyValueStore.CompareAndPut(k, e, u)
-      def delete(k: K)                            = KeyValueStore.Delete(k)
+      def delete(k: K) = KeyValueStore.Delete(k)
     }
 
-  implicit def freeKvs[K, V, F[_], S[_]](implicit F: Kvs[F, K, V], I: F :<: S): Kvs[Free[S, ?], K, V] =
+  implicit def freeKvs[K, V, F[_], S[_]](
+      implicit F: Kvs[F, K, V],
+      I: F :<: S): Kvs[Free[S, ?], K, V] =
     new Kvs[Free[S, ?], K, V] {
-      def keys                                    = Free.liftF(I(F.keys))
-      def get(k: K)                               = Free.liftF(I(F.get(k)))
-      def put(k: K, v: V)                         = Free.liftF(I(F.put(k, v)))
+      def keys = Free.liftF(I(F.keys))
+      def get(k: K) = Free.liftF(I(F.get(k)))
+      def put(k: K, v: V) = Free.liftF(I(F.put(k, v)))
       def compareAndPut(k: K, e: Option[V], u: V) = Free.liftF(I(F.compareAndPut(k, e, u)))
-      def delete(k: K)                            = Free.liftF(I(F.delete(k)))
+      def delete(k: K) = Free.liftF(I(F.delete(k)))
     }
 }
 
@@ -77,6 +80,7 @@ sealed abstract class KvsInstances0 {
   implicit def stateTKvs[K, V, S, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[StateT[F, S, ?], K, V] =
     Kvs.forTrans[F, K, V, StateT[?[_], S, ?]]
 
-  implicit def writerTKvs[K, V, W: Monoid, F[_]: Monad: Kvs[?[_], K, V]]: Kvs[WriterT[F, W, ?], K, V] =
+  implicit def writerTKvs[K, V, W: Monoid, F[_]: Monad: Kvs[?[_], K, V]]
+    : Kvs[WriterT[F, W, ?], K, V] =
     Kvs.forTrans[F, K, V, WriterT[?[_], W, ?]]
 }

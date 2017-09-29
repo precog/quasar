@@ -29,34 +29,33 @@ import scalaz.syntax.equal._
 sealed abstract class PathError
 
 object PathError {
-  final case class PathExists private (path: APath)
-      extends PathError
-  final case class PathNotFound private (path: APath)
-      extends PathError
-  final case class InvalidPath private (path: APath, reason: String)
-      extends PathError
+  final case class PathExists private (path: APath) extends PathError
+  final case class PathNotFound private (path: APath) extends PathError
+  final case class InvalidPath private (path: APath, reason: String) extends PathError
 
   val pathExists =
-    Prism.partial[PathError, APath] { case PathExists(p) => p } (PathExists)
+    Prism.partial[PathError, APath] { case PathExists(p) => p }(PathExists)
 
   val pathNotFound =
-    Prism.partial[PathError, APath] { case PathNotFound(p) => p } (PathNotFound)
+    Prism.partial[PathError, APath] { case PathNotFound(p) => p }(PathNotFound)
 
   val invalidPath =
     Prism.partial[PathError, (APath, String)] {
       case InvalidPath(p, r) => (p, r)
-    } (InvalidPath.tupled)
+    }(InvalidPath.tupled)
 
   val errorPath: Lens[PathError, APath] =
     Lens[PathError, APath] {
-      case PathExists(p)     => p
-      case PathNotFound(p)   => p
+      case PathExists(p) => p
+      case PathNotFound(p) => p
       case InvalidPath(p, _) => p
-    } { p => {
-      case PathExists(_)     => pathExists(p)
-      case PathNotFound(_)   => pathNotFound(p)
-      case InvalidPath(_, r) => invalidPath(p, r)
-    }}
+    } { p =>
+      {
+        case PathExists(_) => pathExists(p)
+        case PathNotFound(_) => pathNotFound(p)
+        case InvalidPath(_, r) => invalidPath(p, r)
+      }
+    }
 
   implicit val pathErrorShow: Show[PathError] = {
     val typeStr: APath => String =
@@ -75,9 +74,9 @@ object PathError {
   }
 
   implicit val equal: Equal[PathError] = Equal.equal {
-    case (PathExists(a), PathExists(b))         => a ≟ b
-    case (PathNotFound(a), PathNotFound(b))     => a ≟ b
+    case (PathExists(a), PathExists(b)) => a ≟ b
+    case (PathNotFound(a), PathNotFound(b)) => a ≟ b
     case (InvalidPath(a, b), InvalidPath(c, d)) => a ≟ c && b ≟ d
-    case _                                      => false
+    case _ => false
   }
 }

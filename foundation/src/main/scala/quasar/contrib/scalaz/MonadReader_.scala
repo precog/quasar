@@ -19,8 +19,8 @@ package quasar.contrib.scalaz
 import scalaz._, Scalaz._
 
 /** A version of MonadReader that doesn't extend Monad to avoid ambiguous implicits
-  * in the presence of multiple "mtl" constraints.
-  */
+ * in the presence of multiple "mtl" constraints.
+ */
 trait MonadReader_[F[_], R] {
   def ask: F[R]
   def local[A](f: R => R)(fa: F[A]): F[A]
@@ -39,19 +39,22 @@ object MonadReader_ extends MonadReader_Instances {
 }
 
 sealed abstract class MonadReader_Instances {
-  implicit def eitherTMonadReader_[F[_]: Functor, E, R](implicit R: MonadReader_[F, R]): MonadReader_[EitherT[F, E, ?], R] =
+  implicit def eitherTMonadReader_[F[_]: Functor, E, R](
+      implicit R: MonadReader_[F, R]): MonadReader_[EitherT[F, E, ?], R] =
     new MonadReader_[EitherT[F, E, ?], R] {
       def ask = EitherT(R.ask map (_.right[E]))
       def local[A](f: R => R)(fa: EitherT[F, E, A]) = EitherT(R.local(f)(fa.run))
     }
 
-  implicit def writerTMonadReader_[F[_]: Functor, W: Monoid, R](implicit R: MonadReader_[F, R]): MonadReader_[WriterT[F, W, ?], R] =
+  implicit def writerTMonadReader_[F[_]: Functor, W: Monoid, R](
+      implicit R: MonadReader_[F, R]): MonadReader_[WriterT[F, W, ?], R] =
     new MonadReader_[WriterT[F, W, ?], R] {
       def ask = WriterT(R.ask strengthL mzero[W])
       def local[A](f: R => R)(fa: WriterT[F, W, A]) = WriterT(R.local(f)(fa.run))
     }
 
-  implicit def kleisliInnerMonadReader_[F[_], R1, R2](implicit R: MonadReader_[F, R1]): MonadReader_[Kleisli[F, R2, ?], R1] =
+  implicit def kleisliInnerMonadReader_[F[_], R1, R2](
+      implicit R: MonadReader_[F, R1]): MonadReader_[Kleisli[F, R2, ?], R1] =
     new MonadReader_[Kleisli[F, R2, ?], R1] {
       def ask = Kleisli(_ => R.ask)
       def local[A](f: R1 => R1)(fa: Kleisli[F, R2, A]) = Kleisli(r2 => R.local(f)(fa.run(r2)))

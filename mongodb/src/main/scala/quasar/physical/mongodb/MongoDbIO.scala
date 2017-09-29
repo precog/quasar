@@ -33,7 +33,7 @@ import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.client.model._
 import com.mongodb.async._
 import com.mongodb.async.client._
-import org.bson.{BsonBoolean, BsonDocument, BSONException, Document}
+import org.bson.{BSONException, BsonBoolean, BsonDocument, Document}
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
@@ -51,20 +51,20 @@ final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]
   def attemptMongo: MongoErrT[MongoDbIO, A] =
     EitherT(attempt >>= {
       case -\/(me: MongoException) => unhandledFSError(me).left.point[MongoDbIO]
-      case -\/(be: BSONException)  => unhandledFSError(be).left.point[MongoDbIO]
-      case -\/(t)                  => MongoDbIO.fail(t)
-      case \/-(a)                  => a.right.point[MongoDbIO]
+      case -\/(be: BSONException) => unhandledFSError(be).left.point[MongoDbIO]
+      case -\/(t) => MongoDbIO.fail(t)
+      case \/-(a) => a.right.point[MongoDbIO]
     })
 
   def run(c: MongoClient): Task[A] =
     r.run(c)
 
   def runF[S[_]](
-    c: MongoClient
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): Free[S, A] = {
+      c: MongoClient
+  )(
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): Free[S, A] = {
     val mongoErr = Failure.Ops[PhysicalError, S]
     mongoErr.unattempt(free.lift(attemptMongo.run.run(c)).into[S])
   }
@@ -73,34 +73,30 @@ final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]
 object MongoDbIO {
 
   /** Returns the stream of results of aggregating documents according to the
-    * given aggregation pipeline.
-    */
+   * given aggregation pipeline.
+   */
   def aggregated(
-    src: Collection,
-    pipeline: List[Bson.Doc],
-    allowDiskUse: Boolean
+      src: Collection,
+      pipeline: List[Bson.Doc],
+      allowDiskUse: Boolean
   ): Process[MongoDbIO, BsonDocument] =
-    aggregateIterable(src, pipeline, allowDiskUse)
-      .liftM[Process]
-      .flatMap(iterableToProcess)
+    aggregateIterable(src, pipeline, allowDiskUse).liftM[Process].flatMap(iterableToProcess)
 
   /** Aggregates documents according to the given aggregation pipeline, which
-    * must end with an `\$out` stage specifying the collection where results
-    * may be found.
-    */
+   * must end with an `\$out` stage specifying the collection where results
+   * may be found.
+   */
   def aggregate(
-    src: Collection,
-    pipeline: List[Bson.Doc],
-    allowDiskUse: Boolean
+      src: Collection,
+      pipeline: List[Bson.Doc],
+      allowDiskUse: Boolean
   ): MongoDbIO[Unit] =
     aggregateIterable(src, pipeline, allowDiskUse)
       .flatMap(c => async[java.lang.Void](c.toCollection(_)))
       .void
 
   def collectionExists(c: Collection): MongoDbIO[Boolean] =
-    collectionsIn(c.database)
-      .exists(_.collection == c.collection)
-      .runLastOr(false)
+    collectionsIn(c.database).exists(_.collection == c.collection).runLastOr(false)
 
   /** All discoverable collections on the server. */
   def collections: Process[MongoDbIO, Collection] =
@@ -108,7 +104,8 @@ object MongoDbIO {
 
   /** The collections in the named database. */
   def collectionsIn(dbName: DatabaseName): Process[MongoDbIO, Collection] =
-    database(dbName).liftM[Process]
+    database(dbName)
+      .liftM[Process]
       .flatMap(db => iterableToProcess(db.listCollectionNames).map(CollectionName(_)))
       .map(Collection(dbName, _))
 
@@ -119,11 +116,13 @@ object MongoDbIO {
 
   /** Names of all discoverable databases on the server. */
   def databaseNames: Process[MongoDbIO, DatabaseName] =
-    client.liftM[Process]
+    client
+      .liftM[Process]
       .flatMap(c => iterableToProcess(c.listDatabaseNames).map(DatabaseName(_)))
       .onFailure {
         case t: MongoCommandException =>
-          credentials.liftM[Process]
+          credentials
+            .liftM[Process]
             .flatMap(ys => Process.emitAll(ys.map(y => DatabaseName(y.getSource)).distinct))
 
         case t =>
@@ -144,8 +143,8 @@ object MongoDbIO {
     collectionExists(c).ifM(().point[MongoDbIO], createCollection(c))
 
   /** Returns the name of the first database where an insert to the collection
-    * having the given name succeeds.
-    */
+   * having the given name succeeds.
+   */
   def firstWritableDb(collName: CollectionName): OptionT[MongoDbIO, DatabaseName] = {
     type M[A] = OptionT[MongoDbIO, A]
 
@@ -161,7 +160,8 @@ object MongoDbIO {
     databaseNames
       .translate[M](liftMT[MongoDbIO, OptionT])
       .evalMap(n => canWriteToCol(Collection(n, collName)))
-      .take(1).runLast
+      .take(1)
+      .runLast
       .flatMap(n => OptionT(n.point[MongoDbIO]))
   }
 
@@ -181,10 +181,12 @@ object MongoDbIO {
   }
 
   /** Attempts to insert as many of the given documents into the collection as
-    * possible. The number of documents inserted is returned, if possible, and
-    * may be smaller than the original amount if any documents failed to insert.
-    */
-  def insertAny[F[_]: Foldable](coll: Collection, docs: F[BsonDocument]): OptionT[MongoDbIO, Int] = {
+   * possible. The number of documents inserted is returned, if possible, and
+   * may be smaller than the original amount if any documents failed to insert.
+   */
+  def insertAny[F[_]: Foldable](
+      coll: Collection,
+      docs: F[BsonDocument]): OptionT[MongoDbIO, Int] = {
     val docList = new LinkedList[WriteModel[BsonDocument]]
     val writeOpts = (new BulkWriteOptions()).ordered(false)
 
@@ -193,18 +195,19 @@ object MongoDbIO {
     if (docList.isEmpty)
       OptionT.none
     else
-      OptionT(collection(coll)
-        .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
-        .map(r => r.wasAcknowledged option r.getInsertedCount))
+      OptionT(
+        collection(coll)
+          .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
+          .map(r => r.wasAcknowledged option r.getInsertedCount))
   }
 
   /** Executes the map-reduce job described by `cfg`, sourcing documents from
-    * `src` and writing the output to `dst`.
-    */
+   * `src` and writing the output to `dst`.
+   */
   def mapReduce(
-    src: Collection,
-    dst: MapReduce.OutputCollection,
-    cfg: MapReduce
+      src: Collection,
+      dst: MapReduce.OutputCollection,
+      cfg: MapReduce
   ): MongoDbIO[Unit] = {
     import MapReduce._, Action._
 
@@ -212,19 +215,18 @@ object MongoDbIO {
     val ms = MonadState[F, MapReduceIterable[BsonDocument]]
 
     def withAction(actOut: ActionedOutput): F[Unit] =
-      actOut.database.traverse_[F](n => ms.modify(_.databaseName(n.value)))     *>
-      actOut.shardOutputCollection.traverse_[F](s => ms.modify(_.sharded(s))) *>
-      actOut.action.nonAtomic.traverse_[F](s => ms.modify(_.nonAtomic(s)))    *>
-      ms.modify(_.action(actOut.action match {
-        case Replace   => MapReduceAction.REPLACE
-        case Merge(_)  => MapReduceAction.MERGE
-        case Reduce(_) => MapReduceAction.REDUCE
-      }))
+      actOut.database.traverse_[F](n => ms.modify(_.databaseName(n.value))) *>
+        actOut.shardOutputCollection.traverse_[F](s => ms.modify(_.sharded(s))) *>
+        actOut.action.nonAtomic.traverse_[F](s => ms.modify(_.nonAtomic(s))) *>
+        ms.modify(_.action(actOut.action match {
+          case Replace => MapReduceAction.REPLACE
+          case Merge(_) => MapReduceAction.MERGE
+          case Reduce(_) => MapReduceAction.REDUCE
+        }))
 
     mapReduceIterable(src, cfg) flatMap { it =>
       val itWithOutput =
-        dst.withAction.traverse_(withAction)
-          .exec(it.collectionName(dst.collection.value))
+        dst.withAction.traverse_(withAction).exec(it.collectionName(dst.collection.value))
 
       async[java.lang.Void](itWithOutput.toCollection).void
     }
@@ -235,7 +237,7 @@ object MongoDbIO {
     import RenameSemantics._
 
     val dropDst = semantics match {
-      case Overwrite    => true
+      case Overwrite => true
       case FailIfExists => false
     }
 
@@ -243,10 +245,13 @@ object MongoDbIO {
       ().point[MongoDbIO]
     else
       collection(src)
-        .flatMap(c => async[java.lang.Void](c.renameCollection(
-          dst.asNamespace,
-          (new RenameCollectionOptions) dropTarget dropDst,
-          _)))
+        .flatMap(
+          c =>
+            async[java.lang.Void](
+              c.renameCollection(
+                dst.asNamespace,
+                (new RenameCollectionOptions) dropTarget dropDst,
+                _)))
         .void
   }
 
@@ -256,19 +261,20 @@ object MongoDbIO {
       val cmd = Bson.Doc(ListMap("buildinfo" -> Bson.Int32(1)))
 
       runCommand(dbName, cmd).attemptMongo.run.map(
-        _.leftMap(_.cause.getMessage)
-          .flatMap(doc =>
+        _.leftMap(_.cause.getMessage).flatMap(
+          doc =>
             Option(doc getString "version")
-              .toRightDisjunction("Unable to determine server version, buildInfo response is missing the 'version' field")
+              .toRightDisjunction(
+                "Unable to determine server version, buildInfo response is missing the 'version' field")
               .flatMap(v => ServerVersion.fromString(v.getValue))))
     }
 
     val finalize: ((Vector[String], Vector[ServerVersion])) => MongoDbIO[ServerVersion] = {
       case (errs, vers) =>
         vers.headOption.map(_.point[MongoDbIO]) orElse
-        // FIXME: Shouldn’t be creating fresh MongoExceptions
-        errs.headOption.map(msg => fail[ServerVersion](new MongoException(msg))) getOrElse
-        fail(new MongoException("No database found."))
+          // FIXME: Shouldn’t be creating fresh MongoExceptions
+          errs.headOption.map(msg => fail[ServerVersion](new MongoException(msg))) getOrElse
+          fail(new MongoException("No database found."))
     }
 
     // NB: use "admin" DB as fallback if no database is known to exist.
@@ -284,40 +290,44 @@ object MongoDbIO {
     val cmd = Bson.Doc(ListMap("collStats" -> coll.collection.bson))
 
     def longValue(doc: BsonDocument, field: String): String \/ Long =
-      \/.fromTryCatchNonFatal(Option(doc.getNumber(field)).map(_.longValue) \/>
-        s"expected field: $field").fold(_.getMessage.left, ι)
+      \/.fromTryCatchNonFatal(
+        Option(doc.getNumber(field)).map(_.longValue) \/>
+          s"expected field: $field").fold(_.getMessage.left, ι)
 
     def booleanValue(doc: BsonDocument, field: String): Boolean =
       doc.get(field, BsonBoolean.FALSE) != BsonBoolean.FALSE
 
-    runCommand(coll.database, cmd).map(doc =>
-      (for {
-        count    <- longValue(doc, "count")
-        dataSize <- longValue(doc, "size")
-        sharded  =  booleanValue(doc, "sharded")
-      } yield CollectionStatistics(count, dataSize, sharded)))
-        .flatMap(_.fold(
+    runCommand(coll.database, cmd)
+      .map(doc =>
+        (for {
+          count <- longValue(doc, "count")
+          dataSize <- longValue(doc, "size")
+          sharded = booleanValue(doc, "sharded")
+        } yield CollectionStatistics(count, dataSize, sharded)))
+      .flatMap(
+        _.fold(
           err => fail(new MongoException("could not read collection statistics: " + err)),
           _.point[MongoDbIO]))
   }
 
   private def collect[A](iter: MongoIterable[A]): MongoDbIO[List[A]] = {
     import scala.collection.JavaConverters._
-    async[java.util.ArrayList[A]](cb => iter.into[java.util.ArrayList[A]](new java.util.ArrayList[A], cb)).map(_.asScala.toList)
+    async[java.util.ArrayList[A]](cb =>
+      iter.into[java.util.ArrayList[A]](new java.util.ArrayList[A], cb)).map(_.asScala.toList)
   }
 
   /** Set of indexes on a collection, including only simple index types and
-    * ignoring the rest.
-    */
+   * ignoring the rest.
+   */
   def indexes(coll: Collection): MongoDbIO[Set[Index]] = {
     // TODO: split on ".", but note that MongoDB seems to treat such keys
     // special anyway, at least when arrays are present.
     def decodeField(s: String): BsonField = BsonField.Name(s)
 
     val decodeType: PartialFunction[java.lang.Object, IndexType] = {
-      case x: java.lang.Number if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Number if x.intValue ≟ 1 => IndexType.Ascending
       case x: java.lang.Number if x.intValue ≟ -1 => IndexType.Descending
-      case "hashed"                               => IndexType.Hashed
+      case "hashed" => IndexType.Hashed
     }
 
     def decodeIndex(doc: Document): Option[Index] =
@@ -331,14 +341,10 @@ object MongoDbIO {
               case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
             })
           case _ => None
-        })(Index(
-          _,
-          _,
-          Option(doc.get("unique")).fold(
-            false) {
-            case java.lang.Boolean.TRUE => true
-            case _                      => false
-          }))
+        })(Index(_, _, Option(doc.get("unique")).fold(false) {
+        case java.lang.Boolean.TRUE => true
+        case _ => false
+      }))
 
     collection(coll)
       .flatMap(c => collect[Document](c.listIndexes))
@@ -353,22 +359,21 @@ object MongoDbIO {
   val liftTask = λ[Task ~> MongoDbIO](t => lift(_ => t))
 
   /** Returns the underlying, configured aggregate iterable for applying the
-    * given pipeline to the source collection.
-    */
+   * given pipeline to the source collection.
+   */
   private[mongodb] def aggregateIterable(
-    src: Collection,
-    pipeline: List[Bson.Doc],
-    allowDiskUse: Boolean
+      src: Collection,
+      pipeline: List[Bson.Doc],
+      allowDiskUse: Boolean
   ): MongoDbIO[AggregateIterable[BsonDocument]] =
     collection(src) map (c =>
-      c.aggregate(pipeline.asJava)
-        .allowDiskUse(new JBoolean(allowDiskUse)))
+      c.aggregate(pipeline.asJava).allowDiskUse(new JBoolean(allowDiskUse)))
 
   private[mongodb] def mapReduceIterable(
-    src: Collection,
-    cfg: MapReduce
+      src: Collection,
+      cfg: MapReduce
   ): MongoDbIO[MapReduceIterable[BsonDocument]] = {
-    type IT       = MapReduceIterable[BsonDocument]
+    type IT = MapReduceIterable[BsonDocument]
     type CfgIt[A] = State[IT, A]
     val ms = MonadState[CfgIt, IT]
 
@@ -380,18 +385,20 @@ object MongoDbIO {
 
     val sortRepr =
       cfg.inputSort map (ts =>
-        Bson.Doc(ListMap(
-          ts.list.toList.map(_.bimap(_.asText, sortDirToBson(_))): _*
-        )).repr)
+        Bson
+          .Doc(ListMap(
+            ts.list.toList.map(_.bimap(_.asText, sortDirToBson(_))): _*
+          ))
+          .repr)
 
     val configuredIt =
-      foldIt(cfg.selection)((i, s) => i.filter(s.bson.repr))           *>
-      foldIt(sortRepr)(_ sort _)                                       *>
-      foldIt(cfg.limit)(_ limit _.toInt)                               *>
-      foldIt(cfg.finalizer)((i, f) => i.finalizeFunction(f.pprint(0))) *>
-      foldIt(nonEmptyScope)((i, s) => i.scope(Bson.Doc(s).repr))       *>
-      foldIt(cfg.jsMode)(_ jsMode _)                                   *>
-      foldIt(cfg.verbose)(_ verbose _)
+      foldIt(cfg.selection)((i, s) => i.filter(s.bson.repr)) *>
+        foldIt(sortRepr)(_ sort _) *>
+        foldIt(cfg.limit)(_ limit _.toInt) *>
+        foldIt(cfg.finalizer)((i, f) => i.finalizeFunction(f.pprint(0))) *>
+        foldIt(nonEmptyScope)((i, s) => i.scope(Bson.Doc(s).repr)) *>
+        foldIt(cfg.jsMode)(_ jsMode _) *>
+        foldIt(cfg.verbose)(_ verbose _)
 
     collection(src) map { c =>
       configuredIt exec c.mapReduce(cfg.map.pprint(0), cfg.reduce.pprint(0))
@@ -435,22 +442,23 @@ object MongoDbIO {
     MongoDbIO(_ getDatabase named.value)
 
   private def runCommand(dbName: DatabaseName, cmd: Bson.Doc): MongoDbIO[BsonDocument] =
-    database(dbName) flatMap (db => async[BsonDocument](db.runCommand(cmd, classOf[BsonDocument], _)))
+    database(dbName) flatMap (db =>
+      async[BsonDocument](db.runCommand(cmd, classOf[BsonDocument], _)))
 
   private def iterableToProcess[A](it: MongoIterable[A]): Process[MongoDbIO, A] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def go(c: AsyncBatchCursor[A]): Process[MongoDbIO, A] =
-      Process.eval(async(c.next))
-        .flatMap(r => Option(r).cata(
-          as => Process.emitAll(as.asScala.toVector) ++ go(c),
-          Process.halt))
+      Process
+        .eval(async(c.next))
+        .flatMap(r =>
+          Option(r).cata(as => Process.emitAll(as.asScala.toVector) ++ go(c), Process.halt))
 
     Process.eval(async(it.batchCursor)) flatMap (cur =>
       go(cur) onComplete Process.eval_(MongoDbIO(_ => cur.close())))
   }
 
   private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)
-    extends SingleResultCallback[A] {
+      extends SingleResultCallback[A] {
 
     def onResult(result: A, error: Throwable): Unit =
       f(Option(error) <\/ result)

@@ -33,16 +33,17 @@ import scalaz._
 import scala.collection.JavaConverters._
 
 /**
-  * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
-  * the index has been created and filled prior to creating this wrapper.
-  */
-class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
-                                                        indexName: String,
-                                                        sortKeyRefs: Seq[ColumnRef],
-                                                        valRefs: Seq[ColumnRef],
-                                                        sortOrder: DesiredSortOrder,
-                                                        sliceSize: Int,
-                                                        val length: Long)
+ * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
+ * the index has been created and filled prior to creating this wrapper.
+ */
+class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (
+    dbFile: File,
+    indexName: String,
+    sortKeyRefs: Seq[ColumnRef],
+    valRefs: Seq[ColumnRef],
+    sortOrder: DesiredSortOrder,
+    sliceSize: Int,
+    val length: Long)
     extends ProjectionLike[M, Slice]
     with Logging {
   import JDBMProjection._
@@ -51,7 +52,7 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
   def structure(implicit M: Monad[M]) = M.point((sortKeyRefs ++ valRefs).toSet)
 
   def foreach(f: java.util.Map.Entry[Array[Byte], Array[Byte]] => Unit) {
-    val DB                                         = DBMaker.openFile(dbFile.getCanonicalPath).make()
+    val DB = DBMaker.openFile(dbFile.getCanonicalPath).make()
     val index: SortedMap[Array[Byte], Array[Byte]] = DB.getTreeMap(indexName)
 
     index.entrySet().iterator().asScala.foreach(f)
@@ -66,7 +67,8 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
       implicit M: Monad[M]): M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {
-      throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")
+      throw new IllegalArgumentException(
+        "JDBM Sort Projections may not be constrained by column descriptor")
     }
 
     // At this point we have completed all valid writes, so we open readonly + no locks, allowing for concurrent use of sorted data
@@ -76,7 +78,8 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
       val index: SortedMap[Array[Byte], Array[Byte]] = db.getTreeMap(indexName)
 
       if (index == null) {
-        throw new IllegalArgumentException("No such index in DB: %s:%s".format(dbFile, indexName))
+        throw new IllegalArgumentException(
+          "No such index in DB: %s:%s".format(dbFile, indexName))
       }
 
       val constrainedMap = id.map { idKey =>
@@ -93,7 +96,7 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
       // FIXME: this is brokenness in JDBM somewhere
       val iterator = {
         var initial: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]] = null
-        var tries                                                            = 0
+        var tries = 0
         while (tries < MAX_SPINS && initial == null) {
           try {
             initial = iteratorSetup()
@@ -115,13 +118,16 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
         val keyColumns = sortKeyRefs.map(JDBMSlice.columnFor(CPath("[0]"), sliceSize))
         val valColumns = valRefs.map(JDBMSlice.columnFor(CPath("[1]"), sliceSize))
 
-        val keyColumnDecoder = keyFormat.ColumnDecoder(keyColumns.map(_._2)(collection.breakOut))
-        val valColumnDecoder = rowFormat.ColumnDecoder(valColumns.map(_._2)(collection.breakOut))
+        val keyColumnDecoder =
+          keyFormat.ColumnDecoder(keyColumns.map(_._2)(collection.breakOut))
+        val valColumnDecoder =
+          rowFormat.ColumnDecoder(valColumns.map(_._2)(collection.breakOut))
 
-        val (firstKey, lastKey, rows) = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
+        val (firstKey, lastKey, rows) =
+          JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
 
         val slice = new Slice {
-          val size    = rows
+          val size = rows
           val columns = keyColumns.toMap ++ valColumns
         }
 

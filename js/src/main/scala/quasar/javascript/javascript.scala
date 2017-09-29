@@ -18,7 +18,7 @@ package quasar.javascript
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{Terminal, RenderTree}
+import quasar.{RenderTree, Terminal}
 
 import scalaz._, Scalaz._
 
@@ -80,7 +80,8 @@ object Js {
   final case class Catch(ident: Ident, body: Stmt) extends Stmt
   final case class If(cond: Expr, `then`: Stmt, `else`: Option[Stmt]) extends Stmt
   final case class While(cond: Expr, body: Stmt) extends Stmt
-  final case class For(init: List[Stmt], check: Expr, update: List[Stmt], body: Stmt) extends Stmt
+  final case class For(init: List[Stmt], check: Expr, update: List[Stmt], body: Stmt)
+      extends Stmt
   final case class ForIn(ident: Ident, coll: Expr, body: Stmt) extends Stmt
   sealed abstract class Switchable extends Stmt
   final case class Case(const: List[Expr], body: Stmt) extends Switchable
@@ -88,7 +89,8 @@ object Js {
   final case class Switch(expr: Expr, cases: List[Case], default: Option[Default]) extends Stmt
   final case class VarDef(idents: List[(String, Expr)]) extends Stmt
   final case class FunDecl(ident: String, params: List[String], body: List[Stmt]) extends Stmt
-  final case class ObjDecl(name: String, constructor: FunDecl, fields: List[(String, Expr)]) extends Stmt
+  final case class ObjDecl(name: String, constructor: FunDecl, fields: List[(String, Expr)])
+      extends Stmt
   final case class Return(jsExpr: Expr) extends Stmt
   final case class Stmts(stmts: List[Stmt]) extends Stmt
 
@@ -112,17 +114,22 @@ object Js {
   }
 
   /** Smart constructors to construct a Js.Num without worrying about numeric
-    * widening or getting the `float` flag correct.
-    */
+   * widening or getting the `float` flag correct.
+   */
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def num(value: Double) = Num(value,          true)
-  def num(value: Long)   = Num(value.toDouble, false)
+  def num(value: Double) = Num(value, true)
+  def num(value: Long) = Num(value.toDouble, false)
 }
 
 private object JavascriptPrinter {
   import Js._
 
-  private[this] val substitutions = Map("\\\"".r -> "\\\\\"", "\\n".r -> "\\\\n", "\\r".r -> "\\\\r", "\\t".r -> "\\\\t", "\\\\".r -> "\\\\\\\\")
+  private[this] val substitutions = Map(
+    "\\\"".r -> "\\\\\"",
+    "\\n".r -> "\\\\n",
+    "\\r".r -> "\\\\r",
+    "\\t".r -> "\\\\t",
+    "\\\\".r -> "\\\\\\\\")
   private[this] def simplify(ast: Js): Js = ast match {
     case Block(stmts) => Block(stmts.filter(_ != Unit))
     case Case(const, Block(List(stmt))) => Case(const, stmt)
@@ -146,78 +153,90 @@ private object JavascriptPrinter {
     }
     def seqOut(content: List[String], open: String, sep: String, close: String) = {
       val isBlock = close ≟ "}"
-      if (content.foldLeft(indent + open.length + close.length)(_ + _.length + sep.length + 1) < 80 && !content.exists(_.contains('\n')))
+      if (content.foldLeft(indent + open.length + close.length)(_ + _.length + sep.length + 1) < 80 && !content
+          .exists(_.contains('\n')))
         if (isBlock) content.mkString(open + " ", sep + " ", " " + close)
-        else         content.mkString(open,       sep + " ",       close)
-        else
-          content.mkString(
-            open + "\n" + ind(2),
-            sep + "\n" + ind(2),
-            if (isBlock) "\n" + ind(0) + close else close)
+        else content.mkString(open, sep + " ", close)
+      else
+        content.mkString(
+          open + "\n" + ind(2),
+          sep + "\n" + ind(2),
+          if (isBlock) "\n" + ind(0) + close else close)
     }
 
     simplify(ast) match {
-      case Lazy(f)                            => p(f())
-      case Null                               => "null"
-      case Bool(value)                        => value.toString
-      case Str(value)                         => "\"" + substitutions.foldLeft(value){case (v, (r, s)) => r.replaceAllIn(v, s)} + "\""
-      case Num(value, true)                   => value.toString
-      case Num(value, false)                  => value.toLong.toString
-      case AnonElem(values)                   =>
+      case Lazy(f) => p(f())
+      case Null => "null"
+      case Bool(value) => value.toString
+      case Str(value) =>
+        "\"" + substitutions.foldLeft(value) { case (v, (r, s)) => r.replaceAllIn(v, s) } + "\""
+      case Num(value, true) => value.toString
+      case Num(value, false) => value.toLong.toString
+      case AnonElem(values) =>
         seqOut(values.map(p3), "[", ",", "]")
-      case Ident(value)                       => value
-      case Raw(value)                         => value
-      case Access(qual, key)                  => s"${s(qual)}[${p(key)}]"
-      case Select(qual, name)                 => s"${s(qual)}.$name"
-      case UnOp(operator, operand)            => operator + " " + s(operand)
-      case BinOp("=", lhs, rhs)               => s"${p(lhs)} = ${p(rhs)}"
-      case BinOp(operator, lhs, rhs)          => s"${s(lhs)} $operator ${s(rhs)}"
-      case New(call)                          => s"new ${p(call)}"
-      case Throw(expr)                        => s"throw ${p(expr)}"
-      case Call(callee @ Ident(_), params)    =>
+      case Ident(value) => value
+      case Raw(value) => value
+      case Access(qual, key) => s"${s(qual)}[${p(key)}]"
+      case Select(qual, name) => s"${s(qual)}.$name"
+      case UnOp(operator, operand) => operator + " " + s(operand)
+      case BinOp("=", lhs, rhs) => s"${p(lhs)} = ${p(rhs)}"
+      case BinOp(operator, lhs, rhs) => s"${s(lhs)} $operator ${s(rhs)}"
+      case New(call) => s"new ${p(call)}"
+      case Throw(expr) => s"throw ${p(expr)}"
+      case Call(callee @ Ident(_), params) =>
         seqOut(params.map(p3), p(callee) + "(", ",", ")")
       case Call(callee @ Select(_, _), params) =>
         seqOut(params.map(p3), p(callee) + "(", ",", ")")
-      case Call(callee, params)               =>
+      case Call(callee, params) =>
         seqOut(params.map(p3), s"""(${p(callee)})(""", ",", ")")
-      case Block(Nil)                         => "{}"
-      case Block(stmts)                       =>
+      case Block(Nil) => "{}"
+      case Block(stmts) =>
         seqOut(stmts.map(p3), "{", ";", "}")
-      case Ternary(cond, thenp, elsep)        => s"${s(cond)} ? ${p(thenp)} : ${p(elsep)}"
-      case If(cond, thenp, elsep)             => s"if (${p(cond)}) ${p(thenp)}" + elsep.map(e => s" else ${p(e)}").getOrElse("")
-      case Switch(expr, cases, default)       =>
-        seqOut(default.foldLeft(cases.map(p2))((l, d) => l :+ p2(d)), s"switch (${p(expr)}) {", "", "}")
-      case Case(consts, body)                 => consts.map(c => s"case ${p(c)}:\n").mkString(ind(0)) + p2(body) + ";\n" + ind(2) + "break;"
-      case Default(body)                      => "default:\n" + p2(body) + ";\n" + ind(2) + "break;"
-      case While(cond, body)                  => s"while (${p(cond)}) ${p(body)}"
-      case Try(body, cat, fin)                =>
+      case Ternary(cond, thenp, elsep) => s"${s(cond)} ? ${p(thenp)} : ${p(elsep)}"
+      case If(cond, thenp, elsep) =>
+        s"if (${p(cond)}) ${p(thenp)}" + elsep.map(e => s" else ${p(e)}").getOrElse("")
+      case Switch(expr, cases, default) =>
+        seqOut(
+          default.foldLeft(cases.map(p2))((l, d) => l :+ p2(d)),
+          s"switch (${p(expr)}) {",
+          "",
+          "}")
+      case Case(consts, body) =>
+        consts
+          .map(c => s"case ${p(c)}:\n")
+          .mkString(ind(0)) + p2(body) + ";\n" + ind(2) + "break;"
+      case Default(body) => "default:\n" + p2(body) + ";\n" + ind(2) + "break;"
+      case While(cond, body) => s"while (${p(cond)}) ${p(body)}"
+      case Try(body, cat, fin) =>
         val b = p(body)
         val c = cat.map(p2).getOrElse("")
         val f = fin.map(f => s"finally {${p2(f)}\n}").getOrElse("")
         s"try { $b \n} $c \n $f"
-      case Catch(Ident(ident), body)          => s"catch($ident) {\n${p2(body)}\n}"
-      case For(init, check, update, body)     =>
+      case Catch(Ident(ident), body) => s"catch($ident) {\n${p2(body)}\n}"
+      case For(init, check, update, body) =>
         val in = init.map(p).mkString(", ")
         val upd = update.map(p).mkString(", ")
         s"for ($in; ${p(check)}; $upd) ${p(body)}"
-      case ForIn(Ident(ident), coll, body)    => s"for (var $ident in (${p(coll)})) ${p(body)}"
-      case VarDef(Nil)                        => scala.sys.error("Var definition must have at least one identifier.")
-      case VarDef(idents)                     =>
+      case ForIn(Ident(ident), coll, body) => s"for (var $ident in (${p(coll)})) ${p(body)}"
+      case VarDef(Nil) => scala.sys.error("Var definition must have at least one identifier.")
+      case VarDef(idents) =>
         "var " + idents.map {
           case (ident, Unit) => ident
-        case (ident, init) => ident + " = " + p(init)
-      }.mkString(", ")
-      case FunDecl(ident, params, body)       => s"""function $ident(${params.mkString(", ")}) ${p(Block(body))}"""
-      case AnonFunDecl(params, body)          => s"""function (${params.mkString(", ")}) ${p(Block(body))}"""
-      case AnonObjDecl(fields)                =>
+          case (ident, init) => ident + " = " + p(init)
+        }.mkString(", ")
+      case FunDecl(ident, params, body) =>
+        s"""function $ident(${params.mkString(", ")}) ${p(Block(body))}"""
+      case AnonFunDecl(params, body) =>
+        s"""function (${params.mkString(", ")}) ${p(Block(body))}"""
+      case AnonObjDecl(fields) =>
         seqOut(fields.map { case (k, v) => s""""$k": ${p3(v)}""" }, "{", ",", "}")
       case ObjDecl(name, FunDecl(_, params, stmts), fields) =>
         val fs = fields ∘ { case (n, v) => ind(2) + s"this.$n = ${p(v)};" }
         val body = fs ++ stmts.map(s => ind(2) + p(s)) mkString "\n"
         s"""function $name(${params.mkString(", ")}) {\n$body\n${ind(0)}}"""
-      case Return(jsExpr)                     => s"return ${p(jsExpr)}"
-      case Unit                               => ""
-      case Stmts(stmts)                       => stmts.map(p).mkString("", ";\n", ";\n")
+      case Return(jsExpr) => s"return ${p(jsExpr)}"
+      case Unit => ""
+      case Stmts(stmts) => stmts.map(p).mkString("", ";\n", ";\n")
     }
   }
 }

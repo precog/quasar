@@ -35,26 +35,27 @@ final case object Arr extends PrimaryType
 final case object Map extends PrimaryType
 
 object PrimaryType {
-  def name = Prism[String, PrimaryType] {
-    case "null"      => Null.some
-    case "boolean"   => Bool.some
-    case "byte"      => Byte.some
-    case "character" => Char.some
-    case "integer"   => Int.some
-    case "decimal"   => Dec.some
-    case "array"     => Arr.some
-    case "map"       => Map.some
-    case _           => none
-  } {
-    case Null => "null"
-    case Bool => "boolean"
-    case Byte => "byte"
-    case Char => "character"
-    case Int  => "integer"
-    case Dec  => "decimal"
-    case Arr  => "array"
-    case Map  => "map"
-  }
+  def name =
+    Prism[String, PrimaryType] {
+      case "null" => Null.some
+      case "boolean" => Bool.some
+      case "byte" => Byte.some
+      case "character" => Char.some
+      case "integer" => Int.some
+      case "decimal" => Dec.some
+      case "array" => Arr.some
+      case "map" => Map.some
+      case _ => none
+    } {
+      case Null => "null"
+      case Bool => "boolean"
+      case Byte => "byte"
+      case Char => "character"
+      case Int => "integer"
+      case Dec => "decimal"
+      case Arr => "array"
+      case Map => "map"
+    }
 
   implicit val equal: Equal[PrimaryType] = Equal.equalRef
 }

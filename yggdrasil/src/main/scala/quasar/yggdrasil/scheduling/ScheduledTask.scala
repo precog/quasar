@@ -44,15 +44,30 @@ object CronExpressionSerialization {
 
   implicit val cronExpressionExtractor = new Extractor[CronExpression] {
     def validated(jv: JValue) = jv match {
-      case JString(expr) => Validation.fromTryCatchThrowable[CronExpression, java.text.ParseException](new CronExpression(expr)).leftMap(Extractor.Error.thrown)
-      case invalid => Failure(Extractor.Error.invalid("Could not parse CRON expression from " + invalid))
+      case JString(expr) =>
+        Validation
+          .fromTryCatchThrowable[CronExpression, java.text.ParseException](
+            new CronExpression(expr))
+          .leftMap(Extractor.Error.thrown)
+      case invalid =>
+        Failure(Extractor.Error.invalid("Could not parse CRON expression from " + invalid))
     }
   }
 }
 
-case class ScheduledTask(id: UUID, repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]) {
+case class ScheduledTask(
+    id: UUID,
+    repeat: Option[CronExpression],
+    apiKey: APIKey,
+    authorities: Authorities,
+    context: EvaluationContext,
+    source: Path,
+    sink: Path,
+    timeoutMillis: Option[Long]) {
   def taskName = "Scheduled %s -> %s".format(source, sink)
-  def timeout = timeoutMillis map { to => Duration(to, TimeUnit.MILLISECONDS) }
+  def timeout = timeoutMillis map { to =>
+    Duration(to, TimeUnit.MILLISECONDS)
+  }
 }
 
 object ScheduledTask {
@@ -61,5 +76,5 @@ object ScheduledTask {
   val schemaV1 = "id" :: "repeat" :: "apiKey" :: "authorities" :: "prefix" :: "source" :: "sink" :: "timeout" :: HNil
 
   implicit val decomposer: Decomposer[ScheduledTask] = decomposerV(schemaV1, Some("1.0".v))
-  implicit val extractor:  Extractor[ScheduledTask]  = extractorV(schemaV1, Some("1.0".v))
+  implicit val extractor: Extractor[ScheduledTask] = extractorV(schemaV1, Some("1.0".v))
 }

@@ -33,11 +33,11 @@ object BackendCapability {
 
   val query = Prism.partial[BackendCapability, Unit] {
     case Query => ()
-  } (κ(Query))
+  }(κ(Query))
 
   val write = Prism.partial[BackendCapability, Unit] {
     case Write => ()
-  } (κ(Write))
+  }(κ(Write))
 
   implicit val order: Order[BackendCapability] =
     Order.orderBy {

@@ -22,7 +22,7 @@ import argonaut.{Argonaut, CodecJson, DecodeResult}
 
 import fs2.util.Catchable
 
-import scalaz.{~>, :<:, Coproduct, Free}
+import scalaz.{:<:, ~>, Coproduct, Free}
 import scalaz.concurrent.Task
 
 import java.util.UUID
@@ -34,7 +34,8 @@ package object vfs {
   type POSIXWithTask[A] = Free[Coproduct[POSIXOp, Task, ?], A]
 
   // this is needed kind of a lot
-  private[vfs] implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] = {
+  private[vfs] implicit def catchableForS[S[_]](
+      implicit I: Task :<: S): Catchable[Free[S, ?]] = {
     val delegate = catchable.freeCatchable[Task, S]
 
     new Catchable[Free[S, ?]] {
@@ -57,7 +58,8 @@ package object vfs {
     def generalize[S[_]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
 
     trait GeneralizeSyntax[S[_]] {
-      def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, A] =
+      def apply[A](
+          pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, A] =
         pwt.mapSuspension(λ[Coproduct[POSIXOp, Task, ?] ~> S](_.run.fold(IP.inj, IT.inj)))
     }
   }
@@ -68,16 +70,18 @@ package object vfs {
     import Argonaut._
 
     implicit val codec: CodecJson[Version] =
-      CodecJson[Version](v => jString(v.value.toString), { c =>
-        c.as[String] flatMap { str =>
-          try {
-            DecodeResult.ok(Version(UUID.fromString(str)))
-          } catch {
-            case _: IllegalArgumentException =>
-              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+      CodecJson[Version](
+        v => jString(v.value.toString), { c =>
+          c.as[String] flatMap { str =>
+            try {
+              DecodeResult.ok(Version(UUID.fromString(str)))
+            } catch {
+              case _: IllegalArgumentException =>
+                DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+            }
           }
         }
-      })
+      )
   }
 
   final case class Blob(value: UUID) extends AnyVal
@@ -86,15 +90,17 @@ package object vfs {
     import Argonaut._
 
     implicit val codec: CodecJson[Blob] =
-      CodecJson[Blob](v => jString(v.value.toString), { c =>
-        c.as[String] flatMap { str =>
-          try {
-            DecodeResult.ok(Blob(UUID.fromString(str)))
-          } catch {
-            case _: IllegalArgumentException =>
-              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+      CodecJson[Blob](
+        v => jString(v.value.toString), { c =>
+          c.as[String] flatMap { str =>
+            try {
+              DecodeResult.ok(Blob(UUID.fromString(str)))
+            } catch {
+              case _: IllegalArgumentException =>
+                DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+            }
           }
         }
-      })
+      )
   }
 }

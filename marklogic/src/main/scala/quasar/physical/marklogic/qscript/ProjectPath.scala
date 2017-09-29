@@ -24,7 +24,7 @@ import quasar.fp.free._
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore, MFC => _, _}
-import quasar.{RenderTree, NonTerminal, Terminal}
+import quasar.{NonTerminal, RenderTree, Terminal}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -58,18 +58,29 @@ object ProjectPath extends ProjectPathInstances {
   }
 
   def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
-    val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
-      case CoEnv(\/-(MFC(MFCore.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFCore.StrLit(field), _))))) => {
+    val alg: AlgebraicGTransform[
+      (FreeMap[T], ?),
+      FreePathMap[T],
+      CoMapFunc[T, ?],
+      CoPathMapFunc[T, ?]] = {
+      case CoEnv(
+          \/-(
+            MFC(
+              MFCore.ProjectField(
+                (_, Embed(CoEnv(\/-(PathProject(path))))),
+                (MFCore.StrLit(field), _))))) => {
         val dir0 = path.path </> dir(field)
-        val pp   = ProjectPath(path.src, dir0)
+        val pp = ProjectPath(path.src, dir0)
 
         CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
-      case CoEnv(\/-(MFC(MFCore.ProjectField((Embed(CoEnv(src)), _), (MFCore.StrLit(field), _))))) => {
+      case CoEnv(
+          \/-(MFC(MFCore.ProjectField((Embed(CoEnv(src)), _), (MFCore.StrLit(field), _))))) => {
         val dir0 = rootDir[Sandboxed] </> dir(field)
-        val desc = src.fold(κ(Free.point[PathMapFunc[T, ?],  Hole](SrcHole)),
+        val desc = src.fold(
+          κ(Free.point[PathMapFunc[T, ?], Hole](SrcHole)),
           Free.roll(_).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]]))
-        val pp   = ProjectPath(desc, dir0)
+        val pp = ProjectPath(desc, dir0)
 
         CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
@@ -99,8 +110,13 @@ sealed abstract class ProjectPathInstances {
   }
 
   implicit def renderTree[A]: Delay[RenderTree, ProjectPath] =
-    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ ProjectPath)#λ](rt =>
-      RenderTree.make(pp =>
-        NonTerminal(List("ProjectPath"), none,
-          List(rt.render(pp.src), Terminal(List("Path"), prettyPrint(pp.path).some))))))
+    Delay.fromNT(
+      λ[RenderTree ~> (RenderTree ∘ ProjectPath)#λ](
+        rt =>
+          RenderTree.make(
+            pp =>
+              NonTerminal(
+                List("ProjectPath"),
+                none,
+                List(rt.render(pp.src), Terminal(List("Path"), prettyPrint(pp.path).some))))))
 }

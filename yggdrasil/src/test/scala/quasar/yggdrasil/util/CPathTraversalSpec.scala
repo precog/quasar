@@ -33,18 +33,19 @@ class CPathTraversalSpec extends Specification {
   }
 
   object ColBuilder {
-    private def builder[@specialized(Boolean, Long, Double) A](f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
+    private def builder[@specialized(Boolean, Long, Double) A](
+        f: (BitSet, Array[A]) => Column): ColBuilder[A] = {
       new ColBuilder[A] {
         def apply(defined: BitSet, items: Array[A]): Column = f(defined, items)
       }
     }
 
-    implicit val LongColBuilder   = builder[Long](ArrayLongColumn(_, _))
-    implicit val StrColBuilder    = builder[String](ArrayStrColumn(_, _))
-    implicit val BoolColBuilder   = builder[Boolean](ArrayBoolColumn(_, _))
+    implicit val LongColBuilder = builder[Long](ArrayLongColumn(_, _))
+    implicit val StrColBuilder = builder[String](ArrayStrColumn(_, _))
+    implicit val BoolColBuilder = builder[Boolean](ArrayBoolColumn(_, _))
     implicit val DoubleColBuilder = builder[Double](ArrayDoubleColumn(_, _))
-    implicit val NumColBuilder    = builder[BigDecimal](ArrayNumColumn(_, _))
-    implicit val DateColBuilder   = builder[ZonedDateTime](ArrayDateColumn(_, _))
+    implicit val NumColBuilder = builder[BigDecimal](ArrayNumColumn(_, _))
+    implicit val DateColBuilder = builder[ZonedDateTime](ArrayDateColumn(_, _))
     implicit def HomogeneousArrayColBuilder[@specialized(Boolean, Long, Double) A: CValueType] =
       builder[Array[A]](ArrayHomogeneousArrayColumn(_, _))
   }
@@ -52,22 +53,29 @@ class CPathTraversalSpec extends Specification {
   "constructing CPathTraversal from CPaths" should {
     "handle trivial select" in {
       val t = CPathTraversal(List(CPath("a[*].b[0]")))
-      t must_== Select(CPathField("a"), Select(CPathArray, Select(CPathField("b"), Select(CPathIndex(0), Done))))
+      t must_== Select(
+        CPathField("a"),
+        Select(CPathArray, Select(CPathField("b"), Select(CPathIndex(0), Done))))
     }
 
     "handle CPath with simple array intersection" in {
       val t = CPathTraversal(List(CPath("[*][0]"), CPath("[*][1]")))
-      t must_== Select(CPathArray, Sequence(List(
-        Select(CPathIndex(0), Done),
-        Select(CPathIndex(1), Done)
-      )))
+      t must_== Select(
+        CPathArray,
+        Sequence(
+          List(
+            Select(CPathIndex(0), Done),
+            Select(CPathIndex(1), Done)
+          )))
     }
   }
-  def col[@specialized(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
+  def col[@specialized(Boolean, Long, Double) A](defined: Int*)(
+      values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
     val max = defined.max + 1
     val column = m.newArray(max)
-    (defined zip values) foreach { case (i, x) =>
-      column(i) = x
+    (defined zip values) foreach {
+      case (i, x) =>
+        column(i) = x
     }
     builder(BitSetUtil.create(defined), column)
   }
@@ -105,9 +113,13 @@ class CPathTraversalSpec extends Specification {
 
     "order non-intersecting arrays by length" in {
       val cols: Map[CPath, Set[Column]] = Map(
-        CPath("[*]") -> Set(ArrayHomogeneousArrayColumn(Array(
-          Array(0L, 1L), Array(0L), Array(0L, 1L, 2L)
-        )))
+        CPath("[*]") -> Set(
+          ArrayHomogeneousArrayColumn(
+            Array(
+              Array(0L, 1L),
+              Array(0L),
+              Array(0L, 1L, 2L)
+            )))
       )
       val paths = cols.keys.toList
 
@@ -180,14 +192,12 @@ class CPathTraversalSpec extends Specification {
     }
 
     val intersectingHom: Map[CPath, Set[Column]] = Map(
-      CPath("[*][0]") -> Set(ArrayHomogeneousArrayColumn(Array(
-        Array(0L, 1L, 2L),
-        Array(0L, 1L, 1L),
-        Array(0L, 1L, 2L)))),
-      CPath("[*][1]") -> Set(ArrayHomogeneousArrayColumn(Array(
-        Array("a", "b", "c"),
-        Array("a", "c", "c"),
-        Array("a", "b", "c"))))
+      CPath("[*][0]") -> Set(
+        ArrayHomogeneousArrayColumn(
+          Array(Array(0L, 1L, 2L), Array(0L, 1L, 1L), Array(0L, 1L, 2L)))),
+      CPath("[*][1]") -> Set(
+        ArrayHomogeneousArrayColumn(
+          Array(Array("a", "b", "c"), Array("a", "c", "c"), Array("a", "b", "c"))))
     )
 
     "order simple intersecting arrays" in {
@@ -245,5 +255,3 @@ class CPathTraversalSpec extends Specification {
     }
   }
 }
-
-

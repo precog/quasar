@@ -23,10 +23,11 @@ import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
 
 /** A helper trait for defining `Delay[Arbitrary, F]` instances that handles
-  * halting corecursive generation by ensuring leaf nodes are produced
-  * eventually.
-  */
+ * halting corecursive generation by ensuring leaf nodes are produced
+ * eventually.
+ */
 trait PatternArbitrary[F[_]] extends Delay[Arbitrary, F] {
+
   /** Weighted generators for the leaf terms of `F[_]` (those without a recursive parameter). */
   def leafGenerators[A]: NonEmptyList[(Int, Gen[F[A]])]
 
@@ -35,12 +36,12 @@ trait PatternArbitrary[F[_]] extends Delay[Arbitrary, F] {
 
   /** Returns a uniformly weighted list of generators. */
   protected def uniformly[A](a: Gen[F[A]], as: Gen[F[A]]*): NonEmptyList[(Int, Gen[F[A]])] =
-    NonEmptyList(a, as : _*) strengthL 1
+    NonEmptyList(a, as: _*) strengthL 1
 
   def apply[A](arb: Arbitrary[A]) = {
-    val leaves   = leafGenerators[A].toList
-    val genLeaf  = Gen.frequency(leaves : _*)
-    val genAll   = Gen.frequency((leaves ::: branchGenerators(arb).toList) : _*)
+    val leaves = leafGenerators[A].toList
+    val genLeaf = Gen.frequency(leaves: _*)
+    val genAll = Gen.frequency((leaves ::: branchGenerators(arb).toList): _*)
     Arbitrary(Gen.sized(size => if (size <= 1) genLeaf else genAll))
   }
 }

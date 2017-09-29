@@ -47,7 +47,7 @@ trait RandomLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           val cols = schema.columns(JObjectFixedT(Map(paths.Value.name -> JNumberT)))
 
           val result: Set[Result] = cols map {
-            case (c: LongColumn)                              =>
+            case (c: LongColumn) =>
               range collectFirst { case i if c.isDefinedAt(i) => i } map { c(_) }
 
             case _ => None

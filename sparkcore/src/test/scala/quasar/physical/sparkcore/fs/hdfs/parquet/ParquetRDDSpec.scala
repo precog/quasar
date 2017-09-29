@@ -41,11 +41,12 @@ class ParquetRDDSpec extends Qspec {
         // when
         val rdd: RDD[Data] = sc.parquet(path)
         // then
-        rdd.first must_= Data.Obj(ListMap(
-          "id" -> Data.Int(1),
-          "login" -> Data.Str("login1"),
-          "age" -> Data.Int(11)
-        ))
+        rdd.first must_= Data.Obj(
+          ListMap(
+            "id" -> Data.Int(1),
+            "login" -> Data.Str("login1"),
+            "age" -> Data.Int(11)
+          ))
       })
     }
   }
@@ -58,4 +59,3 @@ class ParquetRDDSpec extends Qspec {
   }
 
 }
- 

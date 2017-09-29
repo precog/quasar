@@ -27,15 +27,16 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class WriteFilesSpec extends FileSystemTest[BackendEffect](
-  FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+class WriteFilesSpec
+    extends FileSystemTest[BackendEffect](
+      FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._
 
-  val query  = QueryFile.Ops[BackendEffect]
-  val read   = ReadFile.Ops[BackendEffect]
-  val write  = WriteFile.Ops[BackendEffect]
+  val query = QueryFile.Ops[BackendEffect]
+  val read = ReadFile.Ops[BackendEffect]
+  val write = WriteFile.Ops[BackendEffect]
   val manage = ManageFile.Ops[BackendEffect]
 
   val writesPrefix: ADir = rootDir </> dir("w")
@@ -59,8 +60,8 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
       "write to closed handle returns UnknownWriteHandle" >>* {
         val f = writesPrefix </> dir("d1") </> file("f1")
         val r = for {
-          h    <- write.unsafe.open(f)
-          _    <- write.unsafe.close(h).liftM[FileSystemErrT]
+          h <- write.unsafe.open(f)
+          _ <- write.unsafe.close(h).liftM[FileSystemErrT]
           errs <- write.unsafe.write(h, Vector()).liftM[FileSystemErrT]
         } yield errs
 
@@ -85,11 +86,11 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
         val descendant2 = dir[Sandboxed]("subdir2") </> file[Sandboxed]("subdirfile2")
         val f2 = d </> descendant2
         val p = write.append(f1, oneDoc.toProcess).drain ++
-                write.append(f2, oneDoc.toProcess).drain ++
-                query.descendantFiles(d).liftM[Process]
+          write.append(f2, oneDoc.toProcess).drain ++
+          query.descendantFiles(d).liftM[Process]
 
-        runLogT(run, p).map(_.flatMap(_.toVector))
-          .runEither must beRight(containTheSameElementsAs(List(descendant1, descendant2)))
+        runLogT(run, p).map(_.flatMap(_.toVector)).runEither must beRight(
+          containTheSameElementsAs(List(descendant1, descendant2)))
       }
 
       step(deleteForWriting(fs.setupInterpM).runVoid)

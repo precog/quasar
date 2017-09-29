@@ -44,9 +44,9 @@ trait ManagedWriteFile[C] { self: BackendModule =>
     def open(file: AFile): Backend[WriteHandle] =
       for {
         id <- MonoSeqM.next.liftB
-        h  =  WriteHandle(file, id)
-        c  <- ManagedWriteFileModule.writeCursor(file)
-        _  <- WriteKvsM.put(h, c).liftB
+        h = WriteHandle(file, id)
+        c <- ManagedWriteFileModule.writeCursor(file)
+        _ <- WriteKvsM.put(h, c).liftB
       } yield h
 
     def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
@@ -58,7 +58,7 @@ trait ManagedWriteFile[C] { self: BackendModule =>
       OptionT(WriteKvsM.get(h).liftM[ConfiguredT])
         .flatMapF(c =>
           ManagedWriteFileModule.closeCursor(c) *>
-          WriteKvsM.delete(h).liftM[ConfiguredT])
+            WriteKvsM.delete(h).liftM[ConfiguredT])
         .orZero
   }
 }

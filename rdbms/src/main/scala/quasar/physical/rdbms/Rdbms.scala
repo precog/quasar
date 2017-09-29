@@ -29,11 +29,23 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
-import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
+import quasar.qscript.{
+  ::/::,
+  ::\::,
+  EquiJoin,
+  ExtractPath,
+  Injectable,
+  Optimize,
+  QScriptCore,
+  QScriptTotal,
+  ShiftedRead,
+  Unicoalesce,
+  Unirewrite
+}
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
-import quasar.{RenderTree, RenderTreeT, fp}
+import quasar.{fp, RenderTree, RenderTreeT}
 
 import scala.Predef.implicitly
 import doobie.hikari.hikaritransactor.HikariTransactor
@@ -44,10 +56,16 @@ import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with RdbmsQueryFile with Interpreter {
+trait Rdbms
+    extends BackendModule
+    with RdbmsReadFile
+    with RdbmsWriteFile
+    with RdbmsManageFile
+    with RdbmsQueryFile
+    with Interpreter {
 
   type Eff[A] = (
-      ConnectionIO :\:
+    ConnectionIO :\:
       MonotonicSeq :\:
       GenUUID :\:
       KeyValueStore[ReadHandle, SqlReadCursor, ?] :/:
@@ -55,8 +73,8 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   )#M[A]
 
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-  type Repr        = String // TODO define best Repr for a SQL query (Doobie Fragment?)
-  type M[A]        = Free[Eff, A]
+  type Repr = String // TODO define best Repr for a SQL query (Doobie Fragment?)
+  type M[A] = Free[Eff, A]
 
   type Config = common.Config
 
@@ -67,25 +85,25 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
-  def ExtractPathQSM[T[_[_]]: RecursiveT]                               = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]]                                             = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM                                                            = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]    = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
+  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def MonadM = Monad[M]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[
-    QSM[T, ?],
-    QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  override def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]: QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+  override def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
+    : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
     val O = new Optimize[T]
     O.optimize(fp.reflNT[QSM[T, ?]])
   }
 
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
     EitherT(Task.delay(parseConnectionUri(uri).map(Config.apply)))
-
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val xa = HikariTransactor[Task](
@@ -98,8 +116,8 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
     (interp(xa) ∘ (i => (foldMapNT[Eff, Task](i), close))).liftM[DefErrT]
   }
 
-  lazy val MR                   = MonadReader_[Backend, Config]
-  lazy val ME                   = MonadFsErr[Backend]
+  lazy val MR = MonadReader_[Backend, Config]
+  lazy val ME = MonadFsErr[Backend]
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {

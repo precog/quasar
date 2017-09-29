@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{ColumnRef, CPath, CPathField, CPathIndex, Path}
+import quasar.precog.common.{CPath, CPathField, CPathIndex, ColumnRef, Path}
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -73,8 +73,8 @@ object Mimir extends BackendModule with Logging {
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
     QScriptCore[T, ?] :\:
-    EquiJoin[T, ?] :/:
-    Const[ShiftedRead[AFile], ?]
+      EquiJoin[T, ?] :/:
+      Const[ShiftedRead[AFile], ?]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
@@ -82,8 +82,12 @@ object Mimir extends BackendModule with Logging {
   private type Cake = Precog with Singleton
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both
-  final case class SortOrdering[TS1](sortKeys: Set[TS1], sortOrder: DesiredSortOrder, unique: Boolean) {
-    def sort(src: Cake)(table: src.Table)(implicit ev: TS1 === src.trans.TransSpec1): Future[src.Table] =
+  final case class SortOrdering[TS1](
+      sortKeys: Set[TS1],
+      sortOrder: DesiredSortOrder,
+      unique: Boolean) {
+    def sort(src: Cake)(table: src.Table)(
+        implicit ev: TS1 === src.trans.TransSpec1): Future[src.Table] =
       if (sortKeys.isEmpty) {
         Future.successful(table)
       } else {
@@ -114,7 +118,8 @@ object Mimir extends BackendModule with Logging {
       other.asInstanceOf[Repr.this.P.Table]
 
     // this is totally safe because `Precog` is final *and* `TransSpec` can't reference cake state.
-    def mergeTS1(other: or.P.trans.TransSpec1 forSome { val or: Repr }): Repr.this.P.trans.TransSpec1 =
+    def mergeTS1(other: or.P.trans.TransSpec1 forSome { val or: Repr })
+      : Repr.this.P.trans.TransSpec1 =
       other.asInstanceOf[Repr.this.P.trans.TransSpec1]
 
     def map(f: P.Table => P.Table): Repr.Aux[Repr.this.P.type] =
@@ -135,7 +140,8 @@ object Mimir extends BackendModule with Logging {
         val lastSort: Option[SortState[P0.trans.TransSpec1]] = None
       }
 
-    def withSort(P0: Precog)(table0: P0.Table)(lastSort0: Option[SortState[P0.trans.TransSpec1]]): Repr.Aux[P0.type] =
+    def withSort(P0: Precog)(table0: P0.Table)(
+        lastSort0: Option[SortState[P0.trans.TransSpec1]]): Repr.Aux[P0.type] =
       new Repr {
         type P = P0.type
 
@@ -147,7 +153,7 @@ object Mimir extends BackendModule with Logging {
       }
 
     def meld[F[_]: Monad](fn: DepFn1[Cake, λ[`P <: Cake` => F[P#Table]]])(
-      implicit
+        implicit
         F: MonadReader_[F, Cake]): F[Repr] =
       F.ask.flatMap(cake => fn(cake).map(table => Repr(cake)(table)))
 
@@ -162,17 +168,20 @@ object Mimir extends BackendModule with Logging {
   def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
   def MonadM = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   final case class Config(dataDir: java.io.File)
 
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
-      : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+    : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
     val O = new Optimize[T]
     O.optimize(reflNT[QSM[T, ?]])
   }
@@ -188,12 +197,16 @@ object Mimir extends BackendModule with Logging {
     t.liftM[BackendDef.DefErrT]
   }
 
-  def needToSort(p: Precog)(oldSort: SortState[p.trans.TransSpec1], newSort: SortState[p.trans.TransSpec1]): Boolean = {
+  def needToSort(p: Precog)(
+      oldSort: SortState[p.trans.TransSpec1],
+      newSort: SortState[p.trans.TransSpec1]): Boolean = {
     (oldSort.orderings.length != newSort.orderings.length || oldSort.bucket != newSort.bucket) || {
-      def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) = {
+      def requiresSort(
+          oldOrdering: SortOrdering[p.trans.TransSpec1],
+          newOrdering: SortOrdering[p.trans.TransSpec1]) = {
         (oldOrdering.sortKeys & newOrdering.sortKeys).isEmpty ||
-          (oldOrdering.sortOrder != newOrdering.sortOrder) ||
-          (oldOrdering.unique && !newOrdering.unique)
+        (oldOrdering.sortOrder != newOrdering.sortOrder) ||
+        (oldOrdering.unique && !newOrdering.unique)
       }
 
       (oldSort.bucket != newSort.bucket) || {
@@ -243,20 +256,24 @@ object Mimir extends BackendModule with Logging {
       _.run.fold(
         planQScriptCore,
         _.run.fold(
-          _ => ???,   // ProjectBucket
+          _ => ???, // ProjectBucket
           _.run.fold(
-            _ => ???,   // ThetaJoin
+            _ => ???, // ThetaJoin
             _.run.fold(
               planEquiJoin,
               _.run.fold(
-                _ => ???,    // ShiftedRead[ADir]
+                _ => ???, // ShiftedRead[ADir]
                 _.run.fold(
                   planShiftedRead,
                   _.run.fold(
-                    _ => ???,   // Read[ADir]
+                    _ => ???, // Read[ADir]
                     _.run.fold(
-                      _ => ???,   // Read[AFile]
-                      _ => ???))))))))    // DeadEnd
+                      _ => ???, // Read[AFile]
+                      _ => ???))))
+            )
+          )
+        )
+      ) // DeadEnd
 
     def interpretMapFunc[F[_]: Monad](P: Precog)(fm: FreeMap[T]): F[P.trans.TransSpec1] =
       fm.cataM[F, P.trans.TransSpec1](
@@ -272,7 +289,7 @@ object Mimir extends BackendModule with Logging {
       else if (specs.lengthCompare(1) == 0)
         specs.head
       else
-        OuterArrayConcat(specs.map(WrapArray(_): TransSpec1) : _*)
+        OuterArrayConcat(specs.map(WrapArray(_): TransSpec1): _*)
     }
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
@@ -294,7 +311,8 @@ object Mimir extends BackendModule with Logging {
         } yield Repr.withSort(src.P)(src.table.transform(trans))(newSort)
 
       // special-case for distinct (TODO this should be a new node in qscript)
-      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb =>
+      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair)
+          if bucket === arb =>
         import src.P.trans._
 
         for {
@@ -313,7 +331,8 @@ object Mimir extends BackendModule with Logging {
                 case ReduceIndex(-\/(0) | \/-(0)) => bucketTrans.point[Backend]
                 case _ => sys.error("should be impossible")
               },
-              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+            ))
 
           repaired = distincted.table.transform(repairTrans)
         } yield Repr(src.P)(repaired)
@@ -322,18 +341,20 @@ object Mimir extends BackendModule with Logging {
         import src.P.trans._
         import src.P.Library
 
-        def extractReduction(red: ReduceFunc[FreeMap[T]]): (Library.Reduction, FreeMap[T]) = red match {
-          case ReduceFuncs.Count(f) => (Library.Count, f)
-          case ReduceFuncs.Sum(f) => (Library.Sum, f)
-          case ReduceFuncs.Min(f) => (Library.Min, f)
-          case ReduceFuncs.Max(f) => (Library.Max, f)
-          case ReduceFuncs.Avg(f) => (Library.Mean, f)
-          case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
-          case ReduceFuncs.First(f) => (Library.First, f)
-          case ReduceFuncs.Last(f) => (Library.Last, f)
-          case ReduceFuncs.UnshiftArray(f) => ???
-          case ReduceFuncs.UnshiftMap(f1, f2) => ???
-        }
+        def extractReduction(red: ReduceFunc[FreeMap[T]]): (Library.Reduction, FreeMap[T]) =
+          red match {
+            case ReduceFuncs.Count(f) => (Library.Count, f)
+            case ReduceFuncs.Sum(f) => (Library.Sum, f)
+            case ReduceFuncs.Min(f) => (Library.Min, f)
+            case ReduceFuncs.Max(f) => (Library.Max, f)
+            case ReduceFuncs.Avg(f) => (Library.Mean, f)
+            case ReduceFuncs.Arbitrary(f) =>
+              (Library.First, f) // first is the most efficient for Table
+            case ReduceFuncs.First(f) => (Library.First, f)
+            case ReduceFuncs.Last(f) => (Library.Last, f)
+            case ReduceFuncs.UnshiftArray(f) => ???
+            case ReduceFuncs.UnshiftMap(f1, f2) => ???
+          }
 
         val pairs: List[(Library.Reduction, FreeMap[T])] =
           reducers.map(extractReduction)
@@ -383,7 +404,8 @@ object Mimir extends BackendModule with Logging {
 
           // add back in the group key reduction (corresponds with the First we add above)
           megaSpec = { bucketed: Boolean =>
-            combineTransSpecs(src.P)(DerefObjectStatic(Leaf(Source), CPathField("0")) :: adjustedSpecs(bucketed))
+            combineTransSpecs(src.P)(
+              DerefObjectStatic(Leaf(Source), CPathField("0")) :: adjustedSpecs(bucketed))
           }
 
           table <- {
@@ -402,23 +424,24 @@ object Mimir extends BackendModule with Logging {
                         // we don't add First if we aren't bucketed
                         remapIndex(bucketed).get(idx + (if (bucketed) 1 else 0)) match {
                           case Some(i) =>
-                            (DerefArrayStatic(
-                              Leaf(Source),
-                              CPathIndex(i)): TransSpec1).point[Future]
+                            (DerefArrayStatic(Leaf(Source), CPathIndex(i)): TransSpec1)
+                              .point[Future]
 
                           case None => ???
                         }
 
                       case ReduceIndex(-\/(idx)) =>
                         // note that an undefined bucket will still retain indexing as long as we don't compact the slice
-                        Future(scala.Predef.assert(bucketed, s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
+                        Future(
+                          scala.Predef.assert(
+                            bucketed,
+                            s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
                           (DerefArrayStatic(
-                            DerefArrayStatic(
-                              Leaf(Source),
-                              CPathIndex(remapIndex(bucketed)(0))),
+                            DerefArrayStatic(Leaf(Source), CPathIndex(remapIndex(bucketed)(0))),
                             CPathIndex(idx)): TransSpec1).point[Future]
                     },
-                    mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
+                    mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)
+                  ))
               } yield red.transform(trans)
             }
 
@@ -430,9 +453,15 @@ object Mimir extends BackendModule with Logging {
                 bucketTrans = combineTransSpecs(src.P)(bucketTranses)
 
                 prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
-                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+                  .liftM[MT]
+                  .liftB
+                  .map(r => src.unsafeMergeTable(r.table))
 
-                table <- prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)).toTask.liftM[MT].liftB
+                table <- prepared
+                  .partitionMerge(bucketTrans, keepKey = true)(reduceAll(true))
+                  .toTask
+                  .liftM[MT]
+                  .liftB
               } yield table
             }
           }
@@ -443,7 +472,9 @@ object Mimir extends BackendModule with Logging {
 
         for {
           structTrans <- interpretMapFunc[Backend](src.P)(struct)
-          wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
+          wrappedStructTrans = InnerArrayConcat(
+            WrapArray(TransSpec1.Id),
+            WrapArray(structTrans))
 
           repairTrans <- repair.cataM[Backend, TransSpec1](
             interpretM(
@@ -462,7 +493,8 @@ object Mimir extends BackendModule with Logging {
 
                   back.point[Backend]
               },
-              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+            ))
 
           shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1)
           repaired = shifted.transform(repairTrans)
@@ -483,7 +515,10 @@ object Mimir extends BackendModule with Logging {
               interpretMapFunc[Backend](src.P)(fm).map(ts => (ts, order))
           }
 
-          pair = transDirs.foldLeft((Vector.empty[(Vector[TransSpec1], DesiredSortOrder)], None: Option[DesiredSortOrder])) {
+          pair = transDirs.foldLeft(
+            (
+              Vector.empty[(Vector[TransSpec1], DesiredSortOrder)],
+              None: Option[DesiredSortOrder])) {
             case ((acc, None), (ts, order)) =>
               (acc :+ ((Vector(ts), order)), Some(order))
 
@@ -512,8 +547,7 @@ object Mimir extends BackendModule with Logging {
             }
 
             for {
-              bucketTranses <-
-                buckets.traverse(interpretMapFunc[Backend](src.P))
+              bucketTranses <- buckets.traverse(interpretMapFunc[Backend](src.P))
 
               bucketTrans = combineTransSpecs(src.P)(bucketTranses)
 
@@ -521,7 +555,8 @@ object Mimir extends BackendModule with Logging {
                 Some(bucketTrans).filterNot(_ => buckets.isEmpty),
                 sortOrderings)
 
-              sortNeeded = src.lastSort.fold(true)(last => needToSort(Repr.single[src.P](src).P)(last, newSort))
+              sortNeeded = src.lastSort.fold(true)(last =>
+                needToSort(Repr.single[src.P](src).P)(last, newSort))
 
               sortedTable <- {
                 if (sortNeeded) {
@@ -529,9 +564,14 @@ object Mimir extends BackendModule with Logging {
                     sortAll(src.table).toTask.liftM[MT].liftB
                   } else {
                     for {
-                      prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
-                        .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                      table <- prepared.partitionMerge(bucketTrans)(sortAll).toTask.liftM[MT].liftB
+                      prepared <- sortT[src.P.type](Repr.single[src.P](src))(
+                        src.table,
+                        bucketTrans).liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+                      table <- prepared
+                        .partitionMerge(bucketTrans)(sortAll)
+                        .toTask
+                        .liftM[MT]
+                        .liftB
                     } yield table
                   }
                 } else {
@@ -548,13 +588,14 @@ object Mimir extends BackendModule with Logging {
 
         for {
           trans <- interpretMapFunc[Backend](src.P)(f)
-        } yield Repr.withSort(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))(src.lastSort)
+        } yield
+          Repr.withSort(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))(src.lastSort)
 
       case qscript.Union(src, lBranch, rBranch) =>
         for {
-         leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-         rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-         rightCoerced = leftRepr.unsafeMerge(rightRepr)
+          leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+          rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+          rightCoerced = leftRepr.unsafeMerge(rightRepr)
         } yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
       case qscript.Subset(src, from, op, count) =>
@@ -562,27 +603,31 @@ object Mimir extends BackendModule with Logging {
           fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
           countRepr <- count.cataM(interpretM(κ(src.point[Backend]), planQST))
           back <- {
-            def result = for {
-              vals <- countRepr.table.toJson
-              nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
-              number = nums.head
-              compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
-              retainsOrder = op != Sample
-              back <- op match {
-                case Take =>
-                  Future.successful(compacted.take(number))
+            def result =
+              for {
+                vals <- countRepr.table.toJson
+                nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+                number = nums.head
+                compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
+                retainsOrder = op != Sample
+                back <- op match {
+                  case Take =>
+                    Future.successful(compacted.take(number))
 
-                case Drop =>
-                  Future.successful(compacted.drop(number))
+                  case Drop =>
+                    Future.successful(compacted.drop(number))
 
-                case Sample =>
-                  compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
-              }
-            } yield if (retainsOrder) {
-              Repr.withSort(fromRepr.P)(back)(fromRepr.lastSort)
-            } else {
-              Repr(fromRepr.P)(back)
-            }
+                  case Sample =>
+                    compacted
+                      .sample(number, List(fromRepr.P.trans.TransSpec1.Id))
+                      .map(_.head) // the number of Reprs returned equals the number of transspecs
+                }
+              } yield
+                if (retainsOrder) {
+                  Repr.withSort(fromRepr.P)(back)(fromRepr.lastSort)
+                } else {
+                  Repr(fromRepr.P)(back)
+                }
 
             result.toTask.liftM[MT].liftB
           }
@@ -590,19 +635,28 @@ object Mimir extends BackendModule with Logging {
 
       // FIXME look for Map(Unreferenced, Constant) and return constant table
       case qscript.Unreferenced() =>
-        Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
-          def apply(P: Cake): M[P.Table] =
-            P.Table.constLong(Set(0)).point[M]
-        }).liftB
+        Repr
+          .meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
+            def apply(P: Cake): M[P.Table] =
+              P.Table.constLong(Set(0)).point[M]
+          })
+          .liftB
     }
 
     lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
       case qscript.EquiJoin(src, lbranch, rbranch, keys, tpe, combine) =>
         import src.P.trans._, scalaz.syntax.std.option._
 
-        def rephrase2(projection: TransSpec2, rootL: TransSpec1, rootR: TransSpec1): Option[SortOrdering[TransSpec1]] = {
-          val leftRephrase = TransSpec.rephrase(projection, SourceLeft, rootL).fold(Set.empty[TransSpec1])(Set(_))
-          val rightRephrase = TransSpec.rephrase(projection, SourceRight, rootR).fold(Set.empty[TransSpec1])(Set(_))
+        def rephrase2(
+            projection: TransSpec2,
+            rootL: TransSpec1,
+            rootR: TransSpec1): Option[SortOrdering[TransSpec1]] = {
+          val leftRephrase = TransSpec
+            .rephrase(projection, SourceLeft, rootL)
+            .fold(Set.empty[TransSpec1])(Set(_))
+          val rightRephrase = TransSpec
+            .rephrase(projection, SourceRight, rootR)
+            .fold(Set.empty[TransSpec1])(Set(_))
           val bothRephrased = leftRephrase ++ rightRephrase
 
           if (bothRephrased.isEmpty)
@@ -643,15 +697,24 @@ object Mimir extends BackendModule with Logging {
             if (keys.isEmpty) {
               log.trace("EQUIJOIN: full-cross detected!")
 
-              (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[Backend]
+              (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort)
+                .point[Backend]
             } else {
               log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
               for {
-                lsorted <- sortT[leftRepr.P.type](Repr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey))
-                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                rsorted <- sortT[rightRepr.P.type](Repr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey))
-                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+                lsorted <- sortT[leftRepr.P.type](Repr.single[leftRepr.P](leftRepr))(
+                  leftRepr.table,
+                  leftRepr.mergeTS1(transLKey))
+                  .liftM[MT]
+                  .liftB
+                  .map(r => src.unsafeMergeTable(r.table))
+                rsorted <- sortT[rightRepr.P.type](Repr.single[rightRepr.P](rightRepr))(
+                  rightRepr.table,
+                  rightRepr.mergeTS1(transRKey))
+                  .liftM[MT]
+                  .liftB
+                  .map(r => src.unsafeMergeTable(r.table))
 
                 transLeft <- tpe match {
                   case JoinType.LeftOuter | JoinType.FullOuter =>
@@ -685,7 +748,10 @@ object Mimir extends BackendModule with Logging {
                     TransSpec1.Undef.point[Backend]
                 }
                 newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-              } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
+              } yield
+                (
+                  lsorted
+                    .cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
                   newSortOrder.map(order => SortState(None, order :: Nil)))
             }
           }
@@ -701,21 +767,25 @@ object Mimir extends BackendModule with Logging {
         val loaded: EitherT[M, FileSystemError, Repr] =
           for {
             precog <- cake[EitherT[M, FileSystemError, ?]]
-            apiKey <- precog.RootAPIKey.toTask.liftM[MT].liftM[EitherT[?[_], FileSystemError, ?]]
+            apiKey <- precog.RootAPIKey.toTask
+              .liftM[MT]
+              .liftM[EitherT[?[_], FileSystemError, ?]]
 
-            repr <-
-              Repr.meld[EitherT[M, FileSystemError, ?]](
-                new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
-                  def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
-                    val et =
-                      P.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask)
+            repr <- Repr.meld[EitherT[M, FileSystemError, ?]](
+              new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
+                def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
+                  val et =
+                    P.Table
+                      .constString(Set(pathStr))
+                      .load(apiKey, JType.JUniverseT)
+                      .mapT(_.toTask)
 
-                    et.mapT(_.liftM[MT]) leftMap { err =>
-                      val msg = err.messages.toList.reduce(_ + ";" + _)
-                      readFailed(posixCodec.printPath(path), msg)
-                    }
+                  et.mapT(_.liftM[MT]) leftMap { err =>
+                    val msg = err.messages.toList.reduce(_ + ";" + _)
+                    readFailed(posixCodec.printPath(path), msg)
                   }
-                })
+                }
+              })
           } yield {
             import repr.P.trans._
 
@@ -780,7 +850,9 @@ object Mimir extends BackendModule with Logging {
 
         populatorWithTermination = populator >> q.enqueue1(Vector.empty)
 
-        ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
+        ingestor = repr.P
+          .ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits))
+          .run
 
         // generally this function is bad news (TODO provide a way to ingest as a Stream)
         _ <- Task.gatherUnordered(Seq(populatorWithTermination, ingestor))
@@ -853,13 +925,20 @@ object Mimir extends BackendModule with Logging {
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
 
         // apparently read on a non-existent file is equivalent to reading the empty file??!!
-        eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
+        eitherTable <- precog.Table
+          .load(target, JType.JUniverseT)
+          .mapT(_.toTask)
+          .run
+          .liftM[MT]
+          .liftB
         table = eitherTable.fold(_ => precog.Table.empty, table => table)
 
         limited = if (offset.value === 0L && !limit.isDefined)
           table
         else
-          table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+          table.takeRange(
+            offset.value,
+            limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
 
         projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
@@ -902,7 +981,8 @@ object Mimir extends BackendModule with Logging {
     // quasar's paging logic.  See also: TablePager.apply
     private val QueueLimit = 1
 
-    private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
+    private val map
+      : ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
       new ConcurrentHashMap
 
     private val cur = new AtomicLong(0L)
@@ -924,7 +1004,7 @@ object Mimir extends BackendModule with Logging {
           precog <- cake[M]
 
           ingestion = for {
-            _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
+            _ <- precog.ingest(path, jvs).run // TODO log resource errors?
             _ <- signal.set(true)
           } yield ()
 
@@ -1035,7 +1115,8 @@ object Mimir extends BackendModule with Logging {
               MonadError_[Backend, FileSystemError].raiseError(pathErr(error))
             }
           } yield ()
-        })
+        }
+      )
     }
 
     def delete(path: APath): Backend[Unit] = {

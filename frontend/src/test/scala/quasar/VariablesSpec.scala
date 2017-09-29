@@ -41,7 +41,8 @@ class VariablesSpec extends quasar.Qspec {
         }
       }
       "succeedd when all variables are present" >> {
-        val vars = Variables.fromMap(Map("biz" -> "name", "foo" -> "people", "baz" -> "age = 7"))
+        val vars =
+          Variables.fromMap(Map("biz" -> "name", "foo" -> "people", "baz" -> "age = 7"))
         Variables.substVars(sqlE"select :biz from :foo where :baz", vars) must_===
           sqlE"select name from people where age = 7".right
       }

@@ -30,6 +30,8 @@ else
   COVERAGE_REPORT=
 fi
 
+"$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION scalafmt::test
+
 if [[ $CONNECTOR == "mongodb_2_6" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.

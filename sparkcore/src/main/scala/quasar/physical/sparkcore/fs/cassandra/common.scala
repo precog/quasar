@@ -38,28 +38,40 @@ final case class TableExists(keyspace: String, table: String) extends CassandraD
 final case class DropTable(keyspace: String, table: String) extends CassandraDDL[Unit]
 final case class CreateTable(keyspace: String, table: String) extends CassandraDDL[Unit]
 
-final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTable: String) extends CassandraDDL[Unit]
+final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTable: String)
+    extends CassandraDDL[Unit]
 final case class ListTables(keyspace: String) extends CassandraDDL[Set[String]]
 final case class ListKeyspaces(startWith: String) extends CassandraDDL[Set[String]]
 
 final case class ReadTable(keyspace: String, table: String) extends CassandraDDL[RDD[Data]]
-final case class InsertData(keyspace: String, table: String, data: String) extends CassandraDDL[Unit]
+final case class InsertData(keyspace: String, table: String, data: String)
+    extends CassandraDDL[Unit]
 
 object CassandraDDL {
 
-
   class Ops[S[_]](implicit s0: CassandraDDL :<: S) {
-    def keyspaceExists(keyspace: String): Free[S, Boolean] = Free.liftF(s0.inj(KeyspaceExists(keyspace)))
-    def tableExists(keyspace: String, table: String): Free[S, Boolean] = Free.liftF(s0.inj(TableExists(keyspace, table)))
-    def dropKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(DropKeyspace(keyspace)))
-    def dropTable(keyspace: String, table: String): Free[S, Unit] = Free.liftF(s0.inj(DropTable(keyspace, table)))
-    def createTable(keyspace: String, table: String): Free[S, Unit] = Free.liftF(s0.inj(CreateTable(keyspace, table)))
-    def createKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(CreateKeyspace(keyspace)))
-    def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] = Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
-    def listTables(keyspace: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListTables(keyspace)))
-    def listKeyspaces(startWith: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListKeyspaces(startWith)))
-    def readTable(keyspace: String, table: String): Free[S, RDD[Data]] = Free.liftF(s0.inj(ReadTable(keyspace, table)))
-    def insertData(keyspace: String, table: String, data: String): Free[S, Unit] = Free.liftF(s0.inj(InsertData(keyspace, table, data)))
+    def keyspaceExists(keyspace: String): Free[S, Boolean] =
+      Free.liftF(s0.inj(KeyspaceExists(keyspace)))
+    def tableExists(keyspace: String, table: String): Free[S, Boolean] =
+      Free.liftF(s0.inj(TableExists(keyspace, table)))
+    def dropKeyspace(keyspace: String): Free[S, Unit] =
+      Free.liftF(s0.inj(DropKeyspace(keyspace)))
+    def dropTable(keyspace: String, table: String): Free[S, Unit] =
+      Free.liftF(s0.inj(DropTable(keyspace, table)))
+    def createTable(keyspace: String, table: String): Free[S, Unit] =
+      Free.liftF(s0.inj(CreateTable(keyspace, table)))
+    def createKeyspace(keyspace: String): Free[S, Unit] =
+      Free.liftF(s0.inj(CreateKeyspace(keyspace)))
+    def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] =
+      Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
+    def listTables(keyspace: String): Free[S, Set[String]] =
+      Free.liftF(s0.inj(ListTables(keyspace)))
+    def listKeyspaces(startWith: String): Free[S, Set[String]] =
+      Free.liftF(s0.inj(ListKeyspaces(startWith)))
+    def readTable(keyspace: String, table: String): Free[S, RDD[Data]] =
+      Free.liftF(s0.inj(ReadTable(keyspace, table)))
+    def insertData(keyspace: String, table: String, data: String): Free[S, Unit] =
+      Free.liftF(s0.inj(InsertData(keyspace, table, data)))
   }
 
   object Ops {
@@ -99,44 +111,53 @@ object CassandraDDL {
   def keyspaceExists[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
     if (keyspace.length > 0) {
       CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
+        val stmt =
+          session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
         session.execute(stmt.bind(keyspace)).all().size() > 0
       }
     } else false
   }
 
-  def tableExists[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-      session.execute(stmt.bind(keyspace, table)).all().size() > 0
+  def tableExists[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        val stmt = session.prepare(
+          "SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
+        session.execute(stmt.bind(keyspace, table)).all().size() > 0
+      }
     }
-  }
 
-  def dropKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
-    }
-  }.void
+  def dropKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
+      }
+    }.void
 
-  def dropTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      session.execute(s"DROP TABLE $keyspace.$table;")
-    }
-  }.void
+  def dropTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        session.execute(s"DROP TABLE $keyspace.$table;")
+      }
+    }.void
 
-  def createTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
-    }
-  }.void
+  def createTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
+      }
+    }.void
 
-  def createKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      session.execute(s"CREATE KEYSPACE $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-    }
-  }.void
+  def createKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        session.execute(
+          s"CREATE KEYSPACE $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+      }
+    }.void
 
-  def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = Task.delay {
+  def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(
+      implicit sc: SparkContext) = Task.delay {
     val rdd = sc.cassandraTable(fromK, fromT)
     rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = toK, tableName = toT))
   }
@@ -145,30 +166,33 @@ object CassandraDDL {
     sc.cassandraTable[String]("system_schema", "tables")
       .select("table_name")
       .where("keyspace_name = ?", keyspace)
-      .collect.toSet
+      .collect
+      .toSet
   }
 
   def listKeyspaces[S[_]](nameStartWith: String)(implicit sc: SparkContext) = Task.delay {
-    sc.cassandraTable[String]("system_schema","keyspaces")
+    sc.cassandraTable[String]("system_schema", "keyspaces")
       .select("keyspace_name")
       .filter(_.startsWith(nameStartWith))
-      .collect.toSet
+      .collect
+      .toSet
   }
 
   def readTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
-    sc.cassandraTable[String](keyspace, table)
-      .select("data")
-      .map { raw =>
-        DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }
+    sc.cassandraTable[String](keyspace, table).select("data").map { raw =>
+      DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
+    }
   }
 
-  def insertData[S[_]](keyspace: String, table: String, data: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
-      session.execute(stmt.bind(data))
-    }
-  }.void
+  def insertData[S[_]](keyspace: String, table: String, data: String)(
+      implicit sc: SparkContext) =
+    Task.delay {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        val stmt =
+          session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
+        session.execute(stmt.bind(data))
+      }
+    }.void
 
 }
 

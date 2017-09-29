@@ -36,11 +36,12 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import scalaz.scalacheck.ScalazArbitrary._
 
-final class StructuralTypeSpec extends Spec
-  with ScalazMatchers
-  with StructuralTypeArbitrary
-  with EJsonArbitrary
-  with SimpleTypeArbitrary {
+final class StructuralTypeSpec
+    extends Spec
+    with ScalazMatchers
+    with StructuralTypeArbitrary
+    with EJsonArbitrary
+    with SimpleTypeArbitrary {
 
   import StructuralType.{TagST, TypeST}
 
@@ -52,7 +53,10 @@ final class StructuralTypeSpec extends Spec
   def mkST(j: J): S = StructuralType.fromEJsonK[J](1, j)
 
   def diffTags(x: J, y: J): Boolean = (x, y) match {
-    case (Embed(E(ejs.Meta(_, Embed(ejs.Type(x))))), Embed(E(ejs.Meta(_, Embed(ejs.Type(y)))))) => x ≠ y
+    case (
+        Embed(E(ejs.Meta(_, Embed(ejs.Type(x))))),
+        Embed(E(ejs.Meta(_, Embed(ejs.Type(y)))))) =>
+      x ≠ y
     case _ => true
   }
 
@@ -71,58 +75,71 @@ final class StructuralTypeSpec extends Spec
 
     "unmergeable values accumulate via union" >> prop { (x: J, y: J) =>
       ((compositeTypeOf(x) ≠ compositeTypeOf(y)) && diffTags(x, y) && (x ≠ y)) ==> {
-      val (xst, yst) = (mkST(x), mkST(y))
-      val exp = envT(2, TypeST(TypeF.coproduct[J, S](xst, yst))).embed
-      (xst |+| yst) must equal(exp)
-    }}
-
-    "known and unknown arrays merge union of known with lub" >> prop { (xs: List[J], y: SimpleType) =>
-      val arr = mkST(C(ejs.Arr(xs)).embed)
-      val ySimple = envT(1, TypeST(TypeF.simple[J, S](y))).embed
-      val lubArr = envT(1, TypeST(TypeF.arr[J, S](ySimple.right))).embed
-      val consts = xs.toIList.map(mkST)
-
-      val exp = envT(2, TypeST(TypeF.arr[J, S](\/-(consts match {
-        case INil() => ySimple
-
-        case ICons(a, INil()) =>
-          envT(2, TypeST(TypeF.coproduct[J, S](ySimple, a))).embed
-
-        case ICons(a, ICons(b, cs)) =>
-          StructuralType.disjoinUnionsƒ[J, Int, StructuralType.ST[J, ?], S].apply(
-            envT(2, TypeST(TypeF.union[J, S](ySimple, a, b :: cs)))
-          ).embed
-      })))).embed
-
-      (lubArr |+| arr) must equal(exp)
+        val (xst, yst) = (mkST(x), mkST(y))
+        val exp = envT(2, TypeST(TypeF.coproduct[J, S](xst, yst))).embed
+        (xst |+| yst) must equal(exp)
+      }
     }
 
-    "merging known map with unknown results in a map with both" >> prop { (kn: IMap[J, S], unk: (S, S)) =>
-      val m1 = envT(1, TypeST(TypeF.map[J, S](kn, None))).embed
-      val m2 = envT(1, TypeST(TypeF.map[J, S](IMap.empty[J, S], Some(unk)))).embed
-      val me = envT(2, TypeST(TypeF.map[J, S](kn, Some(unk)))).embed
-      (m1 |+| m2) must equal(me)
+    "known and unknown arrays merge union of known with lub" >> prop {
+      (xs: List[J], y: SimpleType) =>
+        val arr = mkST(C(ejs.Arr(xs)).embed)
+        val ySimple = envT(1, TypeST(TypeF.simple[J, S](y))).embed
+        val lubArr = envT(1, TypeST(TypeF.arr[J, S](ySimple.right))).embed
+        val consts = xs.toIList.map(mkST)
+
+        val exp = envT(
+          2,
+          TypeST(TypeF.arr[J, S](\/-(consts match {
+            case INil() => ySimple
+
+            case ICons(a, INil()) =>
+              envT(2, TypeST(TypeF.coproduct[J, S](ySimple, a))).embed
+
+            case ICons(a, ICons(b, cs)) =>
+              StructuralType
+                .disjoinUnionsƒ[J, Int, StructuralType.ST[J, ?], S]
+                .apply(
+                  envT(2, TypeST(TypeF.union[J, S](ySimple, a, b :: cs)))
+                )
+                .embed
+          })))
+        ).embed
+
+        (lubArr |+| arr) must equal(exp)
     }
 
-    "merging known maps where some keys differ results in combination of keys" >> prop { m0: IMap[J, S] =>
-      m0.minViewWithKey map { case ((k, v), m) =>
-        val m1 = envT(1, TypeST(TypeF.map[J, S](IMap.singleton(k, v), None))).embed
-        val m2 = envT(1, TypeST(TypeF.map[J, S](m, None))).embed
-        val m3 = envT(2, TypeST(TypeF.map[J, S](m0, None))).embed
-        (m1 |+| m2) must equal(m3)
-      } getOrElse ok
+    "merging known map with unknown results in a map with both" >> prop {
+      (kn: IMap[J, S], unk: (S, S)) =>
+        val m1 = envT(1, TypeST(TypeF.map[J, S](kn, None))).embed
+        val m2 = envT(1, TypeST(TypeF.map[J, S](IMap.empty[J, S], Some(unk)))).embed
+        val me = envT(2, TypeST(TypeF.map[J, S](kn, Some(unk)))).embed
+        (m1 |+| m2) must equal(me)
     }
 
-    "unions merge by accumulating mergeable values" >> prop { (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
-      val xst = envT(1, TypeST(TypeF.arr[J, S](xs.left))).embed
-      val yst = envT(1, TypeST(TypeF.arr[J, S](ys.left))).embed
-      val ist = mkST(E(ejs.int[J](i)).embed)
-      val sst = mkST(C(ejs.str[J](s)).embed)
-      val pst = envT(1, TypeST(TypeF.simple[J, S](st))).embed
-      val a   = envT(1, TypeST(TypeF.union[J, S](xst, ist, IList(pst)))).embed
-      val b   = envT(1, TypeST(TypeF.union[J, S](yst, sst, IList(pst)))).embed
-      val c   = envT(2, TypeST(TypeF.union[J, S](xst |+| yst, ist, IList(sst, pst |+| pst)))).embed
-      (a |+| b) must equal(c)
+    "merging known maps where some keys differ results in combination of keys" >> prop {
+      m0: IMap[J, S] =>
+        m0.minViewWithKey map {
+          case ((k, v), m) =>
+            val m1 = envT(1, TypeST(TypeF.map[J, S](IMap.singleton(k, v), None))).embed
+            val m2 = envT(1, TypeST(TypeF.map[J, S](m, None))).embed
+            val m3 = envT(2, TypeST(TypeF.map[J, S](m0, None))).embed
+            (m1 |+| m2) must equal(m3)
+        } getOrElse ok
+    }
+
+    "unions merge by accumulating mergeable values" >> prop {
+      (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
+        val xst = envT(1, TypeST(TypeF.arr[J, S](xs.left))).embed
+        val yst = envT(1, TypeST(TypeF.arr[J, S](ys.left))).embed
+        val ist = mkST(E(ejs.int[J](i)).embed)
+        val sst = mkST(C(ejs.str[J](s)).embed)
+        val pst = envT(1, TypeST(TypeF.simple[J, S](st))).embed
+        val a = envT(1, TypeST(TypeF.union[J, S](xst, ist, IList(pst)))).embed
+        val b = envT(1, TypeST(TypeF.union[J, S](yst, sst, IList(pst)))).embed
+        val c =
+          envT(2, TypeST(TypeF.union[J, S](xst |+| yst, ist, IList(sst, pst |+| pst)))).embed
+        (a |+| b) must equal(c)
     }
 
     "same type tag merges contents" >> prop { (t: ejs.TypeTag, s1: S, s2: S) =>

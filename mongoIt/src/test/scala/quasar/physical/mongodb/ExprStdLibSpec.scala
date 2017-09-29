@@ -35,31 +35,41 @@ import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat
 
 /** Test the implementation of the standard library for MongoDb's aggregation
-  * pipeline (aka ExprOp).
-  */
+ * pipeline (aka ExprOp).
+ */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Integer, _)  => notHandled.left
-    case (string.Decimal, _)  => notHandled.left
+  def shortCircuit[N <: Nat](
+      backend: BackendName,
+      func: GenericFunc[N],
+      args: List[Data]): Result \/ Unit = (func, args) match {
+    case (string.Length, _) if !is3_4(backend) =>
+      Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Integer, _) => notHandled.left
+    case (string.Decimal, _) => notHandled.left
 
-    case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
-    case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
+    case (string.Search, _) =>
+      Skipped("compiles to a map/reduce, so can't be run in tests").left
+    case (string.Split, _) if (!is3_4(backend)) =>
+      Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Substring, List(Data.Str(s), _, _))
+        if (!is3_4(backend) && !isPrintableAscii(s)) =>
       Skipped("only printable ascii supported on MongoDB < 3.4").left
-    case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
+    case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) =>
+      Skipped("Implemented, but formatted incorrectly").left
 
-    case (quasar.std.SetLib.Within, _)      => notHandled.left
+    case (quasar.std.SetLib.Within, _) => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
-    case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
-    case (date.Now, _)            => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
+    case (date.ExtractWeek, _) => Skipped("Implemented, but not ISO compliant").left
+    case (date.Now, _) =>
+      Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
 
     case (date.StartOfDay, _) => notHandled.left
-    case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
+    case (date.TimeOfDay, _) if is2_6(backend) =>
+      Skipped("not implemented in aggregation on MongoDB 2.6").left
 
     //FIXME modulo and trunc (which is defined in terms of modulo) cause the
     //mongo docker container to crash (with quite high frequency but not always).
@@ -67,7 +77,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     //cause failures when marked as pending (but with low frequency)
     case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
-    case (math.Power, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.Power, _) if lt3_2(backend) =>
+      Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
@@ -76,45 +87,70 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.IfUndefined, _) => notHandled.left
 
-    case (structural.ConcatOp, _)   => notHandled.left
+    case (structural.ConcatOp, _) => notHandled.left
     case (structural.DeleteField, _) => notHandled.left
     case (structural.ObjectProject, _) => notHandled.left
 
-    case _                  => ().right
+    case _ => ().right
   }
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
   def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
-    expr: Fix[ExprOp], coll: Collection)(
-    implicit RT: RenderTree[WorkflowBuilder[WF]]
+      expr: Fix[ExprOp],
+      coll: Collection)(
+      implicit RT: RenderTree[WorkflowBuilder[WF]]
   ) =
-    WorkflowBuilder.build[PlannerError \/ ?, WF](
-      WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[WF].read(coll),
-        ListMap(BsonField.Name("value") -> \&/-(expr))))
+    WorkflowBuilder
+      .build[PlannerError \/ ?, WF](
+        WorkflowBuilder.DocBuilder(
+          WorkflowBuilder.Ops[WF].read(coll),
+          ListMap(BsonField.Name("value") -> \&/-(expr))))
       .leftMap(qscriptPlanningFailed.reverseGet(_))
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix]
-  ) : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def compile(
+      queryModel: MongoQueryModel,
+      coll: Collection,
+      mf: FreeMap[Fix]): FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     type PlanStdT[A] = ReaderT[FileSystemError \/ ?, Instant, A]
 
     val bsonVersion = MongoQueryModel.toBsonVersion(queryModel)
     queryModel match {
       case MongoQueryModel.`3.4` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4(bsonVersion))(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
-          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+        (MongoDbPlanner
+          .getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4(bsonVersion))(mf)
+          .run(runAt) >>= (build[Workflow3_2F](_, coll))).map(
+          wf =>
+            (
+              Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF],
+              BsonField.Name("value")))
 
       case MongoQueryModel.`3.2` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2(bsonVersion))(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
-          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+        (MongoDbPlanner
+          .getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2(bsonVersion))(mf)
+          .run(runAt) >>= (build[Workflow3_2F](_, coll))).map(
+          wf =>
+            (
+              Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF],
+              BsonField.Name("value")))
 
       case MongoQueryModel.`3.0` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0(bsonVersion))(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
-          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+        (MongoDbPlanner
+          .getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0(bsonVersion))(mf)
+          .run(runAt) >>= (build[Workflow2_6F](_, coll))).map(
+          wf =>
+            (
+              Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF],
+              BsonField.Name("value")))
 
-      case _                     =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6(bsonVersion))(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
-          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+      case _ =>
+        (MongoDbPlanner
+          .getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6(bsonVersion))(mf)
+          .run(runAt) >>= (build[Workflow2_6F](_, coll))).map(
+          wf =>
+            (
+              Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF],
+              BsonField.Name("value")))
 
     }
   }

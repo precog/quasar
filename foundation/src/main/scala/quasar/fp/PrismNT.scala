@@ -23,7 +23,7 @@ import monocle.Prism
 import scalaz._
 
 /** Just like Prism, but operates over Functors.
-  */
+ */
 final case class PrismNT[F[_], G[_]](get: F ~> (Option ∘ G)#λ, reverseGet: G ~> F) {
   def apply[A](ga: G[A]): F[A] = reverseGet(ga)
 

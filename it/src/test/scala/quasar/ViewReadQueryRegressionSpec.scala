@@ -19,7 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
-import quasar.fp._ , free._
+import quasar.fp._, free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.fs.mount.cache.VCache
@@ -34,7 +34,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 class ViewReadQueryRegressionSpec
-  extends QueryRegressionTest[BackendEffectIO](QueryRegressionTest.externalFS.map(_.take(1))) {
+    extends QueryRegressionTest[BackendEffectIO](QueryRegressionTest.externalFS.map(_.take(1))) {
 
   val TestsDir = dir("resultFile").some
 
@@ -46,17 +46,21 @@ class ViewReadQueryRegressionSpec
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
-      TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
-      TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
-      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
-      physicalFileSystems(BackendConfig.Empty)   // test views just against mimir
+      TaskRef(Map[APath, MountConfig](
+        path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
+        TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
+        TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
+        physicalFileSystems(BackendConfig.Empty) // test views just against mimir
     ) { (cfgsRef, hfsRef, mntdRef, mounts) =>
       val mnt =
         KvsMounter.interpreter[Task, FsAskPhysFsEff](
-          KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+          KeyValueStore.impl.fromTaskRef(cfgsRef),
+          hfsRef,
+          mntdRef)
 
-      foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
-        .compose(mnt)
+      foldMapNT(
+        Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure
+          .toRuntimeError[Task, PhysicalError]).compose(mnt)
     }
 
   val seq = TaskRef(0L).map(MonotonicSeq.fromTaskRef)
@@ -82,10 +86,11 @@ class ViewReadQueryRegressionSpec
   }
 
   def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> BackendEffectIO] =
-    (ViewState.toTask(Map()) |@| seq)((v, s) =>
-      (injectNT[Task, BackendEffectIO] compose mnts)                               :+:
-      (injectNT[Task, BackendEffectIO] compose v)                                  :+:
-      (injectNT[Task, BackendEffectIO] compose runConstantVCache[Task](Map.empty)) :+:
-      (injectNT[Task, BackendEffectIO] compose s)                                  :+:
-      reflNT[BackendEffectIO])
+    (ViewState.toTask(Map()) |@| seq)(
+      (v, s) =>
+        (injectNT[Task, BackendEffectIO] compose mnts) :+:
+          (injectNT[Task, BackendEffectIO] compose v) :+:
+          (injectNT[Task, BackendEffectIO] compose runConstantVCache[Task](Map.empty)) :+:
+          (injectNT[Task, BackendEffectIO] compose s) :+:
+          reflNT[BackendEffectIO])
 }

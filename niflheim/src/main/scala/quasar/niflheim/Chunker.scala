@@ -70,7 +70,8 @@ trait Chunker {
     remaining - len
   }
 
-  def write[A](channel: WritableByteChannel, maxSize: Int)(f: ByteBuffer => A): Validation[IOException, A] = {
+  def write[A](channel: WritableByteChannel, maxSize: Int)(
+      f: ByteBuffer => A): Validation[IOException, A] = {
     val buffer = allocate(maxSize)
     val result = f(buffer)
     buffer.flip()
@@ -83,8 +84,9 @@ trait Chunker {
         }
       }
       Success(result)
-    } catch { case ex: IOException =>
-      Failure(ex)
+    } catch {
+      case ex: IOException =>
+        Failure(ex)
     }
   }
 
@@ -108,8 +110,9 @@ trait Chunker {
       buffer.flip()
 
       Success(buffer)
-    } catch { case ioe: IOException =>
-      Failure(ioe)
+    } catch {
+      case ioe: IOException =>
+        Failure(ioe)
     }
   }
 }

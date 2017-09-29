@@ -19,7 +19,7 @@ package quasar.physical.marklogic.xquery
 import slamdata.Predef._
 import quasar.physical.marklogic.xquery.syntax._
 
-import scalaz.{Show, Order}
+import scalaz.{Order, Show}
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.std.tuple._

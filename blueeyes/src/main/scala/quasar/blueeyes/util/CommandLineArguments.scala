@@ -17,14 +17,17 @@
 package quasar.blueeyes
 package util
 
-case class CommandLineArguments private (parameters: Map[String, String], values: List[String]) {
-  def +(that: CommandLineArguments): CommandLineArguments = new CommandLineArguments(this.parameters ++ that.parameters, this.values ++ that.values)
+case class CommandLineArguments private (
+    parameters: Map[String, String],
+    values: List[String]) {
+  def +(that: CommandLineArguments): CommandLineArguments =
+    new CommandLineArguments(this.parameters ++ that.parameters, this.values ++ that.values)
 
   def size = parameters.size + values.length
 }
 object CommandLineArguments {
   def apply(args: String*): CommandLineArguments = {
-    var Key   = """-{1,2}(.+)""".r
+    var Key = """-{1,2}(.+)""".r
     var Value = """([^\-].*)""".r
 
     def parse0(args: List[String]): CommandLineArguments = args match {

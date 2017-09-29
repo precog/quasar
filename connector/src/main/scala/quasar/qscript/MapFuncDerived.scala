@@ -46,17 +46,14 @@ object MapFuncDerived {
 
   implicit def traverse[T[_[_]]]: Traverse[MapFuncDerived[T, ?]] =
     new Traverse[MapFuncDerived[T, ?]] {
-      def traverseImpl[G[_], A, B](
-        fa: MapFuncDerived[T, A])(
-        f: A => G[B])(
-        implicit G: Applicative[G]):
-          G[MapFuncDerived[T, B]] = fa match {
-            // unary
-            case Abs(a1) => f(a1) ∘ (Abs(_))
-            case Ceil(a1) => f(a1) ∘ (Ceil(_))
-            case Floor(a1) => f(a1) ∘ (Floor(_))
-            case Trunc(a1) => f(a1) ∘ (Trunc(_))
-          }
+      def traverseImpl[G[_], A, B](fa: MapFuncDerived[T, A])(f: A => G[B])(
+          implicit G: Applicative[G]): G[MapFuncDerived[T, B]] = fa match {
+        // unary
+        case Abs(a1) => f(a1) ∘ (Abs(_))
+        case Ceil(a1) => f(a1) ∘ (Ceil(_))
+        case Floor(a1) => f(a1) ∘ (Floor(_))
+        case Trunc(a1) => f(a1) ∘ (Trunc(_))
+      }
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))

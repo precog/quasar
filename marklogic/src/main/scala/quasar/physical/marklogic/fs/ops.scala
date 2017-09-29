@@ -29,7 +29,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.physical.marklogic.xcc._
 
-import com.marklogic.xcc.types.{XdmItem, XSString}
+import com.marklogic.xcc.types.{XSString, XdmItem}
 import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -40,12 +40,12 @@ object ops {
 
   /** Appends the given contents to the file, which must already exist. */
   def appendToFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
-    file: AFile,
-    contents: A
-  )(implicit
-    C:  AsContent[FMT, A],
-    SP: StructuralPlanner[F, FMT]
-  ): F[ErrorMessages \/ Vector[XccError]] = {
+      file: AFile,
+      contents: A
+  )(
+      implicit
+      C: AsContent[FMT, A],
+      SP: StructuralPlanner[F, FMT]): F[ErrorMessages \/ Vector[XccError]] = {
     def appendQuery(src: AFile): F[MainModule] =
       main10ml {
         SP.leftShift(fileRoot[FMT](src))
@@ -57,11 +57,11 @@ object ops {
     }
 
     Xcc[F].transact(for {
-      tmp  <- tmpFile
+      tmp <- tmpFile
       errs <- insertFile[F, FMT, A](tmp, contents)
       main <- appendQuery(tmp)
-      _    <- Xcc[F].execute(main)
-      _    <- deleteFile(tmp)
+      _ <- Xcc[F].execute(main)
+      _ <- deleteFile(tmp)
     } yield errs)
   }
 
@@ -69,9 +69,10 @@ object ops {
   def deleteDir[F[_]: Xcc: Applicative, FMT: SearchOptions](dir: ADir): F[Executed] = {
     val file = $("file")
 
-    Xcc[F].executeQuery(fn.map(
-      func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
-      directoryDocuments[FMT](pathUri(dir).xs, true)))
+    Xcc[F].executeQuery(
+      fn.map(
+        func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
+        directoryDocuments[FMT](pathUri(dir).xs, true)))
   }
 
   /** Deletes the given file, erroring if it doesn't exist. */
@@ -79,7 +80,8 @@ object ops {
     Xcc[F].executeQuery(xdmp.documentDelete(pathUri(file).xs))
 
   /** Returns whether any file descendants of the given dir have the specified format. */
-  def descendantsHavingFormatExist[F[_]: Xcc: Functor, FMT: SearchOptions](dir: ADir): F[Boolean] = {
+  def descendantsHavingFormatExist[F[_]: Xcc: Functor, FMT: SearchOptions](
+      dir: ADir): F[Boolean] = {
     val main = main10ml(lib.descendantsHavingFormatExist[W, FMT] apply pathUri(dir).xs)
     Xcc[F].results(main.value) map booleanResult
   }
@@ -106,10 +108,10 @@ object ops {
     }
 
     Xcc[F].transact(for {
-      f     <- nextUri
-      mm    =  main10ml((f >>= lib.directoryContents[W, FMT])(pathUri(dir).xs))
+      f <- nextUri
+      mm = main10ml((f >>= lib.directoryContents[W, FMT])(pathUri(dir).xs))
       items <- Xcc[F].results(mm.value)
-      segs  =  items foldMap asSegments
+      segs = items foldMap asSegments
     } yield segs)
   }
 
@@ -122,20 +124,21 @@ object ops {
     Xcc[F].queryResults(fn.exists(fileNode[FMT](file))) map booleanResult
 
   /** Insert the given contents into the file, overwriting any existing contents
-    * and creating the file otherwise. Returns any errors encountered, either
-    * with the contents or during the process of insertion itself.
-    */
+   * and creating the file otherwise. Returns any errors encountered, either
+   * with the contents or during the process of insertion itself.
+   */
   def insertFile[F[_]: Monad: Xcc, FMT, A](
-    file: AFile,
-    contents: A
-  )(implicit
-    C: AsContent[FMT, A]
-  ): F[ErrorMessages \/ Vector[XccError]] = {
-    val uri         = pathUri(file)
-    val contentUri  = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
-    val content     = contentUri >>= (C.asContent[ErrorMessages \/ ?](_, contents))
+      file: AFile,
+      contents: A
+  )(
+      implicit
+      C: AsContent[FMT, A]): F[ErrorMessages \/ Vector[XccError]] = {
+    val uri = pathUri(file)
+    val contentUri = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
+    val content = contentUri >>= (C.asContent[ErrorMessages \/ ?](_, contents))
 
-    EitherT.fromDisjunction[F](content)
+    EitherT
+      .fromDisjunction[F](content)
       .flatMapF(c => Xcc[F].insert[Id](c) map (_.right[ErrorMessages]))
       .run
   }
@@ -149,12 +152,11 @@ object ops {
         func(file.render) {
           let_(
             srcUri := fn.baseUri(~file),
-            dstUri := fn.concat(
-                        pathUri(dst).xs,
-                        fn.substringAfter(~srcUri, pathUri(src).xs)))
-          .return_(moveF(~srcUri, ~dstUri))
+            dstUri := fn.concat(pathUri(dst).xs, fn.substringAfter(~srcUri, pathUri(src).xs)))
+            .return_(moveF(~srcUri, ~dstUri))
         },
-        directoryDocuments[FMT](pathUri(src).xs, true))
+        directoryDocuments[FMT](pathUri(src).xs, true)
+      )
     }
 
     (src =/= dst) whenM Xcc[F].execute(main10ml(doMoveDir).value) as Executed.executed
@@ -173,14 +175,14 @@ object ops {
   /** Attempts to pretty print the given expression. */
   def prettyPrint[F[_]: Monad: MonadFsErr: Xcc](xqy: XQuery): F[Option[XQuery]] = {
     val prettyPrinted =
-      Xcc[F].queryResults(xdmp.prettyPrint(XQuery(s"'$xqy'")))
+      Xcc[F]
+        .queryResults(xdmp.prettyPrint(XQuery(s"'$xqy'")))
         .map(_.headOption collect { case s: XSString => XQuery(s.asString) })
 
     Xcc[F].handleWith(prettyPrinted) {
       case err @ XccError.QueryError(_, cause) =>
         MonadFsErr[F].raiseError(
-          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
-            err.shows, Some(cause))))
+          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(err.shows, Some(cause))))
 
       // NB: As this is only for pretty printing, if we fail for some other reason
       //     just return an empty result.
@@ -190,16 +192,16 @@ object ops {
 
   /** Stream of the left-shifted contents of the given file. */
   def readFile[F[_]: Monad: Xcc: PrologL, FMT: SearchOptions](
-    file: AFile,
-    offset: Natural,
-    limit: Option[Positive]
-  )(implicit
-    SP: StructuralPlanner[F, FMT]
-  ): Process[F, XdmItem] = {
+      file: AFile,
+      offset: Natural,
+      limit: Option[Positive]
+  )(
+      implicit
+      SP: StructuralPlanner[F, FMT]): Process[F, XdmItem] = {
     val query = SP.leftShift(fileRoot[FMT](file)) map { items =>
       (offset.value + 1, limit.map(_.value.xqy)) match {
         case (1, None) => items
-        case (o, l)    => fn.subsequence(items, o.xqy, l)
+        case (o, l) => fn.subsequence(items, o.xqy, l)
       }
     }
 
@@ -208,15 +210,14 @@ object ops {
 
   /** Appends contents to an existing file, creating it otherwise. */
   def upsertFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
-    file: AFile,
-    contents: A
-  )(implicit
-    C:  AsContent[FMT, A],
-    SP: StructuralPlanner[F, FMT]
-  ): F[ErrorMessages \/ Vector[XccError]] =
-    fileExists[F](file).ifM(
-      appendToFile[F, FMT, A](file, contents),
-      insertFile[F, FMT, A](file, contents))
+      file: AFile,
+      contents: A
+  )(
+      implicit
+      C: AsContent[FMT, A],
+      SP: StructuralPlanner[F, FMT]): F[ErrorMessages \/ Vector[XccError]] =
+    fileExists[F](file)
+      .ifM(appendToFile[F, FMT, A](file, contents), insertFile[F, FMT, A](file, contents))
 
   /** Returns whether the URI lexicon is enabled. */
   def uriLexiconEnabled[F[_]: Functor: Xcc]: F[Boolean] = {

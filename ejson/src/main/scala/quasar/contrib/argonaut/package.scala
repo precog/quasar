@@ -26,7 +26,7 @@ import _root_.scalaz._
 
 package object argonaut {
   private val CJ = Inject[ejson.Common, ejson.Json]
-  private val OJ = Inject[ejson.Obj,    ejson.Json]
+  private val OJ = Inject[ejson.Obj, ejson.Json]
 
   implicit def jsonRecursive: Recursive.Aux[Json, ejson.Json] =
     new Recursive[Json] {
@@ -48,12 +48,12 @@ package object argonaut {
 
       def embed(ft: ejson.Json[Json])(implicit BF: Functor[Base]) =
         ft match {
-          case CJ(ejson.Null())  => jNull
+          case CJ(ejson.Null()) => jNull
           case CJ(ejson.Bool(b)) => jBool(b)
-          case CJ(ejson.Dec(d))  => jNumber(d)
-          case CJ(ejson.Str(s))  => jString(s)
-          case CJ(ejson.Arr(a))  => jArray(a)
-          case OJ(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
+          case CJ(ejson.Dec(d)) => jNumber(d)
+          case CJ(ejson.Str(s)) => jString(s)
+          case CJ(ejson.Arr(a)) => jArray(a)
+          case OJ(ejson.Obj(o)) => jObject(JsonObject.fromTraversableOnce(o))
         }
     }
 }

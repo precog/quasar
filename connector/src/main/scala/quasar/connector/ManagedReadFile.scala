@@ -45,25 +45,25 @@ trait ManagedReadFile[C] { self: BackendModule =>
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
       for {
         id <- MonoSeqM.next.liftB
-        h  =  ReadHandle(file, id)
-        c  <- ManagedReadFileModule.readCursor(file, offset, limit)
-        _  <- ReadKvsM.put(h, c).liftB
+        h = ReadHandle(file, id)
+        c <- ManagedReadFileModule.readCursor(file, offset, limit)
+        _ <- ReadKvsM.put(h, c).liftB
       } yield h
 
     def read(h: ReadHandle): Backend[Vector[Data]] =
       for {
         c0 <- ReadKvsM.get(h).liftB
-        c  <- c0 getOrElseF unknownReadHandle(h).raiseError[Backend, C]
-        r  <- ManagedReadFileModule.nextChunk(c)
+        c <- c0 getOrElseF unknownReadHandle(h).raiseError[Backend, C]
+        r <- ManagedReadFileModule.nextChunk(c)
         (c1, data) = r
-        _  <- ReadKvsM.put(h, c1).liftB
+        _ <- ReadKvsM.put(h, c1).liftB
       } yield data
 
     def close(h: ReadHandle): Configured[Unit] =
       OptionT(ReadKvsM.get(h).liftM[ConfiguredT])
         .flatMapF(c =>
           ManagedReadFileModule.closeCursor(c) *>
-          ReadKvsM.delete(h).liftM[ConfiguredT])
+            ReadKvsM.delete(h).liftM[ConfiguredT])
         .orZero
   }
 }

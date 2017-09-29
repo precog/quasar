@@ -20,7 +20,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
-import scalaz.{Validation, Success, Failure}
+import scalaz.{Failure, Success, Validation}
 
 trait Versioning {
   def magic: Short
@@ -37,8 +37,9 @@ trait Versioning {
         channel.write(buffer)
       }
       Success(())
-    } catch { case ioe: IOException =>
-      Failure(ioe)
+    } catch {
+      case ioe: IOException =>
+        Failure(ioe)
     }
   }
 
@@ -57,10 +58,9 @@ trait Versioning {
       } else {
         Failure(new IOException("Incorrect magic number found."))
       }
-    } catch { case ioe: IOException =>
-      Failure(ioe)
+    } catch {
+      case ioe: IOException =>
+        Failure(ioe)
     }
   }
 }
-
-

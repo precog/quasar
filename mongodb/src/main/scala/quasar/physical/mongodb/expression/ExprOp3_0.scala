@@ -30,8 +30,7 @@ trait ExprOp3_0F[A]
 object ExprOp3_0F {
   final case class $dateToStringF[A](format: FormatString, date: A) extends ExprOp3_0F[A]
 
-  implicit val equal:
-      Delay[Equal, ExprOp3_0F] =
+  implicit val equal: Delay[Equal, ExprOp3_0F] =
     new Delay[Equal, ExprOp3_0F] {
       def apply[A](eq: Equal[A]) = {
         implicit val A: Equal[A] = eq
@@ -43,35 +42,36 @@ object ExprOp3_0F {
     }
 
   implicit val traverse: Traverse[ExprOp3_0F] = new Traverse[ExprOp3_0F] {
-    def traverseImpl[G[_], A, B](fa: ExprOp3_0F[A])(f: A => G[B])(implicit G: Applicative[G]):
-        G[ExprOp3_0F[B]] =
+    def traverseImpl[G[_], A, B](fa: ExprOp3_0F[A])(f: A => G[B])(
+        implicit G: Applicative[G]): G[ExprOp3_0F[B]] =
       fa match {
         case $dateToStringF(fmt, v) => G.map(f(v))($dateToStringF(fmt, _))
       }
   }
 
-  implicit def ops[F[_]: Functor](implicit I: ExprOp3_0F :<: F): ExprOpOps.Aux[ExprOp3_0F, F] = new ExprOpOps[ExprOp3_0F] {
-    type OUT[A] = F[A]
+  implicit def ops[F[_]: Functor](implicit I: ExprOp3_0F :<: F): ExprOpOps.Aux[ExprOp3_0F, F] =
+    new ExprOpOps[ExprOp3_0F] {
+      type OUT[A] = F[A]
 
-    def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
-      κ(None)
+      def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
+        κ(None)
 
-    def bson: Algebra[ExprOp3_0F, Bson] = {
-      case $dateToStringF(format, date) =>
-        Bson.Doc("$dateToString" -> Bson.Doc(
-          "format" -> Bson.Text(format.components.foldMap(_.fold(_.replace("%", "%%"), _.str))),
-          "date" -> date))
+      def bson: Algebra[ExprOp3_0F, Bson] = {
+        case $dateToStringF(format, date) =>
+          Bson.Doc(
+            "$dateToString" -> Bson.Doc(
+              "format" -> Bson.Text(
+                format.components.foldMap(_.fold(_.replace("%", "%%"), _.str))),
+              "date" -> date))
+      }
+
+      def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
+
+      def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
+        κ(None)
     }
 
-    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
-
-    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
-      κ(None)
-  }
-
-  final class fixpoint[T, EX[_]: Functor]
-    (embed: EX[T] => T)
-    (implicit I: ExprOp3_0F :<: EX) {
+  final class fixpoint[T, EX[_]: Functor](embed: EX[T] => T)(implicit I: ExprOp3_0F :<: EX) {
     def $dateToString(format: FormatString, date: T): T =
       embed(I.inj($dateToStringF(format, date)))
   }
@@ -79,16 +79,16 @@ object ExprOp3_0F {
 
 sealed abstract class FormatSpecifier(val str: String)
 object FormatSpecifier {
-  case object Year        extends FormatSpecifier("%Y")
-  case object Month       extends FormatSpecifier("%m")
-  case object DayOfMonth  extends FormatSpecifier("%d")
-  case object Hour        extends FormatSpecifier("%H")
-  case object Minute      extends FormatSpecifier("%M")
-  case object Second      extends FormatSpecifier("%S")
+  case object Year extends FormatSpecifier("%Y")
+  case object Month extends FormatSpecifier("%m")
+  case object DayOfMonth extends FormatSpecifier("%d")
+  case object Hour extends FormatSpecifier("%H")
+  case object Minute extends FormatSpecifier("%M")
+  case object Second extends FormatSpecifier("%S")
   case object Millisecond extends FormatSpecifier("%L")
-  case object DayOfYear   extends FormatSpecifier("%j")
-  case object DayOfWeek   extends FormatSpecifier("%w")
-  case object WeekOfYear  extends FormatSpecifier("%U")
+  case object DayOfYear extends FormatSpecifier("%j")
+  case object DayOfWeek extends FormatSpecifier("%w")
+  case object WeekOfYear extends FormatSpecifier("%U")
 }
 
 final case class FormatString(components: List[String \/ FormatSpecifier]) {

@@ -16,7 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{ -> => _, _ }
+import slamdata.Predef.{-> => _, _}
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
@@ -35,21 +35,21 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object api {
-  type ResponseT[F[_], A]   = EitherT[F, Response, A]
+  type ResponseT[F[_], A] = EitherT[F, Response, A]
   type ResponseIOT[F[_], A] = EitherT[F, Task[Response], A]
-  type ResponseOr[A]        = ResponseT[Task, A]
+  type ResponseOr[A] = ResponseT[Task, A]
 
   type ApiErrT[F[_], A] = EitherT[F, ApiError, A]
 
   /** Interpret a `Failure` effect into `ResponseOr` given evidence the
-    * failure type can be converted to a `QResponse`.
-    */
-  def failureResponseOr[E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> ResponseOr =
+   * failure type can be converted to a `QResponse`.
+   */
+  def failureResponseOr[E](
+      implicit E: ToQResponse[E, ResponseOr]): Failure[E, ?] ~> ResponseOr =
     joinResponseOr compose failureResponseIOT[Task, E]
 
-  def failureResponseIOT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> ResponseIOT[F, ?] = {
+  def failureResponseIOT[F[_]: Monad, E](
+      implicit E: ToQResponse[E, ResponseOr]): Failure[E, ?] ~> ResponseIOT[F, ?] = {
 
     def errToResp(e: E): Task[Response] =
       e.toResponse[ResponseOr].toHttpResponse(NaturalTransformation.refl)
@@ -61,9 +61,7 @@ package object api {
   val joinResponseOr: ResponseIOT[Task, ?] ~> ResponseOr =
     new (ResponseIOT[Task, ?] ~> ResponseOr) {
       def apply[A](et: ResponseIOT[Task, A]) =
-        EitherT(et.run.flatMap(_.fold(
-          _.map(_.left[A]),
-          _.right[Response].point[Task])))
+        EitherT(et.run.flatMap(_.fold(_.map(_.left[A]), _.right[Response].point[Task])))
     }
 
   // https://tools.ietf.org/html/rfc7234#section-4.2.4
@@ -96,16 +94,18 @@ package object api {
 
     def parse(param: String): String \/ HeaderValues = {
       def strings(json: Json): String \/ List[String] =
-        json.string.map(str => \/-(str :: Nil)).getOrElse(
-          json.array.map { vs =>
+        json.string
+          .map(str => \/-(str :: Nil))
+          .getOrElse(json.array.map { vs =>
             vs.traverse(v => v.string \/> (s"expected string in array; found: $v"))
           }.getOrElse(-\/(s"expected a string or array of strings; found: $json")))
 
       for {
         json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
         obj <- json.obj \/> (s"expected a JSON object; found: $json")
-        values <- obj.toList.traverse { case (k, v) =>
-          strings(v).map(CaseInsensitiveString(k) -> _)
+        values <- obj.toList.traverse {
+          case (k, v) =>
+            strings(v).map(CaseInsensitiveString(k) -> _)
         }
       } yield Map(values: _*)
     }
@@ -115,15 +115,18 @@ package object api {
         param.toList.flatMap {
           case (k, vs) => vs.map(v => Header.Raw(CaseInsensitiveString(k), v))
         } ++
-        headers.toList.filterNot(h => param contains h.name))
+          headers.toList.filterNot(h => param contains h.name))
 
     def apply(service: HttpService): HttpService =
       Service.lift { req =>
-        (req.params.get("request-headers").fold[String \/ Request](\/-(req)) { v =>
-          parse(v).map(hv => req.withHeaders(rewrite(req.headers, hv)))
-        }).fold(
-          err => BadRequest(Json("error" := "invalid request-headers: " + err)),
-          service.run)
+        (req.params
+          .get("request-headers")
+          .fold[String \/ Request](\/-(req)) { v =>
+            parse(v).map(hv => req.withHeaders(rewrite(req.headers, hv)))
+          })
+          .fold(
+            err => BadRequest(Json("error" := "invalid request-headers: " + err)),
+            service.run)
       }
   }
 
@@ -131,17 +134,22 @@ package object api {
   object RFC5987ContentDispositionRender extends HttpMiddleware {
     // NonUnitStatements due to http4s's Writer
     @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    final case class ContentDisposition(dispositionType: String, parameters: Map[String, String])
-      extends Header.Parsed {
+    final case class ContentDisposition(
+        dispositionType: String,
+        parameters: Map[String, String])
+        extends Header.Parsed {
       import org.http4s.util.Writer
       override def key = `Content-Disposition`
       override lazy val value = super.value
       override def renderValue(writer: Writer): writer.type = {
         writer.append(dispositionType)
-        parameters.foreach(p =>
-          p._1.endsWith("*").fold(
-            writer << "; " << p._1 << "=" << p._2,
-            writer << "; " << p._1 << "=\"" << p._2 << '"'))
+        parameters.foreach(
+          p =>
+            p._1
+              .endsWith("*")
+              .fold(
+                writer << "; " << p._1 << "=" << p._2,
+                writer << "; " << p._1 << "=\"" << p._2 << '"'))
         writer
       }
     }
@@ -149,11 +157,15 @@ package object api {
     def apply(service: HttpService): HttpService =
       service.map {
         case resp: Response =>
-          resp.headers.get(`Content-Disposition`).cata(
-            i => resp.copy(headers = resp.headers
-              .filter(_.name ≠ `Content-Disposition`.name)
-              .put(ContentDisposition(i.dispositionType, i.parameters))),
-            resp)
+          resp.headers
+            .get(`Content-Disposition`)
+            .cata(
+              i =>
+                resp.copy(
+                  headers = resp.headers
+                    .filter(_.name ≠ `Content-Disposition`.name)
+                    .put(ContentDisposition(i.dispositionType, i.parameters))),
+              resp)
         case pass => pass
       }
   }
@@ -169,9 +181,9 @@ package object api {
       val _uri_path = uriLens composeLens GenLens[Uri](_.path)
 
       val stripChars = prefix match {
-        case "/"                    => 0
+        case "/" => 0
         case x if x.startsWith("/") => x.length
-        case x                      => x.length + 1
+        case x => x.length + 1
       }
 
       def rewrite(path: String): Option[String] =
@@ -181,7 +193,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => Pass.now
+          case None => Pass.now
         }
       }
     }
@@ -212,18 +224,20 @@ package object api {
 
   def decodedDir(encodedPath: String): ApiError \/ ADir =
     decodedPath(encodedPath) flatMap { path =>
-      refineType(path).swap.leftAs(ApiError.fromMsg(
-        BadRequest withReason "Directory path expected.",
-        s"Expected '${posixCodec.printPath(path)}' to be a directory.",
-        "path" := path))
+      refineType(path).swap.leftAs(
+        ApiError.fromMsg(
+          BadRequest withReason "Directory path expected.",
+          s"Expected '${posixCodec.printPath(path)}' to be a directory.",
+          "path" := path))
     }
 
   def decodedFile(encodedPath: String): ApiError \/ AFile =
     decodedPath(encodedPath) flatMap { path =>
-      refineType(path).leftAs(ApiError.fromMsg(
-        BadRequest withReason "File path expected.",
-        s"Expected '${posixCodec.printPath(path)}' to be a file.",
-        "path" := path))
+      refineType(path).leftAs(
+        ApiError.fromMsg(
+          BadRequest withReason "File path expected.",
+          s"Expected '${posixCodec.printPath(path)}' to be a file.",
+          "path" := path))
     }
 
   def decodedPath(encodedPath: String): ApiError \/ APath =
@@ -233,7 +247,11 @@ package object api {
       "encodedPath" := encodedPath)
 
   def transcode(from: PathCodec, to: PathCodec): String => String =
-    from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
+    from.parsePath(
+      to.unsafePrintPath,
+      to.unsafePrintPath,
+      to.unsafePrintPath,
+      to.unsafePrintPath)
 
   def staticFileService(basePath: String): HttpService =
     fileService(FileService.Config(systemPath = basePath))

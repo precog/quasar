@@ -25,8 +25,8 @@ import scalaz.concurrent.Task
 package object config {
   type FsFile = FsPath[File, Sandboxed]
 
-  type CfgErr[A]  = Failure[ConfigError, A]
+  type CfgErr[A] = Failure[ConfigError, A]
 
   type CfgErrT[F[_], A] = EitherT[F, ConfigError, A]
-  type CfgTask[A]       = CfgErrT[Task, A]
+  type CfgTask[A] = CfgErrT[Task, A]
 }

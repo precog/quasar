@@ -31,8 +31,10 @@ class BitsetColumn(definedAt: BitSet) {
 
   override def toString = {
     val limit = definedAt.max
-    val repr  = (row: Int) => if (definedAt(row)) 'x' else '_'
-    getClass.getName + "(" + (0 until limit).map(repr).mkString("[", ",", "]") + ", " + limit + ")"
+    val repr = (row: Int) => if (definedAt(row)) 'x' else '_'
+    getClass.getName + "(" + (0 until limit)
+      .map(repr)
+      .mkString("[", ",", "]") + ", " + limit + ")"
   }
 }
 
@@ -66,7 +68,7 @@ class UnionColumn[T <: Column](c1: T, c2: T) {
 class UnionLotsColumn[T <: Column](cols: Array[T]) {
   this: T =>
   def isDefinedAt(row: Int) = {
-    var i      = 0
+    var i = 0
     var exists = false
     while (i < cols.length && !exists) {
       exists = cols(i).isDefinedAt(row)
@@ -84,7 +86,7 @@ class IntersectColumn[T <: Column](c1: T, c2: T) {
 class IntersectLotsColumn[T <: Column](cols: Array[T]) {
   this: T =>
   def isDefinedAt(row: Int) = {
-    var i      = 0
+    var i = 0
     var forall = true
     while (i < cols.length && forall) {
       forall = cols(i).isDefinedAt(row)
@@ -94,10 +96,12 @@ class IntersectLotsColumn[T <: Column](cols: Array[T]) {
   }
 }
 
-class AndLotsColumn(cols: Array[BoolColumn]) extends UnionLotsColumn[BoolColumn](cols) with BoolColumn {
+class AndLotsColumn(cols: Array[BoolColumn])
+    extends UnionLotsColumn[BoolColumn](cols)
+    with BoolColumn {
   def apply(row: Int): Boolean = {
     var result = true
-    var i      = 0
+    var i = 0
     while (i < cols.length && result) {
       if (cols(i).isDefinedAt(row))
         result = cols(i)(row)
@@ -107,10 +111,12 @@ class AndLotsColumn(cols: Array[BoolColumn]) extends UnionLotsColumn[BoolColumn]
   }
 }
 
-class OrLotsColumn(cols: Array[BoolColumn]) extends UnionLotsColumn[BoolColumn](cols) with BoolColumn {
+class OrLotsColumn(cols: Array[BoolColumn])
+    extends UnionLotsColumn[BoolColumn](cols)
+    with BoolColumn {
   def apply(row: Int): Boolean = {
     var result = false
-    var i      = 0
+    var i = 0
     while (i < cols.length && !result) {
       if (cols(i).isDefinedAt(row))
         result = cols(i)(row)
@@ -197,7 +203,8 @@ class SparsenColumn[T <: Column](delegate: T, idx: Array[Int], toSize: Int) {
 
   val remap: Array[Int] = fill(Array.fill[Int](toSize)(-1), 0)
 
-  def isDefinedAt(row: Int) = row >= 0 && row < toSize && remap(row) != -1 && delegate.isDefinedAt(remap(row))
+  def isDefinedAt(row: Int) =
+    row >= 0 && row < toSize && remap(row) != -1 && delegate.isDefinedAt(remap(row))
 }
 
 class InfiniteColumn {
@@ -212,7 +219,7 @@ class RangeColumn(range: Range) {
 
 class EmptyColumn[T <: Column] {
   this: T =>
-  def isDefinedAt(row: Int)    = false
+  def isDefinedAt(row: Int) = false
   def apply(row: Int): Nothing = sys.error("Undefined.")
 }
 
@@ -224,9 +231,9 @@ abstract class ArraySetColumn[T <: Column](val tpe: CType, protected val backing
     if (i != backing.length) i else -1
   }
   def isDefinedAt(row: Int) = firstDefinedIndexAt(row) != -1
-  def jValue(row: Int)      = backing(firstDefinedIndexAt(row)).jValue(row)
-  def cValue(row: Int)      = backing(firstDefinedIndexAt(row)).cValue(row)
-  def strValue(row: Int)    = backing(firstDefinedIndexAt(row)).strValue(row)
+  def jValue(row: Int) = backing(firstDefinedIndexAt(row)).jValue(row)
+  def cValue(row: Int) = backing(firstDefinedIndexAt(row)).cValue(row)
+  def strValue(row: Int) = backing(firstDefinedIndexAt(row)).strValue(row)
 }
 
 object ArraySetColumn {
@@ -234,51 +241,77 @@ object ArraySetColumn {
     assert(columnSet.length != 0)
     ctype match {
       case CString =>
-        new ArraySetColumn[StrColumn](ctype, columnSet.map(_.asInstanceOf[StrColumn])) with StrColumn {
-          def apply(row: Int): String = backing(firstDefinedIndexAt(row)).asInstanceOf[StrColumn].apply(row)
+        new ArraySetColumn[StrColumn](ctype, columnSet.map(_.asInstanceOf[StrColumn]))
+        with StrColumn {
+          def apply(row: Int): String =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[StrColumn].apply(row)
         }
 
       case CBoolean =>
-        new ArraySetColumn[BoolColumn](ctype, columnSet.map(_.asInstanceOf[BoolColumn])) with BoolColumn {
-          def apply(row: Int): Boolean = backing(firstDefinedIndexAt(row)).asInstanceOf[BoolColumn].apply(row)
+        new ArraySetColumn[BoolColumn](ctype, columnSet.map(_.asInstanceOf[BoolColumn]))
+        with BoolColumn {
+          def apply(row: Int): Boolean =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[BoolColumn].apply(row)
         }
 
       case CLong =>
-        new ArraySetColumn[LongColumn](ctype, columnSet.map(_.asInstanceOf[LongColumn])) with LongColumn {
-          def apply(row: Int): Long = backing(firstDefinedIndexAt(row)).asInstanceOf[LongColumn].apply(row)
+        new ArraySetColumn[LongColumn](ctype, columnSet.map(_.asInstanceOf[LongColumn]))
+        with LongColumn {
+          def apply(row: Int): Long =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[LongColumn].apply(row)
         }
 
       case CDouble =>
-        new ArraySetColumn[DoubleColumn](ctype, columnSet.map(_.asInstanceOf[DoubleColumn])) with DoubleColumn {
-          def apply(row: Int): Double = backing(firstDefinedIndexAt(row)).asInstanceOf[DoubleColumn].apply(row)
+        new ArraySetColumn[DoubleColumn](ctype, columnSet.map(_.asInstanceOf[DoubleColumn]))
+        with DoubleColumn {
+          def apply(row: Int): Double =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[DoubleColumn].apply(row)
         }
 
       case CNum =>
-        new ArraySetColumn[NumColumn](ctype, columnSet.map(_.asInstanceOf[NumColumn])) with NumColumn {
-          def apply(row: Int): BigDecimal = backing(firstDefinedIndexAt(row)).asInstanceOf[NumColumn].apply(row)
+        new ArraySetColumn[NumColumn](ctype, columnSet.map(_.asInstanceOf[NumColumn]))
+        with NumColumn {
+          def apply(row: Int): BigDecimal =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[NumColumn].apply(row)
         }
 
       case CDate =>
-        new ArraySetColumn[DateColumn](ctype, columnSet.map(_.asInstanceOf[DateColumn])) with DateColumn {
-          def apply(row: Int): ZonedDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[DateColumn].apply(row)
+        new ArraySetColumn[DateColumn](ctype, columnSet.map(_.asInstanceOf[DateColumn]))
+        with DateColumn {
+          def apply(row: Int): ZonedDateTime =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[DateColumn].apply(row)
         }
 
       case CPeriod =>
-        new ArraySetColumn[PeriodColumn](ctype, columnSet.map(_.asInstanceOf[PeriodColumn])) with PeriodColumn {
-          def apply(row: Int): Period = backing(firstDefinedIndexAt(row)).asInstanceOf[PeriodColumn].apply(row)
+        new ArraySetColumn[PeriodColumn](ctype, columnSet.map(_.asInstanceOf[PeriodColumn]))
+        with PeriodColumn {
+          def apply(row: Int): Period =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[PeriodColumn].apply(row)
         }
 
       case ctype: CArrayType[a] =>
-        new ArraySetColumn[HomogeneousArrayColumn[a]](ctype, columnSet.map(_.asInstanceOf[HomogeneousArrayColumn[a]])) with HomogeneousArrayColumn[a] {
+        new ArraySetColumn[HomogeneousArrayColumn[a]](
+          ctype,
+          columnSet.map(_.asInstanceOf[HomogeneousArrayColumn[a]]))
+        with HomogeneousArrayColumn[a] {
           override val tpe = ctype
-          def apply(row: Int): Array[a] = backing(firstDefinedIndexAt(row)).asInstanceOf[HomogeneousArrayColumn[a]].apply(row)
+          def apply(row: Int): Array[a] =
+            backing(firstDefinedIndexAt(row)).asInstanceOf[HomogeneousArrayColumn[a]].apply(row)
         }
 
-      case CNull => new ArraySetColumn[NullColumn](ctype, columnSet.map(_.asInstanceOf[NullColumn])) with NullColumn {}
+      case CNull =>
+        new ArraySetColumn[NullColumn](ctype, columnSet.map(_.asInstanceOf[NullColumn]))
+        with NullColumn {}
 
-      case CEmptyObject => new ArraySetColumn[EmptyObjectColumn](ctype, columnSet.map(_.asInstanceOf[EmptyObjectColumn])) with EmptyObjectColumn {}
+      case CEmptyObject =>
+        new ArraySetColumn[EmptyObjectColumn](
+          ctype,
+          columnSet.map(_.asInstanceOf[EmptyObjectColumn])) with EmptyObjectColumn {}
 
-      case CEmptyArray => new ArraySetColumn[EmptyArrayColumn](ctype, columnSet.map(_.asInstanceOf[EmptyArrayColumn])) with EmptyArrayColumn {}
+      case CEmptyArray =>
+        new ArraySetColumn[EmptyArrayColumn](
+          ctype,
+          columnSet.map(_.asInstanceOf[EmptyArrayColumn])) with EmptyArrayColumn {}
 
       case CUndefined => UndefinedColumn(columnSet(0))
     }

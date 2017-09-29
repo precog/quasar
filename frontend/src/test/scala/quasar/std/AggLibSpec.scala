@@ -31,8 +31,10 @@ class AggLibSpec extends quasar.Qspec {
   import AggLib._
 
   "Arbitrary" should {
-    "type a nonempty constant set to the constant first value" >> prop { xs: NonEmptyList[Data] =>
-      Arbitrary.tpe(Func.Input1(Type.Const(Data.Set(xs.list.toList)))) must beSuccessful(Type.Const(xs.head))
+    "type a nonempty constant set to the constant first value" >> prop {
+      xs: NonEmptyList[Data] =>
+        Arbitrary.tpe(Func.Input1(Type.Const(Data.Set(xs.list.toList)))) must beSuccessful(
+          Type.Const(xs.head))
     }
 
     "error when applied to an empty constant set" >> {
@@ -43,7 +45,8 @@ class AggLibSpec extends quasar.Qspec {
   "Avg" should {
     "type a constant Int set to the constant average of values" >> prop { n: BigInt =>
       val s = Data.Set(List(Data.Int(n), Data.Int(n + 2)))
-      Avg.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Dec(BigDecimal(n + 1))))
+      Avg.tpe(Func.Input1(Type.Const(s))) must beSuccessful(
+        Type.Const(Data.Dec(BigDecimal(n + 1))))
     }
 
     "type a constant Dec set to the constant average of values" >> prop { n0: Double =>
@@ -65,7 +68,8 @@ class AggLibSpec extends quasar.Qspec {
 
   "Count" should {
     "type a constant set as the constant length" >> prop { xs: List[Int] =>
-      Count.tpe(Func.Input1(Type.Const(Data.Set(xs.map(Data.Int(_)))))) must beSuccessful(Type.Const(Data.Int(xs.length)))
+      Count.tpe(Func.Input1(Type.Const(Data.Set(xs.map(Data.Int(_)))))) must beSuccessful(
+        Type.Const(Data.Int(xs.length)))
     }
   }
 
@@ -92,21 +96,26 @@ class AggLibSpec extends quasar.Qspec {
   }
 
   "Sum" should {
-    "type a constant Int set to the constant Int sum of values" >> prop { xs: NonEmptyList[BigInt] =>
-      val s = Data.Set(xs.list.toList map (Data.Int(_)))
-      Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Int(xs.list.toList.sum)))
+    "type a constant Int set to the constant Int sum of values" >> prop {
+      xs: NonEmptyList[BigInt] =>
+        val s = Data.Set(xs.list.toList map (Data.Int(_)))
+        Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(
+          Type.Const(Data.Int(xs.list.toList.sum)))
     }
 
-    "type a constant Dec set to the constant Dec sum of values" >> prop { xs: NonEmptyList[Double] =>
-      val ys = xs.list.toList map (BigDecimal(_))
-      val s = Data.Set(ys map (Data.Dec(_)))
-      Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Dec(ys.sum)))
+    "type a constant Dec set to the constant Dec sum of values" >> prop {
+      xs: NonEmptyList[Double] =>
+        val ys = xs.list.toList map (BigDecimal(_))
+        val s = Data.Set(ys map (Data.Dec(_)))
+        Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Dec(ys.sum)))
     }
 
-    "type a constant Interval set to the constant Interval sum of values" >> prop { xs: NonEmptyList[Int] =>
-      val milliss = xs.list.toList map (_.toLong)
-      val s = Data.Set(milliss map (n => Data.Interval(Duration.ofMillis(n))))
-      Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Interval(Duration.ofMillis(milliss.sum))))
+    "type a constant Interval set to the constant Interval sum of values" >> prop {
+      xs: NonEmptyList[Int] =>
+        val milliss = xs.list.toList map (_.toLong)
+        val s = Data.Set(milliss map (n => Data.Interval(Duration.ofMillis(n))))
+        Sum.tpe(Func.Input1(Type.Const(s))) must beSuccessful(
+          Type.Const(Data.Interval(Duration.ofMillis(milliss.sum))))
     }
 
     "type an empty constant set to constant Int(0)" >> {

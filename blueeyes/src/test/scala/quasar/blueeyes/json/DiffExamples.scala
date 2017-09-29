@@ -21,7 +21,7 @@ import quasar.precog.TestSupport._
 
 class DiffExamplesSpec extends Specification {
   import JParser._
-  import MergeExamples.{ scala1, scala2, lotto1, lotto2, mergedLottoResult }
+  import MergeExamples.{lotto1, lotto2, mergedLottoResult, scala1, scala2}
 
   "Diff example" in {
     val Diff(changed, added, deleted) = scala1 diff scala2
@@ -61,9 +61,9 @@ class DiffExamplesSpec extends Specification {
   }
 
   "Example from http://tlrobinson.net/projects/js/jsondiff/" in {
-    val json1             = read("/diff-example-json1.json")
-    val json2             = read("/diff-example-json2.json")
-    val expectedChanges   = read("/diff-example-expected-changes.json")
+    val json1 = read("/diff-example-json1.json")
+    val json2 = read("/diff-example-json2.json")
+    val expectedChanges = read("/diff-example-expected-changes.json")
     val expectedAdditions = read("/diff-example-expected-additions.json")
     val expectedDeletions = read("/diff-example-expected-deletions.json")
 
@@ -74,5 +74,7 @@ class DiffExamplesSpec extends Specification {
     deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
   }
 
-  private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
+  private def read(resource: String) =
+    parseUnsafe(
+      scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
 }

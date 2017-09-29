@@ -17,7 +17,7 @@
 package quasar.contrib
 
 import _root_.algebra.{Eq, Semigroup => ASemigroup, Monoid => AMonoid, Order => AOrder}
-import _root_.scalaz.{Equal, Semigroup, Monoid, Order, Ordering}
+import _root_.scalaz.{Equal, Monoid, Order, Ordering, Semigroup}
 
 package object algebra extends AlgebraInstancesLowPriority {
   implicit def algebraOrder[A](implicit A: AOrder[A]): Order[A] =

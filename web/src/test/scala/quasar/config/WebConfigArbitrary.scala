@@ -27,9 +27,8 @@ import scalaz._, Scalaz._
 
 trait WebConfigArbitrary {
   implicit val webConfigArbitrary: Arbitrary[WebConfig] =
-    Arbitrary(
-      (Arbitrary.arbitrary[Int] ⊛ Arbitrary.arbitrary[DbConnectionConfig])((p, c) =>
-        WebConfig(ServerConfig(p), MetaStoreConfig(c).some)))
+    Arbitrary((Arbitrary.arbitrary[Int] ⊛ Arbitrary.arbitrary[DbConnectionConfig])((p, c) =>
+      WebConfig(ServerConfig(p), MetaStoreConfig(c).some)))
 }
 
 object WebConfigArbitrary extends WebConfigArbitrary

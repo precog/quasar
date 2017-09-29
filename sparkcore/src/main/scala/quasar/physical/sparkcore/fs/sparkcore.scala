@@ -48,9 +48,10 @@ trait SparkCore extends BackendModule {
 
   // conntector specific
   type Eff[A]
-  def toLowerLevel[S[_]](sc: SparkContext, config: Config)(implicit
-    S0: Task :<: S, S1: PhysErr :<: S
-  ): Task[M ~> Free[S, ?]]
+  def toLowerLevel[S[_]](sc: SparkContext, config: Config)(
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): Task[M ~> Free[S, ?]]
   def generateSC: Config => DefErrT[Task, SparkContext]
   def ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
@@ -66,7 +67,8 @@ trait SparkCore extends BackendModule {
 
   private final implicit def _ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff] =
     ReadSparkContextInj
-  private final implicit def _RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff] =
+  private final implicit def _RFKeyValueStoreInj
+    : Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff] =
     RFKeyValueStoreInj
   private final implicit def _MonotonicSeqInj: Inject[MonotonicSeq, Eff] =
     MonotonicSeqInj
@@ -74,13 +76,14 @@ trait SparkCore extends BackendModule {
     TaskInj
   private final implicit def _SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff] =
     SparkConnectorDetailsInj
-  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff] =
+  private final implicit def _QFKeyValueStoreInj
+    : Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff] =
     QFKeyValueStoreInj
 
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
-      : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
-      val O = new Optimize[T]
-      O.optimize(fp.reflNT[QSM[T, ?]])
+    : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+    val O = new Optimize[T]
+    O.optimize(fp.reflNT[QSM[T, ?]])
   }
 
   def detailsOps: SparkConnectorDetails.Ops[Eff] = SparkConnectorDetails.Ops[Eff]
@@ -95,8 +98,10 @@ trait SparkCore extends BackendModule {
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
   def MonadM = Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
 
@@ -118,42 +123,51 @@ trait SparkCore extends BackendModule {
       _ <- if (ccl eq tcl)
         Task.now(())
       else
-        Task.delay(thread.setContextClassLoader(tcl))    // force spark to use its own classloader
+        Task.delay(thread.setContextClassLoader(tcl)) // force spark to use its own classloader
     } yield ()
   }
 
-  def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
-    injectNT[Task, Task],
-    Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
-  )).andThen(λ[Task ~> Task](overrideContextCL >> _))
+  def lowerToTask: LowerLevel ~> Task =
+    λ[LowerLevel ~> Task](
+      _.fold(
+        injectNT[Task, Task],
+        Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure
+          .toCatchable[Task, Exception]
+      )).andThen(λ[Task ~> Task](overrideContextCL >> _))
 
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
     toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
 
-  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
-    sc <- generateSC(cfg)
-    tt <- toTask(sc, cfg).liftM[DefErrT]
-  } yield (tt, Task.delay(sc.stop()))
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
+    for {
+      sc <- generateSC(cfg)
+      tt <- toTask(sc, cfg).liftM[DefErrT]
+    } yield (tt, Task.delay(sc.stop()))
 
   def rddFrom: AFile => Configured[RDD[Data]] =
     (f: AFile) => detailsOps.rddFrom(f).liftM[ConfiguredT]
-  def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay {rdd.first}).into[Eff]
+  def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay { rdd.first }).into[Eff]
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] = for {
-    config <- Kleisli.ask[M, Config].liftB
-    repr   <- (readScOps.ask >>= { sc =>
-      val total = implicitly[Planner[QSM[T, ?], Eff]]
-      cp.cataM(total.plan(f => rddFrom(f).run.apply(config), first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
-    }).liftB.unattempt
-  } yield repr
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] =
+    for {
+      config <- Kleisli.ask[M, Config].liftB
+      repr <- (readScOps.ask >>= { sc =>
+        val total = implicitly[Planner[QSM[T, ?], Eff]]
+        cp.cataM(total.plan(f => rddFrom(f).run.apply(config), first))
+          .eval(sc)
+          .run
+          .map(_.leftMap(pe => qscriptPlanningFailed(pe)))
+      }).liftB.unattempt
+    } yield repr
 
   object SparkReadFileModule extends ReadFileModule {
     import ReadFile._
     import quasar.fp.numeric.{Natural, Positive}
 
-    def open(f: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = for {
-      h <- readfile.open[Eff](f, offset, limit).liftB.unattempt
-    } yield ReadHandle(f, h.id)
+    def open(f: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
+      for {
+        h <- readfile.open[Eff](f, offset, limit).liftB.unattempt
+      } yield ReadHandle(f, h.id)
 
     def read(h: ReadHandle): Backend[Vector[Data]] =
       readfile.read[Eff](h).liftB.unattempt
@@ -167,38 +181,42 @@ trait SparkCore extends BackendModule {
     import QueryFile._
 
     def executePlan(rdd: RDD[Data], out: AFile): Backend[Unit] = {
-      val execute =  detailsOps.storeData(rdd, out).liftB
-      val log     = Vector(PhaseResult.detail("RDD", rdd.toDebugString))
+      val execute = detailsOps.storeData(rdd, out).liftB
+      val log = Vector(PhaseResult.detail("RDD", rdd.toDebugString))
       execute :++> log
     }
 
-    def evaluatePlan(rdd: Repr): Backend[ResultHandle] = (for {
-      h <- msOps.next.map(ResultHandle(_))
-      _ <- qfKvsOps.put(h, SparkCursor(rdd.zipWithIndex.persist.some, 0))
-    } yield h).liftB :++> Vector(PhaseResult.detail("RDD", rdd.toDebugString))
+    def evaluatePlan(rdd: Repr): Backend[ResultHandle] =
+      (for {
+        h <- msOps.next.map(ResultHandle(_))
+        _ <- qfKvsOps.put(h, SparkCursor(rdd.zipWithIndex.persist.some, 0))
+      } yield h).liftB :++> Vector(PhaseResult.detail("RDD", rdd.toDebugString))
 
-    def more(h: ResultHandle): Backend[Vector[Data]] = (for {
-    step <- detailsOps.readChunkSize
-    res  <- (qfKvsOps.get(h).toRight(unknownResultHandle(h)).flatMap {
-      case SparkCursor(None, _) =>
-        Vector.empty[Data].pure[EitherT[Free[Eff, ?], FileSystemError, ?]]
-      case SparkCursor(Some(rdd), p) =>
-        for {
-          collected <- lift(Task.delay {
-            rdd
-              .filter(d => d._2 >= p && d._2 < (p + step))
-              .map(_._1).collect.toVector
-          }).into[Eff].liftM[FileSystemErrT]
-          rddState <- lift(Task.delay {
-            if(collected.isEmpty) {
-              ignore(rdd.unpersist())
-              SparkCursor(None, 0)
-            } else SparkCursor(Some(rdd), p + step)
-          }).into[Eff].liftM[FileSystemErrT]
-          _ <- qfKvsOps.put(h, rddState).liftM[FileSystemErrT]
-        } yield collected
-    }).run
-  } yield res).liftB.unattempt
+    def more(h: ResultHandle): Backend[Vector[Data]] =
+      (for {
+        step <- detailsOps.readChunkSize
+        res <- (qfKvsOps
+          .get(h)
+          .toRight(unknownResultHandle(h))
+          .flatMap {
+            case SparkCursor(None, _) =>
+              Vector.empty[Data].pure[EitherT[Free[Eff, ?], FileSystemError, ?]]
+            case SparkCursor(Some(rdd), p) =>
+              for {
+                collected <- lift(Task.delay {
+                  rdd.filter(d => d._2 >= p && d._2 < (p + step)).map(_._1).collect.toVector
+                }).into[Eff].liftM[FileSystemErrT]
+                rddState <- lift(Task.delay {
+                  if (collected.isEmpty) {
+                    ignore(rdd.unpersist())
+                    SparkCursor(None, 0)
+                  } else SparkCursor(Some(rdd), p + step)
+                }).into[Eff].liftM[FileSystemErrT]
+                _ <- qfKvsOps.put(h, rddState).liftM[FileSystemErrT]
+              } yield collected
+          })
+          .run
+      } yield res).liftB.unattempt
 
     def close(h: ResultHandle): Configured[Unit] = qfKvsOps.delete(h).liftM[ConfiguredT]
 
@@ -222,23 +240,26 @@ trait SparkCore extends BackendModule {
     def moveDir(src: ADir, dst: ADir): M[Unit]
     def doesPathExist: APath => M[Boolean]
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ((scenario, semantics) match {
-      case (FileToFile(sf, df), semantics) => for {
-        _  <- (((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
-          moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
-      } yield ()
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] =
+      ((scenario, semantics) match {
+        case (FileToFile(sf, df), semantics) =>
+          for {
+            _ <- (((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
+              moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
+          } yield ()
 
-      case (DirToDir(sd, dd), semantics) => for {
-        _  <- (((ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
-          moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB).unattempt
-      } yield ()
-    })
+        case (DirToDir(sd, dd), semantics) =>
+          for {
+            _ <- (((ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
+              moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB).unattempt
+          } yield ()
+      })
 
-    def tempFile(near: APath): Backend[AFile] = lift(Task.delay {
-      val parent: ADir = refineType(near).fold(d => d, fileParent(_))
-      val random = scala.util.Random.nextInt().toString
+    def tempFile(near: APath): Backend[AFile] =
+      lift(Task.delay {
+        val parent: ADir = refineType(near).fold(d => d, fileParent(_))
+        val random = scala.util.Random.nextInt().toString
         (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
-    }
-    ).into[Eff].liftB.unattempt
+      }).into[Eff].liftB.unattempt
   }
 }

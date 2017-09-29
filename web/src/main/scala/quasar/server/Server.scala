@@ -54,54 +54,61 @@ object Server {
 
   object WebCmdLineConfig {
     def fromArgs(args: Vector[String]): MainTask[WebCmdLineConfig] =
-      CliOptions.parser.safeParse(args, CliOptions.default)
-        .flatMap(fromCliOptions(_))
+      CliOptions.parser.safeParse(args, CliOptions.default).flatMap(fromCliOptions(_))
 
     def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
       import java.lang.RuntimeException
 
       val loadConfigM: Task[BackendConfig] = opts.loadConfig.fold(
         { plugins =>
-          val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
+          val err =
+            Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
           ADir.fromFile(plugins).getOrElseF(err).map(BackendConfig.JarDirectory(_))
         },
-        backends => BackendConfig.fromBackends(IList.fromList(backends)))
+        backends => BackendConfig.fromBackends(IList.fromList(backends))
+      )
 
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-          FsPath.parseSystemFile(cfg)
-            .toRight(s"Invalid path to config file: $cfg")
-            .map(some)) ⊛
-        loadConfigM.liftM[MainErrT]) ((content, cfgPath, loadConfig) =>
-        WebCmdLineConfig(
-          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient))
+          FsPath.parseSystemFile(cfg).toRight(s"Invalid path to config file: $cfg").map(some)) ⊛
+        loadConfigM.liftM[MainErrT])(
+        (content, cfgPath, loadConfig) =>
+          WebCmdLineConfig(
+            opts.cmd,
+            content.toList,
+            content.map(_.loc),
+            opts.port,
+            cfgPath,
+            loadConfig,
+            opts.openClient))
     }
   }
 
   def nonApiService(
-    defaultPort: Int,
-    reload: Int => Task[String \/ Unit],
-    staticContent: List[StaticContent],
-    redirect: Option[String]
+      defaultPort: Int,
+      reload: Int => Task[String \/ Unit],
+      staticContent: List[StaticContent],
+      redirect: Option[String]
   ): HttpService = {
     val staticRoutes = staticContent map {
       case StaticContent(loc, path) => loc -> staticFileService(path)
     }
 
-    Router(staticRoutes ::: List(
-      "/"            -> redirectService(redirect getOrElse "/welcome"),
-      "/server/info" -> info.service,
-      "/server/port" -> control.service(defaultPort, reload)
-    ): _*)
+    Router(
+      staticRoutes ::: List(
+        "/" -> redirectService(redirect getOrElse "/welcome"),
+        "/server/info" -> info.service,
+        "/server/port" -> control.service(defaultPort, reload)
+      ): _*)
 
   }
 
   def serviceStarter(
-    defaultPort: Int,
-    staticContent: List[StaticContent],
-    redirect: Option[String],
-    eval: CoreEff ~> QErrs_TaskM,
-    persistPortChange: Int => MainTask[Unit]
+      defaultPort: Int,
+      staticContent: List[StaticContent],
+      redirect: Option[String],
+      eval: CoreEff ~> QErrs_TaskM,
+      persistPortChange: Int => MainTask[Unit]
   ): PortChangingServer.ServiceStarter = {
     import RestApi._
 
@@ -111,23 +118,34 @@ object Server {
 
     (reload: Int => Task[String \/ Unit]) =>
       finalizeServices(
-        toHttpServices(liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval), coreServices[CoreEffIO]) ++
-        additionalServices
-      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
+        toHttpServices(
+          liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval),
+          coreServices[CoreEffIO]) ++
+          additionalServices
+      ) orElse nonApiService(
+        defaultPort,
+        Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload),
+        staticContent,
+        redirect)
   }
 
   /**
-    * Start Quasar server
-    * @return A `Task` that can be used to shutdown the server
-    */
+   * Start Quasar server
+   * @return A `Task` that can be used to shutdown the server
+   */
   def startServer(
-    quasarInter: CoreEff ~> QErrs_TaskM,
-    port: Int,
-    staticContent: List[StaticContent],
-    redirect: Option[String],
-    persistPortChange: Int => MainTask[Unit]
+      quasarInter: CoreEff ~> QErrs_TaskM,
+      port: Int,
+      staticContent: List[StaticContent],
+      redirect: Option[String],
+      persistPortChange: Int => MainTask[Unit]
   ): Task[Task[Unit]] = {
-    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
+    val starter = serviceStarter(
+      defaultPort = port,
+      staticContent,
+      redirect,
+      quasarInter,
+      persistPortChange)
     PortChangingServer.start(initialPort = port, starter)
   }
 
@@ -137,20 +155,23 @@ object Server {
   def persistPortChange(configPath: Option[FsFile]): Int => MainTask[Unit] =
     persistWebConfig(configPath, port => _.copy(server = ServerConfig(port)))
 
-  def persistWebConfig[A](configPath: Option[FsFile], modify: A => (WebConfig => WebConfig)): A => MainTask[Unit] = { a =>
+  def persistWebConfig[A](
+      configPath: Option[FsFile],
+      modify: A => (WebConfig => WebConfig)): A => MainTask[Unit] = { a =>
     for {
       diskConfig <- EitherT(ConfigOps[WebConfig].fromOptionalFile(configPath).run.flatMap {
-                      // Great, we were able to load the config file from disk
-                      case \/-(config) => config.right.point[Task]
-                      // The config file is malformed, let's warn the user and not make any changes
-                      case -\/(configErr@ConfigError.MalformedConfig(_,_)) =>
-                        (configErr: ConfigError).shows.left.point[Task]
-                      // There is no config file, so let's create a new one with the default configuration
-                      // to which we will apply this change
-                      case -\/(ConfigError.FileNotFound(_)) => WebConfig.configOps.default.map(_.right)
-                    })
-      newConfig  =  modify(a)(diskConfig)
-      _          <- EitherT(ConfigOps[WebConfig].toFile(newConfig, configPath).attempt).leftMap(_.getMessage)
+        // Great, we were able to load the config file from disk
+        case \/-(config) => config.right.point[Task]
+        // The config file is malformed, let's warn the user and not make any changes
+        case -\/(configErr @ ConfigError.MalformedConfig(_, _)) =>
+          (configErr: ConfigError).shows.left.point[Task]
+        // There is no config file, so let's create a new one with the default configuration
+        // to which we will apply this change
+        case -\/(ConfigError.FileNotFound(_)) => WebConfig.configOps.default.map(_.right)
+      })
+      newConfig = modify(a)(diskConfig)
+      _ <- EitherT(ConfigOps[WebConfig].toFile(newConfig, configPath).attempt)
+        .leftMap(_.getMessage)
     } yield ()
   }
 
@@ -158,25 +179,31 @@ object Server {
     logErrors(for {
       webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
       _ <- initMetaStoreOrStart[WebConfig](
-             webCmdLineCfg.toCmdLineConfig,
-             (wCfg, quasarInter) => {
-               val port = webCmdLineCfg.port | wCfg.server.port
-               val persistPort = persistPortChange(webCmdLineCfg.configPath)
-               (for {
-                 shutdown <- startServer(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort)
-                 _        <- openBrowser(port).whenM(webCmdLineCfg.openClient)
-                 _        <- stdout("Press Enter to stop.")
-                 // If user pressed enter (after this main thread has been blocked on it),
-                 // then we shutdown, otherwise we just run indefinitely until the JVM is killed
-                 // If we don't call shutdown and this main thread completes, the application will
-                 // continue to run indefinitely as `startServer` uses a non-daemon `ExecutorService`
-                 // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
-                 // from completing instead of simply relying on the fact that the server is using a pool of
-                 // non-daemon threads to ensure the application doesn't shutdown
-                 _        <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
-               } yield ()).liftM[MainErrT]
-             },
-             persistMetaStore(webCmdLineCfg.configPath))
+        webCmdLineCfg.toCmdLineConfig,
+        (wCfg, quasarInter) => {
+          val port = webCmdLineCfg.port | wCfg.server.port
+          val persistPort = persistPortChange(webCmdLineCfg.configPath)
+          (for {
+            shutdown <- startServer(
+              quasarInter,
+              port,
+              webCmdLineCfg.staticContent,
+              webCmdLineCfg.redirect,
+              persistPort)
+            _ <- openBrowser(port).whenM(webCmdLineCfg.openClient)
+            _ <- stdout("Press Enter to stop.")
+            // If user pressed enter (after this main thread has been blocked on it),
+            // then we shutdown, otherwise we just run indefinitely until the JVM is killed
+            // If we don't call shutdown and this main thread completes, the application will
+            // continue to run indefinitely as `startServer` uses a non-daemon `ExecutorService`
+            // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
+            // from completing instead of simply relying on the fact that the server is using a pool of
+            // non-daemon threads to ensure the application doesn't shutdown
+            _ <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
+          } yield ()).liftM[MainErrT]
+        },
+        persistMetaStore(webCmdLineCfg.configPath)
+      )
     } yield ())
   }
 

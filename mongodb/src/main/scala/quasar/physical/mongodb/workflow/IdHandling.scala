@@ -28,7 +28,7 @@ object IdHandling {
     // this is the `coalesce` function
     def append(f1: IdHandling, f2: => IdHandling) = (f1, f2) match {
       case (_, IgnoreId) => f1
-      case (_, _)        => f2
+      case (_, _) => f2
     }
 
     def zero = IgnoreId

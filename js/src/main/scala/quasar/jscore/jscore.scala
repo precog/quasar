@@ -159,9 +159,11 @@ object NewF {
 }
 
 object IfF {
-  def apply[A](condition: A, consequent: A, alternative: A): JsCoreF[A] = JsCoreF.IfF[A](condition, consequent, alternative)
+  def apply[A](condition: A, consequent: A, alternative: A): JsCoreF[A] =
+    JsCoreF.IfF[A](condition, consequent, alternative)
   def unapply[A](obj: JsCoreF[A]): Option[(A, A, A)] = obj match {
-    case JsCoreF.IfF(condition, consequent, alternative) => Some((condition, consequent, alternative))
+    case JsCoreF.IfF(condition, consequent, alternative) =>
+      Some((condition, consequent, alternative))
     case _ => None
   }
 }
@@ -175,7 +177,8 @@ object UnOpF {
 }
 
 object BinOpF {
-  def apply[A](op: BinaryOperator, left: A, right: A): JsCoreF[A] = JsCoreF.BinOpF[A](op, left, right)
+  def apply[A](op: BinaryOperator, left: A, right: A): JsCoreF[A] =
+    JsCoreF.BinOpF[A](op, left, right)
   def unapply[A](obj: JsCoreF[A]): Option[(BinaryOperator, A, A)] = obj match {
     case JsCoreF.BinOpF(op, left, right) => Some((op, left, right))
     case _ => None

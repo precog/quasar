@@ -25,7 +25,10 @@ import scalaz.syntax.comonad._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._
-trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CanonicalizeSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with SpecificationLike
+    with ScalaCheck {
   import SampleData._
 
   val table = {
@@ -61,10 +64,11 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       val canonicalizedTable = table.canonicalize(minLength, Some(maxLength))
       val slices = canonicalizedTable.slices.toStream.copoint map (_.size)
       if (size > 0) {
-        slices.init must contain(like[Int]({ case size: Int => size must beBetween(minLength, maxLength) })).forall
+        slices.init must contain(like[Int]({
+          case size: Int => size must beBetween(minLength, maxLength)
+        })).forall
         slices.last must be_<=(maxLength)
-      }
-      else {
+      } else {
         slices must haveSize(0)
       }
     }
@@ -90,7 +94,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
 
       resultSizes mustEqual expected
     }
-  }.set(minTestsOk =  1000)
+  }.set(minTestsOk = 1000)
 
   def testCanonicalize = {
     val result = table.canonicalize(3)
@@ -130,23 +134,23 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
     val emptySlice = Slice(Map(), 0)
     val slices =
       Stream(emptySlice) ++ tableTakeRange(table, 0, 5) ++
-      Stream(emptySlice) ++ tableTakeRange(table, 5, 4) ++
-      Stream(emptySlice) ++ tableTakeRange(table, 9, 5) ++
-      Stream(emptySlice)
+        Stream(emptySlice) ++ tableTakeRange(table, 5, 4) ++
+        Stream(emptySlice) ++ tableTakeRange(table, 9, 5) ++
+        Stream(emptySlice)
 
-    val newTable     = Table(StreamT.fromStream(M.point(slices)), table.size)
-    val result       = newTable.canonicalize(4)
+    val newTable = Table(StreamT.fromStream(M.point(slices)), table.size)
+    val result = newTable.canonicalize(4)
     val resultSlices = result.slices.toStream.copoint
-    val resultSizes  = resultSlices.map(_.size)
+    val resultSizes = resultSlices.map(_.size)
 
     resultSizes mustEqual Stream(4, 4, 4, 2)
   }
 
   def testCanonicalizeEmpty = {
-    val table  = Table.empty
+    val table = Table.empty
     val result = table.canonicalize(3)
     val slices = result.slices.toStream.copoint
-    val sizes  = slices.map(_.size)
+    val sizes = slices.map(_.size)
 
     sizes mustEqual Stream()
   }

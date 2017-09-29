@@ -51,34 +51,35 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
   def timingInterp(i: Instant) = λ[Timing ~> Task] {
     case Timing.Timestamp => Task.now(i)
-    case Timing.Nanos     => Task.now(0)
+    case Timing.Nanos => Task.now(0)
   }
 
   def vcacheInterp(fs: FileSystem ~> Task): VCache ~> Task =
     foldMapNT(
       (fs compose injectNT[ManageFile, FileSystem]) :+:
-      Failure.toRuntimeError[Task, FileSystemError] :+:
-      transactor.trans) compose
-    VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
+        Failure.toRuntimeError[Task, FileSystemError] :+:
+        transactor.trans) compose
+      VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
 
   def eff(i: Instant): Task[Eff ~> Task] =
-    (runFs(InMemState.empty) ⊛ createNewTestMetaStoreConfig)((fs, metaConf) =>
-      NaturalTransformation.refl[Task]                                          :+:
-      transactor.trans                                                          :+:
-      MetaStoreLocation.impl.constant(metaConf)                                 :+:
-      (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
-      mount                                                                     :+:
-      Empty.analyze[Task]                                                       :+:
-      (fs compose Inject[QueryFile, FileSystem])                                :+:
-      (fs compose Inject[ReadFile, FileSystem])                                 :+:
-      (fs compose Inject[WriteFile, FileSystem])                                :+:
-      (fs compose Inject[ManageFile, FileSystem])                               :+:
-      vcacheInterp(fs)                                                          :+:
-      timingInterp(i)                                                           :+:
-      Failure.toRuntimeError[Task, Module.Error]                                :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch]                            :+:
-      Failure.toRuntimeError[Task, MountingError]                               :+:
-      Failure.toRuntimeError[Task, FileSystemError])
+    (runFs(InMemState.empty) ⊛ createNewTestMetaStoreConfig)(
+      (fs, metaConf) =>
+        NaturalTransformation.refl[Task] :+:
+          transactor.trans :+:
+          MetaStoreLocation.impl.constant(metaConf) :+:
+          (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
+          mount :+:
+          Empty.analyze[Task] :+:
+          (fs compose Inject[QueryFile, FileSystem]) :+:
+          (fs compose Inject[ReadFile, FileSystem]) :+:
+          (fs compose Inject[WriteFile, FileSystem]) :+:
+          (fs compose Inject[ManageFile, FileSystem]) :+:
+          vcacheInterp(fs) :+:
+          timingInterp(i) :+:
+          Failure.toRuntimeError[Task, Module.Error] :+:
+          Failure.toRuntimeError[Task, PathTypeMismatch] :+:
+          Failure.toRuntimeError[Task, MountingError] :+:
+          Failure.toRuntimeError[Task, FileSystemError])
 
   "Caching" should {
     "refresh" >> {
@@ -90,8 +91,18 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       val i = Instant.parse("1970-01-01T01:00:00Z")
 
       val viewCache = ViewCache(
-        MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+        MountConfig.ViewConfig(expr, Variables.empty),
+        None,
+        None,
+        0,
+        None,
+        None,
+        600L,
+        Instant.ofEpochSecond(0),
+        ViewCache.Status.Pending,
+        None,
+        g,
+        None)
 
       def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))
 
@@ -103,8 +114,8 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
           val p: Free[Eff, (Option[ViewCache], FileSystemError \/ Vector[Data])] =
             for {
-              _  <- vcache.put(f, viewCache)
-              _  <- lift(r.take(1).run).into[Eff]
+              _ <- vcache.put(f, viewCache)
+              _ <- lift(r.take(1).run).into[Eff]
               vc <- vcache.get(f).run
               gg <- ReadFile.Ops[Eff].scanAll(g).runLog.run
             } yield (vc, gg)
@@ -112,15 +123,19 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
           e(p)
         }).unsafePerformSync
 
-      r must_= ((
-        viewCache.copy(
-          lastUpdate = i.some,
-          executionMillis = 0L.some,
-          assigneeStart = i.some,
-          refreshAfter = ViewCache.expireAt(i, viewCache.maxAgeSeconds.seconds) | i,
-          status = ViewCache.Status.Successful).some,
-        Vector(Data.Obj(ListMap("α" -> Data.Int(42)))).right[FileSystemError]
-      ))
+      r must_= (
+        (
+          viewCache
+            .copy(
+              lastUpdate = i.some,
+              executionMillis = 0L.some,
+              assigneeStart = i.some,
+              refreshAfter = ViewCache.expireAt(i, viewCache.maxAgeSeconds.seconds) | i,
+              status = ViewCache.Status.Successful
+            )
+            .some,
+          Vector(Data.Obj(ListMap("α" -> Data.Int(42)))).right[FileSystemError]
+        ))
     }
   }
 }

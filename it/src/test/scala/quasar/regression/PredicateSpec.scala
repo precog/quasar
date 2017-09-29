@@ -45,20 +45,29 @@ class PredicateSpec extends quasar.Qspec {
     override def show(json: Json) = json.pretty(minspace)
   }
 
-  def shuffle[CC[X] <: scala.collection.TraversableOnce[X], A](as: CC[A])
-      (implicit bf: scala.collection.generic.CanBuildFrom[CC[A], A, CC[A]]): Task[CC[A]] =
+  def shuffle[CC[X] <: scala.collection.TraversableOnce[X], A](as: CC[A])(
+      implicit bf: scala.collection.generic.CanBuildFrom[CC[A], A, CC[A]]): Task[CC[A]] =
     Task.delay { scala.util.Random.shuffle(as) }
 
   def partial(results: Vector[Json]): Process[Task, Json] =
     Process.emitAll(results) ++ Process.eval(Task.fail(new RuntimeException()))
 
-  def run(p: Predicate, expected: Vector[Json], result: Vector[Json], fieldOrder: OrderSignificance, resultOrder: OrderSignificance): Result =
+  def run(
+      p: Predicate,
+      expected: Vector[Json],
+      result: Vector[Json],
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance): Result =
     p(expected, Process.emitAll(result): Process[Task, Json], fieldOrder, resultOrder).unsafePerformSync
 
   def shuffledFields(
-    json: Vector[Json], pred: Predicate, fieldOrder: OrderSignificance, resultOrder: OrderSignificance, matcher: Matcher[Result]
+      json: Vector[Json],
+      pred: Predicate,
+      fieldOrder: OrderSignificance,
+      resultOrder: OrderSignificance,
+      matcher: Matcher[Result]
   ): Prop = {
-    val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
+    val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js }
     val shuffledPairs = shuffle(pairs).unsafePerformSync
 
     pairs != shuffledPairs ==> {
@@ -74,7 +83,9 @@ class PredicateSpec extends quasar.Qspec {
 
     "match exact result with no dupes" >> prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
+      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike {
+        case Success(_, _) => ok
+      }
     }
 
     "match shuffled result with no dupes" >> prop { (a: Vector[Json]) =>
@@ -82,20 +93,28 @@ class PredicateSpec extends quasar.Qspec {
       val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
-        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
+        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike {
+          case Success(_, _) => ok
+        }
       }
     }
 
     "reject shuffled fields when FieldOrderPreserved" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderPreserved, OrderIgnored,
+        json,
+        pred,
+        OrderPreserved,
+        OrderIgnored,
         beLike { case Failure(msg, _, _, _) => msg must contain("order differs") }
       )
     }
 
     "accept shuffled fields when FieldOrderIgnored" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderIgnored, OrderIgnored,
+        json,
+        pred,
+        OrderIgnored,
+        OrderIgnored,
         beLike { case Success(_, _) => ok }
       )
     }
@@ -112,7 +131,9 @@ class PredicateSpec extends quasar.Qspec {
       val result = shuffle(a ++ b).unsafePerformSync
 
       b.nonEmpty ==> {
-        run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
+        run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
+          case Success(_, _) => ok
+        }
       }
     }
 
@@ -135,7 +156,9 @@ class PredicateSpec extends quasar.Qspec {
 
     "match exact result with no dupes" >> prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
+      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike {
+        case Success(_, _) => ok
+      }
     }
 
     "match shuffled result with no dupes" >> prop { (a: Vector[Json]) =>
@@ -143,20 +166,28 @@ class PredicateSpec extends quasar.Qspec {
       val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
-        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
+        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike {
+          case Success(_, _) => ok
+        }
       }
     }
 
     "reject shuffled fields when field OrderPreserved" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderPreserved, OrderIgnored,
+        json,
+        pred,
+        OrderPreserved,
+        OrderIgnored,
         beLike { case Failure(msg, _, _, _) => msg must contain("order differs") }
       )
     }
 
     "accept shuffled fields when field OrderIgnored" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderIgnored, OrderIgnored,
+        json,
+        pred,
+        OrderIgnored,
+        OrderIgnored,
         beLike { case Success(_, _) => ok }
       )
     }
@@ -203,20 +234,27 @@ class PredicateSpec extends quasar.Qspec {
     val pred = Exactly
 
     "match exact result" >> prop { (expected: Vector[Json]) =>
-      run(pred, expected, expected, OrderPreserved, OrderPreserved) must beLike { case Success(_, _) => ok }
+      run(pred, expected, expected, OrderPreserved, OrderPreserved) must beLike {
+        case Success(_, _) => ok
+      }
     }
 
     "reject shuffled result" >> prop { (expected: Vector[Json]) =>
       val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
-        run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike { case Failure(_, _, _, _) => ok }
+        run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike {
+          case Failure(_, _, _, _) => ok
+        }
       }
     }
 
     "reject shuffled fields" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderPreserved, OrderPreserved,
+        json,
+        pred,
+        OrderPreserved,
+        OrderPreserved,
         beLike { case Failure(msg, _, _, _) => msg must contain("order differs") }
       )
     }
@@ -228,17 +266,18 @@ class PredicateSpec extends quasar.Qspec {
       pred(expected, partial(partialResult), OrderPreserved, OrderPreserved).unsafePerformSyncAttempt.toOption must beNone
     }
 
-    "reject with any additional" >> prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
-      (b.nonEmpty) ==> {
-        val expected = a ++ c
-        val result = a ++ b ++ c
+    "reject with any additional" >> prop {
+      (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
+        (b.nonEmpty) ==> {
+          val expected = a ++ c
+          val result = a ++ b ++ c
 
-        run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike {
-          case Failure(msg, _, _, _) =>
-            (msg must contain("had more than expected")) or
-              (msg must contain("does not match"))
+          run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike {
+            case Failure(msg, _, _, _) =>
+              (msg must contain("had more than expected")) or
+                (msg must contain("does not match"))
+          }
         }
-      }
     }
 
     "reject with any missing" >> prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
@@ -259,20 +298,27 @@ class PredicateSpec extends quasar.Qspec {
     val pred = Initial
 
     "match exact result" >> prop { (expected: Vector[Json]) =>
-      run(pred, expected, expected, OrderPreserved, OrderPreserved) must beLike { case Success(_, _) => ok }
+      run(pred, expected, expected, OrderPreserved, OrderPreserved) must beLike {
+        case Success(_, _) => ok
+      }
     }
 
     "reject shuffled result" >> prop { (expected: Vector[Json]) =>
       val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
-        run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike { case Failure(msg, _, _, _) => msg must contain("does not match") }
+        run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike {
+          case Failure(msg, _, _, _) => msg must contain("does not match")
+        }
       }
     }
 
     "reject shuffled fields" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderPreserved, OrderPreserved,
+        json,
+        pred,
+        OrderPreserved,
+        OrderPreserved,
         beLike { case Failure(msg, _, _, _) => msg must contain("order differs") }
       )
     }
@@ -288,14 +334,18 @@ class PredicateSpec extends quasar.Qspec {
       val expected = a
       val result = a ++ b
 
-      run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike { case Success(_, _) => ok }
+      run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike {
+        case Success(_, _) => ok
+      }
     }
 
     "reject with any leading" >> prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
       val expected = b
       val result = a ++ b ++ c
       (a.nonEmpty && b.nonEmpty && result.take(b.length) != b) ==> {
-        run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike { case Failure(msg, _, _, _) => msg must contain("does not match") }
+        run(pred, expected, result, OrderPreserved, OrderPreserved) must beLike {
+          case Failure(msg, _, _, _) => msg must contain("does not match")
+        }
       }
     }
   }
@@ -305,7 +355,9 @@ class PredicateSpec extends quasar.Qspec {
 
     "reject exact result with no dupes" >> prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike { case Failure(_, _, _, _) => ok }
+      run(pred, expected, expected, OrderPreserved, OrderIgnored) must beLike {
+        case Failure(_, _, _, _) => ok
+      }
     }
 
     "reject shuffled result with no dupes" >> prop { (a: Vector[Json]) =>
@@ -313,13 +365,18 @@ class PredicateSpec extends quasar.Qspec {
       val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
-        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Failure(msg, _, _, _) => msg must contain("prohibited values") }
+        run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike {
+          case Failure(msg, _, _, _) => msg must contain("prohibited values")
+        }
       }
     }
 
     "reject shuffled fields" >> prop { (json: Vector[Json]) =>
       shuffledFields(
-        json, pred, OrderPreserved, OrderIgnored,
+        json,
+        pred,
+        OrderPreserved,
+        OrderIgnored,
         beLike { case Failure(msg, _, _, _) => msg must contain("prohibited values") }
       )
     }
@@ -335,7 +392,9 @@ class PredicateSpec extends quasar.Qspec {
         val expected = shuffle(b ++ c).unsafePerformSync
         val result = shuffle(a ++ b).unsafePerformSync
 
-        run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Failure(_, _, _, _) => ok }
+        run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
+          case Failure(_, _, _, _) => ok
+        }
       }
     }
 
@@ -344,9 +403,12 @@ class PredicateSpec extends quasar.Qspec {
         val values: Process[Task, Json] = Process.emitAll(result)
 
         if (expected.nonEmpty)
-          run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
-        else
-          run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Failure(_, _, _, _) => ok }
+          run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
+            case Success(_, _) => ok
+          } else
+          run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
+            case Failure(_, _, _, _) => ok
+          }
       }
     }.set(maxSize = 10)
   }

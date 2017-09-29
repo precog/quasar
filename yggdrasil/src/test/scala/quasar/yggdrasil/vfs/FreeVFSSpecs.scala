@@ -19,7 +19,7 @@ package quasar.yggdrasil.vfs
 import quasar.contrib.pathy.{ADir, RPath}
 import quasar.fs.MoveSemantics
 
-import fs2.{Stream, Sink}
+import fs2.{Sink, Stream}
 
 import org.specs2.mutable._
 
@@ -66,10 +66,7 @@ object FreeVFSSpecs extends Specification {
 
         _ <- vlogInit(BaseDir </> Path.dir("META"), None)
 
-        _ <- persistMeta(
-          BaseDir </> Path.dir("META"),
-          _ mustEqual "{}",
-          _ mustEqual "{}")
+        _ <- persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -84,7 +81,13 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(
+            BaseDir,
+            VersionLog(vlogBase, committed, versions),
+            paths,
+            index,
+            vlogs,
+            blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -109,10 +112,7 @@ object FreeVFSSpecs extends Specification {
 
         _ <- vlogInit(BaseDir </> Path.dir("META"), None)
 
-        _ <- persistMeta(
-          BaseDir </> Path.dir("META"),
-          _ mustEqual "{}",
-          _ mustEqual "{}")
+        _ <- persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -127,7 +127,13 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(
+            BaseDir,
+            VersionLog(vlogBase, committed, versions),
+            paths,
+            index,
+            vlogs,
+            blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -187,7 +193,13 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(
+            BaseDir,
+            VersionLog(vlogBase, committed, versions),
+            paths,
+            index,
+            vlogs,
+            blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -248,7 +260,13 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(
+            BaseDir,
+            VersionLog(vlogBase, committed, versions),
+            paths,
+            index,
+            vlogs,
+            blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -315,7 +333,10 @@ object FreeVFSSpecs extends Specification {
             Task delay {
               target mustEqual BaseDir
 
-              List(Path.dir("META"), Path.dir(blob.value.toString), Path.dir(extra.value.toString))
+              List(
+                Path.dir("META"),
+                Path.dir(blob.value.toString),
+                Path.dir(extra.value.toString))
             }
         }
       } yield ()
@@ -323,7 +344,13 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(
+            BaseDir,
+            VersionLog(vlogBase, committed, versions),
+            paths,
+            index,
+            vlogs,
+            blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -351,10 +378,7 @@ object FreeVFSSpecs extends Specification {
     val BlankVFS =
       VFS(
         BaseDir,
-        VersionLog(
-          BaseDir </> Path.dir("META"),
-          Nil,
-          Set()),
+        VersionLog(BaseDir </> Path.dir("META"), Nil, Set()),
         Map(),
         Map(),
         Map(),
@@ -406,13 +430,17 @@ object FreeVFSSpecs extends Specification {
         _ <- vlogInit(BaseDir </> Path.dir(blob.value.toString), None)
       } yield ()
 
-      val result = interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafePerformSync
+      val result =
+        interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafePerformSync
 
       result mustEqual blob
     }
 
     "exists fails with blank VFS" in {
-      FreeVFS.exists[Need](Path.rootDir </> Path.file("foo")).eval(BlankVFS).value mustEqual false
+      FreeVFS
+        .exists[Need](Path.rootDir </> Path.file("foo"))
+        .eval(BlankVFS)
+        .value mustEqual false
     }
 
     "exists finds file in VFS" in {
@@ -449,9 +477,7 @@ object FreeVFSSpecs extends Specification {
       val target = Path.rootDir </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(
-          paths = Map(target -> blob),
-          blobs = Set(blob))
+        BlankVFS.copy(paths = Map(target -> blob), blobs = Set(blob))
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -475,15 +501,14 @@ object FreeVFSSpecs extends Specification {
 
       val interp =
         persistMeta(
-          BaseDir </> Path.dir("META"),
-          { pathsJson =>
+          BaseDir </> Path.dir("META"), { pathsJson =>
             (pathsJson mustEqual s"""{"/foo":$blobJson,"/bar":$blobJson}""") or
               (pathsJson mustEqual s"""{"/bar":$blobJson,"/foo":$blobJson}""")
-          },
-          { indexJson =>
+          }, { indexJson =>
             (indexJson mustEqual """{"/":["./foo","./bar"]}""") or
               (indexJson mustEqual """{"/":["./bar","./foo"]}""")
-          })
+          }
+        )
 
       val (vfs2, result) = interp(FreeVFS.link[S](blob, target).apply(vfs)).unsafePerformSync
 
@@ -633,7 +658,8 @@ object FreeVFSSpecs extends Specification {
           index = Map(
             Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
             source -> Vector(Path.file("foo")),
-            target -> Vector(Path.file("bar"))))
+            target -> Vector(Path.file("bar")))
+        )
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -655,9 +681,8 @@ object FreeVFSSpecs extends Specification {
       val vfs =
         BlankVFS.copy(
           paths = Map(from -> blob),
-          index = Map(
-            Path.rootDir -> Vector(Path.dir("source")),
-            source -> Vector(Path.file("foo"))))
+          index =
+            Map(Path.rootDir -> Vector(Path.dir("source")), source -> Vector(Path.file("foo"))))
 
       val interp = ().point[Harness[S, Task, ?]]
 
@@ -685,16 +710,17 @@ object FreeVFSSpecs extends Specification {
           index = Map(
             Path.rootDir -> Vector(Path.dir("source"), Path.dir("target")),
             source -> Vector(Path.file("foo")),
-            target -> Vector(Path.file("bar"))))
+            target -> Vector(Path.file("bar")))
+        )
 
       val interp =
         persistMeta(
           BaseDir </> Path.dir("META"),
-          _ mustEqual s"""{"/target/foo":$blobJson}""",
-          { json =>
+          _ mustEqual s"""{"/target/foo":$blobJson}""", { json =>
             (json mustEqual """{"/":["./target/"],"/target/":["./foo"]}""") or
               (json mustEqual """{"/target/":["./foo"],"/":["./target/"]}""")
-          })
+          }
+        )
 
       val (vfs2, result) =
         interp(FreeVFS.moveDir[S](source, target, MoveSemantics.Overwrite).apply(vfs)).unsafePerformSync
@@ -705,7 +731,7 @@ object FreeVFSSpecs extends Specification {
       vfs2.paths(to) mustEqual blob
       vfs2.paths must not(haveKey(from))
 
-      vfs2.index(target) mustEqual Vector(Path.file("foo"))   // no bar!
+      vfs2.index(target) mustEqual Vector(Path.file("foo")) // no bar!
     }
 
     "moveDir moves a directory with a single element" in {
@@ -722,18 +748,17 @@ object FreeVFSSpecs extends Specification {
       val vfs =
         BlankVFS.copy(
           paths = Map(from -> blob),
-          index = Map(
-            Path.rootDir -> Vector(Path.dir("source")),
-            source -> Vector(Path.file("foo"))))
+          index =
+            Map(Path.rootDir -> Vector(Path.dir("source")), source -> Vector(Path.file("foo"))))
 
       val interp =
         persistMeta(
           BaseDir </> Path.dir("META"),
-          _ mustEqual s"""{"/target/foo":$blobJson}""",
-          { json =>
+          _ mustEqual s"""{"/target/foo":$blobJson}""", { json =>
             (json mustEqual """{"/":["./target/"],"/target/":["./foo"]}""") or
               (json mustEqual """{"/target/":["./foo"],"/":["./target/"]}""")
-          })
+          }
+        )
 
       val (vfs2, result) =
         interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).apply(vfs)).unsafePerformSync
@@ -768,10 +793,7 @@ object FreeVFSSpecs extends Specification {
           blobs = Set(blob))
 
       val interp =
-        persistMeta(
-          BaseDir </> Path.dir("META"),
-          _ mustEqual "{}",
-          _ mustEqual "{}")
+        persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
 
       val (vfs2, result) = interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
 
@@ -791,16 +813,12 @@ object FreeVFSSpecs extends Specification {
       val vfs =
         BlankVFS.copy(
           paths = Map(foo -> blob),
-          index = Map(
-            Path.rootDir -> Vector(Path.dir("target")),
-            target -> Vector(Path.file("foo"))),
+          index =
+            Map(Path.rootDir -> Vector(Path.dir("target")), target -> Vector(Path.file("foo"))),
           blobs = Set(blob))
 
       val interp =
-        persistMeta(
-          BaseDir </> Path.dir("META"),
-          _ mustEqual "{}",
-          _ mustEqual "{}")
+        persistMeta(BaseDir </> Path.dir("META"), _ mustEqual "{}", _ mustEqual "{}")
 
       val (vfs2, result) =
         interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
@@ -813,7 +831,10 @@ object FreeVFSSpecs extends Specification {
     }
 
     "readPath produces None for non-existent path" in {
-      FreeVFS.readPath[Need](Path.rootDir </> Path.file("foo")).eval(BlankVFS).value mustEqual None
+      FreeVFS
+        .readPath[Need](Path.rootDir </> Path.file("foo"))
+        .eval(BlankVFS)
+        .value mustEqual None
     }
 
     "readPath finds blob for extant path" in {
@@ -821,8 +842,7 @@ object FreeVFSSpecs extends Specification {
       val target = Path.rootDir </> Path.file("foo")
 
       val vfs =
-        BlankVFS.copy(
-          paths = Map(target -> blob))
+        BlankVFS.copy(paths = Map(target -> blob))
 
       FreeVFS.readPath[Need](target).eval(vfs).value must beSome(blob)
     }
@@ -832,14 +852,12 @@ object FreeVFSSpecs extends Specification {
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(
-          BaseDir </> Path.dir(blob.value.toString),
-          List(version),
-          Set(version))
+        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
 
       val interp = ().point[Harness[S, Task, ?]]
 
-      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafePerformSync
+      val result =
+        interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafePerformSync
 
       result must beNone
     }
@@ -849,21 +867,17 @@ object FreeVFSSpecs extends Specification {
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(
-          BaseDir </> Path.dir(blob.value.toString),
-          List(version),
-          Set(version))
+        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
 
       val vfs =
-        BlankVFS.copy(
-          versions = Map(blob -> blobVLog),
-          blobs = Set(blob))
+        BlankVFS.copy(versions = Map(blob -> blobVLog), blobs = Set(blob))
 
       val interp = ().point[Harness[S, Task, ?]]
 
       val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(vfs)).unsafePerformSync
 
-      result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
+      result must beSome(
+        BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
     }
 
     "determine the underlying dir for a blob/version pair not already cached" in {
@@ -871,18 +885,17 @@ object FreeVFSSpecs extends Specification {
       val version = Version(UUID.randomUUID())
 
       val blobVLog =
-        VersionLog(
-          BaseDir </> Path.dir(blob.value.toString),
-          List(version),
-          Set(version))
+        VersionLog(BaseDir </> Path.dir(blob.value.toString), List(version), Set(version))
 
       val vfs = BlankVFS.copy(blobs = Set(blob))
 
       val interp = vlogInit(BaseDir </> Path.dir(blob.value.toString), Some(List(version)))
 
-      val (vfs2, result) = interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafePerformSync
+      val (vfs2, result) =
+        interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafePerformSync
 
-      result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
+      result must beSome(
+        BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
 
       vfs2.versions must haveSize(1)
       vfs2.versions must haveKey(blob)
@@ -911,7 +924,9 @@ object FreeVFSSpecs extends Specification {
                 Task delay {
                   target mustEqual (baseDir </> Path.file("versions.json"))
 
-                  Stream(ByteVector(versions.map(v => s""""${v.value}"""").mkString("[", ",", "]").getBytes))
+                  Stream(
+                    ByteVector(
+                      versions.map(v => s""""${v.value}"""").mkString("[", ",", "]").getBytes))
                 }
             }
 

@@ -52,21 +52,24 @@ class DefaultConfigPathSpec extends quasar.Qspec {
   def withProp[A](n: String, v: String, t: => Task[A]): Task[A] =
     for {
       prev <- getProp(n)
-      _    <- setProp(n, v)
-      a    <- t onFinish κ(prev.cata(setProp(n, _), Task.now(())))
+      _ <- setProp(n, v)
+      a <- t onFinish κ(prev.cata(setProp(n, _), Task.now(())))
     } yield a
 
   def withoutProp[A](n: String, t: => Task[A]): Task[A] =
     for {
       prev <- getProp(n)
-      _    <- clearProp(n)
-      a    <- t onFinish κ(prev.cata(setProp(n, _), Task.now(())))
+      _ <- clearProp(n)
+      a <- t onFinish κ(prev.cata(setProp(n, _), Task.now(())))
     } yield a
 
   "defaultPathForOS" should {
     "OS X" >> {
       "when home dir" in {
-        val p = withProp("user.home", "/home/foo", defaultPathForOS(file("quasar-config.json"))(OS.mac))
+        val p = withProp(
+          "user.home",
+          "/home/foo",
+          defaultPathForOS(file("quasar-config.json"))(OS.mac))
         printPosix(p.unsafePerformSync) ==== s"/home/foo/$macp/$comp"
       }
 
@@ -78,12 +81,18 @@ class DefaultConfigPathSpec extends quasar.Qspec {
 
     "POSIX" >> {
       "when home dir" in {
-        val p = withProp("user.home", "/home/bar", defaultPathForOS(file("quasar-config.json"))(OS.posix))
+        val p = withProp(
+          "user.home",
+          "/home/bar",
+          defaultPathForOS(file("quasar-config.json"))(OS.posix))
         printPosix(p.unsafePerformSync) ==== s"/home/bar/$posixp/$comp"
       }
 
       "when home dir with trailing slash" in {
-        val p = withProp("user.home", "/home/bar/", defaultPathForOS(file("quasar-config.json"))(OS.posix))
+        val p = withProp(
+          "user.home",
+          "/home/bar/",
+          defaultPathForOS(file("quasar-config.json"))(OS.posix))
         printPosix(p.unsafePerformSync) ==== s"/home/bar/$posixp/$comp"
       }
 

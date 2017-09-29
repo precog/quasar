@@ -43,12 +43,17 @@ object EventMessage {
 
   implicit val decomposer: Decomposer[EventMessage] = new Decomposer[EventMessage] {
     override def decompose(eventMessage: EventMessage): JValue = {
-      eventMessage.fold(IngestMessage.Decomposer.apply _, ArchiveMessage.Decomposer.apply _, StoreFileMessage.Decomposer.apply _)
+      eventMessage.fold(
+        IngestMessage.Decomposer.apply _,
+        ArchiveMessage.Decomposer.apply _,
+        StoreFileMessage.Decomposer.apply _)
     }
   }
 }
 
-case class EventId(producerId: Int, sequenceId: Int) { /** ProducerId and SequenceId used to be aliases to Int */
+case class EventId(producerId: Int, sequenceId: Int) {
+
+  /** ProducerId and SequenceId used to be aliases to Int */
   val uid = (producerId.toLong << 32) | (sequenceId.toLong & 0xFFFFFFFFL)
 }
 
@@ -68,25 +73,28 @@ case class IngestRecord(eventId: EventId, value: JValue)
 object IngestRecord {
   val schemaV1 = "eventId" :: "jvalue" :: HNil
 
-  implicit val (decomposerV1, extractorV1) = serializationV[IngestRecord](schemaV1, Some("1.0".v))
+  implicit val (decomposerV1, extractorV1) =
+    serializationV[IngestRecord](schemaV1, Some("1.0".v))
 }
 
 /**
-  * ownerAccountId must be determined before the message is sent to the central queue; we have to
-  * accept records for processing in the local queue.
-  */
-case class IngestMessage(apiKey: APIKey,
-                         path: Path,
-                         writeAs: Authorities,
-                         data: Seq[IngestRecord],
-                         jobId: Option[JobId],
-                         timestamp: Instant,
-                         streamRef: StreamRef)
+ * ownerAccountId must be determined before the message is sent to the central queue; we have to
+ * accept records for processing in the local queue.
+ */
+case class IngestMessage(
+    apiKey: APIKey,
+    path: Path,
+    writeAs: Authorities,
+    data: Seq[IngestRecord],
+    jobId: Option[JobId],
+    timestamp: Instant,
+    streamRef: StreamRef)
     extends EventMessage {
-  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = im(this)
+  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A =
+    im(this)
   def split: Seq[IngestMessage] = {
     if (data.size > 1) {
-      val (dataA, dataB)  = data.splitAt(data.size / 2)
+      val (dataA, dataB) = data.splitAt(data.size / 2)
       val Seq(refA, refB) = streamRef.split(2)
       List(this.copy(data = dataA, streamRef = refA), this.copy(data = dataB, streamRef = refB))
     } else {
@@ -94,16 +102,27 @@ case class IngestMessage(apiKey: APIKey,
     }
   }
 
-  override def toString = "IngestMessage(%s, %s, %s, (%d records), %s, %s, %s)".format(apiKey, path, writeAs, data.size, jobId, timestamp, streamRef)
+  override def toString =
+    "IngestMessage(%s, %s, %s, (%d records), %s, %s, %s)".format(
+      apiKey,
+      path,
+      writeAs,
+      data.size,
+      jobId,
+      timestamp,
+      streamRef)
 }
 
 object IngestMessage {
   import EventMessage._
 
-  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
-  implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
+  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append
+    .asInstanceOf[StreamRef]) :: HNil
+  implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] =
+    implicitly[Extractor[List[A]]].map(_.toSeq)
 
-  val decomposerV1: Decomposer[IngestMessage] = decomposerV[IngestMessage](schemaV1, Some("1.1".v))
+  val decomposerV1: Decomposer[IngestMessage] =
+    decomposerV[IngestMessage](schemaV1, Some("1.1".v))
   val extractorV1: Extractor[EventMessageExtraction] = new Extractor[EventMessageExtraction] {
     private val extractor = extractorV[IngestMessage](schemaV1, Some("1.1".v))
     override def validated(jv: JValue) = extractor.validated(jv).map(\/.right(_))
@@ -113,69 +132,103 @@ object IngestMessage {
     override def validated(obj: JValue): Validation[Error, EventMessageExtraction] =
       obj.validated[Ingest]("event").flatMap { ingest =>
         (obj.validated[Int]("producerId") |@|
-              obj.validated[Int]("eventId")) { (producerId, sequenceId) =>
+          obj.validated[Int]("eventId")) { (producerId, sequenceId) =>
           val eventRecords = ingest.data map { jv =>
             IngestRecord(EventId(producerId, sequenceId), jv)
           }
           ingest.writeAs map { authorities =>
             assert(ingest.data.size == 1)
-            \/.right(IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
+            \/.right(
+              IngestMessage(
+                ingest.apiKey,
+                ingest.path,
+                authorities,
+                eventRecords,
+                ingest.jobId,
+                defaultTimestamp,
+                StreamRef.Append))
           } getOrElse {
             \/.left(
-              (ingest.apiKey,
-               ingest.path,
-               (authorities: Authorities) =>
-                 IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
+              (
+                ingest.apiKey,
+                ingest.path,
+                (authorities: Authorities) =>
+                  IngestMessage(
+                    ingest.apiKey,
+                    ingest.path,
+                    authorities,
+                    eventRecords,
+                    ingest.jobId,
+                    defaultTimestamp,
+                    StreamRef.Append))
             )
           }
         }
       }
   }
 
-  implicit val Decomposer: Decomposer[IngestMessage]        = decomposerV1
+  implicit val Decomposer: Decomposer[IngestMessage] = decomposerV1
   implicit val Extractor: Extractor[EventMessageExtraction] = extractorV1 <+> extractorV0
 }
 
-case class ArchiveMessage(apiKey: APIKey, path: Path, jobId: Option[JobId], eventId: EventId, timestamp: Instant) extends EventMessage {
-  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = am(this)
+case class ArchiveMessage(
+    apiKey: APIKey,
+    path: Path,
+    jobId: Option[JobId],
+    eventId: EventId,
+    timestamp: Instant)
+    extends EventMessage {
+  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A =
+    am(this)
 }
 
 object ArchiveMessage {
   import EventMessage._
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
 
-  val decomposerV1: Decomposer[ArchiveMessage] = decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
-  val extractorV1: Extractor[ArchiveMessage]   = extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
+  val decomposerV1: Decomposer[ArchiveMessage] =
+    decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
+  val extractorV1: Extractor[ArchiveMessage] =
+    extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
   val extractorV0: Extractor[ArchiveMessage] = new Extractor[ArchiveMessage] {
     override def validated(obj: JValue): Validation[Error, ArchiveMessage] = {
       (obj.validated[Int]("producerId") |@|
-            obj.validated[Int]("deletionId") |@|
-            obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
-        ArchiveMessage(archive.apiKey, archive.path, archive.jobId, EventId(producerId, sequenceId), defaultTimestamp)
+        obj.validated[Int]("deletionId") |@|
+        obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
+        ArchiveMessage(
+          archive.apiKey,
+          archive.path,
+          archive.jobId,
+          EventId(producerId, sequenceId),
+          defaultTimestamp)
       }
     }
   }
 
   implicit val Decomposer: Decomposer[ArchiveMessage] = decomposerV1
-  implicit val Extractor: Extractor[ArchiveMessage]   = extractorV1 <+> extractorV0
+  implicit val Extractor: Extractor[ArchiveMessage] = extractorV1 <+> extractorV0
 }
 
-case class StoreFileMessage(apiKey: APIKey,
-                            path: Path,
-                            writeAs: Authorities,
-                            jobId: Option[JobId],
-                            eventId: EventId,
-                            content: FileContent,
-                            timestamp: Instant,
-                            streamRef: StreamRef)
+case class StoreFileMessage(
+    apiKey: APIKey,
+    path: Path,
+    writeAs: Authorities,
+    jobId: Option[JobId],
+    eventId: EventId,
+    content: FileContent,
+    timestamp: Instant,
+    streamRef: StreamRef)
     extends EventMessage {
-  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = sf(this)
+  def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A =
+    sf(this)
 }
 
 object StoreFileMessage {
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "eventId" :: "content" :: "timestamp" :: "streamRef" :: HNil
 
-  implicit val Decomposer: Decomposer[StoreFileMessage] = decomposerV[StoreFileMessage](schemaV1, Some("1.0".v))
+  implicit val Decomposer: Decomposer[StoreFileMessage] =
+    decomposerV[StoreFileMessage](schemaV1, Some("1.0".v))
 
-  implicit val Extractor: Extractor[StoreFileMessage] = extractorV[StoreFileMessage](schemaV1, Some("1.0".v))
+  implicit val Extractor: Extractor[StoreFileMessage] =
+    extractorV[StoreFileMessage](schemaV1, Some("1.0".v))
 }

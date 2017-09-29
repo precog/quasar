@@ -50,18 +50,20 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     }
 
     "be empty for pure values" in {
-      val wf = $pure[WorkflowF](Bson.Arr(List(
-        Bson.Doc(ListMap("foo" -> Bson.Int64(1))),
-        Bson.Doc(ListMap("bar" -> Bson.Int64(2))))))
+      val wf = $pure[WorkflowF](
+        Bson.Arr(
+          List(
+            Bson.Doc(ListMap("foo" -> Bson.Int64(1))),
+            Bson.Doc(ListMap("bar" -> Bson.Int64(2))))))
 
-        toJS(wf) must beRightDisjunction("")
+      toJS(wf) must beRightDisjunction("")
     }
 
     "write simple query to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
@@ -69,12 +71,9 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     }
 
     "write limit to JS" in {
-      val wf = chain(
-        $read[WorkflowF](collection("db", "zips")),
-        $limit[WorkflowF](10))
+      val wf = chain($read[WorkflowF](collection("db", "zips")), $limit[WorkflowF](10))
 
-      toJS(wf) must beRightDisjunction(
-        """db.zips.find().limit(10);
+      toJS(wf) must beRightDisjunction("""db.zips.find().limit(10);
           |""".stripMargin)
     }
 
@@ -83,9 +82,9 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $read[WorkflowF](collection("db", "zips")),
         $limit[WorkflowF](10),
         $project[WorkflowF](
-          Reshape(ListMap(
-            BsonField.Name("city") -> $include().right)),
-          ExcludeId))
+          Reshape(ListMap(BsonField.Name("city") -> $include().right)),
+          ExcludeId)
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find({ "city": true, "_id": false }).limit(10);
@@ -95,16 +94,14 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write filter, project, and limit to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Lt(Bson.Int64(1000)))),
+        $match[WorkflowF](Selector.Doc(BsonField.Name("pop") -> Selector.Lt(Bson.Int64(1000)))),
         $limit[WorkflowF](10),
         $project[WorkflowF](
-          Reshape(ListMap(
-            BsonField.Name("city") -> $include().right)),
-          ExcludeId))
+          Reshape(ListMap(BsonField.Name("city") -> $include().right)),
+          ExcludeId)
+      )
 
-      toJS(wf) must beRightDisjunction(
-        """db.zips.find(
+      toJS(wf) must beRightDisjunction("""db.zips.find(
           |  { "pop": { "$lt": NumberLong("1000") } },
           |  { "city": true, "_id": false }).limit(
           |  10);
@@ -114,12 +111,12 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write simple count to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
         $group[WorkflowF](
-          Grouped(ListMap(
-            BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
-          $literal(Bson.Null).right))
+          Grouped(ListMap(BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
+          $literal(Bson.Null).right)
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.count({ "pop": { "$gte": NumberLong("1000") } });
@@ -130,13 +127,12 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
         $group[WorkflowF](
-          Grouped(ListMap(
-            BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
+          Grouped(ListMap(BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
           $literal(Bson.Null).right),
-        $limit[WorkflowF](11))
+        $limit[WorkflowF](11)
+      )
 
-      toJS(wf) must beRightDisjunction(
-        """db.zips.count();
+      toJS(wf) must beRightDisjunction("""db.zips.count();
           |""".stripMargin)
     }
 
@@ -145,12 +141,11 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $read[WorkflowF](collection("db", "zips")),
         $group[WorkflowF](
           Grouped(ListMap()),
-          Reshape(ListMap(
-            BsonField.Name("0") -> $field("city").right)).left),
+          Reshape(ListMap(BsonField.Name("0") -> $field("city").right)).left),
         $project[WorkflowF](
-          Reshape(ListMap(
-            BsonField.Name("c") -> $field("_id", "0").right)),
-          ExcludeId))
+          Reshape(ListMap(BsonField.Name("c") -> $field("_id", "0").right)),
+          ExcludeId)
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.distinct("city").map(function (elem) { return { "c": elem } });
@@ -160,16 +155,15 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write filtered distinct to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
         $group[WorkflowF](
           Grouped(ListMap()),
-          Reshape(ListMap(
-            BsonField.Name("0") -> $field("city").right)).left),
+          Reshape(ListMap(BsonField.Name("0") -> $field("city").right)).left),
         $project[WorkflowF](
-          Reshape(ListMap(
-            BsonField.Name("c") -> $field("_id", "0").right)),
-          ExcludeId))
+          Reshape(ListMap(BsonField.Name("c") -> $field("_id", "0").right)),
+          ExcludeId)
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.distinct("city").filter({ "pop": { "$gte": NumberLong("1000") } }).map(
@@ -180,8 +174,8 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write simple pipeline workflow to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
@@ -191,14 +185,13 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write chained pipeline workflow to JS find()" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
-        $sort[WorkflowF](NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)))
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
+        $match[WorkflowF](Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
+        $sort[WorkflowF](NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))
+      )
 
-      toJS(wf) must beRightDisjunction(
-        """db.zips.find(
+      toJS(wf) must beRightDisjunction("""db.zips.find(
           |  {
           |    "$and": [
           |      { "pop": { "$lte": NumberLong("1000") } },
@@ -211,15 +204,14 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write chained pipeline workflow to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-        $match[WorkflowF](Selector.Doc(
-          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
+        $match[WorkflowF](
+          Selector.Doc(BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
+        $match[WorkflowF](Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
         $group[WorkflowF](
-          Grouped(ListMap(
-            BsonField.Name("pop") -> $sum($field("pop")))),
+          Grouped(ListMap(BsonField.Name("pop") -> $sum($field("pop")))),
           $field("city").right),
-        $sort[WorkflowF](NonEmptyList(BsonField.Name("_id") -> SortDir.Ascending)))
+        $sort[WorkflowF](NonEmptyList(BsonField.Name("_id") -> SortDir.Ascending))
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.aggregate(
@@ -240,15 +232,20 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write map-reduce Workflow to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),
-        $map[WorkflowF]($MapF.mapKeyVal(("key", "value"),
-          Js.Select(Js.Ident("value"), "city"),
-          Js.Select(Js.Ident("value"), "pop")),
+        $map[WorkflowF](
+          $MapF.mapKeyVal(
+            ("key", "value"),
+            Js.Select(Js.Ident("value"), "city"),
+            Js.Select(Js.Ident("value"), "pop")),
           ListMap()),
-        $reduce[WorkflowF](Js.AnonFunDecl(List("key", "values"), List(
-          Js.Return(Js.Call(
-            Js.Select(Js.Ident("Array"), "sum"),
-            List(Js.Ident("values")))))),
-          ListMap()))
+        $reduce[WorkflowF](
+          Js.AnonFunDecl(
+            List("key", "values"),
+            List(
+              Js.Return(
+                Js.Call(Js.Select(Js.Ident("Array"), "sum"), List(Js.Ident("values")))))),
+          ListMap())
+      )
 
       toJS(wf) must beRightDisjunction(
         """db.zips.mapReduce(
@@ -289,21 +286,26 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $foldLeft[WorkflowF](
           chain(
             $read[WorkflowF](collection("db", "zips1")),
-            $match[WorkflowF](Selector.Doc(
-              BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER"))))),
+            $match[WorkflowF](
+              Selector.Doc(BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER"))))),
           chain(
             $read[WorkflowF](collection("db", "zips2")),
-            $match[WorkflowF](Selector.Doc(
-              BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
-            $map[WorkflowF]($MapF.mapKeyVal(("key", "value"),
-              Js.Select(Js.Ident("value"), "city"),
-              Js.Select(Js.Ident("value"), "pop")),
+            $match[WorkflowF](
+              Selector.Doc(BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
+            $map[WorkflowF](
+              $MapF.mapKeyVal(
+                ("key", "value"),
+                Js.Select(Js.Ident("value"), "city"),
+                Js.Select(Js.Ident("value"), "pop")),
               ListMap()),
-            $reduce[WorkflowF](Js.AnonFunDecl(List("key", "values"), List(
-              Js.Return(Js.Call(
-                Js.Select(Js.Ident("Array"), "sum"),
-                List(Js.Ident("values")))))),
-              ListMap())))
+            $reduce[WorkflowF](
+              Js.AnonFunDecl(
+                List("key", "values"),
+                List(Js.Return(
+                  Js.Call(Js.Select(Js.Ident("Array"), "sum"), List(Js.Ident("values")))))),
+              ListMap())
+          )
+        )
 
       toJS(wf) must beRightDisjunction(
         """db.zips1.aggregate(

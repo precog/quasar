@@ -24,7 +24,10 @@ import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait PartitionMergeSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with SpecificationLike
+    with ScalaCheck {
   import trans._
 
   def testPartitionMerge = {
@@ -49,24 +52,26 @@ trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with S
       "4a"
     ]""")
 
-    val result: M[Table] = tbl.partitionMerge(DerefObjectStatic(Leaf(Source), CPathField("key"))) { table =>
-      val reducer = new Reducer[String] {
-        def reduce(schema: CSchema, range: Range): String = {
-          schema.columns(JTextT).head match {
-            case col: StrColumn => range map col mkString ";"
-            case _              => abort("Not a StrColumn")
+    val result: M[Table] =
+      tbl.partitionMerge(DerefObjectStatic(Leaf(Source), CPathField("key"))) { table =>
+        val reducer = new Reducer[String] {
+          def reduce(schema: CSchema, range: Range): String = {
+            schema.columns(JTextT).head match {
+              case col: StrColumn => range map col mkString ";"
+              case _ => abort("Not a StrColumn")
+            }
           }
         }
+
+        val derefed = table.transform(
+          DerefObjectStatic(
+            DerefObjectStatic(Leaf(Source), CPathField("value")),
+            CPathField("a")))
+
+        derefed.reduce(reducer).map(s => Table.constString(Set(s)))
       }
-
-      val derefed = table.transform(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("a")))
-
-      derefed.reduce(reducer).map(s => Table.constString(Set(s)))
-    }
 
     result.flatMap(_.toJson).copoint must_== expected.toStream
   }
 
 }
-
-

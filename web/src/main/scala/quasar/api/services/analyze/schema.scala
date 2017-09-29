@@ -42,57 +42,66 @@ object schema {
 
   val DefaultSampleSize: Positive = 1000L
 
-  object ArrayMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("arrayMaxLength")
+  object ArrayMaxLength
+      extends OptionalValidatingQueryParamDecoderMatcher[Positive]("arrayMaxLength")
   object MapMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("mapMaxSize")
-  object StringMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("stringMaxLength")
-  object UnionMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("unionMaxSize")
+  object StringMaxLength
+      extends OptionalValidatingQueryParamDecoderMatcher[Positive]("stringMaxLength")
+  object UnionMaxSize
+      extends OptionalValidatingQueryParamDecoderMatcher[Positive]("unionMaxSize")
 
   def service[S[_]](
-    implicit
-    Q : QueryFile.Ops[S],
-    M : Mounting.Ops[S],
-    S0: Task :<: S,
-    S1: FileSystemFailure :<: S
+      implicit
+      Q: QueryFile.Ops[S],
+      M: Mounting.Ops[S],
+      S0: Task :<: S,
+      S1: FileSystemFailure :<: S
   ): QHttpService[S] =
     QHttpService {
-      case req @ GET -> _        :?
-        ArrayMaxLength(arrMax0)  +&
-        MapMaxSize(mapMax0)      +&
-        StringMaxLength(strMax0) +&
-        UnionMaxSize(unionMax0)  =>
-
+      case req @ GET -> _ :?
+            ArrayMaxLength(arrMax0) +&
+              MapMaxSize(mapMax0) +&
+              StringMaxLength(strMax0) +&
+              UnionMaxSize(unionMax0) =>
         val arrMax =
-          valueOrInvalid("arrayMaxLength", arrMax0)
-            .map(_ | analysis.CompressionSettings.DefaultArrayMaxLength)
+          valueOrInvalid("arrayMaxLength", arrMax0).map(
+            _ | analysis.CompressionSettings.DefaultArrayMaxLength)
 
         val mapMax =
-          valueOrInvalid("mapMaxSize", mapMax0)
-            .map(_ | analysis.CompressionSettings.DefaultMapMaxSize)
+          valueOrInvalid("mapMaxSize", mapMax0).map(
+            _ | analysis.CompressionSettings.DefaultMapMaxSize)
 
         val strMax =
-          valueOrInvalid("stringMaxLength", strMax0)
-            .map(_ | analysis.CompressionSettings.DefaultStringMaxLength)
+          valueOrInvalid("stringMaxLength", strMax0).map(
+            _ | analysis.CompressionSettings.DefaultStringMaxLength)
 
         val unionMax =
-          valueOrInvalid("unionMaxSize", unionMax0)
-            .map(_ | analysis.CompressionSettings.DefaultUnionMaxSize)
+          valueOrInvalid("unionMaxSize", unionMax0).map(
+            _ | analysis.CompressionSettings.DefaultUnionMaxSize)
 
         val compressionSettings =
-          (arrMax |@| mapMax |@| strMax |@| unionMax)((amax, mmax, smax, umax) =>
-            analysis.CompressionSettings(
-              arrayMaxLength  = amax,
-              mapMaxSize      = mmax,
-              stringMaxLength = smax,
-              unionMaxSize    = umax))
+          (arrMax |@| mapMax |@| strMax |@| unionMax)(
+            (amax, mmax, smax, umax) =>
+              analysis.CompressionSettings(
+                arrayMaxLength = amax,
+                mapMaxSize = mmax,
+                stringMaxLength = smax,
+                unionMaxSize = umax))
 
         respondT(for {
-          settings    <- compressionSettings.liftT[Free[S, ?]]
-          rq          <- requestQuery[Fix](req).liftT[Free[S, ?]]
-          (blob, dir) =  rq
-          r           <- analysis.querySchema[S, J, Double](
-                           blob, requestVars(req), dir, DefaultSampleSize, settings
-                         ).leftMap(_.toApiError)
-          schema      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
+          settings <- compressionSettings.liftT[Free[S, ?]]
+          rq <- requestQuery[Fix](req).liftT[Free[S, ?]]
+          (blob, dir) = rq
+          r <- analysis
+            .querySchema[S, J, Double](
+              blob,
+              requestVars(req),
+              dir,
+              DefaultSampleSize,
+              settings
+            )
+            .leftMap(_.toApiError)
+          schema <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
         } yield {
           formattedDataResponse(
             MessageFormat.fromAccept(req.headers.get(Accept)),

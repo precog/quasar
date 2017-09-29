@@ -18,13 +18,15 @@ package quasar.contrib.scalaz
 
 import scalaz._, Scalaz._, Leibniz.===
 
-final class BitraverseOps[F[_, _], A, B] private[scalaz] (self: F[A, B])(implicit F0: Bitraverse[F]) {
+final class BitraverseOps[F[_, _], A, B] private[scalaz] (self: F[A, B])(
+    implicit F0: Bitraverse[F]) {
   final def uTraverse[G[_]: Applicative, C](f: A => G[C])(implicit ev: B === A): G[F[C, C]] =
     F0.uTraverse.traverse(self rightMap ev)(f)
 }
 
 trait ToBitraverseOps {
-  implicit def toBitraverseOps[F[_, _]: Bitraverse, A, B](self: F[A, B]): BitraverseOps[F, A, B] =
+  implicit def toBitraverseOps[F[_, _]: Bitraverse, A, B](
+      self: F[A, B]): BitraverseOps[F, A, B] =
     new BitraverseOps(self)
 }
 

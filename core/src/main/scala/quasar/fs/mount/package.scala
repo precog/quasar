@@ -50,14 +50,13 @@ package object mount {
       KeyValueStore.Ops[APath, MountConfig, S]
   }
 
-
   //-- Views --
 
   sealed abstract class ResultSet
 
   object ResultSet {
-    final case class Data(values: Vector[quasar.Data])       extends ResultSet
-    final case class Read(handle: ReadFile.ReadHandle)       extends ResultSet
+    final case class Data(values: Vector[quasar.Data]) extends ResultSet
+    final case class Read(handle: ReadFile.ReadHandle) extends ResultSet
     final case class Results(handle: QueryFile.ResultHandle) extends ResultSet
   }
 
@@ -65,7 +64,7 @@ package object mount {
 
   object ViewState {
     def Ops[S[_]](
-      implicit S: ViewState :<: S
+        implicit S: ViewState :<: S
     ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S] =
       KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
 
@@ -75,28 +74,28 @@ package object mount {
       TaskRef(initial) map KeyValueStore.impl.fromTaskRef
 
     def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
-      KeyValueStore.impl.toState[State[S,?]](l)
+      KeyValueStore.impl.toState[State[S, ?]](l)
   }
 
   type ViewFileSystem[A] = (
-        Mounting
-    :\: PathMismatchFailure
-    :\: MountingFailure
-    :\: ViewState
-    :\: VCache
-    :\: MonotonicSeq
-    :/: FileSystem
+    Mounting
+      :\: PathMismatchFailure
+      :\: MountingFailure
+      :\: ViewState
+      :\: VCache
+      :\: MonotonicSeq
+      :/: FileSystem
   )#M[A]
 
   object ViewFileSystem {
     def interpret[F[_]](
-      mounting: Mounting ~> F,
-      mismatchFailure: PathMismatchFailure ~> F,
-      mountingFailure: MountingFailure ~> F,
-      viewState: ViewState ~> F,
-      vcache: VCache ~> F,
-      monotonicSeq: MonotonicSeq ~> F,
-      fileSystem: FileSystem ~> F
+        mounting: Mounting ~> F,
+        mismatchFailure: PathMismatchFailure ~> F,
+        mountingFailure: MountingFailure ~> F,
+        viewState: ViewState ~> F,
+        vcache: VCache ~> F,
+        monotonicSeq: MonotonicSeq ~> F,
+        fileSystem: FileSystem ~> F
     ): ViewFileSystem ~> F =
       mounting :+: mismatchFailure :+: mountingFailure :+: viewState :+: vcache :+: monotonicSeq :+: fileSystem
   }

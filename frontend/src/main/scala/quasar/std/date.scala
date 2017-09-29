@@ -17,7 +17,8 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, NullaryFunc, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar.{Data, Func, Mapping, NullaryFunc, SemanticError, Type, UnaryFunc},
+SemanticError._
 import quasar.fp.ski._
 
 import java.time._
@@ -30,46 +31,46 @@ import shapeless.{Data => _, _}
 sealed abstract class TemporalPart extends Serializable
 
 object TemporalPart {
-  final case object Century     extends TemporalPart
-  final case object Day         extends TemporalPart
-  final case object Decade      extends TemporalPart
-  final case object Hour        extends TemporalPart
+  final case object Century extends TemporalPart
+  final case object Day extends TemporalPart
+  final case object Decade extends TemporalPart
+  final case object Hour extends TemporalPart
   final case object Microsecond extends TemporalPart
-  final case object Millennium  extends TemporalPart
+  final case object Millennium extends TemporalPart
   final case object Millisecond extends TemporalPart
-  final case object Minute      extends TemporalPart
-  final case object Month       extends TemporalPart
-  final case object Quarter     extends TemporalPart
-  final case object Second      extends TemporalPart
-  final case object Week        extends TemporalPart
-  final case object Year        extends TemporalPart
+  final case object Minute extends TemporalPart
+  final case object Month extends TemporalPart
+  final case object Quarter extends TemporalPart
+  final case object Second extends TemporalPart
+  final case object Week extends TemporalPart
+  final case object Year extends TemporalPart
 
   implicit val equal: Equal[TemporalPart] = Equal.equalRef
   implicit val show: Show[TemporalPart] = Show.showFromToString
 }
 
-
 trait DateLib extends Library with Serializable {
   import TemporalPart._
 
   def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
-    \/.fromTryCatchNonFatal(Instant.parse(str)).bimap(
-      κ(DateFormatError(Timestamp, str, None)),
-      Data.Timestamp.apply)
+    \/.fromTryCatchNonFatal(Instant.parse(str))
+      .bimap(κ(DateFormatError(Timestamp, str, None)), Data.Timestamp.apply)
 
   def parseDate(str: String): SemanticError \/ Data.Date =
-    \/.fromTryCatchNonFatal(LocalDate.parse(str)).bimap(
-      κ(DateFormatError(Date, str, None)),
-      Data.Date.apply)
+    \/.fromTryCatchNonFatal(LocalDate.parse(str))
+      .bimap(κ(DateFormatError(Date, str, None)), Data.Date.apply)
 
   def parseTime(str: String): SemanticError \/ Data.Time =
-    \/.fromTryCatchNonFatal(LocalTime.parse(str)).bimap(
-      κ(DateFormatError(Time, str, None)),
-      Data.Time.apply)
+    \/.fromTryCatchNonFatal(LocalTime.parse(str))
+      .bimap(κ(DateFormatError(Time, str, None)), Data.Time.apply)
 
   def parseInterval(str: String): SemanticError \/ Data.Interval = {
     \/.fromTryCatchNonFatal(Duration.parse(str)).bimap(
-      κ(DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S; note: year/month not currently supported"))),
+      κ(
+        DateFormatError(
+          Interval,
+          str,
+          Some("expected, e.g. P3DT12H30M15.0S; note: year/month not currently supported"))),
       Data.Interval.apply)
   }
 
@@ -85,65 +86,53 @@ trait DateLib extends Library with Serializable {
   def truncLocalTime(part: TemporalPart, t: LocalTime): SemanticError \/ LocalTime =
     \/.fromTryCatchNonFatal(
       part match {
-        case Century | Day | Decade | Millennium |
-             Month | Quarter | Week | Year       => t.truncatedTo(CU.DAYS)
-        case Hour                                => t.truncatedTo(CU.HOURS)
-        case Microsecond                         => t.truncatedTo(CU.MICROS)
-        case Millisecond                         => t.truncatedTo(CU.MILLIS)
-        case Minute                              => t.truncatedTo(CU.MINUTES)
-        case Second                              => t.truncatedTo(CU.SECONDS)
+        case Century | Day | Decade | Millennium | Month | Quarter | Week | Year =>
+          t.truncatedTo(CU.DAYS)
+        case Hour => t.truncatedTo(CU.HOURS)
+        case Microsecond => t.truncatedTo(CU.MICROS)
+        case Millisecond => t.truncatedTo(CU.MILLIS)
+        case Minute => t.truncatedTo(CU.MINUTES)
+        case Second => t.truncatedTo(CU.SECONDS)
       }
     ).leftMap(err => GenericError(s"truncLocalTime: $err"))
 
-  def truncZonedDateTime(part: TemporalPart, zdt: ZonedDateTime):  SemanticError \/ ZonedDateTime =
-    truncLocalTime(part, zdt.toLocalTime) >>= (t => \/.fromTryCatchNonFatal {
-      val truncTime: ZonedDateTime =
-        ZonedDateTime.of(zdt.toLocalDate, t, zdt.getZone)
+  def truncZonedDateTime(
+      part: TemporalPart,
+      zdt: ZonedDateTime): SemanticError \/ ZonedDateTime =
+    truncLocalTime(part, zdt.toLocalTime) >>= (t =>
+      \/.fromTryCatchNonFatal {
+        val truncTime: ZonedDateTime =
+          ZonedDateTime.of(zdt.toLocalDate, t, zdt.getZone)
 
-      part match {
-        case Century =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 100) * 100)
-        case Day =>
-          truncTime
-        case Decade =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 10) * 10)
-        case Hour =>
-          truncTime
-        case Microsecond =>
-          truncTime
-        case Millennium =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 1000) * 1000)
-        case Millisecond =>
-          truncTime
-        case Minute =>
-          truncTime
-        case Month =>
-          truncTime
-            .withDayOfMonth(1)
-        case Quarter =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(zdt.getMonth.firstMonthOfQuarter().getValue)
-        case Second =>
-          truncTime
-        case Week =>
-          truncTime
-            .`with`(java.time.DayOfWeek.MONDAY)
-        case Year =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-      }
-    }.leftMap(err => GenericError(s"truncZonedDateTime: $err")))
+        part match {
+          case Century =>
+            truncTime.withDayOfMonth(1).withMonth(1).withYear((zdt.getYear / 100) * 100)
+          case Day =>
+            truncTime
+          case Decade =>
+            truncTime.withDayOfMonth(1).withMonth(1).withYear((zdt.getYear / 10) * 10)
+          case Hour =>
+            truncTime
+          case Microsecond =>
+            truncTime
+          case Millennium =>
+            truncTime.withDayOfMonth(1).withMonth(1).withYear((zdt.getYear / 1000) * 1000)
+          case Millisecond =>
+            truncTime
+          case Minute =>
+            truncTime
+          case Month =>
+            truncTime.withDayOfMonth(1)
+          case Quarter =>
+            truncTime.withDayOfMonth(1).withMonth(zdt.getMonth.firstMonthOfQuarter().getValue)
+          case Second =>
+            truncTime
+          case Week =>
+            truncTime.`with`(java.time.DayOfWeek.MONDAY)
+          case Year =>
+            truncTime.withDayOfMonth(1).withMonth(1)
+        }
+      }.leftMap(err => GenericError(s"truncZonedDateTime: $err")))
 
   def truncDate(part: TemporalPart, d: Data.Date): SemanticError \/ Data.Date =
     truncZonedDateTime(part, d.value.atStartOfDay(UTC)) ∘ (t => Data.Date(t.toLocalDate))
@@ -154,55 +143,50 @@ trait DateLib extends Library with Serializable {
   def truncTimestamp(part: TemporalPart, ts: Data.Timestamp): SemanticError \/ Data.Timestamp =
     truncZonedDateTime(part, ts.value.atZone(UTC)) ∘ (t => Data.Timestamp(t.toInstant))
 
-
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
 
   private def extract(help: String) =
     UnaryFunc(
-      Mapping, help,
+      Mapping,
+      help,
       Type.Numeric,
       Func.Input1(Type.Temporal),
       noSimplification,
       constTyper[nat._1](Type.Numeric),
       basicUntyper)
 
-  val ExtractCentury      = extract(
+  val ExtractCentury = extract(
     "Pulls out the century subfield from a date/time value (currently year/100).")
-  val ExtractDayOfMonth   = extract(
+  val ExtractDayOfMonth = extract(
     "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
-  val ExtractDecade       = extract(
-    "Pulls out the decade subfield from a date/time value (year/10).")
-  val ExtractDayOfWeek    = extract(
+  val ExtractDecade = extract("Pulls out the decade subfield from a date/time value (year/10).")
+  val ExtractDayOfWeek = extract(
     "Pulls out the day of week (`dow`) subfield from a date/time value " +
-    "(Sunday: 0 to Saturday: 7).")
-  val ExtractDayOfYear    = extract(
+      "(Sunday: 0 to Saturday: 7).")
+  val ExtractDayOfYear = extract(
     "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
-  val ExtractEpoch        = extract(
+  val ExtractEpoch = extract(
     "Pulls out the epoch subfield from a date/time value. For dates and " +
-    "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
-    "For intervals, the number of seconds in the interval.")
-  val ExtractHour         = extract(
-    "Pulls out the hour subfield from a date/time value (0-23).")
-  val ExtractIsoDayOfWeek       = extract(
+      "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
+      "For intervals, the number of seconds in the interval.")
+  val ExtractHour = extract("Pulls out the hour subfield from a date/time value (0-23).")
+  val ExtractIsoDayOfWeek = extract(
     "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
-    "(Monday: 1 to Sunday: 7).")
-  val ExtractIsoYear      = extract(
+      "(Monday: 1 to Sunday: 7).")
+  val ExtractIsoYear = extract(
     "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
-    "on the first week containing Jan. 4).")
+      "on the first week containing Jan. 4).")
   val ExtractMicroseconds = extract(
     "Pulls out the microseconds subfield from a date/time value (including seconds).")
-  val ExtractMillennium    = extract(
+  val ExtractMillennium = extract(
     "Pulls out the millennium subfield from a date/time value (currently year/1000).")
   val ExtractMilliseconds = extract(
     "Pulls out the milliseconds subfield from a date/time value (including seconds).")
-  val ExtractMinute       = extract(
-    "Pulls out the minute subfield from a date/time value (0-59).")
-  val ExtractMonth        = extract(
-    "Pulls out the month subfield from a date/time value (1-12).")
-  val ExtractQuarter      = extract(
-    "Pulls out the quarter subfield from a date/time value (1-4).")
+  val ExtractMinute = extract("Pulls out the minute subfield from a date/time value (0-59).")
+  val ExtractMonth = extract("Pulls out the month subfield from a date/time value (1-12).")
+  val ExtractQuarter = extract("Pulls out the quarter subfield from a date/time value (1-4).")
   val ExtractSecond = extract(
     "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
   val ExtractTimezone = extract(
@@ -211,10 +195,8 @@ trait DateLib extends Library with Serializable {
     "Pulls out the hour component of the timezone subfield from a date/time value.")
   val ExtractTimezoneMinute = extract(
     "Pulls out the minute component of the timezone subfield from a date/time value.")
-  val ExtractWeek = extract(
-    "Pulls out the week subfield from a date/time value (1-53).")
-  val ExtractYear = extract(
-    "Pulls out the year subfield from a date/time value.")
+  val ExtractWeek = extract("Pulls out the week subfield from a date/time value (1-53).")
+  val ExtractYear = extract("Pulls out the year subfield from a date/time value.")
 
   val Date = UnaryFunc(
     Mapping,
@@ -223,16 +205,19 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseDate(str).map(Type.Const(_)).validation.toValidationNel
-      case Sized(Type.Str)                  => success(Type.Date)
+      case Sized(Type.Const(Data.Str(str))) =>
+        parseDate(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str) => success(Type.Date)
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Now = NullaryFunc(
     Mapping,
     "Returns the current timestamp – this must always return the same value within the same execution of a query.",
     Type.Timestamp,
-    noSimplification)
+    noSimplification
+  )
 
   val Time = UnaryFunc(
     Mapping,
@@ -241,10 +226,12 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseTime(str).map(Type.Const(_)).validation.toValidationNel
-      case Sized(Type.Str)                  => success(Type.Time)
+      case Sized(Type.Const(Data.Str(str))) =>
+        parseTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str) => success(Type.Time)
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Timestamp = UnaryFunc(
     Mapping,
@@ -253,10 +240,12 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Const(Data.Str(str))) =>
+        parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
       case Sized(Type.Str) => success(Type.Timestamp)
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Interval = UnaryFunc(
     Mapping,
@@ -265,10 +254,12 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseInterval(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Const(Data.Str(str))) =>
+        parseInterval(str).map(Type.Const(_)).validation.toValidationNel
       case Sized(Type.Str) => success(Type.Interval)
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val StartOfDay = UnaryFunc(
     Mapping,
@@ -283,15 +274,19 @@ trait DateLib extends Library with Serializable {
         success(Type.Timestamp)
       case Sized(Type.Const(Data.Timestamp(v))) =>
         truncZonedDateTime(TemporalPart.Day, v.atZone(UTC))
-          .map(t => Type.Const(Data.Timestamp(t.toInstant))).validation.toValidationNel
+          .map(t => Type.Const(Data.Timestamp(t.toInstant)))
+          .validation
+          .toValidationNel
       case Sized(Type.Timestamp) =>
         success(Type.Timestamp)
     },
     untyper[nat._1] {
-      case Type.Const(Data.Timestamp(ts)) => success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))
-      case Type.Timestamp                 => success(Func.Input1(Type.Date))
-      case t                              => success(Func.Input1(t))
-    })
+      case Type.Const(Data.Timestamp(ts)) =>
+        success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))
+      case Type.Timestamp => success(Func.Input1(Type.Date))
+      case t => success(Func.Input1(t))
+    }
+  )
 
   val TimeOfDay = UnaryFunc(
     Mapping,
@@ -300,10 +295,12 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Timestamp),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Timestamp(value))) => Type.Const(Data.Time(value.atZone(ZoneOffset.UTC).toLocalTime))
+      case Sized(Type.Const(Data.Timestamp(value))) =>
+        Type.Const(Data.Time(value.atZone(ZoneOffset.UTC).toLocalTime))
       case Sized(Type.Timestamp) => Type.Time
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val ToTimestamp = UnaryFunc(
     Mapping,
@@ -312,10 +309,12 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.Int),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Int(millis))) => Type.Const(Data.Timestamp(Instant.ofEpochMilli(millis.toLong)))
+      case Sized(Type.Const(Data.Int(millis))) =>
+        Type.Const(Data.Timestamp(Instant.ofEpochMilli(millis.toLong)))
       case Sized(Type.Int) => Type.Timestamp
     },
-    basicUntyper)
+    basicUntyper
+  )
 }
 
 object DateLib extends DateLib

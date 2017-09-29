@@ -42,17 +42,22 @@ trait BackendModule {
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
-  type Configured[A]        = ConfiguredT[M, A]
-  type BackendT[F[_], A]    = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
-  type Backend[A]           = BackendT[M, A]
+  type Configured[A] = ConfiguredT[M, A]
+  type BackendT[F[_], A] = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
+  type Backend[A] = BackendT[M, A]
 
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
-  private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
-  private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
+  private final implicit def _DelayRenderTreeQSM[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] =
+    DelayRenderTreeQSM
+  private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]
+    : ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
   private final implicit def _MonadM = MonadM
-  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
-  private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
+  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    UnirewriteT[T]
+  private final implicit def _UnicoalesceCap[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
   implicit class LiftBackend[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -125,11 +130,11 @@ trait BackendModule {
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
-  final def lpToQScript
-    [T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      M[_]: Monad: MonadFsErr: PhaseResultTell]
-    (lp: T[LogicalPlan], lc: DiscoverPath.ListContents[M])
-      : M[T[QSM[T, ?]]] = {
+  final def lpToQScript[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      M[_]: Monad: MonadFsErr: PhaseResultTell](
+      lp: T[LogicalPlan],
+      lc: DiscoverPath.ListContents[M]): M[T[QSM[T, ?]]] = {
 
     type QSR[A] = QScriptRead[T, A]
 
@@ -141,8 +146,7 @@ trait BackendModule {
 
       _ <- logPhase[M](PhaseResult.tree("QScript (ShiftRead)", shifted))
 
-      optimized =
-        shifted.transHylo(optimize[T], Unicoalesce.Capture[T, QS[T]].run)
+      optimized = shifted.transHylo(optimize[T], Unicoalesce.Capture[T, QS[T]].run)
 
       _ <- logPhase[M](PhaseResult.tree("QScript (Optimized)", optimized))
     } yield optimized
@@ -174,14 +178,17 @@ trait BackendModule {
   type M[A]
 
   def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    : Delay[RenderTree, QSM[T, ?]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
   def MonadM: Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    : Unicoalesce.Capture[T, QS[T]]
 
-  def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]: QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]]
+  def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
+    : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]]
   type Config
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config]
 

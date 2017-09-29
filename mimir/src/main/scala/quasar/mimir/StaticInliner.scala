@@ -68,20 +68,20 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
           }
 
           case graph @ Cond(pred, left, leftJoin, right, rightJoin) => {
-            val pred2  = recurse(pred)
-            val left2  = recurse(left)
+            val pred2 = recurse(pred)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             pred2 match {
-              case Const(CBoolean(true))  => left2
+              case Const(CBoolean(true)) => left2
               case Const(CBoolean(false)) => right2
-              case Const(_)               => Undefined(graph.loc)
-              case _                      => Cond(pred2, left2, leftJoin, right2, rightJoin)(graph.loc)
+              case Const(_) => Undefined(graph.loc)
+              case _ => Cond(pred2, left2, leftJoin, right2, rightJoin)(graph.loc)
             }
           }
 
           case graph @ IUI(union, left, right) => {
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             if (left2 == right2)
@@ -92,7 +92,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
 
           // Array operations
           case graph @ Join(JoinArray, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
@@ -103,7 +103,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             }
 
           case graph @ Join(DerefArray, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
@@ -114,14 +114,14 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             }
 
           case graph @ Join(ArraySwap, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
               case (Const(RArray(l)), Const(CNum(r))) if r >= 0 && r < l.length =>
                 val (beforeIndex, afterIndex) = l.splitAt(r.intValue)
-                val (a, d)                    = afterIndex.splitAt(1)
-                val (c, b)                    = beforeIndex.splitAt(1)
+                val (a, d) = afterIndex.splitAt(1)
+                val (c, b) = beforeIndex.splitAt(1)
 
                 Const(RArray(a ++ b ++ c ++ d))(graph.loc)
               case _ =>
@@ -130,7 +130,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
 
           // Object operations
           case graph @ Join(WrapObject, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
@@ -141,7 +141,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             }
 
           case graph @ Join(DerefObject, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
@@ -152,7 +152,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             }
 
           case graph @ Join(JoinObject, sort @ Cross(_), left, right) =>
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             (left2, right2) match {
@@ -163,61 +163,61 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
             }
 
           case graph @ Join(op, sort @ Cross(_), left, right) => {
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             val graphM = for {
               op2 <- op2ForBinOp(op)
               op2F2 <- op2.fold(op2 = const(None), op2F2 = { Some(_) })
               result <- (left2, right2) match {
-                         case (left2 @ Const(CUndefined), _) =>
-                           Some(Const(CUndefined)(left2.loc))
+                case (left2 @ Const(CUndefined), _) =>
+                  Some(Const(CUndefined)(left2.loc))
 
-                         case (_, right2 @ Const(CUndefined)) =>
-                           Some(Const(CUndefined)(right2.loc))
+                case (_, right2 @ Const(CUndefined)) =>
+                  Some(Const(CUndefined)(right2.loc))
 
-                         case (left2 @ Const(leftValue), right2 @ Const(rightValue)) => {
-                           val result = for {
-                             // No Op1F1 that can be applied to a complex RValues
-                             leftCValue <- RValue.toCValue(leftValue)
-                             rightCValue <- RValue.toCValue(rightValue)
-                             col <- op2F2.f2.partialLeft(leftCValue).apply(rightCValue)
-                             if col isDefinedAt 0
-                           } yield col cValue 0
+                case (left2 @ Const(leftValue), right2 @ Const(rightValue)) => {
+                  val result = for {
+                    // No Op1F1 that can be applied to a complex RValues
+                    leftCValue <- RValue.toCValue(leftValue)
+                    rightCValue <- RValue.toCValue(rightValue)
+                    col <- op2F2.f2.partialLeft(leftCValue).apply(rightCValue)
+                    if col isDefinedAt 0
+                  } yield col cValue 0
 
-                           Some(Const(result getOrElse CUndefined)(graph.loc))
-                         }
+                  Some(Const(result getOrElse CUndefined)(graph.loc))
+                }
 
-                         case _ => None
-                       }
+                case _ => None
+              }
             } yield result
 
             graphM getOrElse Join(op, sort, left2, right2)(graph.loc)
           }
 
           case Filter(sort @ (IdentitySort | ValueSort(_)), left, right) => {
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             val back = (left2, right2) match {
               case (_, Const(CUndefined)) => Some(Const(CUndefined)(graph.loc))
               case (Const(CUndefined), _) => Some(Const(CUndefined)(graph.loc))
-              case _                      => None
+              case _ => None
             }
 
             back getOrElse Filter(sort, left2, right2)(graph.loc)
           }
 
           case graph @ Filter(sort @ Cross(_), left, right) => {
-            val left2  = recurse(left)
+            val left2 = recurse(left)
             val right2 = recurse(right)
 
             val back = (left2, right2) match {
-              case (_, Const(CUndefined))     => Some(Const(CUndefined)(graph.loc))
-              case (Const(CUndefined), _)     => Some(Const(CUndefined)(graph.loc))
+              case (_, Const(CUndefined)) => Some(Const(CUndefined)(graph.loc))
+              case (Const(CUndefined), _) => Some(Const(CUndefined)(graph.loc))
               case (_, right2 @ Const(CTrue)) => Some(left2)
-              case (_, right2 @ Const(_))     => Some(Const(CUndefined)(graph.loc))
-              case _                          => None
+              case (_, right2 @ Const(_)) => Some(Const(CUndefined)(graph.loc))
+              case _ => None
             }
 
             back getOrElse Filter(sort, left2, right2)(graph.loc)

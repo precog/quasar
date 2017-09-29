@@ -36,10 +36,17 @@ abstract class XQuerySpec extends quasar.Qspec {
   /** Convenience function for expecting no results. */
   def resultInNothing = equal(noResults.left[Data])
 
-  def xquerySpec(desc: BackendName => String)(tests: (M[XQuery] => ErrorMessages \/ Data) => Fragment): Unit =
-    TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-      contentSourceConnection[Task](uri).map(cs => desc(backend.name) >> tests(evaluateXQuery(cs, _))).void
-    }).unsafePerformSync
+  def xquerySpec(desc: BackendName => String)(
+      tests: (M[XQuery] => ErrorMessages \/ Data) => Fragment): Unit =
+    TestConfig
+      .fileSystemConfigs(FsType)
+      .flatMap(_ traverse_ {
+        case (backend, uri, _) =>
+          contentSourceConnection[Task](uri)
+            .map(cs => desc(backend.name) >> tests(evaluateXQuery(cs, _)))
+            .void
+      })
+      .unsafePerformSync
 
   ////
 
@@ -47,10 +54,11 @@ abstract class XQuerySpec extends quasar.Qspec {
 
   private def evaluateXQuery(cs: ContentSource, xqy: M[XQuery]): ErrorMessages \/ Data = {
     val (prologs, body) = xqy.run.run
-    val mainModule      = body map (MainModule(Version.`1.0-ml`, prologs, _))
+    val mainModule = body map (MainModule(Version.`1.0-ml`, prologs, _))
 
     mainModule >>= (mm =>
-      testing.moduleResults[ReaderT[Task, ContentSource, ?]](mm)
+      testing
+        .moduleResults[ReaderT[Task, ContentSource, ?]](mm)
         .run(cs)
         .map(_ >>= (_ \/> noResults))
         .unsafePerformSync)

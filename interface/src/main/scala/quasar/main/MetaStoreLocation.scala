@@ -32,9 +32,10 @@ object MetaStoreLocation {
   final case object Get extends MetaStoreLocation[DbConnectionConfig]
 
   final case class Set(conn: DbConnectionConfig, initialize: Boolean)
-    extends MetaStoreLocation[String \/ Unit]
+      extends MetaStoreLocation[String \/ Unit]
 
-  final class Ops[S[_]](implicit val ev: MetaStoreLocation :<: S) extends LiftedOps[MetaStoreLocation, S] {
+  final class Ops[S[_]](implicit val ev: MetaStoreLocation :<: S)
+      extends LiftedOps[MetaStoreLocation, S] {
 
     def get: Free[S, DbConnectionConfig] =
       lift(Get)
@@ -50,16 +51,23 @@ object MetaStoreLocation {
 
   object impl {
 
-    def default(ref: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MetaStoreLocation ~> Task =
+    def default(
+        ref: TaskRef[MetaStore],
+        persist: DbConnectionConfig => MainTask[Unit]): MetaStoreLocation ~> Task =
       λ[MetaStoreLocation ~> Task] {
         case Get => ref.read.map(_.connectionInfo)
         case Set(conn, initialize) =>
           (for {
             currentSchemas <- ref.read.map(_.schemas).liftM[MainErrT]
             // Try connecting to the new metastore location
-            m <- MetaStore.connect(conn, initialize || conn.isInMemory, currentSchemas).leftMap(_.message)
+            m <- MetaStore
+              .connect(conn, initialize || conn.isInMemory, currentSchemas)
+              .leftMap(_.message)
             // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
-            _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
+            _ <- EitherT(
+              persist(m.connectionInfo).foldM(
+                persistFailure => m.shutdown.as(persistFailure.left),
+                _ => ().right.point[Task]))
             // We successfully connected to the new metastore and persisted the change to the config file
             // so we shutdown the old one and
             _ <- ref.read.flatMap(_.shutdown.attempt).liftM[MainErrT]
@@ -71,7 +79,8 @@ object MetaStoreLocation {
     def constant(config: DbConnectionConfig): MetaStoreLocation ~> Task =
       λ[MetaStoreLocation ~> Task] {
         case Get => config.point[Task]
-        case Set(conn, initialize) => Task.fail(new Exception("This implementation does not allow changing MetaStore"))
+        case Set(conn, initialize) =>
+          Task.fail(new Exception("This implementation does not allow changing MetaStore"))
       }
   }
 }

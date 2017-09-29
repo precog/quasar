@@ -40,19 +40,19 @@ package object fs extends PhysicalErrorPrisms {
   type PhysErr[A] = Failure[PhysicalError, A]
 
   def interpretFileSystem[M[_]](
-    q: QueryFile ~> M,
-    r: ReadFile ~> M,
-    w: WriteFile ~> M,
-    m: ManageFile ~> M
+      q: QueryFile ~> M,
+      r: ReadFile ~> M,
+      w: WriteFile ~> M,
+      m: ManageFile ~> M
   ): FileSystem ~> M =
     q :+: r :+: w :+: m
 
   def interpretBackendEffect[M[_]](
-    a: Analyze ~> M,
-    q: QueryFile ~> M,
-    r: ReadFile ~> M,
-    w: WriteFile ~> M,
-    m: ManageFile ~> M
+      a: Analyze ~> M,
+      q: QueryFile ~> M,
+      r: ReadFile ~> M,
+      w: WriteFile ~> M,
+      m: ManageFile ~> M
   ): BackendEffect ~> M =
     a :+: q :+: r :+: w :+: m
 

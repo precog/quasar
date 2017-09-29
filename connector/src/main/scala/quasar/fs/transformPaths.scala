@@ -33,17 +33,17 @@ object transformPaths {
   import ReadFile.ReadHandle, WriteFile.WriteHandle
 
   /** Returns a natural transformation that transforms all paths in `ReadFile`
-    * operations using the given transformations.
-    *
-    * @param inPath transforms input paths
-    * @param outPath transforms output paths (including those in errors)
-    */
+   * operations using the given transformations.
+   *
+   * @param inPath transforms input paths
+   * @param outPath transforms output paths (including those in errors)
+   */
   def readFile[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath]
-  )(implicit
-    S: ReadFile :<: S
-  ): S ~> Free[S, ?] = {
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath]
+  )(
+      implicit
+      S: ReadFile :<: S): S ~> Free[S, ?] = {
     import ReadFile._
 
     val R = ReadFile.Unsafe[S]
@@ -55,9 +55,7 @@ object transformPaths {
           .run
 
       case Read(h) =>
-        R.read(readHFile.modify(inPath(_))(h))
-          .leftMap(transformErrorPath(outPath))
-          .run
+        R.read(readHFile.modify(inPath(_))(h)).leftMap(transformErrorPath(outPath)).run
 
       case Close(h) =>
         R.close(readHFile.modify(inPath(_))(h))
@@ -67,17 +65,17 @@ object transformPaths {
   }
 
   /** Returns a natural transformation that transforms all paths in `WriteFile`
-    * operations using the given functions.
-    *
-    * @param inPath transforms input paths
-    * @param outPath transforms output paths (including those in errors)
-    */
+   * operations using the given functions.
+   *
+   * @param inPath transforms input paths
+   * @param outPath transforms output paths (including those in errors)
+   */
   def writeFile[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath]
-  )(implicit
-    S: WriteFile :<: S
-  ): S ~> Free[S, ?] = {
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath]
+  )(
+      implicit
+      S: WriteFile :<: S): S ~> Free[S, ?] = {
     import WriteFile._
 
     val W = WriteFile.Unsafe[S]
@@ -89,8 +87,7 @@ object transformPaths {
           .run
 
       case Write(h, d) =>
-        W.write(writeHFile.modify(inPath(_))(h), d)
-          .map(_ map transformErrorPath(outPath))
+        W.write(writeHFile.modify(inPath(_))(h), d).map(_ map transformErrorPath(outPath))
 
       case Close(h) =>
         W.close(writeHFile.modify(inPath(_))(h))
@@ -99,38 +96,36 @@ object transformPaths {
   }
 
   /** Returns a natural transformation that transforms all paths in `ManageFile`
-    * operations using the given functions.
-    *
-    * @param inPath transforms input paths
-    * @param outPath transforms output paths (including those in errors)
-    */
+   * operations using the given functions.
+   *
+   * @param inPath transforms input paths
+   * @param outPath transforms output paths (including those in errors)
+   */
   def manageFile[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath]
-  )(implicit
-    S: ManageFile :<: S
-  ): S ~> Free[S, ?] = {
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath]
+  )(
+      implicit
+      S: ManageFile :<: S): S ~> Free[S, ?] = {
     import ManageFile._, MoveScenario._
 
     val M = ManageFile.Ops[S]
     val g = λ[ManageFile ~> Free[S, ?]] {
       case Move(scn, sem) =>
         M.move(
-          scn.fold(
-            (src, dst) => dirToDir(inPath(src), inPath(dst)),
-            (src, dst) => fileToFile(inPath(src), inPath(dst))),
-          sem
-        ).leftMap(transformErrorPath(outPath)).run
-
-      case Delete(p) =>
-        M.delete(inPath(p))
+            scn.fold(
+              (src, dst) => dirToDir(inPath(src), inPath(dst)),
+              (src, dst) => fileToFile(inPath(src), inPath(dst))),
+            sem
+          )
           .leftMap(transformErrorPath(outPath))
           .run
 
+      case Delete(p) =>
+        M.delete(inPath(p)).leftMap(transformErrorPath(outPath)).run
+
       case TempFile(p) =>
-        M.tempFile(inPath(p))
-          .bimap(transformErrorPath(outPath), outPath(_))
-          .run
+        M.tempFile(inPath(p)).bimap(transformErrorPath(outPath), outPath(_)).run
     }
 
     transformIn(g, liftFT[S])
@@ -140,19 +135,19 @@ object transformPaths {
     lp.transAna[Fix[LP]](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
 
   /** Returns a natural transformation that transforms all paths in `QueryFile`
-    * operations using the given functions.
-    *
-    * @param inPath transforms input paths
-    * @param outPath transforms output paths (including those in errors)
-    * @param outPathR transforms relative output paths
-    */
+   * operations using the given functions.
+   *
+   * @param inPath transforms input paths
+   * @param outPath transforms output paths (including those in errors)
+   * @param outPathR transforms relative output paths
+   */
   def queryFile[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath],
-    outPathR: EndoK[RelPath]
-  )(implicit
-    S: QueryFile :<: S
-  ): S ~> Free[S, ?] = {
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath],
+      outPathR: EndoK[RelPath]
+  )(
+      implicit
+      S: QueryFile :<: S): S ~> Free[S, ?] = {
     import QueryFile._
 
     val Q = QueryFile.Ops[S]
@@ -162,17 +157,14 @@ object transformPaths {
       case ExecutePlan(lp, out) =>
         Q.execute(transformFile(inPath)(lp), inPath(out))
           .leftMap(transformErrorPath(outPath))
-          .run.run
+          .run
+          .run
 
       case EvaluatePlan(lp) =>
-        U.eval(transformFile(inPath)(lp))
-          .leftMap(transformErrorPath(outPath))
-          .run.run
+        U.eval(transformFile(inPath)(lp)).leftMap(transformErrorPath(outPath)).run.run
 
       case More(h) =>
-        U.more(h)
-          .leftMap(transformErrorPath(outPath))
-          .run
+        U.more(h).leftMap(transformErrorPath(outPath)).run
 
       case Close(h) =>
         U.close(h)
@@ -180,12 +172,11 @@ object transformPaths {
       case Explain(lp) =>
         Q.explain(transformFile(inPath)(lp))
           .bimap(transformErrorPath(outPath), ExecutionPlan.inputs.modify(_ map outPath))
-          .run.run
+          .run
+          .run
 
       case ListContents(d) =>
-        Q.ls(inPath(d))
-          .leftMap(transformErrorPath(outPath))
-          .run
+        Q.ls(inPath(d)).leftMap(transformErrorPath(outPath)).run
 
       case FileExists(f) =>
         Q.fileExists(inPath(f))
@@ -194,12 +185,12 @@ object transformPaths {
   }
 
   def analyze[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath],
-    outPathR: EndoK[RelPath]
-  )(implicit
-    S: Analyze :<: S
-  ): S ~> Free[S, ?] = {
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath],
+      outPathR: EndoK[RelPath]
+  )(
+      implicit
+      S: Analyze :<: S): S ~> Free[S, ?] = {
     import Analyze._
 
     val O = Analyze.Ops[S]
@@ -212,26 +203,26 @@ object transformPaths {
   }
 
   /** Returns a natural transformation that transforms all paths in `FileSystem`
-    * operations using the given functions.
-    *
-    * @param inPath transforms input paths
-    * @param outPath transforms output paths (including those in errors)
-    * @param outPathR transforms relative output paths
-    */
+   * operations using the given functions.
+   *
+   * @param inPath transforms input paths
+   * @param outPath transforms output paths (including those in errors)
+   * @param outPathR transforms relative output paths
+   */
   def fileSystem[S[_]](
-    inPath: EndoK[AbsPath],
-    outPath: EndoK[AbsPath],
-    outPathR: RelPath ~> RelPath
-  )(implicit
-    S0: ReadFile :<: S,
-    S1: WriteFile :<: S,
-    S2: ManageFile :<: S,
-    S3: QueryFile :<: S
-  ): S ~> Free[S, ?] = {
-    flatMapSNT(readFile[S](inPath, outPath))   compose
-    flatMapSNT(writeFile[S](inPath, outPath))  compose
-    flatMapSNT(manageFile[S](inPath, outPath)) compose
-    queryFile[S](inPath, outPath, outPathR)
+      inPath: EndoK[AbsPath],
+      outPath: EndoK[AbsPath],
+      outPathR: RelPath ~> RelPath
+  )(
+      implicit
+      S0: ReadFile :<: S,
+      S1: WriteFile :<: S,
+      S2: ManageFile :<: S,
+      S3: QueryFile :<: S): S ~> Free[S, ?] = {
+    flatMapSNT(readFile[S](inPath, outPath)) compose
+      flatMapSNT(writeFile[S](inPath, outPath)) compose
+      flatMapSNT(manageFile[S](inPath, outPath)) compose
+      queryFile[S](inPath, outPath, outPathR)
   }
 
   ////
@@ -255,16 +246,16 @@ object transformPaths {
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
-    f: EndoK[AbsPath]
+      f: EndoK[AbsPath]
   ): FileSystemError => FileSystemError =
     fsPathError.modify(f(_)) compose
-    fsUnkRdError.modify(f(_)) compose
-    fsUnkWrError.modify(f(_)) compose
-    fsPlannerError.modify(transformFile(f))
+      fsUnkRdError.modify(f(_)) compose
+      fsUnkWrError.modify(f(_)) compose
+      fsPlannerError.modify(transformFile(f))
 
   private def transformLPPaths(f: AFile => AFile) = λ[LP ~> LP] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
     case lp.Read(p) => lp.read(f(mkAbsolute(rootDir, p)))
-    case lp         => lp
+    case lp => lp
   }
 }

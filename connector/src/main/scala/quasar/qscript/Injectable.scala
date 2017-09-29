@@ -20,12 +20,12 @@ import slamdata.Predef._
 import scalaz._, Scalaz._
 
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
-  * where all of the components are in the `OUT` coproduct in any order.
-  *
-  * It _may_ be unprincipled (otherwise, why not allow [[scalaz.Inject]] to work
-  * this way directly?) But it is temporarily necessary in order to “inject” our
-  * more constrained versions of QScript into [[QScriptTotal]].
-  */
+ * where all of the components are in the `OUT` coproduct in any order.
+ *
+ * It _may_ be unprincipled (otherwise, why not allow [[scalaz.Inject]] to work
+ * this way directly?) But it is temporarily necessary in order to “inject” our
+ * more constrained versions of QScript into [[QScriptTotal]].
+ */
 trait Injectable[IN[_]] {
   type OUT[A]
   def inject: IN ~> OUT
@@ -35,23 +35,27 @@ trait Injectable[IN[_]] {
 object Injectable {
   type Aux[IN[_], F[_]] = Injectable[IN] { type OUT[A] = F[A] }
 
-  def make[F[_], G[_]](inj: F ~> G, prj: G ~> λ[A => Option[F[A]]]): Aux[F, G] = new Injectable[F] {
-    type OUT[A] = G[A]
-    val inject  = inj
-    val project = prj
-  }
+  def make[F[_], G[_]](inj: F ~> G, prj: G ~> λ[A => Option[F[A]]]): Aux[F, G] =
+    new Injectable[F] {
+      type OUT[A] = G[A]
+      val inject = inj
+      val project = prj
+    }
 
   /** Note: you'd like this to be implicit, but that makes implicit search
-    * quadratic, so instead this is provided so that you can manually construct
-    * instances where they're needed. */
-  def coproduct[F[_], G[_], H[_]](implicit F: Aux[F, H], G: Aux[G, H]): Aux[Coproduct[F, G, ?], H] = make(
+   * quadratic, so instead this is provided so that you can manually construct
+   * instances where they're needed. */
+  def coproduct[F[_], G[_], H[_]](
+      implicit F: Aux[F, H],
+      G: Aux[G, H]): Aux[Coproduct[F, G, ?], H] = make(
     λ[Coproduct[F, G, ?] ~> H](_.run.fold(F.inject, G.inject)),
-    λ[H ~> λ[A => Option[Coproduct[F, G, A]]]](out =>
-      F.project(out).cata(
-        f => Coproduct(f.left).some,
-        G.project(out) ∘ (g => Coproduct(g.right))
-      )
-    )
+    λ[H ~> λ[A => Option[Coproduct[F, G, A]]]](
+      out =>
+        F.project(out)
+          .cata(
+            f => Coproduct(f.left).some,
+            G.project(out) ∘ (g => Coproduct(g.right))
+        ))
   )
 
   implicit def inject[F[_], G[_]](implicit IN: F :<: G): Aux[F, G] =

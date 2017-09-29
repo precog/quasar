@@ -28,13 +28,18 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
   "concatChildren" should {
     "transform a CPathTree into a TransSpec" in {
-      val tree: CPathTree[Int] = RootNode(Seq(
-        FieldNode(CPathField("bar"),
-          Seq(
-            IndexNode(CPathIndex(0), Seq(LeafNode(4))),
-            IndexNode(CPathIndex(1), Seq(FieldNode(CPathField("baz"), Seq(LeafNode(6))))),
-            IndexNode(CPathIndex(2), Seq(LeafNode(2))))),
-        FieldNode(CPathField("foo"), Seq(LeafNode(0)))))
+      val tree: CPathTree[Int] = RootNode(
+        Seq(
+          FieldNode(
+            CPathField("bar"),
+            Seq(
+              IndexNode(CPathIndex(0), Seq(LeafNode(4))),
+              IndexNode(CPathIndex(1), Seq(FieldNode(CPathField("baz"), Seq(LeafNode(6))))),
+              IndexNode(CPathIndex(2), Seq(LeafNode(2)))
+            )
+          ),
+          FieldNode(CPathField("foo"), Seq(LeafNode(0)))
+        ))
 
       val result = TransSpec.concatChildren(tree)
 
@@ -44,11 +49,14 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
         WrapObject(
           InnerArrayConcat(
             InnerArrayConcat(
-              WrapArray(DerefArrayStatic(Leaf(Source),CPathIndex(4))),
-              WrapArray(WrapObject(DerefArrayStatic(Leaf(Source),CPathIndex(6)),"baz"))),
-            WrapArray(DerefArrayStatic(Leaf(Source),CPathIndex(2)))),"bar"),
-          WrapObject(
-            DerefArrayStatic(Leaf(Source),CPathIndex(0)),"foo"))
+              WrapArray(DerefArrayStatic(Leaf(Source), CPathIndex(4))),
+              WrapArray(WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(6)), "baz"))),
+            WrapArray(DerefArrayStatic(Leaf(Source), CPathIndex(2)))
+          ),
+          "bar"
+        ),
+        WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(0)), "foo")
+      )
 
       result mustEqual expected
     }
@@ -56,47 +64,49 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
   "rephrase" should {
     import scalaz.syntax.std.option._
-    def rephraseTest[A <: SourceType](projection: TransSpec[A], rootSource: A, root: TransSpec1, expected: Option[TransSpec1]): Result = {
+    def rephraseTest[A <: SourceType](
+        projection: TransSpec[A],
+        rootSource: A,
+        root: TransSpec1,
+        expected: Option[TransSpec1]): Result = {
       TransSpec.rephrase(projection, rootSource, root) mustEqual expected
     }
 
     "invert a single-key prefix" in rephraseTest(
       // rephrase(.a, .a.b) --> .b
-      projection = DerefObjectStatic(
-        Leaf(Source),
-        CPathField("a")),
-      root = DerefObjectStatic(DerefObjectStatic(
-        Leaf(Source),
-        CPathField("a")), CPathField("b")),
+      projection = DerefObjectStatic(Leaf(Source), CPathField("a")),
+      root =
+        DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("a")), CPathField("b")),
       rootSource = Source,
       expected = DerefObjectStatic(Leaf(Source), CPathField("b")).some
     )
 
     "invert a multiple-key prefix" in rephraseTest(
       // rephrase(.a.b, .a.b.c) --> .c
-      projection = DerefObjectStatic(DerefObjectStatic(
-        Leaf(Source), CPathField("a")), CPathField("b")),
-      root = DerefObjectStatic(DerefObjectStatic(DerefObjectStatic(
-        Leaf(Source), CPathField("a")), CPathField("b")), CPathField("c")),
+      projection =
+        DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("a")), CPathField("b")),
+      root = DerefObjectStatic(
+        DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("a")), CPathField("b")),
+        CPathField("c")),
       rootSource = Source,
       expected = DerefObjectStatic(Leaf(Source), CPathField("c")).some
     )
 
     "strip a single-index prefix" in rephraseTest(
       // rephrase(.[0], .[0].[1]) --> .[1]
-      projection = DerefArrayStatic(
-        Leaf(Source), CPathIndex(0)),
-      root = DerefArrayStatic(DerefArrayStatic(
-        Leaf(Source), CPathIndex(0)), CPathIndex(1)),
+      projection = DerefArrayStatic(Leaf(Source), CPathIndex(0)),
+      root = DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(1)),
       rootSource = Source,
       expected = DerefArrayStatic(Leaf(Source), CPathIndex(1)).some
     )
 
     "strip a multiple-index prefix" in rephraseTest(
       // rephrase(.[0].[1], .[0].[1].[2]) --> .[2]
-      projection = DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(1)),
-      root = DerefArrayStatic(DerefArrayStatic(DerefArrayStatic(
-        Leaf(Source), CPathIndex(0)), CPathIndex(1)), CPathIndex(2)),
+      projection =
+        DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(1)),
+      root = DerefArrayStatic(
+        DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(1)),
+        CPathIndex(2)),
       rootSource = Source,
       expected = DerefArrayStatic(Leaf(Source), CPathIndex(2)).some
     )
@@ -143,7 +153,9 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
     "strip OuterArrayConcat with nested InnerArrayConcat" in rephraseTest(
       // rephrase(([._1] ++ [._1]) ++ [._2], _2, .) -> .[2]
-      projection = OuterArrayConcat(InnerArrayConcat(WrapArray(Leaf(SourceLeft)), WrapArray(Leaf(SourceLeft))), WrapArray(Leaf(SourceRight))),
+      projection = OuterArrayConcat(
+        InnerArrayConcat(WrapArray(Leaf(SourceLeft)), WrapArray(Leaf(SourceLeft))),
+        WrapArray(Leaf(SourceRight))),
       root = Leaf(Source),
       rootSource = SourceRight,
       expected = DerefArrayStatic(Leaf(Source), CPathIndex(2)).some
@@ -151,7 +163,9 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
     "strip OuterObjectConcat with two args with the same key, with the second returning none" in rephraseTest(
       // rephrase({k: ._1} ++ {k: ._2}, _1, .) -> none
-      projection = OuterObjectConcat(WrapObject(Leaf(SourceLeft), "k"), WrapObject(Leaf(SourceRight), "k")),
+      projection = OuterObjectConcat(
+        WrapObject(Leaf(SourceLeft), "k"),
+        WrapObject(Leaf(SourceRight), "k")),
       root = Leaf(Source),
       rootSource = SourceLeft,
       expected = None
@@ -159,7 +173,9 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
     "strip OuterObjectConcat with two args with the same key, with the first returning none" in rephraseTest(
       // rephrase({k: ._1} ++ {k: ._2}, _2, .) -> .k
-      projection = OuterObjectConcat(WrapObject(Leaf(SourceLeft), "k"), WrapObject(Leaf(SourceRight), "k")),
+      projection = OuterObjectConcat(
+        WrapObject(Leaf(SourceLeft), "k"),
+        WrapObject(Leaf(SourceRight), "k")),
       root = Leaf(Source),
       rootSource = SourceRight,
       expected = DerefObjectStatic(Leaf(Source), CPathField("k")).some
@@ -167,7 +183,8 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
     "strip OuterObjectConcat with two args with different keys chooses the last" in rephraseTest(
       // rephrase({k1: .} ++ {k2: .}, .) -> .k2
-      projection = OuterObjectConcat(WrapObject(Leaf(Source), "k1"), WrapObject(Leaf(Source), "k2")),
+      projection =
+        OuterObjectConcat(WrapObject(Leaf(Source), "k1"), WrapObject(Leaf(Source), "k2")),
       root = Leaf(Source),
       rootSource = Source,
       expected = DerefObjectStatic(Leaf(Source), CPathField("k2")).some
@@ -175,7 +192,9 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
 
     "strip OuterObjectConcat nested with InnerObjectConcat with two args with different keys chooses the last" in rephraseTest(
       // rephrase({k1: .} ++ {k2: .}, .) --> .k2
-      projection = OuterObjectConcat(WrapObject(Leaf(Source), "k1"), InnerObjectConcat(WrapObject(Leaf(Source), "k2"))),
+      projection = OuterObjectConcat(
+        WrapObject(Leaf(Source), "k1"),
+        InnerObjectConcat(WrapObject(Leaf(Source), "k2"))),
       root = Leaf(Source),
       rootSource = Source,
       expected = DerefObjectStatic(Leaf(Source), CPathField("k2")).some
@@ -192,8 +211,8 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
     "strip prefixes with the same target as root" in rephraseTest(
       // rephrase(._1.a, .a.b) --> .b
       projection = DerefObjectStatic(Leaf(SourceLeft), CPathField("a")),
-      root = DerefObjectStatic(DerefObjectStatic(
-        Leaf(Source), CPathField("a")), CPathField("b")),
+      root =
+        DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("a")), CPathField("b")),
       rootSource = SourceLeft,
       expected = DerefObjectStatic(Leaf(Source), CPathField("b")).some
     )
@@ -255,10 +274,12 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
     )
 
     "remove deleted keys" in rephraseTest(
-    // rephrase({key: .[0]} ++ delete({key: .[1]}, key), .[0]) --> .key
+      // rephrase({key: .[0]} ++ delete({key: .[1]}, key), .[0]) --> .key
       projection = OuterObjectConcat(
         WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(0)), "key"),
-        ObjectDelete(WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(1)), "key"), Set(CPathField("key")))
+        ObjectDelete(
+          WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(1)), "key"),
+          Set(CPathField("key")))
       ),
       root = DerefArrayStatic(Leaf(Source), CPathIndex(0)),
       rootSource = Source,
@@ -269,7 +290,8 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
       // rephrase(.x, [.x.y] ++ [.x]) --> [.y] ++ [.]
       projection = DerefObjectStatic(Leaf(Source), CPathField("x")),
       root = OuterArrayConcat(
-        WrapArray(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("x")), CPathField("y"))),
+        WrapArray(
+          DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("x")), CPathField("y"))),
         WrapArray(DerefObjectStatic(Leaf(Source), CPathField("x")))
       ),
       rootSource = Source,
@@ -290,10 +312,16 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
         WrapArray(OuterArrayConcat(WrapArray(Leaf(SourceRight)), WrapArray(Leaf(SourceRight))))
       )
       val expectedLeft = Some(
-        WrapArray(DerefObjectStatic(DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(0)), CPathField("name")))
+        WrapArray(
+          DerefObjectStatic(
+            DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(0)), CPathIndex(0)),
+            CPathField("name")))
       )
       val expectedRight = Some(
-        WrapArray(DerefObjectStatic(DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathIndex(0)), CPathField("name")))
+        WrapArray(
+          DerefObjectStatic(
+            DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathIndex(0)),
+            CPathField("name")))
       )
       val resultLeft = TransSpec.rephrase(repair, SourceLeft, leftKey)
       val resultRight = TransSpec.rephrase(repair, SourceRight, rightKey)
@@ -319,32 +347,45 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
     )
 
     "reduce (. ++ {k: .}).k to ." in testNormalize1(
-      in = DerefObjectStatic(OuterObjectConcat(Leaf(Source), WrapObject(Leaf(Source), "k")), CPathField("k")),
+      in = DerefObjectStatic(
+        OuterObjectConcat(Leaf(Source), WrapObject(Leaf(Source), "k")),
+        CPathField("k")),
       expected = Leaf(Source)
     )
 
     "do not reduce (. ++ {k: .}).k" in {
-      val in = DerefObjectStatic(OuterObjectConcat(WrapObject(Leaf(Source), "k"), Leaf(Source)), CPathField("k"))
+      val in = DerefObjectStatic(
+        OuterObjectConcat(WrapObject(Leaf(Source), "k"), Leaf(Source)),
+        CPathField("k"))
       testNormalize1(in = in, expected = in)
     }
 
     "reduce ([.] ++ .).[0] to ." in testNormalize1(
-      in = DerefArrayStatic(OuterArrayConcat(WrapArray(Leaf(Source)), Leaf(Source)), CPathIndex(0)),
+      in = DerefArrayStatic(
+        OuterArrayConcat(WrapArray(Leaf(Source)), Leaf(Source)),
+        CPathIndex(0)),
       expected = Leaf(Source)
     )
 
     "reduce ([._1] ++ [._2]).[1] to ._2" in testNormalize2(
-      in = DerefArrayStatic(OuterArrayConcat(WrapArray(Leaf(SourceLeft)), WrapArray(Leaf(SourceRight))), CPathIndex(1)),
+      in = DerefArrayStatic(
+        OuterArrayConcat(WrapArray(Leaf(SourceLeft)), WrapArray(Leaf(SourceRight))),
+        CPathIndex(1)),
       expected = Leaf(SourceRight)
     )
 
     "do not reduce (. ++ [.]).[0] to ." in testNormalize1(
-      in = DerefArrayStatic(OuterArrayConcat(Leaf(Source), WrapArray(Leaf(Source))), CPathIndex(0)),
-      expected = DerefArrayStatic(OuterArrayConcat(Leaf(Source), WrapArray(Leaf(Source))), CPathIndex(0))
+      in = DerefArrayStatic(
+        OuterArrayConcat(Leaf(Source), WrapArray(Leaf(Source))),
+        CPathIndex(0)),
+      expected =
+        DerefArrayStatic(OuterArrayConcat(Leaf(Source), WrapArray(Leaf(Source))), CPathIndex(0))
     )
 
     "flatten nested OuterArrayConcat" in testNormalize1(
-      in = OuterArrayConcat(Leaf(Source), OuterArrayConcat(Leaf(Source), OuterArrayConcat(Leaf(Source)))),
+      in = OuterArrayConcat(
+        Leaf(Source),
+        OuterArrayConcat(Leaf(Source), OuterArrayConcat(Leaf(Source)))),
       expected = OuterArrayConcat(Leaf(Source), Leaf(Source), Leaf(Source))
     )
 
@@ -354,63 +395,77 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
     )
 
     "recursively reduce {k1: {k2: {k3: .}}}.k1.k2.k3 to ." in testNormalize1(
-      in =
+      in = DerefObjectStatic(
         DerefObjectStatic(
           DerefObjectStatic(
-            DerefObjectStatic(
-              WrapObject(WrapObject(WrapObject(Leaf(Source), "k3"), "k2"), "k1"),
-              CPathField("k1")),
-            CPathField("k2")),
-          CPathField("k3")
-        ),
+            WrapObject(WrapObject(WrapObject(Leaf(Source), "k3"), "k2"), "k1"),
+            CPathField("k1")),
+          CPathField("k2")),
+        CPathField("k3")
+      ),
       expected = Leaf(Source)
     )
 
     "recursively reduce {k1: {k2: {k3: .}.k3}.k2}.k1 to ." in testNormalize1(
-      in = DerefObjectStatic(WrapObject(
-        DerefObjectStatic(WrapObject(
-          DerefObjectStatic(WrapObject(
-            Leaf(Source), "k3"), CPathField("k3")),
-          "k2"), CPathField("k2")),
-        "k1"), CPathField("k1")
+      in = DerefObjectStatic(
+        WrapObject(
+          DerefObjectStatic(
+            WrapObject(
+              DerefObjectStatic(WrapObject(Leaf(Source), "k3"), CPathField("k3")),
+              "k2"),
+            CPathField("k2")),
+          "k1"),
+        CPathField("k1")
       ),
       expected = Leaf(Source)
     )
 
     "reduce undef.[i], undef.k to undef" in testNormalize1PE(
       ins = DerefArrayStatic(
-        TransSpec1.Undef, CPathIndex(0)
+        TransSpec1.Undef,
+        CPathIndex(0)
       ) :: DerefObjectStatic(
-        TransSpec1.Undef, CPathField("k")
+        TransSpec1.Undef,
+        CPathField("k")
       ) :: DerefArrayDynamic(
-        TransSpec1.Undef, Leaf(Source)
+        TransSpec1.Undef,
+        Leaf(Source)
       ) :: DerefObjectDynamic(
-        TransSpec1.Undef, Leaf(Source)
+        TransSpec1.Undef,
+        Leaf(Source)
       ) :: Nil,
       expected = TransSpec1.Undef
     )
 
     "reduce .(undef) and .[(undef)] to undef" in testNormalize1PE(
       ins = DerefArrayDynamic(
-        Leaf(Source), TransSpec1.Undef
+        Leaf(Source),
+        TransSpec1.Undef
       ) :: DerefObjectDynamic(
-        Leaf(Source), TransSpec1.Undef
+        Leaf(Source),
+        TransSpec1.Undef
       ) :: Nil,
       expected = TransSpec1.Undef
     )
 
     "normalizations must pass through all branches which are preserved" in {
       val transformers = List[TransSpec1 => TransSpec1](
-        DerefArrayStatic(_, CPathIndex(1)), DerefObjectStatic(_, CPathField("k")),
+        DerefArrayStatic(_, CPathIndex(1)),
+        DerefObjectStatic(_, CPathField("k")),
         DerefMetadataStatic(_, CPathMeta("m")),
-        t => DerefArrayDynamic(t, t), t => DerefObjectDynamic(t, t),
-        WrapArray(_), WrapObject(_, "k"),
+        t => DerefArrayDynamic(t, t),
+        t => DerefObjectDynamic(t, t),
+        WrapArray(_),
+        WrapObject(_, "k"),
         t => WrapObjectDynamic(t, t),
-        t => OuterObjectConcat(t, t), t => InnerObjectConcat(t, t),
-        t => OuterArrayConcat(t, t), t => InnerArrayConcat(t, t),
+        t => OuterObjectConcat(t, t),
+        t => InnerObjectConcat(t, t),
+        t => OuterArrayConcat(t, t),
+        t => InnerArrayConcat(t, t),
         IsType(_, JNumberT),
         ConstLiteral(CLong(1L), _),
-        t => Equal(t, t), EqualLiteral(_, CLong(1L), invert = false),
+        t => Equal(t, t),
+        EqualLiteral(_, CLong(1L), invert = false),
         t => Filter(t, t),
         t => Cond(t, t, t),
         t => FilterDefined(t, t, TransSpecModule.AllDefined),
@@ -423,8 +478,7 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
         MapN(_, CFN("id")(_.headOption))
       )
       testNormalize1P(transformers.map(f =>
-        f(DerefArrayStatic(WrapArray(Leaf(Source)), CPathIndex(0))) -> f(Leaf(Source))
-      ))
+        f(DerefArrayStatic(WrapArray(Leaf(Source)), CPathIndex(0))) -> f(Leaf(Source))))
     }
 
   }

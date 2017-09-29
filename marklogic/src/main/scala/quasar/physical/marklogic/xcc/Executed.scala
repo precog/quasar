@@ -20,12 +20,12 @@ import slamdata.Predef.Unit
 import quasar.fp.ski.κ
 
 import monocle.Iso
-import scalaz.{Show, Order}
+import scalaz.{Order, Show}
 import scalaz.std.anyVal._
 
 /** A content-free value indicating an operation was executed but does not produce
-  * any results.
-  */
+ * any results.
+ */
 sealed abstract class Executed
 
 object Executed {

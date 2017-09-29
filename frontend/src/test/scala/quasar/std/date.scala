@@ -29,7 +29,7 @@ class DateSpecs extends quasar.Qspec {
     def fromMillis(millis: Long) = \/-(Data.Interval(Duration.ofMillis(millis)))
 
     def hms(hours: Int, minutes: Int, seconds: Int, millis: Int) =
-      fromMillis((((hours.toLong*60) + minutes)*60 + seconds)*1000 + millis)
+      fromMillis((((hours.toLong * 60) + minutes) * 60 + seconds) * 1000 + millis)
 
     "parse millis" in {
       parseInterval("PT0.001S") must_=== fromMillis(1)

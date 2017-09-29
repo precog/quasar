@@ -20,8 +20,9 @@ import matryoshka.data.Fix
 import simulacrum.typeclass
 
 @typeclass trait Crystallize[F[_]] {
+
   /** Performs some irreversible conversions, meant to be used once, after the
-    * entire workflow has been generated.
-    */
+   * entire workflow has been generated.
+   */
   def crystallize(op: Fix[F]): Crystallized[F]
 }

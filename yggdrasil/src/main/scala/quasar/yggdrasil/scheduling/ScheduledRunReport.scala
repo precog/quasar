@@ -31,7 +31,12 @@ object ScheduledRunReport {
   val schemaV1 = "id" :: "startedAt" :: "endedAt" :: "records" :: "messages" :: HNil
 
   implicit val decomposer = decomposerV[ScheduledRunReport](schemaV1, Some("1.0".v))
-  implicit val extractor  = extractorV[ScheduledRunReport](schemaV1, Some("1.0".v))
+  implicit val extractor = extractorV[ScheduledRunReport](schemaV1, Some("1.0".v))
 }
 
-case class ScheduledRunReport(id: UUID, startedAt: LocalDateTime, endedAt: LocalDateTime, records: Long, messages: List[String] = Nil)
+case class ScheduledRunReport(
+    id: UUID,
+    startedAt: LocalDateTime,
+    endedAt: LocalDateTime,
+    records: Long,
+    messages: List[String] = Nil)

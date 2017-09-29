@@ -19,7 +19,7 @@ package quasar.blueeyes
 import org.specs2.mutable.Specification
 import Encodings._
 
-class EncodingSpec extends Specification{
+class EncodingSpec extends Specification {
 
   "Encodings:  Should produce a encoding" in {
     Encodings.parseEncodings("compress") mustEqual List(compress)
@@ -30,6 +30,8 @@ class EncodingSpec extends Specification{
   }
 
   "Encodings:  Should produce custom encodings" in {
-    Encodings.parseEncodings("customa, customb") mustEqual List(CustomEncoding("customa"), CustomEncoding("customb"))
+    Encodings.parseEncodings("customa, customb") mustEqual List(
+      CustomEncoding("customa"),
+      CustomEncoding("customb"))
   }
 }

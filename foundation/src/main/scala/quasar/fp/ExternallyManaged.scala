@@ -24,10 +24,10 @@ import monocle.Iso
 import scalaz._
 
 /** Used for a normally-recursive parameter that has been “externalized”. E.g.,
-  * `Tree[LogicalPlan[ExternallyManaged]]` vs `Fix[LogicalPlan]`. This indicates
-  * that the recursive structure is intact, but is handled by some containing
-  * structure (`Tree`, in that example).
-  */
+ * `Tree[LogicalPlan[ExternallyManaged]]` vs `Fix[LogicalPlan]`. This indicates
+ * that the recursive structure is intact, but is handled by some containing
+ * structure (`Tree`, in that example).
+ */
 sealed abstract class ExternallyManaged
 
 final case object Extern extends ExternallyManaged

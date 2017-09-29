@@ -31,20 +31,22 @@ import java.util.UUID
 package object blueeyes extends precog.PackageTime {
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
-  def Utf8Charset: Charset                                               = Charset forName "UTF-8"
-  def uuid(s: String): UUID                                              = UUID fromString s
-  def randomUuid(): UUID                                                 = UUID.randomUUID
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
-  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
-  def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
-  def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
+  def Utf8Charset: Charset = Charset forName "UTF-8"
+  def uuid(s: String): UUID = UUID fromString s
+  def randomUuid(): UUID = UUID.randomUUID
+  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer = ByteBuffer.wrap(xs)
+  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer =
+    ByteBuffer.wrap(xs, offset, len)
+  def abort(msg: String): Nothing = throw new RuntimeException(msg)
+  def decimal(d: String): BigDecimal = BigDecimal(d, java.math.MathContext.UNLIMITED)
 
   implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
+  implicit def comparableOrder[A <: Comparable[A]]: scalaz.Order[A] =
     scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
 
-  @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
+  @inline implicit def ValidationFlatMapRequested[E, A](
+      d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
   implicit def bigDecimalOrder: scalaz.Order[BigDecimal] =
@@ -74,5 +76,6 @@ package object blueeyes extends precog.PackageTime {
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
 
-  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
+  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations =
+    new BitSetUtil.BitSetOperations(bs)
 }

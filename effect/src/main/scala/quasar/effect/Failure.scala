@@ -25,16 +25,16 @@ import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 /** Provides the ability to indicate a computation has failed.
-  *
-  * @tparam E the reason/error describing why the computation failed
-  */
+ *
+ * @tparam E the reason/error describing why the computation failed
+ */
 sealed abstract class Failure[E, A]
 
 object Failure {
   final case class Fail[E, A](e: E) extends Failure[E, A]
 
   final class Ops[E, S[_]](implicit S: Failure[E, ?] :<: S)
-    extends LiftedOps[Failure[E, ?], S] {
+      extends LiftedOps[Failure[E, ?], S] {
 
     def attempt[A](fa: FreeS[A]): FreeS[E \/ A] =
       fa.foldMap(attempt0).run
@@ -43,12 +43,10 @@ object Failure {
       lift(Fail(e))
 
     def onFinish[A](fa: FreeS[A], f: Option[E] => FreeS[Unit]): FreeS[A] =
-      attempt(fa).flatMap(_.fold(
-        e => f(Some(e)) *> fail(e),
-        a => f(None)    as a))
+      attempt(fa).flatMap(_.fold(e => f(Some(e)) *> fail(e), a => f(None) as a))
 
     def onFail[A](fa: FreeS[A], f: E => FreeS[Unit]): FreeS[A] =
-      onFinish(fa, _.cata(f,().pure[FreeS]))
+      onFinish(fa, _.cata(f, ().pure[FreeS]))
 
     def recover[A](fa: FreeS[A], f: E => FreeS[A]): FreeS[A] =
       attempt(fa).flatMap(_.fold(f, _.point[FreeS]))
@@ -73,8 +71,8 @@ object Failure {
 
     ////
 
-    private type Err[A]      = Failure[E, A]
-    private type G[A]        = EitherT[FreeS, E, A]
+    private type Err[A] = Failure[E, A]
+    private type G[A] = EitherT[FreeS, E, A]
     private type GT[X[_], A] = EitherT[X, E, A]
 
     private val attemptE: Err ~> G = new (Err ~> G) {
@@ -88,7 +86,7 @@ object Failure {
       def apply[A](sa: S[A]) =
         S.prj(sa) match {
           case Some(err) => attemptE(err)
-          case None      => Free.liftF(sa).liftM[GT]
+          case None => Free.liftF(sa).liftM[GT]
         }
     }
   }
@@ -99,17 +97,17 @@ object Failure {
   }
 
   def mapError[D, E](f: D => E): Failure[D, ?] ~> Failure[E, ?] =
-    λ[Failure[D, ?] ~> Failure[E, ?]]{ case Fail(d) => Fail(f(d))}
+    λ[Failure[D, ?] ~> Failure[E, ?]] { case Fail(d) => Fail(f(d)) }
 
   def toError[F[_], E](implicit F: MonadError[F, E]): Failure[E, ?] ~> F =
-    λ[Failure[E, ?] ~> F]{ case Fail(e) => F.raiseError(e)}
+    λ[Failure[E, ?] ~> F] { case Fail(e) => F.raiseError(e) }
 
   def toCatchable[F[_], E <: Throwable](implicit C: Catchable[F]): Failure[E, ?] ~> F =
-    λ[Failure[E, ?] ~> F]{ case Fail(e) => C.fail(e)}
+    λ[Failure[E, ?] ~> F] { case Fail(e) => C.fail(e) }
 
   def toRuntimeError[F[_]: Catchable, E: Show]: Failure[E, ?] ~> F =
-    toCatchable[F, RuntimeException]
-      .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
+    toCatchable[F, RuntimeException].compose[Failure[E, ?]](mapError(e =>
+      new RuntimeException(e.shows)))
 
   def monadError_[E, S[_]](implicit O: Ops[E, S]): MonadError_[Free[S, ?], E] =
     new MonadError_[Free[S, ?], E] {

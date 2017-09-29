@@ -25,17 +25,21 @@ import quasar.effect._
 import quasar.fp.ski._
 import quasar.fp.free._
 import quasar.fp.TaskRef
-import quasar.fs._,
-  QueryFile.ResultHandle,
-  ReadFile.ReadHandle,
-  WriteFile.WriteHandle,
-  FileSystemError._,
-  PathError._
+import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle,
+FileSystemError._, PathError._
 import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
-import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
+import quasar.physical.sparkcore.fs.{SparkConnectorDetails, SparkCore}, SparkConnectorDetails._
+import quasar.qscript.{
+  ::/::,
+  ::\::,
+  EquiJoin,
+  Injectable,
+  QScriptCore,
+  QScriptTotal,
+  ShiftedRead
+}
 
 import java.net.URLDecoder
 
@@ -58,14 +62,15 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
 
   val Type = FileSystemType("spark-cassandra")
 
-  type Eff7[A] = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
+  type Eff7[A] =
+    Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff6[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff7, A]
   type Eff5[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff6, A]
   type Eff4[A] = Coproduct[Task, Eff5, A]
   type Eff3[A] = Coproduct[PhysErr, Eff4, A]
   type Eff2[A] = Coproduct[CassandraDDL, Eff3, A]
   type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
-  type Eff[A]  = Coproduct[SparkConnectorDetails, Eff1, A]
+  type Eff[A] = Coproduct[SparkConnectorDetails, Eff1, A]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
@@ -81,32 +86,39 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
   def MonoSeqM = MonoSeq[M]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
 
-  def toLowerLevel[S[_]](sc: SparkContext, config: CassandraConfig)(implicit
-    S0: Task :<: S, S1: PhysErr :<: S
-  ): Task[Free[Eff, ?] ~> Free[S, ?]] = (TaskRef(0L) |@|
-    TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
-    TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-    TaskRef(Map.empty[WriteHandle, AFile])) {
-    // TODO better names!
-    (genState, rddStates, sparkCursors, writehandlers) =>
+  def toLowerLevel[S[_]](sc: SparkContext, config: CassandraConfig)(
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): Task[Free[Eff, ?] ~> Free[S, ?]] =
+    (TaskRef(0L) |@|
+      TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
+      TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
+      TaskRef(Map.empty[WriteHandle, AFile])) {
+      // TODO better names!
+      (genState, rddStates, sparkCursors, writehandlers) =>
+        type Temp[A] = Coproduct[CassandraDDL, Task, A]
+        def temp: Free[Temp, ?] ~> Task =
+          foldMapNT(CassandraDDL.interpreter[S](sc) :+: injectNT[Task, Task])
 
-    type Temp[A] = Coproduct[CassandraDDL, Task, A]
-    def temp: Free[Temp, ?] ~> Task =
-      foldMapNT(CassandraDDL.interpreter[S](sc) :+: injectNT[Task, Task])
+        val interpreter: Eff ~> S =
+          (details.interpreter[Temp] andThen temp andThen injectNT[Task, S]) :+:
+            (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+            (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
+            injectNT[PhysErr, S] :+:
+            injectNT[Task, S] :+:
+            (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[
+            Task,
+            S]) :+:
+            (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[
+            Task,
+            S]) :+:
+            (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[
+            Task,
+            S]) :+:
+            (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-    val interpreter: Eff ~> S =
-      (details.interpreter[Temp] andThen temp  andThen injectNT[Task, S]) :+:
-    (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-    (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
-    injectNT[PhysErr, S] :+:
-    injectNT[Task, S]  :+:
-    (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:
-    (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-    (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
-    (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
-
-    mapSNT[Eff, S](interpreter)
-  }
+        mapSNT[Eff, S](interpreter)
+    }
 
   type Config = CassandraConfig
   def parseConfig(connUri: ConnectionUri): DefErrT[Task, Config] = {
@@ -121,58 +133,79 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
       State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
 
     val uriOrErr: DefErrT[Task, Uri] =
-      EitherT(Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString)).point[Task])
+      EitherT(
+        Uri
+          .fromString(connUri.value)
+          .leftMap((pf: ParseFailure) => liftErr(pf.toString))
+          .point[Task])
 
     val sparkConfOrErr: DefErrT[Task, SparkConf] = for {
       uri <- uriOrErr
-      host <- EitherT(uri.host.fold(liftErr("host not provided").left[Uri.Host])(_.right[DefinitionError]).point[Task])
-      port <- EitherT(uri.port.fold(liftErr("port not provided").left[Int])(_.right[DefinitionError]).point[Task])
+      host <- EitherT(
+        uri.host
+          .fold(liftErr("host not provided").left[Uri.Host])(_.right[DefinitionError])
+          .point[Task])
+      port <- EitherT(
+        uri.port
+          .fold(liftErr("port not provided").left[Int])(_.right[DefinitionError])
+          .point[Task])
     } yield {
-      (master(host.value, port)                        *>
-        appName                                        *>
-        config("spark.executor.memory", uri)           *>
-        config("spark.executor.cores", uri)            *>
+      (master(host.value, port) *>
+        appName *>
+        config("spark.executor.memory", uri) *>
+        config("spark.executor.cores", uri) *>
         config("spark.executor.extraJavaOptions", uri) *>
-        config("spark.default.parallelism", uri)       *>
-        config("spark.files.maxPartitionBytes", uri)   *>
-        config("spark.driver.cores", uri)              *>
-        config("spark.driver.maxResultSize", uri)      *>
-        config("spark.driver.memory", uri)             *>
-        config("spark.local.dir", uri)                 *>
-        config("spark.reducer.maxSizeInFlight", uri)   *>
-        config("spark.reducer.maxReqsInFlight", uri)   *>
-        config("spark.shuffle.file.buffer", uri)       *>
-        config("spark.shuffle.io.retryWait", uri)      *>
-        config("spark.memory.fraction", uri)           *>
-        config("spark.memory.storageFraction", uri)    *>
-        config("spark.cores.max", uri)                 *>
-        config("spark.speculation", uri)               *>
-        config("spark.task.cpus", uri)
-      ).exec(new SparkConf())
+        config("spark.default.parallelism", uri) *>
+        config("spark.files.maxPartitionBytes", uri) *>
+        config("spark.driver.cores", uri) *>
+        config("spark.driver.maxResultSize", uri) *>
+        config("spark.driver.memory", uri) *>
+        config("spark.local.dir", uri) *>
+        config("spark.reducer.maxSizeInFlight", uri) *>
+        config("spark.reducer.maxReqsInFlight", uri) *>
+        config("spark.shuffle.file.buffer", uri) *>
+        config("spark.shuffle.io.retryWait", uri) *>
+        config("spark.memory.fraction", uri) *>
+        config("spark.memory.storageFraction", uri) *>
+        config("spark.cores.max", uri) *>
+        config("spark.speculation", uri) *>
+        config("spark.task.cpus", uri)).exec(new SparkConf())
     }
 
-    def fetchParameter(name: String): DefErrT[Task, String] = uriOrErr.flatMap(uri =>
-      uri.params.get(name).fold(
-        EitherT(liftErr(s"'$name' parameter not provided").left[String].point[Task]))(_.point[DefErrT[Task, ?]])
-    )
+    def fetchParameter(name: String): DefErrT[Task, String] =
+      uriOrErr.flatMap(
+        uri =>
+          uri.params
+            .get(name)
+            .fold(EitherT(liftErr(s"'$name' parameter not provided").left[String].point[Task]))(
+              _.point[DefErrT[Task, ?]]))
 
     val rootPathOrErr: DefErrT[Task, ADir] =
       uriOrErr
-        .flatMap(uri =>
-          EitherT(uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError]).point[Task])
-        )
-        .flatMap(pathStr =>
-          EitherT(posixCodec.parseAbsDir(pathStr)
-            .map(unsafeSandboxAbs)
-            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError]).point[Task])
-        )
-
+        .flatMap(
+          uri =>
+            EitherT(
+              uri.params
+                .get("rootPath")
+                .fold(liftErr("'rootPath' parameter not provided").left[String])(
+                  _.right[DefinitionError])
+                .point[Task]))
+        .flatMap(
+          pathStr =>
+            EitherT(
+              posixCodec
+                .parseAbsDir(pathStr)
+                .map(unsafeSandboxAbs)
+                .fold(liftErr("'rootPath' is not a valid path").left[ADir])(
+                  _.right[DefinitionError])
+                .point[Task]))
 
     for {
-      initSparkConf              <- sparkConfOrErr
-      rootPath                   <- rootPathOrErr
-      cassandraHostAndPort       <- fetchParameter("cassandraHost").tuple(fetchParameter("cassandraPort"))
-      (host, port)               = cassandraHostAndPort
+      initSparkConf <- sparkConfOrErr
+      rootPath <- rootPathOrErr
+      cassandraHostAndPort <- fetchParameter("cassandraHost").tuple(
+        fetchParameter("cassandraPort"))
+      (host, port) = cassandraHostAndPort
     } yield {
       val sparkConf = initSparkConf
         .set("spark.cassandra.connection.host", host)
@@ -184,9 +217,14 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
   private def sparkCoreJar: DefErrT[Task, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
-      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+      val pathStr = URLDecoder.decode(
+        this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath,
+        "UTF-8")
       posixCodec.parsePath[Option[APath]](
-        κ(None), _.some.map(unsafeSandboxAbs), κ(None), _.some.map(unsafeSandboxAbs)
+        κ(None),
+        _.some.map(unsafeSandboxAbs),
+        κ(None),
+        _.some.map(unsafeSandboxAbs)
       )(pathStr)
     }
     val jar: Task[Option[APath]] =
@@ -194,77 +232,89 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
     OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
-  private def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
-    new SparkContext(config.sparkConf).right[DefinitionError]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      NonEmptyList("You can not mount second Spark based connector... " +
-        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
+  private def initSC: Config => DefErrT[Task, SparkContext] =
+    (config: Config) =>
+      EitherT(Task.delay {
+        java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+        new SparkContext(config.sparkConf).right[DefinitionError]
+      }.handleWith {
+        case ex: SparkException if ex.getMessage.contains("SPARK-2243") =>
+          NonEmptyList(
+            "You can not mount second Spark based connector... " +
+              "Please unmount existing one first.")
+            .left[EnvironmentError]
+            .left[SparkContext]
+            .point[Task]
+      })
 
-  def generateSC: Config => DefErrT[Task, SparkContext] = (config: Config) => for {
-    sc  <- initSC(config)
-    jar <- sparkCoreJar
-  } yield {
-    sc.addJar(posixCodec.printPath(jar))
-    sc
-  }
+  def generateSC: Config => DefErrT[Task, SparkContext] =
+    (config: Config) =>
+      for {
+        sc <- initSC(config)
+        jar <- sparkCoreJar
+      } yield {
+        sc.addJar(posixCodec.printPath(jar))
+        sc
+    }
 
   object details {
 
     import common._
 
-    def rddFrom[S[_]](f: AFile)(implicit
-      cass: CassandraDDL.Ops[S]
-    ): Free[S, RDD[Data]] =
+    def rddFrom[S[_]](f: AFile)(
+        implicit
+        cass: CassandraDDL.Ops[S]): Free[S, RDD[Data]] =
       cass.readTable(keyspace(fileParent(f)), tableName(f))
 
-    def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-      cass: CassandraDDL.Ops[S],
-      S0: Task :<: S
-    ): Free[S, Unit] = {
+    def store[S[_]](rdd: RDD[Data], out: AFile)(
+        implicit
+        cass: CassandraDDL.Ops[S],
+        S0: Task :<: S): Free[S, Unit] = {
       val ks = keyspace(fileParent(out))
       val tb = tableName(out)
 
       for {
         keyspaceExists <- cass.keyspaceExists(ks)
-        _ <- if(keyspaceExists) ().point[Free[S,?]] else cass.createKeyspace(ks)
+        _ <- if (keyspaceExists) ().point[Free[S, ?]] else cass.createKeyspace(ks)
         tableExists <- cass.tableExists(ks, tb)
-        _ <- if(tableExists) {
+        _ <- if (tableExists) {
           cass.dropTable(ks, tb) *> cass.createTable(ks, tb)
         } else cass.createTable(ks, tb)
         jsons <- {
-          lift(Task.delay(rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
-            .collect().toList)
-          ).into[S]
+          lift(
+            Task.delay(
+              rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().toList))
+            .into[S]
         }
         _ <- jsons.map(cass.insertData(ks, tb, _)).sequence
       } yield ()
     }
 
-    def fileExists[S[_]](f: AFile)(implicit
-      cass: CassandraDDL.Ops[S]
-    ): Free[S, Boolean] =
+    def fileExists[S[_]](f: AFile)(
+        implicit
+        cass: CassandraDDL.Ops[S]): Free[S, Boolean] =
       for {
         tableExists <- cass.tableExists(keyspace(fileParent(f)), tableName(f))
       } yield tableExists
 
-    def listContents[S[_]](d: ADir)(implicit
-      cass: CassandraDDL.Ops[S]
-    ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT{
+    def listContents[S[_]](d: ADir)(
+        implicit
+        cass: CassandraDDL.Ops[S]): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT {
       val ks = keyspace(d)
       for {
         dirs <- cass.listKeyspaces(ks)
         isKeyspaceExists <- cass.keyspaceExists(ks)
-        files <- if(ks.length > 0 && isKeyspaceExists) cass.listTables(ks) else Set.empty[String].point[Free[S,?]]
+        files <- if (ks.length > 0 && isKeyspaceExists) cass.listTables(ks)
+        else Set.empty[String].point[Free[S, ?]]
       } yield {
-        if(dirs.length > 0)
+        if (dirs.length > 0)
           (
-            files.map{f => FileName(f).right[DirName]} ++
-              dirs.map{d => d.replace(ks, "").split("_")(0)}
-              .filter(_.length > 0)
-              .map(d => DirName(d).left[FileName])
+            files.map { f =>
+              FileName(f).right[DirName]
+            } ++
+              dirs.map { d =>
+                d.replace(ks, "").split("_")(0)
+              }.filter(_.length > 0).map(d => DirName(d).left[FileName])
           ).right[FileSystemError]
         else
           pathErr(pathNotFound(d)).left[Set[PathSegment]]
@@ -273,20 +323,20 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
 
     def readChunkSize: Int = 5000
 
-    def interpreter[S[_]](implicit
-      cass: CassandraDDL.Ops[S],
-      S: Task :<: S
-    ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
-      def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f)       => fileExists(f)
-        case ReadChunkSize       => 5000.point[Free[S, ?]]
-        case StoreData(rdd, out) => store(rdd, out)
-        case ListContents(d)     => listContents(d).run
-        case RDDFrom(f)          => rddFrom(f)
+    def interpreter[S[_]](
+        implicit
+        cass: CassandraDDL.Ops[S],
+        S: Task :<: S): SparkConnectorDetails ~> Free[S, ?] =
+      new (SparkConnectorDetails ~> Free[S, ?]) {
+        def apply[A](from: SparkConnectorDetails[A]) = from match {
+          case FileExists(f) => fileExists(f)
+          case ReadChunkSize => 5000.point[Free[S, ?]]
+          case StoreData(rdd, out) => store(rdd, out)
+          case ListContents(d) => listContents(d).run
+          case RDDFrom(f) => rddFrom(f)
+        }
       }
-    }
   }
-
 
   object ManagedWriteFileModule extends ManagedWriteFileModule {
 
@@ -296,9 +346,9 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
 
       (for {
         keyspaceExists <- cass.keyspaceExists(ks)
-        _              <- if(keyspaceExists) ().point[Free[Eff, ?]] else cass.createKeyspace(ks)
-        tableExists    <- cass.tableExists(ks, tb)
-        _              <- if(tableExists) ().point[Free[Eff, ?]] else cass.createTable(ks, tb)
+        _ <- if (keyspaceExists) ().point[Free[Eff, ?]] else cass.createKeyspace(ks)
+        tableExists <- cass.tableExists(ks, tb)
+        _ <- if (tableExists) ().point[Free[Eff, ?]] else cass.createTable(ks, tb)
       } yield file).liftB
     }
 
@@ -327,27 +377,31 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
       val sourceTable = common.tableName(source)
       for {
         keyspaceExists <- cass.keyspaceExists(destinationKeyspace)
-        _              <- if (!keyspaceExists) cass.createKeyspace(destinationKeyspace) else ().point[Free[Eff, ?]]
-        tableExists    <- cass.tableExists(destinationKeyspace, destinationTable)
-        _              <- if(tableExists) cass.dropTable(destinationKeyspace, destinationTable) else ().point[Free[Eff, ?]]
-        _              <- cass.moveTable(sourceKeyspace, sourceTable, destinationKeyspace, destinationTable)
-        _              <- cass.dropTable(sourceKeyspace, sourceTable)
+        _ <- if (!keyspaceExists) cass.createKeyspace(destinationKeyspace)
+        else ().point[Free[Eff, ?]]
+        tableExists <- cass.tableExists(destinationKeyspace, destinationTable)
+        _ <- if (tableExists) cass.dropTable(destinationKeyspace, destinationTable)
+        else ().point[Free[Eff, ?]]
+        _ <- cass.moveTable(sourceKeyspace, sourceTable, destinationKeyspace, destinationTable)
+        _ <- cass.dropTable(sourceKeyspace, sourceTable)
       } yield ()
     }
 
-    def moveDir(source: ADir, destination: ADir): Free[Eff, Unit] =  for {
-      tables <- cass.listTables(common.keyspace(source))
-      _      <- tables.map { tn =>
-        moveFile(source </> file(tn), destination </> file(tn))
-      }.toList.sequence
-      _      <- cass.dropKeyspace(common.keyspace(source))
-    } yield ()
+    def moveDir(source: ADir, destination: ADir): Free[Eff, Unit] =
+      for {
+        tables <- cass.listTables(common.keyspace(source))
+        _ <- tables.map { tn =>
+          moveFile(source </> file(tn), destination </> file(tn))
+        }.toList.sequence
+        _ <- cass.dropKeyspace(common.keyspace(source))
+      } yield ()
 
-    def doesPathExist: APath => Free[Eff, Boolean] = (path: APath) =>
-    refineType(path).fold(
-      d => cass.keyspaceExists(common.keyspace(d)),
-      f => cass.tableExists(common.keyspace(fileParent(f)), common.tableName(f))
-    )
+    def doesPathExist: APath => Free[Eff, Boolean] =
+      (path: APath) =>
+        refineType(path).fold(
+          d => cass.keyspaceExists(common.keyspace(d)),
+          f => cass.tableExists(common.keyspace(fileParent(f)), common.tableName(f))
+      )
 
     def delete(path: APath): Backend[Unit] =
       refineType(path).fold(deleteDir _, deleteFile _).liftB.unattempt
@@ -357,37 +411,37 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
       val table = common.tableName(file)
 
       (for {
-        tableExists    <- cass.tableExists(keyspace, table).liftM[FileSystemErrT]
-        _              <- EitherT((
-          if(tableExists)
-            ().right
-          else
-            pathErr(pathNotFound(file)).left[Unit]
-        ).point[Free[Eff, ?]])
-        _              <- cass.dropTable(keyspace, table).liftM[FileSystemErrT]
+        tableExists <- cass.tableExists(keyspace, table).liftM[FileSystemErrT]
+        _ <- EitherT(
+          (
+            if (tableExists)
+              ().right
+            else
+              pathErr(pathNotFound(file)).left[Unit]
+          ).point[Free[Eff, ?]])
+        _ <- cass.dropTable(keyspace, table).liftM[FileSystemErrT]
       } yield ()).run
     }
 
     private def deleteDir(dir: ADir): Free[Eff, FileSystemError \/ Unit] = {
       val keyspace = common.keyspace(dir)
-        (for {
-          keyspaces <- cass.listKeyspaces(keyspace).liftM[FileSystemErrT]
-          _         <- EitherT((
-            if(keyspaces.isEmpty)
+      (for {
+        keyspaces <- cass.listKeyspaces(keyspace).liftM[FileSystemErrT]
+        _ <- EitherT(
+          (
+            if (keyspaces.isEmpty)
               pathErr(pathNotFound(dir)).left[Unit]
             else
               ().right
           ).point[Free[Eff, ?]])
-          _         <- keyspaces.map { keyspace =>
-            cass.dropKeyspace(keyspace)
-          }.toList.sequence.liftM[FileSystemErrT]
-        } yield ()).run
+        _ <- keyspaces.map { keyspace =>
+          cass.dropKeyspace(keyspace)
+        }.toList.sequence.liftM[FileSystemErrT]
+      } yield ()).run
     }
-
 
   }
 
   def ManageFileModule: ManageFileModule = ElasticManageFileModule
-
 
 }

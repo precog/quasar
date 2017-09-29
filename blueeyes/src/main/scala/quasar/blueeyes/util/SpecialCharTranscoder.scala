@@ -18,8 +18,11 @@ package quasar.blueeyes
 package util
 
 /** Transcodes special characters using an escape character.
-  */
-case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Char, Char], decoding: PartialFunction[Char, Char]) {
+ */
+case class SpecialCharTranscoder(
+    val escape: Char,
+    encoding: PartialFunction[Char, Char],
+    decoding: PartialFunction[Char, Char]) {
   private val defaultEscapeMapping: PartialFunction[Char, Char] = {
     case `escape` => escape
   }
@@ -29,7 +32,7 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
   private val decodingF: Char => Option[Char] = decoding.orElse(defaultEscapeMapping).lift
 
   /** Takes an decoded string, and encodes it.
-    */
+   */
   def encode(s: String): String = {
     val encoded = new StringBuilder
 
@@ -49,7 +52,7 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
   }
 
   /** Takes an encoded string, and decodes it.
-    */
+   */
   def decode(s: String): String = {
     val decoded = new StringBuilder
     var escaping = false
@@ -58,7 +61,8 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
       val c = s.charAt(i)
 
       if (escaping) {
-        val original = decodingF(c).getOrElse(sys.error("Expected to find encoded character but found: " + c))
+        val original = decodingF(c).getOrElse(
+          sys.error("Expected to find encoded character but found: " + c))
 
         decoded.append(original)
 
@@ -66,7 +70,7 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
       } else
         c match {
           case `escape` => escaping = true
-          case _        => decoded.append(c)
+          case _ => decoded.append(c)
         }
     }
 
@@ -74,5 +78,6 @@ case class SpecialCharTranscoder(val escape: Char, encoding: PartialFunction[Cha
   }
 }
 object SpecialCharTranscoder {
-  def fromMap(escape: Char, map: Map[Char, Char]) = new SpecialCharTranscoder(escape, map, map.map(t => (t._2, t._1)))
+  def fromMap(escape: Char, map: Map[Char, Char]) =
+    new SpecialCharTranscoder(escape, map, map.map(t => (t._2, t._1)))
 }

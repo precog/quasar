@@ -20,9 +20,11 @@ import quasar.blueeyes._
 import java.nio.ByteBuffer
 
 /**
-  * Basic ByteBuffer parser.
-  */
-private[json] final class ByteBufferParser(src: ByteBuffer) extends SyncParser with ByteBasedParser {
+ * Basic ByteBuffer parser.
+ */
+private[json] final class ByteBufferParser(src: ByteBuffer)
+    extends SyncParser
+    with ByteBasedParser {
   final val start = src.position
   final val limit = src.limit - start
 
@@ -34,7 +36,7 @@ private[json] final class ByteBufferParser(src: ByteBuffer) extends SyncParser w
   final def reset(i: Int): Int = i
   final def checkpoint(state: Int, i: Int, stack: List[Context]) {}
   final def byte(i: Int): Byte = src.get(i + start)
-  final def at(i: Int): Char   = src.get(i + start).toChar
+  final def at(i: Int): Char = src.get(i + start).toChar
 
   final def at(i: Int, k: Int): String = {
     val len = k - i

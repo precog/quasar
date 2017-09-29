@@ -17,7 +17,13 @@
 package quasar.mimir
 
 import quasar.blueeyes.util.Clock
-import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
+import quasar.niflheim.{
+  Chef,
+  V1CookedBlockFormat,
+  V1SegmentFormat,
+  VersionedCookedBlockFormat,
+  VersionedSegmentFormat
+}
 import quasar.precog.common.accounts.AccountFinder
 
 import quasar.precog.common.security.{
@@ -36,10 +42,10 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.routing.{
   ActorRefRoutee,
   CustomRouterConfig,
-  RouterConfig,
   RoundRobinRoutingLogic,
   Routee,
-  Router
+  Router,
+  RouterConfig
 }
 
 import delorean._
@@ -100,7 +106,7 @@ final class Precog private (dataDir0: File)
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
     Precog.startTask(gated.run, vfsLatch.countDown()).unsafePerformSync
-    vfsLatch.await()      // sigh....
+    vfsLatch.await() // sigh....
   }
 
   // for the time being, do everything with this key
@@ -121,9 +127,10 @@ final class Precog private (dataDir0: File)
   val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
-  private val props: Props = Props(Chef(
-    VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
+  private val props: Props = Props(
+    Chef(
+      VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
+      VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
 
   private def chefs(system: ActorSystem): IndexedSeq[Routee] =
     (1 to Config.howManyChefsInTheKitchen).map { _ =>
@@ -163,10 +170,8 @@ object Precog extends Logging {
 
   // utility function for running a Task in the background
   def startTask(ta: Task[_], cb: => Unit): Task[Unit] =
-    Task.delay(ta.unsafePerformAsync(_.fold(
-      ex => {
-        log.error(s"exception in background task", ex)
-        cb
-      },
-      _ => ())))
+    Task.delay(ta.unsafePerformAsync(_.fold(ex => {
+      log.error(s"exception in background task", ex)
+      cb
+    }, _ => ())))
 }

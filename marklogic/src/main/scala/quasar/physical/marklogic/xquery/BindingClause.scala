@@ -39,11 +39,11 @@ object BindingClause {
 
   val forClause = Prism.partial[BindingClause, NonEmptyList[PositionalBinding]] {
     case ForClause(bindings) => bindings
-  } (ForClause)
+  }(ForClause)
 
   val letClause = Prism.partial[BindingClause, NonEmptyList[Binding]] {
     case LetClause(bindings) => bindings
-  } (LetClause)
+  }(LetClause)
 
   def for_(b: PositionalBinding, bs: PositionalBinding*): BindingClause =
     forClause(NonEmptyList(b, bs: _*))

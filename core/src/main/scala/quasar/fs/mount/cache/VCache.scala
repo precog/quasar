@@ -31,14 +31,15 @@ import scalaz._, Scalaz._
 object VCache {
   type Ops[S[_]] = KeyValueStore.Ops[AFile, ViewCache, S]
 
-  implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
+  implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] =
+    KeyValueStore.Ops[AFile, ViewCache, S]
 
   def deleteFiles[S[_]](
-    files: List[AFile]
-  )(implicit
-    M: ManageFile.Ops[S],
-    E: Failure.Ops[FileSystemError, S]
-  ): Free[S, Unit] =
+      files: List[AFile]
+  )(
+      implicit
+      M: ManageFile.Ops[S],
+      E: Failure.Ops[FileSystemError, S]): Free[S, Unit] =
     E.unattempt(
       files.traverse_(M.delete(_)).run ∘ (_.bimap(
         {
@@ -46,26 +47,27 @@ object VCache {
           case e => e.left
         },
         _.right
-    ).merge))
+      ).merge))
 
   def deleteVCacheFilesThen[S[_], A](
-    k: AFile, op: ConnectionIO[A]
-  )(implicit
-    M: ManageFile.Ops[S],
-    E: Failure.Ops[FileSystemError, S],
-    S0: ConnectionIO :<: S
-  ): Free[S, A] =
+      k: AFile,
+      op: ConnectionIO[A]
+  )(
+      implicit
+      M: ManageFile.Ops[S],
+      E: Failure.Ops[FileSystemError, S],
+      S0: ConnectionIO :<: S): Free[S, A] =
     for {
       vc <- injectFT[ConnectionIO, S].apply(lookupViewCache(k))
-      _  <- vc.foldMap(c => deleteFiles[S](c.dataFile :: c.tmpDataFile.toList))
-      r  <- injectFT[ConnectionIO, S].apply(op)
+      _ <- vc.foldMap(c => deleteFiles[S](c.dataFile :: c.tmpDataFile.toList))
+      r <- injectFT[ConnectionIO, S].apply(op)
     } yield r
 
-  def interp[S[_]](implicit
-    S0: ManageFile :<: S,
-    S1: FileSystemFailure :<: S,
-    S2: ConnectionIO :<: S
-  ): VCache ~> Free[S, ?] = λ[VCache ~> Free[S, ?]] {
+  def interp[S[_]](
+      implicit
+      S0: ManageFile :<: S,
+      S1: FileSystemFailure :<: S,
+      S2: ConnectionIO :<: S): VCache ~> Free[S, ?] = λ[VCache ~> Free[S, ?]] {
     case Keys() =>
       injectFT[ConnectionIO, S].apply(Queries.viewCachePaths.list ∘ (_.toVector))
     case Get(k) =>
@@ -76,14 +78,15 @@ object VCache {
       injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= (vc =>
         (vc ≟ expect).fold(
           {
-            vc.foldMap(c =>
-              // Only delete files that differ from the replacement view cache
-              deleteFiles(
-                ((c.dataFile ≠ v.dataFile) ?? List(c.dataFile)) :::
-                ((c.tmpDataFile ≠ v.tmpDataFile) ?? c.tmpDataFile.toList))) >>
-            injectFT[ConnectionIO, S].apply(insertOrUpdateViewCache(k, v))
+            vc.foldMap(
+              c =>
+                // Only delete files that differ from the replacement view cache
+                deleteFiles(((c.dataFile ≠ v.dataFile) ?? List(c.dataFile)) :::
+                  ((c.tmpDataFile ≠ v.tmpDataFile) ?? c.tmpDataFile.toList))) >>
+              injectFT[ConnectionIO, S].apply(insertOrUpdateViewCache(k, v))
           }.as(true),
-          false.η[Free[S, ?]]))
+          false.η[Free[S, ?]]
+        ))
     case Delete(k) =>
       deleteVCacheFilesThen(k, runOneRowUpdate(Queries.deleteViewCache(k)))
   }

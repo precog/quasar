@@ -24,44 +24,43 @@ import scalaz._, NaturalTransformation.refl
 object mounted {
 
   /** Strips the `mountPoint` off of all input paths in `ReadFile` operations
-    * and restores it on output paths.
-    */
-   def readFile[S[_]](mountPoint: ADir)(implicit S: ReadFile :<: S): S ~> Free[S, ?] =
-     transformPaths.readFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
+   * and restores it on output paths.
+   */
+  def readFile[S[_]](mountPoint: ADir)(implicit S: ReadFile :<: S): S ~> Free[S, ?] =
+    transformPaths.readFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `WriteFile` operations
-    * and restores it on output paths.
-    */
+   * and restores it on output paths.
+   */
   def writeFile[S[_]](mountPoint: ADir)(implicit S: WriteFile :<: S): S ~> Free[S, ?] =
     transformPaths.writeFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `ManageFile` operations
-    * and restores it on output paths.
-    */
+   * and restores it on output paths.
+   */
   def manageFile[S[_]](mountPoint: ADir)(implicit S: ManageFile :<: S): S ~> Free[S, ?] =
     transformPaths.manageFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `QueryFile` operations
-    * and restores it on output paths.
-    */
+   * and restores it on output paths.
+   */
   def queryFile[S[_]](mountPoint: ADir)(implicit S: QueryFile :<: S): S ~> Free[S, ?] =
     transformPaths.queryFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
 
   def analyze[S[_]](mountPoint: ADir)(implicit S: Analyze :<: S): S ~> Free[S, ?] =
     transformPaths.analyze[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
 
-
   def fileSystem[S[_]](
-    mountPoint: ADir
-  )(implicit
-    S0: ReadFile :<: S,
-    S1: WriteFile :<: S,
-    S2: ManageFile :<: S,
-    S3: QueryFile :<: S
-  ): S ~> Free[S, ?] = {
-    flatMapSNT(readFile[S](mountPoint))   compose
-    flatMapSNT(writeFile[S](mountPoint))  compose
-    flatMapSNT(manageFile[S](mountPoint)) compose
-    queryFile[S](mountPoint)
+      mountPoint: ADir
+  )(
+      implicit
+      S0: ReadFile :<: S,
+      S1: WriteFile :<: S,
+      S2: ManageFile :<: S,
+      S3: QueryFile :<: S): S ~> Free[S, ?] = {
+    flatMapSNT(readFile[S](mountPoint)) compose
+      flatMapSNT(writeFile[S](mountPoint)) compose
+      flatMapSNT(manageFile[S](mountPoint)) compose
+      queryFile[S](mountPoint)
   }
 }

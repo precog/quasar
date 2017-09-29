@@ -18,7 +18,7 @@ package quasar.niflheim
 
 import quasar.precog.common._
 
-import scalaz.{ Validation, Success, Failure }
+import scalaz.{Failure, Success, Validation}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -105,4 +105,3 @@ object CTypeFlags {
     }
   }
 }
-

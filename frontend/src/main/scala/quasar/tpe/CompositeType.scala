@@ -34,10 +34,10 @@ object CompositeType {
   val name: Prism[String, CompositeType] =
     Prism.partial[String, CompositeType] {
       case "array" => Arr
-      case "map"   => Map
+      case "map" => Map
     } {
-      case Arr     => "array"
-      case Map     => "map"
+      case Arr => "array"
+      case Map => "map"
     }
 
   implicit val enum: Enum[CompositeType] =

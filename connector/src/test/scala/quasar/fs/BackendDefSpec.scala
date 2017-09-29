@@ -38,10 +38,12 @@ class BackendDefSpec extends QuasarSpecification {
     BackendDef(κ(defnResult.point[DefId].some))
 
   val failedDef =
-    BackendDef(κ(Some(
-      connectionFailed(new RuntimeException("NOPE"))
-        .right[NonEmptyList[String]]
-        .raiseError[DefId, DefinitionResult[Id]])))
+    BackendDef(
+      κ(
+        Some(
+          connectionFailed(new RuntimeException("NOPE"))
+            .right[NonEmptyList[String]]
+            .raiseError[DefId, DefinitionResult[Id]])))
 
   val unhandledDef =
     BackendDef[Id](κ(None))
@@ -50,9 +52,9 @@ class BackendDefSpec extends QuasarSpecification {
   val someUri = ConnectionUri("some://filesystem")
 
   val firstErrMsg =
-    D.left[DefinitionError, DefinitionResult[Id]]  composePrism
-    D.left[NonEmptyList[String], EnvironmentError] composeLens
-    Cons1.head
+    D.left[DefinitionError, DefinitionResult[Id]] composePrism
+      D.left[NonEmptyList[String], EnvironmentError] composeLens
+      Cons1.head
 
   "apply" should {
     "return an unsupported filesytem error when unhandled" >> {

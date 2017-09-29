@@ -25,12 +25,13 @@ import matryoshka._
 import scalaz._
 
 private[qscript] final class MapFuncDerivedPlanner[
-  F[_]: Monad,
-  FMT,
-  T[_[_]]: CorecursiveT
-](implicit
-  CP: MapFuncPlanner[F, FMT, MapFuncCore[T, ?]]
-) extends MapFuncPlanner[F, FMT, MapFuncDerived[T, ?]] {
+    F[_]: Monad,
+    FMT,
+    T[_[_]]: CorecursiveT
+](
+    implicit
+    CP: MapFuncPlanner[F, FMT, MapFuncCore[T, ?]])
+    extends MapFuncPlanner[F, FMT, MapFuncDerived[T, ?]] {
 
   val plan: AlgebraM[F, MapFuncDerived[T, ?], XQuery] = ExpandMapFunc.expand(CP.plan, κ(None))
 

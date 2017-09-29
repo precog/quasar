@@ -25,8 +25,13 @@ import scala.collection.mutable
 
 import java.time.ZonedDateTime
 
-case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutable.ArrayBuffer[CTree], types: mutable.Map[CType, Int]) {
-  def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
+case class CTree(
+    path: CPath,
+    fields: mutable.Map[String, CTree],
+    indices: mutable.ArrayBuffer[CTree],
+    types: mutable.Map[CType, Int]) {
+  def getField(s: String): CTree =
+    fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
   def getIndex(n: Int): CTree = {
     var i = indices.length
     while (i <= n) {
@@ -47,7 +52,12 @@ case class CTree(path: CPath, fields: mutable.Map[String, CTree], indices: mutab
 }
 
 object CTree {
-  def empty(path: CPath) = CTree(path, mutable.Map.empty[String, CTree], mutable.ArrayBuffer.empty[CTree], mutable.Map.empty[CType, Int])
+  def empty(path: CPath) =
+    CTree(
+      path,
+      mutable.Map.empty[String, CTree],
+      mutable.ArrayBuffer.empty[CTree],
+      mutable.Map.empty[CType, Int])
 }
 
 object Segments {

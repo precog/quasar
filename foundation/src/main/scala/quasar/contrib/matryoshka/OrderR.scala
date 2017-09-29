@@ -21,9 +21,12 @@ import matryoshka.implicits._
 import scalaz._
 
 object OrderR {
-  def order[T, F[_]: Functor](a: T, b: T)(implicit T: Recursive.Aux[T, F], O: Delay[Order, F]): Ordering =
+  def order[T, F[_]: Functor](a: T, b: T)(
+      implicit T: Recursive.Aux[T, F],
+      O: Delay[Order, F]): Ordering =
     O(orderR[T, F](O)).order(a.project, b.project)
 
-  def orderR[T, F[_]: Functor](ordF: Delay[Order, F])(implicit T: Recursive.Aux[T, F]): Order[T] =
+  def orderR[T, F[_]: Functor](ordF: Delay[Order, F])(
+      implicit T: Recursive.Aux[T, F]): Order[T] =
     Order.order[T](order[T, F](_, _)(Functor[F], T, ordF))
 }

@@ -22,11 +22,11 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.annotation.tailrec
 
 /**
-  * This object contains some methods to do faster iteration over primitives.
-  *
-  * In particular it doesn't box, allocate intermediate objects, or use a (slow)
-  * shared interface with scala collections.
-  */
+ * This object contains some methods to do faster iteration over primitives.
+ *
+ * In particular it doesn't box, allocate intermediate objects, or use a (slow)
+ * shared interface with scala collections.
+ */
 object Loop {
   @tailrec
   def range(i: Int, limit: Int)(f: Int => Unit) {
@@ -58,7 +58,7 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
     case x => Some(x)
   }
   def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
-  def -(a: A): Map[A, C]                  = iterator.toMap - a
+  def -(a: A): Map[A, C] = iterator.toMap - a
 }
 
 final class FreshAtomicIdSource {
@@ -76,8 +76,8 @@ final class FreshAtomicIdSource {
 object yggConfig {
   val idSource = new FreshAtomicIdSource
 
-  def hashJoins         = true
-  def sortBufferSize    = 1000
+  def hashJoins = true
+  def sortBufferSize = 1000
   def maxSliceSize: Int = 20000
 
   // This is a slice size that we'd like our slices to be at least as large as.

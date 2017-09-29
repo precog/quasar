@@ -19,9 +19,10 @@ package quasar.precog
 import java.util.concurrent.atomic.AtomicInteger
 
 package object util {
+
   /**
-    * Opaque symbolic identifier (like Int, but better!).
-    */
+   * Opaque symbolic identifier (like Int, but better!).
+   */
   final class Identifier extends AnyRef
 
   // Shared Int could easily overflow: Unshare? Extend to a Long? Different approach?

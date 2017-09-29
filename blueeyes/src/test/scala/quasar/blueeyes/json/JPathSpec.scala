@@ -53,7 +53,9 @@ object JPathSpec extends Specification with ScalaCheck {
     }
 
     "extract a second level node" in {
-      val j = JObject(JField("address", JObject(JField("city", JString("B")) :: JField("street", JString("2")) :: Nil)) :: Nil)
+      val j = JObject(JField(
+        "address",
+        JObject(JField("city", JString("B")) :: JField("street", JString("2")) :: Nil)) :: Nil)
 
       JPath("address.city").extract(j) mustEqual (JString("B"))
     }

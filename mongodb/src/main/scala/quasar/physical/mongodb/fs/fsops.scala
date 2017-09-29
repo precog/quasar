@@ -25,7 +25,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object fsops {
-  type MongoFsM[A]  = FileSystemErrT[MongoDbIO, A]
+  type MongoFsM[A] = FileSystemErrT[MongoDbIO, A]
 
   import FileSystemError._, PathError._
 
@@ -33,26 +33,27 @@ object fsops {
   def collectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
     for {
       dbName <- dbNameFromPathM(dir)
-      prefix <- collPrefixFromDirM(dir)
-                  .getOrElse(CollectionName(""))
-                  .liftM[FileSystemErrT]
-      cs     <- MongoDbIO.collectionsIn(dbName)
-                  .filter(_.collection isDescendantOf prefix)
-                  .runLog.map(_.toVector)
-                  .liftM[FileSystemErrT]
-      _      <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoFsM, Unit]
-                else ().point[MongoFsM]
+      prefix <- collPrefixFromDirM(dir).getOrElse(CollectionName("")).liftM[FileSystemErrT]
+      cs <- MongoDbIO
+        .collectionsIn(dbName)
+        .filter(_.collection isDescendantOf prefix)
+        .runLog
+        .map(_.toVector)
+        .liftM[FileSystemErrT]
+      _ <- if (cs.isEmpty) pathErr(pathNotFound(dir)).raiseError[MongoFsM, Unit]
+      else ().point[MongoFsM]
     } yield cs
 
   /** The user (non-system) collections having a prefix equivalent to the given
-    * directory path.
-    */
+   * directory path.
+   */
   def userCollectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
-    collectionsInDir(dir) map (_.filterNot(_.collection isDescendantOf CollectionName("system")))
+    collectionsInDir(dir) map (_.filterNot(
+      _.collection isDescendantOf CollectionName("system")))
 
   /** A filesystem `PathSegment` representing the first segment of a collection name
-    * relative to the given parent directory.
-    */
+   * relative to the given parent directory.
+   */
   def collectionPathSegment(parent: ADir): Collection => Option[PathSegment] =
     _.asFile relativeTo parent flatMap firstSegmentName
 
@@ -69,12 +70,11 @@ object fsops {
     EitherT(Collection.dbNameFromPath(path).leftMap(pathErr(_)).point[MongoDbIO])
 
   /** An error indicating that the directory refers to an ancestor of `/`.
-    *
-    * TODO: This would be eliminated if we switched to AbsDir everywhere and
-    *       disallowed AbsDirs like "/../foo" by construction. Revisit this once
-    *       scala-pathy has been updated.
-    */
+   *
+   * TODO: This would be eliminated if we switched to AbsDir everywhere and
+   *       disallowed AbsDirs like "/../foo" by construction. Revisit this once
+   *       scala-pathy has been updated.
+   */
   def nonExistentParent[A](dir: ADir): MongoFsM[A] =
-    pathErr(invalidPath(dir, "directory refers to nonexistent parent"))
-      .raiseError[MongoFsM, A]
+    pathErr(invalidPath(dir, "directory refers to nonexistent parent")).raiseError[MongoFsM, A]
 }

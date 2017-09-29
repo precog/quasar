@@ -32,19 +32,19 @@ object MatchDepth {
   final case object Descendants extends MatchDepth
 
   val toXQuery: MatchDepth => XQuery = {
-    case Children    => "1".xs
+    case Children => "1".xs
     case Descendants => "infinity".xs
   }
 
   implicit val enum: Enum[MatchDepth] =
     new Enum[MatchDepth] {
       def succ(md: MatchDepth) = md match {
-        case Children    => Descendants
+        case Children => Descendants
         case Descendants => Children
       }
 
       def pred(md: MatchDepth) = md match {
-        case Children    => Descendants
+        case Children => Descendants
         case Descendants => Children
       }
 
@@ -52,7 +52,7 @@ object MatchDepth {
         asInt(a) ?|? asInt(b)
 
       private def asInt(md: MatchDepth): Int = md match {
-        case Children    => 1
+        case Children => 1
         case Descendants => 2
       }
     }

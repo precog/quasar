@@ -33,7 +33,8 @@ trait EncodeEJson[A] {
   def contramap[B](f: B => A): EncodeEJson[B] = {
     val orig = this
     new EncodeEJson[B] {
-      def encode[J](b: B)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](
+          b: B)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         orig.encode[J](f(b))
     }
   }
@@ -41,10 +42,12 @@ trait EncodeEJson[A] {
 
 object EncodeEJson extends EncodeEJsonInstances {
   def encodeEJsonR[T, F[_]: Functor](
-    implicit T: Recursive.Aux[T, F], F: EncodeEJsonK[F]
+      implicit T: Recursive.Aux[T, F],
+      F: EncodeEJsonK[F]
   ): EncodeEJson[T] =
     new EncodeEJson[T] {
-      def encode[J](t: T)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](
+          t: T)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         t.cata[J](F.encodeK[J])
     }
 }
@@ -52,7 +55,8 @@ object EncodeEJson extends EncodeEJsonInstances {
 sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
   implicit val bigIntEncodeEJson: EncodeEJson[BigInt] =
     new EncodeEJson[BigInt] {
-      def encode[J](i: BigInt)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](
+          i: BigInt)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         ExtEJson(int[J](i)).embed
     }
 
@@ -67,30 +71,36 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
 
   implicit val byteEncodeEJson: EncodeEJson[SByte] =
     new EncodeEJson[SByte] {
-      def encode[J](b: SByte)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](
+          b: SByte)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         ExtEJson(byte[J](b)).embed
     }
 
   implicit val charEncodeEJson: EncodeEJson[SChar] =
     new EncodeEJson[SChar] {
-      def encode[J](c: SChar)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](
+          c: SChar)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         ExtEJson(char[J](c)).embed
     }
 
   implicit def optionEncodeEJson[A](implicit A: EncodeEJson[A]): EncodeEJson[Option[A]] =
     new EncodeEJson[Option[A]] {
-      def encode[J](oa: Option[A])(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+      def encode[J](oa: Option[A])(
+          implicit JC: Corecursive.Aux[J, EJson],
+          JR: Recursive.Aux[J, EJson]): J =
         oa.fold(CommonEJson(nul[J]()).embed)(A.encode[J](_))
     }
 
-  implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]: EncodeEJson[T[F]] =
+  implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]
+    : EncodeEJson[T[F]] =
     EncodeEJson.encodeEJsonR[T[F], F]
 }
 
 sealed abstract class EncodeEJsonInstances0 {
   implicit def encodeJsonEJson[A: EncodeJson]: EncodeEJson[A] =
     new EncodeEJson[A] {
-      def encode[J](a: A)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J = {
+      def encode[J](
+          a: A)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J = {
         val mkKey: String => J = s => CommonEJson(str[J](s)).embed
         EncodeJson.of[A].encode(a).transCata[J](EJson.fromJson(mkKey))
       }

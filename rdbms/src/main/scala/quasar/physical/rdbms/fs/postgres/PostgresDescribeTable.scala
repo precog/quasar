@@ -31,23 +31,19 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
       whereClause: Fragment,
       mapResult: List[(String, String)] => T): ConnectionIO[T] = {
     (fr"SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS"
-      ++ whereClause)
-      .query[(String, String)]
-      .list
-      .map(mapResult)
+      ++ whereClause).query[(String, String)].list.map(mapResult)
   }
 
   private def whereSchemaAndTable(tablePath: TablePath): Fragment = {
     fr"WHERE TABLE_SCHEMA =" ++
-    Fragment.const("'" + tablePath.schema.shows + "'") ++
-    fr"AND TABLE_NAME =" ++
-    Fragment.const("'" + tablePath.table.shows + "'")
+      Fragment.const("'" + tablePath.schema.shows + "'") ++
+      fr"AND TABLE_NAME =" ++
+      Fragment.const("'" + tablePath.table.shows + "'")
   }
 
   private def whereSchema(schemaName: String): Fragment =
     fr"WHERE TABLE_SCHEMA =" ++
       Fragment.const("'" + schemaName + "'")
-
 
   override def findChildTables(schema: Schema): ConnectionIO[Vector[TableName]] = {
     val whereClause = schema match {
@@ -80,8 +76,7 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
         descQuery(whereSchema(c.shows), _.nonEmpty)
     }
 
-  override def tableExists(
-      tablePath: TablePath): ConnectionIO[Boolean] =
+  override def tableExists(tablePath: TablePath): ConnectionIO[Boolean] =
     descQuery(whereSchemaAndTable(tablePath), _.nonEmpty)
 
 }

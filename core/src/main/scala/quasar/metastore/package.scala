@@ -17,11 +17,11 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
+import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
 import quasar.fs.mount.cache.ViewCache
-import quasar.fs.mount.{ConnectionUri, MountType, MountConfig}
+import quasar.fs.mount.{ConnectionUri, MountConfig, MountType}
 
 import java.sql.Timestamp
 import java.time.Instant
@@ -45,19 +45,23 @@ import scalaz.concurrent.Task
   SQLException so that these errors will be easy to trace when they occur at
   runtime. That should only happen in the case of bugs or admins tampering with
   the database.
-  */
+ */
 package object metastore {
 
   sealed trait MetastoreFailure {
     def message: String
   }
   final case object MetastoreRequiresInitialization extends MetastoreFailure {
-    def message: String = "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
+    def message: String =
+      "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
   }
-  final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreFailure {
-    def message: String = s"MetaStore schema requires migrating, current version is '$current' latest version is '$latest'."
+  final case class MetastoreRequiresMigration(current: String, latest: String)
+      extends MetastoreFailure {
+    def message: String =
+      s"MetaStore schema requires migrating, current version is '$current' latest version is '$latest'."
   }
-  final case class UnknownError(causedBy: scala.Throwable, `while`: String) extends MetastoreFailure {
+  final case class UnknownError(causedBy: scala.Throwable, `while`: String)
+      extends MetastoreFailure {
     private val metastorePrompt: String = "Is the metastore database running?"
     def message: String = s"${`while`}: ${causedBy.getMessage}. $metastorePrompt"
   }
@@ -65,7 +69,8 @@ package object metastore {
   val taskToConnectionIO: Task ~> ConnectionIO =
     λ[Task ~> ConnectionIO](t => HC.delay(t.unsafePerformSync))
 
-  def verifyMetaStoreSchema[A: Show](schema: Schema[A]): EitherT[ConnectionIO, MetastoreFailure, Unit] =
+  def verifyMetaStoreSchema[A: Show](
+      schema: Schema[A]): EitherT[ConnectionIO, MetastoreFailure, Unit] =
     EitherT(schema.updateRequired map {
       case Some((None, _)) =>
         MetastoreRequiresInitialization.left
@@ -77,83 +82,148 @@ package object metastore {
 
   implicit val aPathMeta: Meta[APath] =
     Meta[String].xmap[APath](
-      str => posixCodec.parsePath[APath](
-        _ => unexpectedValue(s"absolute path required; found: $str"),
-        unsafeSandboxAbs,
-        _ => unexpectedValue(s"absolute path required; found: $str"),
-        unsafeSandboxAbs
-      )(str),
-      posixCodec.printPath(_))
+      str =>
+        posixCodec.parsePath[APath](
+          _ => unexpectedValue(s"absolute path required; found: $str"),
+          unsafeSandboxAbs,
+          _ => unexpectedValue(s"absolute path required; found: $str"),
+          unsafeSandboxAbs
+        )(str),
+      posixCodec.printPath(_)
+    )
 
   // The `APath` existential type seems to confuse doobie, so here's an alternative:
   implicit val refinedAPathMeta: Meta[ADir \/ AFile] =
     Meta[String].xmap[ADir \/ AFile](
-      str => posixCodec.parsePath[ADir \/ AFile](
-        _ => unexpectedValue(s"absolute path required; found: $str"),
-        unsafeSandboxAbs(_).right,
-        _ => unexpectedValue(s"absolute path required; found: $str"),
-        unsafeSandboxAbs(_).left
-      )(str),
-      p => posixCodec.printPath(p.merge[APath]))
+      str =>
+        posixCodec.parsePath[ADir \/ AFile](
+          _ => unexpectedValue(s"absolute path required; found: $str"),
+          unsafeSandboxAbs(_).right,
+          _ => unexpectedValue(s"absolute path required; found: $str"),
+          unsafeSandboxAbs(_).left
+        )(str),
+      p => posixCodec.printPath(p.merge[APath])
+    )
 
   implicit val aFileMeta: Meta[AFile] =
     Meta[String].xmap[AFile](
-      str => unsafeSandboxAbs(
-        posixCodec.parseAbsFile(str).getOrElse(unexpectedValue("not an absolute file path: " + str))),
+      str =>
+        unsafeSandboxAbs(
+          posixCodec
+            .parseAbsFile(str)
+            .getOrElse(unexpectedValue("not an absolute file path: " + str))),
       posixCodec.printPath(_))
 
   implicit val aDirMeta: Meta[ADir] =
     Meta[String].xmap[ADir](
-      str => unsafeSandboxAbs(
-        posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
+      str =>
+        unsafeSandboxAbs(
+          posixCodec
+            .parseAbsDir(str)
+            .getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
 
   implicit val instantMeta: Meta[Instant] = Meta[Timestamp].xmap(_.toInstant, Timestamp.from)
 
   implicit val viewCacheStatusMeta: Meta[ViewCache.Status] = Meta[String].xmap(
     {
-      case "pending"    => ViewCache.Status.Pending
+      case "pending" => ViewCache.Status.Pending
       case "successful" => ViewCache.Status.Successful
-      case "failed"     => ViewCache.Status.Failed
-    },
-    {
-      case ViewCache.Status.Pending    => "pending"
+      case "failed" => ViewCache.Status.Failed
+    }, {
+      case ViewCache.Status.Pending => "pending"
       case ViewCache.Status.Successful => "successful"
-      case ViewCache.Status.Failed     => "failed"
-    })
+      case ViewCache.Status.Failed => "failed"
+    }
+  )
 
   implicit val mountTypeMeta: Meta[MountType] = {
     import MountType._
-    Meta[String].xmap[MountType](
-      { case "view" => viewMount(); case "module" => moduleMount(); case fsType => fileSystemMount(FileSystemType(fsType)) },
-      _.fold(_.value, "view", "module"))
+    Meta[String].xmap[MountType]({
+      case "view" => viewMount(); case "module" => moduleMount();
+      case fsType => fileSystemMount(FileSystemType(fsType))
+    }, _.fold(_.value, "view", "module"))
   }
 
   implicit val viewConfigMeta: Meta[MountConfig.ViewConfig] = {
     Meta[ConnectionUri].xmap[MountConfig.ViewConfig](
-      uri => MountConfig.ViewConfig.tupled(MountConfig.viewCfgFromUri(uri).leftMap(unexpectedValue).merge),
-      viewConfig => MountConfig.viewCfgAsUri(viewConfig.query,viewConfig.vars))
+      uri =>
+        MountConfig.ViewConfig.tupled(
+          MountConfig.viewCfgFromUri(uri).leftMap(unexpectedValue).merge),
+      viewConfig => MountConfig.viewCfgAsUri(viewConfig.query, viewConfig.vars)
+    )
   }
 
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(
-      AFile, MountConfig.ViewConfig, Option[Instant], Option[Long], Int, Option[String],
-      Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
+        AFile,
+        MountConfig.ViewConfig,
+        Option[Instant],
+        Option[Long],
+        Int,
+        Option[String],
+        Option[Instant],
+        Long,
+        Instant,
+        ViewCache.Status,
+        Option[String],
+        AFile,
+        Option[String]
     )].xmap(
-      { case (path, viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
-              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
+      {
+        case (
+            path,
+            viewConfig,
+            lastUpdate,
+            executionMillis,
+            cacheReads,
+            assignee,
+            assigneeStart,
+            maxAge,
+            refreshAfter,
+            status,
+            errorMsg,
+            dataFile,
+            tmpDataFile) =>
           PathedViewCache(
             path,
             ViewCache(
-              viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
-              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile,
-              tmpDataFile ∘ (tf => unsafeSandboxAbs(
-                posixCodec.parseAbsFile(tf)
-                  .getOrElse(unexpectedValue("not an absolute file path: " + tf))))))
+              viewConfig,
+              lastUpdate,
+              executionMillis,
+              cacheReads,
+              assignee,
+              assigneeStart,
+              maxAge,
+              refreshAfter,
+              status,
+              errorMsg,
+              dataFile,
+              tmpDataFile ∘ (
+                  tf =>
+                    unsafeSandboxAbs(
+                      posixCodec
+                        .parseAbsFile(tf)
+                        .getOrElse(unexpectedValue("not an absolute file path: " + tf))))
+            )
+          )
       },
-      c => (c.path, c.vc.viewConfig, c.vc.lastUpdate, c.vc.executionMillis, c.vc.cacheReads, c.vc.assignee,
-             c.vc.assigneeStart, c.vc.maxAgeSeconds, c.vc.refreshAfter, c.vc.status, c.vc.errorMsg, c.vc.dataFile,
-             c.vc.tmpDataFile ∘ (posixCodec.printPath(_))))
+      c =>
+        (
+          c.path,
+          c.vc.viewConfig,
+          c.vc.lastUpdate,
+          c.vc.executionMillis,
+          c.vc.cacheReads,
+          c.vc.assignee,
+          c.vc.assigneeStart,
+          c.vc.maxAgeSeconds,
+          c.vc.refreshAfter,
+          c.vc.status,
+          c.vc.errorMsg,
+          c.vc.dataFile,
+          c.vc.tmpDataFile ∘ (posixCodec.printPath(_)))
+    )
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))

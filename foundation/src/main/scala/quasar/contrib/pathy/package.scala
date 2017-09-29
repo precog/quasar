@@ -29,17 +29,17 @@ import _root_.scalaz._, Scalaz._
 import _root_.scalaz.concurrent.Task
 
 package object pathy {
-  type AbsPath[T] = Path[Abs,T,Sandboxed]
-  type RelPath[T] = Path[Rel,T,Sandboxed]
+  type AbsPath[T] = Path[Abs, T, Sandboxed]
+  type RelPath[T] = Path[Rel, T, Sandboxed]
 
-  type ADir  = AbsDir[Sandboxed]
-  type RDir  = RelDir[Sandboxed]
+  type ADir = AbsDir[Sandboxed]
+  type RDir = RelDir[Sandboxed]
   type AFile = AbsFile[Sandboxed]
   type RFile = RelFile[Sandboxed]
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
-  type FPath = Path[scala.Any,File,Sandboxed]
-  type DPath = Path[scala.Any,Dir, Sandboxed]
+  type FPath = Path[scala.Any, File, Sandboxed]
+  type DPath = Path[scala.Any, Dir, Sandboxed]
 
   type PathSegment = DirName \/ FileName
 
@@ -57,7 +57,10 @@ package object pathy {
       val back = Task delay {
         val check = file.exists() && file.isDirectory()
         // trailing '/' is significant!  yay, pathy...
-        posixCodec.parseAbsDir(file.getAbsolutePath + "/").map(unsafeSandboxAbs).filter(_ => check)
+        posixCodec
+          .parseAbsDir(file.getAbsolutePath + "/")
+          .map(unsafeSandboxAbs)
+          .filter(_ => check)
       }
 
       OptionT(back)
@@ -95,7 +98,8 @@ package object pathy {
       Path.sandbox(Path.currentDir, path).get
 
     implicit val rPathDecodeJson: DecodeJson[RPath] =
-      (relDirDecodeJson.map(resandbox(_)).widen[RPath] ||| relFileDecodeJson.map(resandbox(_))).setName("RPath")
+      (relDirDecodeJson.map(resandbox(_)).widen[RPath] ||| relFileDecodeJson.map(resandbox(_)))
+        .setName("RPath")
 
     implicit val rPathEncodeJson: EncodeJson[RPath] =
       pathEncodeJson
@@ -103,24 +107,25 @@ package object pathy {
 
   /** PathCodec with URI-encoded segments. */
   val UriPathCodec: PathCodec = {
+
     /** This encoder translates spaces into pluses, but we want the
-      * more rigorous %20 encoding.
-      */
+     * more rigorous %20 encoding.
+     */
     val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
     val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")
 
     val escapeRel: String => String = {
       case ".." => "%2E%2E"
-      case "."  => "%2E"
-      case s    => uriEncodeUtf8(s)
+      case "." => "%2E"
+      case s => uriEncodeUtf8(s)
     }
 
     PathCodec('/', escapeRel, uriDecodeUtf8)
   }
 
   /** Rebases absolute paths onto the provided absolute directory, so
-    * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.
-    */
+   * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.
+   */
   def rebaseA(onto: ADir): AbsPath ~> AbsPath =
     new (AbsPath ~> AbsPath) {
       def apply[T](apath: AbsPath[T]) =
@@ -135,26 +140,26 @@ package object pathy {
     }
 
   /** Returns the first named segment of the given path. */
-  def firstSegmentName(p: Path[_,_,_]): Option[PathSegment] =
-    flatten(none, none, none,
-      n => DirName(n).left.some,
-      n => FileName(n).right.some,
-      p).toIList.unite.headOption
+  def firstSegmentName(p: Path[_, _, _]): Option[PathSegment] =
+    flatten(none, none, none, n => DirName(n).left.some, n => FileName(n).right.some, p).toIList.unite.headOption
 
-  def prettyPrint(path: Path[_,_,_]): String =
+  def prettyPrint(path: Path[_, _, _]): String =
     refineType(path).fold(
       dir => posixCodec.unsafePrintPath(dir),
-      file => refineTypeAbs(file).fold(
-        abs => posixCodec.unsafePrintPath(abs),
-        // Remove the `./` from the beginning of the string representation of a relative path
-        rel => posixCodec.unsafePrintPath(rel).drop(2)))
+      file =>
+        refineTypeAbs(file).fold(
+          abs => posixCodec.unsafePrintPath(abs),
+          // Remove the `./` from the beginning of the string representation of a relative path
+          rel => posixCodec.unsafePrintPath(rel).drop(2)
+      )
+    )
 
   /** This is completely unsafe and should be phased out.
-    * Sandboxing is meant to prevent ending up with paths such as `/foo/../../..` and by
-    * calling get on the `Option` we are wishful thinking this problem away
-    */
+   * Sandboxing is meant to prevent ending up with paths such as `/foo/../../..` and by
+   * calling get on the `Option` we are wishful thinking this problem away
+   */
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def unsafeSandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
+  def unsafeSandboxAbs[T, S](apath: Path[Abs, T, S]): Path[Abs, T, Sandboxed] =
     root </> apath.relativeTo(root).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
@@ -163,23 +168,24 @@ package object pathy {
   // since T can only be one of `Abs` or `Rel` and we used `refineTypeAbs`
   // to check which one it is
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
+  def sandboxCurrent[A, T](path: Path[A, T, Unsandboxed]): Option[Path[A, T, Sandboxed]] =
     refineTypeAbs(path).fold(
-      abs => (abs relativeTo root).map(p => (root </> p).asInstanceOf[Path[A,T,Sandboxed]]),
-      rel => (rel relativeTo  cur).map(p => (cur  </> p).asInstanceOf[Path[A,T,Sandboxed]]))
+      abs => (abs relativeTo root).map(p => (root </> p).asInstanceOf[Path[A, T, Sandboxed]]),
+      rel => (rel relativeTo cur).map(p => (cur </> p).asInstanceOf[Path[A, T, Sandboxed]])
+    )
 
   // TODO[pathy]: Offer clean API in pathy to do this
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def refineTypeAbs[T,S](path: Path[_,T,S]): Path[Abs,T,S] \/ Path[Rel,T,S] = {
-    if (path.isAbsolute) path.asInstanceOf[Path[Abs,T,S]].left
-    else path.asInstanceOf[Path[Rel,T,S]].right
+  def refineTypeAbs[T, S](path: Path[_, T, S]): Path[Abs, T, S] \/ Path[Rel, T, S] = {
+    if (path.isAbsolute) path.asInstanceOf[Path[Abs, T, S]].left
+    else path.asInstanceOf[Path[Rel, T, S]].right
   }
 
-  def mkAbsolute[T,S](baseDir: AbsDir[S], path: Path[_,T,S]): Path[Abs,T,S] =
+  def mkAbsolute[T, S](baseDir: AbsDir[S], path: Path[_, T, S]): Path[Abs, T, S] =
     refineTypeAbs(path).fold(ι, baseDir </> _)
 
   ////
 
   private val root = rootDir[Sandboxed]
-  private val cur  = currentDir[Sandboxed]
+  private val cur = currentDir[Sandboxed]
 }

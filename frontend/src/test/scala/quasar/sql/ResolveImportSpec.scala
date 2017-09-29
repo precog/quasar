@@ -29,21 +29,23 @@ class ResolveImportSpec extends quasar.Qspec {
   "Import resolution" >> {
     "simple case" >> {
       val scopedExpr = sqlB"import `/mymodule/`; TRIVIAL(`/foo`)"
-      val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
+      val trivial =
+        FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
       val mymodule = rootDir </> dir("mymodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
         case `mymodule` => List(trivial)
-        case _          => Nil
+        case _ => Nil
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/foo`".right
     }
     "relative paths in function bodies should resolve relative to the module location" >> {
       val scopedExpr = sqlB"import `/mymodule/a/b/c/`; TRIVIAL(`/foo`)"
-      val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM `./data`")
+      val trivial =
+        FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM `./data`")
       val mymodule = rootDir </> dir("mymodule") </> dir("a") </> dir("b") </> dir("c")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
         case `mymodule` => List(trivial)
-        case _          => Nil
+        case _ => Nil
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/mymodule/a/b/c/data`".right
     }
@@ -51,12 +53,12 @@ class ResolveImportSpec extends quasar.Qspec {
       val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
       val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
       val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
-      val mymodule    = rootDir </> dir("mymodule")
+      val mymodule = rootDir </> dir("mymodule")
       val otherModule = rootDir </> dir("othermodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
-        case `mymodule`    => List(foo)
+        case `mymodule` => List(foo)
         case `otherModule` => List(bar)
-        case _             => Nil
+        case _ => Nil
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
@@ -64,10 +66,10 @@ class ResolveImportSpec extends quasar.Qspec {
       val scopedExpr = sqlB"import `/mymodule/`; FOO(1) + Bar(2)"
       val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
       val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
-      val mymodule    = rootDir </> dir("mymodule")
+      val mymodule = rootDir </> dir("mymodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
         case `mymodule` => List(foo, bar)
-        case _          => Nil
+        case _ => Nil
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
@@ -75,12 +77,12 @@ class ResolveImportSpec extends quasar.Qspec {
       val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
       val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
       val bar = FunctionDecl(CIName("bar"), List(CIName("a")), sqlE":a + 2")
-      val mymodule    = rootDir </> dir("mymodule")
+      val mymodule = rootDir </> dir("mymodule")
       val otherModule = rootDir </> dir("othermodule")
       val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
-        case `mymodule`    => List(foo, bar)
+        case `mymodule` => List(foo, bar)
         case `otherModule` => Nil
-        case _             => Nil
+        case _ => Nil
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
@@ -136,7 +138,9 @@ class ResolveImportSpec extends quasar.Qspec {
       // Besides, this is the kind of thing that should be caught when compiling to LogicalPlan once
       // importing resolution is done at that layer
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
-        AmbiguousFunctionInvoke(CIName("foo"), List((CIName("foo"), rootDir), (CIName("foo"), rootDir))).left
+        AmbiguousFunctionInvoke(
+          CIName("foo"),
+          List((CIName("foo"), rootDir), (CIName("foo"), rootDir))).left
     }
     // This should not be the kind of thing caught by import resolution,
     // but it's a stop gap solution until LogicalPlan has user functions

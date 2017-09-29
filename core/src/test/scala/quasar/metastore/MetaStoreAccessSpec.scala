@@ -47,8 +47,18 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
     val f = rootDir </> file("α")
     val instant = Instant.ofEpochSecond(0)
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
-      0, instant, ViewCache.Status.Pending, None, f, None)
+      MountConfig.ViewConfig(sqlB"α", Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      0,
+      instant,
+      ViewCache.Status.Pending,
+      None,
+      f,
+      None)
 
     // NB: these tests do not execute the queries or validate results, but only
     // type-check them against the schema available via the transactor.
@@ -57,7 +67,10 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
     check(Queries.mountsHavingPrefix(rootDir))
     check(Queries.lookupMountType(rootDir))
     check(Queries.lookupMountConfig(rootDir))
-    check(Queries.insertMount(rootDir, MountConfig.fileSystemConfig(FileSystemType(""), ConnectionUri(""))))
+    check(
+      Queries.insertMount(
+        rootDir,
+        MountConfig.fileSystemConfig(FileSystemType(""), ConnectionUri(""))))
     check(Queries.deleteMount(rootDir))
     check(Queries.viewCachePaths)
     check(Queries.lookupViewCache(f))

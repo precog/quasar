@@ -27,14 +27,18 @@ package object mapping {
   implicit val codec = DataCodec.Precise
 
   implicit val JsonDataMeta: Meta[Data] =
-    Meta.other[PGobject]("json").xmap[Data](
-      pGobject =>
-        DataCodec.parse(pGobject.getValue).valueOr(err => scala.sys.error(err.shows)), // failure raises an exception
-      data => {
-        val o = new PGobject
-        o.setType("json")
-        o.setValue(DataCodec.render(data).getOrElse("{}"))
-        o
-      }
-    )
+    Meta
+      .other[PGobject]("json")
+      .xmap[Data](
+        pGobject =>
+          DataCodec
+            .parse(pGobject.getValue)
+            .valueOr(err => scala.sys.error(err.shows)), // failure raises an exception
+        data => {
+          val o = new PGobject
+          o.setType("json")
+          o.setValue(DataCodec.render(data).getOrElse("{}"))
+          o
+        }
+      )
 }

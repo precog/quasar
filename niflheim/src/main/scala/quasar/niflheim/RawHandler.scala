@@ -21,12 +21,7 @@ import quasar.precog.common._
 
 import scala.collection.mutable
 
-import java.io.{
-  BufferedOutputStream,
-  File,
-  FileOutputStream,
-  OutputStream
-}
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 
 object RawHandler {
   // file doesn't exist -> create new file
@@ -51,7 +46,8 @@ object RawHandler {
   }
 }
 
-class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue]) extends StorageReader {
+class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue])
+    extends StorageReader {
   // TODO: weakrefs?
   @volatile protected[this] var rows = mutable.ArrayBuffer.empty[JValue] ++ rs
   @volatile protected[this] var segments = Segments.empty(id)
@@ -62,7 +58,9 @@ class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue])
   def isStable: Boolean = true
 
   def structure: Iterable[ColumnRef] =
-    snapshot(None).segments.map { seg => ColumnRef(seg.cpath, seg.ctype) }
+    snapshot(None).segments.map { seg =>
+      ColumnRef(seg.cpath, seg.ctype)
+    }
 
   def length: Int = count
 
@@ -82,7 +80,9 @@ class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue])
     handleNonempty
 
     val segs = pathConstraint.map { cpaths =>
-      segments.a.filter { seg => cpaths(seg.cpath) }
+      segments.a.filter { seg =>
+        cpaths(seg.cpath)
+      }
     }.getOrElse(segments.a.clone)
 
     Block(id, segs, isStable)
@@ -92,14 +92,21 @@ class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue])
     handleNonempty
 
     val segs = refConstraints.map { refs =>
-      segments.a.filter { seg => refs(ColumnRef(seg.cpath, seg.ctype)) }
+      segments.a.filter { seg =>
+        refs(ColumnRef(seg.cpath, seg.ctype))
+      }
     }.getOrElse(segments.a.clone)
 
     Block(id, segs, isStable)
   }
 }
 
-class RawHandler private[niflheim] (id: Long, log: File, rs: Seq[JValue], private var os: OutputStream) extends RawReader(id, log, rs) {
+class RawHandler private[niflheim] (
+    id: Long,
+    log: File,
+    rs: Seq[JValue],
+    private var os: OutputStream)
+    extends RawReader(id, log, rs) {
   def write(eventid: Long, values: Seq[JValue]) {
     if (!values.isEmpty) {
       rowLock.synchronized {

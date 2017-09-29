@@ -42,11 +42,11 @@ object AccountFinder {
   val DefaultId = "kris-nuttycombe"
 
   def Empty[M[+ _]: Monad] = new AccountFinder[M] {
-    def findAccountByAPIKey(apiKey: APIKey)          = None.point[M]
+    def findAccountByAPIKey(apiKey: APIKey) = None.point[M]
     def findAccountDetailsById(accountId: AccountId) = None.point[M]
   }
 
-  def Singleton[M[+_]: Monad](rootKeyM: M[APIKey]) = new AccountFinder[M] {
+  def Singleton[M[+ _]: Monad](rootKeyM: M[APIKey]) = new AccountFinder[M] {
     def findAccountByAPIKey(apiKey: APIKey) =
       Some(DefaultId).point[M]
 

@@ -21,8 +21,8 @@ import quasar.blueeyes.json._
 import scala.collection.mutable
 
 import java.io.{
-  BufferedReader,
   BufferedOutputStream,
+  BufferedReader,
   File,
   FileInputStream,
   FileOutputStream,
@@ -108,7 +108,11 @@ private[niflheim] object RawLoader {
   /**
    * Recovery
    */
-  def recover1(id: Long, f: File, rows: mutable.ArrayBuffer[JValue], events: mutable.ArrayBuffer[(Long, Int)]) {
+  def recover1(
+      id: Long,
+      f: File,
+      rows: mutable.ArrayBuffer[JValue],
+      events: mutable.ArrayBuffer[(Long, Int)]) {
 
     // open a tempfile to write a "corrected" rawlog to, and write the header
     val tmp = File.createTempFile("nilfheim", "recovery")
@@ -118,15 +122,16 @@ private[niflheim] object RawLoader {
     // for each event, write its rows to the rawlog
     var row = 0
     val values = mutable.ArrayBuffer.empty[JValue]
-    events.foreach { case (eventid, count) =>
-      var i = 0
-      while (i < count) {
-        values.append(rows(row))
-        row += 1
-        i += 1
-      }
-      writeEvents(os, eventid, values)
-      values.clear()
+    events.foreach {
+      case (eventid, count) =>
+        var i = 0
+        while (i < count) {
+          values.append(rows(row))
+          row += 1
+          i += 1
+        }
+        writeEvents(os, eventid, values)
+        values.clear()
     }
 
     // rename the rawlog file to indicate corruption
@@ -136,13 +141,17 @@ private[niflheim] object RawLoader {
     tmp.renameTo(f)
   }
 
-  def isValidEnd1(line: String, eventid: Long): Boolean = try {
-    line.substring(6).toLong == eventid
-  } catch {
-    case _: Exception => false
-  }
+  def isValidEnd1(line: String, eventid: Long): Boolean =
+    try {
+      line.substring(6).toLong == eventid
+    } catch {
+      case _: Exception => false
+    }
 
-  def loadEvents1(reader: BufferedReader, eventid: Long, rows: mutable.ArrayBuffer[JValue]): Int = {
+  def loadEvents1(
+      reader: BufferedReader,
+      eventid: Long,
+      rows: mutable.ArrayBuffer[JValue]): Int = {
     val sofar = mutable.ArrayBuffer.empty[JValue]
 
     var line = reader.readLine()

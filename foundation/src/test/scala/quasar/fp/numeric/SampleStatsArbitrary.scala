@@ -26,7 +26,7 @@ import spire.algebra.Field
 trait SampleStatsArbitrary {
   implicit def arbitrarySampleStats[A: Arbitrary: Equal: Field]: Arbitrary[SampleStats[A]] =
     Arbitrary(for {
-      n  <- Gen.choose(0, 20)
+      n <- Gen.choose(0, 20)
       ds <- Gen.listOfN(n, Gen.choose(-1000000.0, 1000000.0))
     } yield SampleStats.fromFoldable(ds.map(Field[A].fromDouble)))
 }

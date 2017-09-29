@@ -32,9 +32,9 @@ import scalaz.stream.Process
 class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT) {
   import FileSystemTest._, FileSystemError._, PathError._, StdLib._
 
-  val query  = QueryFile.Ops[BackendEffect]
-  val read   = ReadFile.Ops[BackendEffect]
-  val write  = WriteFile.Ops[BackendEffect]
+  val query = QueryFile.Ops[BackendEffect]
+  val read = ReadFile.Ops[BackendEffect]
+  val write = WriteFile.Ops[BackendEffect]
   val manage = ManageFile.Ops[BackendEffect]
 
   val queryPrefix: ADir = rootDir </> dir("q")
@@ -50,37 +50,38 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
       lpr.invoke2(
         structural.MakeObject,
         lpr.constant(Data._str(to)),
-        lpr.invoke2(
-          structural.ObjectProject,
-          lpr.read(src),
-          lpr.constant(Data._str(from)))))
+        lpr.invoke2(structural.ObjectProject, lpr.read(src), lpr.constant(Data._str(from))))
+    )
 
   fileSystemShould { (fs, _) =>
     "Querying Files" should {
       step(deleteForQuery(fs.setupInterpM).runVoid)
 
-      "executing query to an existing file overwrites with results" >> ifSupports(fs,
+      "executing query to an existing file overwrites with results" >> ifSupports(
+        fs,
         BackendCapability.query(),
-        BackendCapability.write()) { pendingFor(fs)(Set("mimir")) {
+        BackendCapability.write()) {
+        pendingFor(fs)(Set("mimir")) {
 
-        val d = queryPrefix </> dir("execappends")
-        val a = d </> file("afile")
-        val b = d </> file("bfile")
-        val c = d </> file("out")
+          val d = queryPrefix </> dir("execappends")
+          val a = d </> file("afile")
+          val b = d </> file("bfile")
+          val c = d </> file("out")
 
-        val setup = write.saveThese(a, oneDoc) *> write.saveThese(b, anotherDoc).void
+          val setup = write.saveThese(a, oneDoc) *> write.saveThese(b, anotherDoc).void
 
-        runT(fs.setupInterpM)(setup).runVoid
+          runT(fs.setupInterpM)(setup).runVoid
 
-        val aToc = readRenamed(a, "a", "c")
-        val bToc = readRenamed(b, "b", "c")
+          val aToc = readRenamed(a, "a", "c")
+          val bToc = readRenamed(b, "b", "c")
 
-        val e = EitherT((query.execute(aToc, c) *> query.execute(bToc, c).void).run.value)
-        val p = e.liftM[Process].drain ++ read.scanAll(c)
+          val e = EitherT((query.execute(aToc, c) *> query.execute(bToc, c).void).run.value)
+          val p = e.liftM[Process].drain ++ read.scanAll(c)
 
-        runLogT(fs.testInterpM, p).runEither must beRight(containTheSameElementsAs(Vector[Data](
-          Data.Obj("c" -> Data._int(2)))))
-      } }
+          runLogT(fs.testInterpM, p).runEither must beRight(
+            containTheSameElementsAs(Vector[Data](Data.Obj("c" -> Data._int(2)))))
+        }
+      }
 
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lsch")
@@ -90,14 +91,13 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         val expectedNodes = List[PathSegment](DirName("d2").left, FileName("f1").right)
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
-                    write.save(f2, anotherDoc.toProcess).drain
+          write.save(f2, anotherDoc.toProcess).drain
 
         execT(fs.setupInterpM, setup).runVoid
 
         val p = query.ls(d1)
 
-        runT(fs.testInterpM)(p)
-          .runEither must beRight(containTheSameElementsAs(expectedNodes))
+        runT(fs.testInterpM)(p).runEither must beRight(containTheSameElementsAs(expectedNodes))
       }
 
       // TODO: Our chrooting prevents this from working, maybe we need a
@@ -117,20 +117,18 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         val f2 = d </> file("f2")
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
-                    write.save(f2, anotherDoc.toProcess).drain
+          write.save(f2, anotherDoc.toProcess).drain
         execT(fs.setupInterpM, setup).runVoid
 
         val p = query.ls(d)
 
         val preDelete = List[PathSegment](FileName("f1").right, FileName("f2").right)
 
-        runT(fs.testInterpM)(p)
-          .runEither must beRight(containTheSameElementsAs(preDelete))
+        runT(fs.testInterpM)(p).runEither must beRight(containTheSameElementsAs(preDelete))
 
         runT(fs.setupInterpM)(manage.delete(f1)).runVoid
 
-        runT(fs.testInterpM)(p)
-          .runEither must beRight(containTheSameElementsAs(preDelete.tail))
+        runT(fs.testInterpM)(p).runEither must beRight(containTheSameElementsAs(preDelete.tail))
       }
 
       step(deleteForQuery(fs.setupInterpM).runVoid)

@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 trait Clock {
 
   /** Returns the current time.
-    */
+   */
   def now(): LocalDateTime
 
   def instant(): Instant
@@ -31,7 +31,7 @@ trait Clock {
   def nanoTime(): Long
 
   /** Times how long the specified future takes to be delivered.
-    */
+   */
   def time[T](f: => Future[T]): Future[(Period, T)] = {
     val start = now()
 
@@ -43,7 +43,7 @@ trait Clock {
   }
 
   /** Times a block of code.
-    */
+   */
   def timeBlock[T](f: => T): (Period, T) = {
     val start = now()
 

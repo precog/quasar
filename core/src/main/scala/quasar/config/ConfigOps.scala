@@ -49,12 +49,14 @@ import simulacrum.typeclass
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] =
     for {
       cfgText <- textFromFile(path.some)
-      config  <- EitherT.fromDisjunction[Task](fromString(cfgText.text))
-                   .leftMap(malformedRsn.modify(rsn =>
-                      s"Failed to parse ${cfgText.displayPath}: $rsn"))
-      _       <- Task.delay(
-                   println(s"Read $name config from ${cfgText.displayPath}")
-                 ).liftM[CfgErrT]
+      config <- EitherT
+        .fromDisjunction[Task](fromString(cfgText.text))
+        .leftMap(malformedRsn.modify(rsn => s"Failed to parse ${cfgText.displayPath}: $rsn"))
+      _ <- Task
+        .delay(
+          println(s"Read $name config from ${cfgText.displayPath}")
+        )
+        .liftM[CfgErrT]
     } yield config
 
   /** Loads configuration from one of the OS-specific default paths. */
@@ -68,7 +70,7 @@ import simulacrum.typeclass
           // Because we only want to expose the current 'default' path, not the
           // legacy one, if both fail.
           case FileNotFound(_) => merr.raiseError(fnf)
-          case err             => merr.raiseError(err)
+          case err => merr.raiseError(err)
         }
       case err => merr.raiseError(err)
     }
@@ -86,19 +88,18 @@ object ConfigOps {
   /** NB: Paths read from environment/props are assumed to be absolute. */
   def defaultPathForOS(file: RFile)(os: OS): Task[FsFile] = {
     def localAppData: OptionT[Task, FsPath.Aux[Abs, Dir, Sandboxed]] =
-      OptionT(Task.delay(envOrNone("LOCALAPPDATA")))
-        .flatMap(s => OptionT(parseWinAbsAsDir(s).point[Task]))
+      OptionT(Task.delay(envOrNone("LOCALAPPDATA"))).flatMap(s =>
+        OptionT(parseWinAbsAsDir(s).point[Task]))
 
     def homeDir: OptionT[Task, FsPath.Aux[Abs, Dir, Sandboxed]] =
-      OptionT(Task.delay(propOrNone("user.home")))
-        .flatMap(s => OptionT(parseAbsAsDir(os, s).point[Task]))
+      OptionT(Task.delay(propOrNone("user.home"))).flatMap(s =>
+        OptionT(parseAbsAsDir(os, s).point[Task]))
 
-    val dirPath: RDir = os.fold(
-      currentDir,
-      dir("Library") </> dir("Application Support"),
-      dir(".config"))
+    val dirPath: RDir =
+      os.fold(currentDir, dir("Library") </> dir("Application Support"), dir(".config"))
 
-    val baseDir = OptionT.some[Task, Boolean](os.isWin)
+    val baseDir = OptionT
+      .some[Task, Boolean](os.isWin)
       .ifM(localAppData, OptionT.none)
       .orElse(homeDir)
       .map(_.forgetBase)
@@ -120,28 +121,29 @@ object ConfigOps {
     }
 
     for {
-      codec   <- systemCodec.liftM[CfgErrT]
-      f       <- file.fold(defaultPath)(Task.now).liftM[CfgErrT]
-      strPath =  printFsPath(codec, f)
-      text    <- attemptReadFile(f, strPath)
+      codec <- systemCodec.liftM[CfgErrT]
+      f <- file.fold(defaultPath)(Task.now).liftM[CfgErrT]
+      strPath = printFsPath(codec, f)
+      text <- attemptReadFile(f, strPath)
     } yield ConfigText(text, strPath)
   }
 
   def jsonFromFile(path: Option[FsFile]): CfgTask[Json] =
     textFromFile(path) >>= (cfgText =>
-      EitherT.fromDisjunction[Task](fromString[Json](cfgText.text))
+      EitherT
+        .fromDisjunction[Task](fromString[Json](cfgText.text))
         .leftMap(malformedRsn.modify(rsn => s"Failed to parse ${cfgText.displayPath}: $rsn")))
 
   def textToFile(text: String, path: Option[FsFile]): Task[Unit] =
-     for {
-       codec <- systemCodec
-       pStr  <- path.fold(defaultPath)(Task.now)
-       jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
-       _     <- Task.delay {
-                  Option(jPath.getParent) foreach (Files.createDirectories(_))
-                  Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
-                }
-     } yield ()
+    for {
+      codec <- systemCodec
+      pStr <- path.fold(defaultPath)(Task.now)
+      jPath <- Task.delay(Paths.get(printFsPath(codec, pStr)))
+      _ <- Task.delay {
+        Option(jPath.getParent) foreach (Files.createDirectories(_))
+        Files.write(jPath, text.getBytes(StandardCharsets.UTF_8))
+      }
+    } yield ()
 
   def jsonToFile(json: Json, path: Option[FsFile]): Task[Unit] =
     textToFile(asString(json), path)
@@ -154,7 +156,7 @@ object ConfigOps {
 
   ////
 
-  private def merr = MonadError[ETask[ConfigError,?], ConfigError]
+  private def merr = MonadError[ETask[ConfigError, ?], ConfigError]
   private val malformedRsn = malformedConfig composeLens _2
 
   /** The default path to the configuration file for the current operating system. */

@@ -21,30 +21,29 @@ import slamdata.Predef._
 import scalaz.MonadState
 
 /** A version of MonadState that doesn't extend Monad to avoid ambiguous
-  * implicits in the presence of multiple "mtl" constraints.
-  */
+ * implicits in the presence of multiple "mtl" constraints.
+ */
 trait MonadState_[F[_], S] { self =>
   def MS: MonadState[F, S]
 
-  def bind[A, B](fa: F[A])(f: (A) ⇒ F[B]): F[B]
+  def bind[A, B](fa: F[A])(f: (A) => F[B]): F[B]
   def get: F[S]
   def init: F[S]
-  def point[A](a: ⇒ A): F[A]
+  def point[A](a: => A): F[A]
   def put(s: S): F[Unit]
 }
 
 object MonadState_ {
   def apply[F[_], S](implicit F: MonadState_[F, S]): MonadState_[F, S] = F
 
-  implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S])
-      : MonadState_[F, S] =
+  implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S]): MonadState_[F, S] =
     new MonadState_[F, S] {
       def MS = F
 
-      def bind[A, B](fa: F[A])(f: (A) ⇒ F[B]) = F.bind(fa)(f)
+      def bind[A, B](fa: F[A])(f: (A) => F[B]) = F.bind(fa)(f)
       def get = F.get
       def init = F.init
-      def point[A](a: ⇒ A) = F.point(a)
+      def point[A](a: => A) = F.point(a)
       def put(s: S) = F.put(s)
     }
 

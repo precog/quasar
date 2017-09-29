@@ -27,17 +27,17 @@ import org.slf4s.Logging
 
 import scalaz._
 import scalaz.effect.IO
-import scalaz.Ordering.{LT, EQ, GT}
+import scalaz.Ordering.{EQ, GT, LT}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
-import scala.{ collection => sc }
+import scala.{collection => sc}
 
 import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
-import java.nio.channels.{ FileChannel, FileLock => JFileLock }
+import java.nio.channels.{FileChannel, FileLock => JFileLock}
 import java.nio.file.Files
 import java.time.ZonedDateTime
 import java.util.Arrays.fill
@@ -50,7 +50,8 @@ trait FileLock {
 class FileLockException(message: String) extends Exception(message)
 
 object FileLock {
-  private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File]) extends FileLock {
+  private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File])
+      extends FileLock {
     def release = {
       lock.release
       channel.close
@@ -69,7 +70,7 @@ object FileLock {
     }
 
     val channel = new RandomAccessFile(lockFile, "rw").getChannel
-    val lock    = channel.tryLock
+    val lock = channel.tryLock
 
     if (lock == null) {
       throw new FileLockException("Could not lock. Previous lock exists on " + target)
@@ -79,12 +80,11 @@ object FileLock {
   }
 }
 
-
-
 // Once we move to 2.10, we can abstract this to a specialized-list. In 2.9,
 // specialization is just too buggy to get it working (tried).
 
-sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, IntList] { self =>
+sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, IntList] {
+  self =>
   def head: Int
   def tail: IntList
 
@@ -93,7 +93,7 @@ sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, I
   override def foreach[@specialized B](f: Int => B): Unit = {
     @tailrec def loop(xs: IntList): Unit = xs match {
       case IntCons(h, t) => f(h); loop(t)
-      case _             =>
+      case _ =>
     }
     loop(this)
   }
@@ -111,7 +111,7 @@ sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, I
   override def length: Int = {
     @tailrec def loop(xs: IntList, len: Int): Int = xs match {
       case IntCons(x, xs0) => loop(xs0, len + 1)
-      case IntNil          => len
+      case IntNil => len
     }
     loop(this, 0)
   }
@@ -129,7 +129,7 @@ sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, I
   override def reverse: IntList = {
     @tailrec def loop(xs: IntList, ys: IntList): IntList = xs match {
       case IntCons(x, xs0) => loop(xs0, x :: ys)
-      case IntNil          => ys
+      case IntNil => ys
     }
     loop(this, IntNil)
   }
@@ -142,8 +142,8 @@ final case class IntCons(override val head: Int, override val tail: IntList) ext
 }
 
 final case object IntNil extends IntList {
-  override def head: Int        = sys.error("no head on empty IntList")
-  override def tail: IntList    = IntNil
+  override def head: Int = sys.error("no head on empty IntList")
+  override def tail: IntList = IntNil
   override def isEmpty: Boolean = true
 }
 
@@ -156,12 +156,10 @@ final class IntListBuilder extends Builder[Int, IntList] {
 
 object IntList {
   implicit def cbf = new CanBuildFrom[IntList, Int, IntList] {
-    def apply(): Builder[Int, IntList]              = new IntListBuilder
+    def apply(): Builder[Int, IntList] = new IntListBuilder
     def apply(from: IntList): Builder[Int, IntList] = apply()
   }
 }
-
-
 
 object IOUtils extends Logging {
   val dotDirs = "." :: ".." :: Nil
@@ -190,8 +188,8 @@ object IOUtils extends Logging {
   }
 
   /** Performs a safe write to the file. Returns true
-    * if the file was completely written, false otherwise
-    */
+   * if the file was completely written, false otherwise
+   */
   def safeWriteToFile(s: String, f: File): IO[Boolean] = {
     val tmpFile = new File(f.getParentFile, f.getName + "-" + System.nanoTime + ".tmp")
 
@@ -209,7 +207,7 @@ object IOUtils extends Logging {
 
   def recursiveDelete(files: Seq[File]): IO[Unit] = {
     files.toList match {
-      case Nil      => IO(())
+      case Nil => IO(())
       case hd :: tl => recursiveDelete(hd).flatMap(_ => recursiveDelete(tl))
     }
   }
@@ -217,7 +215,7 @@ object IOUtils extends Logging {
   def listFiles(f: File): IO[Array[File]] = IO {
     f.listFiles match {
       case null => Array()
-      case xs   => xs
+      case xs => xs
     }
   }
 
@@ -226,15 +224,16 @@ object IOUtils extends Logging {
     def del(): Unit = { file.delete(); () }
 
     if (!file.isDirectory) IO(del())
-    else listFiles(file) flatMap {
-      case Array() => IO(del())
-      case xs      => recursiveDelete(xs).map(_ => del())
-    }
+    else
+      listFiles(file) flatMap {
+        case Array() => IO(del())
+        case xs => recursiveDelete(xs).map(_ => del())
+      }
   }
 
   /** Recursively deletes empty directories, stopping at the first
-    * non-empty dir.
-    */
+   * non-empty dir.
+   */
   def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[Unit] = {
     if (startDir == upTo) {
       IO { log.debug("Stopping recursive clean at root: " + upTo) }
@@ -262,14 +261,12 @@ object IOUtils extends Logging {
   }
 }
 
-
-
-
 /**
-  * Implicit container trait
-  */
+ * Implicit container trait
+ */
 trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
+  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](
+      self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
     new MapPimp(self)
 }
 
@@ -283,7 +280,8 @@ class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
     left foreach {
       case (key, leftValues) => {
         right get key map { rightValues =>
-          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
+          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C](
+            (leftValues, rightValues)))
         } getOrElse {
           leftValues foreach { b =>
             resultBuilder += (key -> Either3.left3[B, (CC[B], CC2[C]), C](b))
@@ -305,8 +303,6 @@ class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
     resultBuilder.result()
   }
 }
-
-
 
 object NumericComparisons {
 
@@ -351,7 +347,7 @@ object NumericComparisons {
     if (a + aError < b - bError) -1 else if (a - aError > b + bError) 1 else 0
   }
 
-  import scalaz.Ordering.{ LT, GT, EQ }
+  import scalaz.Ordering.{EQ, GT, LT}
 
   @inline def order(a: Long, b: Long): scalaz.Ordering =
     if (a < b) LT else if (a == b) EQ else GT
@@ -480,22 +476,21 @@ object RawBitSet {
   }
 }
 
-
-
 /**
-  * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
-  * of the operations on this datastructure are checked for bounds.  You are
-  * trusted to get this right on your own.  If you do something weird, you could
-  * end up overwriting data, reading old results, etc.  Don't do that.
-  *
-  * No objects were allocated in the making of this film.
-  */
-final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
+ * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
+ * of the operations on this datastructure are checked for bounds.  You are
+ * trusted to get this right on your own.  If you do something weird, you could
+ * end up overwriting data, reading old results, etc.  Don't do that.
+ *
+ * No objects were allocated in the making of this film.
+ */
+final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](
+    _bound: Int) {
   val bound = _bound + 1
 
   private val ring = new Array[A](bound)
   private var front = 0
-  private var back  = rotate(front, 1)
+  private var back = rotate(front, 1)
 
   def isEmpty = front == rotate(back, -1)
 
@@ -558,9 +553,6 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
   }
 }
 
-
-
-
 case class VectorClock(map: Map[Int, Int]) {
   def get(producerId: Int): Option[Int] = map.get(producerId)
 
@@ -608,4 +600,3 @@ object VectorClock extends VectorClockSerialization {
     }
   }
 }
-

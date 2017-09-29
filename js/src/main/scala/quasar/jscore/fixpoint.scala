@@ -23,26 +23,27 @@ import matryoshka.data._
 import matryoshka.implicits._
 
 final case class fixpoint[R](embed: JsCoreF[R] => R) {
-  def Literal(value: Js.Lit): R                          = embed(LiteralF[R](value))
-  def Ident(value: Name): R                              = embed(IdentF[R](value))
-  def Access(expr: R, key: R): R                         = embed(AccessF(expr, key))
-  def Call(callee: R, args: List[R]): R                  = embed(CallF(callee, args))
-  def New(name: Name, args: List[R]): R                  = embed(NewF(name, args))
-  def If(condition: R, consequent: R, alternative: R): R = embed(IfF(condition, consequent, alternative))
-  def UnOp(op: UnaryOperator, arg: R): R                 = embed(UnOpF(op, arg))
-  def BinOp(op: BinaryOperator, left: R, right: R): R    = embed(BinOpF(op, left, right))
-  def Arr(values: List[R]): R                            = embed(ArrF(values))
-  def Fun(params: List[Name], body: R): R                = embed(FunF(params, body))
-  def Obj(values: ListMap[Name, R]): R                   = embed(ObjF(values))
-  def Let(name: Name, expr: R, body: R): R               = embed(LetF(name, expr, body))
-  def SpliceObjects(srcs: List[R]): R                    = embed(SpliceObjectsF(srcs))
-  def SpliceArrays(srcs: List[R]): R                     = embed(SpliceArraysF(srcs))
+  def Literal(value: Js.Lit): R = embed(LiteralF[R](value))
+  def Ident(value: Name): R = embed(IdentF[R](value))
+  def Access(expr: R, key: R): R = embed(AccessF(expr, key))
+  def Call(callee: R, args: List[R]): R = embed(CallF(callee, args))
+  def New(name: Name, args: List[R]): R = embed(NewF(name, args))
+  def If(condition: R, consequent: R, alternative: R): R =
+    embed(IfF(condition, consequent, alternative))
+  def UnOp(op: UnaryOperator, arg: R): R = embed(UnOpF(op, arg))
+  def BinOp(op: BinaryOperator, left: R, right: R): R = embed(BinOpF(op, left, right))
+  def Arr(values: List[R]): R = embed(ArrF(values))
+  def Fun(params: List[Name], body: R): R = embed(FunF(params, body))
+  def Obj(values: ListMap[Name, R]): R = embed(ObjF(values))
+  def Let(name: Name, expr: R, body: R): R = embed(LetF(name, expr, body))
+  def SpliceObjects(srcs: List[R]): R = embed(SpliceObjectsF(srcs))
+  def SpliceArrays(srcs: List[R]): R = embed(SpliceArraysF(srcs))
 
   def ident(name: String): R = Ident(Name(name))
   def select(expr: R, name: String): R = Access(expr, Literal(Js.Str(name)))
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def binop(op: BinaryOperator, a1: R, args: R*): R = args.toList match {
-    case Nil    => a1
+    case Nil => a1
     case h :: t => BinOp(op, a1, binop(op, h, t: _*))
   }
 }
@@ -73,7 +74,8 @@ object New {
 }
 
 object If {
-  def apply(condition: JsCore, consequent: JsCore, alternative: JsCore): JsCore = Fix(IfF(condition, consequent, alternative))
+  def apply(condition: JsCore, consequent: JsCore, alternative: JsCore): JsCore =
+    Fix(IfF(condition, consequent, alternative))
   def unapply(obj: JsCore): Option[(JsCore, JsCore, JsCore)] = IfF.unapply(obj.project)
 }
 
@@ -83,8 +85,10 @@ object UnOp {
 }
 
 object BinOp {
-  def apply(op: BinaryOperator, left: JsCore, right: JsCore): JsCore = Fix(BinOpF(op, left, right))
-  def unapply(obj: JsCore): Option[(BinaryOperator, JsCore, JsCore)] = BinOpF.unapply(obj.project)
+  def apply(op: BinaryOperator, left: JsCore, right: JsCore): JsCore =
+    Fix(BinOpF(op, left, right))
+  def unapply(obj: JsCore): Option[(BinaryOperator, JsCore, JsCore)] =
+    BinOpF.unapply(obj.project)
 }
 
 object Arr {

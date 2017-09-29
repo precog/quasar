@@ -30,50 +30,48 @@ package object xml {
 
   object KeywordConfig {
     val ejsonCompliant =
-      KeywordConfig(
-        attributesKeyName = "_xml.attributes",
-        textKeyName       = "_xml.text")
+      KeywordConfig(attributesKeyName = "_xml.attributes", textKeyName = "_xml.text")
   }
 
   import Data._
 
   /** Example
-    *
-    * <foo type="baz" id="1">
-    *   <bar>
-    *     <baz>37</baz>
-    *     <bat>one</bat>
-    *     <bat>two</bat>
-    *   </bar>
-    *   <quux>lorem ipsum</quux>
-    * </foo>
-    *
-    * {
-    *   "foo": {
-    *     "_attributes": {
-    *       "type": "baz",
-    *       "id": "1"
-    *     },
-    *     "bar": {
-    *       "baz": "37",
-    *       "bat": ["one", "two"]
-    *     },
-    *     "quux": "lorem ipsum"
-    *   }
-    * }
-    */
+   *
+   * <foo type="baz" id="1">
+   *   <bar>
+   *     <baz>37</baz>
+   *     <bat>one</bat>
+   *     <bat>two</bat>
+   *   </bar>
+   *   <quux>lorem ipsum</quux>
+   * </foo>
+   *
+   * {
+   *   "foo": {
+   *     "_attributes": {
+   *       "type": "baz",
+   *       "id": "1"
+   *     },
+   *     "bar": {
+   *       "baz": "37",
+   *       "bat": ["one", "two"]
+   *     },
+   *     "quux": "lorem ipsum"
+   *   }
+   * }
+   */
   def toData(elem: Elem, config: KeywordConfig): Data = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
       case Seq() =>
-        m.cata(attrsAndText(_,  ""), _str(""))
+        m.cata(attrsAndText(_, ""), _str(""))
       case LeafText(txt) =>
         m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
         val childrenByName = elements(xs) groupBy qualifiedName
         val childrenData = childrenByName.mapValues {
           case Seq(single) => impl(single.child, single.attributes.some)
-          case xs          => Arr(xs.map(x => impl(x.child, x.attributes.some)).toList)
+          case xs => Arr(xs.map(x => impl(x.child, x.attributes.some)).toList)
         }
         val attributeData = m.flatMap(attrToData).strengthL(config.attributesKeyName)
         Obj(ListMap((attributeData.toList ++ childrenData): _*))
@@ -81,13 +79,12 @@ package object xml {
 
     def attrToData(meta: MetaData): Option[Data] = meta match {
       case scala.xml.Null => none
-      case m              => some(Obj(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*))
+      case m => some(Obj(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*))
     }
 
     def attrsAndText(attrs: MetaData, txt: String): Data =
-      attrToData(attrs).fold(_str(txt))(d => _obj(ListMap(
-        config.attributesKeyName -> d,
-        config.textKeyName       -> _str(txt))))
+      attrToData(attrs).fold(_str(txt))(d =>
+        _obj(ListMap(config.attributesKeyName -> d, config.textKeyName -> _str(txt))))
 
     Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
@@ -113,7 +110,7 @@ package object xml {
     def unapply(nodes: Seq[Node]): Option[Seq[Node]] =
       nodes.forall({
         case _: Elem => false
-        case _       => true
+        case _ => true
       }) option nodes
   }
 
@@ -121,7 +118,7 @@ package object xml {
   object LeafText {
     def unapply(nodes: Seq[Node]): Option[String] =
       Leaf.unapply(nodes) map (_.collect({
-        case Text(s)   => s
+        case Text(s) => s
         case PCData(s) => s
       }).mkString)
   }

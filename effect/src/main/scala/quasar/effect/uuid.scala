@@ -41,9 +41,8 @@ object uuid {
 
     def type1[F[_]: Capture]: F[GenUUID ~> F] =
       Capture[F].capture(
-        fromNoArg[F](Option(EthernetAddress.fromInterface).fold(
-          Generators.timeBasedGenerator)(
-          Generators.timeBasedGenerator)))
+        fromNoArg[F](Option(EthernetAddress.fromInterface)
+          .fold(Generators.timeBasedGenerator)(Generators.timeBasedGenerator)))
 
     def type4[F[_]: Capture]: F[GenUUID ~> F] =
       Capture[F].capture(fromNoArg[F](Generators.randomBasedGenerator))
@@ -61,15 +60,15 @@ object uuid {
     uuid.toString.replace("-", "")
 
   /** Returns an opaque string from the given UUID that is sequential w.r.t.
-    * lexigraphical ordering for UUID Type-1 variants. That is, if a: UUID and
-    * b: UUID and `b` was generated after `a` then
-    *
-    *   `toSequentialString(a) < toSequentialString(b) == true`
-    *
-    * returns None if the given UUID is not Type-1.
-    *
-    * See https://www.ietf.org/rfc/rfc4122.txt
-    */
+   * lexigraphical ordering for UUID Type-1 variants. That is, if a: UUID and
+   * b: UUID and `b` was generated after `a` then
+   *
+   *   `toSequentialString(a) < toSequentialString(b) == true`
+   *
+   * returns None if the given UUID is not Type-1.
+   *
+   * See https://www.ietf.org/rfc/rfc4122.txt
+   */
   def toSequentialString(uuid: UUID): Option[String] =
     if (uuid.version === 1) {
       val parts = uuid.toString.split("-")

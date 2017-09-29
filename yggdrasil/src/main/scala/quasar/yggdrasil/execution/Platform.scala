@@ -20,8 +20,8 @@ import quasar.precog.common.security._
 
 import scalaz._
 
-trait Execution[M[+_], A] {
+trait Execution[M[+ _], A] {
   def executorFor(apiKey: APIKey): EitherT[M, String, QueryExecutor[M, A]]
 }
 
-trait Platform[M[+_], Block, A] extends Execution[M, A]
+trait Platform[M[+ _], Block, A] extends Execution[M, A]

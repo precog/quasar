@@ -30,8 +30,7 @@ final case class WriteError(value: Data, hint: Option[String]) {
 
 object WriteError {
   implicit val Encode: EncodeJson[WriteError] = EncodeJson[WriteError](e =>
-    Json("data"   := DataCodec.Precise.encode(e.value),
-         "detail" := e.hint.getOrElse("")))
+    Json("data" := DataCodec.Precise.encode(e.value), "detail" := e.hint.getOrElse("")))
 
   implicit def writeErrorShow: Show[WriteError] =
     Show.shows(_.message)

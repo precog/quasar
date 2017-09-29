@@ -24,9 +24,9 @@ import scalaz.stream._
 final class FoldableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Foldable[F]) {
 
   /** Returns whether this `Foldable` is equal to `other` when viewed as sets.
-    *
-    * NB: Has O(n^2) complexity.
-    */
+   *
+   * NB: Has O(n^2) complexity.
+   */
   def equalsAsSets(other: F[A])(implicit A: Equal[A]): Boolean =
     self.all(other element _) && other.all(self element _)
 

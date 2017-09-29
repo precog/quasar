@@ -25,7 +25,14 @@ import quasar.fp.free._
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.fs.mount.cache.VCache
 import quasar.effect._
-import quasar.main.{physicalFileSystems, FsAsk, KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
+import quasar.main.{
+  physicalFileSystems,
+  FsAsk,
+  HierarchicalFsEffM,
+  KvsMounter,
+  PhysFsEff,
+  PhysFsEffM
+}
 import quasar.physical._
 import quasar.regression.{interpretHfsIO, HfsIO}
 
@@ -42,22 +49,22 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 /** Executes all the examples defined within the `fileSystemShould` block
-  * for each file system in `fileSystems`.
-  *
-  * TODO: Currently, examples for a single filesystem are executed concurrently,
-  *       but the suites themselves are executed sequentially due to the `step`s
-  *       inserted for setup/teardown. It'd be nice if the tests for all
-  *       filesystems would run concurrently.
-  */
+ * for each file system in `fileSystems`.
+ *
+ * TODO: Currently, examples for a single filesystem are executed concurrently,
+ *       but the suites themselves are executed sequentially due to the `step`s
+ *       inserted for setup/teardown. It'd be nice if the tests for all
+ *       filesystems would run concurrently.
+ */
 abstract class FileSystemTest[S[_]](
-  val fileSystems: Task[IList[SupportedFs[S]]]
+    val fileSystems: Task[IList[SupportedFs[S]]]
 ) extends quasar.Qspec {
 
   sequential
 
-  type F[A]      = Free[S, A]
+  type F[A] = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]
-  type Run       = F ~> Task
+  type Run = F ~> Task
 
   def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
@@ -68,12 +75,16 @@ abstract class FileSystemTest[S[_]](
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
           Fragments(s"${fs.ref.name.shows} FileSystem" >>
-            skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
-        })
+            skipped(
+              s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
+      })
     }.unsafePerformSync
 
   /** Returns the given result if the filesystem supports the given capabilities or `Skipped` otherwise. */
-  def ifSupports[A: AsResult](fs: FileSystemUT[S], capability: BackendCapability, capabilities: BackendCapability*)(a: => A): Result =
+  def ifSupports[A: AsResult](
+      fs: FileSystemUT[S],
+      capability: BackendCapability,
+      capabilities: BackendCapability*)(a: => A): Result =
     NonEmptyList(capability, capabilities: _*)
       .traverse_(c => fs.supports(c).fold(().successNel[BackendCapability], c.failureNel))
       .as(AsResult(a))
@@ -84,7 +95,8 @@ abstract class FileSystemTest[S[_]](
     toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
   }
 
-  def pendingForF[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(fa: => F[A])(implicit run: Run): Result =
+  def pendingForF[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(fa: => F[A])(
+      implicit run: Run): Result =
     pendingFor(fs)(toPend)(run(fa).unsafePerformSync)
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
@@ -147,7 +159,8 @@ object FileSystemTest {
       ext <- externalFsUT(mounts)
     } yield {
       (loc ::: ext) map { sf =>
-        sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir))))
+        sf.copy(impl = sf.impl.map(ut =>
+          ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir))))
       }
     }
   }
@@ -156,10 +169,11 @@ object FileSystemTest {
     TestConfig externalFileSystems {
       case (tpe, uri) =>
         filesystems.testFileSystem(
-          mounts.translate(
-            foldMapNT(
-              injectFT[Task, filesystems.Eff] :+:
-              injectFT[PhysErr, filesystems.Eff])).apply(tpe, uri).run)
+          mounts
+            .translate(foldMapNT(injectFT[Task, filesystems.Eff] :+:
+              injectFT[PhysErr, filesystems.Eff]))
+            .apply(tpe, uri)
+            .run)
     }
   }
 
@@ -174,21 +188,22 @@ object FileSystemTest {
 
   def nullViewUT(mounts: BackendDef[PhysFsEffM]): Task[FileSystemUT[BackendEffect]] =
     (
-      inMemUT                                             |@|
-      TaskRef(0L)                                         |@|
-      ViewState.toTask(Map())                             |@|
-      TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
-      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-    ) {
-      (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
-
+      inMemUT |@|
+        TaskRef(0L) |@|
+        ViewState.toTask(Map()) |@|
+        TaskRef(Map[APath, MountConfig]()) |@|
+        TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
+        TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
+    ) { (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
       val mounting: Mounting ~> Task = {
         val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
-          KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+          KeyValueStore.impl.fromTaskRef(cfgsRef),
+          hfsRef,
+          mntdRef)
 
-        foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
-          .compose(toPhysFs)
+        foldMapNT(
+          Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure
+            .toRuntimeError[Task, PhysicalError]).compose(toPhysFs)
       }
 
       type ViewBackendEffect[A] = (
@@ -202,12 +217,12 @@ object FileSystemTest {
       )#M[A]
 
       val memPlus: ViewBackendEffect ~> Task = mounting :+:
-      Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
-      Failure.toRuntimeError[Task, MountingError] :+:
-      viewState :+:
-      runConstantVCache[Task](Map.empty) :+:
-      MonotonicSeq.fromTaskRef(seqRef) :+:
-      mem.testInterp
+        Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
+        Failure.toRuntimeError[Task, MountingError] :+:
+        viewState :+:
+        runConstantVCache[Task](Map.empty) :+:
+        MonotonicSeq.fromTaskRef(seqRef) :+:
+        mem.testInterp
 
       val fs = foldMapNT(memPlus) compose view.backendEffect[ViewBackendEffect]
       val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
@@ -222,19 +237,21 @@ object FileSystemTest {
       foldMapNT[HfsIO, Task](f) compose
         hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mntDir, r))
 
-    (interpretHfsIO |@| inMemUT)((f, mem) =>
-      FileSystemUT(
-        BackendRef.name.set(BackendName("hierarchical"))(mem.ref),
-        fs(f, mem.testInterp),
-        fs(f, mem.setupInterp),
-        mntDir,
-        mem.close))
+    (interpretHfsIO |@| inMemUT)(
+      (f, mem) =>
+        FileSystemUT(
+          BackendRef.name.set(BackendName("hierarchical"))(mem.ref),
+          fs(f, mem.testInterp),
+          fs(f, mem.setupInterp),
+          mntDir,
+          mem.close))
   }
 
   def inMemUT: Task[FileSystemUT[BackendEffect]] = {
     val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
 
-    InMemory.runStatefully(InMemory.InMemState.empty)
+    InMemory
+      .runStatefully(InMemory.InMemState.empty)
       .map(_ compose InMemory.fileSystem)
       .map(f => Empty.analyze[Task] :+: f)
       .map(f => FileSystemUT(ref, f, f, rootDir, ().point[Task]))

@@ -21,12 +21,12 @@ import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
 
 import java.io.File
-import scala.collection.Seq     // uh, yeah
+import scala.collection.Seq // uh, yeah
 import scala.util.{Left, Right}
 
 import monocle.Lens
 import monocle.macros.Lenses
-import scalaz.{\/-, -\/, \/}
+import scalaz.{-\/, \/, \/-}
 import scalaz.std.either._
 import scalaz.std.list._
 import scalaz.syntax.traverse._
@@ -50,15 +50,15 @@ object CliOptions {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
-      head("quasar", BuildInfo.version)
+    head("quasar", BuildInfo.version)
 
-      help("help") text("prints this usage text\n")
+    help("help") text ("prints this usage text\n")
 
-      cmd("initUpdateMetaStore")
-        .text("Initializes and updates the metastore.\n")
-        .action((_, c) =>
-          (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
-    }
+    cmd("initUpdateMetaStore")
+      .text("Initializes and updates the metastore.\n")
+      .action((_, c) =>
+        (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   class CliOptionsParser[C](l: Lens[C, CliOptions], cmdName: String)
@@ -66,7 +66,7 @@ object CliOptions {
 
     opt[String]('c', "config") action { (x, c) =>
       (l composeLens config).set(Some(x))(c)
-    } text("path to the config file to use")
+    } text ("path to the config file to use")
 
     opt[File]('P', "plugins") validate { x =>
       if (!x.exists()) {
@@ -79,7 +79,7 @@ object CliOptions {
       }
     } action { (x, c) =>
       (l composeLens loadConfig).set(-\/(x))(c)
-    } text("path to the plugins directory containing JAR files which will be loaded as backends")
+    } text ("path to the plugins directory containing JAR files which will be loaded as backends")
 
     // we hide this one because it's only intended for local development
     opt[(String, Seq[File])]("backend").hidden.unbounded validate { x =>
@@ -95,22 +95,22 @@ object CliOptions {
 
     opt[String]('L', "content-location") action { (x, c) =>
       (l composeLens contentLoc).set(Some(x))(c)
-    } text("location where static content will be hosted on the Quasar server. Must begin with a /")
+    } text ("location where static content will be hosted on the Quasar server. Must begin with a /")
 
     opt[String]('C', "content-path") action { (x, c) =>
       (l composeLens contentPath).set(Some(x))(c)
-    } text("path where static content lives on the file system")
+    } text ("path where static content lives on the file system")
 
     opt[Unit]('r', "content-path-relative") action { (_, c) =>
       (l composeLens contentPathRelative).set(true)(c)
-    } text("specifies that the content-path is relative to the install directory (not the current dir)")
+    } text ("specifies that the content-path is relative to the install directory (not the current dir)")
 
     opt[Unit]('o', "open-client") action { (_, c) =>
       (l composeLens openClient).set(true)(c)
-    } text("opens a browser window to the client on startup")
+    } text ("opens a browser window to the client on startup")
 
     opt[Int]('p', "port") action { (x, c) =>
       (l composeLens port).set(Some(x))(c)
-    } text("the port to run Quasar on")
+    } text ("the port to run Quasar on")
   }
 }

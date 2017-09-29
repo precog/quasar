@@ -21,9 +21,10 @@ import slamdata.Predef._
 import scalaz._, Scalaz._
 
 final class ZipperOps[A] private[scalaz] (self: Zipper[A]) {
+
   /** Returns a `Zipper` focused on the first value for which the function was
-    * defined, updating the focused value with the result of the function.
-    */
+   * defined, updating the focused value with the result of the function.
+   */
   final def findMap(f: A => Option[A]): Option[Zipper[A]] = {
     def updated(z: Zipper[A]): Option[Zipper[A]] =
       f(z.focus) map (z.update(_))
@@ -39,10 +40,11 @@ final class ZipperOps[A] private[scalaz] (self: Zipper[A]) {
   @tailrec
   private def findMap_[A, B](fa: Stream[A])(f: A => Option[B]): Option[B] = {
     fa match {
-      case h #:: t => f(h) match {
-        case None => findMap_(t)(f)
-        case b    => b
-      }
+      case h #:: t =>
+        f(h) match {
+          case None => findMap_(t)(f)
+          case b => b
+        }
       case _ => none
     }
   }

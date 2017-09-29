@@ -20,11 +20,8 @@ import quasar.pkg.tests._
 
 trait JoinTypeArbitrary {
   implicit val joinTypeArbitrary: Arbitrary[JoinType] =
-    Arbitrary(Gen.oneOf(
-      JoinType.Inner,
-      JoinType.FullOuter,
-      JoinType.LeftOuter,
-      JoinType.RightOuter))
+    Arbitrary(
+      Gen.oneOf(JoinType.Inner, JoinType.FullOuter, JoinType.LeftOuter, JoinType.RightOuter))
 }
 
 object JoinTypeArbitrary extends JoinTypeArbitrary

@@ -31,7 +31,9 @@ import scalaz.concurrent.Task
 
 object metastore {
 
-  def service[S[_]](implicit meta: MetaStoreLocation.Ops[S], S0: Task :<: S): QHttpService[S] = {
+  def service[S[_]](
+      implicit meta: MetaStoreLocation.Ops[S],
+      S0: Task :<: S): QHttpService[S] = {
 
     QHttpService {
       case GET -> Root =>
@@ -40,11 +42,13 @@ object metastore {
         val initialize = req.params.keys.toList.contains("initialize")
         respondT((for {
           connConfigJson <- lift(req.as[Json]).into[S].liftM[MainErrT]
-          connConfig     <- EitherT.fromEither(connConfigJson.as[DbConnectionConfig].result.leftMap(_._1).point[Free[S, ?]])
-          _              <- EitherT(meta.set(connConfig, initialize))
-          newUrl         =  DbConnectionConfig.connectionInfo(connConfig).url
-          initializedStr =  if (initialize) "newly initialized " else ""
-        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg(BadRequest, msg)))
+          connConfig <- EitherT.fromEither(
+            connConfigJson.as[DbConnectionConfig].result.leftMap(_._1).point[Free[S, ?]])
+          _ <- EitherT(meta.set(connConfig, initialize))
+          newUrl = DbConnectionConfig.connectionInfo(connConfig).url
+          initializedStr = if (initialize) "newly initialized " else ""
+        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg =>
+          ApiError.fromMsg(BadRequest, msg)))
     }
   }
 }

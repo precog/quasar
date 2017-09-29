@@ -23,11 +23,10 @@ import scalaz._
 import simulacrum.typeclass
 
 /** Analogous to `ShowT`; allows construction of `Delay[RenderTree, F]` for
-  * an `F` that refers to `T[... F ...]`.
-  */
+ * an `F` that refers to `T[... F ...]`.
+ */
 @typeclass trait RenderTreeT[T[_[_]]] {
-  def render[F[_]: Functor](t: T[F])(implicit delay: Delay[RenderTree, F])
-      : RenderedTree
+  def render[F[_]: Functor](t: T[F])(implicit delay: Delay[RenderTree, F]): RenderedTree
 
   def renderTree[F[_]: Functor](delay: Delay[RenderTree, F]): RenderTree[T[F]] =
     RenderTree.make[T[F]](t => render(t)(Functor[F], delay))
@@ -40,6 +39,6 @@ object RenderTreeT {
     }
 
   implicit val fix: RenderTreeT[Fix] = recursiveT
-  implicit val mu:  RenderTreeT[Mu]  = recursiveT
-  implicit val nu:  RenderTreeT[Nu]  = recursiveT
+  implicit val mu: RenderTreeT[Mu] = recursiveT
+  implicit val nu: RenderTreeT[Nu] = recursiveT
 }

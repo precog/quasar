@@ -17,7 +17,7 @@
 package quasar.physical
 
 import slamdata.Predef._
-import quasar.connector.{EnvironmentError, EnvErr}
+import quasar.connector.{EnvErr, EnvironmentError}
 import quasar.config.{CfgErr, ConfigError}
 import quasar.effect.Failure
 import quasar.fp._
@@ -29,21 +29,21 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object filesystems {
-  type Eff[A]  = (CfgErr :\: EnvErr :\: PhysErr :/: Task)#M[A]
+  type Eff[A] = (CfgErr :\: EnvErr :\: PhysErr :/: Task)#M[A]
   type EffM[A] = Free[Eff, A]
 
   def testFileSystem(
-    f: Free[Eff, BackendDef.DefinitionError \/ BackendDef.DefinitionResult[Free[Eff, ?]]]
+      f: Free[Eff, BackendDef.DefinitionError \/ BackendDef.DefinitionResult[Free[Eff, ?]]]
   ): Task[(BackendEffect ~> Task, Task[Unit])] = {
     val fsDef = f.flatMap[BackendDef.DefinitionResult[EffM]] {
-        case -\/(-\/(strs)) => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
-        case -\/(\/-(err))  => injectFT[Task, Eff].apply(Task.fail(new RuntimeException(err.shows)))
-        case \/-(d)         => d.point[EffM]
-      }
+      case -\/(-\/(strs)) =>
+        injectFT[Task, Eff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
+      case -\/(\/-(err)) =>
+        injectFT[Task, Eff].apply(Task.fail(new RuntimeException(err.shows)))
+      case \/-(d) => d.point[EffM]
+    }
 
-    effMToTask(fsDef).map(d =>
-      (effMToTask compose d.run,
-        effMToTask(d.close)))
+    effMToTask(fsDef).map(d => (effMToTask compose d.run, effMToTask(d.close)))
   }
 
   ////
@@ -51,10 +51,10 @@ object filesystems {
   private val envErr = Failure.Ops[EnvironmentError, Eff]
 
   private val effToTask: Eff ~> Task =
-    Failure.toRuntimeError[Task, ConfigError]      :+:
-    Failure.toRuntimeError[Task, EnvironmentError] :+:
-    Failure.toRuntimeError[Task, PhysicalError]    :+:
-    NaturalTransformation.refl
+    Failure.toRuntimeError[Task, ConfigError] :+:
+      Failure.toRuntimeError[Task, EnvironmentError] :+:
+      Failure.toRuntimeError[Task, PhysicalError] :+:
+      NaturalTransformation.refl
 
   private val effMToTask: EffM ~> Task =
     foldMapNT(effToTask)

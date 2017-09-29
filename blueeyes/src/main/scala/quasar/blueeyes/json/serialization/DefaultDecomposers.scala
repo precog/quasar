@@ -19,13 +19,13 @@ package quasar.blueeyes.json.serialization
 import quasar.blueeyes._, json._
 
 import json._
-import java.util.{ Date => JDate }
+import java.util.{Date => JDate}
 import java.math.MathContext
 
 import java.time.LocalDateTime
 
 /** Decomposers for all basic types.
-  */
+ */
 trait DefaultDecomposers {
   implicit val JValueDecomposer: Decomposer[JValue] = new Decomposer[JValue] {
     def decompose(tvalue: JValue): JValue = tvalue
@@ -63,66 +63,94 @@ trait DefaultDecomposers {
     def decompose(date: JDate): JValue = JNum(BigDecimal(date.getTime, MathContext.UNLIMITED))
   }
 
-  implicit def OptionDecomposer[T](implicit decomposer: Decomposer[T]): Decomposer[Option[T]] = new Decomposer[Option[T]] {
-    def decompose(tvalue: Option[T]): JValue = tvalue match {
-      case None    => JNull
-      case Some(v) => decomposer.decompose(v)
+  implicit def OptionDecomposer[T](implicit decomposer: Decomposer[T]): Decomposer[Option[T]] =
+    new Decomposer[Option[T]] {
+      def decompose(tvalue: Option[T]): JValue = tvalue match {
+        case None => JNull
+        case Some(v) => decomposer.decompose(v)
+      }
     }
+
+  implicit def Tuple2Decomposer[T1, T2](
+      implicit decomposer1: Decomposer[T1],
+      decomposer2: Decomposer[T2]): Decomposer[(T1, T2)] = new Decomposer[(T1, T2)] {
+    def decompose(tvalue: (T1, T2)) =
+      JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: Nil)
   }
 
-  implicit def Tuple2Decomposer[T1, T2](implicit decomposer1: Decomposer[T1], decomposer2: Decomposer[T2]): Decomposer[(T1, T2)] = new Decomposer[(T1, T2)] {
-    def decompose(tvalue: (T1, T2)) = JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: Nil)
+  implicit def Tuple3Decomposer[T1, T2, T3](
+      implicit decomposer1: Decomposer[T1],
+      decomposer2: Decomposer[T2],
+      decomposer3: Decomposer[T3]): Decomposer[(T1, T2, T3)] = new Decomposer[(T1, T2, T3)] {
+    def decompose(tvalue: (T1, T2, T3)) =
+      JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: Nil)
   }
 
-  implicit def Tuple3Decomposer[T1, T2, T3](implicit decomposer1: Decomposer[T1],
-                                            decomposer2: Decomposer[T2],
-                                            decomposer3: Decomposer[T3]): Decomposer[(T1, T2, T3)] = new Decomposer[(T1, T2, T3)] {
-    def decompose(tvalue: (T1, T2, T3)) = JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: Nil)
+  implicit def Tuple4Decomposer[T1, T2, T3, T4](
+      implicit decomposer1: Decomposer[T1],
+      decomposer2: Decomposer[T2],
+      decomposer3: Decomposer[T3],
+      decomposer4: Decomposer[T4]): Decomposer[(T1, T2, T3, T4)] =
+    new Decomposer[(T1, T2, T3, T4)] {
+      def decompose(tvalue: (T1, T2, T3, T4)) =
+        JArray(
+          decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: decomposer4(
+            tvalue._4) :: Nil)
+    }
+
+  implicit def Tuple5Decomposer[T1, T2, T3, T4, T5](
+      implicit decomposer1: Decomposer[T1],
+      decomposer2: Decomposer[T2],
+      decomposer3: Decomposer[T3],
+      decomposer4: Decomposer[T4],
+      decomposer5: Decomposer[T5]): Decomposer[(T1, T2, T3, T4, T5)] =
+    new Decomposer[(T1, T2, T3, T4, T5)] {
+      def decompose(tvalue: (T1, T2, T3, T4, T5)) =
+        JArray(
+          decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: decomposer4(
+            tvalue._4) :: decomposer5(tvalue._5) :: Nil)
+    }
+
+  implicit def ArrayDecomposer[T](
+      implicit elementDecomposer: Decomposer[T]): Decomposer[Array[T]] =
+    new Decomposer[Array[T]] {
+      def decompose(tvalue: Array[T]): JValue =
+        JArray(tvalue.toList.map(elementDecomposer.decompose _))
+    }
+
+  implicit def SetDecomposer[T](implicit elementDecomposer: Decomposer[T]): Decomposer[Set[T]] =
+    new Decomposer[Set[T]] {
+      def decompose(tvalue: Set[T]): JValue =
+        JArray(tvalue.toList.map(elementDecomposer.decompose _))
+    }
+
+  implicit def SeqDecomposer[T](implicit elementDecomposer: Decomposer[T]): Decomposer[Seq[T]] =
+    new Decomposer[Seq[T]] {
+      def decompose(tvalue: Seq[T]): JValue =
+        JArray(tvalue.toList.map(elementDecomposer.decompose _))
+    }
+
+  implicit def ListDecomposer[T: Decomposer]: Decomposer[List[T]] =
+    SeqDecomposer[T].contramap((_: List[T]).toSeq)
+
+  implicit def VectorDecomposer[T: Decomposer]: Decomposer[Vector[T]] =
+    SeqDecomposer[T].contramap((_: Vector[T]).toSeq)
+
+  implicit def MapDecomposer[K, V](
+      implicit keyDecomposer: Decomposer[K],
+      valueDecomposer: Decomposer[V]): Decomposer[Map[K, V]] = new Decomposer[Map[K, V]] {
+    def decompose(tvalue: Map[K, V]): JValue =
+      SeqDecomposer(Tuple2Decomposer(keyDecomposer, valueDecomposer)).decompose(tvalue.toList)
   }
 
-  implicit def Tuple4Decomposer[T1, T2, T3, T4](implicit decomposer1: Decomposer[T1],
-                                                decomposer2: Decomposer[T2],
-                                                decomposer3: Decomposer[T3],
-                                                decomposer4: Decomposer[T4]): Decomposer[(T1, T2, T3, T4)] = new Decomposer[(T1, T2, T3, T4)] {
-    def decompose(tvalue: (T1, T2, T3, T4)) =
-      JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: decomposer4(tvalue._4) :: Nil)
-  }
-
-  implicit def Tuple5Decomposer[T1, T2, T3, T4, T5](implicit decomposer1: Decomposer[T1],
-                                                    decomposer2: Decomposer[T2],
-                                                    decomposer3: Decomposer[T3],
-                                                    decomposer4: Decomposer[T4],
-                                                    decomposer5: Decomposer[T5]): Decomposer[(T1, T2, T3, T4, T5)] = new Decomposer[(T1, T2, T3, T4, T5)] {
-    def decompose(tvalue: (T1, T2, T3, T4, T5)) =
-      JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: decomposer3(tvalue._3) :: decomposer4(tvalue._4) :: decomposer5(tvalue._5) :: Nil)
-  }
-
-  implicit def ArrayDecomposer[T](implicit elementDecomposer: Decomposer[T]): Decomposer[Array[T]] = new Decomposer[Array[T]] {
-    def decompose(tvalue: Array[T]): JValue = JArray(tvalue.toList.map(elementDecomposer.decompose _))
-  }
-
-  implicit def SetDecomposer[T](implicit elementDecomposer: Decomposer[T]): Decomposer[Set[T]] = new Decomposer[Set[T]] {
-    def decompose(tvalue: Set[T]): JValue = JArray(tvalue.toList.map(elementDecomposer.decompose _))
-  }
-
-  implicit def SeqDecomposer[T](implicit elementDecomposer: Decomposer[T]): Decomposer[Seq[T]] = new Decomposer[Seq[T]] {
-    def decompose(tvalue: Seq[T]): JValue = JArray(tvalue.toList.map(elementDecomposer.decompose _))
-  }
-
-  implicit def ListDecomposer[T: Decomposer]: Decomposer[List[T]] = SeqDecomposer[T].contramap((_: List[T]).toSeq)
-
-  implicit def VectorDecomposer[T: Decomposer]: Decomposer[Vector[T]] = SeqDecomposer[T].contramap((_: Vector[T]).toSeq)
-
-  implicit def MapDecomposer[K, V](implicit keyDecomposer: Decomposer[K], valueDecomposer: Decomposer[V]): Decomposer[Map[K, V]] = new Decomposer[Map[K, V]] {
-    def decompose(tvalue: Map[K, V]): JValue = SeqDecomposer(Tuple2Decomposer(keyDecomposer, valueDecomposer)).decompose(tvalue.toList)
-  }
-
-  implicit def StringMapDecomposer[V](implicit valueDecomposer: Decomposer[V]): Decomposer[Map[String, V]] = new Decomposer[Map[String, V]] {
-    def decompose(tvalue: Map[String, V]): JValue =
-      JObject(tvalue.keys.toList.map { key =>
-        JField(key, valueDecomposer(tvalue.apply(key)))
-      })
-  }
+  implicit def StringMapDecomposer[V](
+      implicit valueDecomposer: Decomposer[V]): Decomposer[Map[String, V]] =
+    new Decomposer[Map[String, V]] {
+      def decompose(tvalue: Map[String, V]): JValue =
+        JObject(tvalue.keys.toList.map { key =>
+          JField(key, valueDecomposer(tvalue.apply(key)))
+        })
+    }
 
   implicit val LocalDateTimeDecomposer = new Decomposer[LocalDateTime] {
     def decompose(dateTime: LocalDateTime): JValue = JNum(dateTime.getMillis)

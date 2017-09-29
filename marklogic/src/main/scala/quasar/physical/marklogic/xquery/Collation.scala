@@ -26,8 +26,8 @@ import scalaz.std.string._
 import scalaz.syntax.show._
 
 /** A URI used to denote a collation.
-  * @see https://www.w3.org/TR/xquery-operators/#collations
-  */
+ * @see https://www.w3.org/TR/xquery-operators/#collations
+ */
 final case class Collation(value: String Refined Uri) {
   override def toString = this.shows
 }

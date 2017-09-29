@@ -17,7 +17,7 @@
 package quasar.server
 
 import argonaut.Json
-import org.http4s.{Status, Method, Request}
+import org.http4s.{Method, Request, Status}
 import org.http4s.argonaut._
 import org.http4s.syntax.service._
 

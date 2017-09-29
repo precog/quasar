@@ -30,10 +30,12 @@ import scalaz.syntax.monadError._
 import BackendDef._
 
 final case class BackendDef[F[_]](run: FsCfg => Option[DefErrT[F, DefinitionResult[F]]]) {
-  def apply(typ: FileSystemType, uri: ConnectionUri)(implicit F: Monad[F]): DefErrT[F, DefinitionResult[F]] =
-    run((typ, uri)).getOrElse(NonEmptyList(
-      s"Unsupported filesystem type: ${typ.value}"
-    ).left[EnvironmentError].raiseError[DefErrT[F, ?], DefinitionResult[F]])
+  def apply(typ: FileSystemType, uri: ConnectionUri)(
+      implicit F: Monad[F]): DefErrT[F, DefinitionResult[F]] =
+    run((typ, uri)).getOrElse(
+      NonEmptyList(
+        s"Unsupported filesystem type: ${typ.value}"
+      ).left[EnvironmentError].raiseError[DefErrT[F, ?], DefinitionResult[F]])
 
   def orElse(other: => BackendDef[F]): BackendDef[F] =
     BackendDef(cfg => run(cfg) orElse other.run(cfg))
@@ -43,9 +45,10 @@ final case class BackendDef[F[_]](run: FsCfg => Option[DefErrT[F, DefinitionResu
 }
 
 object BackendDef {
-  type FsCfg            = (FileSystemType, ConnectionUri)
+  type FsCfg = (FileSystemType, ConnectionUri)
+
   /** Reasons why the configuration is invalid or an environment error. */
-  type DefinitionError  = NonEmptyList[String] \/ EnvironmentError
+  type DefinitionError = NonEmptyList[String] \/ EnvironmentError
   type DefErrT[F[_], A] = EitherT[F, DefinitionError, A]
 
   final case class DefinitionResult[F[_]](run: BackendEffect ~> F, close: F[Unit]) {
@@ -54,7 +57,7 @@ object BackendDef {
   }
 
   def fromPF[F[_]](
-    pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
+      pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
   ): BackendDef[F] =
     BackendDef(pf.lift)
 

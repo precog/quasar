@@ -53,11 +53,12 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
   checkAll(LatticePartialOrderLaws[T].boundedLatticePartialOrder.all)
 
   "identical" >> {
-    "unions that differ only in order are identical" >> prop { (x: T, y: T, z: T, zs: IList[T]) =>
-      TypeF.identical[J](
-        TypeF.union[J, T](x, y, z :: zs).embed,
-        TypeF.union[J, T](y, z, x :: zs).embed
-      ) must beTrue
+    "unions that differ only in order are identical" >> prop {
+      (x: T, y: T, z: T, zs: IList[T]) =>
+        TypeF.identical[J](
+          TypeF.union[J, T](x, y, z :: zs).embed,
+          TypeF.union[J, T](y, z, x :: zs).embed
+        ) must beTrue
     }
   }
 
@@ -82,26 +83,22 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "<map> <: {}" >> prop { (kn: IMap[J, T], unk: Option[(T, T)]) =>
-      isSubtypeOf[J](
-        tmap[J, T](kn              ,  unk).embed,
-        tmap[J, T](IMap.empty[J, T], None).embed)
+      isSubtypeOf[J](tmap[J, T](kn, unk).embed, tmap[J, T](IMap.empty[J, T], None).embed)
     }
 
     "{m ? t : u} <: {m}" >> prop { (kn: IMap[J, T], uk: T, uv: T) =>
-      isSubtypeOf[J](
-        tmap[J, T](kn, Some((uk, uv))).embed,
-        tmap[J, T](kn,           None).embed)
+      isSubtypeOf[J](tmap[J, T](kn, Some((uk, uv))).embed, tmap[J, T](kn, None).embed)
     }
 
     "{m} ∪ {k:v} <: {m}" >> prop { kn: IMap[J, T] =>
-      val normM = kn.mapKeys(_.transCata[J](
-        EJson.replaceString[J] <<< EJson.elideMetadata[J]
-      ))
+      val normM = kn.mapKeys(
+        _.transCata[J](
+          EJson.replaceString[J] <<< EJson.elideMetadata[J]
+        ))
 
-      normM.maxViewWithKey forall { case ((k, v), m) =>
-        isSubtypeOf[J](
-          tmap[J, T](m + (k -> v), None).embed,
-          tmap[J, T](m,            None).embed)
+      normM.maxViewWithKey forall {
+        case ((k, v), m) =>
+          isSubtypeOf[J](tmap[J, T](m + (k -> v), None).embed, tmap[J, T](m, None).embed)
       }
     }
 
@@ -113,16 +110,14 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "<array> <: []" >> prop { a: IList[T] \/ T =>
-      isSubtypeOf[J](
-        arr[J, T](a           ).embed,
-        arr[J, T](IList().left).embed)
+      isSubtypeOf[J](arr[J, T](a).embed, arr[J, T](IList().left).embed)
     }
 
     "[x, y] <: z[] iff (x <: z) && (y <: z)" >> prop { (a: T, b: T, c: T) =>
       val (x, y, z) = (orT(a), orT(b), orT(c))
       isSubtypeOf[J](
         arr[J, T](IList(x, y).left).embed,
-        arr[J, T](         z.right).embed
+        arr[J, T](z.right).embed
       ) ≟ (isSubtypeOf[J](x, z) && isSubtypeOf[J](y, z))
     }
 
@@ -135,9 +130,7 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "[a, b] <: [a]" >> prop { (as: IList[T], b: T) =>
-      isSubtypeOf[J](
-        arr[J, T]((as ::: IList(b)).left).embed,
-        arr[J, T]( as.left              ).embed)
+      isSubtypeOf[J](arr[J, T]((as ::: IList(b)).left).embed, arr[J, T](as.left).embed)
     }
 
     "(x ∧ y) <: x && (x ∧ y) <: y" >> prop { (x: T, y: T) =>

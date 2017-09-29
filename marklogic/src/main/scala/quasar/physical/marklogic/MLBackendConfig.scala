@@ -30,9 +30,9 @@ import quasar.physical.marklogic.xcc._
 import matryoshka._
 
 /** Internal configuration used in the MarkLogic BackendModule.
-  *
-  * NB: This is in a separate file in order to break up the compilation units.
-  */
+ *
+ * NB: This is in a separate file in order to break up the compilation units.
+ */
 private[marklogic] sealed abstract class MLBackendConfig {
   type M[A] = MLFSQ[A]
   type QSM[T[_[_]], A] = MLQScriptCP[T]#M[A]

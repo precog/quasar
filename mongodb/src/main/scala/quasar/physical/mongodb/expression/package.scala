@@ -29,10 +29,13 @@ package object expression {
 
   /** The type for expressions targeting MongoDB 2.6 specifically. */
   type Expr2_6[A] = ExprOpCoreF[A]
+
   /** The type for expressions targeting MongoDB 3.0 specifically. */
   type Expr3_0[A] = Coproduct[ExprOp3_0F, ExprOpCoreF, A]
+
   /** The type for expressions targeting MongoDB 3.2 specifically. */
   type Expr3_2[A] = Coproduct[ExprOp3_2F, Expr3_0, A]
+
   /** The type for expressions targeting MongoDB 3.4 specifically. */
   type Expr3_4[A] = Coproduct[ExprOp3_4F, Expr3_2, A]
 
@@ -44,10 +47,11 @@ package object expression {
 
   val DocField = Prism.partial[DocVar, BsonField] {
     case DocVar.ROOT(Some(tail)) => tail
-  } (DocVar.ROOT(_))
+  }(DocVar.ROOT(_))
 
   // FIXME: no way to put this in anybody's companion where it will be found?
-  implicit def exprOpRenderTree[T[_[_]]: RecursiveT, EX[_]: Functor](implicit ops: ExprOpOps.Uni[EX]): RenderTree[T[EX]] =
+  implicit def exprOpRenderTree[T[_[_]]: RecursiveT, EX[_]: Functor](
+      implicit ops: ExprOpOps.Uni[EX]): RenderTree[T[EX]] =
     new RenderTree[T[EX]] {
       def render(v: T[EX]) = Terminal(List("ExprOp"), v.cata(ops.bson).toJs.pprint(0).some)
     }

@@ -35,13 +35,13 @@ trait RowComparator { self =>
       case GT =>
         if (lmax - lmin <= 1) {
           compare(lmin, ridx) match {
-            case LT      => lmax
+            case LT => lmax
             case GT | EQ => lmin
           }
         } else {
           val lmid = lmin + ((lmax - lmin) / 2)
           compare(lmid, ridx) match {
-            case LT      => nextLeftIndex(lmid + 1, lmax, ridx)
+            case LT => nextLeftIndex(lmid + 1, lmax, ridx)
             case GT | EQ => nextLeftIndex(lmin, lmid - 1, ridx)
           }
         }
@@ -49,7 +49,7 @@ trait RowComparator { self =>
       case EQ =>
         if (lmax - lmin <= 1) {
           compare(lmin, ridx) match {
-            case LT      => lmax
+            case LT => lmax
             case GT | EQ => lmin
           }
         } else {

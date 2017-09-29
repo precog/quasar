@@ -27,31 +27,32 @@ import monocle.Prism
 import scalaz._, Scalaz.{char => charz, _}
 
 object JsonCodec {
+
   /** Encode an EJson value as Json.
-    *
-    * In order to remain compatible with JSON and achieve a compact encoding
-    * the following scheme is used:
-    *
-    * 1. All JSON compatible values are encoded verbatim.
-    *
-    * 2. Extended values are encoded as
-    *
-    *    Meta -> { ∃value: ..., ∃meta: ...}
-    *    Map  -> { ∃map: [{∃key: ..., ∃value: ...}, ...] }
-    *    Byte -> { ∃byte: 42 }
-    *    Char -> { ∃char: "x" }
-    *    Int  -> { ∃int: 2345 }
-    *
-    * 3. A Map where the keys are all strings will be encoded as a Json object
-    *    with encoded EJson values.
-    *
-    * 4. Any map keys in a source EJson value that begin with '∃' are prefixed with an
-    *    additional '∃'.
-    */
+   *
+   * In order to remain compatible with JSON and achieve a compact encoding
+   * the following scheme is used:
+   *
+   * 1. All JSON compatible values are encoded verbatim.
+   *
+   * 2. Extended values are encoded as
+   *
+   *    Meta -> { ∃value: ..., ∃meta: ...}
+   *    Map  -> { ∃map: [{∃key: ..., ∃value: ...}, ...] }
+   *    Byte -> { ∃byte: 42 }
+   *    Char -> { ∃char: "x" }
+   *    Int  -> { ∃int: 2345 }
+   *
+   * 3. A Map where the keys are all strings will be encoded as a Json object
+   *    with encoded EJson values.
+   *
+   * 4. Any map keys in a source EJson value that begin with '∃' are prefixed with an
+   *    additional '∃'.
+   */
   def encodeƒ[J](
-    implicit
-    JC: Corecursive.Aux[J, Json],
-    JR: Recursive.Aux[J, Json]
+      implicit
+      JC: Corecursive.Aux[J, Json],
+      JR: Recursive.Aux[J, Json]
   ): Algebra[EJson, J] = {
     case CommonEJson(c) =>
       CommonJson(c).embed
@@ -75,7 +76,7 @@ object JsonCodec {
       val maybeObj =
         sigildEntries.traverse({
           case (Embed(CommonJson(Str(k))), v) => some(k -> v)
-          case _                              => none
+          case _ => none
         }) map (kvs => ObjJson(Obj(ListMap(kvs: _*))).embed)
 
       maybeObj getOrElse SingletonObj(MapK, MapArr(sigildEntries).embed).embed
@@ -86,53 +87,53 @@ object JsonCodec {
 
   /** Attempt to decode an EJson value from Json. */
   def decodeƒ[J](
-    implicit
-    JC: Corecursive.Aux[J, Json],
-    JR: Recursive.Aux[J, Json]
+      implicit
+      JC: Corecursive.Aux[J, Json],
+      JR: Recursive.Aux[J, Json]
   ): Coalgebra[CoEnv[DecodingFailed[J], EJson, ?], J] =
-    j => CoEnv(j.project match {
-      case MetaObj(v, m) =>
-        ExtEJson(Meta(v, m)).right
+    j =>
+      CoEnv(j.project match {
+        case MetaObj(v, m) =>
+          ExtEJson(Meta(v, m)).right
 
-      case SingletonObj(`ByteK`, v) =>
-        extractC(dec[J], v.project)
-          .filter(_.isValidByte)
-          .map(d => EE[J].composePrism(byte)(d.toByte))
-          .toRightDisjunction(DecodingFailed("expected a byte", v))
+        case SingletonObj(`ByteK`, v) =>
+          extractC(dec[J], v.project)
+            .filter(_.isValidByte)
+            .map(d => EE[J].composePrism(byte)(d.toByte))
+            .toRightDisjunction(DecodingFailed("expected a byte", v))
 
-      case SingletonObj(`CharK`, v) =>
-        some(v.project)
-          .collect { case OneChar(c) => EE[J].composePrism(char)(c) }
-          .toRightDisjunction(DecodingFailed("expected a single character", v))
+        case SingletonObj(`CharK`, v) =>
+          some(v.project).collect { case OneChar(c) => EE[J].composePrism(char)(c) }
+            .toRightDisjunction(DecodingFailed("expected a single character", v))
 
-      case SingletonObj(`IntK`, v) =>
-        extractC(dec[J], v.project)
-          .flatMap(_.toBigIntExact.map(EE[J].composePrism(int)(_)))
-          .toRightDisjunction(DecodingFailed("expected an integer", v))
+        case SingletonObj(`IntK`, v) =>
+          extractC(dec[J], v.project)
+            .flatMap(_.toBigIntExact.map(EE[J].composePrism(int)(_)))
+            .toRightDisjunction(DecodingFailed("expected an integer", v))
 
-      case SingletonObj(`MapK`, v) =>
-        MapArr.unapply(v.project)
-          .map(xs => ExtEJson(Map(xs)))
-          .toRightDisjunction(DecodingFailed("expected an array of map entries", v))
+        case SingletonObj(`MapK`, v) =>
+          MapArr
+            .unapply(v.project)
+            .map(xs => ExtEJson(Map(xs)))
+            .toRightDisjunction(DecodingFailed("expected an array of map entries", v))
 
-      case ObjJson(Obj(m)) =>
-        ExtEJson(Map(m.toList.map(_.leftMap(s =>
-          CJ[J].composePrism(str)(unsigild(s)).embed
-        )))).right
+        case ObjJson(Obj(m)) =>
+          ExtEJson(
+            Map(m.toList.map(_.leftMap(s => CJ[J].composePrism(str)(unsigild(s)).embed)))).right
 
-      case CommonJson(c) =>
-        CommonEJson(c).right
-    })
+        case CommonJson(c) =>
+          CommonEJson(c).right
+      })
 
   /** Constants used in the Json encoding. */
-  val Sigil   = '∃'
-  val ByteK   = sigild("byte")
-  val CharK   = sigild("char")
-  val IntK    = sigild("int")
-  val KeyK    = sigild("key")
-  val MetaK   = sigild("meta")
-  val MapK    = sigild("map")
-  val ValueK  = sigild("value")
+  val Sigil = '∃'
+  val ByteK = sigild("byte")
+  val CharK = sigild("char")
+  val IntK = sigild("int")
+  val KeyK = sigild("key")
+  val MetaK = sigild("meta")
+  val MapK = sigild("map")
+  val ValueK = sigild("value")
   val ExtKeys = ISet.fromList(List(ByteK, CharK, IntK, KeyK, MetaK, MapK, ValueK))
 
   ////
@@ -161,9 +162,7 @@ object JsonCodec {
       CommonJson(Str(c.toString))
 
     def unapply[A](js: Json[A]): Option[SChar] =
-      CJ[A].composePrism(str)
-        .getOption(js)
-        .flatMap(s => s.headOption.filter(κ(s.length ≟ 1)))
+      CJ[A].composePrism(str).getOption(js).flatMap(s => s.headOption.filter(κ(s.length ≟ 1)))
   }
 
   private object SingletonObj {
@@ -188,14 +187,15 @@ object JsonCodec {
 
   private object MapArr {
     def apply[J](xs: List[(J, J)])(
-      implicit J: Corecursive.Aux[J, Json]
+        implicit J: Corecursive.Aux[J, Json]
     ): Json[J] =
       CommonJson(Arr(xs map { case (k, v) => MapEntry(k, v).embed }))
 
     def unapply[J](js: Json[J])(
-      implicit J: Recursive.Aux[J, Json]
+        implicit J: Recursive.Aux[J, Json]
     ): Option[List[(J, J)]] =
-      CJ[J].composePrism(arr)
+      CJ[J]
+        .composePrism(arr)
         .getOption(js)
         .flatMap(_.traverse(j => MapEntry.unapply(j.project)))
   }

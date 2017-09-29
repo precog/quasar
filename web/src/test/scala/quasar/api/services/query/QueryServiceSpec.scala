@@ -38,7 +38,8 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](test: ((InMemState, Map[APath, MountConfig]) => Service[Request, Response]) => Fragment) = {
+    def testBoth[A](test: (
+        (InMemState, Map[APath, MountConfig]) => Service[Request, Response]) => Fragment) = {
       "Compile" should {
         test(compileService)
       }
@@ -65,8 +66,8 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
             query = None,
             state = filesystem.state,
             status = Status.BadRequest,
-            response = (_: ApiError) must equal(ApiError.fromStatus(
-              Status.BadRequest withReason "No SQL^2 query found in URL."))
+            response = (_: ApiError) must equal(
+              ApiError.fromStatus(Status.BadRequest withReason "No SQL^2 query found in URL."))
           )
         }
 
@@ -102,21 +103,21 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
               query = Some(Query("select * from :foo where :baz")),
               state = filesystem.state,
               status = Status.BadRequest,
-              response = (_: Json) must_=== Json(
-                "error" -> Json(
-                  "status" := "Multiple errors",
-                  "detail" -> Json(
-                    "errors" := List(
-                      Json(
-                        "status" := "Unbound variable.",
-                        "detail" -> Json(
-                          "message" := "There is no binding for the variable :foo",
-                          "varName" := "foo")),
-                      Json(
-                        "status" := "Unbound variable.",
-                        "detail" -> Json(
-                          "message" := "There is no binding for the variable :baz",
-                          "varName" := "baz"))))))
+              response = (_: Json) must_=== Json("error" -> Json(
+                "status" := "Multiple errors",
+                "detail" -> Json("errors" := List(
+                  Json(
+                    "status" := "Unbound variable.",
+                    "detail" -> Json(
+                      "message" := "There is no binding for the variable :foo",
+                      "varName" := "foo")),
+                  Json(
+                    "status" := "Unbound variable.",
+                    "detail" -> Json(
+                      "message" := "There is no binding for the variable :baz",
+                      "varName" := "baz"))
+                ))
+              ))
             )
           }
         }
@@ -132,7 +133,8 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
 
             val parentAsFile = asFile(filesystem.parent).get
 
-            val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
+            val req =
+              Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
             val resp = service(filesystem.state, Map.empty)(req).unsafePerformSync
             resp.status must_== Status.BadRequest
             resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(

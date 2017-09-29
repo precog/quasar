@@ -23,26 +23,26 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 /**
-  * Use with care. Functions make the assumption that Sandboxed Pathy paths do
-  * not contain ParentIn or Current. This can not currently be guaranteed.
-  */
+ * Use with care. Functions make the assumption that Sandboxed Pathy paths do
+ * not contain ParentIn or Current. This can not currently be guaranteed.
+ */
 object SandboxedPathy {
 
   implicit val fileNameEqual: Equal[FileName] = Equal.equalA
   implicit val dirNameEqual: Equal[DirName] = Equal.equalA
 
   def rootSubPath(depth: Int, p: APath): APath = {
-    val elems = flatten(none, none, none, DirName(_).left.some, FileName(_).right.some, p).toList.unite
+    val elems =
+      flatten(none, none, none, DirName(_).left.some, FileName(_).right.some, p).toList.unite
     val dirs = elems.collect { case -\/(e) => e }
     val file = elems.collect { case \/-(e) => e }.headOption
 
-    def dirsPath(dirs: List[DirName]) = dirs.foldLeft(rootDir){ case (a, e) => a </> dir1(e) }
+    def dirsPath(dirs: List[DirName]) = dirs.foldLeft(rootDir) { case (a, e) => a </> dir1(e) }
 
     if (depth > dirs.size) {
       val p = dirsPath(dirs)
       file.cata(p </> file1(_), p)
-    }
-    else
+    } else
       dirsPath(dirs.take(depth))
   }
 
@@ -52,10 +52,13 @@ object SandboxedPathy {
     rootSubPath(i.getOrElse(0), a)
   }
 
-  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[PathSegment] = {
+  def segAt[B, T, S](index: Int, path: pathy.Path[B, T, S]): Option[PathSegment] = {
     scala.Predef.require(index >= 0)
     val list =
-      pathy.Path.flatten(none, none, none, DirName(_).left.some,FileName(_).right.some, path).toIList.unite
+      pathy.Path
+        .flatten(none, none, none, DirName(_).left.some, FileName(_).right.some, path)
+        .toIList
+        .unite
     list.drop(index).headOption
   }
 

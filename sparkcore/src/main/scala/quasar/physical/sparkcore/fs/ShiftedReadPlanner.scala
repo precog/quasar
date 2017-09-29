@@ -31,8 +31,8 @@ class ShiftedReadPlanner[S[_]] extends Planner[Const[ShiftedRead[AFile], ?], S] 
   import Planner.SparkState
 
   def plan(
-    fromFile: AFile => Free[S, RDD[Data]],
-    first: RDD[Data] => Free[S, Data]
+      fromFile: AFile => Free[S, RDD[Data]],
+      first: RDD[Data] => Free[S, Data]
   ): AlgebraM[SparkState[S, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
@@ -40,14 +40,12 @@ class ShiftedReadPlanner[S[_]] extends Planner[Const[ShiftedRead[AFile], ?], S] 
         val idStatus = qs.getConst.idStatus
 
         EitherT(fromFile(filePath).map { rdd =>
-          (sc,
-            idStatus match {
-              case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
-              case IncludeId =>
-                rdd.zipWithIndex.map[Data](p =>
-                  Data.Arr(List(Data.Int(p._2), p._1)))
-              case ExcludeId => rdd
-            }).right[PlannerError]
+          (sc, idStatus match {
+            case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
+            case IncludeId =>
+              rdd.zipWithIndex.map[Data](p => Data.Arr(List(Data.Int(p._2), p._1)))
+            case ExcludeId => rdd
+          }).right[PlannerError]
         })
       })
     }

@@ -26,23 +26,32 @@ import shapeless.HNil
 
 import java.time.LocalDateTime
 
-case class AccountDetails(accountId: AccountId,
-                          email: String,
-                          accountCreationDate: LocalDateTime,
-                          apiKey: APIKey,
-                          rootPath: Path,
-                          plan: AccountPlan,
-                          lastPasswordChangeTime: Option[LocalDateTime] = None,
-                          profile: Option[JValue] = None)
+case class AccountDetails(
+    accountId: AccountId,
+    email: String,
+    accountCreationDate: LocalDateTime,
+    apiKey: APIKey,
+    rootPath: Path,
+    plan: AccountPlan,
+    lastPasswordChangeTime: Option[LocalDateTime] = None,
+    profile: Option[JValue] = None)
 
 object AccountDetails {
   def from(account: Account): AccountDetails = {
     import account._
-    AccountDetails(accountId, email, accountCreationDate, apiKey, rootPath, plan, lastPasswordChangeTime, profile)
+    AccountDetails(
+      accountId,
+      email,
+      accountCreationDate,
+      apiKey,
+      rootPath,
+      plan,
+      lastPasswordChangeTime,
+      profile)
   }
 
   val schema = "accountId" :: "email" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "lastPasswordChangeTime" :: "profile" :: HNil
 
   implicit val accountDetailsDecomposer = decomposerV[AccountDetails](schema, None)
-  implicit val accountDetailsExtractor  = extractorV[AccountDetails](schema, None)
+  implicit val accountDetailsExtractor = extractorV[AccountDetails](schema, None)
 }

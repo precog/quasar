@@ -17,7 +17,13 @@
 package quasar.precog.common.accounts
 
 import quasar.precog.common.Path
-import quasar.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
+import quasar.precog.common.security.{
+  APIKey,
+  DeletePermission,
+  Permission,
+  ReadPermission,
+  WritePermission
+}
 import quasar.precog.common.security.Permission._
 
 import quasar.blueeyes._, json._
@@ -35,27 +41,28 @@ object AccountPlan {
   val Root = AccountPlan("Root")
   val Free = AccountPlan("Free")
 
-  val schema                           = "type" :: HNil
+  val schema = "type" :: HNil
   implicit val (decomposer, extractor) = serializationV[AccountPlan](schema, None)
 }
 
-case class Account(accountId: AccountId,
-                   email: String,
-                   passwordHash: String,
-                   passwordSalt: String,
-                   accountCreationDate: LocalDateTime,
-                   apiKey: APIKey,
-                   rootPath: Path,
-                   plan: AccountPlan,
-                   parentId: Option[String] = None,
-                   lastPasswordChangeTime: Option[LocalDateTime] = None,
-                   profile: Option[JValue] = None)
+case class Account(
+    accountId: AccountId,
+    email: String,
+    passwordHash: String,
+    passwordSalt: String,
+    accountCreationDate: LocalDateTime,
+    apiKey: APIKey,
+    rootPath: Path,
+    plan: AccountPlan,
+    parentId: Option[String] = None,
+    lastPasswordChangeTime: Option[LocalDateTime] = None,
+    profile: Option[JValue] = None)
 
 object Account {
-  val schemaV1     = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
+  val schemaV1 = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
 
-  val extractorPreV             = extractorV[Account](schemaV1, None)
-  val extractorV1               = extractorV[Account](schemaV1, Some("1.1".v))
+  val extractorPreV = extractorV[Account](schemaV1, None)
+  val extractorV1 = extractorV[Account](schemaV1, Some("1.1".v))
   implicit val accountExtractor = extractorV1 <+> extractorPreV
 
   implicit val decomposerV1 = decomposerV[Account](schemaV1, Some("1.1".v))
@@ -84,5 +91,6 @@ case class WrappedAccountId(accountId: AccountId)
 object WrappedAccountId {
   val schema = "accountId" :: HNil
 
-  implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) = serializationV[WrappedAccountId](schema, None)
+  implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) =
+    serializationV[WrappedAccountId](schema, None)
 }

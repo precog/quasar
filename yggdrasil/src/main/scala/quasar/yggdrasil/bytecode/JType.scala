@@ -24,16 +24,16 @@ sealed trait JType {
 
 sealed trait JPrimitiveType extends JType
 
-case object JNumberT  extends JPrimitiveType
-case object JTextT    extends JPrimitiveType
+case object JNumberT extends JPrimitiveType
+case object JTextT extends JPrimitiveType
 case object JBooleanT extends JPrimitiveType
-case object JNullT    extends JPrimitiveType
+case object JNullT extends JPrimitiveType
 
-case object JDateT   extends JPrimitiveType
+case object JDateT extends JPrimitiveType
 case object JPeriodT extends JPrimitiveType
 
 sealed trait JArrayT extends JType
-case class JArrayHomogeneousT(jType: JType)        extends JArrayT
+case class JArrayHomogeneousT(jType: JType) extends JArrayT
 case class JArrayFixedT(elements: Map[Int, JType]) extends JArrayT
 case object JArrayUnfixedT extends JArrayT
 
@@ -52,7 +52,7 @@ case class JUnionT(left: JType, right: JType) extends JType {
 
 object JType {
   val JPrimitiveUnfixedT = JNumberT | JTextT | JBooleanT | JNullT | JDateT | JPeriodT
-  val JUniverseT         = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
+  val JUniverseT = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
 
   // this must be consistent with JValue.fromData
   def fromType(tpe: Type): JType = tpe match {

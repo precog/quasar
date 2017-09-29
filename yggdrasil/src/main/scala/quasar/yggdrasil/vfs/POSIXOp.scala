@@ -18,7 +18,7 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
 
-import fs2.{Stream, Sink}
+import fs2.{Sink, Stream}
 
 import scodec.bits.ByteVector
 

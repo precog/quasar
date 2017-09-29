@@ -24,33 +24,32 @@ import quasar.fp.free, free._
 import scalaz._
 import scalaz.concurrent.Task
 
-
 final case class SupportedFs[S[_]](
-  ref: BackendRef,
-  impl: Option[FileSystemUT[S]],
-  implNonChrooted: Option[FileSystemUT[S]] = None
+    ref: BackendRef,
+    impl: Option[FileSystemUT[S]],
+    implNonChrooted: Option[FileSystemUT[S]] = None
 ) {
   def liftIO: SupportedFs[Coproduct[Task, S, ?]] =
     this.copy(impl = impl.map(_.liftIO), implNonChrooted = implNonChrooted.map(_.liftIO))
 }
 
 /** FileSystem Under Test
-  *
-  * @param ref description of the filesystem
-  * @param testInterp an interpreter of the filesystem into the `Task` monad
-  * @param setupInterp a second interpreter which has the ability to insert
-  *   and otherwise write to the filesystem, even if `testInterp` does not
-  * @param testDir a directory in the filesystem tests may use for temp data
-  * @param close an effect to clean up any resources created when the
-  *   interpreters are used. Need not be called if no interpreted effect was
-  *   ever run, but it's safe to call it either way.
-  */
+ *
+ * @param ref description of the filesystem
+ * @param testInterp an interpreter of the filesystem into the `Task` monad
+ * @param setupInterp a second interpreter which has the ability to insert
+ *   and otherwise write to the filesystem, even if `testInterp` does not
+ * @param testDir a directory in the filesystem tests may use for temp data
+ * @param close an effect to clean up any resources created when the
+ *   interpreters are used. Need not be called if no interpreted effect was
+ *   ever run, but it's safe to call it either way.
+ */
 final case class FileSystemUT[S[_]](
-  ref:         BackendRef,
-  testInterp:  S ~> Task,
-  setupInterp: S ~> Task,
-  testDir:     ADir,
-  close:       Task[Unit]
+    ref: BackendRef,
+    testInterp: S ~> Task,
+    setupInterp: S ~> Task,
+    testDir: ADir,
+    close: Task[Unit]
 ) {
 
   type F[A] = Free[S, A]

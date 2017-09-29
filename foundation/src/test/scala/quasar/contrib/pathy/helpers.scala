@@ -24,6 +24,7 @@ import _root_.pathy.Path, Path._
 import _root_.scalaz.concurrent.Task
 
 object Helpers {
+
   /** Returns the contents of the file as a `String`. */
   def textContents(file: RFile): Task[String] =
     jtextContents(jFile(file))

@@ -25,23 +25,24 @@ import scalaz._, Scalaz._
 
 sealed abstract class Command
 object Command {
-  private val ExitPattern         = "(?i)(?:exit)|(?:quit)".r
-  private val HelpPattern         = "(?i)(?:help)|(?:commands)|\\?".r
-  private val CdPattern           = "(?i)cd(?: +(.+))?".r
-  private val NamedExprPattern    = "(?i)([^ :]+) *<- *(.+)".r
-  private val ExplainPattern      = "(?i)explain +(.+)".r
-  private val CompilePattern      = "(?i)compile +(.+)".r
-  private val SchemaPattern       = "(?i)schema +(.+)".r
-  private val LsPattern           = "(?i)ls(?: +(.+))?".r
-  private val SavePattern         = "(?i)save +([\\S]+) (.+)".r
-  private val AppendPattern       = "(?i)append +([\\S]+) (.+)".r
-  private val DeletePattern       = "(?i)rm +([\\S]+)".r
-  private val DebugPattern        = "(?i)(?:set +)?debug *= *(0|1|2)".r
+  private val ExitPattern = "(?i)(?:exit)|(?:quit)".r
+  private val HelpPattern = "(?i)(?:help)|(?:commands)|\\?".r
+  private val CdPattern = "(?i)cd(?: +(.+))?".r
+  private val NamedExprPattern = "(?i)([^ :]+) *<- *(.+)".r
+  private val ExplainPattern = "(?i)explain +(.+)".r
+  private val CompilePattern = "(?i)compile +(.+)".r
+  private val SchemaPattern = "(?i)schema +(.+)".r
+  private val LsPattern = "(?i)ls(?: +(.+))?".r
+  private val SavePattern = "(?i)save +([\\S]+) (.+)".r
+  private val AppendPattern = "(?i)append +([\\S]+) (.+)".r
+  private val DeletePattern = "(?i)rm +([\\S]+)".r
+  private val DebugPattern = "(?i)(?:set +)?debug *= *(0|1|2)".r
   private val SummaryCountPattern = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
-  private val FormatPattern       = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv))".r
-  private val SetVarPattern       = "(?i)(?:set +)?(\\w+) *= *(.*\\S)".r
-  private val UnsetVarPattern     = "(?i)unset +(\\w+)".r
-  private val ListVarPattern      = "(?i)env".r
+  private val FormatPattern =
+    "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv))".r
+  private val SetVarPattern = "(?i)(?:set +)?(\\w+) *= *(.*\\S)".r
+  private val UnsetVarPattern = "(?i)unset +(\\w+)".r
+  private val ListVarPattern = "(?i)env".r
 
   final case object Exit extends Command
   final case object Help extends Command
@@ -63,47 +64,42 @@ object Command {
 
   def parse(input: String): Command =
     input match {
-      case ExitPattern()                 => Exit
-      case CdPattern(XDir(d))            => Cd(d)
-      case CdPattern(_)                  => Cd(rootDir.right)
+      case ExitPattern() => Exit
+      case CdPattern(XDir(d)) => Cd(d)
+      case CdPattern(_) => Cd(rootDir.right)
       case NamedExprPattern(name, query) => Select(Some(name), Query(query))
-      case ExplainPattern(query)         => Explain(Query(query))
-      case CompilePattern(query)         => Compile(Query(query))
-      case SchemaPattern(query)          => Schema(Query(query))
-      case LsPattern(XDir(d))            => Ls(d.some)
-      case LsPattern(_)                  => Ls(none)
-      case SavePattern(XFile(f), value)  => Save(f, value)
+      case ExplainPattern(query) => Explain(Query(query))
+      case CompilePattern(query) => Compile(Query(query))
+      case SchemaPattern(query) => Schema(Query(query))
+      case LsPattern(XDir(d)) => Ls(d.some)
+      case LsPattern(_) => Ls(none)
+      case SavePattern(XFile(f), value) => Save(f, value)
       case AppendPattern(XFile(f), value) => Append(f, value)
-      case DeletePattern(XFile(f))       => Delete(f)
-      case DebugPattern(code)            => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
-      case SummaryCountPattern(rows)     => SummaryCount(rows.toInt)
-      case FormatPattern(format)         => Format(OutputFormat.fromString(format) | OutputFormat.Table)
-      case HelpPattern()                 => Help
-      case SetVarPattern(name, value)    => SetVar(name, value)
-      case UnsetVarPattern(name)         => UnsetVar(name)
-      case ListVarPattern()              => ListVars
-      case _                             => Select(None, Query(input))
+      case DeletePattern(XFile(f)) => Delete(f)
+      case DebugPattern(code) => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
+      case SummaryCountPattern(rows) => SummaryCount(rows.toInt)
+      case FormatPattern(format) => Format(OutputFormat.fromString(format) | OutputFormat.Table)
+      case HelpPattern() => Help
+      case SetVarPattern(name, value) => SetVar(name, value)
+      case UnsetVarPattern(name) => UnsetVar(name)
+      case ListVarPattern() => ListVars
+      case _ => Select(None, Query(input))
     }
 
   type XDir = RelDir[Unsandboxed] \/ ADir
   object XDir {
     def unapply(str: String): Option[XDir] =
-      Option(str)
-        .filter(_ ≠ "")
-        .map(s => if (s.endsWith("/")) s else s + "/")
-        .flatMap { s =>
-          posixCodec.parseRelDir(s).map(_.left) orElse
-            posixCodec.parseAbsDir(s).map(unsafeSandboxAbs(_).right)
-        }
+      Option(str).filter(_ ≠ "").map(s => if (s.endsWith("/")) s else s + "/").flatMap { s =>
+        posixCodec.parseRelDir(s).map(_.left) orElse
+          posixCodec.parseAbsDir(s).map(unsafeSandboxAbs(_).right)
+      }
   }
   type XFile = RelFile[Unsandboxed] \/ AFile
   object XFile {
     def unapply(str: String): Option[XFile] =
-      Option(str)
-        .filter(_ ≠ "")
-        .flatMap { s =>
-          posixCodec.parseRelFile(s).map(_.left) orElse
-            posixCodec.parseAbsFile(s).map(unsafeSandboxAbs(_).right)
-        }
+      Option(str).filter(_ ≠ "").flatMap { s =>
+        posixCodec.parseRelFile(s).map(_.left) orElse
+          posixCodec.parseAbsFile(s).map(unsafeSandboxAbs(_).right)
+      }
   }
 }

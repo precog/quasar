@@ -54,17 +54,14 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         offset: Int,
         limit: Option[Int]
     ): ConnectionIO[Vector[Data]] = {
-      val streamWithOffset = (fr"select * from" ++ Fragment.const(dbPath.shows))
-        .query[Data]
-        .process
-        .drop(offset)
+      val streamWithOffset =
+        (fr"select * from" ++ Fragment.const(dbPath.shows)).query[Data].process.drop(offset)
 
       val streamWithLimit = limit match {
         case Some(l) => streamWithOffset.take(l)
-        case None    => streamWithOffset
+        case None => streamWithOffset
       }
-      streamWithLimit
-        .vector
+      streamWithLimit.vector
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] = {
@@ -72,11 +69,16 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         \/.fromTryCatchNonFatal(long.toInt)
           .leftMap(
             _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
-          ).point[ConnectionIO]
-        ).liftB
+          )
+          .point[ConnectionIO]
+        )
+        .liftB
     }
 
-    def openExisting(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+    def openExisting(
+        file: AFile,
+        offset: Natural,
+        limit: Option[Positive]): Backend[ReadHandle] = {
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
@@ -96,7 +98,10 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
       } yield handle
     }
 
-    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+    override def open(
+        file: AFile,
+        offset: Natural,
+        limit: Option[Positive]): Backend[ReadHandle] = {
       val dbPath = TablePath.create(file)
       for {
         exists <- tableExists(dbPath).liftB

@@ -30,7 +30,7 @@ class AsPathSpec extends quasar.Qspec {
         val httpPath = HPath(UriPathCodec.printPath(file))
         AsFilePath.unapply(httpPath) must_== Some(file)
       }
-      "AbsDir" >> prop { dir : ADir =>
+      "AbsDir" >> prop { dir: ADir =>
         val httpPath = HPath(UriPathCodec.printPath(dir))
         AsDirPath.unapply(httpPath) must_== Some(dir)
       }

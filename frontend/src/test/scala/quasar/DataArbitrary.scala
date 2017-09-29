@@ -35,10 +35,12 @@ trait DataArbitrary {
     )
   )
 
-  implicit def dataShrink(implicit l: Shrink[List[Data]], m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
+  implicit def dataShrink(
+      implicit l: Shrink[List[Data]],
+      m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
     case Data.Arr(value) => l.shrink(value).map(Data.Arr(_))
     case Data.Obj(value) => m.shrink(value).map(Data.Obj(_))
-    case _               => Stream.empty
+    case _ => Stream.empty
   }
 }
 
@@ -49,16 +51,17 @@ object DataArbitrary extends DataArbitrary {
   val LargeInt = BigInt(Long.MaxValue.toString + "0")
 
   /** Long value that can safely be represented in any possible backend
-    * (including those using JavaScript.)
-    */
+   * (including those using JavaScript.)
+   */
   val SafeInt: Gen[Long] = choose(-1000L, 1000L)
-  val SafeBigInt         = SafeInt ^^ (x => BigInt(x))
-  val IntAsDouble        = SafeInt ^^ (_.toDouble) // NB: Decimals that look like ints, may need special handling
+  val SafeBigInt = SafeInt ^^ (x => BigInt(x))
+  val IntAsDouble = SafeInt ^^ (_.toDouble) // NB: Decimals that look like ints, may need special handling
 
   val defaultInt: Gen[BigInt] = Gen.oneOf[BigInt](SafeBigInt, LargeInt)
 
   // NB: Decimals that look like ints, may need special handling
-  val defaultDec: Gen[BigDecimal] = Gen.oneOf[Double](Gen.choose(-1000.0, 1000.0), IntAsDouble) ^^ (x => BigDecimal(x))
+  val defaultDec: Gen[BigDecimal] = Gen
+    .oneOf[Double](Gen.choose(-1000.0, 1000.0), IntAsDouble) ^^ (x => BigDecimal(x))
 
   // NB: a (nominally) valid MongoDB id, because we use this generator to test BSON conversion, too
   val defaultId: Gen[String] = Gen.oneOf[Char]("0123456789abcdef") * 24 ^^ (_.mkString)
@@ -72,22 +75,26 @@ object DataArbitrary extends DataArbitrary {
   )
 
   /** Generator of atomic Data (everything but Obj and Arr). */
-  def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] = {
+  def genAtomicData(
+      strSrc: Gen[String],
+      intSrc: Gen[BigInt],
+      decSrc: Gen[BigDecimal],
+      idSrc: Gen[String]): Gen[Data] = {
     import Data._
     Gen.oneOf[Data](
       Null,
       True,
       False,
       NA,
-      strSrc           ^^ Str,
-      intSrc           ^^ Int,
-      decSrc           ^^ Dec,
-      genInstant       ^^ Timestamp,
-      genDuration      ^^ Interval,
-      genDate          ^^ Date,
-      genTime          ^^ Time,
+      strSrc ^^ Str,
+      intSrc ^^ Int,
+      decSrc ^^ Dec,
+      genInstant ^^ Timestamp,
+      genDuration ^^ Interval,
+      genDate ^^ Date,
+      genTime ^^ Time,
       arrayOf(genByte) ^^ Binary.fromArray,
-      idSrc            ^^ Id
+      idSrc ^^ Id
     )
   }
 

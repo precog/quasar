@@ -27,8 +27,8 @@ import scalaz._, Scalaz._
 import shapeless.Lazy
 
 /** Extracts paths of particular type from QScript, collecting them in the
-  * provided `ApplicativePlus`.
-  */
+ * provided `ApplicativePlus`.
+ */
 trait ExtractPath[F[_], P] {
   def extractPath[G[_]: ApplicativePlus]: Algebra[F, G[P]]
 }
@@ -39,9 +39,9 @@ object ExtractPath extends ExtractPathInstances {
 
 sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   implicit def coproduct[F[_], G[_], P](
-    implicit
-    F: Lazy[ExtractPath[F, P]],
-    G: Lazy[ExtractPath[G, P]]
+      implicit
+      F: Lazy[ExtractPath[F, P]],
+      G: Lazy[ExtractPath[G, P]]
   ): ExtractPath[Coproduct[F, G, ?], P] =
     new ExtractPath[Coproduct[F, G, ?], P] {
       def extractPath[H[_]: ApplicativePlus]: Algebra[Coproduct[F, G, ?], H[P]] =
@@ -63,7 +63,7 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
     }
 
   implicit def equiJoin[T[_[_]]: RecursiveT, P](
-    implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
+      implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
   ): ExtractPath[EquiJoin[T, ?], P] =
     new ExtractPath[EquiJoin[T, ?], P] {
       def extractPath[G[_]: ApplicativePlus] = {
@@ -73,23 +73,25 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
     }
 
   implicit def qScriptCore[T[_[_]]: RecursiveT, P](
-    implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
+      implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
   ): ExtractPath[QScriptCore[T, ?], P] =
     new ExtractPath[QScriptCore[T, ?], P] {
       def extractPath[G[_]: ApplicativePlus] = {
-        case Filter(paths, _)          => paths
+        case Filter(paths, _) => paths
         case LeftShift(paths, _, _, _) => paths
-        case Map(paths, _)             => paths
-        case Reduce(paths, _, _, _)    => paths
-        case Sort(paths, _, _)         => paths
-        case Subset(paths, fm, _, ct)  => extractBranch[T, G, P](fm) <+> extractBranch[T, G, P](ct) <+> paths
-        case Union(paths, l, r)        => extractBranch[T, G, P](l)  <+> extractBranch[T, G, P](r)  <+> paths
-        case Unreferenced()            => mempty[G, P]
+        case Map(paths, _) => paths
+        case Reduce(paths, _, _, _) => paths
+        case Sort(paths, _, _) => paths
+        case Subset(paths, fm, _, ct) =>
+          extractBranch[T, G, P](fm) <+> extractBranch[T, G, P](ct) <+> paths
+        case Union(paths, l, r) =>
+          extractBranch[T, G, P](l) <+> extractBranch[T, G, P](r) <+> paths
+        case Unreferenced() => mempty[G, P]
       }
     }
 
   implicit def thetaJoin[T[_[_]]: RecursiveT, P](
-    implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
+      implicit QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
   ): ExtractPath[ThetaJoin[T, ?], P] =
     new ExtractPath[ThetaJoin[T, ?], P] {
       def extractPath[G[_]: ApplicativePlus] = {
@@ -101,10 +103,11 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   ////
 
   private def extractBranch[T[_[_]]: RecursiveT, G[_]: ApplicativePlus, P](
-    branch: FreeQS[T]
-  )(implicit
-    QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
-  ): G[P] = branch.cata(interpret(κ(mempty[G, P]), QST.value.extractPath[G]))
+      branch: FreeQS[T]
+  )(
+      implicit
+      QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]): G[P] =
+    branch.cata(interpret(κ(mempty[G, P]), QST.value.extractPath[G]))
 }
 
 sealed abstract class ExtractPathInstances0 {
@@ -115,7 +118,8 @@ sealed abstract class ExtractPathInstances0 {
   //     QScript if it includes them, however QScriptTotal Knows All, so we
   //     must define them for it.
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def qScriptTotalPath[T[_[_]]: RecursiveT]: Lazy[ExtractPath[QScriptTotal[T, ?], APath]] = {
+  implicit def qScriptTotalPath[T[_[_]]: RecursiveT]
+    : Lazy[ExtractPath[QScriptTotal[T, ?], APath]] = {
     implicit val constDeadEnd: ExtractPath[Const[DeadEnd, ?], APath] =
       new ExtractPath[Const[DeadEnd, ?], APath] {
         def extractPath[G[_]: ApplicativePlus] = {

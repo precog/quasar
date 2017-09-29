@@ -53,35 +53,54 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
   private val notImplemented: Result = Skipped("TODO")
 
-  private def skipBinary(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+  private def skipBinary(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(
+      run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.ConcatArrays(_,_)), Data.Arr(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.ConcatArrays(_,_)), Data.Str(_), Data.Arr(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.ConcatArrays(_, _)), Data.Arr(_), Data.Str(_)) =>
+        notImplemented
+      case (ExtractFunc(MapFuncsCore.ConcatArrays(_, _)), Data.Str(_), Data.Arr(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Eq(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Lt(_, _)), Data.Str(_), Data.Str(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Lt(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Lte(_, _)), Data.Str(_), Data.Str(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Lte(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Gt(_, _)), Data.Str(_), Data.Str(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Gt(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Gte(_, _)), Data.Str(_), Data.Str(_)) => notImplemented
+      case (ExtractFunc(MapFuncsCore.Gte(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Add(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
-      case (ExtractFunc(MapFuncsCore.Add(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Add(_, _)), Data.Int(_), Data.Dec(_)) =>
+        notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Add(_, _)), Data.Dec(_), Data.Int(_)) =>
+        notImplemented // FIXME implemented: should be working
 
-      case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
-      case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
-      case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Subtract(_, _)), Data.Dec(_), Data.Dec(_)) =>
+        notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Subtract(_, _)), Data.Int(_), Data.Dec(_)) =>
+        notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Subtract(_, _)), Data.Dec(_), Data.Int(_)) =>
+        notImplemented // FIXME implemented: should be working
 
-      case (ExtractFunc(MapFuncsCore.Power(_,_)), Data.Int(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
-      case (ExtractFunc(MapFuncsCore.Power(_,_)), Data.Dec(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
-      case (ExtractFunc(MapFuncsCore.Power(_,_)), Data.Int(_), Data.Int(two)) if two.toInt == 2 => notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Power(_, _)), Data.Int(_), Data.Int(one))
+          if one.toInt == 1 =>
+        notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Power(_, _)), Data.Dec(_), Data.Int(one))
+          if one.toInt == 1 =>
+        notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Power(_, _)), Data.Int(_), Data.Int(two))
+          if two.toInt == 2 =>
+        notImplemented // FIXME implemented: should be working
 
       case _ => run
     }
@@ -114,26 +133,32 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.ToTimestamp(_) => notImplemented.left
     case MapFuncsCore.Now() => notImplemented.left
     case MapFuncsCore.TypeOf(_) => notImplemented.left
-    case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
+    case MapFuncsCore.Negate(_) =>
+      notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
     // case MapFuncsCore.ToString(Data.Date(_) | Data.Timestamp(_) | Data.Time(_) | Data.Interval(_)) => notImplemented.left
-    case MapFuncsCore.ToString(_) => notImplemented.left    // TODO it's implemented but not for everything
+    case MapFuncsCore.ToString(_) =>
+      notImplemented.left // TODO it's implemented but not for everything
     case MapFuncsCore.Meta(_) => notImplemented.left
     case MapFuncsCore.Range(_, _) => notImplemented.left
     case _ => ().right
   }
 
   private def check[A](fm: FreeMapA[Fix, A]): Option[Result] =
-    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](
-      κ(().right),
-      _.run.fold(shortCircuitCore, shortCircuitDerived))).swap.toOption
+    fm.cataM(
+        interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](
+          κ(().right),
+          _.run.fold(shortCircuitCore, shortCircuitDerived)))
+      .swap
+      .toOption
 
   private def run[A](
-    freeMap: FreeMapA[Fix, A],
-    hole: A => cake.trans.TransSpec1)
-      : cake.trans.TransSpec1 =
-    freeMap.cataM[Id.Id, cake.trans.TransSpec1](interpretM[Id.Id, MapFunc[Fix, ?], A, cake.trans.TransSpec1](
-      hole(_).point[Id.Id],
-      MapFuncPlanner[Fix, Id.Id, MapFunc[Fix, ?]].plan(cake)[cake.trans.Source1](cake.trans.TransSpec1.Id)))
+      freeMap: FreeMapA[Fix, A],
+      hole: A => cake.trans.TransSpec1): cake.trans.TransSpec1 =
+    freeMap.cataM[Id.Id, cake.trans.TransSpec1](
+      interpretM[Id.Id, MapFunc[Fix, ?], A, cake.trans.TransSpec1](
+        hole(_).point[Id.Id],
+        MapFuncPlanner[Fix, Id.Id, MapFunc[Fix, ?]]
+          .plan(cake)[cake.trans.Source1](cake.trans.TransSpec1.Id)))
 
   private def evaluate(transSpec: cake.trans.TransSpec1): cake.Table =
     cake.Table.constString(Set("")).transform(transSpec)
@@ -153,17 +178,11 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data): Result =
       notImplemented
 
-    def unaryMapFunc(
-        prg: FreeMapA[Fix, UnaryArg],
-        arg: Data,
-        expected: Data): Result = {
+    def unaryMapFunc(prg: FreeMapA[Fix, UnaryArg], arg: Data, expected: Data): Result = {
 
       check(prg) getOrElse {
         val table: cake.Table =
-          evaluate(
-            run[UnaryArg](
-              prg,
-              _.fold(dataToTransSpec(arg))))
+          evaluate(run[UnaryArg](prg, _.fold(dataToTransSpec(arg))))
 
         lazy val primary = ((actual(table) must haveSize(1)) and
           (actual(table).head must beCloseTo(expected)))
@@ -183,11 +202,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
       skipBinary(prg, arg1, arg2)(check(prg) getOrElse {
         val table: cake.Table =
-          evaluate(run[BinaryArg](
-            prg,
-            _.fold(
-              dataToTransSpec(arg1),
-              dataToTransSpec(arg2))))
+          evaluate(run[BinaryArg](prg, _.fold(dataToTransSpec(arg1), dataToTransSpec(arg2))))
 
         lazy val primary = ((actual(table) must haveSize(1)) and
           (actual(table).head must beCloseTo(expected)))
@@ -208,12 +223,10 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
       check(prg) getOrElse {
         val table: cake.Table =
-          evaluate(run[TernaryArg](
-            prg,
-            _.fold(
-              dataToTransSpec(arg1),
-              dataToTransSpec(arg2),
-              dataToTransSpec(arg3))))
+          evaluate(
+            run[TernaryArg](
+              prg,
+              _.fold(dataToTransSpec(arg1), dataToTransSpec(arg2), dataToTransSpec(arg3))))
 
         lazy val primary = ((actual(table) must haveSize(1)) and
           (actual(table).head must beCloseTo(expected)))

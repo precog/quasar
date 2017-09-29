@@ -32,8 +32,8 @@ private[json] final class SingleContext extends Context {
   var value: JValue = null
   def add(s: String): Unit = value = JString(s)
   def add(v: JValue): Unit = value = v
-  def finish               = value
-  def isObj                = false
+  def finish = value
+  def isObj = false
 }
 
 private[json] final class ArrContext extends Context {
@@ -41,13 +41,13 @@ private[json] final class ArrContext extends Context {
 
   def add(s: String): Unit = vs.append(JString(s))
   def add(v: JValue): Unit = vs.append(v)
-  def finish               = new JArray(vs.toList)
-  def isObj                = false
+  def finish = new JArray(vs.toList)
+  def isObj = false
 }
 
 private[json] final class ObjContext extends Context {
   private var key: String = null
-  private val vs          = mutable.HashMap[String, JValue]()
+  private val vs = mutable.HashMap[String, JValue]()
 
   def add(s: String): Unit =
     if (key == null) {
@@ -60,5 +60,5 @@ private[json] final class ObjContext extends Context {
   def add(v: JValue): Unit = { vs(key) = v; key = null }
 
   def finish = JObject(vs.toMap)
-  def isObj  = true
+  def isObj = true
 }

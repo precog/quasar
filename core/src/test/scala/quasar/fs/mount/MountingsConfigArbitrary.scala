@@ -24,17 +24,20 @@ import org.scalacheck.{Arbitrary, Gen}
 trait MountingsConfigArbitrary {
 
   implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig] =
-    Arbitrary(Gen.listOf(Gen.oneOf(genFileSystemConfigEntry, genViewConfigEntry)).map(l => MountingsConfig(l.toMap)))
+    Arbitrary(
+      Gen
+        .listOf(Gen.oneOf(genFileSystemConfigEntry, genViewConfigEntry))
+        .map(l => MountingsConfig(l.toMap)))
 
   private def genFileSystemConfigEntry: Gen[(APath, MountConfig)] =
     for {
-      dir    <- Arbitrary.arbitrary[ADir]
+      dir <- Arbitrary.arbitrary[ADir]
       config <- MountConfigArbitrary.genFileSystemConfig
     } yield (dir, config)
 
   private def genViewConfigEntry: Gen[(APath, MountConfig)] =
     for {
-      file   <- Arbitrary.arbitrary[AFile]
+      file <- Arbitrary.arbitrary[AFile]
       config <- MountConfigArbitrary.genViewConfig
     } yield (file, config)
 }

@@ -20,5 +20,6 @@ import org.scalacheck.{Arbitrary, Gen}
 
 trait MoveSemanticsArbitrary {
   implicit val arbitraryMoveSemantics: Arbitrary[MoveSemantics] =
-    Arbitrary(Gen.oneOf(MoveSemantics.Overwrite, MoveSemantics.FailIfExists, MoveSemantics.FailIfMissing))
+    Arbitrary(Gen
+      .oneOf(MoveSemantics.Overwrite, MoveSemantics.FailIfExists, MoveSemantics.FailIfMissing))
 }

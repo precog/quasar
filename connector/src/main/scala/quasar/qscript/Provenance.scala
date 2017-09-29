@@ -36,12 +36,10 @@ sealed abstract class Provenance[T[_[_]]]
 @Lenses final case class Nada[T[_[_]]]() extends Provenance[T]
 @Lenses final case class Value[T[_[_]]](expr: FreeMap[T]) extends Provenance[T]
 @Lenses final case class Proj[T[_[_]]](field: T[EJson]) extends Provenance[T]
-@Lenses final case class Both[T[_[_]]](l: Provenance[T], r: Provenance[T])
-    extends Provenance[T]
+@Lenses final case class Both[T[_[_]]](l: Provenance[T], r: Provenance[T]) extends Provenance[T]
 @Lenses final case class OneOf[T[_[_]]](l: Provenance[T], r: Provenance[T])
     extends Provenance[T]
-@Lenses final case class Then[T[_[_]]](l: Provenance[T], r: Provenance[T])
-    extends Provenance[T]
+@Lenses final case class Then[T[_[_]]](l: Provenance[T], r: Provenance[T]) extends Provenance[T]
 
 object Provenance {
   // TODO: This might not be the proper notion of equality – this just tells us
@@ -55,17 +53,17 @@ object Provenance {
       (nubNadas <<< flattenBoth)(x) equalsAsSets (nubNadas <<< flattenBoth)(y)
 
     Equal.equal {
-      case (Nada(),        Nada())        => true
-      case (Value(_),      Value(_))      => true
-      case (Value(_),      Proj(_))       => true
-      case (Proj(_),       Value(_))      => true
-      case (Proj(d1),      Proj(d2))      => d1 ≟ d2
-      case (l @ Both(_, _),            r) => bothEq(l, r)
-      case (l           , r @ Both(_, _)) => bothEq(l, r)
+      case (Nada(), Nada()) => true
+      case (Value(_), Value(_)) => true
+      case (Value(_), Proj(_)) => true
+      case (Proj(_), Value(_)) => true
+      case (Proj(d1), Proj(d2)) => d1 ≟ d2
+      case (l @ Both(_, _), r) => bothEq(l, r)
+      case (l, r @ Both(_, _)) => bothEq(l, r)
       case (OneOf(l1, r1), OneOf(l2, r2)) =>
         l1 ≟ l2 && r1 ≟ r2 || l1 ≟ r2 && r1 ≟ l2
-      case (Then(l1, r1),  Then(l2, r2))  => l1 ≟ l2 && r1 ≟ r2
-      case (_,             _)             => false
+      case (Then(l1, r1), Then(l2, r2)) => l1 ≟ l2 && r1 ≟ r2
+      case (_, _) => false
     }
   }
 
@@ -85,133 +83,166 @@ class ProvenanceT[T[_[_]]](implicit J: Equal[T[EJson]]) extends TTypes[T] {
 
   val flattenBoth: Provenance => List[Provenance] = {
     case Both(l, r) => flattenBoth(l) ++ flattenBoth(r)
-    case other      => List(other)
+    case other => List(other)
   }
 
-  val  nubNadas: List[Provenance] => List[Provenance] =
+  val nubNadas: List[Provenance] => List[Provenance] =
     _.filter(_ =/= Nada())
 
-  def genComparisons(lps: List[Provenance], rps: List[Provenance])(implicit T: CorecursiveT[T]): JoinFunc =
-    lps.reverse.zip(rps.reverse).takeWhile { case (l, r) => l ≟ r }.reverse.map((genComparison(_, _)).tupled(_).toList).join match {
-      case Nil    => BoolLit(true)
+  def genComparisons(lps: List[Provenance], rps: List[Provenance])(
+      implicit T: CorecursiveT[T]): JoinFunc =
+    lps.reverse
+      .zip(rps.reverse)
+      .takeWhile { case (l, r) => l ≟ r }
+      .reverse
+      .map((genComparison(_, _)).tupled(_).toList)
+      .join match {
+      case Nil => BoolLit(true)
       case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(And(a, e))))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def genComparison(lp: Provenance, rp: Provenance): Option[JoinFunc] =
     (lp, rp) match {
-      case (Value(v1), Value(v2)) => Free.roll(MFC(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), v2.as(RightSide)))).some
-      case (Value(v1), Proj(d2)) => Free.roll(MFC(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), Free.roll(MFC(Constant(d2)))))).some
-      case (Proj(d1), Value(v2)) => Free.roll(MFC(MapFuncsCore.Eq[T, JoinFunc](Free.roll(MFC(Constant(d1))), v2.as(RightSide)))).some
-      case (Both(l1, r1),  Both(l2, r2)) =>
-        genComparison(l1, l2).fold(
-          genComparison(r1, r2))(
-          lc => genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
-      case (OneOf(l1, r1),  OneOf(l2, r2)) =>
-        genComparison(l1, l2).fold(
-          genComparison(r1, r2))(
-          lc => genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
-      case (Then(l1, r1),  Then(l2, r2)) =>
-        genComparison(l1, l2).fold(
-          genComparison(r1, r2))(
-          lc => genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
+      case (Value(v1), Value(v2)) =>
+        Free.roll(MFC(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), v2.as(RightSide)))).some
+      case (Value(v1), Proj(d2)) =>
+        Free
+          .roll(
+            MFC(MapFuncsCore.Eq[T, JoinFunc](v1.as(LeftSide), Free.roll(MFC(Constant(d2))))))
+          .some
+      case (Proj(d1), Value(v2)) =>
+        Free
+          .roll(
+            MFC(MapFuncsCore.Eq[T, JoinFunc](Free.roll(MFC(Constant(d1))), v2.as(RightSide))))
+          .some
+      case (Both(l1, r1), Both(l2, r2)) =>
+        genComparison(l1, l2).fold(genComparison(r1, r2))(lc =>
+          genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
+      case (OneOf(l1, r1), OneOf(l2, r2)) =>
+        genComparison(l1, l2).fold(genComparison(r1, r2))(lc =>
+          genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
+      case (Then(l1, r1), Then(l2, r2)) =>
+        genComparison(l1, l2).fold(genComparison(r1, r2))(lc =>
+          genComparison(r1, r2).fold(lc)(rc => Free.roll(MFC(And[T, JoinFunc](lc, rc)))).some)
       case (_, _) => None
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def rebase0(newBase: FreeMap): Provenance => Option[Provenance] = {
     case Value(expr) => Value(expr >> newBase).some
-    case Both(l, r)  => (rebase0(newBase)(l), rebase0(newBase)(r)) match {
-      case (None,     None)     => None
-      case (None,     Some(r0)) => Both(l, r0).some
-      case (Some(l0), None)     => Both(l0, r).some
-      case (Some(l0), Some(r0)) => Both(l0, r0).some
-    }
-    case OneOf(l, r) => (rebase0(newBase)(l), rebase0(newBase)(r)) match {
-      case (None,     None)     => None
-      case (None,     Some(r0)) => OneOf(l, r0).some
-      case (Some(l0), None)     => OneOf(l0, r).some
-      case (Some(l0), Some(r0)) => OneOf(l0, r0).some
-    }
-    case Then(l, r)  => (rebase0(newBase)(l), rebase0(newBase)(r)) match {
-      case (None,     None)     => None
-      case (None,     Some(r0)) => Then(l, r0).some
-      case (Some(l0), None)     => Then(l0, r).some
-      case (Some(l0), Some(r0)) => Then(l0, r0).some
-    }
-    case _           => None
+    case Both(l, r) =>
+      (rebase0(newBase)(l), rebase0(newBase)(r)) match {
+        case (None, None) => None
+        case (None, Some(r0)) => Both(l, r0).some
+        case (Some(l0), None) => Both(l0, r).some
+        case (Some(l0), Some(r0)) => Both(l0, r0).some
+      }
+    case OneOf(l, r) =>
+      (rebase0(newBase)(l), rebase0(newBase)(r)) match {
+        case (None, None) => None
+        case (None, Some(r0)) => OneOf(l, r0).some
+        case (Some(l0), None) => OneOf(l0, r).some
+        case (Some(l0), Some(r0)) => OneOf(l0, r0).some
+      }
+    case Then(l, r) =>
+      (rebase0(newBase)(l), rebase0(newBase)(r)) match {
+        case (None, None) => None
+        case (None, Some(r0)) => Then(l, r0).some
+        case (Some(l0), None) => Then(l0, r).some
+        case (Some(l0), Some(r0)) => Then(l0, r0).some
+      }
+    case _ => None
   }
 
   def rebase(newBase: FreeMap, ps: List[Provenance]): List[Provenance] =
     ps.map(orOriginal(rebase0(newBase)))
 
   /** Reifies the part of the provenance that must exist in the plan.
-    */
-  def genBuckets(ps: List[Provenance])(implicit T: CorecursiveT[T]): Option[(List[Provenance], FreeMap)] =
-    ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
-      case Nil      => None
-      case h :: t   =>
-        t.foldLeft(
-          Free.roll(MFC(MakeArray[T, FreeMap](h))))(
-          (a, e) => Free.roll(MFC(ConcatArrays(a, Free.roll(MFC(MakeArray(e))))))).some
-    })
+   */
+  def genBuckets(ps: List[Provenance])(
+      implicit T: CorecursiveT[T]): Option[(List[Provenance], FreeMap)] =
+    ps.traverse(genBucket)
+      .eval(0)
+      .unzip
+      .traverse(_.join match {
+        case Nil => None
+        case h :: t =>
+          t.foldLeft(Free.roll(MFC(MakeArray[T, FreeMap](h))))((a, e) =>
+              Free.roll(MFC(ConcatArrays(a, Free.roll(MFC(MakeArray(e)))))))
+            .some
+      })
 
-  def genBucketList(ps: List[Provenance])(implicit T: CorecursiveT[T]): Option[(List[Provenance], List[FreeMap])] =
-    ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
-      case Nil => None
-      case l   => l.some
-    })
+  def genBucketList(ps: List[Provenance])(
+      implicit T: CorecursiveT[T]): Option[(List[Provenance], List[FreeMap])] =
+    ps.traverse(genBucket)
+      .eval(0)
+      .unzip
+      .traverse(_.join match {
+        case Nil => None
+        case l => l.some
+      })
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def genBucket(p: Provenance)(implicit T: CorecursiveT[T]): State[Int, (Provenance, List[FreeMap])] =
+  def genBucket(p: Provenance)(
+      implicit T: CorecursiveT[T]): State[Int, (Provenance, List[FreeMap])] =
     p match {
-      case Nada()      => (Nada[T](): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
+      case Nada() => (Nada[T](): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
       case Value(expr) =>
         State(i => (i + 1, (Value(Free.roll(MFC(ProjectIndex(HoleF, IntLit(i))))), List(expr))))
-      case Proj(d)     => (Proj(d): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
-      case Both(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-        case ((lp, lf), (rp, rf)) => (Both(lp, rp), lf ++ rf)
-      }
-      case OneOf(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-        case ((lp, lf), (rp, rf)) => (OneOf(lp, rp), lf ++ rf)
-      }
-      case Then(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-        case ((lp, lf), (rp, rf)) => (Then(lp, rp), lf ++ rf)
-      }
+      case Proj(d) => (Proj(d): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
+      case Both(l, r) =>
+        (genBucket(l) ⊛ genBucket(r)) {
+          case ((lp, lf), (rp, rf)) => (Both(lp, rp), lf ++ rf)
+        }
+      case OneOf(l, r) =>
+        (genBucket(l) ⊛ genBucket(r)) {
+          case ((lp, lf), (rp, rf)) => (OneOf(lp, rp), lf ++ rf)
+        }
+      case Then(l, r) =>
+        (genBucket(l) ⊛ genBucket(r)) {
+          case ((lp, lf), (rp, rf)) => (Then(lp, rp), lf ++ rf)
+        }
     }
 
-  def joinProvenances(leftBuckets: List[Provenance], rightBuckets: List[Provenance]):
-      List[Provenance] =
-    leftBuckets.reverse.alignWith(rightBuckets.reverse) {
-      case \&/.Both(l, r) => if (l ≟ r) l else Both(l, r)
-      case \&/.This(l)    => Both(l, Nada())
-      case \&/.That(r)    => Both(Nada(), r)
-    }.reverse
+  def joinProvenances(
+      leftBuckets: List[Provenance],
+      rightBuckets: List[Provenance]): List[Provenance] =
+    leftBuckets.reverse
+      .alignWith(rightBuckets.reverse) {
+        case \&/.Both(l, r) => if (l ≟ r) l else Both(l, r)
+        case \&/.This(l) => Both(l, Nada())
+        case \&/.That(r) => Both(Nada(), r)
+      }
+      .reverse
 
-  def unionProvenances(leftBuckets: List[Provenance], rightBuckets: List[Provenance]):
-      List[Provenance] =
-    leftBuckets.reverse.alignWith(rightBuckets.reverse) {
-      case \&/.Both(l, r) => OneOf(l, r)
-      case \&/.This(l)    => OneOf(l, Nada())
-      case \&/.That(r)    => OneOf(Nada(), r)
-    }.reverse
+  def unionProvenances(
+      leftBuckets: List[Provenance],
+      rightBuckets: List[Provenance]): List[Provenance] =
+    leftBuckets.reverse
+      .alignWith(rightBuckets.reverse) {
+        case \&/.Both(l, r) => OneOf(l, r)
+        case \&/.This(l) => OneOf(l, Nada())
+        case \&/.That(r) => OneOf(Nada(), r)
+      }
+      .reverse
 
   def nestProvenances(buckets: List[Provenance]): List[Provenance] =
     buckets match {
       case a :: b :: tail => Then(a, b) :: tail
-      case _              => buckets
+      case _ => buckets
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def squashProvenances(buckets: List[Provenance]): List[Provenance] =
     buckets match {
       case a :: b :: tail => squashProvenances(Then(a, b) :: tail)
-      case _              => buckets
+      case _ => buckets
     }
 
   def swapProvenances(buckets: List[Provenance]): List[Provenance] =
     buckets match {
       case a :: b :: tail => b :: a :: tail
-      case _              => buckets
+      case _ => buckets
     }
 }

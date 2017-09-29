@@ -23,18 +23,17 @@ import monocle.Prism
 import scalaz._
 
 /** A runtime error encountered within a data source connector. A user isn't
-  * expected to usually be able to handle these as they likely arise from a defect
-  * or an "environmental" issue (memory, network, storage, etc).
-  *
-  * This should not be used to communicate configuration/validation errors at
-  * mount-time as `DefinitionError` is more appropriate in that case.
-  */
+ * expected to usually be able to handle these as they likely arise from a defect
+ * or an "environmental" issue (memory, network, storage, etc).
+ *
+ * This should not be used to communicate configuration/validation errors at
+ * mount-time as `DefinitionError` is more appropriate in that case.
+ */
 sealed abstract class PhysicalError {
   val cause: Exception
 }
 
-@Lenses final case class UnhandledFSError(cause: Exception)
-    extends PhysicalError
+@Lenses final case class UnhandledFSError(cause: Exception) extends PhysicalError
 
 object PhysicalError extends PhysicalErrorPrisms {
   implicit val show: Show[PhysicalError] = Show.shows(_.cause.getMessage)
@@ -43,5 +42,5 @@ object PhysicalError extends PhysicalErrorPrisms {
 abstract class PhysicalErrorPrisms {
   val unhandledFSError = Prism.partial[PhysicalError, Exception] {
     case UnhandledFSError(ex) => ex
-  } (UnhandledFSError(_))
+  }(UnhandledFSError(_))
 }

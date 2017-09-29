@@ -131,8 +131,9 @@ class TypesSpec extends quasar.Qspec {
         beEqualIfSuccess(typecheck(t1, t2))
     }
 
-    "fail under Obj with non-matching field name and arbitrary types" >> prop { (t1: Type, t2: Type) =>
-      typecheck(Obj(Map("a" -> t1), None), Obj(Map("b" -> t2), None)).toOption should beNone
+    "fail under Obj with non-matching field name and arbitrary types" >> prop {
+      (t1: Type, t2: Type) =>
+        typecheck(Obj(Map("a" -> t1), None), Obj(Map("b" -> t2), None)).toOption should beNone
     }
 
     "match unknowns under Obj" >> prop { (t1: Type, t2: Type) =>
@@ -480,7 +481,6 @@ class TypesSpec extends quasar.Qspec {
       simplify(Int ⨿ Bottom) should_== Int
     }
 
-
     // Properties for product:
     "simplify t ⨯ t to t" >> prop { (t: Type) =>
       simplify(t ⨯ t) must_= simplify(t)
@@ -506,8 +506,6 @@ class TypesSpec extends quasar.Qspec {
     "simplify Bottom ⨿ t to t" >> prop { (t: Type) =>
       simplify(Bottom ⨿ t) must_= simplify(t)
     }
-
-
 
     "lub simple match" in {
       lub(Int, Int) should_== Int
@@ -608,10 +606,27 @@ class TypesSpec extends quasar.Qspec {
     val exIndexed = Arr(List(Int))
 
     val examples =
-      List(Top, Bottom, Null, Str, Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval,
-          Const(Data.Int(0)),
-          Int ⨯ Str, Int ⨿ Str,
-          exField, exNamed, exConstObj, exElem, exIndexed)
+      List(
+        Top,
+        Bottom,
+        Null,
+        Str,
+        Int,
+        Dec,
+        Bool,
+        Binary,
+        Timestamp,
+        Date,
+        Time,
+        Interval,
+        Const(Data.Int(0)),
+        Int ⨯ Str,
+        Int ⨿ Str,
+        exField,
+        exNamed,
+        exConstObj,
+        exElem,
+        exIndexed)
 
     "only fields and objects are objectLike" in {
       examples.filter(_.objectLike) should_== List(exField, exNamed, exConstObj)
@@ -648,10 +663,10 @@ class TypesSpec extends quasar.Qspec {
 
   "arrayElem" should {
     "fail for non-array type" >> prop { (t: Type) =>
-      t.arrayElem(Const(Data.Int(0))) should beFailing//WithClass[TypeError]
+      t.arrayElem(Const(Data.Int(0))) should beFailing //WithClass[TypeError]
     }.setArbitrary(arbitrarySimpleType)
 
-    "fail for non-int index"  >> prop { (t: Type) =>
+    "fail for non-int index" >> prop { (t: Type) =>
       // TODO: this occasionally get stuck... maybe lub() is diverging?
       lub(t, Int) != Int ==> {
         val arr = Const(Data.Arr(Nil))
@@ -680,7 +695,7 @@ class TypesSpec extends quasar.Qspec {
 
     "descend into product of FlexArrs with const index" in {
       val arr = FlexArr(0, None, Int) ⨯ FlexArr(0, None, Str)
-          arr.arrayElem(Const(Data.Int(0))) should beSuccessful(Int ⨿ Str)
+      arr.arrayElem(Const(Data.Int(0))) should beSuccessful(Int ⨿ Str)
     }
 
     "descend into product of FlexArrss with unspecified index" in {
@@ -717,19 +732,19 @@ class TypesSpec extends quasar.Qspec {
     def typJson(typ: Type): Json = typ.asJson
 
     "encode simple types as their name" in {
-      (typJson(Top)       must_= jString("Top"))       and
-      (typJson(Bottom)    must_= jString("Bottom"))    and
-      (typJson(Null)      must_= jString("Null"))      and
-      (typJson(Str)       must_= jString("Str"))       and
-      (typJson(Int)       must_= jString("Int"))       and
-      (typJson(Dec)       must_= jString("Dec"))       and
-      (typJson(Bool)      must_= jString("Bool"))      and
-      (typJson(Binary)    must_= jString("Binary"))    and
-      (typJson(Timestamp) must_= jString("Timestamp")) and
-      (typJson(Date)      must_= jString("Date"))      and
-      (typJson(Time)      must_= jString("Time"))      and
-      (typJson(Interval)  must_= jString("Interval"))  and
-      (typJson(Id)        must_= jString("Id"))
+      (typJson(Top) must_= jString("Top")) and
+        (typJson(Bottom) must_= jString("Bottom")) and
+        (typJson(Null) must_= jString("Null")) and
+        (typJson(Str) must_= jString("Str")) and
+        (typJson(Int) must_= jString("Int")) and
+        (typJson(Dec) must_= jString("Dec")) and
+        (typJson(Bool) must_= jString("Bool")) and
+        (typJson(Binary) must_= jString("Binary")) and
+        (typJson(Timestamp) must_= jString("Timestamp")) and
+        (typJson(Date) must_= jString("Date")) and
+        (typJson(Time) must_= jString("Time")) and
+        (typJson(Interval) must_= jString("Interval")) and
+        (typJson(Id) must_= jString("Id"))
     }
 
     "encode constant types as their data encoding" >> prop { data: Data =>
@@ -746,19 +761,19 @@ class TypesSpec extends quasar.Qspec {
 
     "encode flex arrays as components" >> prop { (min: Int, max: Option[Int], mbr: Type) =>
       typJson(FlexArr(min, max, mbr)) must_=
-        Json("FlexArr" := (
-          ("minSize" := min)  ->:
-          ("maxSize" :?= max) ->?:
-          ("members" := mbr)  ->:
-          jEmptyObject))
+        Json(
+          "FlexArr" := (("minSize" := min) ->:
+            ("maxSize" :?= max) ->?:
+            ("members" := mbr) ->:
+            jEmptyObject))
     }
 
     "encode objects" >> prop { (assocs: Map[String, Type], unks: Option[Type]) =>
       typJson(Obj(assocs, unks)) must_=
-        Json("Obj" := (
-          ("associations" := assocs) ->:
-          ("unknownKeys"  :?= unks)  ->?:
-          jEmptyObject))
+        Json(
+          "Obj" := (("associations" := assocs) ->:
+            ("unknownKeys" :?= unks) ->?:
+            jEmptyObject))
     }
 
     "encode coproducts as an array of types" >> prop { (t1: Type, t2: Type, ts: List[Type]) =>

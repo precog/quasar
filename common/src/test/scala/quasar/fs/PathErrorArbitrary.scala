@@ -28,10 +28,11 @@ import scalaz.scalacheck.ScalazArbitrary._
 
 trait PathErrorArbitrary {
   implicit val arbPathError: Arbitrary[PathError] =
-    Arbitrary(Gen.oneOf(
-      arb[APath] ∘ (PathError.PathExists(_)),
-      arb[APath] ∘ (PathError.PathNotFound(_)),
-      (arb[APath] ⊛ arb[String])(PathError.InvalidPath(_, _))))
+    Arbitrary(
+      Gen.oneOf(
+        arb[APath] ∘ (PathError.PathExists(_)),
+        arb[APath] ∘ (PathError.PathNotFound(_)),
+        (arb[APath] ⊛ arb[String])(PathError.InvalidPath(_, _))))
 }
 
 object PathErrorArbitrary extends PathErrorArbitrary

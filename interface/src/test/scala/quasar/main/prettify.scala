@@ -31,23 +31,29 @@ class PrettifySpecs extends quasar.Qspec {
   "flatten" should {
     "find single field" in {
       val data = Data.Obj(ListMap("a" -> Data.Int(1)))
-      flatten(data) must_== ListMap(
-        Path(List(FieldSeg("a"))) -> Data.Int(1))
+      flatten(data) must_== ListMap(Path(List(FieldSeg("a"))) -> Data.Int(1))
     }
 
     "find multiple fields" in {
-      val data = Data.Obj(ListMap(
-        "a" -> Data.Null, "b" -> Data.True, "c" -> Data.False, "d" -> Data.Dec(1.0), "e" -> Data.Str("foo")))
+      val data = Data.Obj(
+        ListMap(
+          "a" -> Data.Null,
+          "b" -> Data.True,
+          "c" -> Data.False,
+          "d" -> Data.Dec(1.0),
+          "e" -> Data.Str("foo")))
       flatten(data) must_== ListMap(
         Path(List(FieldSeg("a"))) -> Data.Null,
         Path(List(FieldSeg("b"))) -> Data.True,
         Path(List(FieldSeg("c"))) -> Data.False,
         Path(List(FieldSeg("d"))) -> Data.Dec(1.0),
-        Path(List(FieldSeg("e"))) -> Data.Str("foo"))
+        Path(List(FieldSeg("e"))) -> Data.Str("foo")
+      )
     }
 
     "find nested fields" in {
-      val data = Data.Obj(ListMap("value" -> Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2)))))
+      val data =
+        Data.Obj(ListMap("value" -> Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2)))))
       flatten(data) must_== ListMap(
         Path(List(FieldSeg("value"), FieldSeg("a"))) -> Data.Int(1),
         Path(List(FieldSeg("value"), FieldSeg("b"))) -> Data.Int(2))
@@ -61,10 +67,11 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "find nested array indices" in {
-      val data = Data.Obj(ListMap(
-        "arr" -> Data.Arr(List(
-          Data.Obj(ListMap("a" -> Data.Str("foo"))),
-          Data.Obj(ListMap("b" -> Data.Str("bar")))))))
+      val data = Data.Obj(
+        ListMap(
+          "arr" -> Data.Arr(List(
+            Data.Obj(ListMap("a" -> Data.Str("foo"))),
+            Data.Obj(ListMap("b" -> Data.Str("bar")))))))
       flatten(data) must_== ListMap(
         Path(List(FieldSeg("arr"), IndexSeg(0), FieldSeg("a"))) -> Data.Str("foo"),
         Path(List(FieldSeg("arr"), IndexSeg(1), FieldSeg("b"))) -> Data.Str("bar"))
@@ -76,17 +83,13 @@ class PrettifySpecs extends quasar.Qspec {
       val flat = ListMap(
         Path(List(FieldSeg("a"))) -> Data.Int(1),
         Path(List(FieldSeg("b"))) -> Data.Int(2))
-      unflatten(flat) must_== Data.Obj(ListMap(
-        "a" -> Data.Int(1),
-        "b" -> Data.Int(2)))
+      unflatten(flat) must_== Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2)))
     }
 
     "construct single nested field" in {
-      val flat = ListMap(
-        Path(List(FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(1))
-      unflatten(flat) must_== Data.Obj(ListMap(
-        "foo" -> Data.Obj(ListMap(
-          "bar" -> Data.Int(1)))))
+      val flat = ListMap(Path(List(FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(1))
+      unflatten(flat) must_== Data.Obj(
+        ListMap("foo" -> Data.Obj(ListMap("bar" -> Data.Int(1)))))
     }
 
     "construct array with missing elements" in {
@@ -94,27 +97,23 @@ class PrettifySpecs extends quasar.Qspec {
         Path(List(FieldSeg("a"), IndexSeg(0))) -> Data.Int(1),
         Path(List(FieldSeg("a"), IndexSeg(2))) -> Data.Int(3))
       unflatten(flat) must_==
-        Data.Obj(ListMap(
-          "a" -> Data.Arr(List(
-            Data.Int(1), Data.Null, Data.Int(3)))))
+        Data.Obj(ListMap("a" -> Data.Arr(List(Data.Int(1), Data.Null, Data.Int(3)))))
     }
 
     "construct array with nested fields" in {
       val flat = ListMap(
         Path(List(FieldSeg("a"), IndexSeg(0), FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(1),
         Path(List(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(3),
-        Path(List(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("baz"))) -> Data.Int(4))
+        Path(List(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("baz"))) -> Data.Int(4)
+      )
       unflatten(flat) must_==
-        Data.Obj(ListMap(
-          "a" -> Data.Arr(List(
-            Data.Obj(ListMap(
-              "foo" -> Data.Obj(ListMap(
-                "bar" -> Data.Int(1))))),
+        Data.Obj(
+          ListMap("a" -> Data.Arr(List(
+            Data.Obj(ListMap("foo" -> Data.Obj(ListMap("bar" -> Data.Int(1))))),
             Data.Null,
-            Data.Obj(ListMap(
-              "foo" -> Data.Obj(ListMap(
-                "bar" -> Data.Int(3),
-                "baz" -> Data.Int(4)))))))))
+            Data.Obj(
+              ListMap("foo" -> Data.Obj(ListMap("bar" -> Data.Int(3), "baz" -> Data.Int(4)))))
+          ))))
     }
 
     "construct obj with populated contradictory paths" in {
@@ -122,9 +121,7 @@ class PrettifySpecs extends quasar.Qspec {
         Path(List(FieldSeg("foo"), IndexSeg(0))) -> Data.Int(1),
         Path(List(FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(2))
       unflatten(flat) must_==
-        Data.Obj(ListMap(
-          "foo" -> Data.Arr(List(
-            Data.Int(1)))))
+        Data.Obj(ListMap("foo" -> Data.Arr(List(Data.Int(1)))))
     }
   }
 
@@ -160,15 +157,18 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "index in the middle" in {
-      Path.parse("foo[0].bar") must_== \/-(Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
+      Path.parse("foo[0].bar") must_== \/-(
+        Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
     }
 
     "field-style index" in {
-      Path.parse("foo.0.bar") must_== \/-(Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
+      Path.parse("foo.0.bar") must_== \/-(
+        Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
     }
 
     "nested indices" in {
-      Path.parse("matrix[0][1]") must_== \/-(Path(List(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1))))
+      Path.parse("matrix[0][1]") must_== \/-(
+        Path(List(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1))))
     }
 
     "fail with unmatched brackets" in {
@@ -215,18 +215,18 @@ class PrettifySpecs extends quasar.Qspec {
 
     // TODO: Add explanation for why these particular values are not representable here
     def representable(data: Data): Boolean = data match {
-      case Data.Str("")     => false
-      case Data.Obj(_)      => false
-      case Data.Arr(_)      => false
-      case Data.Set(_)      => false
-      case Data.Binary(_)   => false
-      case Data.Id(_)       => false
-      case Data.NA          => false
+      case Data.Str("") => false
+      case Data.Obj(_) => false
+      case Data.Arr(_) => false
+      case Data.Set(_) => false
+      case Data.Binary(_) => false
+      case Data.Id(_) => false
+      case Data.NA => false
       // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
       // and although it would appear to work for a human observer,
       // the runtime instances are not found to be "equal" which is breaking tests
       case Data.Interval(_) => false
-      case _                => true
+      case _ => true
     }
 
     "round-trip all representable values" >> prop { (data: RepresentableData) =>
@@ -272,7 +272,7 @@ class PrettifySpecs extends quasar.Qspec {
       (isFlat(data) && r ≠ "" && !Data._interval.nonEmpty(data)) ==> {
         parse(r).map(render(_).value) must beSome(r)
       }
-      // Test will sometimes fail due to to many generator failures without this
+    // Test will sometimes fail due to to many generator failures without this
     }.setArbitrary(Arbitrary(DataArbitrary.simpleData))
   }
 
@@ -282,53 +282,28 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "format one value" in {
-      renderTable(List(
-        Data.Int(0))) must_==
-        List(
-          " value |",
-          "-------|",
-          "     0 |")
+      renderTable(List(Data.Int(0))) must_==
+        List(" value |", "-------|", "     0 |")
     }
 
     "format one obj" in {
-      renderTable(List(
-        Data.Obj(ListMap(
-          "a" -> Data.Int(0))))) must_==
-        List(
-          " a  |",
-          "----|",
-          "  0 |")
+      renderTable(List(Data.Obj(ListMap("a" -> Data.Int(0))))) must_==
+        List(" a  |", "----|", "  0 |")
     }
 
     "format one row" in {
-      renderTable(List(
-        Data.Obj(ListMap(
-          "a" -> Data.Int(0), "b" -> Data.Str("foo"))))) must_==
-        List(
-          " a  | b    |",
-          "----|------|",
-          "  0 | foo  |")
+      renderTable(List(Data.Obj(ListMap("a" -> Data.Int(0), "b" -> Data.Str("foo"))))) must_==
+        List(" a  | b    |", "----|------|", "  0 | foo  |")
     }
 
     "format one array" in {
-      renderTable(List(
-        Data.Arr(List(
-          Data.Int(0), Data.Str("foo"))))) must_==
-        List(
-          " [0] | [1]  |",
-          "-----|------|",
-          "   0 | foo  |")
+      renderTable(List(Data.Arr(List(Data.Int(0), Data.Str("foo"))))) must_==
+        List(" [0] | [1]  |", "-----|------|", "   0 | foo  |")
     }
 
     "format empty values" in {
-      renderTable(List(
-        Data.Obj(),
-        Data.Obj())) must_==
-        List(
-          " <empty> |",
-          "---------|",
-          "         |",
-          "         |")
+      renderTable(List(Data.Obj(), Data.Obj())) must_==
+        List(" <empty> |", "---------|", "         |", "         |")
     }
   }
 
@@ -339,39 +314,28 @@ class PrettifySpecs extends quasar.Qspec {
     "empty stream" in {
       val values: Process[Task, Data] = Process.halt
       val rows = renderStream(values, 100)
-      rows.runLog.unsafePerformSync must_== Vector(
-        List("<empty>"))
+      rows.runLog.unsafePerformSync must_== Vector(List("<empty>"))
     }
 
     "empty values" in {
-      val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(),
-        Data.Obj()))
+      val values: Process[Task, Data] = Process.emitAll(List(Data.Obj(), Data.Obj()))
       val rows = renderStream(values, 100)
-      rows.runLog.unsafePerformSync must_== Vector(
-        List("<empty>"),
-        List(""),
-        List(""))
+      rows.runLog.unsafePerformSync must_== Vector(List("<empty>"), List(""), List(""))
     }
 
     "one trivial value" in {
-      val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(ListMap("a" -> Data.Int(1)))))
+      val values: Process[Task, Data] =
+        Process.emitAll(List(Data.Obj(ListMap("a" -> Data.Int(1)))))
       val rows = renderStream(values, 100)
-      rows.runLog.unsafePerformSync must_== Vector(
-        List("a"),
-        List("1"))
+      rows.runLog.unsafePerformSync must_== Vector(List("a"), List("1"))
     }
 
     "more than n" in {
-      val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(ListMap(
-          "a" -> Data.Int(1))),
-        Data.Obj(ListMap(
-          "b" -> Data.Int(2))),
-        Data.Obj(ListMap(
-          "a" -> Data.Int(3),
-          "b" -> Data.Int(4)))))
+      val values: Process[Task, Data] = Process.emitAll(
+        List(
+          Data.Obj(ListMap("a" -> Data.Int(1))),
+          Data.Obj(ListMap("b" -> Data.Int(2))),
+          Data.Obj(ListMap("a" -> Data.Int(3), "b" -> Data.Int(4)))))
       val rows = renderStream(values, 2)
       rows.runLog.unsafePerformSync must_== Vector(
         List("a", "b"),
@@ -381,15 +345,11 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "more than n with new fields after" in {
-      val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(ListMap(
-          "a" -> Data.Int(1))),
-        Data.Obj(ListMap(
-          "b" -> Data.Int(2))),
-        Data.Obj(ListMap(
-          "a" -> Data.Int(3),
-          "b" -> Data.Int(4),
-          "c" -> Data.Int(5)))))
+      val values: Process[Task, Data] = Process.emitAll(
+        List(
+          Data.Obj(ListMap("a" -> Data.Int(1))),
+          Data.Obj(ListMap("b" -> Data.Int(2))),
+          Data.Obj(ListMap("a" -> Data.Int(3), "b" -> Data.Int(4), "c" -> Data.Int(5)))))
       val rows = renderStream(values, 2)
       rows.runLog.unsafePerformSync must_== Vector(
         List("a", "b"),
@@ -410,10 +370,7 @@ class PrettifySpecs extends quasar.Qspec {
       // Run the process once:
       val rez = rows.runLog.unsafePerformSync
 
-      rez must_== Vector(
-        List("n"),
-        List("0"),
-        List("1"))
+      rez must_== Vector(List("n"), List("0"), List("1"))
       history must_== List(0, 1)
     }
   }

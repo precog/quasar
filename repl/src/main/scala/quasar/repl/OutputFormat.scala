@@ -28,10 +28,10 @@ object OutputFormat {
   case object Csv extends OutputFormat
 
   def fromString(str: String): Option[OutputFormat] = str.toLowerCase match {
-    case "table"    => Table.some
-    case "precise"  => Precise.some
+    case "table" => Table.some
+    case "precise" => Precise.some
     case "readable" => Readable.some
-    case "csv"      => Csv.some
-    case _          => none
+    case "csv" => Csv.some
+    case _ => none
   }
 }

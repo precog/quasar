@@ -47,14 +47,13 @@ object ExtractPrimary {
     }
 
   implicit def typeFExtractPrimary[L](
-    implicit L: Recursive.Aux[L, EJson]
+      implicit L: Recursive.Aux[L, EJson]
   ): ExtractPrimary[TypeF[L, ?]] =
     new ExtractPrimary[TypeF[L, ?]] {
       def primaryTag[A](fa: TypeF[L, A]) = TypeF.primary(fa) map (_.left)
     }
 
-  implicit def envTExtractPrimary[E, F[_]: ExtractPrimary]
-    : ExtractPrimary[EnvT[E, F, ?]] =
+  implicit def envTExtractPrimary[E, F[_]: ExtractPrimary]: ExtractPrimary[EnvT[E, F, ?]] =
     new ExtractPrimary[EnvT[E, F, ?]] {
       def primaryTag[A](fa: EnvT[E, F, A]) = fa.lower.primaryTag
     }

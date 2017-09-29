@@ -72,12 +72,14 @@ trait Decoder {
   def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data]
   /* Does not decode in a streaming fashion */
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def decode(txtStream: Process[Task,String]): Task[DecodeError \/ Process[Task, DecodeError \/ Data]] =
+  def decode(txtStream: Process[Task, String])
+    : Task[DecodeError \/ Process[Task, DecodeError \/ Data]] =
     txtStream.runLog.map(_.mkString).map(decode(_))
   /* Not a streaming decoder */
-  def decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = EntityDecoder.decodeBy(mediaType) { msg =>
-    EitherT(decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
-  }
+  def decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] =
+    EntityDecoder.decodeBy(mediaType) { msg =>
+      EitherT(decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
+    }
 }
 
 sealed abstract class MessageFormat extends Decoder {
@@ -89,9 +91,9 @@ sealed abstract class MessageFormat extends Decoder {
 
 object MessageFormat {
   final case class JsonContentType(
-    mode: JsonPrecision,
-    format: JsonFormat,
-    disposition: Option[`Content-Disposition`]
+      mode: JsonPrecision,
+      format: JsonFormat,
+      disposition: Option[`Content-Disposition`]
   ) extends MessageFormat {
     val LineSep = "\r\n"
     def mediaType = {
@@ -102,7 +104,8 @@ object MessageFormat {
       val encodedData = data.map(DataCodec.render(_)(mode.codec)).unite
       format match {
         case JsonFormat.SingleArray =>
-          Process.emit("[" + LineSep) ++ encodedData.intersperse("," + LineSep) ++ Process.emit(LineSep + "]" + LineSep)
+          Process.emit("[" + LineSep) ++ encodedData.intersperse("," + LineSep) ++ Process.emit(
+            LineSep + "]" + LineSep)
         case JsonFormat.LineDelimited =>
           encodedData.map(_ + LineSep)
       }
@@ -113,17 +116,26 @@ object MessageFormat {
         implicit val codec: DataCodec = mode.codec
         format match {
           case JsonFormat.SingleArray =>
-            DataCodec.parse(txt).fold(
-              err => DecodeError("parse error: " + err.message).left,
-              {
-                case Data.Arr(data) => Process.emitAll(data.map(_.right)).right
-                case _              => DecodeError("Provided body is not a json array").left
-              }
-            )
+            DataCodec
+              .parse(txt)
+              .fold(
+                err => DecodeError("parse error: " + err.message).left, {
+                  case Data.Arr(data) => Process.emitAll(data.map(_.right)).right
+                  case _ => DecodeError("Provided body is not a json array").left
+                }
+              )
           case JsonFormat.LineDelimited =>
-            val jsonByLine = txt.split("\n").map(line => DataCodec.parse(line).leftMap(
-              e => DecodeError(s"parse error: ${e.message} in the following line: $line")
-            )).toList
+            val jsonByLine = txt
+              .split("\n")
+              .map(
+                line =>
+                  DataCodec
+                    .parse(line)
+                    .leftMap(
+                      e =>
+                        DecodeError(s"parse error: ${e.message} in the following line: $line")
+                  ))
+              .toList
             Process.emitAll(jsonByLine).right
         }
       }
@@ -131,12 +143,14 @@ object MessageFormat {
 
   object JsonContentType {
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(mode: JsonPrecision, format: JsonFormat): JsonContentType = JsonContentType(mode, format, disposition = None)
+    def apply(mode: JsonPrecision, format: JsonFormat): JsonContentType =
+      JsonContentType(mode, format, disposition = None)
   }
 
   val Default = JsonContentType(JsonPrecision.Readable, JsonFormat.LineDelimited, None)
 
-  final case class Csv(format: CsvParser.Format, disposition: Option[`Content-Disposition`]) extends MessageFormat {
+  final case class Csv(format: CsvParser.Format, disposition: Option[`Content-Disposition`])
+      extends MessageFormat {
     import Csv._
 
     val CsvColumnsFromInitialRowsCount: Int Refined Positive = 1000
@@ -146,7 +160,8 @@ object MessageFormat {
         "columnDelimiter" -> escapeNewlines(format.delimiter.toString),
         "rowDelimiter" -> escapeNewlines(format.lineTerminator),
         "quoteChar" -> escapeNewlines(format.quoteChar.toString),
-        "escapeChar" -> escapeNewlines(format.escapeChar.toString))
+        "escapeChar" -> escapeNewlines(format.escapeChar.toString)
+      )
       val extensions = alwaysExtensions ++ dispositionExtension
       Csv.mediaType.withExtensions(extensions)
     }
@@ -160,14 +175,16 @@ object MessageFormat {
       val lines = CsvParser.TototoshiCsvParser(format).parse(txt)
       val data = lines.headOption.map { header =>
         val paths = header.fold(κ(Nil), _.fields.map(Prettify.Path.parse(_).toOption))
-        lines.drop(1).map(_.bimap(
-          err => DecodeError("parse error: " + err),
-          rec => {
-            val pairs = paths zip rec.fields.map(Prettify.parse)
-            val good = pairs.map { case (p, s) => (p |@| s).tupled }.foldMap(_.toList)
-            Prettify.unflatten(good.toListMap)
-          }
-        ))
+        lines
+          .drop(1)
+          .map(_.bimap(
+            err => DecodeError("parse error: " + err),
+            rec => {
+              val pairs = paths zip rec.fields.map(Prettify.parse)
+              val good = pairs.map { case (p, s) => (p |@| s).tupled }.foldMap(_.toList)
+              Prettify.unflatten(good.toListMap)
+            }
+          ))
       }.getOrElse(Stream.empty)
       Process.emitAll(data).right
     }
@@ -197,31 +214,48 @@ object MessageFormat {
   def forMessage(msg: Message): DecodeFailure \/ MessageFormat =
     for {
       cType <- msg.headers.get(`Content-Type`) \/> (MediaTypeMissing(supportedMediaTypes): DecodeFailure)
-      fmt   <- fromMediaType(cType.mediaType) \/> MediaTypeMismatch(cType.mediaType, supportedMediaTypes)
+      fmt <- fromMediaType(cType.mediaType) \/> MediaTypeMismatch(
+        cType.mediaType,
+        supportedMediaTypes)
     } yield fmt
 
   def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
-    val disposition = mediaType.extensions.get("disposition").flatMap(str =>
-      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption)
+    val disposition = mediaType.extensions
+      .get("disposition")
+      .flatMap(str => HttpHeaderParser.CONTENT_DISPOSITION(str).toOption)
     if (mediaType satisfies Csv.mediaType) {
       def toChar(str: String): Option[Char] = str.toList match {
         case c :: Nil => Some(c)
         case _ => None
       }
       val format = CsvParser.Format(
-        delimiter      = mediaType.extensions.get("columnDelimiter").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse(','),
-        quoteChar      = mediaType.extensions.get("quoteChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-        escapeChar     = mediaType.extensions.get("escapeChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-        lineTerminator = mediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n"))
+        delimiter = mediaType.extensions
+          .get("columnDelimiter")
+          .map(Csv.unescapeNewlines)
+          .flatMap(toChar)
+          .getOrElse(','),
+        quoteChar = mediaType.extensions
+          .get("quoteChar")
+          .map(Csv.unescapeNewlines)
+          .flatMap(toChar)
+          .getOrElse('"'),
+        escapeChar = mediaType.extensions
+          .get("escapeChar")
+          .map(Csv.unescapeNewlines)
+          .flatMap(toChar)
+          .getOrElse('"'),
+        lineTerminator =
+          mediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n")
+      )
       Some(Csv(format, disposition))
-    }
-    else {
+    } else {
       val format =
         if (mediaType satisfies JsonFormat.SingleArray.mediaType)
           if (mediaType.extensions.get("boundary") =/= Some("NL")) Some(JsonFormat.SingleArray)
           else Some(JsonFormat.LineDelimited)
         else if ((mediaType satisfies JsonFormat.LineDelimited.mediaType) ||
-                 (mediaType satisfies new MediaType("application", "x-ldjson"))) Some(JsonFormat.LineDelimited)
+          (mediaType satisfies new MediaType("application", "x-ldjson")))
+          Some(JsonFormat.LineDelimited)
         else None
       format.map { f =>
         val precision =
@@ -238,6 +272,14 @@ object MessageFormat {
     // TODO: MediaRange needs an Order instance – combining QValue ordering
     //       with specificity (EG, application/json sorts before
     //       application/* if they have the same q-value).
-    accept.flatMap(_.values.sortBy(_.qValue).list.map(_.mediaRange).map(fromMediaType).flatten(Option.option2Iterable).lastOption)
+    accept
+      .flatMap(
+        _.values
+          .sortBy(_.qValue)
+          .list
+          .map(_.mediaRange)
+          .map(fromMediaType)
+          .flatten(Option.option2Iterable)
+          .lastOption)
       .getOrElse(MessageFormat.Default)
 }

@@ -27,34 +27,35 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
-import scalaz.{~>, \/, Applicative, Bind}
+import scalaz.{\/, ~>, Applicative, Bind}
 import scalaz.syntax.equal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
 
 /** `FileSystem` interpreters for a filesystem that has no, and doesn't support
-  * creating any, files.
-  */
+ * creating any, files.
+ */
 object Empty {
   import FileSystemError._, PathError._
 
   def readFile[F[_]: Applicative] = λ[ReadFile ~> F] {
     case ReadFile.Open(f, _, _) => fsPathNotFound(f)
-    case ReadFile.Read(h)       => unknownReadHandle(h).left.point[F]
-    case ReadFile.Close(_)      => ().point[F]
+    case ReadFile.Read(h) => unknownReadHandle(h).left.point[F]
+    case ReadFile.Close(_) => ().point[F]
   }
 
   def writeFile[F[_]: Applicative] = λ[WriteFile ~> F] {
-    case WriteFile.Open(f)        => WriteFile.WriteHandle(f, 0).right.point[F]
+    case WriteFile.Open(f) => WriteFile.WriteHandle(f, 0).right.point[F]
     case WriteFile.Write(_, data) => data.map(writeFailed(_, "empty filesystem")).point[F]
-    case WriteFile.Close(_)       => ().point[F]
+    case WriteFile.Close(_) => ().point[F]
   }
 
   def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
     case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
-    case ManageFile.Delete(p)    => fsPathNotFound(p)
-    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+    case ManageFile.Delete(p) => fsPathNotFound(p)
+    case ManageFile.TempFile(p) =>
+      (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
   }
 
   def queryFile[F[_]: Applicative]: QueryFile ~> F =
@@ -86,12 +87,14 @@ object Empty {
       }
     }
 
-  def analyze[F[_] : Applicative]: Analyze ~> F = new (Analyze ~> F) {
+  def analyze[F[_]: Applicative]: Analyze ~> F = new (Analyze ~> F) {
     def apply[A](from: Analyze[A]) = from match {
-      case Analyze.QueryCost(lp) => lpResult[F, FileSystemError \/ Int](lp).map(_._2).map(Bind[FileSystemError \/ ?].join(_))
+      case Analyze.QueryCost(lp) =>
+        lpResult[F, FileSystemError \/ Int](lp)
+          .map(_._2)
+          .map(Bind[FileSystemError \/ ?].join(_))
     }
   }
-
 
   def fileSystem[F[_]: Applicative]: FileSystem ~> F =
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
@@ -103,7 +106,8 @@ object Empty {
 
   private val lp = new LogicalPlanR[Fix[LogicalPlan]]
 
-  private def lpResult[F[_]: Applicative, A](plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
+  private def lpResult[F[_]: Applicative, A](
+      plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
     lp.paths(plan)
       .findMin
       // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
@@ -113,6 +117,7 @@ object Empty {
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
     pathErr(pathNotFound(p)).left.point[F]
 
-  private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
+  private def unsupportedPlan[F[_]: Applicative, A](
+      lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
     planningFailed(lp, UnsupportedPlan(lp.project, None)).left.point[F]
 }

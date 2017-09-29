@@ -22,33 +22,29 @@ import quasar.contrib.scalaz.foldable._
 import scalaz._, Scalaz._
 
 /** A map from keys of type `K` to values of type `V` that relies on key
-  * equality to implement operations.
-  *
-  * As a result, more types are permitted as keys than for maps relying
-  * on an ordering, however, operations on `EqMap` are O(n).
-  */
+ * equality to implement operations.
+ *
+ * As a result, more types are permitted as keys than for maps relying
+ * on an ordering, however, operations on `EqMap` are O(n).
+ */
 final class EqMap[K, V] private (val toList: List[(K, V)]) {
   def lookup(k: K)(implicit K: Equal[K]): Option[V] =
     toList find (_._1 === k) map (_._2)
 
   def insert(k: K, v: V)(implicit K: Equal[K]): EqMap[K, V] = {
     def upsert(z: Zipper[(K, V)]): List[(K, V)] =
-      z.findZ(_._1 === k).cata(
-        _.modify(_ as v).toList,
-        (k, v) :: toList)
+      z.findZ(_._1 === k).cata(_.modify(_ as v).toList, (k, v) :: toList)
 
-    toList.toZipper.cata(
-      z => new EqMap(upsert(z)),
-      EqMap.singleton(k, v))
+    toList.toZipper.cata(z => new EqMap(upsert(z)), EqMap.singleton(k, v))
   }
 
-  def + (kv: (K, V))(implicit K: Equal[K]): EqMap[K, V] =
+  def +(kv: (K, V))(implicit K: Equal[K]): EqMap[K, V] =
     insert(kv._1, kv._2)
 
   def delete(k: K)(implicit K: Equal[K]): EqMap[K, V] =
     new EqMap(toList filterNot (_._1 === k))
 
-  def - (k: K)(implicit K: Equal[K]): EqMap[K, V] =
+  def -(k: K)(implicit K: Equal[K]): EqMap[K, V] =
     delete(k)
 }
 

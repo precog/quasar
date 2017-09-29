@@ -27,13 +27,14 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class ThetaJoinPlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-  FMT: SearchOptions,
-  T[_[_]]: BirecursiveT
-](implicit
-  QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],
-  SP : StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, ThetaJoin[T, ?], T[EJson]] {
+    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+    FMT: SearchOptions,
+    T[_[_]]: BirecursiveT
+](
+    implicit
+    QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],
+    SP: StructuralPlanner[F, FMT])
+    extends Planner[F, FMT, ThetaJoin[T, ?], T[EJson]] {
   import expr.for_
 
   // FIXME: Handle `JoinType`
@@ -41,49 +42,53 @@ private[qscript] final class ThetaJoinPlanner[
   //        assign it to a variable? It may be necessary in order to be able to
   //        use the cts:query features, but we'll need to profile otherwise.
   def plan[Q](
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): AlgebraM[F, ThetaJoin[T, ?], Search[Q] \/ XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, _, combine) =>
       for {
-        l      <- freshName[F]
-        r      <- freshName[F]
-        lhs0   <- rebaseXQuery[T, F, FMT, Q](lBranch, src)
-        rhs0   <- rebaseXQuery[T, F, FMT, Q](rBranch, src)
-        lhs    <- elimSearch[Q](lhs0)
-        rhs    <- elimSearch[Q](rhs0)
+        l <- freshName[F]
+        r <- freshName[F]
+        lhs0 <- rebaseXQuery[T, F, FMT, Q](lBranch, src)
+        rhs0 <- rebaseXQuery[T, F, FMT, Q](rBranch, src)
+        lhs <- elimSearch[Q](lhs0)
+        rhs <- elimSearch[Q](rhs0)
         filter <- mergeXQuery[T, F, FMT](on, ~l, ~r)
-        body   <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
-      } yield ((lhs, rhs) match {
-        case (IterativeFlwor(lcs, None, INil(), _, lr), IterativeFlwor(rcs, None, INil(), _, rr)) =>
-          thetaJoinFlwor(
-            lcs                                        |+|
-            NonEmptyList(BindingClause.let_(l := lr))  |+|
-            rcs                                        |+|
-            NonEmptyList(BindingClause.let_(r := rr)),
-            filter,
-            body)
+        body <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
+      } yield
+        ((lhs, rhs) match {
+          case (
+              IterativeFlwor(lcs, None, INil(), _, lr),
+              IterativeFlwor(rcs, None, INil(), _, rr)) =>
+            thetaJoinFlwor(
+              lcs |+|
+                NonEmptyList(BindingClause.let_(l := lr)) |+|
+                rcs |+|
+                NonEmptyList(BindingClause.let_(r := rr)),
+              filter,
+              body)
 
-        case (IterativeFlwor(lcs, None, INil(), _, lr), _                                        ) =>
-          thetaJoinFlwor(
-            lcs                                        |+|
-            NonEmptyList(
-              BindingClause.let_(l := lr),
-              BindingClause.for_(r in rhs)),
-            filter,
-            body)
+          case (IterativeFlwor(lcs, None, INil(), _, lr), _) =>
+            thetaJoinFlwor(
+              lcs |+|
+                NonEmptyList(BindingClause.let_(l := lr), BindingClause.for_(r in rhs)),
+              filter,
+              body)
 
-        case (_                                       , IterativeFlwor(rcs, None, INil(), _, rr)) =>
-          thetaJoinFlwor(
-            NonEmptyList(BindingClause.for_(l := lhs)) |+|
-            rcs                                        |+|
-            NonEmptyList(BindingClause.let_(r := rr)),
-            filter,
-            body)
+          case (_, IterativeFlwor(rcs, None, INil(), _, rr)) =>
+            thetaJoinFlwor(
+              NonEmptyList(BindingClause.for_(l := lhs)) |+|
+                rcs |+|
+                NonEmptyList(BindingClause.let_(r := rr)),
+              filter,
+              body)
 
-        case _ => for_ (l in lhs, r in rhs) where_ filter return_ body
-      }).right
+          case _ => for_(l in lhs, r in rhs) where_ filter return_ body
+        }).right
   }
 
-  def thetaJoinFlwor(bindings: NonEmptyList[BindingClause], filter: XQuery, body: XQuery): XQuery =
+  def thetaJoinFlwor(
+      bindings: NonEmptyList[BindingClause],
+      filter: XQuery,
+      body: XQuery): XQuery =
     XQuery.Flwor(bindings, Some(filter), IList.empty, false, body)
 }

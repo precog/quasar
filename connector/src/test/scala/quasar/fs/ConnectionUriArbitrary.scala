@@ -24,7 +24,7 @@ trait ConnectionUriArbitrary {
   implicit val connectionUriArbitrary: Arbitrary[ConnectionUri] =
     Arbitrary(for {
       scheme <- Gen.alphaStr
-      rest   <- Gen.alphaStr
+      rest <- Gen.alphaStr
     } yield ConnectionUri(s"$scheme:$rest"))
 }
 

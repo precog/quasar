@@ -30,13 +30,13 @@ import scalaz.concurrent.Task
 object metastore {
 
   def jdbcMounter[S[_]](
-    hfsRef: TaskRef[BackendEffect~> HierarchicalFsEffM],
-    mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
-  )(implicit
-    S0: ConnectionIO :<: S,
-    S1: PhysErr :<: S,
-    S2: FsAsk :<: S
-  ): Mounting ~> Free[S, ?] = {
+      hfsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM],
+      mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
+  )(
+      implicit
+      S0: ConnectionIO :<: S,
+      S1: PhysErr :<: S,
+      S2: FsAsk :<: S): Mounting ~> Free[S, ?] = {
     type M[A] = Free[MountEff, A]
     type G[A] = Coproduct[ConnectionIO, M, A]
     type T[A] = Coproduct[Task, S, A]
@@ -46,12 +46,10 @@ object metastore {
 
     val g: G ~> Free[S, ?] =
       injectFT[ConnectionIO, S] :+:
-      foldMapNT(mapSNT(t) compose MountEff.interpreter[T](hfsRef, mntdRef))
+        foldMapNT(mapSNT(t) compose MountEff.interpreter[T](hfsRef, mntdRef))
 
     def mounter(handler: MountRequestHandler[PhysFsEffM, HierarchicalFsEff]) = {
-      MetaStoreMounter[M, G](
-        handler.mount[MountEff](_),
-        handler.unmount[MountEff](_))
+      MetaStoreMounter[M, G](handler.mount[MountEff](_), handler.unmount[MountEff](_))
     }
 
     λ[Mounting ~> Free[S, ?]] { mounting =>

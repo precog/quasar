@@ -27,24 +27,27 @@ import scalaz.syntax.functor._
 import xml.name._
 
 /** A source of QNames unique within `F[_]`, an implementation must have the
-  * property that, if Applicative[F], then (freshQName |@| freshQName)(_ != _).
-  */
+ * property that, if Applicative[F], then (freshQName |@| freshQName)(_ != _).
+ */
 @typeclass trait QNameGenerator[F[_]] {
+
   /** Returns a fresh QName, guaranteed to be unique among all the other QNames
-    * generated from `F`.
-    */
+   * generated from `F`.
+   */
   def freshQName: F[QName]
 }
 
 object QNameGenerator extends QNameGeneratorInstances
 
 sealed abstract class QNameGeneratorInstances extends QNameGeneratorInstances0 {
-  implicit def sequenceQNameGenerator[F[_]](implicit F: MonadState[F, Long]): QNameGenerator[F] =
+  implicit def sequenceQNameGenerator[F[_]](
+      implicit F: MonadState[F, Long]): QNameGenerator[F] =
     new QNameGenerator[F] {
       def freshQName = F.bind(F.get)(n => F.put(n + 1) as numericQName(n))
     }
 
-  implicit def monotonicSeqQNameGenerator[F[_]: Functor](implicit F: MonoSeq[F]): QNameGenerator[F] =
+  implicit def monotonicSeqQNameGenerator[F[_]: Functor](
+      implicit F: MonoSeq[F]): QNameGenerator[F] =
     new QNameGenerator[F] {
       def freshQName = MonoSeq[F].next map (numericQName)
     }
@@ -56,22 +59,26 @@ sealed abstract class QNameGeneratorInstances extends QNameGeneratorInstances0 {
 }
 
 sealed abstract class QNameGeneratorInstances0 {
-  implicit def eitherTQNameGenerator[F[_]: QNameGenerator : Functor, A]: QNameGenerator[EitherT[F, A, ?]] =
+  implicit def eitherTQNameGenerator[F[_]: QNameGenerator: Functor, A]
+    : QNameGenerator[EitherT[F, A, ?]] =
     new QNameGenerator[EitherT[F, A, ?]] {
       def freshQName = EitherT.right(QNameGenerator[F].freshQName)
     }
 
-  implicit def readerTQNameGenerator[F[_]: QNameGenerator, A]: QNameGenerator[ReaderT[F, A, ?]] =
+  implicit def readerTQNameGenerator[F[_]: QNameGenerator, A]
+    : QNameGenerator[ReaderT[F, A, ?]] =
     new QNameGenerator[ReaderT[F, A, ?]] {
       def freshQName = ReaderT(κ(QNameGenerator[F].freshQName))
     }
 
-  implicit def stateTQNameGenerator[F[_]: QNameGenerator : Monad, S]: QNameGenerator[StateT[F, S, ?]] =
+  implicit def stateTQNameGenerator[F[_]: QNameGenerator: Monad, S]
+    : QNameGenerator[StateT[F, S, ?]] =
     new QNameGenerator[StateT[F, S, ?]] {
       def freshQName = StateT(s => QNameGenerator[F].freshQName strengthL s)
     }
 
-  implicit def writerTQNameGenerator[F[_]: QNameGenerator : Functor, W: Monoid]: QNameGenerator[WriterT[F, W, ?]] =
+  implicit def writerTQNameGenerator[F[_]: QNameGenerator: Functor, W: Monoid]
+    : QNameGenerator[WriterT[F, W, ?]] =
     new QNameGenerator[WriterT[F, W, ?]] {
       def freshQName = WriterT.put(QNameGenerator[F].freshQName)(Monoid[W].zero)
     }

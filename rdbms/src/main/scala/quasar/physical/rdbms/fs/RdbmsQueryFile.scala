@@ -28,12 +28,11 @@ import quasar.physical.rdbms.common.{Schema, TablePath}
 import quasar.physical.rdbms.common.TablePath.showTableName
 import pathy.Path
 
-import scalaz.{-\/, Monad, \/-}
+import scalaz.{-\/, \/-, Monad}
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
 import scalaz.std.vector._
-
 
 trait RdbmsQueryFile {
   this: Rdbms =>
@@ -56,15 +55,14 @@ trait RdbmsQueryFile {
 
     override def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       val schema = TablePath.dirToSchema(dir)
-      schemaExists(schema).liftB.flatMap(_.unlessM(ME.raiseError(pathErr(pathNotFound(dir))))) *>
+      schemaExists(schema).liftB
+        .flatMap(_.unlessM(ME.raiseError(pathErr(pathNotFound(dir))))) *>
         (for {
-        childSchemas <- findChildSchemas(schema)
-        childTables <- findChildTables(schema)
-        childDirs = childSchemas.map(d => -\/(Schema.lastDirName(d))).toSet
-        childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
-      }
-        yield childDirs ++ childFiles)
-          .liftB
+          childSchemas <- findChildSchemas(schema)
+          childTables <- findChildTables(schema)
+          childDirs = childSchemas.map(d => -\/(Schema.lastDirName(d))).toSet
+          childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
+        } yield childDirs ++ childFiles).liftB
     }
 
     override def close(h: ResultHandle): Configured[Unit] = ???

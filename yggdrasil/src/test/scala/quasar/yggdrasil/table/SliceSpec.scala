@@ -24,7 +24,7 @@ import quasar.precog.util._
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import scala.util.Random
-import org.scalacheck.{ Arbitrary, Gen }
+import org.scalacheck.{Arbitrary, Gen}
 import Gen.listOfN
 import ArbitrarySlice._
 
@@ -45,10 +45,14 @@ class SliceSpec extends Specification with ScalaCheck {
     byCPath.mapValues(_.map(_._2).toList)
   }
 
-  def sortableCValues(slice: Slice, cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
+  def sortableCValues(
+      slice: Slice,
+      cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
     val byCPath = columnsByCPath(slice)
     (0 until slice.size).map({ row =>
-      (extractCValues(cpaths.map(byCPath).toList, row), extractCValues(byCPath.values.toList, row))
+      (
+        extractCValues(cpaths.map(byCPath).toList, row),
+        extractCValues(byCPath.values.toList, row))
     })(collection.breakOut)
   }
 
@@ -184,32 +188,41 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 }
 
-
 object ArbitrarySlice {
-  private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
+  private def genBitSet(size: Int): Gen[BitSet] =
+    listOfN(size, genBool) ^^ (BitsetColumn bitset _)
 
   // TODO remove duplication with `SegmentFormatSupport#genForCType`
   def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
     def bs = BitSetUtil.range(0, size)
     col.ctype match {
-      case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
-      case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
-      case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
-      case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
-      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns.map(n => ZonedDateTime.ofInstant(Instant.ofEpochSecond(n % Instant.MAX.getEpochSecond), ZoneOffset.UTC))))
-      case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
-      case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
-      case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
-      case CEmptyObject  => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
-      case CEmptyArray   => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
-      case CUndefined    => UndefinedColumn.raw
+      case CString => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
+      case CBoolean => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
+      case CLong => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
+      case CDouble => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
+      case CDate =>
+        arrayOfN(size, genLong) ^^ (ns =>
+          ArrayDateColumn(
+            bs,
+            ns.map(n =>
+              ZonedDateTime.ofInstant(
+                Instant.ofEpochSecond(n % Instant.MAX.getEpochSecond),
+                ZoneOffset.UTC))))
+      case CPeriod =>
+        arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
+      case CNum =>
+        arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
+      case CNull => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
+      case CEmptyObject => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
+      case CEmptyArray => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
+      case CUndefined => UndefinedColumn.raw
       case CArrayType(_) => abort("undefined")
     }
   }
 
   def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
-    val zero    = Nil: Gen[List[(ColumnRef, Column)]]
-    val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
+    val zero = Nil: Gen[List[(ColumnRef, Column)]]
+    val gs = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
     val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
 
     genData ^^ (data => Slice(data.toMap, sz))

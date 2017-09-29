@@ -35,27 +35,31 @@ import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
 
 /** Abstract spec for the standard library, intended to be implemented for each
-  * library implementation, of which there are one or more per backend.
-  */
+ * library implementation, of which there are one or more per backend.
+ */
 abstract class StdLibSpec extends Qspec {
   def isPrintableAscii(c: Char): Boolean = c >= '\u0020' && c <= '\u007e'
   def isPrintableAscii(s: String): Boolean = s.forall(isPrintableAscii)
 
   def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
-      x == y || ((x - y).abs/(y.abs max err)).toDouble < err
+      x == y || ((x - y).abs / (y.abs max err)).toDouble < err
 
     def apply[S <: Data](s: Expectable[S]) = {
       val v = s.value
       (v, expected) match {
         case (Data.Number(x), Data.Number(exp)) =>
-          result(isClose(x, exp, 1e-9),
+          result(
+            isClose(x, exp, 1e-9),
             s"$x is a Number and matches $exp",
-            s"$x is a Number but does not match $exp", s)
+            s"$x is a Number but does not match $exp",
+            s)
         case _ =>
-          result(Equal[Data].equal(v, expected),
+          result(
+            Equal[Data].equal(v, expected),
             s"$v matches $expected",
-            s"$v does not match $expected", s)
+            s"$v does not match $expected",
+            s)
       }
     }
   }
@@ -76,7 +80,8 @@ abstract class StdLibSpec extends Qspec {
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-        arg1: Data, arg2: Data,
+        arg1: Data,
+        arg2: Data,
         expected: Data): Result =
       binary(prg, arg1, arg2, expected) and
         binary(prg, arg2, arg1, expected)
@@ -94,28 +99,93 @@ abstract class StdLibSpec extends Qspec {
 
       "Search" >> {
         "find contents within string when case sensitive" >> {
-          ternary(Search(_, _, _).embed, Data.Str("church"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("China"), Data.Str("^Ch.*$"), Data.Bool(false), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true))
+          ternary(
+            Search(_, _, _).embed,
+            Data.Str("church"),
+            Data.Str(".*ch.*"),
+            Data.Bool(false),
+            Data.Bool(true)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("China"),
+              Data.Str("^Ch.*$"),
+              Data.Bool(false),
+              Data.Bool(true)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("matching"),
+              Data.Str(".*ch.*"),
+              Data.Bool(false),
+              Data.Bool(true))
         }
 
         "reject a non-matching string when case sensitive" >> {
-          ternary(Search(_, _, _).embed, Data.Str("church"), Data.Str("^bs.*$"), Data.Bool(false), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("china"), Data.Str("^bs.*$"), Data.Bool(false), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*bs.*"), Data.Bool(false), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*CH.*"), Data.Bool(false), Data.Bool(false))
+          ternary(
+            Search(_, _, _).embed,
+            Data.Str("church"),
+            Data.Str("^bs.*$"),
+            Data.Bool(false),
+            Data.Bool(false)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("china"),
+              Data.Str("^bs.*$"),
+              Data.Bool(false),
+              Data.Bool(false)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("matching"),
+              Data.Str(".*bs.*"),
+              Data.Bool(false),
+              Data.Bool(false)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("matching"),
+              Data.Str(".*CH.*"),
+              Data.Bool(false),
+              Data.Bool(false))
         }
 
         "find contents within string when case insensitive" >> {
-          ternary(Search(_, _, _).embed, Data.Str("Church"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("cHina"), Data.Str("^ch.*$"), Data.Bool(true), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true))
+          ternary(
+            Search(_, _, _).embed,
+            Data.Str("Church"),
+            Data.Str(".*ch.*"),
+            Data.Bool(true),
+            Data.Bool(true)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("cHina"),
+              Data.Str("^ch.*$"),
+              Data.Bool(true),
+              Data.Bool(true)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("matCHing"),
+              Data.Str(".*ch.*"),
+              Data.Bool(true),
+              Data.Bool(true))
         }
 
         "reject a non-matching string when case insensitive" >> {
-          ternary(Search(_, _, _).embed, Data.Str("Church"), Data.Str("^bs.*$"), Data.Bool(true), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("cHina"), Data.Str("^bs.*$"), Data.Bool(true), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*bs.*"), Data.Bool(true), Data.Bool(false))
+          ternary(
+            Search(_, _, _).embed,
+            Data.Str("Church"),
+            Data.Str("^bs.*$"),
+            Data.Bool(true),
+            Data.Bool(false)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("cHina"),
+              Data.Str("^bs.*$"),
+              Data.Bool(true),
+              Data.Bool(false)) and
+            ternary(
+              Search(_, _, _).embed,
+              Data.Str("matCHing"),
+              Data.Str(".*bs.*"),
+              Data.Bool(true),
+              Data.Bool(false))
         }
       }
 
@@ -143,28 +213,53 @@ abstract class StdLibSpec extends Qspec {
       "Substring" >> {
         "simple" >> {
           // NB: not consistent with PostgreSQL, which is 1-based for `start`
-          ternary(Substring(_, _, _).embed, Data.Str("Thomas"), Data.Int(1), Data.Int(3), Data.Str("hom"))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str("Thomas"),
+            Data.Int(1),
+            Data.Int(3),
+            Data.Str("hom"))
         }
 
         "multibyte chars" >> {
-          ternary(Substring(_, _, _).embed, Data.Str("cafétéria"), Data.Int(3), Data.Int(1), Data.Str("é"))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str("cafétéria"),
+            Data.Int(3),
+            Data.Int(1),
+            Data.Str("é"))
         }
 
         "empty string and any offsets" >> prop { (start0: Int, length0: Int) =>
           // restrict the range to something that will actually exercise the behavior
           val start = start0 % 1000
           val length = length0 % 1000
-          ternary(Substring(_, _, _).embed, Data.Str(""), Data.Int(start), Data.Int(length), Data.Str(""))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str(""),
+            Data.Int(start),
+            Data.Int(length),
+            Data.Str(""))
         }
 
         "any string with entire range" >> prop { (str: String) =>
-          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(0), Data.Int(str.length), Data.Str(str))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str(str),
+            Data.Int(0),
+            Data.Int(str.length),
+            Data.Str(str))
         }
 
         "any string with 0 length" >> prop { (str: String, start0: Int) =>
           // restrict the range to something that will actually exercise the behavior
           val start = start0 % 1000
-          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(0), Data.Str(""))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str(str),
+            Data.Int(start),
+            Data.Int(0),
+            Data.Str(""))
         }
 
         "any string and offsets" >> prop { (str: String, start0: Int, length0: Int) =>
@@ -174,16 +269,29 @@ abstract class StdLibSpec extends Qspec {
 
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
-          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(expected))
+          ternary(
+            Substring(_, _, _).embed,
+            Data.Str(str),
+            Data.Int(start),
+            Data.Int(length),
+            Data.Str(expected))
         }
       }
 
       "Split" >> {
         "some string" >> {
-          binary(Split(_, _).embed, Data.Str("some string"), Data.Str(" "), Data.Arr(List("some", "string").map(Data.Str(_))))
+          binary(
+            Split(_, _).embed,
+            Data.Str("some string"),
+            Data.Str(" "),
+            Data.Arr(List("some", "string").map(Data.Str(_))))
         }
         "some string by itself" >> {
-          binary(Split(_, _).embed, Data.Str("some string"), Data.Str("some string"), Data.Arr(List("", "").map(Data.Str(_))))
+          binary(
+            Split(_, _).embed,
+            Data.Str("some string"),
+            Data.Str("some string"),
+            Data.Arr(List("", "").map(Data.Str(_))))
         }
         "any string not containing delimiter" >> prop { (s: String, d: String) =>
           (!d.isEmpty && !s.contains(d)) ==>
@@ -191,7 +299,11 @@ abstract class StdLibSpec extends Qspec {
         }
         "any string with non-empty delimiter" >> prop { (s: String, d: String) =>
           !d.isEmpty ==>
-            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d), -1).toList.map(Data.Str(_))))
+            binary(
+              Split(_, _).embed,
+              Data.Str(s),
+              Data.Str(d),
+              Data.Arr(s.split(Regex.quote(d), -1).toList.map(Data.Str(_))))
         }
       }
 
@@ -260,14 +372,15 @@ abstract class StdLibSpec extends Qspec {
         // }
 
         "timestamp" >> {
-          def test(x: Instant) = unary(
-            ToString(_).embed,
-            Data.Timestamp(x),
-            Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
+          def test(x: Instant) =
+            unary(
+              ToString(_).embed,
+              Data.Timestamp(x),
+              Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
 
           "zero fractional seconds" >> test(Instant.EPOCH)
 
-          "any" >> prop (test(_: Instant))
+          "any" >> prop(test(_: Instant))
         }
 
         "date" >> prop { (x: LocalDate) =>
@@ -275,14 +388,12 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "time" >> {
-          def test(x: LocalTime) = unary(
-            ToString(_).embed,
-            Data.Time(x),
-            Data.Str(x.format(DataCodec.timeFormatter)))
+          def test(x: LocalTime) =
+            unary(ToString(_).embed, Data.Time(x), Data.Str(x.format(DataCodec.timeFormatter)))
 
           "zero fractional seconds" >> test(LocalTime.NOON)
 
-          "any" >> prop (test(_: LocalTime))
+          "any" >> prop(test(_: LocalTime))
         }
 
         // TODO: Enable
@@ -309,33 +420,54 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 0001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractCentury(_).embed,
+            Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "midnight 2000-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(20))
+          unary(
+            ExtractCentury(_).embed,
+            Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")),
+            Data.Int(20))
         }
 
         "midnight 2001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(21))
+          unary(
+            ExtractCentury(_).embed,
+            Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")),
+            Data.Int(21))
         }
       }
 
       "ExtractDayOfMonth" >> {
         "2016-01-01" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.Date(LocalDate.parse("2016-01-01")),
+            Data.Int(1))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "2016-02-29" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(29))
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.Date(LocalDate.parse("2016-02-29")),
+            Data.Int(29))
         }
 
         "midnight 2016-02-29" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(29))
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")),
+            Data.Int(29))
         }
       }
 
@@ -345,61 +477,100 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 1999-12-31" >> {
-          unary(ExtractDecade(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(199))
+          unary(
+            ExtractDecade(_).embed,
+            Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")),
+            Data.Int(199))
         }
       }
 
       "ExtractDayOfWeek" >> {
         "2016-09-28" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Date(LocalDate.parse("2016-09-28")),
+            Data.Int(3))
         }
 
         "midnight 2016-09-28" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")),
+            Data.Int(3))
         }
 
         "2016-10-02" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(0))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Date(LocalDate.parse("2016-10-02")),
+            Data.Int(0))
         }
 
         "midnight 2016-10-02" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(0))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")),
+            Data.Int(0))
         }
 
         "2016-10-08" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-08")), Data.Int(6))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Date(LocalDate.parse("2016-10-08")),
+            Data.Int(6))
         }
 
         "noon 2016-10-08" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-08T12:00:00.000Z")), Data.Int(6))
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-10-08T12:00:00.000Z")),
+            Data.Int(6))
         }
       }
 
       "ExtractDayOfYear" >> {
         "2016-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2016-03-01")), Data.Int(61))
+          unary(
+            ExtractDayOfYear(_).embed,
+            Data.Date(LocalDate.parse("2016-03-01")),
+            Data.Int(61))
         }
 
         "midnight 2016-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(61))
+          unary(
+            ExtractDayOfYear(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Int(61))
         }
 
         "2017-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2017-03-01")), Data.Int(60))
+          unary(
+            ExtractDayOfYear(_).embed,
+            Data.Date(LocalDate.parse("2017-03-01")),
+            Data.Int(60))
         }
 
         "midnight 2017-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2017-03-01T00:00:00.000Z")), Data.Int(60))
+          unary(
+            ExtractDayOfYear(_).embed,
+            Data.Timestamp(Instant.parse("2017-03-01T00:00:00.000Z")),
+            Data.Int(60))
         }
       }
 
       "ExtractEpoch" >> {
         "2016-09-29" >> {
-          unary(ExtractEpoch(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(1475107200.0))
+          unary(
+            ExtractEpoch(_).embed,
+            Data.Date(LocalDate.parse("2016-09-29")),
+            Data.Dec(1475107200.0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractEpoch(_).embed, Data.Timestamp(Instant.parse("2016-09-29T12:34:56.789Z")), Data.Dec(1475152496.789))
+          unary(
+            ExtractEpoch(_).embed,
+            Data.Timestamp(Instant.parse("2016-09-29T12:34:56.789Z")),
+            Data.Dec(1475152496.789))
         }
       }
 
@@ -409,102 +580,167 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-09-29" >> {
-          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+          unary(
+            ExtractHour(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Int(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(12))
+          unary(
+            ExtractHour(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")),
+            Data.Int(12))
         }
       }
 
       "ExtractIsoDayOfWeek" >> {
         "2016-09-28" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.Date(LocalDate.parse("2016-09-28")),
+            Data.Int(3))
         }
 
         "midnight 2016-09-28" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")),
+            Data.Int(3))
         }
 
         "2016-10-02" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(7))
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.Date(LocalDate.parse("2016-10-02")),
+            Data.Int(7))
         }
 
         "midnight 2016-10-02" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(7))
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")),
+            Data.Int(7))
         }
       }
 
       "ExtractIsoYear" >> {
         "2006-01-01" >> {
-          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-01")), Data.Int(2005))
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.Date(LocalDate.parse("2006-01-01")),
+            Data.Int(2005))
         }
 
         "midnight 2006-01-01" >> {
-          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-01T00:00:00.000Z")), Data.Int(2005))
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.Timestamp(Instant.parse("2006-01-01T00:00:00.000Z")),
+            Data.Int(2005))
         }
 
         "2006-01-02" >> {
-          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-02")), Data.Int(2006))
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.Date(LocalDate.parse("2006-01-02")),
+            Data.Int(2006))
         }
 
         "midnight 2006-01-02" >> {
-          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-02T00:00:00.000Z")), Data.Int(2006))
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.Timestamp(Instant.parse("2006-01-02T00:00:00.000Z")),
+            Data.Int(2006))
         }
       }
 
       "ExtractMicroseconds" >> {
         "2016-09-29" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+          unary(
+            ExtractMicroseconds(_).embed,
+            Data.Date(LocalDate.parse("2016-09-29")),
+            Data.Dec(0))
         }
 
         "midnight 2016-09-29" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unary(
+            ExtractMicroseconds(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e6))
+          unary(
+            ExtractMicroseconds(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")),
+            Data.Dec(56.789e6))
         }
       }
 
-
       "ExtractMillennium" >> {
         "0001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Date(LocalDate.parse("0001-01-01")),
+            Data.Int(1))
         }
 
         "2000-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Date(LocalDate.parse("2000-01-01")),
+            Data.Int(2))
         }
 
         "2001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Date(LocalDate.parse("2001-01-01")),
+            Data.Int(3))
         }
 
         "midnight 0001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "midnight 2000-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")),
+            Data.Int(2))
         }
 
         "midnight 2001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
+          unary(
+            ExtractMillennium(_).embed,
+            Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")),
+            Data.Int(3))
         }
       }
 
       "ExtractMilliseconds" >> {
         "2016-09-29" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+          unary(
+            ExtractMilliseconds(_).embed,
+            Data.Date(LocalDate.parse("2016-09-29")),
+            Data.Dec(0))
         }
 
         "midnight 2016-09-29" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unary(
+            ExtractMilliseconds(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e3))
+          unary(
+            ExtractMilliseconds(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")),
+            Data.Dec(56.789e3))
         }
       }
 
@@ -514,11 +750,17 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-09-29" >> {
-          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+          unary(
+            ExtractMinute(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Int(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(34))
+          unary(
+            ExtractMinute(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")),
+            Data.Int(34))
         }
       }
 
@@ -528,7 +770,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractMonth(_).embed,
+            Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "2016-02-29" >> {
@@ -536,7 +781,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-02-29" >> {
-          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(2))
+          unary(
+            ExtractMonth(_).embed,
+            Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")),
+            Data.Int(2))
         }
       }
 
@@ -546,7 +794,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-10-03" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-10-03T00:00:00.000Z")), Data.Int(4))
+          unary(
+            ExtractQuarter(_).embed,
+            Data.Timestamp(Instant.parse("2016-10-03T00:00:00.000Z")),
+            Data.Int(4))
         }
 
         "2016-03-31 (leap year)" >> {
@@ -554,7 +805,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-03-31 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-03-31T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractQuarter(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-31T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "2016-04-01 (leap year)" >> {
@@ -562,7 +816,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-04-01 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-04-01T00:00:00.000Z")), Data.Int(2))
+          unary(
+            ExtractQuarter(_).embed,
+            Data.Timestamp(Instant.parse("2016-04-01T00:00:00.000Z")),
+            Data.Int(2))
         }
 
         "2017-03-31" >> {
@@ -570,7 +827,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2017-03-31" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-03-31T00:00:00.000Z")), Data.Int(1))
+          unary(
+            ExtractQuarter(_).embed,
+            Data.Timestamp(Instant.parse("2017-03-31T00:00:00.000Z")),
+            Data.Int(1))
         }
 
         "2017-04-01" >> {
@@ -578,7 +838,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2017-04-01" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-04-01T00:00:00.000Z")), Data.Int(2))
+          unary(
+            ExtractQuarter(_).embed,
+            Data.Timestamp(Instant.parse("2017-04-01T00:00:00.000Z")),
+            Data.Int(2))
         }
       }
 
@@ -588,11 +851,17 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-09-29" >> {
-          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unary(
+            ExtractSecond(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")),
+            Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789))
+          unary(
+            ExtractSecond(_).embed,
+            Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")),
+            Data.Dec(56.789))
         }
       }
 
@@ -606,7 +875,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(53))
+          unary(
+            ExtractWeek(_).embed,
+            Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")),
+            Data.Int(53))
         }
 
         "2001-02-16" >> {
@@ -614,7 +886,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2016-10-03" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
+          unary(
+            ExtractWeek(_).embed,
+            Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")),
+            Data.Int(7))
         }
 
         "2005-01-01" >> {
@@ -622,7 +897,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 2005-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
+          unary(
+            ExtractWeek(_).embed,
+            Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")),
+            Data.Int(53))
         }
       }
 
@@ -632,7 +910,10 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "midnight 1999-12-31" >> {
-          unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+          unary(
+            ExtractYear(_).embed,
+            Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")),
+            Data.Int(1999))
         }
       }
 
@@ -642,10 +923,7 @@ abstract class StdLibSpec extends Qspec {
 
           truncZonedDateTime(TemporalPart.Day, t).fold(
             e => Failure(e.shows),
-            tt => unary(
-              StartOfDay(_).embed,
-              Data.Timestamp(x),
-              Data.Timestamp(tt.toInstant)))
+            tt => unary(StartOfDay(_).embed, Data.Timestamp(x), Data.Timestamp(tt.toInstant)))
         }
 
         "date" >> prop { (x: LocalDate) =>
@@ -670,10 +948,8 @@ abstract class StdLibSpec extends Qspec {
         def truncZonedDateTimeTimestamp(p: TemporalPart, i: Instant): Result =
           truncZonedDateTime(p, i.atZone(UTC)).fold(
             e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Timestamp(i),
-              Data.Timestamp(tt.toInstant)))
+            tt =>
+              unary(TemporalTrunc(p, _).embed, Data.Timestamp(i), Data.Timestamp(tt.toInstant)))
 
         "Q#1966" >>
           truncZonedDateTimeTimestamp(
@@ -735,10 +1011,7 @@ abstract class StdLibSpec extends Qspec {
         def truncZonedDateTimeDate(p: TemporalPart, d: LocalDate): Result =
           truncZonedDateTime(p, d.atStartOfDay(UTC)).fold(
             e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Date(d),
-              Data.Date(tt.toLocalDate)))
+            tt => unary(TemporalTrunc(p, _).embed, Data.Date(d), Data.Date(tt.toLocalDate)))
 
         "date Century" >> prop { d: LocalDate =>
           truncZonedDateTimeDate(TemporalPart.Century, d)
@@ -795,10 +1068,7 @@ abstract class StdLibSpec extends Qspec {
         def truncLocalTimeʹ(p: TemporalPart, t: LocalTime): Result =
           truncLocalTime(p, t).fold(
             e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Time(t),
-              Data.Time(tt)))
+            tt => unary(TemporalTrunc(p, _).embed, Data.Time(t), Data.Time(tt)))
 
         "time Century" >> prop { t: LocalTime =>
           truncLocalTimeʹ(TemporalPart.Century, t)
@@ -964,7 +1234,11 @@ abstract class StdLibSpec extends Qspec {
       "Divide" >> {
         "any ints" >> prop { (x: Int, y: Int) =>
           y != 0 ==>
-            binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Dec(x.toDouble / y.toDouble))
+            binary(
+              Divide(_, _).embed,
+              Data.Int(x),
+              Data.Int(y),
+              Data.Dec(x.toDouble / y.toDouble))
         }
 
         // TODO: figure out what domain can be tested here
@@ -1044,7 +1318,11 @@ abstract class StdLibSpec extends Qspec {
 
         "any ints" >> prop { (x: Int, y: Int) =>
           y != 0 ==>
-            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
+            binary(
+              Modulo(_, _).embed,
+              Data.Int(x),
+              Data.Int(y),
+              Data.Int(BigInt(x) % BigInt(y)))
         }
 
         // TODO analyze and optionally shortCircuit per connector
@@ -1102,8 +1380,8 @@ abstract class StdLibSpec extends Qspec {
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
           (x.dataType != y.dataType &&
-            !((Type.Numeric contains x.dataType) &&
-              (Type.Numeric contains y.dataType))) ==>
+          !((Type.Numeric contains x.dataType) &&
+            (Type.Numeric contains y.dataType))) ==>
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
@@ -1145,8 +1423,8 @@ abstract class StdLibSpec extends Qspec {
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
           (x.dataType != y.dataType &&
-            !((Type.Numeric contains x.dataType) &&
-              (Type.Numeric contains y.dataType))) ==>
+          !((Type.Numeric contains x.dataType) &&
+            (Type.Numeric contains y.dataType))) ==>
             binary(Neq(_, _).embed, x, y, Data.Bool(true))
         }
 
@@ -1275,30 +1553,60 @@ abstract class StdLibSpec extends Qspec {
 
       "Between" >> {
         "any Int with self" >> prop { (x: BigInt) =>
-          ternary(Between(_, _, _).embed, Data.Int(x), Data.Int(x), Data.Int(x), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Int(x),
+            Data.Int(x),
+            Data.Int(x),
+            Data.Bool(true))
         }
 
         "any three Ints" >> prop { (x1: BigInt, x2: BigInt, x3: BigInt) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Int(xs(1)), Data.Int(xs(0)), Data.Int(xs(2)), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Int(xs(1)),
+            Data.Int(xs(0)),
+            Data.Int(xs(2)),
+            Data.Bool(true))
         }
 
         "any Dec with self" >> prop { (x: BigDecimal) =>
-          ternary(Between(_, _, _).embed, Data.Dec(x), Data.Dec(x), Data.Dec(x), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Dec(x),
+            Data.Dec(x),
+            Data.Dec(x),
+            Data.Bool(true))
         }
 
         "any three Decs" >> prop { (x1: BigDecimal, x2: BigDecimal, x3: BigDecimal) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Dec(xs(1)), Data.Dec(xs(0)), Data.Dec(xs(2)), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Dec(xs(1)),
+            Data.Dec(xs(0)),
+            Data.Dec(xs(2)),
+            Data.Bool(true))
         }
 
         "any Str with self" >> prop { (x: String) =>
-          ternary(Between(_, _, _).embed, Data.Str(x), Data.Str(x), Data.Str(x), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Str(x),
+            Data.Str(x),
+            Data.Str(x),
+            Data.Bool(true))
         }
 
         "any three Strs" >> prop { (x1: String, x2: String, x3: String) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Str(xs(1)), Data.Str(xs(0)), Data.Str(xs(2)), Data.Bool(true))
+          ternary(
+            Between(_, _, _).embed,
+            Data.Str(xs(1)),
+            Data.Str(xs(0)),
+            Data.Str(xs(2)),
+            Data.Bool(true))
         }
 
         // TODO: Timestamp, Interval, cross-type comparison
@@ -1306,19 +1614,11 @@ abstract class StdLibSpec extends Qspec {
 
       "IfUndefined" >> {
         """NA ?? 42""" >> {
-          binary(
-            IfUndefined(_, _).embed,
-            Data.NA,
-            Data.Int(42),
-            Data.Int(42))
+          binary(IfUndefined(_, _).embed, Data.NA, Data.Int(42), Data.Int(42))
         }
 
         """1 ?? 2""" >> {
-          binary(
-            IfUndefined(_, _).embed,
-            Data.Int(1),
-            Data.Int(2),
-            Data.Int(1))
+          binary(IfUndefined(_, _).embed, Data.Int(1), Data.Int(2), Data.Int(1))
         }
 
         """{"a": 1} ?? 2""" >> {
@@ -1405,17 +1705,31 @@ abstract class StdLibSpec extends Qspec {
       "ConcatOp" >> {
         "array  || array" >> prop { (xs: List[BigInt], ys: List[BigInt]) =>
           val (xints, yints) = (xs map (Data._int(_)), ys map (Data._int(_)))
-          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._arr(yints), Data._arr(xints ::: yints))
+          binary(
+            ConcatOp(_, _).embed,
+            Data._arr(xints),
+            Data._arr(yints),
+            Data._arr(xints ::: yints))
         }
 
         "array  || string" >> prop { (xs: List[BigInt], y: String) =>
-          val (xints, ystrs) = (xs map (Data._int(_)), y.toList map (c => Data._str(c.toString)))
-          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._str(y), Data._arr(xints ::: ystrs))
+          val (xints, ystrs) =
+            (xs map (Data._int(_)), y.toList map (c => Data._str(c.toString)))
+          binary(
+            ConcatOp(_, _).embed,
+            Data._arr(xints),
+            Data._str(y),
+            Data._arr(xints ::: ystrs))
         }
 
         "string || array" >> prop { (x: String, ys: List[BigInt]) =>
-          val (xstrs, yints) = (x.toList map (c => Data._str(c.toString)), ys map (Data._int(_)))
-          binary(ConcatOp(_, _).embed, Data._str(x), Data._arr(yints), Data._arr(xstrs ::: yints))
+          val (xstrs, yints) =
+            (x.toList map (c => Data._str(c.toString)), ys map (Data._int(_)))
+          binary(
+            ConcatOp(_, _).embed,
+            Data._str(x),
+            Data._arr(yints),
+            Data._arr(xstrs ::: yints))
         }
 
         "string || string" >> prop { (x: String, y: String) =>
@@ -1449,11 +1763,7 @@ abstract class StdLibSpec extends Qspec {
         }
 
         """({}).c""" >> {
-          binary(
-            ObjectProject(_, _).embed,
-            Data.Obj(),
-            Data.Str("c"),
-            Data.NA)
+          binary(ObjectProject(_, _).embed, Data.Obj(), Data.Str("c"), Data.NA)
         }
       }
 
@@ -1494,11 +1804,19 @@ abstract class StdLibSpec extends Qspec {
 
       "Within" >> {
         "0 in [1, 2, 3]" >> {
-          binary(Within(_, _).embed, Data.Int(0), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.False)
+          binary(
+            Within(_, _).embed,
+            Data.Int(0),
+            Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))),
+            Data.False)
         }
 
         "1 in [1, 2, 3]" >> {
-          binary(Within(_, _).embed, Data.Int(1), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.True)
+          binary(
+            Within(_, _).embed,
+            Data.Int(1),
+            Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))),
+            Data.True)
         }
 
         "0 in []" >> {
@@ -1515,7 +1833,8 @@ abstract class StdLibSpec extends Qspec {
                 Data.Int(2),
                 Data.Obj(ListMap("a" -> Data.Int(3))),
                 Data.Arr(List(Data.Int(0))))),
-            Data.True)
+            Data.True
+          )
         }
 
         "[0, 1] in [[1], 2, {a:3}, [0, 1]]" >> {
@@ -1528,7 +1847,8 @@ abstract class StdLibSpec extends Qspec {
                 Data.Int(2),
                 Data.Obj(ListMap("a" -> Data.Int(3))),
                 Data.Arr(List(Data.Int(0), Data.Int(1))))),
-            Data.True)
+            Data.True
+          )
         }
       }
     }

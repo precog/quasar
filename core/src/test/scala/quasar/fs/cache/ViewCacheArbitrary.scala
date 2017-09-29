@@ -31,16 +31,14 @@ import scalaz.scalacheck.ScalaCheckBinding._
 
 trait ViewCacheArbitrary {
   implicit val arbViewCacheStatus: Arbitrary[ViewCache.Status] =
-    Arbitrary(Gen.oneOf(
-      ViewCache.Status.Pending,
-      ViewCache.Status.Successful,
-      ViewCache.Status.Failed))
+    Arbitrary(
+      Gen.oneOf(ViewCache.Status.Pending, ViewCache.Status.Successful, ViewCache.Status.Failed))
 
   implicit val arbViewCache: Arbitrary[ViewCache] =
     Arbitrary(
       (MountConfigArbitrary.genViewConfig ⊛ arb[Option[Instant]] ⊛ arb[Option[Long]] ⊛
-       arb[Int] ⊛ arb[Option[String]] ⊛ arb[Option[Instant]] ⊛ arb[Long] ⊛ arb[Instant] ⊛
-       arb[ViewCache.Status] ⊛ arb[Option[String]] ⊛ arb[AFile] ⊛ arb[Option[AFile]])(
+        arb[Int] ⊛ arb[Option[String]] ⊛ arb[Option[Instant]] ⊛ arb[Long] ⊛ arb[Instant] ⊛
+        arb[ViewCache.Status] ⊛ arb[Option[String]] ⊛ arb[AFile] ⊛ arb[Option[AFile]])(
         ViewCache.apply))
 }
 

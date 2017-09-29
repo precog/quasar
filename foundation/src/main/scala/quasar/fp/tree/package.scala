@@ -23,9 +23,10 @@ import matryoshka.patterns._
 import scalaz._
 
 /** "Generic" types for building partially-constructed trees in some
-  * "functorized" type. */
+ * "functorized" type. */
 // TODO: submit to matryoshka?
 package object tree {
+
   /** A tree structure with one kind of hole. See [[UnaryOps.eval]]. */
   type Unary[F[_]] = Free[F, UnaryArg]
   object Unary {
@@ -59,10 +60,7 @@ package object tree {
     case object _2 extends BinaryArg
   }
   implicit class BinaryOps[F[_]](self: Binary[F]) {
-    def eval[T]
-      (arg1: T, arg2: T)
-      (implicit T: Corecursive.Aux[T, F], F: Functor[F])
-        : T =
+    def eval[T](arg1: T, arg2: T)(implicit T: Corecursive.Aux[T, F], F: Functor[F]): T =
       self.cata(interpret[F, BinaryArg, T](_.fold(arg1, arg2), _.embed))
   }
 
@@ -86,10 +84,9 @@ package object tree {
     case object _3 extends TernaryArg
   }
   implicit class TernaryOps[F[_]](self: Ternary[F]) {
-    def eval[T]
-      (arg1: T, arg2: T, arg3: T)
-      (implicit T: Corecursive.Aux[T, F], F: Functor[F])
-        : T =
+    def eval[T](arg1: T, arg2: T, arg3: T)(
+        implicit T: Corecursive.Aux[T, F],
+        F: Functor[F]): T =
       self.cata(interpret[F, TernaryArg, T](_.fold(arg1, arg2, arg3), _.embed))
   }
 }

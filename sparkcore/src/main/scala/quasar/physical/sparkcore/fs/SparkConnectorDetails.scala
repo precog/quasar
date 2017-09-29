@@ -32,7 +32,8 @@ object SparkConnectorDetails {
   final case class FileExists(afile: AFile) extends SparkConnectorDetails[Boolean]
   final case object ReadChunkSize extends SparkConnectorDetails[Int]
   final case class StoreData(rdd: RDD[Data], out: AFile) extends SparkConnectorDetails[Unit]
-  final case class ListContents(dir: ADir) extends SparkConnectorDetails[FileSystemError \/ Set[PathSegment]]
+  final case class ListContents(dir: ADir)
+      extends SparkConnectorDetails[FileSystemError \/ Set[PathSegment]]
   final case class RDDFrom(afile: AFile) extends SparkConnectorDetails[RDD[Data]]
 
   class Ops[S[_]](implicit S: SparkConnectorDetails :<: S) {
@@ -52,6 +53,5 @@ object SparkConnectorDetails {
     implicit def apply[S[_]](implicit S: SparkConnectorDetails :<: S): Ops[S] =
       new Ops[S]
   }
-
 
 }

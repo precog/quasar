@@ -20,31 +20,39 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule.paths
 
-trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableLibModule[M] with OpFinderModule[M] {
+trait EvaluatorMethodsModule[M[+ _]]
+    extends DAG
+    with TableModule[M]
+    with TableLibModule[M]
+    with OpFinderModule[M] {
   import dag._
   import instructions._
   import trans._
 
   trait EvaluatorMethods extends OpFinder {
 
-    def transFromBinOp[A <: SourceType](op: BinaryOperation)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = op match {
-      case Eq                      => trans.Equal[A](left, right)
-      case NotEq                   => op1ForUnOp(Comp).spec(trans.Equal[A](left, right))
+    def transFromBinOp[A <: SourceType](
+        op: BinaryOperation)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = op match {
+      case Eq => trans.Equal[A](left, right)
+      case NotEq => op1ForUnOp(Comp).spec(trans.Equal[A](left, right))
       case instructions.WrapObject => WrapObjectDynamic(left, right)
-      case JoinObject              => InnerObjectConcat(left, right)
-      case JoinArray               => InnerArrayConcat(left, right)
-      case instructions.ArraySwap  => sys.error("nothing happens")
-      case DerefObject             => DerefObjectDynamic(left, right)
-      case DerefMetadata           => sys.error("cannot do a dynamic metadata deref")
-      case DerefArray              => DerefArrayDynamic(left, right)
-      case _                       => op2ForBinOp(op).get.spec(left, right)
+      case JoinObject => InnerObjectConcat(left, right)
+      case JoinArray => InnerArrayConcat(left, right)
+      case instructions.ArraySwap => sys.error("nothing happens")
+      case DerefObject => DerefObjectDynamic(left, right)
+      case DerefMetadata => sys.error("cannot do a dynamic metadata deref")
+      case DerefArray => DerefArrayDynamic(left, right)
+      case _ => op2ForBinOp(op).get.spec(left, right)
     }
 
     def combineTransSpecs(specs: List[TransSpec1]): TransSpec1 =
-      specs map { trans.WrapArray(_): TransSpec1 } reduceLeftOption { trans.OuterArrayConcat(_, _) } get
+      specs map { trans.WrapArray(_): TransSpec1 } reduceLeftOption {
+        trans.OuterArrayConcat(_, _)
+      } get
 
-    def buildWrappedJoinSpec(idMatch: IdentityMatch, valueKeys: Set[Int] = Set.empty)(spec: (TransSpec2, TransSpec2) => TransSpec2): TransSpec2 = {
-      val leftIdentitySpec  = DerefObjectStatic(Leaf(SourceLeft), paths.Key)
+    def buildWrappedJoinSpec(idMatch: IdentityMatch, valueKeys: Set[Int] = Set.empty)(
+        spec: (TransSpec2, TransSpec2) => TransSpec2): TransSpec2 = {
+      val leftIdentitySpec = DerefObjectStatic(Leaf(SourceLeft), paths.Key)
       val rightIdentitySpec = DerefObjectStatic(Leaf(SourceRight), paths.Key)
 
       val sharedDerefs = for ((i, _) <- idMatch.sharedIndices)
@@ -66,13 +74,16 @@ trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableL
 
       val wrappedIdentitySpec = trans.WrapObject(newIdentitySpec, paths.Key.name)
 
-      val leftValueSpec  = DerefObjectStatic(Leaf(SourceLeft), paths.Value)
+      val leftValueSpec = DerefObjectStatic(Leaf(SourceLeft), paths.Value)
       val rightValueSpec = DerefObjectStatic(Leaf(SourceRight), paths.Value)
 
-      val wrappedValueSpec = trans.WrapObject(spec(leftValueSpec, rightValueSpec), paths.Value.name)
+      val wrappedValueSpec =
+        trans.WrapObject(spec(leftValueSpec, rightValueSpec), paths.Value.name)
 
       val valueKeySpecs = valueKeys map { key =>
-        trans.WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("sort-" + key)), "sort-" + key)
+        trans.WrapObject(
+          DerefObjectStatic(Leaf(SourceLeft), CPathField("sort-" + key)),
+          "sort-" + key)
       }
 
       val keyValueSpec = InnerObjectConcat(wrappedValueSpec, wrappedIdentitySpec)
@@ -85,17 +96,17 @@ trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableL
     }
 
     def buildWrappedCrossSpec(spec: (TransSpec2, TransSpec2) => TransSpec2): TransSpec2 = {
-      val leftIdentitySpec  = DerefObjectStatic(Leaf(SourceLeft), paths.Key)
+      val leftIdentitySpec = DerefObjectStatic(Leaf(SourceLeft), paths.Key)
       val rightIdentitySpec = DerefObjectStatic(Leaf(SourceRight), paths.Key)
 
       val newIdentitySpec = InnerArrayConcat(leftIdentitySpec, rightIdentitySpec)
 
       val wrappedIdentitySpec = trans.WrapObject(newIdentitySpec, paths.Key.name)
 
-      val leftValueSpec  = DerefObjectStatic(Leaf(SourceLeft), paths.Value)
+      val leftValueSpec = DerefObjectStatic(Leaf(SourceLeft), paths.Value)
       val rightValueSpec = DerefObjectStatic(Leaf(SourceRight), paths.Value)
 
-      val valueSpec        = spec(leftValueSpec, rightValueSpec)
+      val valueSpec = spec(leftValueSpec, rightValueSpec)
       val wrappedValueSpec = trans.WrapObject(valueSpec, paths.Value.name)
 
       InnerObjectConcat(wrappedIdentitySpec, wrappedValueSpec)

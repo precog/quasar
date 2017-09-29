@@ -24,66 +24,67 @@ import java.lang.Integer.parseInt
 // (https://github.com/non/jawn)
 
 case class ParseException(msg: String, index: Int, line: Int, col: Int) extends Exception(msg)
-case class IncompleteParseException(msg: String)                        extends Exception(msg)
+case class IncompleteParseException(msg: String) extends Exception(msg)
 
 /**
-  * Parser contains the state machine that does all the work. The only
-  */
+ * Parser contains the state machine that does all the work. The only
+ */
 private[json] trait Parser {
+
   /**
-    * Read the byte/char at 'i' as a Char.
-    *
-    * Note that this should not be used on potential multi-byte sequences.
-    */
+   * Read the byte/char at 'i' as a Char.
+   *
+   * Note that this should not be used on potential multi-byte sequences.
+   */
   protected[this] def at(i: Int): Char
 
   /**
-    * Read the bytes/chars from 'i' until 'j' as a String.
-    */
+   * Read the bytes/chars from 'i' until 'j' as a String.
+   */
   protected[this] def at(i: Int, j: Int): String
 
   /**
-    * Return true iff 'i' is at or beyond the end of the input (EOF).
-    */
+   * Return true iff 'i' is at or beyond the end of the input (EOF).
+   */
   protected[this] def atEof(i: Int): Boolean
 
   /**
-    * Return true iff the byte/char at 'i' is equal to 'c'.
-    */
+   * Return true iff the byte/char at 'i' is equal to 'c'.
+   */
   protected[this] final def is(i: Int, c: Char): Boolean = at(i) == c
 
   /**
-    * Return true iff the bytes/chars from 'i' until 'j' are equal to 'str'.
-    */
+   * Return true iff the bytes/chars from 'i' until 'j' are equal to 'str'.
+   */
   protected[this] final def is(i: Int, j: Int, str: String): Boolean = at(i, j) == str
 
   /**
-    * The reset() method is used to signal that we're working from the given
-    * position, and any previous data can be released. Some parsers (e.g.
-    * StringParser) will ignore release, while others (e.g. PathParser) will
-    * need to use this information to release and allocate different areas.
-    */
+   * The reset() method is used to signal that we're working from the given
+   * position, and any previous data can be released. Some parsers (e.g.
+   * StringParser) will ignore release, while others (e.g. PathParser) will
+   * need to use this information to release and allocate different areas.
+   */
   protected[this] def reset(i: Int): Int
 
   /**
-    * The checkpoint() method is used to allow some parsers to store their
-    * progress.
-    */
+   * The checkpoint() method is used to allow some parsers to store their
+   * progress.
+   */
   protected[this] def checkpoint(state: Int, i: Int, stack: List[Context]): Unit
 
   /**
-    * Should be called when parsing is finished.
-    */
+   * Should be called when parsing is finished.
+   */
   protected[this] def close(): Unit
 
   /**
-    * Valid parser states.
-    */
+   * Valid parser states.
+   */
   @inline protected[this] final val ARRBEG = 6
   @inline protected[this] final val OBJBEG = 7
-  @inline protected[this] final val DATA   = 1
-  @inline protected[this] final val KEY    = 2
-  @inline protected[this] final val SEP    = 3
+  @inline protected[this] final val DATA = 1
+  @inline protected[this] final val KEY = 2
+  @inline protected[this] final val SEP = 3
   @inline protected[this] final val ARREND = 4
   @inline protected[this] final val OBJEND = 5
 
@@ -92,8 +93,8 @@ private[json] trait Parser {
   protected[this] def column(i: Int): Int
 
   /**
-    * Used to generate error messages with character info and byte addresses.
-    */
+   * Used to generate error messages with character info and byte addresses.
+   */
   protected[this] def die(i: Int, msg: String) = {
     val y = line() + 1
     val x = column(i) + 1
@@ -102,21 +103,21 @@ private[json] trait Parser {
   }
 
   /**
-    * Used to generate messages for internal errors.
-    */
+   * Used to generate messages for internal errors.
+   */
   protected[this] def error(msg: String) =
     sys.error(msg)
 
   /**
-    * Parse the given number, and add it to the given context.
-    *
-    * We don't actually instantiate a number here, but rather save the string
-    * for future use. This ends up being way faster and has the nice side-effect
-    * that we know exactly how the user represented the number.
-    *
-    * It would probably be possible to keep track of the whether the number is
-    * expected to be whole, decimal, etc. but we don't do that at the moment.
-    */
+   * Parse the given number, and add it to the given context.
+   *
+   * We don't actually instantiate a number here, but rather save the string
+   * for future use. This ends up being way faster and has the nice side-effect
+   * that we know exactly how the user represented the number.
+   *
+   * It would probably be possible to keep track of the whether the number is
+   * expected to be whole, decimal, etc. but we don't do that at the moment.
+   */
   protected[this] final def parseNum(i: Int, ctxt: Context): Int = {
     var j = i
     var c = at(j)
@@ -148,14 +149,14 @@ private[json] trait Parser {
   }
 
   /**
-    * This number parser is a bit slower because it has to be sure it doesn't
-    * run off the end of the input. Normally (when operating in rparse in the
-    * context of an outer array or objedct) we don't have to worry about this
-    * and can just grab characters, because if we run out of characters that
-    * would indicate bad input.
-    *
-    * This method has all the same caveats as the previous method.
-    */
+   * This number parser is a bit slower because it has to be sure it doesn't
+   * run off the end of the input. Normally (when operating in rparse in the
+   * context of an outer array or objedct) we don't have to worry about this
+   * and can just grab characters, because if we run out of characters that
+   * would indicate bad input.
+   *
+   * This method has all the same caveats as the previous method.
+   */
   protected[this] final def parseNumSlow(i: Int, ctxt: Context): Int = {
     var j = i
     var c = at(j)
@@ -210,45 +211,45 @@ private[json] trait Parser {
   }
 
   /**
-    * Generate a Char from the hex digits of "\u1234" (i.e. "1234").
-    *
-    * NOTE: This is only capable of generating characters from the basic plane.
-    * This is why it can only return Char instead of Int.
-    */
+   * Generate a Char from the hex digits of "\u1234" (i.e. "1234").
+   *
+   * NOTE: This is only capable of generating characters from the basic plane.
+   * This is why it can only return Char instead of Int.
+   */
   protected[this] final def descape(s: String) = parseInt(s, 16).toChar
 
   /**
-    * Parse the JSON string starting at 'i' and save it into 'ctxt'.
-    */
+   * Parse the JSON string starting at 'i' and save it into 'ctxt'.
+   */
   protected[this] def parseString(i: Int, ctxt: Context): Int
 
   /**
-    * Parse the JSON constant "true".
-    */
+   * Parse the JSON constant "true".
+   */
   protected[this] final def parseTrue(i: Int) =
     if (is(i, i + 4, "true")) JTrue else die(i, "expected true")
 
   /**
-    * Parse the JSON constant "false".
-    */
+   * Parse the JSON constant "false".
+   */
   protected[this] final def parseFalse(i: Int) =
     if (is(i, i + 5, "false")) JFalse else die(i, "expected false")
 
   /**
-    * Parse the JSON constant "null".
-    */
+   * Parse the JSON constant "null".
+   */
   protected[this] final def parseNull(i: Int) =
     if (is(i, i + 4, "null")) JNull else die(i, "expected null")
 
   /**
-    * Parse and return the "next" JSON value as well as the position beyond it.
-    * This method is used by both parse() as well as parseMany().
-    */
+   * Parse and return the "next" JSON value as well as the position beyond it.
+   * This method is used by both parse() as well as parseMany().
+   */
   protected[this] final def parse(i: Int): (JValue, Int) =
     try {
       (at(i): @switch) match {
         // ignore whitespace
-        case ' '  => parse(i + 1)
+        case ' ' => parse(i + 1)
         case '\t' => parse(i + 1)
         case '\r' => parse(i + 1)
         case '\n' => newline(i); parse(i + 1)
@@ -261,13 +262,13 @@ private[json] trait Parser {
         // we have a single top-level number
         case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
           val ctxt = new SingleContext
-          val j    = parseNumSlow(i, ctxt)
+          val j = parseNumSlow(i, ctxt)
           (ctxt.value, j)
 
         // we have a single top-level string
         case '"' =>
           val ctxt = new SingleContext
-          val j    = parseString(i, ctxt)
+          val j = parseString(i, ctxt)
           (ctxt.value, j)
 
         // we have a single top-level constant
@@ -284,16 +285,16 @@ private[json] trait Parser {
     }
 
   /**
-    * Tail-recursive parsing method to do the bulk of JSON parsing.
-    *
-    * This single method manages parser states, data, etc. Except for parsing
-    * non-recursive values (like strings, numbers, and constants) all important
-    * work happens in this loop (or in methods it calls, like reset()).
-    *
-    * Currently the code is optimized to make use of switch statements. Future
-    * work should consider whether this is better or worse than manually
-    * constructed if/else statements or something else.
-    */
+   * Tail-recursive parsing method to do the bulk of JSON parsing.
+   *
+   * This single method manages parser states, data, etc. Except for parsing
+   * non-recursive values (like strings, numbers, and constants) all important
+   * work happens in this loop (or in methods it calls, like reset()).
+   *
+   * Currently the code is optimized to make use of switch statements. Future
+   * work should consider whether this is better or worse than manually
+   * constructed if/else statements or something else.
+   */
   @tailrec
   protected[this] final def rparse(state: Int, j: Int, stack: List[Context]): (JValue, Int) = {
     val i = reset(j)
@@ -302,7 +303,7 @@ private[json] trait Parser {
       // we are inside an object or array expecting to see data
       case DATA =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -312,12 +313,12 @@ private[json] trait Parser {
 
           case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             val ctxt = stack.head
-            val j    = parseNum(i, ctxt)
+            val j = parseNum(i, ctxt)
             rparse(if (ctxt.isObj) OBJEND else ARREND, j, stack)
 
           case '"' =>
             val ctxt = stack.head
-            val j    = parseString(i, ctxt)
+            val j = parseString(i, ctxt)
             rparse(if (ctxt.isObj) OBJEND else ARREND, j, stack)
 
           case 't' =>
@@ -342,7 +343,7 @@ private[json] trait Parser {
       // we are in an object expecting to see a key
       case KEY =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -357,7 +358,7 @@ private[json] trait Parser {
       // we are starting an array, expecting to see data or a closing bracket
       case ARRBEG =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -379,7 +380,7 @@ private[json] trait Parser {
       // we are starting an object, expecting to see a key or a closing brace
       case OBJBEG =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -401,7 +402,7 @@ private[json] trait Parser {
       // we are in an object just after a key, expecting to see a colon
       case SEP =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -415,7 +416,7 @@ private[json] trait Parser {
       // either a comma (before more data) or a closing bracket.
       case ARREND =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)
@@ -440,7 +441,7 @@ private[json] trait Parser {
       // either a comma (before more data) or a closing brace.
       case OBJEND =>
         (at(i): @switch) match {
-          case ' '  => rparse(state, i + 1, stack)
+          case ' ' => rparse(state, i + 1, stack)
           case '\t' => rparse(state, i + 1, stack)
           case '\r' => rparse(state, i + 1, stack)
           case '\n' => newline(i); rparse(state, i + 1, stack)

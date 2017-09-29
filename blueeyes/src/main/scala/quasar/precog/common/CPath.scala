@@ -25,7 +25,8 @@ import scalaz.syntax.std.boolean._
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
 
-  def parent: Option[CPath] = if (nodes.isEmpty) None else Some(CPath(nodes.take(nodes.length - 1): _*))
+  def parent: Option[CPath] =
+    if (nodes.isEmpty) None else Some(CPath(nodes.take(nodes.length - 1): _*))
 
   def ancestors: List[CPath] = {
     def ancestors0(path: CPath, acc: List[CPath]): List[CPath] = {
@@ -47,13 +48,13 @@ sealed trait CPath { self =>
       }
   }
 
-  def \(that: CPath): CPath  = CPath(self.nodes ++ that.nodes)
+  def \(that: CPath): CPath = CPath(self.nodes ++ that.nodes)
   def \(that: String): CPath = CPath(self.nodes :+ CPathField(that))
-  def \(that: Int): CPath    = CPath(self.nodes :+ CPathIndex(that))
+  def \(that: Int): CPath = CPath(self.nodes :+ CPathIndex(that))
 
-  def \:(that: CPath): CPath  = CPath(that.nodes ++ self.nodes)
+  def \:(that: CPath): CPath = CPath(that.nodes ++ self.nodes)
   def \:(that: String): CPath = CPath(CPathField(that) +: self.nodes)
-  def \:(that: Int): CPath    = CPath(CPathIndex(that) +: self.nodes)
+  def \:(that: Int): CPath = CPath(CPathIndex(that) +: self.nodes)
 
   def hasPrefixComponent(p: CPathNode): Boolean = nodes.startsWith(p :: Nil)
   def hasSuffixComponent(p: CPathNode): Boolean = nodes.endsWith(p :: Nil)
@@ -71,8 +72,8 @@ sealed trait CPath { self =>
         case x :: xs =>
           toDrop match {
             case `x` :: ys => remainder(xs, ys)
-            case Nil       => Some(CPath(nodes))
-            case _         => None
+            case Nil => Some(CPath(nodes))
+            case _ => None
           }
 
         case Nil =>
@@ -88,10 +89,10 @@ sealed trait CPath { self =>
 
   def extract(jvalue: JValue): JValue = {
     def extract0(path: List[CPathNode], d: JValue): JValue = path match {
-      case Nil                       => d
-      case CPathField(name) :: tail  => extract0(tail, d \ name)
+      case Nil => d
+      case CPathField(name) :: tail => extract0(tail, d \ name)
       case CPathIndex(index) :: tail => extract0(tail, d(index))
-      case head :: _                 => abort("Unexpected CPathNode " + head)
+      case head :: _ => abort("Unexpected CPathNode " + head)
     }
     extract0(nodes, jvalue)
   }
@@ -103,22 +104,24 @@ sealed trait CPath { self =>
   def expand(jvalue: JValue): List[CPath] = {
     def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
 
-    def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] = right match {
-      case Nil                                              => CPath(current) :: Nil
-      case (x @ CPathIndex(index)) :: tail                  => expand0(current :+ x, tail, jvalue(index))
-      case (x @ CPathField(name)) :: tail if !isRegex(name) => expand0(current :+ x, tail, jvalue \ name)
-      case (x @ CPathField(name)) :: tail =>
-        val R = name.r
-        val fields = jvalue match {
-          case JObject(fs) => fs.toList
-          case _           => Nil
-        }
-        fields flatMap {
-          case (R(name), value) => expand0(current :+ CPathField(name), tail, value)
-          case _                => Nil
-        }
-      case head :: _ => abort("Unexpected CPathNode " + head)
-    }
+    def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] =
+      right match {
+        case Nil => CPath(current) :: Nil
+        case (x @ CPathIndex(index)) :: tail => expand0(current :+ x, tail, jvalue(index))
+        case (x @ CPathField(name)) :: tail if !isRegex(name) =>
+          expand0(current :+ x, tail, jvalue \ name)
+        case (x @ CPathField(name)) :: tail =>
+          val R = name.r
+          val fields = jvalue match {
+            case JObject(fs) => fs.toList
+            case _ => Nil
+          }
+          fields flatMap {
+            case (R(name), value) => expand0(current :+ CPathField(name), tail, value)
+            case _ => Nil
+          }
+        case head :: _ => abort("Unexpected CPathNode " + head)
+      }
 
     expand0(Nil, nodes, jvalue)
   }
@@ -133,27 +136,27 @@ sealed trait CPath { self =>
 }
 
 sealed trait CPathNode {
-  def \(that: CPath)     = CPath(this :: that.nodes)
+  def \(that: CPath) = CPath(this :: that.nodes)
   def \(that: CPathNode) = CPath(this :: that :: Nil)
 }
 
 object CPathNode {
   implicit def s2PathNode(name: String): CPathNode = CPathField(name)
-  implicit def i2PathNode(index: Int): CPathNode   = CPathIndex(index)
+  implicit def i2PathNode(index: Int): CPathNode = CPathIndex(index)
 
   implicit object CPathNodeOrder extends scalaz.Order[CPathNode] {
     def order(n1: CPathNode, n2: CPathNode): scalaz.Ordering = (n1, n2) match {
       case (CPathField(s1), CPathField(s2)) => scalaz.Ordering.fromInt(s1.compare(s2))
-      case (CPathField(_), _)               => GT
-      case (_, CPathField(_))               => LT
+      case (CPathField(_), _) => GT
+      case (_, CPathField(_)) => LT
 
       case (CPathArray, CPathArray) => EQ
-      case (CPathArray, _)          => GT
-      case (_, CPathArray)          => LT
+      case (CPathArray, _) => GT
+      case (_, CPathArray) => LT
 
       case (CPathIndex(i1), CPathIndex(i2)) => if (i1 < i2) LT else if (i1 == i2) EQ else GT
-      case (CPathIndex(_), _)               => GT
-      case (_, CPathIndex(_))               => LT
+      case (CPathIndex(_), _) => GT
+      case (_, CPathIndex(_)) => LT
 
       case (CPathMeta(m1), CPathMeta(m2)) => scalaz.Ordering.fromInt(m1.compare(m2))
     }
@@ -192,7 +195,7 @@ object CPath {
 
   private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
-  private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
+  private val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
   private val IndexPattern = """^\[(\d+)\]$""".r
 
   val Identity = apply()
@@ -204,7 +207,7 @@ object CPath {
   def apply(path: JPath): CPath = {
     val nodes2 = path.nodes map {
       case JPathField(name) => CPathField(name)
-      case JPathIndex(idx)  => CPathIndex(idx)
+      case JPathIndex(idx) => CPathIndex(idx)
     }
 
     CPath(nodes2: _*)
@@ -222,7 +225,7 @@ object CPath {
         if (head.trim.length == 0) parse0(tail, acc)
         else
           parse0(tail, (head match {
-            case "[*]"               => CPathArray
+            case "[*]" => CPathArray
             case IndexPattern(index) => CPathIndex(index.toInt)
 
             case name => CPathField(name)
@@ -235,10 +238,10 @@ object CPath {
   }
 
   trait CPathTree[A]
-  case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
+  case class RootNode[A](children: Seq[CPathTree[A]]) extends CPathTree[A]
   case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
   case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class LeafNode[A](value: A)                                        extends CPathTree[A]
+  case class LeafNode[A](value: A) extends CPathTree[A]
 
   case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
     val size: Int = path.length
@@ -249,8 +252,8 @@ object CPath {
       if (paths.size == 1 && paths.head.size == 0) {
         List(LeafNode(paths.head.value))
       } else {
-        val filtered = paths filterNot { case PathWithLeaf(path, _)  => path.isEmpty }
-        val grouped  = filtered groupBy { case PathWithLeaf(path, _) => path.head }
+        val filtered = paths filterNot { case PathWithLeaf(path, _) => path.isEmpty }
+        val grouped = filtered groupBy { case PathWithLeaf(path, _) => path.head }
 
         def recurse[A](paths: Seq[PathWithLeaf[A]]) =
           inner(paths map { case PathWithLeaf(path, v) => PathWithLeaf(path.tail, v) })
@@ -260,7 +263,7 @@ object CPath {
             node match {
               case (field: CPathField) => FieldNode(field, recurse(paths))
               case (index: CPathIndex) => IndexNode(index, recurse(paths))
-              case _                   => sys.error("CPathArray and CPathMeta not supported")
+              case _ => sys.error("CPathArray and CPathMeta not supported")
             }
         }
         result
@@ -290,8 +293,8 @@ object CPath {
     def order(v1: CPath, v2: CPath): scalaz.Ordering = {
       def compare0(n1: List[CPathNode], n2: List[CPathNode]): scalaz.Ordering = (n1, n2) match {
         case (Nil, Nil) => EQ
-        case (Nil, _)   => LT
-        case (_, Nil)   => GT
+        case (Nil, _) => LT
+        case (_, Nil) => GT
         case (n1 :: ns1, n2 :: ns2) =>
           val ncomp = scalaz.Order[CPathNode].order(n1, n2)
           if (ncomp != EQ) ncomp else compare0(ns1, ns2)

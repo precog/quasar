@@ -30,22 +30,21 @@ object console {
     Task.delay(System.err.println(msg))
 
   def logErrors(a: quasar.Errors.ETask[String, Unit]): Task[Unit] =
-    a.swap
-    .flatMapF(e => stderr("Error: " + e).map(_.right))
-    .merge
-    .handleWith { case err => stderr("Error: " + err.getMessage) }
+    a.swap.flatMapF(e => stderr("Error: " + e).map(_.right)).merge.handleWith {
+      case err => stderr("Error: " + err.getMessage)
+    }
 
   /** Check for a Java system property that is defined and has the value
-    * "true", case-insensitively.
-    */
+   * "true", case-insensitively.
+   */
   def booleanProp(name: String): Task[Boolean] = Task.delay {
-    Option(java.lang.System.getProperty(name)).cata(
-      _.equalsIgnoreCase("true"),
-      false)
+    Option(java.lang.System.getProperty(name)).cata(_.equalsIgnoreCase("true"), false)
   }
 
   /** Read the value of an environment variable. */
   def readEnv(name: String): OptionT[Task, String] =
-    Task.delay(System.getenv).liftM[OptionT]
+    Task
+      .delay(System.getenv)
+      .liftM[OptionT]
       .flatMap(env => OptionT(Task.delay(Option(env.get(name)))))
 }

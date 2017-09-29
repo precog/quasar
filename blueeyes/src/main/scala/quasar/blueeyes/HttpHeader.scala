@@ -34,16 +34,14 @@ sealed trait HttpHeaderField[T <: HttpHeader] extends ProductPrefixUnmangler {
 object HttpHeaderField {
   import HttpHeaders._
 
-  val All: List[HttpHeaderField[_ <: HttpHeader]] = List(
-    `Content-Length`,
-    `Cache-Control`,
-    Trailer,
-    `Transfer-Encoding`)
+  val All: List[HttpHeaderField[_ <: HttpHeader]] =
+    List(`Content-Length`, `Cache-Control`, Trailer, `Transfer-Encoding`)
 
   val ByName: Map[String, HttpHeaderField[_]] = All.map(v => (v.name.toLowerCase -> v)).toMap
 
   def parseAll(inString: String, parseType: String): List[HttpHeaderField[_]] = {
-    val fields = inString.toLowerCase.split("""\s*,\s*""").toList.flatMap(HttpHeaderField.ByName.get)
+    val fields =
+      inString.toLowerCase.split("""\s*,\s*""").toList.flatMap(HttpHeaderField.ByName.get)
 
     if (parseType == "trailer") fields.filterNot {
       case Trailer => true
@@ -51,10 +49,11 @@ object HttpHeaderField {
       case `Content-Length` => true
       case NullHeader => true
       case _ => false
-    } else fields.filterNot {
-      case NullHeader => true
-      case _ => false
-    }
+    } else
+      fields.filterNot {
+        case NullHeader => true
+        case _ => false
+      }
   }
 }
 
@@ -76,7 +75,8 @@ sealed trait HttpHeader extends ProductPrefixUnmangler {
   def tuple = (name, value)
 
   override def equals(any: Any) = any match {
-    case that: HttpHeader => name.equalsIgnoreCase(that.name) && value.equalsIgnoreCase(that.value)
+    case that: HttpHeader =>
+      name.equalsIgnoreCase(that.name) && value.equalsIgnoreCase(that.value)
     case _ => false
   }
 }
@@ -87,19 +87,23 @@ trait HttpHeaderImplicits {
 
 object HttpHeader extends HttpHeaderImplicits {
   private val All = Map(HttpHeaderField.All.map(field => (field.name.toLowerCase, field)): _*)
-  def apply(t: (String, String)): HttpHeader = All.get(t._1.toLowerCase).flatMap(_.parse(t)).getOrElse(HttpHeaders.CustomHeader(t._1, t._2))
+  def apply(t: (String, String)): HttpHeader =
+    All
+      .get(t._1.toLowerCase)
+      .flatMap(_.parse(t))
+      .getOrElse(HttpHeaders.CustomHeader(t._1, t._2))
 }
 
 sealed trait HttpHeaderRequest extends HttpHeader
 sealed trait HttpHeaderResponse extends HttpHeader
 
 case class HttpHeaders private (val raw: Map[String, String]) {
-  def + (kv: (String, String)): HttpHeaders = this + HttpHeader(kv)
-  def + (header: HttpHeader): HttpHeaders = new HttpHeaders(raw + header.tuple)
-  def ++ (that: HttpHeaders) = new HttpHeaders(raw ++ that.raw)
-  def ++ (that: Iterable[(HttpHeader)]) = new HttpHeaders(raw ++ that.map(_.tuple))
+  def +(kv: (String, String)): HttpHeaders = this + HttpHeader(kv)
+  def +(header: HttpHeader): HttpHeaders = new HttpHeaders(raw + header.tuple)
+  def ++(that: HttpHeaders) = new HttpHeaders(raw ++ that.raw)
+  def ++(that: Iterable[(HttpHeader)]) = new HttpHeaders(raw ++ that.map(_.tuple))
 
-  def - (key: String): HttpHeaders = new HttpHeaders(raw - key)
+  def -(key: String): HttpHeaders = new HttpHeaders(raw - key)
 
   def get(key: String): Option[String] = raw.get(key)
 
@@ -109,18 +113,20 @@ case class HttpHeaders private (val raw: Map[String, String]) {
 }
 
 trait HttpHeadersImplicits extends HttpHeaderImplicits {
-  implicit def iterableOfTuple2ToHttpHeaders(i: Iterable[(String, String)]): HttpHeaders = HttpHeaders(i)
-  implicit def iterableToHttpHeaders[A <: HttpHeader](i: Iterable[A]): HttpHeaders = HttpHeaders(i)
+  implicit def iterableOfTuple2ToHttpHeaders(i: Iterable[(String, String)]): HttpHeaders =
+    HttpHeaders(i)
+  implicit def iterableToHttpHeaders[A <: HttpHeader](i: Iterable[A]): HttpHeaders =
+    HttpHeaders(i)
 }
 
 object HttpHeaders {
-  def apply(headers: HttpHeader*): HttpHeaders = 
+  def apply(headers: HttpHeader*): HttpHeaders =
     apply(headers.map(_.tuple))
-    
-  def apply(i: Iterable[(String, String)]): HttpHeaders = 
+
+  def apply(i: Iterable[(String, String)]): HttpHeaders =
     apply(i.map(HttpHeader(_)))
 
-  def apply[A](i: Iterable[A])(implicit ev: A <:< HttpHeader): HttpHeaders = 
+  def apply[A](i: Iterable[A])(implicit ev: A <:< HttpHeader): HttpHeaders =
     new HttpHeaders(i.map(ev(_).tuple)(collection.breakOut))
 
   val Empty: HttpHeaders = new HttpHeaders(Map.empty[String, String])
@@ -161,7 +167,9 @@ object HttpHeaders {
     def unapply(t: (String, String)) = parse(t).map(_.encodings)
   }
 
-  case class CustomHeader(override val name: String, val value: String) extends HttpHeaderRequest with HttpHeaderResponse
+  case class CustomHeader(override val name: String, val value: String)
+      extends HttpHeaderRequest
+      with HttpHeaderResponse
 
   class NullHeader extends HttpHeader {
     def value = ""

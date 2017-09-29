@@ -152,7 +152,9 @@ class SQLParserSpec extends quasar.Qspec {
             SelectAll,
             List(Proj(IdentR("foo"), None)),
             Some(TableRelationAST(file("bar"), None)),
-            None, None, None))
+            None,
+            None,
+            None))
     }
 
     "parse keywords as identifiers" in {
@@ -164,7 +166,8 @@ class SQLParserSpec extends quasar.Qspec {
             TableRelationAST(file("from"), "from".some).some,
             IdentR("where").some,
             GroupBy(List(IdentR("group")), None).some,
-            OrderBy((ASC: OrderType, IdentR("order")).wrapNel).some))
+            OrderBy((ASC: OrderType, IdentR("order")).wrapNel).some
+          ))
     }
 
     "parse ambiguous keyword as identifier" in {
@@ -174,7 +177,9 @@ class SQLParserSpec extends quasar.Qspec {
             SelectAll,
             List(Proj(IdentR("false"), None)),
             TableRelationAST(file("zips"), None).some,
-            None, None, None))
+            None,
+            None,
+            None))
     }
 
     "parse ambiguous expression as expression" in {
@@ -182,8 +187,14 @@ class SQLParserSpec extends quasar.Qspec {
         beRightDisjOrDiff(
           SelectR(
             SelectAll,
-            List(Proj(MatchR(IdentR("from"), List(Case(IdentR("where"), IdentR("and"))), None), None)),
-            None, None, None, None))
+            List(
+              Proj(
+                MatchR(IdentR("from"), List(Case(IdentR("where"), IdentR("and"))), None),
+                None)),
+            None,
+            None,
+            None,
+            None))
     }
 
     "parse partially-disambiguated expression" in {
@@ -194,7 +205,8 @@ class SQLParserSpec extends quasar.Qspec {
             List(Proj(IdentR("case"), None)),
             TableRelationAST(file("when"), None).some,
             BinopR(IdentR("then"), IdentR("end"), And).some,
-            None, None))
+            None,
+            None))
     }
     "parse quoted literal" in {
       parse("""select * from foo where bar = "abc" """).toOption should beSome
@@ -214,9 +226,11 @@ class SQLParserSpec extends quasar.Qspec {
           SelectR(
             SelectAll,
             List(Proj(SpliceR(None), None)),
-            Some(TableRelationAST(file("users"),None)),
-            Some(BinopR(IdentR("add_date"),IntLiteralR(1425460451000L), Gt)),
-            None,None))
+            Some(TableRelationAST(file("users"), None)),
+            Some(BinopR(IdentR("add_date"), IntLiteralR(1425460451000L), Gt)),
+            None,
+            None
+          ))
     }
 
     "parse quoted identifier" in {
@@ -241,26 +255,22 @@ class SQLParserSpec extends quasar.Qspec {
 
     "not parse variable with '_' as the name" in {
       parse(""":_""") must
-        beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `:'"))
+        beLeftDisjunction(GenericParsingError("quotedIdent expected; but found `:'"))
     }
 
     "not parse variable with digit as the name" in {
       parse(""":8""") must
-        beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `:'"))
+        beLeftDisjunction(GenericParsingError("quotedIdent expected; but found `:'"))
     }
 
     "not parse variable with digit at the start of the name" in {
       parse(""":8_""") must
-        beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `:'"))
+        beLeftDisjunction(GenericParsingError("quotedIdent expected; but found `:'"))
     }
 
     "not parse variable with '_' at the start of the name" in {
       parse(""":_8""") must
-        beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `:'"))
+        beLeftDisjunction(GenericParsingError("quotedIdent expected; but found `:'"))
     }
 
     "parse simple query with '_' as relation" in {
@@ -276,33 +286,45 @@ class SQLParserSpec extends quasar.Qspec {
     }
 
     "parse true and false literals" in {
-      parse("""SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
+      parse(
+        """SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
     }
 
     "parse “full-value” insert expression" in {
       parse("insert into zips values 1, 2, 3") should
-      beRightDisjOrDiff(
-        Distinct(UnionAll(
-          SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
-          SelectR(
-            SelectAll,
-            List(Proj(SpliceR(None), None)),
-            Some(TableRelationAST(file("zips"),None)),
-            None, None, None)).embed).embed)
+        beRightDisjOrDiff(
+          Distinct(UnionAll(
+            SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+            SelectR(
+              SelectAll,
+              List(Proj(SpliceR(None), None)),
+              Some(TableRelationAST(file("zips"), None)),
+              None,
+              None,
+              None)
+          ).embed).embed)
     }
 
     "parse “keyed” insert expression" in {
       parse("insert into zips ('a', 'b') values (1, 2), (3, 4)") should
-      beRightDisjOrDiff(
-        Distinct(UnionAll(
-          SetLiteralR(List(
-            MapLiteralR(List(StringLiteralR("a") -> IntLiteralR(1), StringLiteralR("b") -> IntLiteralR(2))),
-            MapLiteralR(List(StringLiteralR("a") -> IntLiteralR(3), StringLiteralR("b") -> IntLiteralR(4))))),
-          SelectR(
-            SelectAll,
-            List(Proj(SpliceR(None), None)),
-            Some(TableRelationAST(file("zips"),None)),
-            None, None, None)).embed).embed)
+        beRightDisjOrDiff(
+          Distinct(UnionAll(
+            SetLiteralR(List(
+              MapLiteralR(List(
+                StringLiteralR("a") -> IntLiteralR(1),
+                StringLiteralR("b") -> IntLiteralR(2))),
+              MapLiteralR(List(
+                StringLiteralR("a") -> IntLiteralR(3),
+                StringLiteralR("b") -> IntLiteralR(4)))
+            )),
+            SelectR(
+              SelectAll,
+              List(Proj(SpliceR(None), None)),
+              Some(TableRelationAST(file("zips"), None)),
+              None,
+              None,
+              None)
+          ).embed).embed)
     }
 
     "parse numeric literals" in {
@@ -342,7 +364,8 @@ class SQLParserSpec extends quasar.Qspec {
     }
 
     "parse `not in` and `not like` with optional `is`" in {
-      val q1 = "select * from zips where pop is not in (1000, 2000) and city is not like \"BOU%\""
+      val q1 =
+        "select * from zips where pop is not in (1000, 2000) and city is not like \"BOU%\""
       val q2 = "select * from zips where pop not in (1000, 2000) and city not like \"BOU%\""
       parse(q1) must_=== parse(q2)
     }
@@ -365,30 +388,30 @@ class SQLParserSpec extends quasar.Qspec {
               CrossRelation(
                 TableRelationAST(file("b"), None),
                 TableRelationAST(file("c"), None)))),
-          None, None, None))
+          None,
+          None,
+          None
+        ))
     }
 
     "parse array constructor and concat op" in {
       parse("select loc || [ pop ] from zips") must beRightDisjunction(
-        SelectR(SelectAll,
-          List(
-            Proj(
-              BinopR(IdentR("loc"),
-                ArrayLiteralR(List(
-                  IdentR("pop"))),
-                Concat),
-              None)),
+        SelectR(
+          SelectAll,
+          List(Proj(BinopR(IdentR("loc"), ArrayLiteralR(List(IdentR("pop"))), Concat), None)),
           Some(TableRelationAST(file("zips"), None)),
-          None, None, None))
+          None,
+          None,
+          None))
     }
 
-    val expectedSelect = SelectR(SelectAll,
+    val expectedSelect = SelectR(
+      SelectAll,
       List(Proj(IdentR("loc"), None)),
       Some(TableRelationAST(file("places"), None)),
       None,
       None,
-      None
-    )
+      None)
     val selectString = "select loc from places"
 
     "parse offset" in {
@@ -441,38 +464,38 @@ class SQLParserSpec extends quasar.Qspec {
 
     "parse basic let" in {
       parse("""foo := 5; foo""") must
-        beRightDisjunction(
-          LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
+        beRightDisjunction(LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
     }
 
     "parse basic let with quoted identifier starting with '_'" in {
       parse("""`_8` := 5; `_8`""") must
-        beRightDisjunction(
-          LetR(CIName("_8"), IntLiteralR(5), IdentR("_8")))
+        beRightDisjunction(LetR(CIName("_8"), IntLiteralR(5), IdentR("_8")))
     }
 
     "not parse basic let with '_' as the identifier" in {
       parse("""_ := 5; _""") must
         beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `*** error: `!' expected but _ found'"))
+          GenericParsingError(
+            "quotedIdent expected; but found `*** error: `!' expected but _ found'"))
     }
 
     "not parse basic let with digit as the identifier" in {
       parse("""8 := 5; 8""") must
-        beLeftDisjunction(
-          GenericParsingError("keyword 'except' expected; but found `:='"))
+        beLeftDisjunction(GenericParsingError("keyword 'except' expected; but found `:='"))
     }
 
     "not parse basic let with digit at the start of the identifier" in {
       parse("""8_ := 5; 8_""") must
         beLeftDisjunction(
-          GenericParsingError("keyword 'except' expected; but found `*** error: `!' expected but _ found'"))
+          GenericParsingError(
+            "keyword 'except' expected; but found `*** error: `!' expected but _ found'"))
     }
 
     "not parse basic let with '_' at the start of the identifier" in {
       parse("""_8 := 5; _8""") must
         beLeftDisjunction(
-          GenericParsingError("quotedIdent expected; but found `*** error: `!' expected but _ found'"))
+          GenericParsingError(
+            "quotedIdent expected; but found `*** error: `!' expected but _ found'"))
     }
 
     "parse nested lets" in {
@@ -493,12 +516,7 @@ class SQLParserSpec extends quasar.Qspec {
           SelectR(
             SelectAll,
             List(Proj(IdentR("foo"), None)),
-            Some(ExprRelationAST(
-              LetR(
-                CIName("bar"),
-                IntLiteralR(12),
-                IdentR("baz")),
-              "quag")),
+            Some(ExprRelationAST(LetR(CIName("bar"), IntLiteralR(12), IdentR("baz")), "quag")),
             None,
             None,
             None))
@@ -509,15 +527,15 @@ class SQLParserSpec extends quasar.Qspec {
         beRightDisjunction(
           LetR(
             CIName("foo"),
-            SetLiteralR(
-              List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+            SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
               SelectAll,
               List(Proj(SpliceR(None), None)),
               Some(IdentRelationAST("foo", None)),
               None,
               None,
-              None)))
+              None)
+          ))
     }
 
     "parse select inside body of let" in {
@@ -525,8 +543,7 @@ class SQLParserSpec extends quasar.Qspec {
         beRightDisjunction(
           LetR(
             CIName("foo"),
-            SetLiteralR(
-              List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+            SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
               SelectAll,
               // TODO this should be IdentRelationAST not Ident
@@ -534,22 +551,23 @@ class SQLParserSpec extends quasar.Qspec {
               Some(TableRelationAST(file("bar"), None)),
               None,
               None,
-              None)))
+              None)
+          ))
     }
 
     "parse select inside body of let inside select" in {
       val innerLet =
         LetR(
           CIName("foo"),
-          SetLiteralR(
-            List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+          SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
           SelectR(
             SelectAll,
             List(Proj(SpliceR(None), None)),
             Some(IdentRelationAST("foo", None)),
             None,
             None,
-            None))
+            None)
+        )
 
       parse("""select (foo := (1,2,3); select * from foo) from baz""") must
         beRightDisjunction(
@@ -570,11 +588,16 @@ class SQLParserSpec extends quasar.Qspec {
     "should parse escaped characters" in {
       val q = raw"select '\'', '\\', '\u1234'"
       parse(q) must beRightDisjunction(
-        SelectR(SelectAll, List(
-          Proj(StringLiteralR("'"), None),
-          Proj(StringLiteralR(raw"\"), None),
-          Proj(StringLiteralR("ሴ"), None)),
-          None, None, None, None))
+        SelectR(
+          SelectAll,
+          List(
+            Proj(StringLiteralR("'"), None),
+            Proj(StringLiteralR(raw"\"), None),
+            Proj(StringLiteralR("ሴ"), None)),
+          None,
+          None,
+          None,
+          None))
     }
     "should parse escaped characters in a string" in {
       val q = raw""""'\\\u1234""""
@@ -589,7 +612,13 @@ class SQLParserSpec extends quasar.Qspec {
     "parse function declaration" in {
       val funcDeclString = "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END"
       fixParser.parseWithParser(funcDeclString, fixParser.func_def) must beRightDisjunction(
-        FunctionDecl(CIName("ARRAY_LENGTH"),List(CIName("foo")),Fix(invokeFunction(CIName("count"),List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")),ShiftArrayValues)))))))
+        FunctionDecl(
+          CIName("ARRAY_LENGTH"),
+          List(CIName("foo")),
+          Fix(
+            invokeFunction(
+              CIName("count"),
+              List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")), ShiftArrayValues)))))))
     }
 
     "parse import statement" in {
@@ -626,9 +655,12 @@ class SQLParserSpec extends quasar.Qspec {
           |  END;
           |USER_DATA("bob")
         """.stripMargin
-      val invokeAST: Fix[Sql] = Fix(invokeFunction[Fix[Sql]](CIName("USER_DATA"),List(Fix(stringLiteral[Fix[Sql]]("bob")))))
+      val invokeAST: Fix[Sql] = Fix(
+        invokeFunction[Fix[Sql]](
+          CIName("USER_DATA"),
+          List(Fix(stringLiteral[Fix[Sql]]("bob")))))
       fixParser.parse(scopedExprString) must beLike {
-        case \/-(ScopedExpr(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
+        case \/-(ScopedExpr(`invokeAST`, List(FunctionDecl(_, _, _)))) => ok
       }
     }
 
@@ -638,25 +670,23 @@ class SQLParserSpec extends quasar.Qspec {
     }
 
     "parse empty set literal" in {
-      parse("()") must beRightDisjunction(
-        SetLiteralR(Nil))
+      parse("()") must beRightDisjunction(SetLiteralR(Nil))
     }
 
     "parse parenthesized simple expression (which is syntactically identical to a 1-element set literal)" in {
-      parse("(a)") must beRightDisjunction(
-        IdentR("a"))
+      parse("(a)") must beRightDisjunction(IdentR("a"))
     }
 
     "parse 2-element set literal" in {
-      parse("(a, b)") must beRightDisjunction(
-        SetLiteralR(List(IdentR("a"), IdentR("b"))))
+      parse("(a, b)") must beRightDisjunction(SetLiteralR(List(IdentR("a"), IdentR("b"))))
     }
 
     "parse deeply nested parens" in {
       // NB: Just a stress-test that the parser can handle a deeply
       // left-recursive expression with many unneeded parens, which
       // happens to be exactly what pprint produces.
-      val q = """(select distinct topArr, topObj from `/demo/demo/nested` where ((((((((((((((((((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true)))) or (search((((topArr)[:*])[:*]).b, "^.*$", true)))) or (search((((topArr)[:*])[:*]).c, "^.*$", true)))) or (search((((topArr)[:*]).botObj).a, "^.*$", true)))) or (search((((topArr)[:*]).botObj).b, "^.*$", true)))) or (search((((topArr)[:*]).botObj).c, "^.*$", true)))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*]).a, "^.*$", true)))) or (search((((topObj).midArr)[:*]).b, "^.*$", true)))) or (search((((topObj).midArr)[:*]).c, "^.*$", true)))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true)))) or (search((((topObj).midObj).botObj).a, "^.*$", true)))) or (search((((topObj).midObj).botObj).b, "^.*$", true)))) or (search((((topObj).midObj).botObj).c, "^.*$", true))))"""
+      val q =
+        """(select distinct topArr, topObj from `/demo/demo/nested` where ((((((((((((((((((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true)))) or (search((((topArr)[:*])[:*]).b, "^.*$", true)))) or (search((((topArr)[:*])[:*]).c, "^.*$", true)))) or (search((((topArr)[:*]).botObj).a, "^.*$", true)))) or (search((((topArr)[:*]).botObj).b, "^.*$", true)))) or (search((((topArr)[:*]).botObj).c, "^.*$", true)))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true)))) or (search((((topObj).midArr)[:*]).a, "^.*$", true)))) or (search((((topObj).midArr)[:*]).b, "^.*$", true)))) or (search((((topObj).midArr)[:*]).c, "^.*$", true)))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true)))) or (search((((topObj).midObj).botObj).a, "^.*$", true)))) or (search((((topObj).midObj).botObj).b, "^.*$", true)))) or (search((((topObj).midObj).botObj).c, "^.*$", true))))"""
       parse(q).map(pprint[Fix[Sql]]) must beRightDisjunction(q)
     }
 
@@ -687,7 +717,8 @@ class SQLParserSpec extends quasar.Qspec {
     }
 
     "pprint an import statement should escpae backticks" >> {
-      val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
+      val `import` =
+        Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
       val string = List(`import`).pprint
       string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
       fixParser.parseModule(string) must_=== List(`import`).right

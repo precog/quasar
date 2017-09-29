@@ -34,12 +34,14 @@ case class Authorities private (accountIds: Set[AccountId]) {
 }
 
 object Authorities {
-  def apply(accountIds: NonEmptyList[AccountId]): Authorities = apply(accountIds.list.toVector.toSet)
+  def apply(accountIds: NonEmptyList[AccountId]): Authorities =
+    apply(accountIds.list.toVector.toSet)
 
   def apply(firstAccountId: AccountId, others: AccountId*): Authorities =
     apply(others.toSet + firstAccountId)
 
-  def ifPresent(accountIds: Set[AccountId]): Option[Authorities] = accountIds.nonEmpty.option(apply(accountIds))
+  def ifPresent(accountIds: Set[AccountId]): Option[Authorities] =
+    accountIds.nonEmpty.option(apply(accountIds))
 
   implicit val AuthoritiesDecomposer: Decomposer[Authorities] = new Decomposer[Authorities] {
     override def decompose(authorities: Authorities): JValue = {

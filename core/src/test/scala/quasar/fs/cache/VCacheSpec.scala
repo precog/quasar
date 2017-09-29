@@ -21,7 +21,7 @@ import quasar.{Data, Variables}
 import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStoreSpec}
 import quasar.fp._, free._
-import quasar.fs.{FileSystem, FileSystemFailure, FileSystemError, InMemory, ManageFile}
+import quasar.fs.{FileSystem, FileSystemError, FileSystemFailure, InMemory, ManageFile}
 import quasar.fs.InMemory.InMemState
 import quasar.fs.mount.MountConfig
 import quasar.fs.mount.cache.ViewCacheArbitrary._
@@ -43,16 +43,23 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
   type Eff[A] = (ManageFile :\: FileSystemFailure :/: ConnectionIO)#M[A]
 
   def interp(files: List[AFile]): Task[(Eff ~> ConnectionIO, Task[InMemState])] =
-    InMemory.runInspect(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)) ∘ (_.leftMap(inMemFS =>
-      (taskToConnectionIO compose inMemFS compose InMemory.fileSystem compose injectNT[ManageFile, FileSystem]) :+:
-      (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError])                                :+:
-      reflNT[ConnectionIO]))
+    InMemory.runInspect(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)) ∘ (_.leftMap(
+      inMemFS =>
+        (taskToConnectionIO compose inMemFS compose InMemory.fileSystem compose injectNT[
+          ManageFile,
+          FileSystem]) :+:
+          (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError]) :+:
+          reflNT[ConnectionIO]))
 
   def eval[A](program: Free[VCache, A]): A = evalWithFiles(program, Nil)._1
 
   def evalWithFiles[A](program: Free[VCache, A], files: List[AFile]): (A, Task[InMemState]) =
-    (interp(files) >>= { case (i, s) =>
-      program.foldMap(foldMapNT(i) compose VCache.interp[Eff]).transact(transactor).strengthR(s)
+    (interp(files) >>= {
+      case (i, s) =>
+        program
+          .foldMap(foldMapNT(i) compose VCache.interp[Eff])
+          .transact(transactor)
+          .strengthR(s)
     }).unsafePerformSync
 
   val vcache = VCache.Ops[VCache]
@@ -63,8 +70,19 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val tmpDataFile = rootDir </> file("tmpDataFile")
     val expr = sqlB"α"
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      MountConfig.ViewConfig(expr, Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      600L,
+      Instant.ofEpochSecond(0),
+      ViewCache.Status.Pending,
+      None,
+      dataFile,
+      tmpDataFile.some
+    )
 
     evalWithFiles(
       vcache.put(f, viewCache) >> vcache.put(f, viewCache),
@@ -78,16 +96,28 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val tmpDataFile = rootDir </> file("tmpDataFile")
     val expr = sqlB"α"
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      MountConfig.ViewConfig(expr, Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      600L,
+      Instant.ofEpochSecond(0),
+      ViewCache.Status.Pending,
+      None,
+      dataFile,
+      tmpDataFile.some
+    )
 
     evalWithFiles(
       vcache.put(f, viewCache) >>
-      vcache.compareAndPut(
-        f, viewCache.some,
-        viewCache.copy(
-          dataFile = rootDir </> file("otherDataFile"),
-          tmpDataFile = (rootDir </> file("otherTmpDataFile")).some)),
+        vcache.compareAndPut(
+          f,
+          viewCache.some,
+          viewCache.copy(
+            dataFile = rootDir </> file("otherDataFile"),
+            tmpDataFile = (rootDir </> file("otherTmpDataFile")).some)),
       List(dataFile, tmpDataFile)
     )._2.unsafePerformSync.contents must_= Map.empty
   }
@@ -98,12 +128,23 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val tmpDataFile = rootDir </> file("tmpDataFile")
     val expr = sqlB"α"
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      MountConfig.ViewConfig(expr, Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      600L,
+      Instant.ofEpochSecond(0),
+      ViewCache.Status.Pending,
+      None,
+      dataFile,
+      tmpDataFile.some
+    )
 
     evalWithFiles(
       vcache.put(f, viewCache) >>
-      vcache.compareAndPut(f, viewCache.some, viewCache),
+        vcache.compareAndPut(f, viewCache.some, viewCache),
       List(dataFile, tmpDataFile)
     )._2.unsafePerformSync.contents.keys.toList must_= List(dataFile, tmpDataFile)
   }
@@ -114,8 +155,19 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val tmpDataFile = rootDir </> file("tmpDataFile")
     val expr = sqlB"α"
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      MountConfig.ViewConfig(expr, Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      600L,
+      Instant.ofEpochSecond(0),
+      ViewCache.Status.Pending,
+      None,
+      dataFile,
+      tmpDataFile.some
+    )
 
     evalWithFiles(
       vcache.compareAndPut(f, viewCache.some, viewCache),
@@ -129,8 +181,19 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val tmpDataFile = rootDir </> file("tmpDataFile")
     val expr = sqlB"α"
     val viewCache = ViewCache(
-      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      MountConfig.ViewConfig(expr, Variables.empty),
+      None,
+      None,
+      0,
+      None,
+      None,
+      600L,
+      Instant.ofEpochSecond(0),
+      ViewCache.Status.Pending,
+      None,
+      dataFile,
+      tmpDataFile.some
+    )
 
     evalWithFiles(
       vcache.put(f, viewCache) >> vcache.delete(f),

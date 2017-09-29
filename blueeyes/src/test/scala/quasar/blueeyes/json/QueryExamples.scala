@@ -24,7 +24,12 @@ class QueryExamplesSpec extends Specification {
 
   "List of IPs" in {
     val ips = for { JString(ip) <- json \\ "ip" } yield ip
-    ips mustEqual List("192.168.1.125", "192.168.1.126", "192.168.1.127", "192.168.2.125", "192.168.2.126")
+    ips mustEqual List(
+      "192.168.1.125",
+      "192.168.1.126",
+      "192.168.1.127",
+      "192.168.2.125",
+      "192.168.2.126")
   }
 
   "List of IPs converted to XML" in {
@@ -35,7 +40,7 @@ class QueryExamplesSpec extends Specification {
   "List of IPs in cluster2" in {
     val ips = for {
       cluster @ JObject(x) <- json \ "data_center"
-      if (x.get("name") == Some(JString("cluster2")))
+      if x.get("name") == Some(JString("cluster2"))
       JString(ip) <- cluster \\ "ip"
     } yield ip
     ips mustEqual List("192.168.2.125", "192.168.2.126")
@@ -60,7 +65,8 @@ class QueryExamplesSpec extends Specification {
       Server("192.168.2.125", 453423),
       Server("192.168.2.126", 214312),
       Server("192.168.1.126", 189822),
-      Server("192.168.1.125", 150123))
+      Server("192.168.1.125", 150123)
+    )
   }
 
   "Clusters administered by liza" in {
@@ -74,7 +80,8 @@ class QueryExamplesSpec extends Specification {
     clusters mustEqual List("cluster2")
   }
 
-  def json = parseUnsafe("""
+  def json =
+    parseUnsafe("""
     { "data_center": [
       {
         "name": "cluster1",

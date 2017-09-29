@@ -51,7 +51,8 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
 
   def close = {
     if (pendingCookIds0.size > 0) {
-      log.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
+      log.warn(
+        "Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
     }
     txLog.close()
     workLock.release
@@ -127,7 +128,6 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
   }
 }
 
-
 sealed trait TXLogEntry {
   def blockId: Long
 }
@@ -142,7 +142,10 @@ object TXLogEntry extends Logging {
     buffer.getShort match {
       case 0x1 => StartCook(buffer.getLong)
       case 0x2 => CompleteCook(buffer.getLong)
-      case other => log.error("Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
+      case other =>
+        log.error(
+          "Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s"
+            .format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
     }
   }
 
@@ -161,5 +164,3 @@ object TXLogEntry extends Logging {
     Array[Array[Byte]](record)
   }
 }
-
-

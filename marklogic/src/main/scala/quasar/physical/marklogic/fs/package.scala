@@ -27,9 +27,9 @@ import quasar.fp._, free._
 import quasar.frontend.logicalplan
 import quasar.fs._
 import quasar.fs.impl.DataStream
-import quasar.fs.mount._, BackendDef.{DefinitionError, DefErrT}
+import quasar.fs.mount._, BackendDef.{DefErrT, DefinitionError}
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc.{AsContent, provideSession}
+import quasar.physical.marklogic.xcc.{provideSession, AsContent}
 import quasar.physical.marklogic.xquery.PrologT
 import quasar.{qscript => qs}
 
@@ -46,45 +46,45 @@ package object fs {
   import xcc._
   import uuid.GenUUID
 
-  type XccSessionR[A]       = Read[Session, A]
+  type XccSessionR[A] = Read[Session, A]
   type XccContentSourceR[A] = Read[ContentSource, A]
 
   type XccEvalEff[A] = (
-        Task
-    :\: MonotonicSeq
-    :\: XccSessionR
-    :/: XccContentSourceR
+    Task
+      :\: MonotonicSeq
+      :\: XccSessionR
+      :/: XccContentSourceR
   )#M[A]
 
-  type XccEval[A]         = MarkLogicPlanErrT[PrologT[Free[XccEvalEff, ?], ?], A]
-  type XccDataStream      = DataStream[XccEval]
+  type XccEval[A] = MarkLogicPlanErrT[PrologT[Free[XccEvalEff, ?], ?], A]
+  type XccDataStream = DataStream[XccEval]
 
-  type MLReadHandles[A]   = KeyValueStore[ReadHandle, XccDataStream, A]
+  type MLReadHandles[A] = KeyValueStore[ReadHandle, XccDataStream, A]
   type MLResultHandles[A] = KeyValueStore[ResultHandle, XccDataStream, A]
-  type MLWriteHandles[A]  = KeyValueStore[WriteHandle, AFile, A]
+  type MLWriteHandles[A] = KeyValueStore[WriteHandle, AFile, A]
 
   type MarkLogicFs[A] = (
-        GenUUID
-    :\: MLReadHandles
-    :\: MLResultHandles
-    :\: MLWriteHandles
-    :/: XccEvalEff
+    GenUUID
+      :\: MLReadHandles
+      :\: MLResultHandles
+      :\: MLWriteHandles
+      :/: XccEvalEff
   )#M[A]
 
-  implicit val xccSessionR  = quasar.effect.Read.monadReader_[Session, XccEvalEff]
-  implicit val xccSourceR   = quasar.effect.Read.monadReader_[ContentSource, XccEvalEff]
+  implicit val xccSessionR = quasar.effect.Read.monadReader_[Session, XccEvalEff]
+  implicit val xccSourceR = quasar.effect.Read.monadReader_[ContentSource, XccEvalEff]
   implicit val mlfsSessionR = quasar.effect.Read.monadReader_[Session, MarkLogicFs]
   implicit val mlfsCSourceR = quasar.effect.Read.monadReader_[ContentSource, MarkLogicFs]
-  implicit val mlfsUuidR    = quasar.effect.Read.monadReader_[UUID, MarkLogicFs]
+  implicit val mlfsUuidR = quasar.effect.Read.monadReader_[UUID, MarkLogicFs]
 
-  type MLFS[A]  = PrologT[Free[MarkLogicFs, ?], A]
+  type MLFS[A] = PrologT[Free[MarkLogicFs, ?], A]
   type MLFSQ[A] = MarkLogicPlanErrT[MLFS, A]
 
   type MLQScriptCP[T[_[_]]] = (
-    qs.QScriptCore[T, ?]           :\:
-    qs.ThetaJoin[T, ?]             :\:
-    Const[qs.ShiftedRead[ADir], ?] :/:
-    Const[qs.Read[AFile], ?]
+    qs.QScriptCore[T, ?] :\:
+      qs.ThetaJoin[T, ?] :\:
+      Const[qs.ShiftedRead[ADir], ?] :/:
+      Const[qs.Read[AFile], ?]
   )
 
   val FsType = FileSystemType("marklogic")
@@ -94,7 +94,8 @@ package object fs {
     Capture[F].capture(ContentSourceFactory.newContentSource(uri))
 
   /** The `ContentSource` located at the given ConnectionUri. */
-  def contentSourceConnection[F[_]: Capture: Bind](connectionUri: ConnectionUri): F[ContentSource] =
+  def contentSourceConnection[F[_]: Capture: Bind](
+      connectionUri: ConnectionUri): F[ContentSource] =
     Capture[F].capture(new URI(connectionUri.value)) >>= contentSourceAt[F]
 
   /** Converts MarkLogicPlannerErrors into FileSystemErrors. */
@@ -102,18 +103,18 @@ package object fs {
     import MarkLogicPlannerError._
 
     def unsupportedPlan(desc: String): FileSystemError =
-      FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(
-        logicalplan.constant(Data.Str(desc)), Some(mlerr.shows)))
+      FileSystemError.qscriptPlanningFailed(
+        QPlanner.UnsupportedPlan(logicalplan.constant(Data.Str(desc)), Some(mlerr.shows)))
 
     mlerr match {
-      case InvalidQName(s)  => unsupportedPlan(s)
-      case InvalidUri(s)    => unsupportedPlan(s)
+      case InvalidQName(s) => unsupportedPlan(s)
+      case InvalidUri(s) => unsupportedPlan(s)
       case Unimplemented(f) => unsupportedPlan(f)
 
-      case Unreachable(d)   =>
-        FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
-          s"Should not have been reached, indicates a defect: $d.",
-          None))
+      case Unreachable(d) =>
+        FileSystemError.qscriptPlanningFailed(
+          QPlanner
+            .InternalError(s"Should not have been reached, indicates a defect: $d.", None))
     }
   }
 
@@ -126,9 +127,9 @@ package object fs {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def runMarkLogicFs(xccUri: URI): DefErrT[Task, (Free[MarkLogicFs, ?] ~> Task, Task[Unit])] = {
     type CRT[X[_], A] = ReaderT[X, ContentSource, A]
-    type  CR[      A] = CRT[Task, A]
+    type CR[A] = CRT[Task, A]
     type SRT[X[_], A] = ReaderT[X, Session, A]
-    type  SR[      A] = SRT[Task, A]
+    type SR[A] = SRT[Task, A]
 
     val contentSource: DefErrT[Task, ContentSource] =
       EitherT(contentSourceAt[Task](xccUri) map (_.right[DefinitionError]) handleNonFatal {
@@ -136,41 +137,42 @@ package object fs {
       })
 
     val runFs = (
-      KeyValueStore.impl.default[WriteHandle, AFile]          |@|
-      KeyValueStore.impl.default[ReadHandle, XccDataStream]   |@|
-      KeyValueStore.impl.default[ResultHandle, XccDataStream] |@|
-      MonotonicSeq.fromZero                                   |@|
-      GenUUID.type4[Task]
-    ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
-      contentSource flatMapF { cs =>
-        val mlToSR = (liftMT[Task, SRT] compose genUUID)  :+:
-                     (liftMT[Task, SRT] compose rhandles) :+:
-                     (liftMT[Task, SRT] compose qhandles) :+:
-                     (liftMT[Task, SRT] compose whandles) :+:
-                      liftMT[Task, SRT]                   :+:
-                     (liftMT[Task, SRT] compose seq)      :+:
-                     Read.toReader[SR, Session]           :+:
-                     Read.constant[SR, ContentSource](cs)
-        val runML  = provideSession[Task](cs) compose foldMapNT(mlToSR)
-        val sdown  = Task.delay(cs.getConnectionProvider.shutdown(null))
+      KeyValueStore.impl.default[WriteHandle, AFile] |@|
+        KeyValueStore.impl.default[ReadHandle, XccDataStream] |@|
+        KeyValueStore.impl.default[ResultHandle, XccDataStream] |@|
+        MonotonicSeq.fromZero |@|
+        GenUUID.type4[Task]
+    ).tupled.map {
+      case (whandles, rhandles, qhandles, seq, genUUID) =>
+        contentSource flatMapF { cs =>
+          val mlToSR = (liftMT[Task, SRT] compose genUUID) :+:
+            (liftMT[Task, SRT] compose rhandles) :+:
+            (liftMT[Task, SRT] compose qhandles) :+:
+            (liftMT[Task, SRT] compose whandles) :+:
+            liftMT[Task, SRT] :+:
+            (liftMT[Task, SRT] compose seq) :+:
+            Read.toReader[SR, Session] :+:
+            Read.constant[SR, ContentSource](cs)
+          val runML = provideSession[Task](cs) compose foldMapNT(mlToSR)
+          val sdown = Task.delay(cs.getConnectionProvider.shutdown(null))
 
-        contentsource.defaultSession[CR] flatMap {
-          testXccConnection[SRT[CR, ?]]
-            .map(_.right[NonEmptyList[String]])
-            .toLeft((runML, sdown))
-            .run
-        } handleNonFatal {
-          case th => EnvironmentError.connectionFailed(th).right.left
-        } run cs
-      }
+          contentsource.defaultSession[CR] flatMap {
+            testXccConnection[SRT[CR, ?]]
+              .map(_.right[NonEmptyList[String]])
+              .toLeft((runML, sdown))
+              .run
+          } handleNonFatal {
+            case th => EnvironmentError.connectionFailed(th).right.left
+          } run cs
+        }
     }
 
     runFs.liftM[DefErrT].join
   }
 
   /** Returns an error describing why an XCC connection failed or `None` if it
-    * is successful.
-    */
+   * is successful.
+   */
   def testXccConnection[F[_]: Applicative](implicit X: Xcc[F]): OptionT[F, EnvironmentError] =
     // NB: An innocuous operation used to test the connection.
     OptionT(X.handle(X.currentServerPointInTime as none[EnvironmentError]) {
@@ -183,7 +185,8 @@ package object fs {
 
   /** Lift XccEval into MLFSQ. */
   val xccEvalToMLFSQ: XccEval ~> MLFSQ =
-    Hoist[MarkLogicPlanErrT].hoist(Hoist[PrologT].hoist(mapSNT(Inject[XccEvalEff, MarkLogicFs])))
+    Hoist[MarkLogicPlanErrT].hoist(
+      Hoist[PrologT].hoist(mapSNT(Inject[XccEvalEff, MarkLogicFs])))
 
   implicit val dataAsXmlContent: AsContent[DocType.Xml, Data] =
     new AsContent[DocType.Xml, Data] {

@@ -35,83 +35,90 @@ object readfile {
 
   import ReadFile.ReadHandle
 
-  def interpret[S[_]](implicit
-    s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
-    s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S,
-    s3: Task :<: S,
-    details: SparkConnectorDetails.Ops[S]
-  ): ReadFile ~> Free[S, ?] =
+  def interpret[S[_]](
+      implicit
+      s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
+      s1: Read[SparkContext, ?] :<: S,
+      s2: MonotonicSeq :<: S,
+      s3: Task :<: S,
+      details: SparkConnectorDetails.Ops[S]): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
         case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit)
-        case ReadFile.Read(h) =>  read[S](h)
+        case ReadFile.Read(h) => read[S](h)
         case ReadFile.Close(h) => close[S](h)
       }
-  }
+    }
 
-  def open[S[_]](f: AFile, offset: Offset, limit: Limit)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
-    s1: Read[SparkContext, ?] :<: S,
-    gen: MonotonicSeq.Ops[S],
-    details: SparkConnectorDetails.Ops[S]
-  ): Free[S, FileSystemError \/ ReadHandle] = {
+  def open[S[_]](f: AFile, offset: Offset, limit: Limit)(
+      implicit
+      kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
+      s1: Read[SparkContext, ?] :<: S,
+      gen: MonotonicSeq.Ops[S],
+      details: SparkConnectorDetails.Ops[S]): Free[S, FileSystemError \/ ReadHandle] = {
 
     def freshHandle: Free[S, ReadHandle] =
       gen.next map (ReadHandle(f, _))
 
-    def _open: Free[S, ReadHandle] = for {
-      rdd <- details.rddFrom(f)
-      limitedRdd = rdd.zipWithIndex().filter {
-        case (value, index) =>
-          limit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
-      }
-      cur = SparkCursor(limitedRdd.some, 0)
-      h <- freshHandle
-      _ <- kvs.put(h, cur)
-    } yield h
+    def _open: Free[S, ReadHandle] =
+      for {
+        rdd <- details.rddFrom(f)
+        limitedRdd = rdd.zipWithIndex().filter {
+          case (value, index) =>
+            limit.fold(
+              index >= offset.value
+            )(
+              limit => index >= offset.value && index < limit.value + offset.value
+            )
+        }
+        cur = SparkCursor(limitedRdd.some, 0)
+        h <- freshHandle
+        _ <- kvs.put(h, cur)
+      } yield h
 
-    def _empty: Free[S, ReadHandle] = for {
-      h <- freshHandle
-      cur = SparkCursor(None, 0)
-      _ <- kvs.put(h, cur)
-    } yield h
+    def _empty: Free[S, ReadHandle] =
+      for {
+        h <- freshHandle
+        cur = SparkCursor(None, 0)
+        _ <- kvs.put(h, cur)
+      } yield h
 
-    details.fileExists(f).ifM(
-      _open map (_.right[FileSystemError]),
-     _empty map (_.right[FileSystemError])
-    )
+    details
+      .fileExists(f)
+      .ifM(
+        _open map (_.right[FileSystemError]),
+        _empty map (_.right[FileSystemError])
+      )
   }
 
-  def read[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
-    s1: Task :<: S,
-    details: SparkConnectorDetails.Ops[S]
-  ): Free[S, FileSystemError \/ Vector[Data]] = 
-    details.readChunkSize >>= (step => kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
-      case SparkCursor(None, _) =>
-        Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-      case SparkCursor(Some(rdd), p) =>
+  def read[S[_]](h: ReadHandle)(
+      implicit
+      kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
+      s1: Task :<: S,
+      details: SparkConnectorDetails.Ops[S]): Free[S, FileSystemError \/ Vector[Data]] =
+    details.readChunkSize >>= (step =>
+      kvs
+        .get(h)
+        .toRight(unknownReadHandle(h))
+        .flatMap {
+          case SparkCursor(None, _) =>
+            Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
+          case SparkCursor(Some(rdd), p) =>
+            val collect = lift(Task.delay {
+              rdd.filter(d => d._2 >= p && d._2 < (p + step)).map(_._1).collect.toVector
+            }).into[S].liftM[FileSystemErrT]
 
-        val collect = lift(Task.delay {
-          rdd
-            .filter(d => d._2 >= p && d._2 < (p + step))
-            .map(_._1).collect.toVector
-        }).into[S].liftM[FileSystemErrT]
+            for {
+              collected <- collect
+              cur = if (collected.isEmpty) SparkCursor(None, 0)
+              else SparkCursor(some(rdd), p + step)
+              _ <- kvs.put(h, cur).liftM[FileSystemErrT]
+            } yield collected
 
-        for {
-          collected <- collect
-          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(some(rdd), p + step)
-          _ <- kvs.put(h, cur).liftM[FileSystemErrT]
-        } yield collected
-        
-    }.run)
+        }
+        .run)
 
-  def close[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
-  ): Free[S, Unit] = kvs.delete(h)
+  def close[S[_]](h: ReadHandle)(
+      implicit
+      kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]): Free[S, Unit] = kvs.delete(h)
 }

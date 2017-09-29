@@ -21,7 +21,7 @@ import quasar.RenderTree
 import scalaz._, Scalaz._
 
 sealed abstract class IdStatus
-case object IdOnly    extends IdStatus
+case object IdOnly extends IdStatus
 case object IncludeId extends IdStatus
 case object ExcludeId extends IdStatus
 

@@ -59,7 +59,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
 
   // TODO 20 is the old default size; need to actually tune this
-  private val TxLogScheduler = new ScheduledThreadPoolExecutor(20,
+  private val TxLogScheduler = new ScheduledThreadPoolExecutor(
+    20,
     new ThreadFactory {
       private val counter = new AtomicInteger(0)
 
@@ -69,7 +70,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
         t
       }
-    })
+    }
+  )
 
   def CookThreshold: Int
   def StorageTimeout: FiniteDuration
@@ -99,12 +101,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
             dir <- vfs.underlyingDir(blob, version).liftM[OptionT]
 
             tndb = Task delay {
-              NIHDB.open(
-                masterChef,
-                dir,
-                CookThreshold,
-                StorageTimeout,
-                TxLogScheduler).unsafePerformIO()
+              NIHDB
+                .open(masterChef, dir, CookThreshold, StorageTimeout, TxLogScheduler)
+                .unsafePerformIO()
             }
 
             validation <- OptionT(tndb)
@@ -129,24 +128,26 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     val createBlob: Task[Blob] = for {
       blob <- vfs.scratch
-      _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
+      _ <- vfs.link(blob, path) // should be `true` because we already looked for path
     } yield blob
 
     for {
       maybeBlob <- vfs.readPath(path)
       blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
 
-      version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
+      version <- vfs.fresh(blob) // overwrite any previously-existing HEAD
       dir <- vfs.underlyingDir(blob, version)
 
       validation <- Task delay {
-        NIHDB.create(
-          masterChef,
-          Authorities(AccountFinder.DefaultId),
-          dir,
-          CookThreshold,
-          StorageTimeout,
-          TxLogScheduler).unsafePerformIO()
+        NIHDB
+          .create(
+            masterChef,
+            Authorities(AccountFinder.DefaultId),
+            dir,
+            CookThreshold,
+            StorageTimeout,
+            TxLogScheduler)
+          .unsafePerformIO()
       }
 
       disj = validation.disjunction.leftMap(failure)
@@ -182,7 +183,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield ()
   }
 
-  def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
+  def ingest(
+      path: PrecogPath,
+      ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
     for {
       afile <- pathToAFileET[Task](path)
       triple <- EitherT.eitherT(createDB(afile))
@@ -277,8 +280,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
       case None =>
         EitherT.left[F, ResourceError, AFile] {
-          val err: ResourceError = ResourceError.notFound(
-            s"invalid path does not contain file element: $path")
+          val err: ResourceError =
+            ResourceError.notFound(s"invalid path does not contain file element: $path")
 
           err.point[F]
         }
@@ -289,7 +292,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
       for {
-        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
+        _ <- EitherT.right(table.toJson.map(json =>
+          log.trace("Starting load from " + json.toList.map(_.renderCompact))))
         paths <- EitherT.right(pathsM(table))
 
         projections <- paths.toList traverse { path =>
@@ -299,7 +303,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
             afile <- pathToAFileET[Task](path)
 
             nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map { opt =>
-              opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
+              opt.getOrElse(
+                -\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
             })
 
             projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[ET]
@@ -316,7 +321,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
           }
 
           log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
+          acc ++ StreamT.wrapEffect(constraints map { c =>
+            proj.getBlockStream(c)
+          })
         }
 
         Table(stream, ExactSize(length))

@@ -23,7 +23,7 @@ import quasar.fp.TaskRef
 import quasar.fs._
 import quasar.physical.mongodb._
 
-import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
+import com.mongodb.{MongoCommandException, MongoException, MongoServerException}
 import com.mongodb.async.client.MongoClient
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -32,17 +32,17 @@ import scalaz.concurrent.Task
 object managefile {
   import FileSystemError._, PathError._, MongoDbIO._, fsops._
 
-  type ManageIn           = (TmpPrefix, TaskRef[Long])
+  type ManageIn = (TmpPrefix, TaskRef[Long])
   type ManageInT[F[_], A] = ReaderT[F, ManageIn, A]
-  type MongoManage[A]     = ManageInT[MongoDbIO, A]
+  type MongoManage[A] = ManageInT[MongoDbIO, A]
 
   /** Run [[MongoManage]] with the given `MongoClient`. */
   def run[S[_]](
-    client: MongoClient
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): Task[MongoManage ~> Free[S, ?]] =
+      client: MongoClient
+  )(
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): Task[MongoManage ~> Free[S, ?]] =
     (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
       new (MongoManage ~> Free[S, ?]) {
         def apply[A](fs: MongoManage[A]) =
@@ -51,8 +51,8 @@ object managefile {
     }
 
   val moveToRename: MoveSemantics => RenameSemantics = {
-    case MoveSemantics.Overwrite     => RenameSemantics.Overwrite
-    case MoveSemantics.FailIfExists  => RenameSemantics.FailIfExists
+    case MoveSemantics.Overwrite => RenameSemantics.Overwrite
+    case MoveSemantics.FailIfExists => RenameSemantics.FailIfExists
     case MoveSemantics.FailIfMissing => RenameSemantics.Overwrite
   }
 
@@ -64,22 +64,25 @@ object managefile {
         s"Mismatched files when moving '${pp(src)}' to '${pp(dst)}': srcFiles = ${srcs map pp}, dstFiles = ${dsts map pp}")
     }
 
-    def moveAllUserCollections = for {
-      colls    <- userCollectionsInDir(src)
-      srcFiles =  colls map (_.asFile)
-      dstFiles =  srcFiles.map(_ relativeTo (src) map (dst </> _)).unite
-      _        <- srcFiles.alignBoth(dstFiles).sequence.cata(
-                    _.traverse { case (s, d) => moveFile(s, d, sem) },
-                    MongoDbIO.fail(filesMismatchError(srcFiles, dstFiles)).liftM[FileSystemErrT])
-    } yield ()
+    def moveAllUserCollections =
+      for {
+        colls <- userCollectionsInDir(src)
+        srcFiles = colls map (_.asFile)
+        dstFiles = srcFiles.map(_ relativeTo (src) map (dst </> _)).unite
+        _ <- srcFiles
+          .alignBoth(dstFiles)
+          .sequence
+          .cata(
+            _.traverse { case (s, d) => moveFile(s, d, sem) },
+            MongoDbIO.fail(filesMismatchError(srcFiles, dstFiles)).liftM[FileSystemErrT])
+      } yield ()
 
     if (src === dst)
       ().point[MongoFsM]
     else if (depth(src) == 1)
       dbNameFromPathM(src) flatMap { dbName =>
         moveAllUserCollections *> dropDatabase(dbName).liftM[FileSystemErrT]
-      }
-    else
+      } else
       moveAllUserCollections
   }
 
@@ -91,8 +94,8 @@ object managefile {
     val dstExistsErr = "target namespace exists"
 
     /** Error codes obtained from MongoDB `renameCollection` docs:
-      * See http://docs.mongodb.org/manual/reference/command/renameCollection/
-      */
+     * See http://docs.mongodb.org/manual/reference/command/renameCollection/
+     */
     def reifyMongoErr(m: MongoDbIO[Unit]): MongoFsM[Unit] =
       EitherT(m.attempt flatMap {
         case -\/(e: MongoServerException) if e.getCode == 10026 =>
@@ -115,30 +118,33 @@ object managefile {
       })
 
     def ensureDstExists(dstColl: Collection): MongoFsM[Unit] =
-      EitherT(collectionsIn(dstColl.database)
-                .filter(_ === dstColl)
-                .runLast
-                .map(_.toRightDisjunction(pathErr(pathNotFound(dst))).void))
+      EitherT(
+        collectionsIn(dstColl.database)
+          .filter(_ === dstColl)
+          .runLast
+          .map(_.toRightDisjunction(pathErr(pathNotFound(dst))).void))
 
     if (src === dst)
       collFromFileM(src) flatMap (srcColl =>
-        collectionExists(srcColl).liftM[FileSystemErrT].ifM(
-          if (MoveSemantics.failIfExists nonEmpty sem)
-            MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathExists(src)))
-          else
-            ().point[MongoFsM]
-          ,
-          MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathNotFound(src)))))
+        collectionExists(srcColl)
+          .liftM[FileSystemErrT]
+          .ifM(
+            if (MoveSemantics.failIfExists nonEmpty sem)
+              MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathExists(src)))
+            else
+              ().point[MongoFsM],
+            MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathNotFound(src)))
+          ))
     else
       for {
         srcColl <- collFromFileM(src)
         dstColl <- collFromFileM(dst)
-        rSem    =  moveToRename(sem)
-        _       <- if (MoveSemantics.failIfMissing nonEmpty sem)
-                     ensureDstExists(dstColl)
-                   else
-                     ().point[MongoFsM]
-        _       <- reifyMongoErr(rename(srcColl, dstColl, rSem))
+        rSem = moveToRename(sem)
+        _ <- if (MoveSemantics.failIfMissing nonEmpty sem)
+          ensureDstExists(dstColl)
+        else
+          ().point[MongoFsM]
+        _ <- reifyMongoErr(rename(srcColl, dstColl, rSem))
       } yield ()
   }
 
@@ -150,8 +156,7 @@ object managefile {
         dropDatabase(n).liftM[FileSystemErrT]
 
       case Some(_) =>
-        collectionsInDir(dir)
-          .flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
+        collectionsInDir(dir).flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
 
       case None if depth(dir) == 0 =>
         dropAllDatabases.liftM[FileSystemErrT]
@@ -162,15 +167,17 @@ object managefile {
 
   def deleteFile(file: AFile): MongoFsM[Unit] =
     collFromFileM(file) flatMap (c =>
-      collectionExists(c).liftM[FileSystemErrT].ifM(
-        dropCollection(c).liftM[FileSystemErrT],
-        pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
+      collectionExists(c)
+        .liftM[FileSystemErrT]
+        .ifM(
+          dropCollection(c).liftM[FileSystemErrT],
+          pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
   def freshName: MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
       (prefix, ref) = in
-      n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
+      n <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
     } yield prefix.run + n.toString
 
   def tmpPrefix: Task[TmpPrefix] =

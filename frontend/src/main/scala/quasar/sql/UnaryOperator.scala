@@ -25,20 +25,20 @@ sealed abstract class UnaryOperator(val sql: String) extends Product with Serial
   val name = sql
 }
 
-final case object Not                 extends UnaryOperator("not")
-final case object Exists              extends UnaryOperator("exists")
-final case object Positive            extends UnaryOperator("+")
-final case object Negative            extends UnaryOperator("-")
-final case object Distinct            extends UnaryOperator("distinct")
-final case object FlattenMapKeys      extends UnaryOperator("{*:}")
-final case object FlattenMapValues    extends UnaryOperator("flatten_map")
-final case object ShiftMapKeys        extends UnaryOperator("{_:}")
-final case object ShiftMapValues      extends UnaryOperator("shift_map")
+final case object Not extends UnaryOperator("not")
+final case object Exists extends UnaryOperator("exists")
+final case object Positive extends UnaryOperator("+")
+final case object Negative extends UnaryOperator("-")
+final case object Distinct extends UnaryOperator("distinct")
+final case object FlattenMapKeys extends UnaryOperator("{*:}")
+final case object FlattenMapValues extends UnaryOperator("flatten_map")
+final case object ShiftMapKeys extends UnaryOperator("{_:}")
+final case object ShiftMapValues extends UnaryOperator("shift_map")
 final case object FlattenArrayIndices extends UnaryOperator("[*:]")
-final case object FlattenArrayValues  extends UnaryOperator("flatten_array")
-final case object ShiftArrayIndices   extends UnaryOperator("[_:]")
-final case object ShiftArrayValues    extends UnaryOperator("shift_array")
-final case object UnshiftArray        extends UnaryOperator("[...]")
+final case object FlattenArrayValues extends UnaryOperator("flatten_array")
+final case object ShiftArrayIndices extends UnaryOperator("[_:]")
+final case object ShiftArrayValues extends UnaryOperator("shift_array")
+final case object UnshiftArray extends UnaryOperator("[...]")
 
 object UnaryOperator {
   implicit val equal: Equal[UnaryOperator] = Equal.equalRef

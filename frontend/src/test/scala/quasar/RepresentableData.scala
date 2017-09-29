@@ -28,17 +28,19 @@ trait RepresentableDataArbitrary {
     Null,
     True,
     False,
-    Gen.alphaStr                   ^^ Str,
-    DataArbitrary.defaultInt       ^^ Int,
-    DataArbitrary.defaultDec       ^^ Dec,
-    DateArbitrary.genDate          ^^ Date,
-    DateArbitrary.genTime          ^^ Time)
+    Gen.alphaStr ^^ Str,
+    DataArbitrary.defaultInt ^^ Int,
+    DataArbitrary.defaultDec ^^ Dec,
+    DateArbitrary.genDate ^^ Date,
+    DateArbitrary.genTime ^^ Time)
 
   implicit val representableDataArbitrary: Arbitrary[RepresentableData] = Arbitrary(
-    Gen.oneOf(
-      atomicData,
-      DataArbitrary.genNested(DataArbitrary.genKey, atomicData)
-    ).map(RepresentableData(_))
+    Gen
+      .oneOf(
+        atomicData,
+        DataArbitrary.genNested(DataArbitrary.genKey, atomicData)
+      )
+      .map(RepresentableData(_))
   )
 }
 

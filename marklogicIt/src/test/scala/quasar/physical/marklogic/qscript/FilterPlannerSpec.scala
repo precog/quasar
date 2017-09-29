@@ -46,8 +46,8 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   // Shadow the monadMTMAB instance
   import EitherT.eitherTMonad
 
-  type U      = Fix[Query[Fix[EJson], ?]]
-  type SR[A]  = Const[ShiftedRead[ADir], A]
+  type U = Fix[Query[Fix[EJson], ?]]
+  type SR[A] = Const[ShiftedRead[ADir], A]
   type QSR[A] = Coproduct[QScriptCore[Fix, ?], SR, A]
 
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
@@ -55,10 +55,10 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   xccSpec[DocType.Json](bn => s"Filter Planner for ${bn.name}") { (evalPlan, evalXQuery) =>
     "uses a path range index when it exists" >> {
-      val field            = randomIndexName
-      val idxName          = prettyPrint(rootDir[Sandboxed] </> file(field))
+      val field = randomIndexName
+      val idxName = prettyPrint(rootDir[Sandboxed] </> file(field))
       val (create, delete) = mkPathRangeIndex[G](idxName)
-      val planFilter       = evalPlan(filterExpr(field))
+      val planFilter = evalPlan(filterExpr(field))
 
       val test = (evalXQuery(create) >> planFilter).onFinish(_ => evalXQuery(delete))
 
@@ -68,10 +68,10 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   xccSpec[DocType.Xml](bn => s"Filter Planner for ${bn.name}") { (evalPlan, evalXQuery) =>
     "uses a path range index when it exists" >> {
-      val field            = randomIndexName
-      val idxName          = prettyPrint(rootDir[Sandboxed] </> dir("*") </> file(field))
+      val field = randomIndexName
+      val idxName = prettyPrint(rootDir[Sandboxed] </> dir("*") </> file(field))
       val (create, delete) = mkPathRangeIndex[G](idxName)
-      val planFilter       = evalPlan(filterExpr(field))
+      val planFilter = evalPlan(filterExpr(field))
 
       val test = (evalXQuery(create) >> planFilter).onFinish(_ => evalXQuery(delete))
 
@@ -107,19 +107,27 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }
 
-  private def xccSpec[FMT: StructuralPlanner[M, ?]: FilterPlanner[Fix, ?]: SearchOptions](desc: BackendName => String)(
-   tests: (Fix[QSR] => Task[Option[Search[U] \/ XQuery]], G[XQuery] => Task[Unit]) => Fragment
+  private def xccSpec[FMT: StructuralPlanner[M, ?]: FilterPlanner[Fix, ?]: SearchOptions](
+      desc: BackendName => String)(
+      tests: (
+          Fix[QSR] => Task[Option[Search[U] \/ XQuery]],
+          G[XQuery] => Task[Unit]) => Fragment
   ): Unit =
-    TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-      contentSourceConnection[Task](uri).map { cs =>
-        val evalPlan: Fix[QSR] => Task[Option[Search[U] \/ XQuery]] = plan[FMT](cs, _)
-        val evalXQuery: G[XQuery] => Task[Unit] = runXQuery(cs, _)
+    TestConfig
+      .fileSystemConfigs(FsType)
+      .flatMap(_ traverse_ {
+        case (backend, uri, _) =>
+          contentSourceConnection[Task](uri).map { cs =>
+            val evalPlan: Fix[QSR] => Task[Option[Search[U] \/ XQuery]] = plan[FMT](cs, _)
+            val evalXQuery: G[XQuery] => Task[Unit] = runXQuery(cs, _)
 
-        desc(backend.name) >> tests(evalPlan, evalXQuery)
-      }.void
-    }).unsafePerformSync
+            desc(backend.name) >> tests(evalPlan, evalXQuery)
+          }.void
+      })
+      .unsafePerformSync
 
-  private def mkPathRangeIndex[F[_]: Monad: PrologW](idxName: String): (F[XQuery], F[XQuery]) = {
+  private def mkPathRangeIndex[F[_]: Monad: PrologW](
+      idxName: String): (F[XQuery], F[XQuery]) = {
     val idx = admin.databaseRangePathIndex[F](
       xdmp.database,
       "string".xs,
@@ -133,9 +141,9 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   private def bracketConfig[F[_]: Monad: PrologW](fx: XQuery => F[XQuery]) =
     for {
-      config    <- admin.getConfiguration[F]
+      config <- admin.getConfiguration[F]
       newConfig <- fx(config)
-      save      <- admin.saveConfiguration[F](newConfig)
+      save <- admin.saveConfiguration[F](newConfig)
     } yield save
 
   private def createPathRangeIndex[F[_]: Monad: PrologW](pathIdx: XQuery): F[XQuery] =
@@ -154,14 +162,16 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   private def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): Task[A] =
     MonotonicSeq.fromZero >>= { (monoSeq: MonotonicSeq ~> Task) =>
       val xccToTask: XccEvalEff ~> Task =
-        reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read.constant[Task, ContentSource](cs)
+        reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read
+          .constant[Task, ContentSource](cs)
       val eval: Free[XccEvalEff, ?] ~> Task = foldMapNT(xccToTask)
 
       eval(f)
     }
 
   private def plan[FMT: StructuralPlanner[M, ?]: FilterPlanner[Fix, ?]: SearchOptions](
-    cs: ContentSource, qs: Fix[QSR]
+      cs: ContentSource,
+      qs: Fix[QSR]
   ): Task[Option[Search[U] \/ XQuery]] = {
     val plan = qs.cataM(Planner[M, FMT, QSR, Fix[EJson]].plan[U])
 

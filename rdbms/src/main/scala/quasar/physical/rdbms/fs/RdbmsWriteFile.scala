@@ -42,18 +42,15 @@ trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreat
 
   override def WriteFileModule: WriteFileModule = new WriteFileModule {
 
-    private def getDbPath(h: WriteHandle) = ME.unattempt(
-      writeKvs
-        .get(h)
-        .toRight(FileSystemError.unknownWriteHandle(h))
-        .run
-        .liftB)
+    private def getDbPath(h: WriteHandle) =
+      ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
 
     override def write(
         h: WriteHandle,
         chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       (for {
-        _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
+        _ <- ME.unattempt(
+          writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
         dbPath <- getDbPath(h)
         _ <- batchInsert(dbPath, chunk).liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))

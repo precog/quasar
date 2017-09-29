@@ -33,7 +33,8 @@ object Planner {
   def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
   implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
-    implicit F: Planner[T, N, F], G: Planner[T, N, G]
+      implicit F: Planner[T, N, F],
+      G: Planner[T, N, G]
   ): Planner[T, N, Coproduct[F, G, ?]] =
     new Planner[T, N, Coproduct[F, G, ?]] {
       val plan: AlgebraM[N, Coproduct[F, G, ?], T[N1QL]] =
@@ -53,19 +54,20 @@ object Planner {
     new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
   implicit def constShiftedReadFilePlanner[
-    T[_[_]]: CorecursiveT,
-    F[_]: Applicative: ContextReader: NameGenerator]
+      T[_[_]]: CorecursiveT,
+      F[_]: Applicative: ContextReader: NameGenerator]
     : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
     new ShiftedReadFilePlanner[T, F]
 
   implicit def equiJoinPlanner[
-    T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
+      T[_[_]]: BirecursiveT: ShowT,
+      F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
-    : Planner[T, F, MapFunc[T, ?]] = {
+  def mapFuncPlanner[
+      T[_[_]]: BirecursiveT: ShowT,
+      F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]: Planner[T, F, MapFunc[T, ?]] = {
     val core = new MapFuncCorePlanner[T, F]
     coproduct(core, new MapFuncDerivedPlanner(core))
   }
@@ -75,13 +77,12 @@ object Planner {
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
   implicit def qScriptCorePlanner[
-    T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
+      T[_[_]]: BirecursiveT: ShowT,
+      F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 
-  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative]
-    : Planner[T, F, ReduceFunc] =
+  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative]: Planner[T, F, ReduceFunc] =
     new ReduceFuncPlanner[T, F]
 
   implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]

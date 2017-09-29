@@ -51,18 +51,22 @@ object EvaluationError {
 }
 
 case class QueryOptions(
-  page: Option[(Long, Long)] = None,
-  sortOn: List[CPath] = Nil,
-  sortOrder: TableModule.DesiredSortOrder = TableModule.SortAscending,
-  timeout: Option[Duration] = None,
-  output: MimeType = MimeTypes.application/MimeTypes.json,
-  cacheControl: CacheControl = CacheControl.NoCache)
+    page: Option[(Long, Long)] = None,
+    sortOn: List[CPath] = Nil,
+    sortOrder: TableModule.DesiredSortOrder = TableModule.SortAscending,
+    timeout: Option[Duration] = None,
+    output: MimeType = MimeTypes.application / MimeTypes.json,
+    cacheControl: CacheControl = CacheControl.NoCache)
 
-case class CacheControl(maxAge: Option[Long], recacheAfter: Option[Long], cacheable: Boolean, onlyIfCached: Boolean)
+case class CacheControl(
+    maxAge: Option[Long],
+    recacheAfter: Option[Long],
+    cacheable: Boolean,
+    onlyIfCached: Boolean)
 
 object CacheControl {
   import quasar.blueeyes.CacheDirective
-  import quasar.blueeyes.CacheDirectives.{ `max-age`, `no-cache`, `only-if-cached`, `max-stale` }
+  import quasar.blueeyes.CacheDirectives.{`max-age`, `max-stale`, `no-cache`, `only-if-cached`}
   import scalaz.syntax.semigroup._
   import scalaz.std.option._
   import scalaz.std.anyVal._
@@ -72,17 +76,23 @@ object CacheControl {
   def fromCacheDirectives(cacheDirectives: CacheDirective*) = {
     val maxAge = cacheDirectives.collectFirst { case `max-age`(Some(n)) => n.number * 1000 }
     val maxStale = cacheDirectives.collectFirst { case `max-stale`(Some(n)) => n.number * 1000 }
-    val cacheable = cacheDirectives exists { _ != `no-cache`}
-    val onlyIfCached = cacheDirectives exists { _ == `only-if-cached`}
+    val cacheable = cacheDirectives exists { _ != `no-cache` }
+    val onlyIfCached = cacheDirectives exists { _ == `only-if-cached` }
     CacheControl(maxAge |+| maxStale, maxAge, cacheable, onlyIfCached)
   }
 }
 
-trait QueryExecutor[M[+_], A] { self =>
-  def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, A]
+trait QueryExecutor[M[+ _], A] { self =>
+  def execute(
+      query: String,
+      context: EvaluationContext,
+      opts: QueryOptions): EitherT[M, EvaluationError, A]
 
   def map[B](f: A => B)(implicit M: Functor[M]): QueryExecutor[M, B] = new QueryExecutor[M, B] {
-    def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, B] = {
+    def execute(
+        query: String,
+        context: EvaluationContext,
+        opts: QueryOptions): EitherT[M, EvaluationError, B] = {
       self.execute(query, context, opts) map f
     }
   }

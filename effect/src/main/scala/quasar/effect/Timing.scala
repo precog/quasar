@@ -27,14 +27,13 @@ object Timing {
   final case object Timestamp extends Timing[Instant]
   final case object Nanos extends Timing[Long]
 
-  final class Ops[S[_]](implicit S: Timing :<: S)
-    extends LiftedOps[Timing, S] {
+  final class Ops[S[_]](implicit S: Timing :<: S) extends LiftedOps[Timing, S] {
 
     private val lowLevel = LowLevel[S]
 
     /** Clock time, convertible to time and date, but with relatively little
-      * precision.
-      */
+     * precision.
+     */
     def timestamp: FreeS[Instant] =
       lift(Timestamp)
 
@@ -42,8 +41,8 @@ object Timing {
     def time[A](fa: FreeS[A]): FreeS[(A, Duration)] = {
       for {
         start <- lowLevel.nanos
-        a     <- fa
-        end   <- lowLevel.nanos
+        a <- fa
+        end <- lowLevel.nanos
       } yield (a, Duration.ofNanos(end - start))
     }
   }
@@ -53,12 +52,11 @@ object Timing {
       new Ops[S]
   }
 
-  final class LowLevel[S[_]](implicit S: Timing :<: S)
-    extends LiftedOps[Timing, S] {
+  final class LowLevel[S[_]](implicit S: Timing :<: S) extends LiftedOps[Timing, S] {
 
     /** Raw nanoseconds value; note that these values are only meaningful when
-      * compared to each other.
-      */
+     * compared to each other.
+     */
     val nanos: FreeS[Long] =
       lift(Nanos)
   }
@@ -69,11 +67,11 @@ object Timing {
   }
 
   /** Uses the JVM's `currentTimeMillis` and `nanoTime` primitives, providing timestamps
-    * with ~10ms resolution and elapsed times accurate to probably ~1 microsecond.
-    */
+   * with ~10ms resolution and elapsed times accurate to probably ~1 microsecond.
+   */
   val toTask: Timing ~> Task =
-    λ[Timing ~> Task]{
+    λ[Timing ~> Task] {
       case Timestamp => Task.delay { Instant.now }
-      case Nanos     => Task.delay { java.lang.System.nanoTime }
+      case Nanos => Task.delay { java.lang.System.nanoTime }
     }
 }

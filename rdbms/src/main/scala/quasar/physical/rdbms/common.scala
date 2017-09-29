@@ -36,14 +36,14 @@ object common {
 
   final case class CustomSchema(name: String) extends Schema
 
-
   object Schema {
     def lastDirName(schema: Schema): DirName = {
       schema match {
         case DefaultSchema => DirName("")
         case CustomSchema(name) =>
           val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
-          val startIndex = if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
+          val startIndex =
+            if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
           DirName(name.substring(startIndex))
       }
     }
@@ -68,7 +68,8 @@ object common {
     val SeparatorRegex = "__c_"
 
     def dirToSchema(dir: ADir): Schema = {
-      Path.flatten(None, None, None, Some(_), Some(_), dir)
+      Path
+        .flatten(None, None, None, Some(_), Some(_), dir)
         .toIList
         .unite
         .intercalate(Separator) match {

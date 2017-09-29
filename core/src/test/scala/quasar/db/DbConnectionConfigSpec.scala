@@ -28,29 +28,33 @@ import pathy.Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 
-class DbConnectionConfigSpec extends mutable.Specification with ScalaCheck with DbConnectionConfigArbitrary {
+class DbConnectionConfigSpec
+    extends mutable.Specification
+    with ScalaCheck
+    with DbConnectionConfigArbitrary {
   import DbConnectionConfig._
 
   def decode(json: Json): Either[String, ConnectionInfo] =
-    json.as[DbConnectionConfig].fold(
-      { case (msg, _) => Left(msg) },
-      cfg => Right(connectionInfo(cfg)))
-
+    json
+      .as[DbConnectionConfig]
+      .fold({ case (msg, _) => Left(msg) }, cfg => Right(connectionInfo(cfg)))
 
   "H2" should {
     "decode" >> prop { (f: AFile) =>
       val cfg =
-        Json("h2" ->
-          Json("location" := f))
+        Json(
+          "h2" ->
+            Json("location" := f))
       decode(cfg) must beRight.which { info =>
-          (info.driverClassName must_== "org.h2.Driver") and
-            (info.url must_== "jdbc:h2:" + posixCodec.printPath(f))
-        }
+        (info.driverClassName must_== "org.h2.Driver") and
+          (info.url must_== "jdbc:h2:" + posixCodec.printPath(f))
+      }
     }
     "decode old format" >> prop { (f: AFile) =>
       val cfg =
-        Json("h2" ->
-          Json("file" := f))
+        Json(
+          "h2" ->
+            Json("file" := f))
       decode(cfg) must beRight.which { info =>
         (info.driverClassName must_== "org.h2.Driver") and
           (info.url must_== "jdbc:h2:" + posixCodec.printPath(f))
@@ -61,10 +65,9 @@ class DbConnectionConfigSpec extends mutable.Specification with ScalaCheck with 
   "PostgreSQL" should {
     "decode minimal" in {
       val cfg =
-        Json("postgresql" ->
-          Json(
-            "userName" := "sa",
-            "password" := "pw"))
+        Json(
+          "postgresql" ->
+            Json("userName" := "sa", "password" := "pw"))
       decode(cfg) must beRight.which { info =>
         (info.driverClassName must_== "org.postgresql.Driver") and
           (info.url must_== "jdbc:postgresql:/") and
@@ -75,16 +78,15 @@ class DbConnectionConfigSpec extends mutable.Specification with ScalaCheck with 
 
     "decode all" in {
       val cfg =
-        Json("postgresql" ->
-          Json(
-            "host" := "localhost",
-            "port" := 5432,
-            "database" := "quasarmeta",
-            "userName" := "sa",
-            "password" := "pw",
-            "parameters" -> Json(
-              "ssl" := "true",
-              "loglevel" := 1)))
+        Json(
+          "postgresql" ->
+            Json(
+              "host" := "localhost",
+              "port" := 5432,
+              "database" := "quasarmeta",
+              "userName" := "sa",
+              "password" := "pw",
+              "parameters" -> Json("ssl" := "true", "loglevel" := 1)))
       decode(cfg) must beRight.which { info =>
         (info.url must_== "jdbc:postgresql://localhost:5432/quasarmeta?ssl=true&loglevel=1") and
           (info.userName must_== "sa") and
@@ -94,11 +96,9 @@ class DbConnectionConfigSpec extends mutable.Specification with ScalaCheck with 
 
     "require host if port is specified" in {
       val cfg =
-        Json("postgresql" ->
-          Json(
-            "port" := 5432,
-            "userName" := "sa",
-            "password" := "pw"))
+        Json(
+          "postgresql" ->
+            Json("port" := 5432, "userName" := "sa", "password" := "pw"))
       decode(cfg) must beLeft("host required when port specified")
     }
   }

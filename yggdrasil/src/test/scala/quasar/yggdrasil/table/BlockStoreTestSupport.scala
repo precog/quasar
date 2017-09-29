@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 
 import scala.annotation.tailrec
 
-trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
+trait BlockStoreTestModule[M[+ _]] extends BaseBlockStoreTestModule[M] {
   implicit def M: Monad[M] with Comonad[M]
 
   type GroupId = String
@@ -37,7 +37,8 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   object Table extends TableCompanion
 }
 
-trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
+trait BaseBlockStoreTestModule[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
     with SliceColumnarTableModule[M]
     with StubProjectionModule[M, Slice] {
 
@@ -58,11 +59,13 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
     }
     def structure(implicit M: Monad[M]) = M.point(xyz)
 
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(
+        implicit M: Monad[M]) = M.point {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
         blocks.filterNot(_.isEmpty) match {
           case x #:: xs =>
-            if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
+            if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x)
+            else findBlockAfter(id, xs)
 
           case _ => None
         }
@@ -83,7 +86,10 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
           }.getOrElse(s.columns)
         }
 
-        BlockProjectionData[JArray, Slice](s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0)
+        BlockProjectionData[JArray, Slice](
+          s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray],
+          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray],
+          s0)
       }
     }
   }
@@ -94,29 +100,32 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 
   def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
     case (_: JNum, CNum | CLong | CDouble) => true
-    case (JUndefined, CUndefined)          => true
-    case (JNull, CNull)                    => true
-    case (_: JBool, CBoolean)              => true
-    case (_: JString, CString)             => true
-    case (JObject(fields), CEmptyObject)   => fields.isEmpty
-    case (JArray(Nil), CEmptyArray)        => true
-    case _                                 => false
+    case (JUndefined, CUndefined) => true
+    case (JNull, CNull) => true
+    case (_: JBool, CBoolean) => true
+    case (_: JString, CString) => true
+    case (JObject(fields), CEmptyObject) => fields.isEmpty
+    case (JArray(Nil), CEmptyArray) => true
+    case _ => false
   }
 
-  def sortTransspec(sortKeys: CPath*): TransSpec1 = InnerObjectConcat(sortKeys.zipWithIndex.map {
-    case (sortKey, idx) => WrapObject(
-      sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
-        case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
-        case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
-        case x                              => sys.error(s"Unexpected arg $x")
-      },
-      "%09d".format(idx)
-    )
-  }: _*)
+  def sortTransspec(sortKeys: CPath*): TransSpec1 =
+    InnerObjectConcat(sortKeys.zipWithIndex.map {
+      case (sortKey, idx) =>
+        WrapObject(
+          sortKey.nodes
+            .foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
+              case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
+              case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
+              case x => sys.error(s"Unexpected arg $x")
+            },
+          "%09d".format(idx)
+        )
+    }: _*)
 }
 
 object BlockStoreTestModule {
-  def empty[M[+_]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
+  def empty[M[+ _]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
     val M = M0
     val projections = Map.empty[Path, Projection]
   }

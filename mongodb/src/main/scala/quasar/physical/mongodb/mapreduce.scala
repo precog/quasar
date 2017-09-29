@@ -25,35 +25,35 @@ import monocle.macros.GenLens
 import scalaz._, Scalaz._
 
 /** Configuration parameters for MapReduce operations
-  *
-  * @param map The mapping function
-  * @param reduce The reducing function
-  * @param selection Query selector to apply to input documents
-  * @param inputSort Criteria to use to sort the input documents.
-  * @param limit Limit the number of input documents to `map`
-  * @param finalizer JavaScript function applied to the output after the
-  *                  `reduce` function.
-  * @param scope Global variables made available to the `map`, `reduce` and
-  *              `finalizer` functions.
-  * @param jsMode Whether to avoid converting intermediate values to
-  *               BSON, leaving them as JavaScript objects instead.
-  *               Setting this to `true` has implications on the size of
-  *               the input, see the MongoDB `mapReduce` documentation
-  *               for details.
-  * @param verbose Whether to include additional information, such
-  *                as timing, in the results.
-  */
+ *
+ * @param map The mapping function
+ * @param reduce The reducing function
+ * @param selection Query selector to apply to input documents
+ * @param inputSort Criteria to use to sort the input documents.
+ * @param limit Limit the number of input documents to `map`
+ * @param finalizer JavaScript function applied to the output after the
+ *                  `reduce` function.
+ * @param scope Global variables made available to the `map`, `reduce` and
+ *              `finalizer` functions.
+ * @param jsMode Whether to avoid converting intermediate values to
+ *               BSON, leaving them as JavaScript objects instead.
+ *               Setting this to `true` has implications on the size of
+ *               the input, see the MongoDB `mapReduce` documentation
+ *               for details.
+ * @param verbose Whether to include additional information, such
+ *                as timing, in the results.
+ */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class MapReduce(
-  map:       Js.Expr, // "function if (...) emit(...) }"
-  reduce:    Js.Expr, // "function (key, values) { ...; return ... }"
-  selection: Option[Selector] = None,
-  inputSort: Option[NonEmptyList[(BsonField, SortDir)]] = None,
-  limit:     Option[Long] = None,
-  finalizer: Option[Js.Expr] = None, // "function (key, reducedValue) { ...; return ... }"
-  scope:     MapReduce.Scope = ListMap(),
-  jsMode:    Option[Boolean] = None,
-  verbose:   Option[Boolean] = None) {
+    map: Js.Expr, // "function if (...) emit(...) }"
+    reduce: Js.Expr, // "function (key, values) { ...; return ... }"
+    selection: Option[Selector] = None,
+    inputSort: Option[NonEmptyList[(BsonField, SortDir)]] = None,
+    limit: Option[Long] = None,
+    finalizer: Option[Js.Expr] = None, // "function (key, reducedValue) { ...; return ... }"
+    scope: MapReduce.Scope = ListMap(),
+    jsMode: Option[Boolean] = None,
+    verbose: Option[Boolean] = None) {
 
   import MapReduce._
 
@@ -69,15 +69,17 @@ final case class MapReduce(
     def sortBson(xs: NonEmptyList[(BsonField, SortDir)]): Bson.Doc =
       Bson.Doc(ListMap(xs.list.toList.map(_ bimap (_.asText, sortDirToBson(_))): _*))
 
-    Bson.Doc(ListMap(("out" -> out) :: List(
-      selection        map  ("query"    -> _.bson),
-      inputSort        map  ("sort"     -> sortBson(_)),
-      limit            map  ("limit"    -> Bson.Int64(_)),
-      finalizer        map  ("finalize" -> Bson.JavaScript(_)),
-      scope.nonEmpty option ("scope"    -> Bson.Doc(scope)),
-      jsMode           map  ("jsMode"   -> Bson.Bool(_)),
-      verbose          map  ("verbose"  -> Bson.Bool(_))
-    ).unite: _*))
+    Bson.Doc(
+      ListMap(
+        ("out" -> out) :: List(
+          selection map ("query" -> _.bson),
+          inputSort map ("sort" -> sortBson(_)),
+          limit map ("limit" -> Bson.Int64(_)),
+          finalizer map ("finalize" -> Bson.JavaScript(_)),
+          scope.nonEmpty option ("scope" -> Bson.Doc(scope)),
+          jsMode map ("jsMode" -> Bson.Bool(_)),
+          verbose map ("verbose" -> Bson.Bool(_))
+        ).unite: _*))
   }
 }
 
@@ -89,68 +91,71 @@ object MapReduce {
   }
 
   object Action {
+
     /** Replace any existing documents in the destination collection with the
-      * result of the map reduce.
-      */
+     * result of the map reduce.
+     */
     final case object Replace extends Action {
       def nonAtomic = None
     }
 
     /** Merge the result of the map reduce with the existing contents of the
-      * output collection.
-      */
+     * output collection.
+     */
     final case class Merge(nonAtomic: Option[Boolean]) extends Action
 
     /** The name would suggest the output of the map reduce is reduced, using
-      * the reducer function, with any existing contents of the output
-      * collection, but the MongoDB docs are incomplete here.
-      */
+     * the reducer function, with any existing contents of the output
+     * collection, but the MongoDB docs are incomplete here.
+     */
     final case class Reduce(nonAtomic: Option[Boolean]) extends Action
 
     /** Returns the field name that represents the given `Action` in a
-      * map-reduce BSON document.
-      */
+     * map-reduce BSON document.
+     */
     def bsonFieldName(act: Action): String =
       (act match {
-        case Replace   => MapReduceAction.REPLACE
-        case Merge(_)  => MapReduceAction.MERGE
+        case Replace => MapReduceAction.REPLACE
+        case Merge(_) => MapReduceAction.MERGE
         case Reduce(_) => MapReduceAction.REDUCE
       }).name.toLowerCase
   }
 
   /** Action to apply to output collection.
-    *
-    * @param action The action to take if the output collection exists.
-    * @param databaseName the database containing the output collection,
-    *                     defaulting to the source database
-    * @param shardOutputCollection whether the output collection should be
-    *                              sharded (the output database must support
-    *                              sharding).
-    */
+   *
+   * @param action The action to take if the output collection exists.
+   * @param databaseName the database containing the output collection,
+   *                     defaulting to the source database
+   * @param shardOutputCollection whether the output collection should be
+   *                              sharded (the output database must support
+   *                              sharding).
+   */
   final case class ActionedOutput(
-    action: Action,
-    database: Option[DatabaseName],
-    shardOutputCollection: Option[Boolean]
+      action: Action,
+      database: Option[DatabaseName],
+      shardOutputCollection: Option[Boolean]
   ) {
     def bson(coll: CollectionName): Bson.Doc =
-      Bson.Doc(ListMap((Action.bsonFieldName(action) -> coll.bson) :: List(
-        database              map ("db"        -> _.bson),
-        shardOutputCollection map ("sharded"   -> Bson.Bool(_)),
-        action.nonAtomic      map ("nonAtomic" -> Bson.Bool(_))
-      ).unite: _*))
+      Bson.Doc(
+        ListMap(
+          (Action.bsonFieldName(action) -> coll.bson) :: List(
+            database map ("db" -> _.bson),
+            shardOutputCollection map ("sharded" -> Bson.Bool(_)),
+            action.nonAtomic map ("nonAtomic" -> Bson.Bool(_))
+          ).unite: _*))
   }
 
   /** Output collection for non-inline map-reduce jobs. */
   final case class OutputCollection(
-    collection: CollectionName,
-    withAction: Option[ActionedOutput]
+      collection: CollectionName,
+      withAction: Option[ActionedOutput]
   ) {
     def bson: Bson =
       withAction.fold[Bson](collection.bson)(_ bson collection)
   }
 
-  val _map       = GenLens[MapReduce](_.map)
-  val _reduce    = GenLens[MapReduce](_.reduce)
+  val _map = GenLens[MapReduce](_.map)
+  val _reduce = GenLens[MapReduce](_.reduce)
   val _finalizer = GenLens[MapReduce](_.finalizer)
-  val _scope     = GenLens[MapReduce](_.scope)
+  val _scope = GenLens[MapReduce](_.scope)
 }

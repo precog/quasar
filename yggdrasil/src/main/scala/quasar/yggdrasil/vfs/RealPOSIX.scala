@@ -26,7 +26,7 @@ import fs2.util.Suspendable
 
 import pathy.Path
 
-import scalaz.{~>, -\/, \/-, Coproduct, Free, Inject}
+import scalaz.{-\/, \/-, ~>, Coproduct, Free, Inject}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.syntax.traverse._

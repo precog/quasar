@@ -23,9 +23,9 @@ import scala.annotation.tailrec
 object RangeUtil {
 
   /**
-    * Loops through a Range much more efficiently than Range#foreach, running
-    * the provided callback 'f' on each position. Assumes that step is 1.
-    */
+   * Loops through a Range much more efficiently than Range#foreach, running
+   * the provided callback 'f' on each position. Assumes that step is 1.
+   */
   def loop(r: Range)(f: Int => Unit) {
     var i = r.start
     val limit = r.end
@@ -36,9 +36,9 @@ object RangeUtil {
   }
 
   /**
-    * Like loop but also includes a built-in check for whether the given Column
-    * is defined for this particular row.
-    */
+   * Like loop but also includes a built-in check for whether the given Column
+   * is defined for this particular row.
+   */
   def loopDefined(r: Range, col: Column)(f: Int => Unit): Boolean = {
     @tailrec def unseen(i: Int, limit: Int): Boolean =
       if (i < limit) {

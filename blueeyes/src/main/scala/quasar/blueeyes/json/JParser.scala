@@ -35,8 +35,8 @@ object JParser {
 
   def parseUnsafe(str: String): JValue = new StringParser(str).parse()
 
-  type Result[A]   = Validation[Throwable, A]
-  type Extract[A]  = Validation[Extractor.Error, A]
+  type Result[A] = Validation[Throwable, A]
+  type Extract[A] = Validation[Extractor.Error, A]
   type AsyncResult = (AsyncParse, AsyncParser)
 
   def parseFromString(str: String): Result[JValue] =
@@ -61,17 +61,23 @@ object JParser {
     fromTryCatchNonFatal(new StringParser(str).parseMany())
 
   def validateManyFromString[A: Extractor](str: String) =
-    ((thrown _) <-: parseManyFromString(str)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }
+    ((thrown _) <-: parseManyFromString(str)) flatMap {
+      _.toStream.map(_.validated[A]).sequence[Extract, A]
+    }
 
   def parseManyFromFile(file: File): Result[Seq[JValue]] =
     fromTryCatchNonFatal(ChannelParser.fromFile(file).parseMany())
 
   def validateManyFromFile[A: Extractor](file: File) =
-    ((thrown _) <-: parseManyFromFile(file)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }
+    ((thrown _) <-: parseManyFromFile(file)) flatMap {
+      _.toStream.map(_.validated[A]).sequence[Extract, A]
+    }
 
   def parseManyFromByteBuffer(buf: ByteBuffer): Result[Seq[JValue]] =
     fromTryCatchNonFatal(new ByteBufferParser(buf).parseMany())
 
   def validateManyFromByteBuffer[A: Extractor](buf: ByteBuffer) =
-    ((thrown _) <-: parseManyFromByteBuffer(buf)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }
+    ((thrown _) <-: parseManyFromByteBuffer(buf)) flatMap {
+      _.toStream.map(_.validated[A]).sequence[Extract, A]
+    }
 }

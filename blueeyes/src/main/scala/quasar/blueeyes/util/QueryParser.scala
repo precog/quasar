@@ -21,10 +21,10 @@ import java.net.URLDecoder._
 import java.net.URLEncoder._
 
 /**
-  * This object only deals with the query portion of the URI.  A URI can be decomposed into
-  * constituant components using the java.lang.URI class.
-  * Note:  The individual parameters/values are assumed to be encoded, if neccesary
-  */
+ * This object only deals with the query portion of the URI.  A URI can be decomposed into
+ * constituant components using the java.lang.URI class.
+ * Note:  The individual parameters/values are assumed to be encoded, if neccesary
+ */
 object QueryParser {
   val encoding = "UTF-8"
 
@@ -34,17 +34,17 @@ object QueryParser {
         .split("&")
         .toList
         .flatMap { nameEqualsValue =>
-        nameEqualsValue.split("=").toList match {
-          case "" :: Nil              => Nil
-          case name :: Nil            => (name, "") :: Nil
-          case name :: value :: Nil   => (name, value) :: Nil
-          case name :: everythingElse => (name, everythingElse.mkString("=")) :: Nil
-          case Nil                    => Nil
-        }
-      })
+          nameEqualsValue.split("=").toList match {
+            case "" :: Nil => Nil
+            case name :: Nil => (name, "") :: Nil
+            case name :: value :: Nil => (name, value) :: Nil
+            case name :: everythingElse => (name, everythingElse.mkString("=")) :: Nil
+            case Nil => Nil
+          }
+        })
         .map { nameValue =>
-        (Symbol(decode(nameValue._1, encoding)), decode(nameValue._2, encoding))
-      }: _*)
+          (Symbol(decode(nameValue._1, encoding)), decode(nameValue._2, encoding))
+        }: _*)
 
   def unparseQuery(query: Map[Symbol, String], shouldEncode: Boolean = true): String = {
     def transformFn(nameValue: Tuple2[Symbol, String]) = {

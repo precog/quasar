@@ -27,19 +27,20 @@ import scalaz._, Scalaz._
 
 package object accumulator {
 
-  def rewriteGroupRefs[EX[_]: Functor](t: AccumOp[Fix[EX]])(applyVar: PartialFunction[DocVar, DocVar])
-      (implicit exprOps: ExprOpOps.Uni[EX]): AccumOp[Fix[EX]] =
+  def rewriteGroupRefs[EX[_]: Functor](t: AccumOp[Fix[EX]])(
+      applyVar: PartialFunction[DocVar, DocVar])(
+      implicit exprOps: ExprOpOps.Uni[EX]): AccumOp[Fix[EX]] =
     t.map(_.cata(exprOps.rewriteRefs(applyVar)))
 
   val groupBsonƒ: AccumOp[Bson] => Bson = {
     case $addToSet(value) => Bson.Doc("$addToSet" -> value)
-    case $push(value)     => Bson.Doc("$push" -> value)
-    case $first(value)    => Bson.Doc("$first" -> value)
-    case $last(value)     => Bson.Doc("$last" -> value)
-    case $max(value)      => Bson.Doc("$max" -> value)
-    case $min(value)      => Bson.Doc("$min" -> value)
-    case $avg(value)      => Bson.Doc("$avg" -> value)
-    case $sum(value)      => Bson.Doc("$sum" -> value)
+    case $push(value) => Bson.Doc("$push" -> value)
+    case $first(value) => Bson.Doc("$first" -> value)
+    case $last(value) => Bson.Doc("$last" -> value)
+    case $max(value) => Bson.Doc("$max" -> value)
+    case $min(value) => Bson.Doc("$min" -> value)
+    case $avg(value) => Bson.Doc("$avg" -> value)
+    case $sum(value) => Bson.Doc("$sum" -> value)
   }
 
   def groupBson[EX[_]: Functor](g: AccumOp[Fix[EX]])(implicit exprOps: ExprOpOps.Uni[EX]) =

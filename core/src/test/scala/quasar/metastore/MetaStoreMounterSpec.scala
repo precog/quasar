@@ -33,7 +33,7 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
   import MetaStoreMounterSpec._
   import MountRequest.MountFileSystem
 
-  isolated  // NB: each test needs a fresh DB, or else need to get cleanup working in between
+  isolated // NB: each test needs a fresh DB, or else need to get cleanup working in between
 
   val xa = {
     val tr = MetaStoreFixture.createNewTestTransactor.unsafePerformSync
@@ -54,9 +54,9 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
         doMount.andThen(_.point[ConnectionIO]),
         κ(().point[ConnectionIO]))
 
-    foldMapNT(db).compose(t)                       :+:
-    Failure.toRuntimeError[Task, PathTypeMismatch] :+:
-    Failure.toRuntimeError[Task, MountingError]
+    foldMapNT(db).compose(t) :+:
+      Failure.toRuntimeError[Task, PathTypeMismatch] :+:
+      Failure.toRuntimeError[Task, MountingError]
   }
 
   val invalidUri = ConnectionUri(uriA.value + "INVALID")
@@ -65,7 +65,7 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
 
   def doMount: MountRequest => MountingError \/ Unit = {
     case MountFileSystem(_, `dbType`, `invalidUri`) => invalidErr.left
-    case _                                          => ().right
+    case _ => ().right
   }
 
   "Handling mounts" should {
@@ -73,7 +73,8 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       val loc = rootDir </> dir("some") </> dir("db")
       val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
-      mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
+      mntErr
+        .attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
         .tuple(mnt.lookupConfig(loc).run.run)
         .map(_ must_=== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
     }
@@ -95,14 +96,15 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
 
       val b = (
         mnt.mountFileSystem(d1, dbType, uriA) >>
-        mnt.mountView(f1, exprA, noVars)      >>
-        mnt.havingPrefix(prefix)
+          mnt.mountView(f1, exprA, noVars) >>
+          mnt.havingPrefix(prefix)
       ).foldMap(interpret)
 
       val r = (a >> b).unsafePerformSync
 
       r ∘ {
-        case -\/(i @ MountingError.InvalidMount(MountType.ViewMount, _)) => i.copy(error = "").left
+        case -\/(i @ MountingError.InvalidMount(MountType.ViewMount, _)) =>
+          i.copy(error = "").left
         case i => i
       } must_=== mnts
     }
@@ -120,10 +122,10 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       val trickyF = parent </> dir("trickyB") </> file("mnt")
 
       val p =
-        mnt.mountFileSystem(mntA, dbType, uriA)    *>
-        mnt.mountFileSystem(trickyD, dbType, uriB) *>
-        mnt.mountView(trickyF, exprA, noVars)      *>
-        mnt.havingPrefix(prefix)
+        mnt.mountFileSystem(mntA, dbType, uriA) *>
+          mnt.mountFileSystem(trickyD, dbType, uriB) *>
+          mnt.mountView(trickyF, exprA, noVars) *>
+          mnt.havingPrefix(prefix)
 
       val rez = p.foldMap(interpret).unsafePerformSync
 
@@ -139,10 +141,10 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       val trickyF = parent </> dir("trickyC") </> file("mnt")
 
       val p =
-        mnt.mountFileSystem(mntA, dbType, uriA)    *>
-        mnt.mountFileSystem(trickyD, dbType, uriB) *>
-        mnt.mountView(trickyF, exprA, noVars)      *>
-        mnt.havingPrefix(prefix)
+        mnt.mountFileSystem(mntA, dbType, uriA) *>
+          mnt.mountFileSystem(trickyD, dbType, uriB) *>
+          mnt.mountView(trickyF, exprA, noVars) *>
+          mnt.havingPrefix(prefix)
 
       val rez = p.foldMap(interpret).unsafePerformSync
 
@@ -158,10 +160,10 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       val trickyF = parent </> dir("tricky") </> file("mnt")
 
       val p =
-        mnt.mountFileSystem(mntA, dbType, uriA)    *>
-        mnt.mountFileSystem(trickyD, dbType, uriB) *>
-        mnt.mountView(trickyF, exprA, noVars)      *>
-        mnt.havingPrefix(prefix)
+        mnt.mountFileSystem(mntA, dbType, uriA) *>
+          mnt.mountFileSystem(trickyD, dbType, uriB) *>
+          mnt.mountView(trickyF, exprA, noVars) *>
+          mnt.havingPrefix(prefix)
 
       val rez = p.foldMap(interpret).unsafePerformSync
 
@@ -173,12 +175,11 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
 }
 
 object MetaStoreMounterSpec {
-  type Eff[A]  = Coproduct[Mounting, Eff0, A]
+  type Eff[A] = Coproduct[Mounting, Eff0, A]
   type Eff0[A] = Coproduct[PathMismatchFailure, MountingFailure, A]
 
   def insertMount(path: APath, `type`: MountType, uri: String): ConnectionIO[Unit] =
-    MetaStoreAccess.runOneRowUpdate(
-      sql"""INSERT INTO Mounts (path, type, connectionUri)
+    MetaStoreAccess.runOneRowUpdate(sql"""INSERT INTO Mounts (path, type, connectionUri)
             VALUES (${refineType(path)}, ${`type`}, $uri)
             """.update)
 }

@@ -45,7 +45,8 @@ final class NormalizationSpec extends Qspec with TypeFArbitrary with EJsonArbitr
 
   "coalesceUnion" >> {
     "resulting union contains no unions" >> prop { (x: T, y: T, zs: IList[T]) =>
-      Unioned.unapply(coalesceUnion[J, T] apply union[J, T](x, y, zs))
+      Unioned
+        .unapply(coalesceUnion[J, T] apply union[J, T](x, y, zs))
         .map(_.any(isUnion)) must beSome(beFalse)
     }
   }
@@ -55,7 +56,7 @@ final class NormalizationSpec extends Qspec with TypeFArbitrary with EJsonArbitr
       val u = union[J, T](top[J, T]().embed, bottom[J, T]().embed, zs)
       (elideBottom[J, T] <<< coalesceUnion[J, T])(u) must beLike {
         case Unioned(ts) => ts.any(isBottom[J](_)) must beFalse
-        case _           => ok
+        case _ => ok
       }
     }
   }
@@ -72,7 +73,7 @@ final class NormalizationSpec extends Qspec with TypeFArbitrary with EJsonArbitr
     "resulting union is disjoint" >> prop { (x: T, y: T, zs: IList[T]) =>
       ((simplifyUnion[J, T] <<< coalesceUnion[J, T]) apply union[J, T](x, y, zs)) must beLike {
         case Unioned(ts) => ts.all(t => !ts.any(PartialOrder[T].lt(_, t))) must beTrue
-        case _           => ok
+        case _ => ok
       }
     }
   }

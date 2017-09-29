@@ -37,16 +37,24 @@ object Mount {
   val toMountConfig: Mount => MountingError \/ MountConfig = {
     case Mount(ViewMount, uri) =>
       viewCfgFromUri(uri).fold(
-        e => MountingError.invalidMount(
-          ViewMount,
-          s"error while obtaining a view config for ${uri.value}, $e").left,
+        e =>
+          MountingError
+            .invalidMount(
+              ViewMount,
+              s"error while obtaining a view config for ${uri.value}, $e")
+            .left,
         viewConfig(_).right)
     case Mount(ModuleMount, uri) =>
-      sql.fixParser.parseModule(uri.value).fold(
-        e => MountingError.invalidMount(
-          ModuleMount,
-          s"error while obtaining a mount config for ${uri.value}, ${e.message}").left,
-        moduleConfig(_).right)
+      sql.fixParser
+        .parseModule(uri.value)
+        .fold(
+          e =>
+            MountingError
+              .invalidMount(
+                ModuleMount,
+                s"error while obtaining a mount config for ${uri.value}, ${e.message}")
+              .left,
+          moduleConfig(_).right)
     case Mount(FileSystemMount(fsType), uri) =>
       fileSystemConfig(fsType, uri).right
   }

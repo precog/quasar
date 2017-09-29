@@ -19,12 +19,12 @@ package quasar.physical
 import slamdata.Predef.String
 import quasar.contrib.scalaz.MonadError_
 
-import scalaz.{NonEmptyList, MonadError}
+import scalaz.{MonadError, NonEmptyList}
 
 package object marklogic {
   type ErrorMessages = NonEmptyList[String]
 
-  type MonadErrMsgs[F[_]]  = MonadError[F, ErrorMessages]
+  type MonadErrMsgs[F[_]] = MonadError[F, ErrorMessages]
 
   object MonadErrMsgs {
     def apply[F[_]](implicit F: MonadErrMsgs[F]): MonadErrMsgs[F] = F

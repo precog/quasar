@@ -17,39 +17,41 @@
 package quasar.blueeyes.json
 
 /** A difference between two JSONs (j1 diff j2).
-  */
+ */
 case class Diff(changed: JValue, added: JValue, deleted: JValue) {
   def map(f: JValue => JValue): Diff = {
     def applyTo(x: JValue) = x match {
       case JUndefined => JUndefined
-      case _          => f(x)
+      case _ => f(x)
     }
     Diff(applyTo(changed), applyTo(added), applyTo(deleted))
   }
-  def merge(that: Diff) = Diff(changed merge that.changed, added merge that.added, deleted merge that.deleted)
+  def merge(that: Diff) =
+    Diff(changed merge that.changed, added merge that.added, deleted merge that.deleted)
 }
 
 /** Computes a diff between two JSONs.
-  */
+ */
 object Diff {
 
   /** Return a diff.
-    */
+   */
   def diff(val1: JValue, val2: JValue): Diff = (val1, val2) match {
-    case (x, y) if x == y                     => Diff(JUndefined, JUndefined, JUndefined)
-    case (JObject(xs), JObject(ys))           => diffFields(xs, ys)
-    case (JArray(xs), JArray(ys))             => diffVals(xs, ys)
-    case (JNum(x), JNum(y)) if (x != y)       => Diff(JNum(y), JUndefined, JUndefined)
+    case (x, y) if x == y => Diff(JUndefined, JUndefined, JUndefined)
+    case (JObject(xs), JObject(ys)) => diffFields(xs, ys)
+    case (JArray(xs), JArray(ys)) => diffVals(xs, ys)
+    case (JNum(x), JNum(y)) if (x != y) => Diff(JNum(y), JUndefined, JUndefined)
     case (JString(x), JString(y)) if (x != y) => Diff(JString(y), JUndefined, JUndefined)
-    case (JBool(x), JBool(y)) if (x != y)     => Diff(JBool(y), JUndefined, JUndefined)
-    case (x, y)                               => Diff(JUndefined, y, x)
+    case (JBool(x), JBool(y)) if (x != y) => Diff(JBool(y), JUndefined, JUndefined)
+    case (x, y) => Diff(JUndefined, y, x)
   }
 
   private def diffFields(vs1: Map[String, JValue], vs2: Map[String, JValue]): Diff = {
     def diffRec(xleft: Map[String, JValue], yleft: Map[String, JValue]): Diff = {
-      if (xleft.isEmpty) Diff(JUndefined, if (yleft.isEmpty) JUndefined else JObject(yleft), JUndefined)
+      if (xleft.isEmpty)
+        Diff(JUndefined, if (yleft.isEmpty) JUndefined else JObject(yleft), JUndefined)
       else {
-        val x  = xleft.head
+        val x = xleft.head
         val xs = xleft.tail
 
         yleft.get(x._1) match {

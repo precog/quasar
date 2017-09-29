@@ -29,9 +29,9 @@ object UnionWidth extends UWidthInstances
 
 sealed abstract class UWidthInstances extends UWidthInstances0 {
   implicit def coproductUWidth[F[_], G[_]](
-    implicit
-    F: UnionWidth[F],
-    G: UnionWidth[G]
+      implicit
+      F: UnionWidth[F],
+      G: UnionWidth[G]
   ): UnionWidth[Coproduct[F, G, ?]] =
     new UnionWidth[Coproduct[F, G, ?]] {
       val width = F.width + G.width

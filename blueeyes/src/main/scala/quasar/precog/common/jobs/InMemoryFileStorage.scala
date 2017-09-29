@@ -22,11 +22,11 @@ import quasar.precog.MimeType
 
 import scalaz._
 
-final class InMemoryFileStorage[M[+_]](implicit M: Monad[M]) extends FileStorage[M] {
+final class InMemoryFileStorage[M[+ _]](implicit M: Monad[M]) extends FileStorage[M] {
   import scalaz.syntax.monad._
 
   private val files = new mutable.HashMap[String, (Option[MimeType], Array[Byte])]
-      with mutable.SynchronizedMap[String, (Option[MimeType], Array[Byte])]
+  with mutable.SynchronizedMap[String, (Option[MimeType], Array[Byte])]
 
   def exists(file: String): M[Boolean] = M.point { files contains file }
 
@@ -42,8 +42,9 @@ final class InMemoryFileStorage[M[+_]](implicit M: Monad[M]) extends FileStorage
   }
 
   def load(file: String): M[Option[FileData[M]]] = M.point {
-    files get file map { case (mimeType, data) =>
-      FileData(mimeType, data :: StreamT.empty[M, Array[Byte]])
+    files get file map {
+      case (mimeType, data) =>
+        FileData(mimeType, data :: StreamT.empty[M, Array[Byte]])
     }
   }
 

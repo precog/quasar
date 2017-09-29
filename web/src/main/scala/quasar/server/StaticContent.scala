@@ -26,8 +26,8 @@ import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
 /** Describes the virtual and physical location of static content served
-  * by Quasar.
-  */
+ * by Quasar.
+ */
 final case class StaticContent(loc: String, path: String)
 
 object StaticContent {
@@ -49,17 +49,15 @@ object StaticContent {
   ////
 
   /** NB: This is a terrible thing. Is there a better way to find the path to
-    *     a jar?
-    */
+   *     a jar?
+   */
   private val jarPath: Task[String] = Task.delay {
     // NB: This is the “right” way to get a `java.net.JarURLconnection`.
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def altPath(uri: URI) =
-      uri.toURL.openConnection
-        .asInstanceOf[JarURLConnection]
-        .getJarFileURL.getPath
+      uri.toURL.openConnection.asInstanceOf[JarURLConnection].getJarFileURL.getPath
 
-    val uri  = getClass.getProtectionDomain.getCodeSource.getLocation.toURI
+    val uri = getClass.getProtectionDomain.getCodeSource.getLocation.toURI
     val path = URLDecoder.decode(Option(uri.getPath) getOrElse altPath(uri), "UTF-8")
 
     (new java.io.File(path)).getParentFile.getPath + "/"

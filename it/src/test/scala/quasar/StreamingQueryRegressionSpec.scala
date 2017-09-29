@@ -26,9 +26,8 @@ import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 
 class StreamingQueryRegressionSpec
-  extends QueryRegressionTest[BackendEffectIO](
-    QueryRegressionTest.externalFS.map(_.filter(
-      _.ref.supports(BackendCapability.query())))) {
+    extends QueryRegressionTest[BackendEffectIO](
+      QueryRegressionTest.externalFS.map(_.filter(_.ref.supports(BackendCapability.query())))) {
 
   val TestsDir = None
 

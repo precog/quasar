@@ -37,7 +37,13 @@ import xml.name._
 import scalaz._, Scalaz._
 
 final class FilterPlannerSpec extends quasar.Qspec {
-  val comparisons = List(ComparisonOp.EQ , ComparisonOp.NE , ComparisonOp.LT , ComparisonOp.LE , ComparisonOp.GT , ComparisonOp.GE)
+  val comparisons = List(
+    ComparisonOp.EQ,
+    ComparisonOp.NE,
+    ComparisonOp.LT,
+    ComparisonOp.LE,
+    ComparisonOp.GT,
+    ComparisonOp.GE)
 
   def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
     Free.roll(MFC(MFCore.ProjectField(src, MFCore.StrLit(str))))
@@ -47,11 +53,11 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
     Free.roll(MFC(op match {
       case ComparisonOp.EQ => MFCore.Eq(src, searchExpr)
-      case ComparisonOp.NE => MFCore.Neq(src,searchExpr)
+      case ComparisonOp.NE => MFCore.Neq(src, searchExpr)
       case ComparisonOp.LT => MFCore.Lt(src, searchExpr)
-      case ComparisonOp.LE => MFCore.Lte(src,searchExpr)
+      case ComparisonOp.LE => MFCore.Lte(src, searchExpr)
       case ComparisonOp.GT => MFCore.Gt(src, searchExpr)
-      case ComparisonOp.GE => MFCore.Gte(src,searchExpr)
+      case ComparisonOp.GE => MFCore.Gte(src, searchExpr)
     }))
   }
 
@@ -59,11 +65,12 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
   val genNestedProject: Gen[(FreeMap[Fix], ADir)] =
     for {
-      dir0  <- arbitrary[ADir]
+      dir0 <- arbitrary[ADir]
       first <- Gen.alphaStr
       path = rebaseA(rootDir[Sandboxed] </> dir(first))(dir0)
-      nested = flatten(None, None, None, Some(_), Some(_), dir0).tail.unite.foldLeft(
-        projectField(HoleF, first))((prj: FreeMap[Fix], nxt: String) => projectField(prj, nxt))
+      nested = flatten(None, None, None, Some(_), Some(_), dir0).tail.unite
+        .foldLeft(projectField(HoleF, first))((prj: FreeMap[Fix], nxt: String) =>
+          projectField(prj, nxt))
     } yield (nested, path)
 
   val genProjectTestCase: Gen[ProjectTestCase] =
@@ -79,25 +86,25 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
   type U = Fix[Query[Fix[EJson], ?]]
 
-  def directoryQuery[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
-  ): Q = Q.embed(Query.Directory[Fix[EJson], Q](IList("/some/ml/location"), MatchDepth.Children))
+  def directoryQuery[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Q =
+    Q.embed(Query.Directory[Fix[EJson], Q](IList("/some/ml/location"), MatchDepth.Children))
 
-  def documentQuery[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
-  ): Q = Q.embed(Query.Document[Fix[EJson], Q](IList("/some/ml/location")))
+  def documentQuery[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Q =
+    Q.embed(Query.Document[Fix[EJson], Q](IList("/some/ml/location")))
 
-  def andQuery[Q](l: Q, r: Q)(implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
-  ): Q = Q.embed(Query.And[Fix[EJson], Q](IList(l, r)))
+  def andQuery[Q](l: Q, r: Q)(implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Q =
+    Q.embed(Query.And[Fix[EJson], Q](IList(l, r)))
 
   def pathRange[Q](path: String, op: ComparisonOp, value: Fix[EJson])(
-    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+      implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
   ): Q = Q.embed(Query.PathRange(IList(path), op, IList(value)))
 
   def elementRange[Q](element: QName, op: ComparisonOp, value: Fix[EJson])(
-    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+      implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
   ): Q = Q.embed(Query.ElementRange(IList(element), op, IList(value)))
 
   def jsonPropertyRange[Q](property: String, op: ComparisonOp, value: Fix[EJson])(
-    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+      implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
   ): Q = Q.embed(Query.JsonPropertyRange(IList(property), op, IList(value)))
 
   def src0[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Search[Q] =
@@ -109,8 +116,8 @@ final class FilterPlannerSpec extends quasar.Qspec {
     dirName(dir0) >>= (d => QName.string.getOption(d.value))
 
   // The FMT type index is not relevant for these tests
-  def planner(implicit ev: FilterPlanner[Fix, DocType.Json]
-  ): FilterPlanner[Fix, DocType.Json] = ev
+  def planner(implicit ev: FilterPlanner[Fix, DocType.Json]): FilterPlanner[Fix, DocType.Json] =
+    ev
 
   "StarIndexPlanner" >> {
     "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
@@ -118,11 +125,10 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
       val expectedSearch = IndexPlan(
         Search[U](
-          andQuery[U](
-            directoryQuery[U],
-            pathRange[U](path, prj.op, str(prj.expr))),
+          andQuery[U](directoryQuery[U], pathRange[U](path, prj.op, str(prj.expr))),
           IncludeId,
-          IList()), false)
+          IList()),
+        false)
 
       planner.StarIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
@@ -134,11 +140,10 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
       val expectedSearch = IndexPlan(
         Search[U](
-          andQuery[U](
-            directoryQuery[U],
-            pathRange[U](path, prj.op, str(prj.expr))),
+          andQuery[U](directoryQuery[U], pathRange[U](path, prj.op, str(prj.expr))),
           IncludeId,
-          IList()), false)
+          IList()),
+        false)
 
       planner.PathIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
@@ -150,7 +155,9 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
     "planXml" >> {
       def predPath(path0: ADir): XQuery =
-        flattenDir(path0).map(child.elementNamed(_)).foldLeft(child.*)((path, segment) => path `/` segment)
+        flattenDir(path0)
+          .map(child.elementNamed(_))
+          .foldLeft(child.*)((path, segment) => path `/` segment)
 
       "plan with a star path and path predicate" >> prop { prj: ProjectTestCase =>
         val name: Option[QName] = qnameDirName(prj.path)
@@ -158,11 +165,10 @@ final class FilterPlannerSpec extends quasar.Qspec {
         val expectedSearch: Option[IndexPlan[U]] = name map ((elName: QName) =>
           IndexPlan(
             Search[U](
-              andQuery[U](
-                directoryQuery[U],
-                elementRange[U](elName, prj.op, str(prj.expr))),
+              andQuery[U](directoryQuery[U], elementRange[U](elName, prj.op, str(prj.expr))),
               IncludeId,
-              IList(predPath(prj.path))), true))
+              IList(predPath(prj.path))),
+            true))
 
         planner.ElementIndexPlanner.planXml(src0[U], prj.fm) must beEqualTo(expectedSearch)
       }
@@ -176,11 +182,10 @@ final class FilterPlannerSpec extends quasar.Qspec {
         val expectedSearch: Option[IndexPlan[U]] = name map ((elName: QName) =>
           IndexPlan(
             Search[U](
-              andQuery[U](
-                directoryQuery[U],
-                elementRange[U](elName, prj.op, str(prj.expr))),
+              andQuery[U](directoryQuery[U], elementRange[U](elName, prj.op, str(prj.expr))),
               IncludeId,
-              IList(existingPredPath, predPath(prj.path))), true))
+              IList(existingPredPath, predPath(prj.path))),
+            true))
 
         planner.ElementIndexPlanner.planXml(src1, prj.fm) must beEqualTo(expectedSearch)
       }
@@ -188,15 +193,20 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
     "planJson" >> {
       "add the path as a predicate to the search expression" >> prop { prj: ProjectTestCase =>
-        val path = flattenDir(prj.path).map(child.nodeNamed(_)).foldLeft1Opt((path, segment) => path `/` segment)
+        val path = flattenDir(prj.path)
+          .map(child.nodeNamed(_))
+          .foldLeft1Opt((path, segment) => path `/` segment)
 
-        val expectedSearch: Option[IndexPlan[U]] = (path |@| dirName(prj.path))((pth, prop) =>
-          IndexPlan(Search[U](
-            andQuery[U](
-              directoryQuery[U],
-              jsonPropertyRange[U](prop.value, prj.op, str(prj.expr))),
-            IncludeId,
-            IList(pth)), true).some).join
+        val expectedSearch: Option[IndexPlan[U]] = (path |@| dirName(prj.path))(
+          (pth, prop) =>
+            IndexPlan(
+              Search[U](
+                andQuery[U](
+                  directoryQuery[U],
+                  jsonPropertyRange[U](prop.value, prj.op, str(prj.expr))),
+                IncludeId,
+                IList(pth)),
+              true).some).join
 
         planner.ElementIndexPlanner.planJson(src0[U], prj.fm) must beEqualTo(expectedSearch)
       }
@@ -207,10 +217,9 @@ final class FilterPlannerSpec extends quasar.Qspec {
     "return true if cts.Document exists anywhere in the cts.Query AST" >> {
       import FilterPlanner.anyDocument
 
-      anyDocument[Fix, U](
-        andQuery[U](
-          directoryQuery[U],
-          andQuery[U](directoryQuery[U], documentQuery[U]))) must beEqualTo(true)
+      anyDocument[Fix, U](andQuery[U](
+        directoryQuery[U],
+        andQuery[U](directoryQuery[U], documentQuery[U]))) must beEqualTo(true)
 
       anyDocument[Fix, U](directoryQuery[U]) must beEqualTo(false)
     }

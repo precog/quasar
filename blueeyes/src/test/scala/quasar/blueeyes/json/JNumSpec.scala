@@ -32,37 +32,37 @@ class JNumSpec extends Specification {
     val n5: JNum = JNum(0L)
     val n6: JNum = JNum(1L)
 
-    val d1: JNum  = JNum(123.455555555555)
-    val d2: JNum  = JNum(123.456)
-    val d3: JNum  = JNum(123.4560000000923)
-    val d4: JNum  = JNum(-1.000000472)
-    val d5: JNum  = JNum(-1.0)
-    val d6: JNum  = JNum(-0.99999999999)
-    val d7: JNum  = JNum(3333333.0)
-    val d8: JNum  = JNum(0.0)
-    val d9: JNum  = JNum(0.00000001)
+    val d1: JNum = JNum(123.455555555555)
+    val d2: JNum = JNum(123.456)
+    val d3: JNum = JNum(123.4560000000923)
+    val d4: JNum = JNum(-1.000000472)
+    val d5: JNum = JNum(-1.0)
+    val d6: JNum = JNum(-0.99999999999)
+    val d7: JNum = JNum(3333333.0)
+    val d8: JNum = JNum(0.0)
+    val d9: JNum = JNum(0.00000001)
     val d10: JNum = JNum(0.00000001110101)
 
-    val b1: JNum  = JNum(BigDecimal("123.45999999999999999999999"))
-    val b2: JNum  = JNum(BigDecimal("123.45600000000000000000000"))
-    val b3: JNum  = JNum(BigDecimal("123.45600000000000000000001"))
-    val b4: JNum  = JNum(BigDecimal("-1.000000000000000000000000000000000001"))
-    val b5: JNum  = JNum(BigDecimal("-1.000000000000000000000000000000000000"))
-    val b6: JNum  = JNum(BigDecimal("-0.999999999999999999999999999999999999"))
-    val b7: JNum  = JNum(BigDecimal("3333333.00000000000001"))
-    val b8: JNum  = JNum(BigDecimal("3333333.0"))
-    val b9: JNum  = JNum(BigDecimal("3333332.99999999999999"))
+    val b1: JNum = JNum(BigDecimal("123.45999999999999999999999"))
+    val b2: JNum = JNum(BigDecimal("123.45600000000000000000000"))
+    val b3: JNum = JNum(BigDecimal("123.45600000000000000000001"))
+    val b4: JNum = JNum(BigDecimal("-1.000000000000000000000000000000000001"))
+    val b5: JNum = JNum(BigDecimal("-1.000000000000000000000000000000000000"))
+    val b6: JNum = JNum(BigDecimal("-0.999999999999999999999999999999999999"))
+    val b7: JNum = JNum(BigDecimal("3333333.00000000000001"))
+    val b8: JNum = JNum(BigDecimal("3333333.0"))
+    val b9: JNum = JNum(BigDecimal("3333332.99999999999999"))
     val b10: JNum = JNum(BigDecimal("0.0000000999999999999999999"))
     val b11: JNum = JNum(BigDecimal("0.00000001"))
     val b12: JNum = JNum(BigDecimal("0.0000000100000000000000001"))
 
     val nums: List[JNum] = (
-        s1 :: s2 :: s3 :: s4 ::
-          n1 :: n2 :: n3 :: n4 :: n5 :: n6 ::
-            d1 :: d2 :: d3 :: d4 :: d5 :: d6 :: d7 :: d8 :: d9 :: d10 ::
-              b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: b9 :: b10 :: b11 :: b12 ::
-                Nil
-      )
+      s1 :: s2 :: s3 :: s4 ::
+        n1 :: n2 :: n3 :: n4 :: n5 :: n6 ::
+        d1 :: d2 :: d3 :: d4 :: d5 :: d6 :: d7 :: d8 :: d9 :: d10 ::
+        b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: b9 :: b10 :: b11 :: b12 ::
+        Nil
+    )
 
     type Q = (JNum, BigDecimal, Double, Long)
     implicit val ordq = new scala.math.Ordering[Q] {

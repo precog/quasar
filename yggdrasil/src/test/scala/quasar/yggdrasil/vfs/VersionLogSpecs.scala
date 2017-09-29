@@ -176,7 +176,8 @@ object VersionLogSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("versions.json"))
 
-              Stream(ByteVector(s"""["${committed(0).value.toString}","${committed(1).value.toString}"]""".getBytes))
+              Stream(ByteVector(
+                s"""["${committed(0).value.toString}","${committed(1).value.toString}"]""".getBytes))
             }
         }
 
@@ -254,7 +255,8 @@ object VersionLogSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("versions.json.new"))
 
-              assertionSink(_ mustEqual s"""["${v.value.toString}","${other.value.toString}"]""")
+              assertionSink(
+                _ mustEqual s"""["${v.value.toString}","${other.value.toString}"]""")
             }
         }
 

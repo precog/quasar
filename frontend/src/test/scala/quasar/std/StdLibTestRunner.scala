@@ -28,54 +28,49 @@ import org.scalacheck.Gen
 
 /** The operations needed to execute the various StdLib tests for a backend. */
 trait StdLibTestRunner {
-  /** The result of comparing `expected` to the result of the executing the given
-    * nullary function on the backend.
-    */
-  def nullary(
-    prg: Fix[LP],
-    expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
-    * unary function on the backend.
-    */
-  def unary(
-    prg: Fix[LP] => Fix[LP],
-    arg: Data,
-    expected: Data): Result
+   * nullary function on the backend.
+   */
+  def nullary(prg: Fix[LP], expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
-    * binary function on the backend.
-    */
-  def binary(
-    prg: (Fix[LP], Fix[LP]) => Fix[LP],
-    arg1: Data, arg2: Data,
-    expected: Data): Result
+   * unary function on the backend.
+   */
+  def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data): Result
 
   /** The result of comparing `expected` to the result of the executing the given
-    * ternary function on the backend.
-    */
+   * binary function on the backend.
+   */
+  def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, expected: Data): Result
+
+  /** The result of comparing `expected` to the result of the executing the given
+   * ternary function on the backend.
+   */
   def ternary(
-    prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
-    arg1: Data, arg2: Data, arg3: Data,
-    expected: Data): Result
+      prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+      arg1: Data,
+      arg2: Data,
+      arg3: Data,
+      expected: Data): Result
 
   /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
+   * well-behaved.
+   */
   def intDomain: Gen[BigInt]
 
   /** Defines the domain of values for `Data.Dec` for which the implementation is
-    * well-behaved.
-    */
+   * well-behaved.
+   */
   def decDomain: Gen[BigDecimal]
 
   /** Defines the domain of values for `Data.Str` for which the implementation is
-    * well-behaved.
-    */
+   * well-behaved.
+   */
   def stringDomain: Gen[String]
 
   /** Defines the domain of values for `Data.Date` for which the implementation is
-    * well-behaved.
-    */
+   * well-behaved.
+   */
   def dateDomain: Gen[LocalDate]
 }

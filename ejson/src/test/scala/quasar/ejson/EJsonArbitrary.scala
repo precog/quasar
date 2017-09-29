@@ -32,8 +32,8 @@ trait EJsonArbitrary {
       def leafGenerators[A] =
         uniformly(
           const(Null[A]()),
-          genBool       ^^ Bool[A],
-          genString     ^^ Str[A],
+          genBool ^^ Bool[A],
+          genString ^^ Str[A],
           genBigDecimal ^^ Dec[A])
 
       def branchGenerators[A: Arbitrary] =
@@ -49,15 +49,10 @@ trait EJsonArbitrary {
   implicit val arbitraryExtension: Delay[Arbitrary, Extension] =
     new PatternArbitrary[Extension] {
       def leafGenerators[A] =
-        uniformly(
-          genByte   ^^ Byte[A],
-          genChar   ^^ Char[A],
-          genBigInt ^^ Int[A])
+        uniformly(genByte ^^ Byte[A], genChar ^^ Char[A], genBigInt ^^ Int[A])
 
       def branchGenerators[A: Arbitrary] =
-        uniformly(
-          arbitrary[(A, A)] ^^ (Meta[A] _).tupled,
-          arbitrary[List[(A, A)]] ^^ Map[A])
+        uniformly(arbitrary[(A, A)] ^^ (Meta[A] _).tupled, arbitrary[List[(A, A)]] ^^ Map[A])
     }
 
   implicit val arbitraryTypeTag: Arbitrary[TypeTag] =

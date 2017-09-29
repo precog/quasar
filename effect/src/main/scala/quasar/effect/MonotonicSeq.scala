@@ -25,24 +25,23 @@ import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
 
 /** Provides the ability to request the next element of a monotonically
-  * increasing numeric sequence.
-  *
-  * That is,
-  *
-  *   for {
-  *     a <- next
-  *     b <- next
-  *   } yield a < b
-  *
-  * must always be true.
-  */
+ * increasing numeric sequence.
+ *
+ * That is,
+ *
+ *   for {
+ *     a <- next
+ *     b <- next
+ *   } yield a < b
+ *
+ * must always be true.
+ */
 sealed abstract class MonotonicSeq[A]
 
 object MonotonicSeq {
   case object Next extends MonotonicSeq[Long]
 
-  final class Ops[S[_]](implicit S: MonotonicSeq :<: S)
-    extends LiftedOps[MonotonicSeq, S] {
+  final class Ops[S[_]](implicit S: MonotonicSeq :<: S) extends LiftedOps[MonotonicSeq, S] {
 
     def next: FreeS[Long] =
       lift(Next)
@@ -57,8 +56,8 @@ object MonotonicSeq {
     TaskRef(0L).map(fromTaskRef)
 
   /** Returns an interpreter of `MonotonicSeq` into `Task`, given a
-    * `TaskRef[Long]`.
-    */
+   * `TaskRef[Long]`.
+   */
   def fromTaskRef(ref: TaskRef[Long]): MonotonicSeq ~> Task =
     new (MonotonicSeq ~> Task) {
       val toST = toState[State[Long, ?]](Lens.id[Long])
@@ -67,18 +66,18 @@ object MonotonicSeq {
     }
 
   /** Returns an interpreter of `MonotonicSeq` into `F[S, ?]`,
-    * given a `Lens[S, Long]` and `MonadState[F, S]`.
-    *
-    * NB: Uses partial application of `F[_, _]` for better type inference, usage:
-    *   `toState[F](lens)`
-    */
+   * given a `Lens[S, Long]` and `MonadState[F, S]`.
+   *
+   * NB: Uses partial application of `F[_, _]` for better type inference, usage:
+   *   `toState[F](lens)`
+   */
   object toState {
     def apply[F[_]]: Aux[F] =
       new Aux[F]
 
     final class Aux[F[_]] {
       def apply[S](l: Lens[S, Long])(implicit F: MonadState[F, S]): MonotonicSeq ~> F =
-        λ[MonotonicSeq ~> F]{ case Next => F.gets(l.get) <* F.modify(l.modify(_ + 1)) }
+        λ[MonotonicSeq ~> F] { case Next => F.gets(l.get) <* F.modify(l.modify(_ + 1)) }
     }
   }
 }

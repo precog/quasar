@@ -34,22 +34,23 @@ abstract class MapFuncPlanner[T[_[_]], F[_]: Applicative, MF[_]] {
 }
 
 object MapFuncPlanner {
-  def apply[T[_[_]], F[_], MF[_]]
-    (implicit ev: MapFuncPlanner[T, F, MF]): MapFuncPlanner[T, F, MF] =
+  def apply[T[_[_]], F[_], MF[_]](
+      implicit ev: MapFuncPlanner[T, F, MF]): MapFuncPlanner[T, F, MF] =
     ev
 
-  implicit def coproduct[T[_[_]], F[_]: Applicative, G[_], H[_]]
-    (implicit G: MapFuncPlanner[T, F, G], H: MapFuncPlanner[T, F, H])
-      : MapFuncPlanner[T, F, Coproduct[G, H, ?]] =
+  implicit def coproduct[T[_[_]], F[_]: Applicative, G[_], H[_]](
+      implicit G: MapFuncPlanner[T, F, G],
+      H: MapFuncPlanner[T, F, H]): MapFuncPlanner[T, F, Coproduct[G, H, ?]] =
     new MapFuncPlanner[T, F, Coproduct[G, H, ?]] {
       def plan(cake: Precog): PlanApplicator[cake.type] =
         new PlanApplicatorCoproduct(cake)
 
       final class PlanApplicatorCoproduct[P <: Precog](override val cake: P)
-        extends PlanApplicator[P](cake) {
+          extends PlanApplicator[P](cake) {
         import cake.trans._
 
-        def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, Coproduct[G, H, ?], TransSpec[A]] =
+        def apply[A <: SourceType](
+            id: cake.trans.TransSpec[A]): AlgebraM[F, Coproduct[G, H, ?], TransSpec[A]] =
           _.run.fold(G.plan(cake).apply(id), H.plan(cake).apply(id))
       }
 

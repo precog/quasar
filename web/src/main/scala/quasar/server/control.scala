@@ -16,7 +16,7 @@
 
 package quasar.server
 
-import slamdata.Predef.{ -> => _, _ }
+import slamdata.Predef.{-> => _, _}
 
 import org.http4s.dsl._
 import org.http4s.HttpService
@@ -26,10 +26,10 @@ import scalaz.concurrent.Task
 object control {
 
   /** A service that exposes the ability to change the port the server is listens on.
-    * @param defaultPort The default port for this server. Will restart the server on this port
-    *                    if the `DELETE` http method is used.
-    * @param restart A function that will restart the server on the specified port
-    */
+   * @param defaultPort The default port for this server. Will restart the server on this port
+   *                    if the `DELETE` http method is used.
+   * @param restart A function that will restart the server on the specified port
+   */
   def service(defaultPort: Int, restart: Int => Task[String \/ Unit]): HttpService = {
     def safeRestart(port: Int, default: Boolean, currentPort: Int) =
       if (currentPort ≟ port)
@@ -39,23 +39,29 @@ object control {
           possibleReason map { reason =>
             PreconditionFailed(s"Could not restart on new port because $reason")
           } getOrElse {
-            val defaultString = if(default) " default " else ""
+            val defaultString = if (default) " default " else ""
             restart(port).flatMap {
-              case -\/(reason) => BadRequest(s"Cannot restart server on port $port because $reason")
-              case _           => Accepted(s"Restarting on $defaultString port $port")
+              case -\/(reason) =>
+                BadRequest(s"Cannot restart server on port $port because $reason")
+              case _ => Accepted(s"Restarting on $defaultString port $port")
             } handleWith {
-              case e: Exception => InternalServerError(s"Failed to restart on port $port because ${e.getMessage}")
-              case _            => InternalServerError(s"Failed to restart on port $port for unknown reason")
+              case e: Exception =>
+                InternalServerError(s"Failed to restart on port $port because ${e.getMessage}")
+              case _ =>
+                InternalServerError(s"Failed to restart on port $port for unknown reason")
             }
           }
         }
 
     HttpService {
       case req @ PUT -> Root =>
-        req.as[String].flatMap(body =>
-          body.parseInt.fold(
-            e => BadRequest(e.getMessage),
-            portNum => safeRestart(portNum, default = false, req.serverPort)))
+        req
+          .as[String]
+          .flatMap(
+            body =>
+              body.parseInt.fold(
+                e => BadRequest(e.getMessage),
+                portNum => safeRestart(portNum, default = false, req.serverPort)))
 
       case req @ DELETE -> Root =>
         safeRestart(defaultPort, default = true, req.serverPort)

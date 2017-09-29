@@ -68,15 +68,15 @@ object MoveSemantics {
 
   val overwrite = Prism.partial[MoveSemantics, Unit] {
     case Overwrite => ()
-  } (κ(Overwrite))
+  }(κ(Overwrite))
 
   val failIfExists = Prism.partial[MoveSemantics, Unit] {
     case FailIfExists => ()
-  } (κ(FailIfExists))
+  }(κ(FailIfExists))
 
   val failIfMissing = Prism.partial[MoveSemantics, Unit] {
     case FailIfMissing => ()
-  } (κ(FailIfMissing))
+  }(κ(FailIfMissing))
 
   implicit val show: Show[MoveSemantics] = Show.showFromToString
 }

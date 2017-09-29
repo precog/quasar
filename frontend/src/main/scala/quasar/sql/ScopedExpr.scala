@@ -24,7 +24,7 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses final case class ScopedExpr[T](expr: T, scope: List[Statement[T]]) {
-  def mapExpressionM[M[_]:Functor](f: T => M[T]): M[ScopedExpr[T]] =
+  def mapExpressionM[M[_]: Functor](f: T => M[T]): M[ScopedExpr[T]] =
     f(expr).map(ScopedExpr(_, scope))
   def imports: List[Import[T]] =
     scope.collect { case i: Import[_] => i }
@@ -37,13 +37,14 @@ import scalaz._, Scalaz._
 }
 
 object ScopedExpr {
-  implicit def renderTree[T:RenderTree]: RenderTree[ScopedExpr[T]] =
+  implicit def renderTree[T: RenderTree]: RenderTree[ScopedExpr[T]] =
     new RenderTree[ScopedExpr[T]] {
       def render(sExpr: ScopedExpr[T]) =
         NonTerminal("Sql Scoped Expr" :: Nil, None, List(sExpr.scope.render, sExpr.expr.render))
     }
   implicit val traverse: Traverse[ScopedExpr] = new Traverse[ScopedExpr] {
-    def traverseImpl[G[_]:Applicative,A,B](ba: ScopedExpr[A])(f: A => G[B]): G[ScopedExpr[B]] =
+    def traverseImpl[G[_]: Applicative, A, B](ba: ScopedExpr[A])(
+        f: A => G[B]): G[ScopedExpr[B]] =
       (f(ba.expr) |@| ba.scope.traverse(_.traverse(f)))(ScopedExpr(_, _))
   }
 

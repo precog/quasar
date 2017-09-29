@@ -32,4 +32,3 @@ final class FreshAtomicIdSource extends IdSource {
     nextId
   }
 }
-

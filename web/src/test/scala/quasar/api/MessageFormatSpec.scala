@@ -37,42 +37,43 @@ class MessageFormatSpec extends quasar.Qspec {
     }
 
     "choose precise" in {
-      val accept = Accept(
-        new MediaType("application", "ldjson").withExtensions(Map("mode" -> "precise")))
+      val accept =
+        Accept(new MediaType("application", "ldjson").withExtensions(Map("mode" -> "precise")))
       fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose streaming via boundary extension" in {
-      val accept = Accept(
-        new MediaType("application", "json").withExtensions(Map("boundary" -> "NL")))
+      val accept =
+        Accept(new MediaType("application", "json").withExtensions(Map("boundary" -> "NL")))
       fromAccept(Some(accept)) must_== JsonContentType(Readable, LineDelimited)
     }
 
     "choose precise list" in {
-      val accept = Accept(
-        new MediaType("application", "json").withExtensions(Map("mode" -> "precise")))
+      val accept =
+        Accept(new MediaType("application", "json").withExtensions(Map("mode" -> "precise")))
       fromAccept(Some(accept)) must_== JsonContentType(Precise, SingleArray)
     }
 
     "choose streaming and precise via extensions" in {
       val accept = Accept(
-        new MediaType("application", "json").withExtensions(Map("mode" -> "precise", "boundary" -> "NL")))
+        new MediaType("application", "json")
+          .withExtensions(Map("mode" -> "precise", "boundary" -> "NL")))
       fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose CSV" in {
-      val accept = Accept(
-        new MediaType("text", "csv"))
+      val accept = Accept(new MediaType("text", "csv"))
       fromAccept(Some(accept)) must_== Csv.Default
     }
 
     "choose CSV with custom format" in {
       val accept = Accept(
-        new MediaType("text", "csv").withExtensions(Map(
-          "columnDelimiter" -> "\t",
-          "rowDelimiter" -> ";",
-          "quoteChar" -> "'",
-          "escapeChar" -> "\\")))
+        new MediaType("text", "csv").withExtensions(
+          Map(
+            "columnDelimiter" -> "\t",
+            "rowDelimiter" -> ";",
+            "quoteChar" -> "'",
+            "escapeChar" -> "\\")))
       fromAccept(Some(accept)) must_== Csv(CsvParser.Format('\t', '\'', '\\', ";"), None)
     }
 
@@ -119,7 +120,11 @@ class MessageFormatSpec extends quasar.Qspec {
         Data.Obj(ListMap("c" -> Data.Arr(List(Data.Int(3))))))
       val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
       def test(data: List[Data], expectedEncoding: String, format: Csv) =
-        format.encode(Process.emitAll(data): Process[Task,Data]).runLog.unsafePerformSync.mkString("") must_== expectedEncoding
+        format
+          .encode(Process.emitAll(data): Process[Task, Data])
+          .runLog
+          .unsafePerformSync
+          .mkString("") must_== expectedEncoding
 
       "simple" >> test(
         data = simpleData,
@@ -127,15 +132,19 @@ class MessageFormatSpec extends quasar.Qspec {
         format = Csv.Default
       )
       "with quoting" >> test(
-        data = List(
-          Data.Obj(ListMap(
-            "a" -> Data.Str("\"Hey\""),
-            "b" -> Data.Str("a, b, c")))),
-        expectedEncoding = List("a,b", "\"\"\"Hey\"\"\",\"a, b, c\"").mkString("", "\r\n", "\r\n"),
+        data = List(Data.Obj(ListMap("a" -> Data.Str("\"Hey\""), "b" -> Data.Str("a, b, c")))),
+        expectedEncoding =
+          List("a,b", "\"\"\"Hey\"\"\",\"a, b, c\"").mkString("", "\r\n", "\r\n"),
         format = Csv.Default
       )
       "alternative delimiters" >> {
-        val alternative = Csv(CsvParser.Format(delimiter = '\t', lineTerminator = ";", quoteChar = '\'', escapeChar = '\\'), None)
+        val alternative = Csv(
+          CsvParser.Format(
+            delimiter = '\t',
+            lineTerminator = ";",
+            quoteChar = '\'',
+            escapeChar = '\\'),
+          None)
         test(
           data = simpleData,
           expectedEncoding = "a\tb\tc[0];1\t\t;\t2\t;\t\t3;",

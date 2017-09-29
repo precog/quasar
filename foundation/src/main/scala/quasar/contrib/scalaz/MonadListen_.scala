@@ -19,8 +19,8 @@ package quasar.contrib.scalaz
 import scalaz._, Scalaz._
 
 /** A version of MonadListen that doesn't extend Monad to avoid ambiguous implicits
-  * in the presence of multiple "mtl" constraints.
-  */
+ * in the presence of multiple "mtl" constraints.
+ */
 trait MonadListen_[F[_], W] {
   def listen[A](fa: F[A]): F[(A, W)]
 
@@ -33,13 +33,15 @@ object MonadListen_ extends MonadListen_Instances {
 }
 
 sealed abstract class MonadListen_Instances extends MonadListen_Instances0 {
-  implicit def eitherTMonadListen[F[_]: Functor, W, E](implicit L: MonadListen_[F, W]): MonadListen_[EitherT[F, E, ?], W] =
+  implicit def eitherTMonadListen[F[_]: Functor, W, E](
+      implicit L: MonadListen_[F, W]): MonadListen_[EitherT[F, E, ?], W] =
     new MonadListen_[EitherT[F, E, ?], W] {
       def listen[A](fa: EitherT[F, E, A]) =
         EitherT(L.listen(fa.run) map { case (d, w) => d strengthR w })
     }
 
-  implicit def writerTMonadListen[F[_]: Functor, W1, W2](implicit L: MonadListen_[F, W1]): MonadListen_[WriterT[F, W2, ?], W1] =
+  implicit def writerTMonadListen[F[_]: Functor, W1, W2](
+      implicit L: MonadListen_[F, W1]): MonadListen_[WriterT[F, W2, ?], W1] =
     new MonadListen_[WriterT[F, W2, ?], W1] {
       def listen[A](fa: WriterT[F, W2, A]) =
         WriterT(L.listen(fa.run) map { case ((w2, a), w1) => (w2, (a, w1)) })

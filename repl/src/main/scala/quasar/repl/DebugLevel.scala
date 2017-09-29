@@ -34,8 +34,8 @@ object DebugLevel {
       case 1 => Normal
       case 2 => Verbose
     } {
-      case Silent  => 0
-      case Normal  => 1
+      case Silent => 0
+      case Normal => 1
       case Verbose => 2
     }
 

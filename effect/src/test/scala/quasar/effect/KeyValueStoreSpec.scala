@@ -22,7 +22,8 @@ import quasar.fp._, ski._
 import org.scalacheck.Arbitrary
 import scalaz._, Scalaz._
 
-abstract class KeyValueStoreSpec[K: Arbitrary: Equal, V: Arbitrary: Equal: Show] extends quasar.Qspec {
+abstract class KeyValueStoreSpec[K: Arbitrary: Equal, V: Arbitrary: Equal: Show]
+    extends quasar.Qspec {
 
   type S[A] = KeyValueStore[K, V, A]
 

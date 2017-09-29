@@ -21,9 +21,9 @@ import quasar.RenderTree, RenderTree.ops._
 import scalaz._, Scalaz._
 
 /** Arbitrary javascript expression which is applied inline at compile time
-  * (kinda like a macro)
-  * @param param The free parameter to the expression
-  */
+ * (kinda like a macro)
+ * @param param The free parameter to the expression
+ */
 final case class JsFn(param: Name, expr: JsCore) {
   def apply(x: JsCore): JsCore = expr.substitute(Ident(param), x)
 
@@ -37,7 +37,7 @@ final case class JsFn(param: Name, expr: JsCore) {
   // NB: Hanging around because other types lack an explicit equality.
   override def equals(obj: scala.Any) = obj match {
     case that @ JsFn(_, _) => this ≟ that
-    case _                 => false
+    case _ => false
   }
 }
 object JsFn {

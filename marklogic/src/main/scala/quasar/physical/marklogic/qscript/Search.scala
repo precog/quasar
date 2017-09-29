@@ -33,10 +33,10 @@ final case class Search[Q](query: Q, idStatus: IdStatus, pred: IList[XQuery])
 
 object Search {
   def plan[F[_]: Monad: PrologW, Q, V, FMT](s: Search[Q], f: V => F[XQuery])(
-    implicit
-    Q:  Recursive.Aux[Q, Query[V, ?]],
-    SP: StructuralPlanner[F, FMT],
-    O:  SearchOptions[FMT]
+      implicit
+      Q: Recursive.Aux[Q, Query[V, ?]],
+      SP: StructuralPlanner[F, FMT],
+      O: SearchOptions[FMT]
   ): F[XQuery] = {
     import axes.child
     val x = $("x")
@@ -45,18 +45,20 @@ object Search {
       val queryM = Q.cataM(s.query)(Query.toXQuery[V, F](f))
       val searchExpr = s.pred.foldLeft(fn.doc())((nxt, exp) => (nxt)(exp))
 
-      queryM.map(q =>
-        cts.search(
-          expr    = searchExpr,
-          query   = q,
-          options = SearchOptions[FMT].searchOptions
-        ) `/` child.node())
+      queryM.map(
+        q =>
+          cts.search(
+            expr = searchExpr,
+            query = q,
+            options = SearchOptions[FMT].searchOptions
+          ) `/` child.node())
     }
 
     def urisAndDocs: F[XQuery] =
-      docsOnly >>= (docOnly => SP.seqToArray(mkSeq_(fn.baseUri(~x), ~x)) map { pair =>
-        fn.map(expr.func(x.render) { pair }, docOnly)
-      })
+      docsOnly >>= (docOnly =>
+        SP.seqToArray(mkSeq_(fn.baseUri(~x), ~x)) map { pair =>
+          fn.map(expr.func(x.render) { pair }, docOnly)
+        })
 
     def urisOnly: F[XQuery] =
       docsOnly map (fn.map(fn.ns(NCName("base-uri")) :# 1, _))
@@ -64,7 +66,7 @@ object Search {
     s.idStatus match {
       case ExcludeId => docsOnly
       case IncludeId => urisAndDocs
-      case IdOnly    => urisOnly
+      case IdOnly => urisOnly
     }
   }
 }

@@ -50,22 +50,20 @@ object ReadFile {
   }
 
   final case class Open(file: AFile, offset: Natural, limit: Option[Positive])
-    extends ReadFile[FileSystemError \/ ReadHandle]
+      extends ReadFile[FileSystemError \/ ReadHandle]
 
-  final case class Read(h: ReadHandle)
-    extends ReadFile[FileSystemError \/ Vector[Data]]
+  final case class Read(h: ReadHandle) extends ReadFile[FileSystemError \/ Vector[Data]]
 
-  final case class Close(h: ReadHandle)
-    extends ReadFile[Unit]
+  final case class Close(h: ReadHandle) extends ReadFile[Unit]
 
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     type F[A] = unsafe.FreeS[A]
     type M[A] = unsafe.M[A]
 
     /** Returns a process which produces data from the given file, beginning
-      * at the specified offset. An optional limit may be supplied to restrict
-      * the maximum amount of data read.
-      */
+     * at the specified offset. An optional limit may be supplied to restrict
+     * the maximum amount of data read.
+     */
     def scan(file: AFile, offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
       def closeHandle(h: ReadHandle): Process[M, Nothing] =
@@ -83,8 +81,8 @@ object ReadFile {
     }
 
     /** Returns a process that produces all the data contained in the
-      * given file.
-      */
+     * given file.
+     */
     def scanAll(file: AFile): Process[M, Data] =
       scan(file, 0L, None)
   }
@@ -95,28 +93,27 @@ object ReadFile {
   }
 
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
-    * when using these.
-    */
-  final class Unsafe[S[_]](implicit S: ReadFile :<: S)
-    extends LiftedOps[ReadFile, S] {
+   * when using these.
+   */
+  final class Unsafe[S[_]](implicit S: ReadFile :<: S) extends LiftedOps[ReadFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
 
     /** Returns a read handle for the given file, positioned at the given
-      * zero-indexed offset, that may be used to read chunks of data from the
-      * file. An optional limit may be supplied to restrict the total amount of
-      * data able to be read using the handle.
-      *
-      * Care must be taken to `close` the returned handle in order to avoid
-      * potential resource leaks.
-      */
+     * zero-indexed offset, that may be used to read chunks of data from the
+     * file. An optional limit may be supplied to restrict the total amount of
+     * data able to be read using the handle.
+     *
+     * Care must be taken to `close` the returned handle in order to avoid
+     * potential resource leaks.
+     */
     def open(file: AFile, offset: Natural, limit: Option[Positive]): M[ReadHandle] =
       EitherT(lift(Open(file, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.
-      *
-      * An empty `Vector` signals that all data has been read.
-      */
+     *
+     * An empty `Vector` signals that all data has been read.
+     */
     def read(rh: ReadHandle): M[Vector[Data]] =
       EitherT(lift(Read(rh)))
 
@@ -133,11 +130,14 @@ object ReadFile {
   implicit def renderTree[A]: RenderTree[ReadFile[A]] =
     new RenderTree[ReadFile[A]] {
       def render(rf: ReadFile[A]) = rf match {
-        case Open(file, off, lim) => NonTerminal(List("Open"), None,
-          file.render :: Terminal(List("Offset"), Some(off.toString)) ::
-            lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
-        case Read(handle)         => Terminal(List("Read"), handle.shows.some)
-        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
+        case Open(file, off, lim) =>
+          NonTerminal(
+            List("Open"),
+            None,
+            file.render :: Terminal(List("Offset"), Some(off.toString)) ::
+              lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
+        case Read(handle) => Terminal(List("Read"), handle.shows.some)
+        case Close(handle) => Terminal(List("Close"), handle.shows.some)
       }
     }
 }

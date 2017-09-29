@@ -36,8 +36,8 @@ package object z85 {
       "}@%$#").toCharArray
 
   /** This takes a ByteArray containing exactly four bytes and returns a String
-    * containing exactly five ASCII characters.
-    */
+   * containing exactly five ASCII characters.
+   */
   def encodeBlock(bytes: ByteVector): String = {
     val num1 = bytes.toLong(false)
     val index1 = num1 % 85
@@ -60,14 +60,23 @@ package object z85 {
 
   // TODO: this should really fail if unsupported chars are included
   val decodeBlock: String => Option[ByteVector] =
-    str => ByteVector.fromLong(str.toList.map(mapping.indexOf(_).toLong).fzipWith(List(85 * 85 * 85 * 85, 85 * 85 * 85, 85 * 85, 85, 1))(_ * _).foldRight(0L)(_ + _), 4).some
+    str =>
+      ByteVector
+        .fromLong(
+          str.toList
+            .map(mapping.indexOf(_).toLong)
+            .fzipWith(List(85 * 85 * 85 * 85, 85 * 85 * 85, 85 * 85, 85, 1))(_ * _)
+            .foldRight(0L)(_ + _),
+          4)
+        .some
 
   val encode: ByteVector => String =
     StreamT
       .unfold(_)(b =>
         if (b.size ≟ 0) None
         else (b.take(4).padTo(4), b.drop(4)).some)
-      .foldLeftRec(Cord(""))((acc, b) => acc ++ Cord(encodeBlock(b))).toString
+      .foldLeftRec(Cord(""))((acc, b) => acc ++ Cord(encodeBlock(b)))
+      .toString
 
   val decode: String => Option[ByteVector] =
     StreamT

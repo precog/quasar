@@ -24,9 +24,9 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
-  * connectors to implement. It potentially adds a [[Filter]] iff there are
-  * conditions in the [[ThetaJoin]] that can not be handled by an [[EquiJoin]].
-  */
+ * connectors to implement. It potentially adds a [[Filter]] iff there are
+ * conditions in the [[ThetaJoin]] that can not be handled by an [[EquiJoin]].
+ */
 trait SimplifyJoin[F[_]] {
   type IT[F[_]]
   type G[A]
@@ -34,11 +34,11 @@ trait SimplifyJoin[F[_]] {
   def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[IT[H]] => H[IT[H]]
 }
 
-private final case class EquiJoinKey[T[_[_]]]
-  (left: FreeMap[T], right: FreeMap[T])
+private final case class EquiJoinKey[T[_[_]]](left: FreeMap[T], right: FreeMap[T])
 
-private final case class SimplifiedJoinCondition[T[_[_]]]
-  (keys: List[EquiJoinKey[T]], filter: Option[JoinFunc[T]])
+private final case class SimplifiedJoinCondition[T[_[_]]](
+    keys: List[EquiJoinKey[T]],
+    filter: Option[JoinFunc[T]])
 
 object SimplifyJoin {
   type Aux[T[_[_]], F[_], H[_]] = SimplifyJoin[F] {
@@ -51,14 +51,16 @@ object SimplifyJoin {
   def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
     val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
       _.transCata[T[CoEnvQS[T, ?]]](
-        liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+        liftCo(
+          SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]]
+            .simplifyJoin(coenvPrism.reverseGet)))
 
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-      : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](
+      implicit EJ: EquiJoin[T, ?] :<: F,
+      QC: QScriptCore[T, ?] :<: F): SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
       import MapFuncCore._
       import MapFuncsCore._
@@ -87,46 +89,47 @@ object SimplifyJoin {
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
                   fir.keys ++ sec.keys,
-                  fir.filter.fold(
-                    sec.filter)(
-                    f => sec.filter.fold(f.some)(s => Free.roll(MFC(And[T, JoinFunc[T]](f, s))).some)))
+                  fir.filter.fold(sec.filter)(f =>
+                    sec.filter.fold(f.some)(s =>
+                      Free.roll(MFC(And[T, JoinFunc[T]](f, s))).some)))
               case -\/(MFC(Eq(l, r))) =>
-                alignCondition(l, r).fold(
-                  SimplifiedJoinCondition(Nil, fm.some))(
-                  pair => SimplifiedJoinCondition(List(pair), None))
+                alignCondition(l, r).fold(SimplifiedJoinCondition(Nil, fm.some))(pair =>
+                  SimplifiedJoinCondition(List(pair), None))
               case _ => SimplifiedJoinCondition(Nil, fm.some)
             }
 
           def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
             jf >>= {
-              case LeftSide  => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(0))))
+              case LeftSide => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(0))))
               case RightSide => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(1))))
             }
 
           val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
-          GtoH(QC.inj(Map(filter.foldLeft(
-            GtoH(EJ.inj(EquiJoin(
-              tj.src,
-              applyToBranch(tj.lBranch),
-              applyToBranch(tj.rBranch),
-              keys.map(k => (k.left, k.right)),
-              tj.f,
-              Free.roll(MFC(ConcatArrays(
-                Free.roll(MFC(MakeArray(Free.point(LeftSide)))),
-                Free.roll(MFC(MakeArray(Free.point(RightSide)))))))))).embed)(
-            (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
-            mergeSides(tj.combine))))
+          GtoH(
+            QC.inj(Map(
+              filter.foldLeft(GtoH(EJ.inj(EquiJoin(
+                tj.src,
+                applyToBranch(tj.lBranch),
+                applyToBranch(tj.rBranch),
+                keys.map(k => (k.left, k.right)),
+                tj.f,
+                Free.roll(MFC(ConcatArrays(
+                  Free.roll(MFC(MakeArray(Free.point(LeftSide)))),
+                  Free.roll(MFC(MakeArray(Free.point(RightSide)))))))
+              ))).embed)((ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
+              mergeSides(tj.combine)
+            )))
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]]
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](
+      implicit QC: QScriptCore[T, ?] :<: F): SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
-      type IT[F[_]] = T [F]
+      type IT[F[_]] = T[F]
       type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H)
-          : QScriptCore[T, T[H]] => H[T[H]] = fa => GtoH(QC.inj(fa match {
+      def simplifyJoin[H[_]: Functor](GtoH: G ~> H): QScriptCore[T, T[H]] => H[T[H]] =
+        fa =>
+          GtoH(QC.inj(fa match {
             case Union(src, lb, rb) =>
               Union(src, applyToBranch(lb), applyToBranch(rb))
             case Subset(src, lb, sel, rb) =>
@@ -135,35 +138,35 @@ object SimplifyJoin {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F)
-      : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](
+      implicit EJ: EquiJoin[T, ?] :<: F): SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {
-      type IT[F[_]] = T [F]
+      type IT[F[_]] = T[F]
       type G[A] = F[A]
       def simplifyJoin[H[_]: Functor](GtoH: G ~> H): EquiJoin[T, T[H]] => H[T[H]] =
-        ej => GtoH(EJ.inj(EquiJoin(
-          ej.src,
-          applyToBranch(ej.lBranch),
-          applyToBranch(ej.rBranch),
-          ej.key,
-          ej.f,
-          ej.combine)))
+        ej =>
+          GtoH(
+            EJ.inj(
+              EquiJoin(
+                ej.src,
+                applyToBranch(ej.lBranch),
+                applyToBranch(ej.rBranch),
+                ej.key,
+                ej.f,
+                ej.combine)))
     }
 
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
-    (implicit I: SimplifyJoin.Aux[T, I, F], J: SimplifyJoin.Aux[T, J, F])
-      : SimplifyJoin.Aux[T, Coproduct[I, J, ?], F] =
+  implicit def coproduct[T[_[_]], F[_], I[_], J[_]](
+      implicit I: SimplifyJoin.Aux[T, I, F],
+      J: SimplifyJoin.Aux[T, J, F]): SimplifyJoin.Aux[T, Coproduct[I, J, ?], F] =
     new SimplifyJoin[Coproduct[I, J, ?]] {
       type IT[F[_]] = T[F]
       type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H)
-          : Coproduct[I, J, T[H]] => H[T[H]] =
+      def simplifyJoin[H[_]: Functor](GtoH: G ~> H): Coproduct[I, J, T[H]] => H[T[H]] =
         _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
     }
 
-  def default[T[_[_]], F[_], I[_]](implicit F: F :<: I)
-      : SimplifyJoin.Aux[T, F, I] =
+  def default[T[_[_]], F[_], I[_]](implicit F: F :<: I): SimplifyJoin.Aux[T, F, I] =
     new SimplifyJoin[F] {
       type IT[F[_]] = T[F]
       type G[A] = I[A]
@@ -172,21 +175,19 @@ object SimplifyJoin {
         fa => GtoH(F.inj(fa))
     }
 
-  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
-      : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
+  implicit def deadEnd[T[_[_]], F[_]](
+      implicit DE: Const[DeadEnd, ?] :<: F): SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def read[T[_[_]], F[_], A](implicit R: Const[Read[A], ?] :<: F)
-      : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
+  implicit def read[T[_[_]], F[_], A](
+      implicit R: Const[Read[A], ?] :<: F): SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
-      : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
+  implicit def shiftedRead[T[_[_]], F[_], A](implicit SR: Const[ShiftedRead[A], ?] :<: F)
+    : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]]
-    (implicit PB: ProjectBucket[T, ?] :<: F)
-      : SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
+  implicit def projectBucket[T[_[_]], F[_]](
+      implicit PB: ProjectBucket[T, ?] :<: F): SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
     default
 }

@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import slamdata.Predef.{Unit, String}
+import slamdata.Predef.{String, Unit}
 import quasar.contrib.pathy.ADir
 import quasar.fp.numeric._
 import quasar.effect.AtomicRef
@@ -38,12 +38,12 @@ final class FileSystemMountHandler[F[_]](fsDef: BackendDef[F]) {
   }
 
   /** Attempts to mount a filesystem at the given location, using the provided
-    * definition.
-    */
-  def mount[S[_]]
-      (loc: ADir, typ: FileSystemType, uri: ConnectionUri)
-      (implicit S0: F :<: S, S1: MountedFsRef :<: S, F: Monad[F])
-      : Free[S, MountingError \/ Unit] = {
+   * definition.
+   */
+  def mount[S[_]](loc: ADir, typ: FileSystemType, uri: ConnectionUri)(
+      implicit S0: F :<: S,
+      S1: MountedFsRef :<: S,
+      F: Monad[F]): Free[S, MountingError \/ Unit] = {
 
     type M[A] = Free[S, A]
 
@@ -55,41 +55,39 @@ final class FileSystemMountHandler[F[_]](fsDef: BackendDef[F]) {
     val createFs: MntErrT[M, DefinitionResult[F]] =
       EitherT[M, DefinitionError, DefinitionResult[F]](
         free.lift(fsDef(typ, uri).run).into[S]
-      ).leftMap(_.fold(
-        invalidConfig(fileSystemConfig(typ, uri), _),
-        environmentError(_)))
+      ).leftMap(_.fold(invalidConfig(fileSystemConfig(typ, uri), _), environmentError(_)))
 
     def addMount(fsr: DefinitionResult[F]): MntErrT[M, Unit] = {
       def cleanupOnError(err: String) =
         free.lift(fsr.close).into[S] as pathError(invalidPath(loc, err))
 
-      EitherT[M, MountingError, Unit](MountedFsRef.Ops[S].modifyS(mnts =>
-        mnts.add(loc, fsr).fold(
-          err => (mnts, cleanupOnError(err) map (_.left[Unit])),
-          nxt => (nxt, cleanup[S](mnts, loc) map (_.right[MountingError])))
-      ).join)
+      EitherT[M, MountingError, Unit](
+        MountedFsRef
+          .Ops[S]
+          .modifyS(
+            mnts =>
+              mnts
+                .add(loc, fsr)
+                .fold(
+                  err => (mnts, cleanupOnError(err) map (_.left[Unit])),
+                  nxt => (nxt, cleanup[S](mnts, loc) map (_.right[MountingError]))))
+          .join)
     }
 
     (failUnlessCandidate *> createFs).flatMap(addMount).run
   }
 
-  def unmount[S[_]]
-      (loc: ADir)
-      (implicit S0: F :<: S, S1: MountedFsRef :<: S)
-      : Free[S, Unit] = {
+  def unmount[S[_]](loc: ADir)(implicit S0: F :<: S, S1: MountedFsRef :<: S): Free[S, Unit] = {
 
     MountedFsRef.Ops[S].modifyS(mnts => (mnts - loc, cleanup[S](mnts, loc))).join
   }
 
   ////
 
-  private def cleanup[S[_]]
-              (mnts: Mounts[DefinitionResult[F]], loc: ADir)
-              (implicit S: F :<: S)
-              : Free[S, Unit] = {
+  private def cleanup[S[_]](mnts: Mounts[DefinitionResult[F]], loc: ADir)(
+      implicit S: F :<: S): Free[S, Unit] = {
 
-    mnts.lookup(loc).map(_.close)
-      .fold(().point[Free[S, ?]])(free.lift(_).into[S])
+    mnts.lookup(loc).map(_.close).fold(().point[Free[S, ?]])(free.lift(_).into[S])
   }
 }
 

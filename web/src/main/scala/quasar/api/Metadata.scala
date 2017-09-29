@@ -17,7 +17,7 @@
 package quasar.api
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{RFile, sandboxCurrent}
+import quasar.contrib.pathy.{sandboxCurrent, RFile}
 
 import argonaut._, Argonaut._
 import org.http4s.headers.`Content-Type`
@@ -31,19 +31,25 @@ object FileMetadata {
   implicit val contentTypeCodecJson: CodecJson[`Content-Type`] =
     CodecJson.derived(
       EncodeJson.of[String].contramap[`Content-Type`](_.value),
-      DecodeJson.of[String].flatMap(s => DecodeJson(cur =>
-        DecodeResult(`Content-Type`.parse(s).leftMap(_.message -> cur.history).toEither))))
+      DecodeJson
+        .of[String]
+        .flatMap(s =>
+          DecodeJson(cur =>
+            DecodeResult(`Content-Type`.parse(s).leftMap(_.message -> cur.history).toEither)))
+    )
 
   implicit val codecJson: CodecJson[FileMetadata] =
     CodecJson(
       md => Json("Content-Type" := md.contentType),
-      json => json.fields match {
-        case Some("Content-Type" :: Nil) =>
-          val ctCur = json --\ "Content-Type"
-          ctCur.as[`Content-Type`].map(FileMetadata(_))
-        case _ =>
-          DecodeResult.fail(s"invalid metadata: ${json.focus}", json.history)
-      })
+      json =>
+        json.fields match {
+          case Some("Content-Type" :: Nil) =>
+            val ctCur = json --\ "Content-Type"
+            ctCur.as[`Content-Type`].map(FileMetadata(_))
+          case _ =>
+            DecodeResult.fail(s"invalid metadata: ${json.focus}", json.history)
+      }
+    )
 }
 
 final case class ArchiveMetadata(files: Map[RFile, FileMetadata])
@@ -53,12 +59,18 @@ object ArchiveMetadata {
 
   implicit val codecJson: CodecJson[ArchiveMetadata] =
     CodecJson.derived(
-      EncodeJson.of[Map[String, FileMetadata]].contramap(
-        _.files map { case (k, v) => posixCodec.printPath(k) -> v }),
+      EncodeJson
+        .of[Map[String, FileMetadata]]
+        .contramap(_.files map { case (k, v) => posixCodec.printPath(k) -> v }),
       DecodeJson.of[Map[String, FileMetadata]].flatMap { (m: Map[String, FileMetadata]) =>
-        val m1: String \/ Map[RFile, FileMetadata] = (m.toList traverse { case (k, v) =>
-          posixCodec.parseRelFile(k).flatMap(sandboxCurrent)
-            .cata(p => (p -> v).right, s"expected relative file path; found: $k".left) }).map(_.toMap)
+        val m1: String \/ Map[RFile, FileMetadata] = (m.toList traverse {
+          case (k, v) =>
+            posixCodec
+              .parseRelFile(k)
+              .flatMap(sandboxCurrent)
+              .cata(p => (p -> v).right, s"expected relative file path; found: $k".left)
+        }).map(_.toMap)
         DecodeJson(cur => DecodeResult(m1.bimap(_ -> cur.history, ArchiveMetadata(_)).toEither))
-      })
+      }
+    )
 }

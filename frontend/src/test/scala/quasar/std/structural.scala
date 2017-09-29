@@ -233,9 +233,8 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
 
   import org.scalacheck.Gen, Gen._
   import org.scalacheck.Arbitrary, Arbitrary._
-  lazy val arbStrType: Arbitrary[Type] = Arbitrary(Gen.oneOf(
-    const(Str),
-    arbitrary[String].map(s => Const(Data.Str(s)))))
+  lazy val arbStrType: Arbitrary[Type] = Arbitrary(
+    Gen.oneOf(const(Str), arbitrary[String].map(s => Const(Data.Str(s)))))
 
   lazy val arbArrayType: Arbitrary[Type] = Arbitrary(simpleArrayGen)
   lazy val simpleArrayGen = Gen.oneOf(
@@ -249,5 +248,6 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
     } yield Arr(t),
     for {
       ds <- resize(5, arbitrary[List[Data]])
-    } yield Const(Data.Arr(ds)))
+    } yield Const(Data.Arr(ds))
+  )
 }

@@ -24,11 +24,11 @@ import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
 /** A thread-safe, atomically updatable mutable reference.
-  *
-  * Cribbed from the `IORef` defined in oncue/remotely, an Apache 2 licensed
-  * project: https://github.com/oncue/remotely
-  *
-  */
+ *
+ * Cribbed from the `IORef` defined in oncue/remotely, an Apache 2 licensed
+ * project: https://github.com/oncue/remotely
+ *
+ */
 sealed abstract class TaskRef[A] {
   def read: Task[A]
   def write(a: A): Task[Unit]

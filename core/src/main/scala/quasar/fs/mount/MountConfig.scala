@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.{Variables, VarName, VarValue}
+import quasar.{VarName, VarValue, Variables}
 import quasar.fs.FileSystemType
 import quasar.sql, sql._
 
@@ -33,8 +33,7 @@ sealed abstract class MountConfig
 
 object MountConfig {
   final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])
-    extends MountConfig
-  {
+      extends MountConfig {
     def declarations: List[FunctionDecl[Fix[Sql]]] =
       statements.decls
     def imports: List[Import[Fix[Sql]]] =
@@ -42,25 +41,27 @@ object MountConfig {
   }
 
   final case class ViewConfig private[mount] (query: ScopedExpr[Fix[Sql]], vars: Variables)
-    extends MountConfig {
-      def asUri = viewCfgAsUri(query,vars)
-    }
+      extends MountConfig {
+    def asUri = viewCfgAsUri(query, vars)
+  }
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
-    extends MountConfig
+      extends MountConfig
 
   val moduleConfig = Prism.partial[MountConfig, List[Statement[Fix[Sql]]]] {
     case ModuleConfig(statements) => statements
-  } (ModuleConfig)
+  }(ModuleConfig)
 
   def viewConfig0(scopedExpr: ScopedExpr[Fix[Sql]], vars: (String, String)*): MountConfig = {
-    val vars0 = Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
+    val vars0 = Variables(Map(vars.map {
+      case (n, v) => quasar.VarName(n) -> quasar.VarValue(v)
+    }: _*))
     viewConfig.apply(scopedExpr, vars0)
   }
 
   val viewConfig = Prism.partial[MountConfig, (ScopedExpr[Fix[Sql]], Variables)] {
     case ViewConfig(query, vars) => (query, vars)
-  } ((ViewConfig(_, _)).tupled)
+  }((ViewConfig(_, _)).tupled)
 
   val viewConfigUri: Prism[ConnectionUri, (ScopedExpr[Fix[Sql]], Variables)] =
     Prism((viewCfgFromUri _) >>> (_.toOption))((viewCfgAsUri _).tupled)
@@ -68,12 +69,12 @@ object MountConfig {
   val fileSystemConfig =
     Prism.partial[MountConfig, (FileSystemType, ConnectionUri)] {
       case FileSystemConfig(typ, uri) => (typ, uri)
-    } ((FileSystemConfig(_, _)).tupled)
+    }((FileSystemConfig(_, _)).tupled)
 
   implicit val show: Show[MountConfig] =
     Show.shows {
       case ModuleConfig(statements) =>
-        "Module Config"  // TODO: Perhaps make this more descriptive
+        "Module Config" // TODO: Perhaps make this more descriptive
       case ViewConfig(expr, vars) =>
         viewConfigUri.reverseGet((expr, vars)).value
       case FileSystemConfig(typ, uri) =>
@@ -81,7 +82,8 @@ object MountConfig {
     }
 
   implicit def equal: Equal[MountConfig] =
-    Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
+    Equal.equalBy(m =>
+      (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
   val toConfigPair: MountConfig => (String, String) = {
     case ViewConfig(query, vars) =>
@@ -96,43 +98,65 @@ object MountConfig {
     case ("view", uri) =>
       viewCfgFromUri(ConnectionUri(uri)).map(i => viewConfig(i))
     case ("module", stmts) =>
-      sql.fixParser.parseWithParser(stmts, sql.fixParser.statements).bimap(
-        _.message,
-        moduleConfig(_))
+      sql.fixParser
+        .parseWithParser(stmts, sql.fixParser.statements)
+        .bimap(_.message, moduleConfig(_))
     case (typ, uri) =>
       fileSystemConfig(FileSystemType(typ), ConnectionUri(uri)).right
   }
 
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
-    CodecJson({
-      case ModuleConfig(statements)   =>
-        Json("module" := statements.pprint)
-      case ViewConfig(query, vars)    =>
-        Json("view" := Json("connectionUri" := viewCfgAsUriStr(query, vars)))
-      case FileSystemConfig(typ, uri) =>
-        Json(typ.value := Json("connectionUri" := uri.value))
-    },
-    json => json.fields match {
-      case Some(key :: Nil) => key match {
-        case "module" =>
-          (json --\ key).as[String].flatMap(stmtsStr =>
-            DecodeResult(stmtsStrAsSql(stmtsStr).bimap(e => (e.message, (json --\ key).history), moduleConfig(_)).toEither))
-        case "view" =>
-          (json --\ key --\ "connectionUri").as[ConnectionUri].flatMap(uri =>
-            DecodeResult(viewCfgFromUriStr(uri.value).bimap((_, (json --\ key).history), viewConfig(_)).toEither))
-        case fsType =>
-          (json --\ key --\ "connectionUri").as[ConnectionUri].map(uri =>
-            fileSystemConfig(FileSystemType(fsType), uri))
+    CodecJson(
+      {
+        case ModuleConfig(statements) =>
+          Json("module" := statements.pprint)
+        case ViewConfig(query, vars) =>
+          Json("view" := Json("connectionUri" := viewCfgAsUriStr(query, vars)))
+        case FileSystemConfig(typ, uri) =>
+          Json(typ.value := Json("connectionUri" := uri.value))
+      },
+      json =>
+        json.fields match {
+          case Some(key :: Nil) =>
+            key match {
+              case "module" =>
+                (json --\ key)
+                  .as[String]
+                  .flatMap(
+                    stmtsStr =>
+                      DecodeResult(
+                        stmtsStrAsSql(stmtsStr)
+                          .bimap(e => (e.message, (json --\ key).history), moduleConfig(_))
+                          .toEither))
+              case "view" =>
+                (json --\ key --\ "connectionUri")
+                  .as[ConnectionUri]
+                  .flatMap(
+                    uri =>
+                      DecodeResult(
+                        viewCfgFromUriStr(uri.value)
+                          .bimap((_, (json --\ key).history), viewConfig(_))
+                          .toEither))
+              case fsType =>
+                (json --\ key --\ "connectionUri")
+                  .as[ConnectionUri]
+                  .map(uri => fileSystemConfig(FileSystemType(fsType), uri))
+            }
+          case _ =>
+            DecodeResult.fail(
+              s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}",
+              json.history)
       }
-      case _ =>
-        DecodeResult.fail(s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}", json.history)
-    })
+    )
 
-  def viewCfgFromUri(uri: ConnectionUri): String \/ (ScopedExpr[Fix[Sql]], Variables) = viewCfgFromUriStr(uri.value)
+  def viewCfgFromUri(uri: ConnectionUri): String \/ (ScopedExpr[Fix[Sql]], Variables) =
+    viewCfgFromUriStr(uri.value)
 
-  def viewCfgAsUri(query: ScopedExpr[Fix[Sql]], vars: Variables): ConnectionUri = ConnectionUri(viewCfgAsUriStr(query, vars))
+  def viewCfgAsUri(query: ScopedExpr[Fix[Sql]], vars: Variables): ConnectionUri =
+    ConnectionUri(viewCfgAsUriStr(query, vars))
 
-  def stmtsAsSqlUri(stmts: List[Statement[Fix[Sql]]]): ConnectionUri = ConnectionUri(stmtsAsSqlStr(stmts))
+  def stmtsAsSqlUri(stmts: List[Statement[Fix[Sql]]]): ConnectionUri =
+    ConnectionUri(stmtsAsSqlStr(stmts))
 
   ////
 
@@ -144,17 +168,18 @@ object MountConfig {
     import org.http4s.{parser => _, _}
 
     for {
-      parsed   <- Uri.fromString(uri).leftMap(_.sanitized)
-      scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
-      _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
+      parsed <- Uri.fromString(uri).leftMap(_.sanitized)
+      scheme <- parsed.scheme \/> s"missing URI scheme: $parsed"
+      _ <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
-      sExpr    <- sql.fixParser.parseScopedExpr(queryStr).leftMap(_.message)
-      vars     =  Variables(parsed.multiParams collect {
-                    case (n, vs) if n.startsWith(VarPrefix) => (
-                      VarName(n.substring(VarPrefix.length)),
-                      VarValue(vs.lastOption.getOrElse(""))
-                    )
-                  })
+      sExpr <- sql.fixParser.parseScopedExpr(queryStr).leftMap(_.message)
+      vars = Variables(parsed.multiParams collect {
+        case (n, vs) if n.startsWith(VarPrefix) =>
+          (
+            VarName(n.substring(VarPrefix.length)),
+            VarValue(vs.lastOption.getOrElse(""))
+          )
+      })
     } yield (sExpr, vars)
   }
 
@@ -166,15 +191,15 @@ object MountConfig {
     }
 
     /** NB: host and path are specified here just to force the URI to have
-      * all three slashes, as the documentation shows it. The current parser
-      * will accept any number of slashes, actually, since we're ignoring
-      * the host and path for now.
-      */
+     * all three slashes, as the documentation shows it. The current parser
+     * will accept any number of slashes, actually, since we're ignoring
+     * the host and path for now.
+     */
     Uri(
-      scheme    = Some("sql2".ci),
+      scheme = Some("sql2".ci),
       authority = Some(Uri.Authority(host = Uri.RegName("".ci))),
-      path      = "/",
-      query     = Query.fromMap(qryMap)
+      path = "/",
+      query = Query.fromMap(qryMap)
     ).renderString
   }
 

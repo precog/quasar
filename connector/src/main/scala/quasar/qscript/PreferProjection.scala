@@ -31,11 +31,11 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 /** A rewrite that, where possible, replaces map key deletion with construction
-  * of a new map containing the keys in the complement of the singleton set consisting
-  * of the deleted key.
-  *
-  * Only applies to maps where all keys are known statically.
-  */
+ * of a new map containing the keys in the complement of the singleton set consisting
+ * of the deleted key.
+ *
+ * Only applies to maps where all keys are known statically.
+ */
 trait PreferProjection[F[_], T, B[_]] {
   def preferProjectionƒ(BtoF: PrismNT[B, F]): F[(Outline.Shape, T)] => B[T]
 }
@@ -43,8 +43,8 @@ trait PreferProjection[F[_], T, B[_]] {
 object PreferProjection extends PreferProjectionInstances {
 
   /** Rewrites map key deletion into construction of a new map containing the
-    * keys in the complement of the singleton set consisting of the deleted key.
-    */
+   * keys in the complement of the singleton set consisting of the deleted key.
+   */
   object preferProjection {
     def apply[F[_]] = new PartiallyApplied[F]
     final class PartiallyApplied[F[_]] {
@@ -54,17 +54,14 @@ object PreferProjection extends PreferProjectionInstances {
           TR: Recursive.Aux[T, F],
           F: Functor[F],
           P: PreferProjection[F, T, F],
-          O: Outline[F])
-          : T =
+          O: Outline[F]): T =
         t.zygo(O.outlineƒ, P.preferProjectionƒ(PrismNT.id[F]) >>> (_.embed))
-      }
+    }
   }
 
-  def preferProjectionF[F[_]: Functor, A]
-      (fa: Free[F, A])
-      (f: A => Outline.Shape)
-      (implicit P: PreferProjection[F, Free[F, A], CoEnv[A, F, ?]], O: Outline[F])
-      : Free[F, A] = {
+  def preferProjectionF[F[_]: Functor, A](fa: Free[F, A])(f: A => Outline.Shape)(
+      implicit P: PreferProjection[F, Free[F, A], CoEnv[A, F, ?]],
+      O: Outline[F]): Free[F, A] = {
 
     val ƒ: GAlgebra[(Outline.Shape, ?), CoEnv[A, F, ?], Free[F, A]] = {
       case CoEnv(\/-(fu)) =>
@@ -76,21 +73,19 @@ object PreferProjection extends PreferProjectionInstances {
     fa.zygo(interpret(f, O.outlineƒ), ƒ)
   }
 
-  def projectComplement[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      (fm: FreeMapA[T, A])
-      (f: A => Outline.Shape)
-      : FreeMapA[T, A] =
+  def projectComplement[T[_[_]]: BirecursiveT: EqualT, A: Equal](fm: FreeMapA[T, A])(
+      f: A => Outline.Shape): FreeMapA[T, A] =
     fm.elgotZygo(
         interpret(f, Outline[MapFunc[T, ?]].outlineƒ),
         projectComplementƒ[T, MapFunc[T, ?], A])
       .transCata[FreeMapA[T, A]](MapFuncCore.normalize)
 
   /** Replaces field deletion of a map having statically known structure with a
-    * projection of the complement of the deleted field.
-    */
-  def projectComplementƒ[T[_[_]]: BirecursiveT, F[_]: Functor, A]
-      (implicit I: MapFuncCore[T, ?] :<: F)
-      : ElgotAlgebra[(Outline.Shape, ?), CoEnv[A, F, ?], Free[F, A]] = {
+   * projection of the complement of the deleted field.
+   */
+  def projectComplementƒ[T[_[_]]: BirecursiveT, F[_]: Functor, A](
+      implicit I: MapFuncCore[T, ?] :<: F)
+    : ElgotAlgebra[(Outline.Shape, ?), CoEnv[A, F, ?], Free[F, A]] = {
 
     import MapFuncsCore._
 
@@ -107,7 +102,8 @@ object PreferProjection extends PreferProjectionInstances {
                 P(MakeMap[T, U](c, P(ProjectField[T, U](src, c)).embed)).embed
               }
 
-              maps.foldLeft1Opt((a, b) => P(ConcatMaps(a, b)).embed) | P(MapFuncCore.EmptyMap[T, U]).embed
+              maps.foldLeft1Opt((a, b) => P(ConcatMaps(a, b)).embed) | P(
+                MapFuncCore.EmptyMap[T, U]).embed
             }
         }
 
@@ -134,8 +130,7 @@ sealed abstract class PreferProjectionInstances {
   implicit def coproduct[F[_], G[_], T, B[_]](
       implicit
       F: PreferProjection[F, T, B],
-      G: PreferProjection[G, T, B])
-      : PreferProjection[Coproduct[F, G, ?], T, B] =
+      G: PreferProjection[G, T, B]): PreferProjection[Coproduct[F, G, ?], T, B] =
     new PreferProjection[Coproduct[F, G, ?], T, B] {
       type C[A] = Coproduct[F, G, A]
 
@@ -149,8 +144,7 @@ sealed abstract class PreferProjectionInstances {
       implicit
       UC: Corecursive.Aux[U, B],
       UR: Recursive.Aux[U, B],
-      O: Outline[QScriptCore[T, ?]])
-      : PreferProjection[QScriptCore[T, ?], U, B] =
+      O: Outline[QScriptCore[T, ?]]): PreferProjection[QScriptCore[T, ?], U, B] =
     new PreferProjection[QScriptCore[T, ?], U, B] {
       def preferProjectionƒ(BtoF: PrismNT[B, QScriptCore[T, ?]]) = {
         case Map((srcShape, u), f) =>
@@ -169,7 +163,8 @@ sealed abstract class PreferProjectionInstances {
 
         case Reduce((srcShape, u), buckets, reducers, repair) =>
           val prjBuckets = buckets map (prjFreeMap(srcShape, _))
-          val prjReducers = Functor[List].compose[ReduceFunc].map(reducers)(prjFreeMap(srcShape, _))
+          val prjReducers =
+            Functor[List].compose[ReduceFunc].map(reducers)(prjFreeMap(srcShape, _))
           val prjRepair = projectComplement(repair) { ridx =>
             O.outlineƒ(Reduce(srcShape, buckets, reducers, Free.point(ridx)))
           }
@@ -197,8 +192,7 @@ sealed abstract class PreferProjectionInstances {
       implicit
       UC: Corecursive.Aux[U, B],
       UR: Recursive.Aux[U, B],
-      O: Outline[ThetaJoin[T, ?]])
-      : PreferProjection[ThetaJoin[T, ?], U, B] =
+      O: Outline[ThetaJoin[T, ?]]): PreferProjection[ThetaJoin[T, ?], U, B] =
     new PreferProjection[ThetaJoin[T, ?], U, B] {
       def preferProjectionƒ(BtoF: PrismNT[B, ThetaJoin[T, ?]]) = {
         case ThetaJoin((srcShape, u), l, r, on, jtype, combine) =>
@@ -219,8 +213,7 @@ sealed abstract class PreferProjectionInstances {
       implicit
       UC: Corecursive.Aux[U, B],
       UR: Recursive.Aux[U, B],
-      O: Outline[EquiJoin[T, ?]])
-      : PreferProjection[EquiJoin[T, ?], U, B] =
+      O: Outline[EquiJoin[T, ?]]): PreferProjection[EquiJoin[T, ?], U, B] =
     new PreferProjection[EquiJoin[T, ?], U, B] {
       def preferProjectionƒ(BtoF: PrismNT[B, EquiJoin[T, ?]]) = {
         case EquiJoin((srcShape, u), l, r, key, jtype, combine) =>
@@ -237,13 +230,15 @@ sealed abstract class PreferProjectionInstances {
 
   // Identity Instances
 
-  implicit def projectBucket[T[_[_]], U, B[_]: Functor]: PreferProjection[ProjectBucket[T, ?], U, B] =
+  implicit def projectBucket[T[_[_]], U, B[_]: Functor]
+    : PreferProjection[ProjectBucket[T, ?], U, B] =
     identityInstance
 
   implicit def constRead[U, B[_]: Functor, A]: PreferProjection[Const[Read[A], ?], U, B] =
     identityInstance
 
-  implicit def constShiftedRead[U, B[_]: Functor, A]: PreferProjection[Const[ShiftedRead[A], ?], U, B] =
+  implicit def constShiftedRead[U, B[_]: Functor, A]
+    : PreferProjection[Const[ShiftedRead[A], ?], U, B] =
     identityInstance
 
   implicit def constDeadEnd[U, B[_]: Functor]: PreferProjection[Const[DeadEnd, ?], U, B] =
@@ -253,14 +248,12 @@ sealed abstract class PreferProjectionInstances {
 
   private def prjFreeQS[T[_[_]]: BirecursiveT: EqualT](
       srcShape: Outline.Shape,
-      fqs: FreeQS[T])
-      : FreeQS[T] =
+      fqs: FreeQS[T]): FreeQS[T] =
     PreferProjection.preferProjectionF(fqs)(κ(srcShape))
 
   private def prjFreeMap[T[_[_]]: BirecursiveT: EqualT](
       srcShape: Outline.Shape,
-      fm: FreeMap[T])
-      : FreeMap[T] =
+      fm: FreeMap[T]): FreeMap[T] =
     projectComplement(fm)(κ(srcShape))
 
   private def identityInstance[F[_], U, B[_]: Functor]: PreferProjection[F, U, B] =

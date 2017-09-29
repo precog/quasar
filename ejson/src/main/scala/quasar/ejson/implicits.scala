@@ -26,9 +26,9 @@ object implicits {
   // NB: This is defined here as we need to elide metadata from args before
   //     comparing them.
   implicit def ejsonOrder[T](
-    implicit
-    TC: Corecursive.Aux[T, EJson],
-    TR: Recursive.Aux[T, EJson]
+      implicit
+      TC: Corecursive.Aux[T, EJson],
+      TR: Recursive.Aux[T, EJson]
   ): Order[T] =
     Order.order { (x, y) =>
       implicit val ordExt = Extension.structuralOrder
@@ -39,20 +39,20 @@ object implicits {
 
   implicit final class EncodeEJsonOps[A](val self: A) extends scala.AnyVal {
     def asEJson[J](
-      implicit
-      A : EncodeEJson[A],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+        implicit
+        A: EncodeEJson[A],
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
     ): J =
       A.encode[J](self)
   }
 
   implicit final class EncodeEJsonKOps[F[_], J](val self: F[J]) extends scala.AnyVal {
     def asEJsonK(
-      implicit
-      F : EncodeEJsonK[F],
-      JC: Corecursive.Aux[J, EJson],
-      JR: Recursive.Aux[J, EJson]
+        implicit
+        F: EncodeEJsonK[F],
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
     ): J =
       F.encodeK[J].apply(self)
   }

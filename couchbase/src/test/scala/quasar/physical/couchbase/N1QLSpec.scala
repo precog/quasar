@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 
 class N1QLSpec extends Spec with N1QLArbitrary {
 
-    checkAll(ScalazProperties.traverse.laws[N1QL])
+  checkAll(ScalazProperties.traverse.laws[N1QL])
 
 }
 
@@ -56,14 +56,13 @@ trait N1QLArbitrary {
     Arbitrary((arb[A] ⊛ arb[Option[Id[A]]])(Keyspace(_, _)))
 
   implicit def arbLookupJoin[A: Arbitrary]: Arbitrary[LookupJoin[A]] =
-    Arbitrary((
-      arb[Id[A]]         ⊛
-      arb[Option[Id[A]]] ⊛
-      arb[A]             ⊛
-      Gen.oneOf(JoinType.LeftOuter.left, JoinType.Inner.right)
-     )(
-      LookupJoin(_, _, _, _))
-    )
+    Arbitrary(
+      (
+        arb[Id[A]] ⊛
+          arb[Option[Id[A]]] ⊛
+          arb[A] ⊛
+          Gen.oneOf(JoinType.LeftOuter.left, JoinType.Inner.right)
+      )(LookupJoin(_, _, _, _)))
 
   implicit def arbUnnest[A: Arbitrary]: Arbitrary[Unnest[A]] =
     Arbitrary((arb[A] ⊛ arb[Option[Id[A]]])(Unnest(_, _)))
@@ -84,103 +83,103 @@ trait N1QLArbitrary {
     Arbitrary((arb[A] ⊛ arb[A])(WhenThen(_, _)))
 
   implicit def arbElse[A: Arbitrary]: Arbitrary[Else[A]] =
-     Arbitrary(arb[A] ∘ (Else(_)))
+    Arbitrary(arb[A] ∘ (Else(_)))
 
   implicit val arbSortDir: Arbitrary[SortDir] =
     Arbitrary(Gen.oneOf(Ascending, Descending))
 
   // TODO: Fragile to changes in N1QL terms
-  implicit def arbN1QL[A: Arbitrary]: Arbitrary[N1QL[A]] = Arbitrary(Gen.oneOf(
-    arb[QData]                         ∘ (Data[A](_)),
-    arb[String]                        ∘ (Id[A](_)),
-    arb[List[(A, A)]]                  ∘ (Obj(_)),
-    arb[List[A]]                       ∘ (Arr(_)),
-    arb[A]                             ∘ (Time(_)),
-    arb[A]                             ∘ (Timestamp(_)),
-    Gen.const                            (Null[A]()),
-    (arb[A] ⊛ arb[A])                    (SelectField(_, _)),
-    (arb[A] ⊛ arb[A])                    (SelectElem(_, _)),
-    (arb[A] ⊛ arb[Option[A]])            (Slice(_, _)),
-    (arb[A] ⊛ arb[A])                    (ConcatStr(_, _)),
-    arb[A]                             ∘ (Not(_)),
-    (arb[A] ⊛ arb[A])                    (Eq(_, _)),
-    (arb[A] ⊛ arb[A])                    (Neq(_, _)),
-    (arb[A] ⊛ arb[A])                    (Lt(_, _)),
-    (arb[A] ⊛ arb[A])                    (Lte(_, _)),
-    (arb[A] ⊛ arb[A])                    (Gt(_, _)),
-    (arb[A] ⊛ arb[A])                    (Gte(_, _)),
-    arb[A]                             ∘ (IsNull(_)),
-    arb[A]                             ∘ (IsNotNull(_)),
-    arb[A]                             ∘ (Neg(_)),
-    (arb[A] ⊛ arb[A])                    (Add(_, _)),
-    (arb[A] ⊛ arb[A])                    (Sub(_, _)),
-    (arb[A] ⊛ arb[A])                    (Mult(_, _)),
-    (arb[A] ⊛ arb[A])                    (Div(_, _)),
-    (arb[A] ⊛ arb[A])                    (Mod(_, _)),
-    (arb[A] ⊛ arb[A])                    (And(_, _)),
-    (arb[A] ⊛ arb[A])                    (Or(_, _)),
-    arb[A]                             ∘ (Meta(_)),
-    (arb[A] ⊛ arb[A])                    (ConcatArr(_, _)),
-    (arb[A] ⊛ arb[A])                    (ConcatObj(_, _)),
-    arb[OneAnd[NonEmptyList, A]]       ∘ (IfNull(_)),
-    arb[OneAnd[NonEmptyList, A]]       ∘ (IfMissing(_)),
-    arb[OneAnd[NonEmptyList, A]]       ∘ (IfMissingOrNull(_)),
-    arb[A]                             ∘ (Type(_)),
-    arb[A]                             ∘ (ToString(_)),
-    arb[A]                             ∘ (ToNumber(_)),
-    arb[A]                             ∘ (Floor(_)),
-    arb[A]                             ∘ (Length(_)),
-    arb[A]                             ∘ (LengthArr(_)),
-    arb[A]                             ∘ (LengthObj(_)),
-    arb[A]                             ∘ (IsString(_)),
-    arb[A]                             ∘ (Lower(_)),
-    arb[A]                             ∘ (Upper(_)),
-    (arb[A] ⊛ arb[A])                    (Split(_, _)),
-    (arb[A] ⊛ arb[A] ⊛ arb[Option[A]])   (Substr(_, _, _)),
-    (arb[A] ⊛ arb[A])                    (RegexContains(_, _)),
-    arb[OneAnd[NonEmptyList, A]]       ∘ (Least(_)),
-    (arb[A] ⊛ arb[A])                    (Pow(_, _)),
-    arb[A]                             ∘ (Ceil(_)),
-    arb[A]                             ∘ (Millis(_)),
-    (arb[A] ⊛ arb[Option[A]])            (MillisToUTC(_, _)),
-    (arb[A] ⊛ arb[A] ⊛ arb[A])           (DateAddStr(_, _, _)),
-    (arb[A] ⊛ arb[A])                    (DatePartStr(_, _)),
-    (arb[A] ⊛ arb[A] ⊛ arb[A])           (DateDiffStr(_, _, _)),
-    (arb[A] ⊛ arb[A])                    (DateTruncStr(_, _)),
-    arb[A]                             ∘ (StrToMillis(_)),
-    Gen.const                            (NowStr[A]()),
-    (arb[A] ⊛ arb[A])                    (ArrContains(_, _)),
-    (arb[A] ⊛ arb[A] ⊛ arb[Option[A]])   (ArrRange(_, _, _)),
-    arb[A]                             ∘ (IsArr(_)),
-    arb[A]                             ∘ (ObjNames(_)),
-    arb[A]                             ∘ (ObjValues(_)),
-    (arb[A] ⊛ arb[A])                    (ObjRemove(_, _)),
-    arb[A]                             ∘ (IsObj(_)),
-    arb[A]                             ∘ (Avg(_)),
-    arb[A]                             ∘ (Count(_)),
-    arb[A]                             ∘ (Max(_)),
-    arb[A]                             ∘ (Min(_)),
-    arb[A]                             ∘ (Sum(_)),
-    arb[A]                             ∘ (ArrAgg(_)),
-    (arb[A] ⊛ arb[A])                    (Union(_, _)),
-    (arb[A] ⊛ arb[A] ⊛ arb[A])           (ArrFor(_, _, _)),
-    (arb[Value]                       ⊛
-     arb[NonEmptyList[ResultExpr[A]]] ⊛
-     arb[Option[Keyspace[A]]]         ⊛
-     arb[Option[LookupJoin[A]]]       ⊛
-     arb[Option[Unnest[A]]]           ⊛
-     arb[List[Binding[A]]]            ⊛
-     arb[Option[Filter[A]]]           ⊛
-     arb[Option[GroupBy[A]]]          ⊛
-     arb[List[OrderBy[A]]]
-    )(
-      Select(_, _, _, _, _, _, _, _, _)
-    ),
-    (arb[NonEmptyList[WhenThen[A]]]  ⊛
-     arb[Else[A]]
-   )(
-     Case(_, _)
-   )
-  ))
+  implicit def arbN1QL[A: Arbitrary]: Arbitrary[N1QL[A]] =
+    Arbitrary(
+      Gen.oneOf(
+        arb[QData] ∘ (Data[A](_)),
+        arb[String] ∘ (Id[A](_)),
+        arb[List[(A, A)]] ∘ (Obj(_)),
+        arb[List[A]] ∘ (Arr(_)),
+        arb[A] ∘ (Time(_)),
+        arb[A] ∘ (Timestamp(_)),
+        Gen.const(Null[A]()),
+        (arb[A] ⊛ arb[A])(SelectField(_, _)),
+        (arb[A] ⊛ arb[A])(SelectElem(_, _)),
+        (arb[A] ⊛ arb[Option[A]])(Slice(_, _)),
+        (arb[A] ⊛ arb[A])(ConcatStr(_, _)),
+        arb[A] ∘ (Not(_)),
+        (arb[A] ⊛ arb[A])(Eq(_, _)),
+        (arb[A] ⊛ arb[A])(Neq(_, _)),
+        (arb[A] ⊛ arb[A])(Lt(_, _)),
+        (arb[A] ⊛ arb[A])(Lte(_, _)),
+        (arb[A] ⊛ arb[A])(Gt(_, _)),
+        (arb[A] ⊛ arb[A])(Gte(_, _)),
+        arb[A] ∘ (IsNull(_)),
+        arb[A] ∘ (IsNotNull(_)),
+        arb[A] ∘ (Neg(_)),
+        (arb[A] ⊛ arb[A])(Add(_, _)),
+        (arb[A] ⊛ arb[A])(Sub(_, _)),
+        (arb[A] ⊛ arb[A])(Mult(_, _)),
+        (arb[A] ⊛ arb[A])(Div(_, _)),
+        (arb[A] ⊛ arb[A])(Mod(_, _)),
+        (arb[A] ⊛ arb[A])(And(_, _)),
+        (arb[A] ⊛ arb[A])(Or(_, _)),
+        arb[A] ∘ (Meta(_)),
+        (arb[A] ⊛ arb[A])(ConcatArr(_, _)),
+        (arb[A] ⊛ arb[A])(ConcatObj(_, _)),
+        arb[OneAnd[NonEmptyList, A]] ∘ (IfNull(_)),
+        arb[OneAnd[NonEmptyList, A]] ∘ (IfMissing(_)),
+        arb[OneAnd[NonEmptyList, A]] ∘ (IfMissingOrNull(_)),
+        arb[A] ∘ (Type(_)),
+        arb[A] ∘ (ToString(_)),
+        arb[A] ∘ (ToNumber(_)),
+        arb[A] ∘ (Floor(_)),
+        arb[A] ∘ (Length(_)),
+        arb[A] ∘ (LengthArr(_)),
+        arb[A] ∘ (LengthObj(_)),
+        arb[A] ∘ (IsString(_)),
+        arb[A] ∘ (Lower(_)),
+        arb[A] ∘ (Upper(_)),
+        (arb[A] ⊛ arb[A])(Split(_, _)),
+        (arb[A] ⊛ arb[A] ⊛ arb[Option[A]])(Substr(_, _, _)),
+        (arb[A] ⊛ arb[A])(RegexContains(_, _)),
+        arb[OneAnd[NonEmptyList, A]] ∘ (Least(_)),
+        (arb[A] ⊛ arb[A])(Pow(_, _)),
+        arb[A] ∘ (Ceil(_)),
+        arb[A] ∘ (Millis(_)),
+        (arb[A] ⊛ arb[Option[A]])(MillisToUTC(_, _)),
+        (arb[A] ⊛ arb[A] ⊛ arb[A])(DateAddStr(_, _, _)),
+        (arb[A] ⊛ arb[A])(DatePartStr(_, _)),
+        (arb[A] ⊛ arb[A] ⊛ arb[A])(DateDiffStr(_, _, _)),
+        (arb[A] ⊛ arb[A])(DateTruncStr(_, _)),
+        arb[A] ∘ (StrToMillis(_)),
+        Gen.const(NowStr[A]()),
+        (arb[A] ⊛ arb[A])(ArrContains(_, _)),
+        (arb[A] ⊛ arb[A] ⊛ arb[Option[A]])(ArrRange(_, _, _)),
+        arb[A] ∘ (IsArr(_)),
+        arb[A] ∘ (ObjNames(_)),
+        arb[A] ∘ (ObjValues(_)),
+        (arb[A] ⊛ arb[A])(ObjRemove(_, _)),
+        arb[A] ∘ (IsObj(_)),
+        arb[A] ∘ (Avg(_)),
+        arb[A] ∘ (Count(_)),
+        arb[A] ∘ (Max(_)),
+        arb[A] ∘ (Min(_)),
+        arb[A] ∘ (Sum(_)),
+        arb[A] ∘ (ArrAgg(_)),
+        (arb[A] ⊛ arb[A])(Union(_, _)),
+        (arb[A] ⊛ arb[A] ⊛ arb[A])(ArrFor(_, _, _)),
+        (arb[Value] ⊛
+          arb[NonEmptyList[ResultExpr[A]]] ⊛
+          arb[Option[Keyspace[A]]] ⊛
+          arb[Option[LookupJoin[A]]] ⊛
+          arb[Option[Unnest[A]]] ⊛
+          arb[List[Binding[A]]] ⊛
+          arb[Option[Filter[A]]] ⊛
+          arb[Option[GroupBy[A]]] ⊛
+          arb[List[OrderBy[A]]])(
+          Select(_, _, _, _, _, _, _, _, _)
+        ),
+        (arb[NonEmptyList[WhenThen[A]]] ⊛
+          arb[Else[A]])(
+          Case(_, _)
+        )
+      ))
 
 }

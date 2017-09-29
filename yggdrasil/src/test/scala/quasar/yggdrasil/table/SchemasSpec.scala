@@ -22,10 +22,14 @@ import quasar.blueeyes._, json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait SchemasSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with SpecificationLike
+    with ScalaCheck {
   def testSingleSchema = {
     val expected = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
-    val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))
+    val trivialData =
+      Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))
     val sample = SampleData(trivialData)
     val table = fromSample(sample, Some(10))
     table.schemas.copoint must_== expected
@@ -54,7 +58,10 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     val expected = Set(
       JObjectFixedT(Map("a" -> JArrayFixedT(Map.empty), "b" -> JTextT)),
       JObjectFixedT(Map("a" -> JNullT, "b" -> JTextT)),
-      JObjectFixedT(Map("a" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JNumberT)), "b" -> JArrayFixedT(Map(0 -> JTextT, 1 -> JObjectFixedT(Map.empty)))))
+      JObjectFixedT(
+        Map(
+          "a" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JNumberT)),
+          "b" -> JArrayFixedT(Map(0 -> JTextT, 1 -> JObjectFixedT(Map.empty)))))
     )
     val data = Stream.tabulate(30) {
       case i if i % 3 == 0 => JParser.parseUnsafe("""{ "a": [], "b": "2" }""")
@@ -77,7 +84,7 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       case i if i % 4 == 0 => JObject(List(JField("a", JNum(1)), JField("b", JNum(i))))
       case i if i % 4 == 1 => JObject(List(JField("a", JNum(1)), JField("b", JUndefined)))
       case i if i % 4 == 2 => JObject(List(JField("a", JUndefined), JField("b", JNum(i))))
-      case _               => JObject()
+      case _ => JObject()
     }
 
     val table = fromSample(SampleData(data), Some(10))
@@ -101,7 +108,9 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       JObjectFixedT(Map("a" -> JObjectFixedT(Map("b" -> JObjectFixedT(Map("c" -> JNumberT))))))
     )
     val data = Stream(
-      "1", "true", "null",
+      "1",
+      "true",
+      "null",
       """ "abc" """,
       """[ 1, 2 ]""",
       """{ "a": 1 }""",

@@ -36,42 +36,47 @@ object DateTimeUtil {
     try {
       Instant.parse(value).atZone(utc)
     } catch {
-      case _: Throwable => try {
-        ZonedDateTime.of(
-          LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE),
-          LocalTime.of(0, 0, 0, 0),
-          utc)
-      } catch {
-        case _: Throwable =>
+      case _: Throwable =>
+        try {
           ZonedDateTime.of(
-            LocalDate.now(utc), // FIXME what is the expected default?
-            LocalTime.parse(value, DateTimeFormatter.ISO_TIME),
+            LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE),
+            LocalTime.of(0, 0, 0, 0),
             utc)
-      }
+        } catch {
+          case _: Throwable =>
+            ZonedDateTime.of(
+              LocalDate.now(utc), // FIXME what is the expected default?
+              LocalTime.parse(value, DateTimeFormatter.ISO_TIME),
+              utc)
+        }
     }
   }
 
-  def isValidISO(str: String): Boolean = try {
-    parseDateTime(str); true
-  } catch {
-    case e:IllegalArgumentException => { false }
-  }
+  def isValidISO(str: String): Boolean =
+    try {
+      parseDateTime(str); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidTimeZone(str: String): Boolean = try {
-    ZoneId.of(str); true
-  } catch {
-    case e:IllegalArgumentException => { false }
-  }
+  def isValidTimeZone(str: String): Boolean =
+    try {
+      ZoneId.of(str); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidFormat(time: String, fmt: String): Boolean = try {
-    DateTimeFormatter.ofPattern(fmt)./*withOffsetParsed().*/parse(time); true
-  } catch {
-    case e: IllegalArgumentException => { false }
-  }
+  def isValidFormat(time: String, fmt: String): Boolean =
+    try {
+      DateTimeFormatter.ofPattern(fmt). /*withOffsetParsed().*/ parse(time); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 
-  def isValidPeriod(period: String): Boolean = try {
-    Period.parse(period); true
-  } catch {
-    case e: IllegalArgumentException => { false }
-  }
+  def isValidPeriod(period: String): Boolean =
+    try {
+      Period.parse(period); true
+    } catch {
+      case e: IllegalArgumentException => { false }
+    }
 }

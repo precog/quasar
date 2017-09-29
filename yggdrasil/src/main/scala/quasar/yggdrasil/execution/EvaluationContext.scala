@@ -24,11 +24,16 @@ import shapeless.HNil
 
 import java.time.LocalDateTime
 
-final case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: LocalDateTime)
+final case class EvaluationContext(
+    apiKey: APIKey,
+    account: AccountDetails,
+    basePath: Path,
+    scriptPath: Path,
+    startTime: LocalDateTime)
 
 object EvaluationContext {
   val schemaV1 = "apiKey" :: "account" :: "basePath" :: "scriptPath" :: "startTime" :: HNil
 
   implicit val decomposer: Decomposer[EvaluationContext] = decomposerV(schemaV1, Some("1.0".v))
-  implicit val extractor: Extractor[EvaluationContext]   = extractorV(schemaV1, Some("1.0".v))
+  implicit val extractor: Extractor[EvaluationContext] = extractorV(schemaV1, Some("1.0".v))
 }

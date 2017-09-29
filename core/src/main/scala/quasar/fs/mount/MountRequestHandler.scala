@@ -26,18 +26,18 @@ import monocle.function.Field1
 import scalaz._, Scalaz._
 
 /** Handles mount requests, validating them and updating a hierarchical
-  * `FileSystem` interpreter as mounts are added and removed.
-  *
-  * @tparam F the base effect that `FileSystem` operations are translated into
-  * @tparam S the composite effect, supporting the base and hierarchical effects
-  */
+ * `FileSystem` interpreter as mounts are added and removed.
+ *
+ * @tparam F the base effect that `FileSystem` operations are translated into
+ * @tparam S the composite effect, supporting the base and hierarchical effects
+ */
 final class MountRequestHandler[F[_], S[_]](
-  fsDef: BackendDef[F]
-)(implicit
-  S0: F :<: S,
-  S1: MountedResultH :<: S,
-  S2: MonotonicSeq :<: S
-) {
+    fsDef: BackendDef[F]
+)(
+    implicit
+    S0: F :<: S,
+    S1: MountedResultH :<: S,
+    S2: MonotonicSeq :<: S) {
   import MountRequest._
 
   type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[S, ?], A]
@@ -48,13 +48,13 @@ final class MountRequestHandler[F[_], S[_]](
   }
 
   def mount[T[_]](
-    req: MountRequest
-  )(implicit
-    T0: F :<: T,
-    T1: fsm.MountedFsRef :<: T,
-    T2: HierarchicalFsRef :<: T,
-    F: Monad[F]
-  ): Free[T, MountingError \/ Unit] = {
+      req: MountRequest
+  )(
+      implicit
+      T0: F :<: T,
+      T1: fsm.MountedFsRef :<: T,
+      T2: HierarchicalFsRef :<: T,
+      F: Monad[F]): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
         case MountFileSystem(d, typ, uri) => fsm.mount[T](d, typ, uri)
@@ -70,12 +70,12 @@ final class MountRequestHandler[F[_], S[_]](
   }
 
   def unmount[T[_]](
-    req: MountRequest
-  )(implicit
-    T0: F :<: T,
-    T1: fsm.MountedFsRef :<: T,
-    T2: HierarchicalFsRef :<: T
-  ): Free[T, Unit] =
+      req: MountRequest
+  )(
+      implicit
+      T0: F :<: T,
+      T1: fsm.MountedFsRef :<: T,
+      T2: HierarchicalFsRef :<: T): Free[T, Unit] =
     fsDir.getOption(req).traverse_(fsm.unmount[T]) *> updateHierarchy[T]
 
   ////
@@ -84,40 +84,40 @@ final class MountRequestHandler[F[_], S[_]](
   private val fsDir = mountFileSystem composeLens Field1.first
 
   /** Builds the hierarchical interpreter from the currently mounted filesystems,
-    * storing the result in `HierarchicalFsRef`.
-    *
-    * TODO: Effects should be `Read[MountedFs, ?]` and `Write[HierarchicalFs, ?]`
-    *       to be more precise.
-    *
-    * This involves, roughly
-    *   1. Get the current mounted filesystems from `MountedFsRef`.
-    *
-    *   2. Build a hierarchical filesystem interpreter using the mounts from (1).
-    *
-    *   3. Lift the result of (2) into the output effect, `S[_]`.
-    *
-    *   4. Store the result of (3) in `HierarchicalFsRef`.
-    */
+   * storing the result in `HierarchicalFsRef`.
+   *
+   * TODO: Effects should be `Read[MountedFs, ?]` and `Write[HierarchicalFs, ?]`
+   *       to be more precise.
+   *
+   * This involves, roughly
+   *   1. Get the current mounted filesystems from `MountedFsRef`.
+   *
+   *   2. Build a hierarchical filesystem interpreter using the mounts from (1).
+   *
+   *   3. Lift the result of (2) into the output effect, `S[_]`.
+   *
+   *   4. Store the result of (3) in `HierarchicalFsRef`.
+   */
   private def updateHierarchy[T[_]](
-    implicit
-    T0: F :<: T,
-    T1: fsm.MountedFsRef :<: T,
-    T2: HierarchicalFsRef :<: T
+      implicit
+      T0: F :<: T,
+      T1: fsm.MountedFsRef :<: T,
+      T2: HierarchicalFsRef :<: T
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-                 (mnts => hierarchical.backendEffect[F, S](mnts.map(_.run)))
-      _     <- HierarchicalFsRef.Ops[T].set(mnted)
+        (mnts => hierarchical.backendEffect[F, S](mnts.map(_.run)))
+      _ <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }
 
 object MountRequestHandler {
   def apply[F[_], S[_]](
-    fsDef: BackendDef[F]
-  )(implicit
-    S0: F :<: S,
-    S1: MountedResultH :<: S,
-    S2: MonotonicSeq :<: S
-  ): MountRequestHandler[F, S] =
+      fsDef: BackendDef[F]
+  )(
+      implicit
+      S0: F :<: S,
+      S1: MountedResultH :<: S,
+      S2: MonotonicSeq :<: S): MountRequestHandler[F, S] =
     new MountRequestHandler[F, S](fsDef)
 }

@@ -22,11 +22,11 @@ import quasar.yggdrasil._
 
 import scalaz._
 
-trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
+trait ReductionFinderSpecs[M[+ _]] extends EvaluatorSpecification[M] {
 
   import instructions._
   import dag._
-  import library.{ op1ForUnOp => _, _ }
+  import library.{op1ForUnOp => _, _}
   import TableModule.CrossOrder._
 
   val evalCtx = defaultEvaluationContext
@@ -48,7 +48,9 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val line = Line(1, 1, "")
 
       val input = dag.Reduce(Count, Const(CString("alpha"))(line))(line)
-      val megaR = dag.MegaReduce(List((trans.Leaf(trans.Source), List(input.red))), Const(CString("alpha"))(line))
+      val megaR = dag.MegaReduce(
+        List((trans.Leaf(trans.Source), List(input.red))),
+        Const(CString("alpha"))(line))
 
       val expected = joinDeref(megaR, 0, 0, line)
 
@@ -58,9 +60,7 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
     "in a single reduction" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Reduce(Count,
-        dag.AbsoluteLoad(Const(CString("/foo"))(line))(line))(line)
-
+      val input = dag.Reduce(Count, dag.AbsoluteLoad(Const(CString("/foo"))(line))(line))(line)
 
       val parent = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
       val red = Count
@@ -76,58 +76,81 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       val clicks = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
 
-      val notEq = Join(NotEq, Cross(None),
-        Join(DerefObject, Cross(None),
-          clicks,
-          Const(CString("foo"))(line))(line),
+      val notEq = Join(
+        NotEq,
+        Cross(None),
+        Join(DerefObject, Cross(None), clicks, Const(CString("foo"))(line))(line),
         Const(CNum(5))(line))(line)
 
-      val obj = Join(WrapObject, Cross(None),
-        Const(CString("bar"))(line),
-        clicks)(line)
+      val obj = Join(WrapObject, Cross(None), Const(CString("bar"))(line), clicks)(line)
 
-      val op = Operate(Neg,
-        Join(DerefArray, Cross(None),
-          clicks,
-          Const(CNum(1))(line))(line))(line)
+      val op =
+        Operate(Neg, Join(DerefArray, Cross(None), clicks, Const(CNum(1))(line))(line))(line)
 
-      val filter = Filter(IdentitySort,
+      val filter = Filter(
+        IdentitySort,
         clicks,
-        Join(Eq, Cross(None),
-          Join(DerefObject, Cross(None),
-            clicks,
-            Const(CString("baz"))(line))(line),
+        Join(
+          Eq,
+          Cross(None),
+          Join(DerefObject, Cross(None), clicks, Const(CString("baz"))(line))(line),
           Const(CNum(12))(line))(line))(line)
 
       val fooDerefTrans = trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("foo"))
-      val nonEqTrans = trans.Map1(trans.Equal(fooDerefTrans, trans.ConstLiteral(CNum(5), fooDerefTrans)), Unary.Comp.f1)
+      val nonEqTrans = trans.Map1(
+        trans.Equal(fooDerefTrans, trans.ConstLiteral(CNum(5), fooDerefTrans)),
+        Unary.Comp.f1)
       val objTrans = trans.WrapObject(trans.Leaf(trans.Source), "bar")
-      val opTrans = op1ForUnOp(Neg).spec(trans.DerefArrayStatic(trans.Leaf(trans.Source), CPathIndex(1)))
+      val opTrans =
+        op1ForUnOp(Neg).spec(trans.DerefArrayStatic(trans.Leaf(trans.Source), CPathIndex(1)))
       val bazDerefTrans = trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("baz"))
-      val filterTrans = trans.Filter(trans.Leaf(trans.Source), trans.Equal(bazDerefTrans, trans.ConstLiteral(CNum(12), bazDerefTrans)))
+      val filterTrans = trans.Filter(
+        trans.Leaf(trans.Source),
+        trans.Equal(bazDerefTrans, trans.ConstLiteral(CNum(12), bazDerefTrans)))
 
-      val reductions: List[(trans.TransSpec1, List[Reduction])] = List((filterTrans, List(StdDev)), (opTrans, List(Max)), (objTrans, List(Max, Sum)), (nonEqTrans, List(Min))).reverse
+      val reductions: List[(trans.TransSpec1, List[Reduction])] = List(
+        (filterTrans, List(StdDev)),
+        (opTrans, List(Max)),
+        (objTrans, List(Max, Sum)),
+        (nonEqTrans, List(Min))).reverse
       val megaR = MegaReduce(reductions, clicks)
 
-      val input = Join(Sub, Cross(None),
+      val input = Join(
+        Sub,
+        Cross(None),
         dag.Reduce(Min, notEq)(line),
-        Join(Sub, Cross(None),
+        Join(
+          Sub,
+          Cross(None),
           dag.Reduce(Max, obj)(line),
-          Join(Sub, Cross(None),
+          Join(
+            Sub,
+            Cross(None),
             dag.Reduce(Max, op)(line),
-            Join(Sub, Cross(None),
+            Join(
+              Sub,
+              Cross(None),
               dag.Reduce(StdDev, filter)(line),
-              dag.Reduce(Sum, obj)(line))(line))(line))(line))(line)
+              dag.Reduce(Sum, obj)(line))(line))(line)
+        )(line)
+      )(line)
 
-      val expected = Join(Sub, Cross(None),
+      val expected = Join(
+        Sub,
+        Cross(None),
         joinDeref(megaR, 3, 0, line),
-        Join(Sub, Cross(None),
+        Join(
+          Sub,
+          Cross(None),
           joinDeref(megaR, 2, 1, line),
-          Join(Sub, Cross(None),
+          Join(
+            Sub,
+            Cross(None),
             joinDeref(megaR, 1, 0, line),
-            Join(Sub, Cross(None),
-              joinDeref(megaR, 0, 0, line),
-              joinDeref(megaR, 2, 0, line))(line))(line))(line))(line)
+            Join(Sub, Cross(None), joinDeref(megaR, 0, 0, line), joinDeref(megaR, 2, 0, line))(
+              line))(line)
+        )(line)
+      )(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -146,9 +169,8 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val reductions = List((trans.Leaf(trans.Source), List(red1, red2)))
       val megaR = dag.MegaReduce(reductions, parent)
 
-      val expected = Join(Add, Cross(None),
-        joinDeref(megaR, 0, 1, line),
-        joinDeref(megaR, 0, 0, line))(line)
+      val expected =
+        Join(Add, Cross(None), joinDeref(megaR, 0, 1, line), joinDeref(megaR, 0, 0, line))(line)
 
       val expectedReductions = MegaReduceState(
         Map(left -> parent, right -> parent),
@@ -160,7 +182,6 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       findReductions(input, evalCtx) mustEqual expectedReductions
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
-
 
     }
 
@@ -175,17 +196,17 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       "right" in {
         val input = Join(Add, Cross(None), dag.Operate(Neg, load)(line), r)(line)
-        val expected = Join(Add, Cross(None),
-          dag.Operate(Neg, load)(line),
-          joinDeref(megaR, 0, 0, line))(line)
+        val expected =
+          Join(Add, Cross(None), dag.Operate(Neg, load)(line), joinDeref(megaR, 0, 0, line))(
+            line)
 
         megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
       }
       "left" in {
         val input = Join(Add, Cross(None), r, dag.Operate(Neg, load)(line))(line)
-        val expected = Join(Add, Cross(None),
-          joinDeref(megaR, 0, 0, line),
-          dag.Operate(Neg, load)(line))(line)
+        val expected =
+          Join(Add, Cross(None), joinDeref(megaR, 0, 0, line), dag.Operate(Neg, load)(line))(
+            line)
 
         megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
       }
@@ -207,7 +228,9 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val megaR1 = dag.MegaReduce(List((spec, List(red))), load1)
       val megaR2 = dag.MegaReduce(List((spec, List(red))), load2)
 
-      val expected = Join(Add, Cross(Some(CrossRight)),
+      val expected = Join(
+        Add,
+        Cross(Some(CrossRight)),
         joinDeref(megaR1, 0, 0, line),
         joinDeref(megaR2, 0, 0, line))(line)
 
@@ -226,30 +249,45 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val r4 = dag.Reduce(Max, load2)(line)
       val r5 = dag.Reduce(Min, load2)(line)
 
-      val input = Join(Add, Cross(Some(CrossRight)),
+      val input = Join(
+        Add,
+        Cross(Some(CrossRight)),
         r1,
-        Join(Add, Cross(Some(CrossRight)),
+        Join(
+          Add,
+          Cross(Some(CrossRight)),
           r2,
-          Join(Add, Cross(Some(CrossRight)),
+          Join(
+            Add,
+            Cross(Some(CrossRight)),
             r3,
-            Join(Add, Cross(Some(CrossRight)),
-              r4,
-              r5)(line))(line))(line))(line)
+            Join(Add, Cross(Some(CrossRight)), r4, r5)(line))(line))(line)
+      )(line)
 
       val spec = trans.Leaf(trans.Source)
 
       val megaR1 = dag.MegaReduce(List((spec, List(Sum, Max))), load1)
       val megaR2 = dag.MegaReduce(List((spec, List(Count, Max, Min))), load2)
 
-      val expected = Join(Add, Cross(Some(CrossRight)),
+      val expected = Join(
+        Add,
+        Cross(Some(CrossRight)),
         joinDeref(megaR1, 0, 1, line),
-        Join(Add, Cross(Some(CrossRight)),
+        Join(
+          Add,
+          Cross(Some(CrossRight)),
           joinDeref(megaR1, 0, 0, line),
-          Join(Add, Cross(Some(CrossRight)),
+          Join(
+            Add,
+            Cross(Some(CrossRight)),
             joinDeref(megaR2, 0, 2, line),
-            Join(Add, Cross(Some(CrossRight)),
+            Join(
+              Add,
+              Cross(Some(CrossRight)),
               joinDeref(megaR2, 0, 1, line),
-              joinDeref(megaR2, 0, 0, line))(line))(line))(line))(line)
+              joinDeref(megaR2, 0, 0, line))(line))(line)
+        )(line)
+      )(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -264,14 +302,22 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val red3 = StdDev
       val r3 = dag.Reduce(red3, load)(line)
 
-      val input = Join(Add, Cross(Some(CrossRight)), r1, Join(Sub, Cross(Some(CrossRight)), r1, r3)(line))(line)
+      val input = Join(
+        Add,
+        Cross(Some(CrossRight)),
+        r1,
+        Join(Sub, Cross(Some(CrossRight)), r1, r3)(line))(line)
 
       val leaf = trans.Leaf(trans.Source)
       val megaR = MegaReduce(List((leaf, List(red1, red3))), load)
 
-      val expected = Join(Add, Cross(Some(CrossRight)),
+      val expected = Join(
+        Add,
+        Cross(Some(CrossRight)),
         joinDeref(megaR, 0, 1, line),
-        Join(Sub, Cross(Some(CrossRight)),
+        Join(
+          Sub,
+          Cross(Some(CrossRight)),
           joinDeref(megaR, 0, 1, line),
           joinDeref(megaR, 0, 0, line))(line))(line)
 
@@ -308,11 +354,12 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
         load
       )
 
-      val expected = Join(Add, Cross(None),
+      val expected = Join(
+        Add,
+        Cross(None),
         joinDeref(mega, 2, 0, line),
-        Join(Add, Cross(None),
-          joinDeref(mega, 1, 0, line),
-          joinDeref(mega, 0, 0, line))(line))(line)
+        Join(Add, Cross(None), joinDeref(mega, 1, 0, line), joinDeref(mega, 0, 0, line))(line))(
+        line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -345,11 +392,12 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
         load
       )
 
-      val expected = Join(Add, Cross(None),
+      val expected = Join(
+        Add,
+        Cross(None),
         joinDeref(mega, 1, 1, line),
-        Join(Add, Cross(None),
-          joinDeref(mega, 1, 0, line),
-          joinDeref(mega, 0, 0, line))(line))(line)
+        Join(Add, Cross(None), joinDeref(mega, 1, 0, line), joinDeref(mega, 0, 0, line))(line))(
+        line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -380,11 +428,12 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
         load
       )
 
-      val expected = Join(Add, Cross(None),
+      val expected = Join(
+        Add,
+        Cross(None),
         joinDeref(mega, 0, 2, line),
-        Join(Add, Cross(None),
-          joinDeref(mega, 0, 1, line),
-          joinDeref(mega, 0, 0, line))(line))(line)
+        Join(Add, Cross(None), joinDeref(mega, 0, 1, line), joinDeref(mega, 0, 0, line))(line))(
+        line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -417,11 +466,12 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
         load
       )
 
-      val expected = Join(Add, Cross(None),
+      val expected = Join(
+        Add,
+        Cross(None),
         joinDeref(mega, 2, 0, line),
-        Join(Add, Cross(None),
-          joinDeref(mega, 1, 0, line),
-          joinDeref(mega, 0, 0, line))(line))(line)
+        Join(Add, Cross(None), joinDeref(mega, 1, 0, line), joinDeref(mega, 0, 0, line))(line))(
+        line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -444,28 +494,34 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       val input = dag.Split(
         dag.Group(1, nums, UnfixedSolution(0, nums)),
-        Join(Add, Cross(None),
+        Join(
+          Add,
+          Cross(None),
           SplitGroup(1, nums.identities, id)(line),
-          dag.Reduce(reduction,
-            Filter(IdentitySort,
+          dag.Reduce(
+            reduction,
+            Filter(
+              IdentitySort,
               nums,
-              Join(Lt, Cross(None),
-                nums,
-                SplitParam(0, id)(line))(line))(line))(line))(line), id)(line)
+              Join(Lt, Cross(None), nums, SplitParam(0, id)(line))(line))(line))(line)
+        )(line),
+        id
+      )(line)
 
-      val parent = Filter(IdentitySort,
-        nums,
-        Join(Lt, Cross(None),
-          nums,
-          SplitParam(0, id)(line))(line))(line)  //TODO need a window function
+      val parent =
+        Filter(IdentitySort, nums, Join(Lt, Cross(None), nums, SplitParam(0, id)(line))(line))(
+          line) //TODO need a window function
 
       val megaR = MegaReduce(List((trans.Leaf(trans.Source), List(reduction))), parent)
 
       val expected = dag.Split(
         dag.Group(1, nums, UnfixedSolution(0, nums)),
-        Join(Add, Cross(None),
+        Join(
+          Add,
+          Cross(None),
           SplitGroup(1, nums.identities, id)(line),
-          joinDeref(megaR, 0, 0, line))(line), id)(line)
+          joinDeref(megaR, 0, 0, line))(line),
+        id)(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -486,25 +542,41 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val id = new Identifier
 
       val input = dag.Split(
-        dag.Group(1,
+        dag.Group(
+          1,
           Join(DerefObject, Cross(None), clicks, Const(CString("foo"))(line))(line),
-          UnfixedSolution(0,
-            Join(DerefObject, Cross(None),
-              clicks,
-              Const(CString("user"))(line))(line))),
-        Join(JoinObject, Cross(None),
-          Join(WrapObject, Cross(None),
-            Const(CString("user"))(line),
-            SplitParam(0, id)(line))(line),
-          Join(JoinObject, Cross(None),
-            Join(WrapObject, Cross(None),
+          UnfixedSolution(
+            0,
+            Join(DerefObject, Cross(None), clicks, Const(CString("user"))(line))(line))
+        ),
+        Join(
+          JoinObject,
+          Cross(None),
+          Join(WrapObject, Cross(None), Const(CString("user"))(line), SplitParam(0, id)(line))(
+            line),
+          Join(
+            JoinObject,
+            Cross(None),
+            Join(
+              WrapObject,
+              Cross(None),
               Const(CString("min"))(line),
-              dag.Reduce(Min,
-                SplitGroup(1, Identities.Specs(Vector(LoadIds("/clicks"))), id)(line))(line))(line),
-            Join(WrapObject, Cross(None),
+              dag.Reduce(
+                Min,
+                SplitGroup(1, Identities.Specs(Vector(LoadIds("/clicks"))), id)(line))(line))(
+              line),
+            Join(
+              WrapObject,
+              Cross(None),
               Const(CString("max"))(line),
-              dag.Reduce(Max,
-                SplitGroup(1, Identities.Specs(Vector(LoadIds("/clicks"))), id)(line))(line))(line))(line))(line), id)(line)
+              dag.Reduce(
+                Max,
+                SplitGroup(1, Identities.Specs(Vector(LoadIds("/clicks"))), id)(line))(line))(
+              line)
+          )(line)
+        )(line),
+        id
+      )(line)
 
       val parent = SplitGroup(1, clicks.identities, id)(line)
       val red1 = dag.Reduce(Min, parent)(line)
@@ -512,23 +584,35 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
       val megaR = MegaReduce(List((trans.Leaf(trans.Source), List(red1.red, red2.red))), parent)
 
       val expected = dag.Split(
-        dag.Group(1,
+        dag.Group(
+          1,
           Join(DerefObject, Cross(None), clicks, Const(CString("foo"))(line))(line),
-          UnfixedSolution(0,
-            Join(DerefObject, Cross(None),
-              clicks,
-              Const(CString("user"))(line))(line))),
-        Join(JoinObject, Cross(None),
-          Join(WrapObject, Cross(None),
-            Const(CString("user"))(line),
-            SplitParam(0, id)(line))(line),
-          Join(JoinObject, Cross(None),
-            Join(WrapObject, Cross(None),
+          UnfixedSolution(
+            0,
+            Join(DerefObject, Cross(None), clicks, Const(CString("user"))(line))(line))
+        ),
+        Join(
+          JoinObject,
+          Cross(None),
+          Join(WrapObject, Cross(None), Const(CString("user"))(line), SplitParam(0, id)(line))(
+            line),
+          Join(
+            JoinObject,
+            Cross(None),
+            Join(
+              WrapObject,
+              Cross(None),
               Const(CString("min"))(line),
               joinDeref(megaR, 0, 1, line))(line),
-            Join(WrapObject, Cross(None),
+            Join(
+              WrapObject,
+              Cross(None),
               Const(CString("max"))(line),
-              joinDeref(megaR, 0, 0, line))(line))(line))(line), id)(line)
+              joinDeref(megaR, 0, 0, line))(line)
+          )(line)
+        )(line),
+        id
+      )(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -645,11 +729,9 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       val id = new Identifier
 
-      val input = dag.Split(
-        dag.Group(1,
-          clicks,
-          UnfixedSolution(0, count)),
-        SplitParam(1, id)(line), id)(line)
+      val input =
+        dag.Split(dag.Group(1, clicks, UnfixedSolution(0, count)), SplitParam(1, id)(line), id)(
+          line)
 
       val expected = MegaReduceState(
         Map(count -> clicks),
@@ -660,7 +742,6 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       findReductions(input, evalCtx) mustEqual expected
     }
-
 
     "in a join where only one side is a reduction" in {
       val line = Line(1, 1, "")
@@ -759,13 +840,18 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
       lazy val input: dag.Split = dag.Split(
         group1,
-        Join(JoinObject, Cross(None),
-          Join(WrapObject, Cross(None),
-            userRoot,
-            SplitParam(0, id)(line))(line),
-          Join(JoinObject, Cross(None),
+        Join(
+          JoinObject,
+          Cross(None),
+          Join(WrapObject, Cross(None), userRoot, SplitParam(0, id)(line))(line),
+          Join(
+            JoinObject,
+            Cross(None),
             Join(WrapObject, Cross(None), minRoot, r1)(line),
-            Join(WrapObject, Cross(None), maxRoot, r2)(line))(line))(line), id)(line)
+            Join(WrapObject, Cross(None), maxRoot, r2)(line))(line)
+        )(line),
+        id
+      )(line)
 
       val expected = MegaReduceState(
         Map(r1 -> parent, r2 -> parent),
@@ -779,12 +865,11 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
   }
 
   def joinDeref(left: DepGraph, first: Int, second: Int, line: Line): DepGraph =
-    Join(DerefArray, Cross(Some(CrossLeft)),
-      Join(DerefArray, Cross(Some(CrossLeft)),
-        left,
-        Const(CLong(first))(line))(line),
+    Join(
+      DerefArray,
+      Cross(Some(CrossLeft)),
+      Join(DerefArray, Cross(Some(CrossLeft)), left, Const(CLong(first))(line))(line),
       Const(CLong(second))(line))(line)
 }
-
 
 object ReductionFinderSpecs extends ReductionFinderSpecs[Need]

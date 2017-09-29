@@ -34,11 +34,13 @@ object ReadTask {
 }
 
 object QueryTask {
-  def apply(source: WorkflowTask, query: Selector, skip: Option[Int], limit: Option[Int]):
-      WorkflowTask =
+  def apply(
+      source: WorkflowTask,
+      query: Selector,
+      skip: Option[Int],
+      limit: Option[Int]): WorkflowTask =
     Fix(QueryTaskF(source, query, skip, limit))
-  def unapply(obj: WorkflowTask):
-      Option[(WorkflowTask, Selector, Option[Int], Option[Int])] =
+  def unapply(obj: WorkflowTask): Option[(WorkflowTask, Selector, Option[Int], Option[Int])] =
     QueryTaskF.unapply(obj.unFix)
 }
 
@@ -58,10 +60,8 @@ object MapReduceTask {
 }
 
 object FoldLeftTask {
-  def apply(head: WorkflowTask, tail: NonEmptyList[WorkflowTask]):
-      WorkflowTask =
+  def apply(head: WorkflowTask, tail: NonEmptyList[WorkflowTask]): WorkflowTask =
     Fix(FoldLeftTaskF(head, tail))
-  def unapply(obj: WorkflowTask):
-      Option[(WorkflowTask, NonEmptyList[WorkflowTask])] =
+  def unapply(obj: WorkflowTask): Option[(WorkflowTask, NonEmptyList[WorkflowTask])] =
     FoldLeftTaskF.unapply(obj.unFix)
 }

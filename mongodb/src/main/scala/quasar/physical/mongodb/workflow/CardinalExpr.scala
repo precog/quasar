@@ -19,21 +19,21 @@ package quasar.physical.mongodb.workflow
 import scalaz._, Scalaz._
 
 sealed abstract class CardinalExpr[A]
-final case class MapExpr[A](fn: A)  extends CardinalExpr[A]
+final case class MapExpr[A](fn: A) extends CardinalExpr[A]
+
 /** Like `MapExpr`, but stores the result of `fn` in `place` (which must be
-  * assignable).
-  */
-final case class SubExpr[A](place: A, fn: A)  extends CardinalExpr[A]
+ * assignable).
+ */
+final case class SubExpr[A](place: A, fn: A) extends CardinalExpr[A]
 final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
 
 object CardinalExpr {
   implicit val traverse: Traverse[CardinalExpr] =
     new Traverse[CardinalExpr] {
-      def traverseImpl[G[_]: Applicative, A, B](
-        fa: CardinalExpr[A])(f: A => G[B]):
-          G[CardinalExpr[B]] =
+      def traverseImpl[G[_]: Applicative, A, B](fa: CardinalExpr[A])(
+          f: A => G[B]): G[CardinalExpr[B]] =
         fa match {
-          case MapExpr(e)  => f(e).map(MapExpr(_))
+          case MapExpr(e) => f(e).map(MapExpr(_))
           case SubExpr(p, e) => (f(p) ⊛ f(e))(SubExpr(_, _))
           case FlatExpr(e) => f(e).map(FlatExpr(_))
         }

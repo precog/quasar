@@ -26,9 +26,10 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._
 
-final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
-  (core: Planner[T, F, MapFuncCore[T, ?]])
-  extends Planner[T, F, MapFuncDerived[T, ?]] {
+final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT: ShowT,
+F[_]: Applicative: Monad: NameGenerator: PlannerErrorME](core: Planner[T, F, MapFuncCore[T, ?]])
+    extends Planner[T, F, MapFuncDerived[T, ?]] {
 
-    def plan: AlgebraM[F, MapFuncDerived[T, ?], T[N1QL]] = ExpandMapFunc.expand(core.plan, κ(None))
+  def plan: AlgebraM[F, MapFuncDerived[T, ?], T[N1QL]] =
+    ExpandMapFunc.expand(core.plan, κ(None))
 }

@@ -24,7 +24,8 @@ import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.niflheim._
 
-case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: Long) extends Slice {
+case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: Long)
+    extends Slice {
   import TransSpecModule.paths
 
   val logger = LoggerFactory.getLogger("com.precog.yggdrasil.table.SegmentsWrapper")
@@ -50,7 +51,8 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
       def apply(row: Int) = loId(row)
     }
 
-    Set((ColumnRef(CPath(paths.Key) \ 0 \ 0, CLong), loKey),
+    Set(
+      (ColumnRef(CPath(paths.Key) \ 0 \ 0, CLong), loKey),
       (ColumnRef(CPath(paths.Key) \ 0 \ 1, CLong), hoKey))
   }
 
@@ -64,7 +66,8 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
     (ColumnRef(CPath(paths.Key) \ 0, CLong), ArrayLongColumn(keys))
   }
 
-  private def buildColumnRef(seg: Segment) = ColumnRef(CPath(paths.Value) \ seg.cpath, seg.ctype)
+  private def buildColumnRef(seg: Segment) =
+    ColumnRef(CPath(paths.Value) \ seg.cpath, seg.ctype)
 
   private def buildColumn(seg: Segment): Column = seg match {
     case segment: ArraySegment[a] =>
@@ -85,22 +88,24 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
     case BooleanSegment(_, _, defined, values, _) =>
       new ArrayBoolColumn(defined, values)
 
-    case NullSegment(_, _, ctype, defined, _) => ctype match {
-      case CNull =>
-        NullColumn(defined)
-      case CEmptyObject =>
-        new MutableEmptyObjectColumn(defined)
-      case CEmptyArray =>
-        new MutableEmptyArrayColumn(defined)
-      case CUndefined =>
-        sys.error("also impossible")
-    }
+    case NullSegment(_, _, ctype, defined, _) =>
+      ctype match {
+        case CNull =>
+          NullColumn(defined)
+        case CEmptyObject =>
+          new MutableEmptyObjectColumn(defined)
+        case CEmptyArray =>
+          new MutableEmptyArrayColumn(defined)
+        case CUndefined =>
+          sys.error("also impossible")
+      }
   }
 
   private def buildMap(segments: Seq[Segment]): Map[ColumnRef, Column] =
     segments.map(seg => (buildColumnRef(seg), buildColumn(seg))).toMap
 
-  private val cols: Map[ColumnRef, Column] = buildMap(segments) + buildKeyColumn(segments.headOption map (_.length) getOrElse 0)
+  private val cols: Map[ColumnRef, Column] = buildMap(segments) + buildKeyColumn(
+    segments.headOption map (_.length) getOrElse 0)
 
   val size: Int = {
     val sz = segments.foldLeft(0)(_ max _.length)

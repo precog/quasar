@@ -33,7 +33,8 @@ class FsPathSpec extends quasar.Qspec {
     }
 
     "include volume when in volume" in {
-      val p = InVolume("c:", rootDir[Sandboxed]) </> dir("bat") </> dir("quux") </> file("blaat.png")
+      val p = InVolume("c:", rootDir[Sandboxed]) </> dir("bat") </> dir("quux") </> file(
+        "blaat.png")
       printWin(p) ==== s"c:${printPath(p.path)}"
     }
   }

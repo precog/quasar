@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import slamdata.Predef.{ Eq => _, _ }
+import slamdata.Predef.{Eq => _, _}
 import quasar._
 import quasar.javascript.Js
 import quasar.jscore._
@@ -29,8 +29,7 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
 
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
   def toJsDate(value: Bson.Date): R =
-    New(Name("Date"), List(
-      Literal(Js.Str(Instant.ofEpochMilli(value.millis).toString))))
+    New(Name("Date"), List(Literal(Js.Str(Instant.ofEpochMilli(value.millis).toString))))
 
   /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
   def toJsObjectId(value: Bson.ObjectId): R =
@@ -43,7 +42,8 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
     BinOp(Or, isDec(expr), isInt(expr))
 
   def isInt[A](expr: R): R =
-    BinOp(Or,
+    BinOp(
+      Or,
       BinOp(Instance, expr, ident("NumberInt")),
       BinOp(Instance, expr, ident("NumberLong")))
 
@@ -60,14 +60,10 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
     Call(select(ident("Array"), "isArray"), List(expr))
 
   def isObject(expr: R): R =
-    BinOp(And,
-      isObjectOrArray(expr),
-      UnOp(Not, isArray(expr)))
+    BinOp(And, isObjectOrArray(expr), UnOp(Not, isArray(expr)))
 
   def isArrayOrString(expr: R): R =
-    BinOp(Or,
-      isArray(expr),
-      isString(expr))
+    BinOp(Or, isArray(expr), isString(expr))
 
   def isBoolean(expr: R): R =
     BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))

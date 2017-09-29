@@ -30,7 +30,10 @@ trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
 
   def findAllAPIKeys(fromRoot: APIKey): M[Set[v1.APIKeyDetails]]
 
-  def createAPIKey(accountId: AccountId, keyName: Option[String] = None, keyDesc: Option[String] = None): M[v1.APIKeyDetails]
+  def createAPIKey(
+      accountId: AccountId,
+      keyName: Option[String] = None,
+      keyDesc: Option[String] = None): M[v1.APIKeyDetails]
 
   def addGrant(accountKey: APIKey, grantId: GrantId): M[Boolean]
 
@@ -41,7 +44,10 @@ trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
     def findAllAPIKeys(fromRoot: APIKey) =
       t(self.findAllAPIKeys(fromRoot))
 
-    def createAPIKey(accountId: AccountId, keyName: Option[String] = None, keyDesc: Option[String] = None) =
+    def createAPIKey(
+        accountId: AccountId,
+        keyName: Option[String] = None,
+        keyDesc: Option[String] = None) =
       t(self.createAPIKey(accountId, keyName, keyDesc))
 
     def addGrant(accountKey: APIKey, grantId: GrantId) =
@@ -52,12 +58,16 @@ trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
   }
 }
 
-class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging {
+class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: Monad[M])
+    extends APIKeyFinder[M]
+    with Logging {
   val grantDetails: Grant => v1.GrantDetails = {
-    case Grant(gid, gname, gdesc, _, _, perms, createdAt, exp) => v1.GrantDetails(gid, gname, gdesc, perms, createdAt, exp)
+    case Grant(gid, gname, gdesc, _, _, perms, createdAt, exp) =>
+      v1.GrantDetails(gid, gname, gdesc, perms, createdAt, exp)
   }
 
-  def recordDetails(rootKey: Option[APIKey]): PartialFunction[APIKeyRecord, M[v1.APIKeyDetails]] = {
+  def recordDetails(
+      rootKey: Option[APIKey]): PartialFunction[APIKeyRecord, M[v1.APIKeyDetails]] = {
     case APIKeyRecord(apiKey, name, description, issuer, grantIds, false) =>
       underlying.findAPIKeyAncestry(apiKey).flatMap { ancestors =>
         val ancestorKeys = ancestors.drop(1).map(_.apiKey) // The first element of ancestors is the key itself, so we drop it
@@ -65,15 +75,25 @@ class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: M
           val divulgedIssuers = rootKey.map { rk =>
             ancestorKeys.reverse.dropWhile(_ != rk).reverse
           }.getOrElse(Nil)
-          log.debug("Divulging issuers %s for key %s based on root key %s and ancestors %s".format(divulgedIssuers, apiKey, rootKey, ancestorKeys))
-          v1.APIKeyDetails(apiKey, name, description, grants.flatten.map(grantDetails)(collection.breakOut), divulgedIssuers)
+          log.debug(
+            "Divulging issuers %s for key %s based on root key %s and ancestors %s"
+              .format(divulgedIssuers, apiKey, rootKey, ancestorKeys))
+          v1.APIKeyDetails(
+            apiKey,
+            name,
+            description,
+            grants.flatten.map(grantDetails)(collection.breakOut),
+            divulgedIssuers)
         }
       }
   }
 
   val recordDetails: PartialFunction[APIKeyRecord, M[v1.APIKeyDetails]] = recordDetails(None)
 
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = {
+  def hasCapability(
+      apiKey: APIKey,
+      perms: Set[Permission],
+      at: Option[LocalDateTime]): M[Boolean] = {
     underlying.hasCapability(apiKey, perms, at)
   }
 
@@ -95,7 +115,10 @@ class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: M
     }
   }
 
-  def createAPIKey(accountId: AccountId, keyName: Option[String] = None, keyDesc: Option[String] = None): M[v1.APIKeyDetails] = {
+  def createAPIKey(
+      accountId: AccountId,
+      keyName: Option[String] = None,
+      keyDesc: Option[String] = None): M[v1.APIKeyDetails] = {
     underlying.newStandardAPIKeyRecord(accountId, keyName, keyDesc) flatMap recordDetails
   }
 

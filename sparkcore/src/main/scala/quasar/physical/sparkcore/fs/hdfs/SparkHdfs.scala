@@ -22,18 +22,24 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, readerT._
 import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
-import quasar.fp, fp.ski._, fp.TaskRef,  fp.free._
-import quasar.fs._,
-  mount._,
-  FileSystemError._, PathError._, WriteFile._,
-  BackendDef.{DefinitionError, DefErrT},
-  QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
+import quasar.fp, fp.ski._, fp.TaskRef, fp.free._
+import quasar.fs._, mount._, FileSystemError._, PathError._, WriteFile._,
+BackendDef.{DefErrT, DefinitionError}, QueryFile.ResultHandle, ReadFile.ReadHandle,
+WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._, SparkConnectorDetails._
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
+import quasar.qscript.{
+  ::/::,
+  ::\::,
+  EquiJoin,
+  Injectable,
+  QScriptCore,
+  QScriptTotal,
+  ShiftedRead
+}
 
 import java.io.BufferedWriter
-import java.net.{URLDecoder, URI}
+import java.net.{URI, URLDecoder}
 
 import org.http4s.{ParseFailure, Uri}
 import org.apache.hadoop.conf.Configuration
@@ -58,17 +64,18 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
   val Type = FileSystemType("spark-hdfs")
 
-  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
-  type Eff2[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
-  type Eff3[A]  = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff2, A]
-  type Eff4[A]  = Coproduct[Task, Eff3, A]
-  type Eff5[A]  = Coproduct[PhysErr, Eff4, A]
-  type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
-  type Eff7[A]  = Coproduct[SparkConnectorDetails, Eff6, A]
-  type Eff[A]   = Coproduct[Read[HdfsFileSystem, ?], Eff7, A]
+  type Eff1[A] =
+    Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
+  type Eff2[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
+  type Eff3[A] = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff2, A]
+  type Eff4[A] = Coproduct[Task, Eff3, A]
+  type Eff5[A] = Coproduct[PhysErr, Eff4, A]
+  type Eff6[A] = Coproduct[MonotonicSeq, Eff5, A]
+  type Eff7[A] = Coproduct[SparkConnectorDetails, Eff6, A]
+  type Eff[A] = Coproduct[Read[HdfsFileSystem, ?], Eff7, A]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-        ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
@@ -91,37 +98,48 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
         HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
       }
       uriStr = fs.getUri().toASCIIString()
-      _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
+      _ <- if (uriStr.startsWith("file:///"))
+        Task.fail(new RuntimeException("Provided URL is not valid HDFS URL"))
+      else ().point[Task]
     } yield fs
 
-  def hdfsPathStr(sfsConf: HdfsConfig): AFile => ReaderT[Task, SparkContext, String] = (afile: AFile) => ReaderT(κ(Task.delay {
-    sfsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
-  }))
+  def hdfsPathStr(sfsConf: HdfsConfig): AFile => ReaderT[Task, SparkContext, String] =
+    (afile: AFile) =>
+      ReaderT(κ(Task.delay {
+        sfsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
+      }))
 
-  def toLowerLevel[S[_]](sc: SparkContext, config: HdfsConfig)(implicit
-    S0: Task :<: S, S1: PhysErr :<: S
-  ): Task[Free[Eff, ?] ~> Free[S, ?]] =
+  def toLowerLevel[S[_]](sc: SparkContext, config: HdfsConfig)(
+      implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): Task[Free[Eff, ?] ~> Free[S, ?]] =
     (TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, HdfsWriteCursor]) |@|
-      generateHdfsFS(config)
-    ) {
-      (genState, rddStates, sparkCursors, writeCursors, hdfsFS) =>
-
+      generateHdfsFS(config)) { (genState, rddStates, sparkCursors, writeCursors, hdfsFS) =>
       val detailsInterpreter =
-        details.interpreter[ReaderT[Task, SparkContext, ?]](readChunkSize = 5000, ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config))
+        details.interpreter[ReaderT[Task, SparkContext, ?]](
+          readChunkSize = 5000,
+          ReaderT(κ(hdfsFS.point[Task])),
+          hdfsPathStr(config))
 
       val interpreter: Eff ~> S =
         (Read.constant[Task, HdfsFileSystem](hdfsFS) andThen injectNT[Task, S]) :+:
-        (detailsInterpreter andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
-      (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-      injectNT[PhysErr, S] :+:
-      injectNT[Task, S]  :+:
-      (KeyValueStore.impl.fromTaskRef[WriteHandle, HdfsWriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
-      (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-      (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
-      (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+          (detailsInterpreter andThen runReaderNT(sc) andThen injectNT[Task, S]) :+:
+          (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+          injectNT[PhysErr, S] :+:
+          injectNT[Task, S] :+:
+          (KeyValueStore.impl.fromTaskRef[WriteHandle, HdfsWriteCursor](writeCursors) andThen injectNT[
+          Task,
+          S]) :+:
+          (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[
+          Task,
+          S]) :+:
+          (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[
+          Task,
+          S]) :+:
+          (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
       mapSNT[Eff, S](interpreter)
     }
@@ -140,12 +158,22 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
       State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
 
     val uriOrErr: DefErrT[Task, Uri] =
-      EitherT(Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString)).point[Task])
+      EitherT(
+        Uri
+          .fromString(connUri.value)
+          .leftMap((pf: ParseFailure) => liftErr(pf.toString))
+          .point[Task])
 
     val sparkConfOrErr: DefErrT[Task, SparkConf] = for {
       uri <- uriOrErr
-      host <- EitherT(uri.host.fold(liftErr("host not provided").left[Uri.Host])(_.right[DefinitionError]).point[Task])
-      port <- EitherT(uri.port.fold(liftErr("port not provided").left[Int])(_.right[DefinitionError]).point[Task])
+      host <- EitherT(
+        uri.host
+          .fold(liftErr("host not provided").left[Uri.Host])(_.right[DefinitionError])
+          .point[Task])
+      port <- EitherT(
+        uri.port
+          .fold(liftErr("port not provided").left[Int])(_.right[DefinitionError])
+          .point[Task])
     } yield {
       (master(host.value, port) *> appName *>
         config("spark.executor.memory", uri) *>
@@ -165,24 +193,38 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
         config("spark.memory.storageFraction", uri) *>
         config("spark.cores.max", uri) *>
         config("spark.speculation", uri) *>
-        config("spark.task.cpus", uri)
-      ).exec(new SparkConf())
+        config("spark.task.cpus", uri)).exec(new SparkConf())
     }
 
-    val hdfsUrlOrErr: DefErrT[Task, String] = uriOrErr.flatMap(uri =>
-      EitherT(uri.params.get("hdfsUrl").map(url => URLDecoder.decode(url, "UTF-8")).fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError]).point[Task])
-    )
+    val hdfsUrlOrErr: DefErrT[Task, String] = uriOrErr.flatMap(
+      uri =>
+        EitherT(
+          uri.params
+            .get("hdfsUrl")
+            .map(url => URLDecoder.decode(url, "UTF-8"))
+            .fold(liftErr("'hdfsUrl' parameter not provided").left[String])(
+              _.right[DefinitionError])
+            .point[Task]))
 
     val rootPathOrErr: DefErrT[Task, ADir] =
       uriOrErr
-        .flatMap(uri =>
-          EitherT(uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError]).point[Task])
-        )
-        .flatMap(pathStr =>
-          EitherT(posixCodec.parseAbsDir(pathStr)
-            .map(unsafeSandboxAbs)
-            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError]).point[Task])
-        )
+        .flatMap(
+          uri =>
+            EitherT(
+              uri.params
+                .get("rootPath")
+                .fold(liftErr("'rootPath' parameter not provided").left[String])(
+                  _.right[DefinitionError])
+                .point[Task]))
+        .flatMap(
+          pathStr =>
+            EitherT(
+              posixCodec
+                .parseAbsDir(pathStr)
+                .map(unsafeSandboxAbs)
+                .fold(liftErr("'rootPath' is not a valid path").left[ADir])(
+                  _.right[DefinitionError])
+                .point[Task]))
 
     for {
       sparkConf <- sparkConfOrErr
@@ -194,8 +236,14 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   private def sparkCoreJar: DefErrT[Task, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
-      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
+      val pathStr = URLDecoder.decode(
+        this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath,
+        "UTF-8")
+      posixCodec.parsePath[Option[APath]](
+        _ => None,
+        Some(_).map(unsafeSandboxAbs),
+        _ => None,
+        Some(_).map(unsafeSandboxAbs))(pathStr)
     }
     val jar: Task[Option[APath]] =
       fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
@@ -203,30 +251,39 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  private def initSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => EitherT(Task.delay {
-    // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+  private def initSC: HdfsConfig => DefErrT[Task, SparkContext] =
+    (config: HdfsConfig) =>
+      EitherT(Task.delay {
+        // look, I didn't make Spark the way it is...
+        java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
 
-    new SparkContext(config.sparkConf).right[DefinitionError]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      NonEmptyList("You can not mount second Spark based connector... " +
-        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
+        new SparkContext(config.sparkConf).right[DefinitionError]
+      }.handleWith {
+        case ex: SparkException if ex.getMessage.contains("SPARK-2243") =>
+          NonEmptyList(
+            "You can not mount second Spark based connector... " +
+              "Please unmount existing one first.")
+            .left[EnvironmentError]
+            .left[SparkContext]
+            .point[Task]
+      })
 
-  def generateSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => for {
-    sc  <- initSC(config)
-    jar <- sparkCoreJar
-  } yield {
-    sc.addJar(posixCodec.printPath(jar))
-    sc
-  }
+  def generateSC: HdfsConfig => DefErrT[Task, SparkContext] =
+    (config: HdfsConfig) =>
+      for {
+        sc <- initSC(config)
+        jar <- sparkCoreJar
+      } yield {
+        sc.addJar(posixCodec.printPath(jar))
+        sc
+    }
 
-  private def toPath(apath: APath): Free[Eff, Path] = lift(Task.delay {
-    new Path(posixCodec.unsafePrintPath(apath))
-  }).into[Eff]
+  private def toPath(apath: APath): Free[Eff, Path] =
+    lift(Task.delay {
+      new Path(posixCodec.unsafePrintPath(apath))
+    }).into[Eff]
 
-  class details[F[_]:Capture:Bind](fileSystem: F[HdfsFileSystem]) {
+  class details[F[_]: Capture: Bind](fileSystem: F[HdfsFileSystem]) {
 
     private def toPath(apath: APath): F[Path] = Capture[F].capture {
       new Path(posixCodec.unsafePrintPath(apath))
@@ -235,71 +292,83 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     private def fetchRdd(sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
       import ParquetRDD._
       // TODO add magic number support to distinguish
-      if(pathStr.endsWith(".parquet"))
+      if (pathStr.endsWith(".parquet"))
         sc.parquet(pathStr)
       else
-        sc.textFile(pathStr)
-          .map(raw => DataCodec.parse(raw)(DataCodec.Precise) | Data.NA)
+        sc.textFile(pathStr).map(raw => DataCodec.parse(raw)(DataCodec.Precise) | Data.NA)
     }
 
-    def rddFrom(f: AFile)(hdfsPathStr: AFile => F[String])(implicit
-      reader: MonadReader[F, SparkContext]
-    ): F[RDD[Data]] = for {
-      pathStr <- hdfsPathStr(f)
-      sc <- reader.ask
-      rdd <- fetchRdd(sc, pathStr)
-    } yield rdd
+    def rddFrom(f: AFile)(hdfsPathStr: AFile => F[String])(
+        implicit
+        reader: MonadReader[F, SparkContext]): F[RDD[Data]] =
+      for {
+        pathStr <- hdfsPathStr(f)
+        sc <- reader.ask
+        rdd <- fetchRdd(sc, pathStr)
+      } yield rdd
 
-    def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
-      path <- toPath(out)
-      hdfs <- fileSystem
-    } yield {
-      val os: OutputStream = hdfs.create(path, new Progressable() {
-        override def progress(): Unit = {}
-      })
-      val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
+    def store(rdd: RDD[Data], out: AFile): F[Unit] =
+      for {
+        path <- toPath(out)
+        hdfs <- fileSystem
+      } yield {
+        val os: OutputStream = hdfs.create(path, new Progressable() {
+          override def progress(): Unit = {}
+        })
+        val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
 
-      rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => {
-        bw.write(v)
-        bw.newLine()
-      })
-      bw.close()
-    }
+        rdd
+          .flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
+          .collect()
+          .foreach(v => {
+            bw.write(v)
+            bw.newLine()
+          })
+        bw.close()
+      }
 
-    def fileExists(f: AFile): F[Boolean] = for {
-      path <- toPath(f)
-      hdfs <- fileSystem
-    } yield hdfs.exists(path)
+    def fileExists(f: AFile): F[Boolean] =
+      for {
+        path <- toPath(f)
+        hdfs <- fileSystem
+      } yield hdfs.exists(path)
 
-    def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] = EitherT(for {
-      path <- toPath(d)
-      hdfs <- fileSystem
-    } yield if(hdfs.exists(path)) {
-        hdfs.listStatus(path).toSet.map {
-          case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
-          case directory => DirName(directory.getPath().getName()).left[FileName]
-        }.right[FileSystemError]
-      } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-    )}
+    def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] =
+      EitherT(
+        for {
+          path <- toPath(d)
+          hdfs <- fileSystem
+        } yield
+          if (hdfs.exists(path)) {
+            hdfs
+              .listStatus(path)
+              .toSet
+              .map {
+                case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
+                case directory => DirName(directory.getPath().getName()).left[FileName]
+              }
+              .right[FileSystemError]
+          } else pathErr(pathNotFound(d)).left[Set[PathSegment]])
+  }
 
   object details {
 
-    def interpreter[F[_]:Capture](
-      readChunkSize: Int,
-      fileSystem: F[HdfsFileSystem],
-      hdfsPathStr: AFile => F[String]
-    )(implicit
-      reader: MonadReader[F, SparkContext]
-    ): SparkConnectorDetails ~> F =
+    def interpreter[F[_]: Capture](
+        readChunkSize: Int,
+        fileSystem: F[HdfsFileSystem],
+        hdfsPathStr: AFile => F[String]
+    )(
+        implicit
+        reader: MonadReader[F, SparkContext]): SparkConnectorDetails ~> F =
       new (SparkConnectorDetails ~> F) {
         val qf = new details[F](fileSystem)
 
         def apply[A](from: SparkConnectorDetails[A]) = from match {
-          case FileExists(f)       => qf.fileExists(f)
-          case ReadChunkSize       => readChunkSize.point[F]
+          case FileExists(f) => qf.fileExists(f)
+          case ReadChunkSize => readChunkSize.point[F]
           case StoreData(rdd, out) => qf.store(rdd, out)
-          case ListContents(d)     => qf.listContents(d).run
-          case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
+          case ListContents(d) => qf.listContents(d).run
+          case RDDFrom(f) => qf.rddFrom(f)(hdfsPathStr)
         }
       }
   }
@@ -308,16 +377,17 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     import WriteFile._
 
     def open(file: AFile): Backend[WriteHandle] = {
-      def createCursor: Free[Eff, HdfsWriteCursor] = for {
-        path <- toPath(file)
-        hdfs <- hdfsFSOps.ask
-      } yield {
-        val os: OutputStream = hdfs.create(path, new Progressable() {
-          override def progress(): Unit = {}
-        })
-        val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
-        HdfsWriteCursor(hdfs, bw)
-      }
+      def createCursor: Free[Eff, HdfsWriteCursor] =
+        for {
+          path <- toPath(file)
+          hdfs <- hdfsFSOps.ask
+        } yield {
+          val os: OutputStream = hdfs.create(path, new Progressable() {
+            override def progress(): Unit = {}
+          })
+          val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
+          HdfsWriteCursor(hdfs, bw)
+        }
 
       (for {
         hwc <- createCursor
@@ -338,7 +408,7 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
         lift(Task.delay(lines.flatMap {
           case (line, data) =>
-            \/.fromTryCatchNonFatal{
+            \/.fromTryCatchNonFatal {
               bw.write(line)
               bw.newLine()
             }.fold(
@@ -350,21 +420,24 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
       val findAndWrite: OptionT[Free[Eff, ?], Vector[FileSystemError]] = for {
         HdfsWriteCursor(_, bw) <- writersOps.get(h)
-        errors                 <- _write(bw).liftM[OptionT]
+        errors <- _write(bw).liftM[OptionT]
       } yield errors
 
-      findAndWrite.fold (
-        errs => errs,
-        Vector[FileSystemError](unknownWriteHandle(h))
-      ).liftM[ConfiguredT]
+      findAndWrite
+        .fold(
+          errs => errs,
+          Vector[FileSystemError](unknownWriteHandle(h))
+        )
+        .liftM[ConfiguredT]
     }
 
-    def close(h: WriteHandle): Configured[Unit] = (for {
-      HdfsWriteCursor(hdfs, br) <- writersOps.get(h)
-      _                         <- writersOps.delete(h).liftM[OptionT]
-    } yield {
-      br.close()
-    }).run.void.liftM[ConfiguredT]
+    def close(h: WriteHandle): Configured[Unit] =
+      (for {
+        HdfsWriteCursor(hdfs, br) <- writersOps.get(h)
+        _ <- writersOps.delete(h).liftM[OptionT]
+      } yield {
+        br.close()
+      }).run.void.liftM[ConfiguredT]
   }
 
   def WriteFileModule = HdfsWriteFileModule
@@ -398,20 +471,23 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
       Failure.Ops[PhysicalError, Eff].unattempt(move)
     }
 
-    def doesPathExist: APath => Free[Eff, Boolean] = (ap) => for {
-      path <- toPath(ap)
-      hdfs <- hdfsFSOps.ask
-    } yield hdfs.exists(path)
+    def doesPathExist: APath => Free[Eff, Boolean] =
+      (ap) =>
+        for {
+          path <- toPath(ap)
+          hdfs <- hdfsFSOps.ask
+        } yield hdfs.exists(path)
 
     def delete(p: APath): Backend[Unit] = {
 
       val delete: Free[Eff, FileSystemError \/ Unit] = for {
         path <- toPath(p)
         hdfs <- hdfsFSOps.ask
-      } yield (if (hdfs.exists(path))
-        hdfs.delete(path, true).right[FileSystemError].void
-      else
-        pathErr(pathNotFound(p)).left[Unit])
+      } yield
+        (if (hdfs.exists(path))
+           hdfs.delete(path, true).right[FileSystemError].void
+         else
+           pathErr(pathNotFound(p)).left[Unit])
 
       delete.liftB.unattempt
     }

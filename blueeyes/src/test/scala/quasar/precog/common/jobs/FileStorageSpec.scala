@@ -34,13 +34,17 @@ class FileStorageSpec extends Specification {
 
   lazy val data1: FileData[M] = {
     val strings = "Hello" :: "," :: " " :: "world!" :: StreamT.empty[M, String]
-    val data = strings map { s => s.getBytes("UTF-8") }
+    val data = strings map { s =>
+      s.getBytes("UTF-8")
+    }
     FileData(Some(TEXT), data)
   }
 
   lazy val data2: FileData[M] = {
     val strings = "Goodbye" :: "," :: " " :: "cruel world." :: StreamT.empty[M, String]
-    val data = strings map { s => s.getBytes("UTF-8") }
+    val data = strings map { s =>
+      s.getBytes("UTF-8")
+    }
     FileData(Some(HTML), data)
   }
 
@@ -79,7 +83,7 @@ class FileStorageSpec extends Specification {
         _ <- fs.save("f3", data1): M[Unit]
         exists <- fs.exists("f3"): M[Boolean]
       } yield exists
-      
+
       result.copoint must_== true
     }
 
@@ -88,7 +92,7 @@ class FileStorageSpec extends Specification {
     }
 
     "allow removal of files" in {
-      val result: M[(Boolean, Boolean)]  = for {
+      val result: M[(Boolean, Boolean)] = for {
         _ <- fs.save("f4", data1)
         e1 <- fs.exists("f4")
         _ <- fs.remove("f4")

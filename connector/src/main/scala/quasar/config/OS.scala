@@ -27,8 +27,8 @@ sealed abstract class OS {
   def fold[X](win: => X, mac: => X, posix: => X): X =
     this match {
       case Windows => win
-      case Mac     => mac
-      case Posix   => posix
+      case Mac => mac
+      case Posix => posix
     }
 
   def isWin: Boolean = fold(true, false, false)

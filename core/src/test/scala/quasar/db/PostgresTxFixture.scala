@@ -28,7 +28,7 @@ trait PostgresTxFixture {
   def postgresConfigStr: OptionT[Task, String]
 
   /** Connects to a freshly-created PostgreSQL test DB.
-    */
+   */
   def postgreSqlTransactor(dbName: String): OptionT[Task, Transactor[Task]] = {
     def recreateDb(dbName: String): ConnectionIO[Unit] =
       Update0(s"DROP DATABASE IF EXISTS $dbName", None).run.void *>
@@ -36,19 +36,24 @@ trait PostgresTxFixture {
 
     postgresConfigStr.flatMapF(cfgStr =>
       for {
-        cfgJson <- Parse.parse(cfgStr).fold(
-                    err => Task.fail(new RuntimeException(err)),
-                    json => Task.now(Json("postgresql" -> json)))
-        mainCfg <- cfgJson.as[DbConnectionConfig].result.fold(
-                    err => Task.fail(new RuntimeException(err.toString)),
-                    Task.now)
+        cfgJson <- Parse
+          .parse(cfgStr)
+          .fold(
+            err => Task.fail(new RuntimeException(err)),
+            json => Task.now(Json("postgresql" -> json)))
+        mainCfg <- cfgJson
+          .as[DbConnectionConfig]
+          .result
+          .fold(err => Task.fail(new RuntimeException(err.toString)), Task.now)
 
         // Reset the test DB:
-        interp  =  DbUtil.noTxInterp(DbConnectionConfig.connectionInfo(mainCfg))
-        _       <- interp(recreateDb(dbName))
+        interp = DbUtil.noTxInterp(DbConnectionConfig.connectionInfo(mainCfg))
+        _ <- interp(recreateDb(dbName))
 
         // Connect to the fresh test DB:
-        testCfg =  mainCfg.asInstanceOf[DbConnectionConfig.PostgreSql].copy(database = dbName.some)
+        testCfg = mainCfg
+          .asInstanceOf[DbConnectionConfig.PostgreSql]
+          .copy(database = dbName.some)
       } yield simpleTransactor(DbConnectionConfig.connectionInfo(testCfg)))
   }
 }

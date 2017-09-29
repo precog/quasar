@@ -40,8 +40,6 @@ trait PostgresInsert extends RdbmsInsert {
 
     val fQuery = fr"insert into " ++ Fragment.const(dbPath.shows) ++ fr"(data) values(?::JSON)"
 
-    Update[Data](fQuery.update.sql)
-      .updateMany(chunk)
-      .map(_ => Vector.empty[FileSystemError])
+    Update[Data](fQuery.update.sql).updateMany(chunk).map(_ => Vector.empty[FileSystemError])
   }
 }

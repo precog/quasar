@@ -19,7 +19,7 @@ package quasar.api
 import slamdata.Predef.PartialFunction
 import quasar.fp.free
 import quasar.fp.ski._
-import org.http4s.{Request, Status, HttpService}
+import org.http4s.{HttpService, Request, Status}
 import scalaz._
 
 final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QResponse[S]]]) {

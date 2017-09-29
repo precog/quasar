@@ -31,17 +31,21 @@ import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
   def projectField[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
-    implicit I: MapFunc[Fix, ?] :<: S
+      implicit I: MapFunc[Fix, ?] :<: S
   ): Free[S, Hole] =
-    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectField(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+    Free
+      .roll[MapFunc[Fix, ?], Hole](MFC(ProjectField(src, StrLit(str))))
+      .mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
   def makeMap[S[_]: Functor](key: String, values: Free[MapFunc[Fix, ?], Hole])(
-    implicit I: MapFunc[Fix, ?] :<: S
-  ) : Free[S, Hole] =
-    Free.roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+      implicit I: MapFunc[Fix, ?] :<: S
+  ): Free[S, Hole] =
+    Free
+      .roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values)))
+      .mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
   def hole[S[_]: Functor](
-    implicit I: MapFunc[Fix, ?] :<: S
+      implicit I: MapFunc[Fix, ?] :<: S
   ): Free[S, Hole] =
     Free.point[MapFunc[Fix, ?], Hole](SrcHole).mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
@@ -64,7 +68,8 @@ final class ProjectPathSpec extends quasar.Qspec {
     }
 
     "preserve an unrelated node inside a nesting of ProjectField" in {
-      val inclUnrelatedNode = projectField[MapFunc[Fix, ?]](makeMap("k", projectField(hole, "info")), "location")
+      val inclUnrelatedNode =
+        projectField[MapFunc[Fix, ?]](makeMap("k", projectField(hole, "info")), "location")
 
       ProjectPath.foldProjectField(inclUnrelatedNode) must
         equal(projectPath(makeMap("k", projectField(hole, "info")), root </> dir("location")))

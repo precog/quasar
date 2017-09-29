@@ -29,16 +29,16 @@ object MetaStoreMounter {
   import MetaStoreAccess._
 
   /** Interpret `Mounting` into `ConnectionIO`, using the supplied functions
-    * to handle mount and unmount requests, and the `Mounts` table as the
-    * `PathStore`.
-    */
+   * to handle mount and unmount requests, and the `Mounts` table as the
+   * `PathStore`.
+   */
   def apply[F[_], S[_]](
-    mount: MountRequest => F[MountingError \/ Unit],
-    unmount: MountRequest => F[Unit]
-  )(implicit
-    S0: F :<: S,
-    S1: ConnectionIO :<: S
-  ): Mounting ~> Free[S, ?] = {
+      mount: MountRequest => F[MountingError \/ Unit],
+      unmount: MountRequest => F[Unit]
+  )(
+      implicit
+      S0: F :<: S,
+      S1: ConnectionIO :<: S): Mounting ~> Free[S, ?] = {
     Mounter[Free[S, ?]](
       req => EitherT(lift(mount(req)).into[S]),
       req => lift(unmount(req)).into[S],
@@ -48,12 +48,12 @@ object MetaStoreMounter {
         def descendants(dir: ADir) =
           lift(mountsHavingPrefix(dir).map(_.keys.toSet)).into[S]
         def insert(path: APath, value: MountConfig) =
-          lift(insertMount(path, value).attempt
-                .flatMap(_.fold(
-                  κ(HC.rollback.as(false)),
-                  κ(true.point[ConnectionIO])))).into[S]
+          lift(
+            insertMount(path, value).attempt.flatMap(
+              _.fold(κ(HC.rollback.as(false)), κ(true.point[ConnectionIO])))).into[S]
         def delete(path: APath) =
           lift(deleteMount(path).run.void).into[S]
-      })
+      }
+    )
   }
 }

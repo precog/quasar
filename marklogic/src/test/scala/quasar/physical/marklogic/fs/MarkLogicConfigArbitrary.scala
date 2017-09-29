@@ -31,12 +31,12 @@ trait MarkLogicConfigArbitrary {
   implicit val markLogicConfigArbitrary: Arbitrary[MarkLogicConfig] =
     Arbitrary(for {
       port <- Gen.choose(1, 65535)
-      fmt  <- Gen.oneOf(DocType.json, DocType.xml)
+      fmt <- Gen.oneOf(DocType.json, DocType.xml)
       rdir <- Arbitrary.arbitrary[PathOf[Abs, Dir, Sandboxed, AlphaCharacters]]
-      db   <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
-      u    <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
-      p    <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
-      uri  =  new URI("xcc", s"$u:$p", "ml.example.com", port, s"/${db}", null, null)
+      db <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
+      u <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
+      p <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_.toString + _)
+      uri = new URI("xcc", s"$u:$p", "ml.example.com", port, s"/${db}", null, null)
     } yield MarkLogicConfig(uri, rdir.path, fmt))
 }
 

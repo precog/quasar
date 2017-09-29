@@ -17,6 +17,6 @@
 package quasar.precog.common
 
 package object security {
-  type APIKey  = String
+  type APIKey = String
   type GrantId = String
 }

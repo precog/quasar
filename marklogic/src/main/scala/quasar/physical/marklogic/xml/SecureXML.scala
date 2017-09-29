@@ -26,10 +26,10 @@ import scala.xml.factory.XMLLoader
 import scalaz.\/
 
 /** Provides methods for securely parsing XML documents, avoiding known DoS attacks.
-  *
-  * @see https://github.com/scala/scala-xml/issues/17
-  * @see https://github.com/akka/akka/pull/17660/files#diff-3f57ed15f4aa764e53d971ec647b544fR47
-  */
+ *
+ * @see https://github.com/scala/scala-xml/issues/17
+ * @see https://github.com/akka/akka/pull/17660/files#diff-3f57ed15f4aa764e53d971ec647b544fR47
+ */
 object SecureXML {
   def loadString(s: String): SAXException \/ Elem =
     \/.fromTryCatchThrowable[Elem, SAXException](loader.loadString(s))
@@ -42,9 +42,15 @@ object SecureXML {
       import com.sun.org.apache.xerces.internal.impl.Constants
       import javax.xml.XMLConstants
 
-      factory.setFeature(Constants.SAX_FEATURE_PREFIX + Constants.EXTERNAL_GENERAL_ENTITIES_FEATURE, false)
-      factory.setFeature(Constants.SAX_FEATURE_PREFIX + Constants.EXTERNAL_PARAMETER_ENTITIES_FEATURE, false)
-      factory.setFeature(Constants.XERCES_FEATURE_PREFIX + Constants.DISALLOW_DOCTYPE_DECL_FEATURE, true)
+      factory.setFeature(
+        Constants.SAX_FEATURE_PREFIX + Constants.EXTERNAL_GENERAL_ENTITIES_FEATURE,
+        false)
+      factory.setFeature(
+        Constants.SAX_FEATURE_PREFIX + Constants.EXTERNAL_PARAMETER_ENTITIES_FEATURE,
+        false)
+      factory.setFeature(
+        Constants.XERCES_FEATURE_PREFIX + Constants.DISALLOW_DOCTYPE_DECL_FEATURE,
+        true)
       factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
       factory.newSAXParser()
     }

@@ -22,8 +22,8 @@ import com.marklogic.xcc.Content
 import scalaz._
 
 /** Typeclass representing the ability to convert an `A` into `Content`, indexed
-  * by the content format.
-  */
+ * by the content format.
+ */
 trait AsContent[FMT, A] { self =>
   def asContent[F[_]: MonadErrMsgs](uri: ContentUri, a: A): F[Content]
 

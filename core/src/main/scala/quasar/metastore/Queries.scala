@@ -27,16 +27,17 @@ import doobie.imports._
 import pathy.Path, Path._
 
 /** Raw query and update terms, which may be `checked` against a DB schema
-  * without requiring or affecting any data.
-  */
+ * without requiring or affecting any data.
+ */
 trait Queries {
   val fsMounts: Query0[(APath, FileSystemConfig)] =
-    sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'".query[(APath, FileSystemConfig)]
+    sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'"
+      .query[(APath, FileSystemConfig)]
 
   def mountsHavingPrefix(dir: ADir): Query0[(APath, MountType)] = {
     val patternChars = List("\\\\", "_", "%") // NB: Order is important here to avoid double-escaping
-    val patternEscaped = patternChars.foldLeft(posixCodec.printPath(dir))((s, c) =>
-                           s.replaceAll(c, s"\\\\$c"))
+    val patternEscaped =
+      patternChars.foldLeft(posixCodec.printPath(dir))((s, c) => s.replaceAll(c, s"\\\\$c"))
     sql"SELECT path, type FROM Mounts WHERE path LIKE ${patternEscaped + "_%"}"
       .query[(APath, MountType)]
   }
@@ -112,12 +113,20 @@ trait Queries {
           FROM view_cache
           WHERE last_update IS NULL OR ($now > refresh_after)""".query[PathedViewCache]
 
-  def cacheRefreshAssigneStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): Update0 =
+  def cacheRefreshAssigneStart(
+      path: AFile,
+      assigneeId: String,
+      start: Instant,
+      tmpDataPath: AFile): Update0 =
     sql"""UPDATE view_cache
           SET assignee = $assigneeId, assignee_start = $start, tmp_data_file = $tmpDataPath
           WHERE path = $path""".update
 
-  def updatePerSuccesfulCacheRefresh(path: AFile, lastUpdate: Instant, executionMillis: Long, refreshAfter: Instant): Update0 =
+  def updatePerSuccesfulCacheRefresh(
+      path: AFile,
+      lastUpdate: Instant,
+      executionMillis: Long,
+      refreshAfter: Instant): Update0 =
     sql"""UPDATE view_cache
           SET
             assignee = null,

@@ -29,7 +29,7 @@ import doobie.imports._
 import scalaz._, Scalaz._
 
 /** Operations that access the meta-store via doobie, all wrapped in ConnectionIO
-  */
+ */
 trait MetaStoreAccess {
 
   //--- Mounts ---
@@ -52,7 +52,8 @@ trait MetaStoreAccess {
     runOneRowUpdateOpt(Queries.deleteMount(path)) toRight NotFound
 
   //--- View Cache ---
-  def staleCachedViews(now: Instant): ConnectionIO[List[PathedViewCache]] = Queries.staleCachedViews(now).list
+  def staleCachedViews(now: Instant): ConnectionIO[List[PathedViewCache]] =
+    Queries.staleCachedViews(now).list
 
   def lookupViewCache(path: AFile): ConnectionIO[Option[ViewCache]] =
     (Queries.lookupViewCache(path) ∘ (_.vc)).option
@@ -70,8 +71,7 @@ trait MetaStoreAccess {
   def tableExists(name: String): ConnectionIO[Boolean] =
     sql"""select true from information_schema.tables
           where lower(table_schema) = lower('public')
-          and lower(table_name) = lower($name)"""
-      .query[Boolean].option.map(_.getOrElse(false))
+          and lower(table_name) = lower($name)""".query[Boolean].option.map(_.getOrElse(false))
 
   /** Fail if the update doesn't modify exactly one row. */
   def runOneRowUpdate(update: Update0): ConnectionIO[Unit] =

@@ -33,7 +33,6 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
     val actualSchema = inferSchema(sampleData.data map { _ \ "value" })
 
     val projections = List(actualSchema).map { subschema =>
-
       val stream = sampleData.data flatMap { jv =>
         val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
           case (obj, (jpath, ctype)) => {
@@ -81,13 +80,20 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
 
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
-    val result = module.Table.constString(Set("/test")).load("dummyAPIKey", Schema.mkType(cschema).get).flatMap(t => EitherT.right(t.toJson)).run.copoint
+    val result = module.Table
+      .constString(Set("/test"))
+      .load("dummyAPIKey", Schema.mkType(cschema).get)
+      .flatMap(t => EitherT.right(t.toJson))
+      .run
+      .copoint
     result.map(_.toList) must_== \/.right(expected.toList)
   }
 
   def checkLoadDense = {
     implicit val gen = sample(objectSchema(_, 3))
-    prop { (sample: SampleData) => testLoadDense(sample) }
+    prop { (sample: SampleData) =>
+      testLoadDense(sample)
+    }
   }
 
   def testLoadSample1 = {
@@ -103,7 +109,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1 , List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
+        (1, List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
     )
 
@@ -157,13 +163,17 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
          }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (3, List(JPath(".f.bn[0]") -> CNull,
-                 JPath(".f.wei") -> CLong,
-                 JPath(".f.wei") -> CDouble,
-                 JPath(".ljz[0]") -> CNull,
-                 JPath(".ljz[1][0]") -> CString,
-                 JPath(".ljz[2]") -> CBoolean,
-                 JPath(".jmy") -> CDouble))
+        (
+          3,
+          List(
+            JPath(".f.bn[0]") -> CNull,
+            JPath(".f.wei") -> CLong,
+            JPath(".f.wei") -> CDouble,
+            JPath(".ljz[0]") -> CNull,
+            JPath(".ljz[1][0]") -> CString,
+            JPath(".ljz[2]") -> CBoolean,
+            JPath(".jmy") -> CDouble
+          ))
       )
     )
 
@@ -191,11 +201,14 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (2, List(JPath(".dV.d") -> CBoolean,
-                 JPath(".dV.l") -> CBoolean,
-                 JPath(".dV.vq") -> CEmptyObject,
-                 JPath(".oy.nm") -> CBoolean,
-                 JPath(".uR") -> CDouble))
+        (
+          2,
+          List(
+            JPath(".dV.d") -> CBoolean,
+            JPath(".dV.l") -> CBoolean,
+            JPath(".dV.vq") -> CEmptyObject,
+            JPath(".oy.nm") -> CBoolean,
+            JPath(".uR") -> CDouble))
       )
     )
 
@@ -294,13 +307,18 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           "key":[9]
         }
       ]""") --> classOf[JArray]).elements.toStream,
-      Some((1, List((JPath(".o8agyghfjxe") -> CEmptyArray),
-                    (JPath(".fg[0]") -> CBoolean),
-                    (JPath(".fg[1]") -> CNum),
-                    (JPath(".fg[1]") -> CLong),
-                    (JPath(".fg[2]") -> CNum),
-                    (JPath(".fg[2]") -> CLong),
-                    (JPath(".cfnYTg92dg") -> CString))))
+      Some(
+        (
+          1,
+          List(
+            (JPath(".o8agyghfjxe") -> CEmptyArray),
+            (JPath(".fg[0]") -> CBoolean),
+            (JPath(".fg[1]") -> CNum),
+            (JPath(".fg[1]") -> CLong),
+            (JPath(".fg[2]") -> CNum),
+            (JPath(".fg[2]") -> CLong),
+            (JPath(".cfnYTg92dg") -> CString)
+          )))
     )
 
     testLoadDense(sampleData)

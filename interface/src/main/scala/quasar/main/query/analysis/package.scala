@@ -39,20 +39,21 @@ package object analysis {
 
   /* TODO this needs empirical evaluation */
   private def costToResult: Int => AnalysisResult = {
-    case i if i < 100  => Instant
+    case i if i < 100 => Instant
     case i if i < 1000 => Interactive
     case i if i < 5000 => SemiInteractive
-    case i             => Batch
+    case i => Batch
   }
 
-  def analyze[S[_], F[_] : Traverse, T](qs: T)(implicit
-    R: Recursive.Aux[T, F],
-    CA: Cardinality[F],
-    CO: Cost[F],
-    Q: QueryFile.Ops[S]
-  ): Free[S, AnalysisResult] = {
-    val resultErr = R.zygoM(qs)(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S])).map(costToResult)
-    resultErr.fold(κ(Unknown),ι)
+  def analyze[S[_], F[_]: Traverse, T](qs: T)(
+      implicit
+      R: Recursive.Aux[T, F],
+      CA: Cardinality[F],
+      CO: Cost[F],
+      Q: QueryFile.Ops[S]): Free[S, AnalysisResult] = {
+    val resultErr =
+      R.zygoM(qs)(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S])).map(costToResult)
+    resultErr.fold(κ(Unknown), ι)
   }
-  
+
 }

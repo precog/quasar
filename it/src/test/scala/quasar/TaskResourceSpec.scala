@@ -21,30 +21,29 @@ import quasar.fp.TaskRef
 
 import scala.concurrent.duration._
 import scalaz._, Scalaz._
-import scalaz.concurrent.{Task, Strategy}
+import scalaz.concurrent.{Strategy, Task}
 
 class TaskResourceSpec extends QuasarSpecification {
 
   "TaskResource" should {
     def loggingRsrc(ref: TaskRef[List[String]]): Task[TaskResource[Int]] =
-      TaskResource(
-        ref.modify(_ :+ "acq").as(0), Strategy.DefaultStrategy)(
-        _ => ref.modify(_ :+ "rel").void)
+      TaskResource(ref.modify(_ :+ "acq").as(0), Strategy.DefaultStrategy)(_ =>
+        ref.modify(_ :+ "rel").void)
 
     val failingRsrc: Task[TaskResource[Int]] =
       TaskResource(
-        Task.fail(new RuntimeException("simulated failure")), Strategy.DefaultStrategy)(
-        _ => Task.now(()))
+        Task.fail(new RuntimeException("simulated failure")),
+        Strategy.DefaultStrategy)(_ => Task.now(()))
 
     "acquire once and release once" in {
       (for {
-        ref  <- TaskRef(List[String]())
+        ref <- TaskRef(List[String]())
         rsrc <- loggingRsrc(ref)
 
-        _    <- rsrc.get
-        _    <- rsrc.release
+        _ <- rsrc.get
+        _ <- rsrc.release
 
-        log  <- ref.read
+        log <- ref.read
       } yield {
         log must_=== List("acq", "rel")
       }).timed(1000.milliseconds).unsafePerformSync
@@ -52,17 +51,17 @@ class TaskResourceSpec extends QuasarSpecification {
 
     "acquire once and release once with multiple concurrent requests" in {
       (for {
-        ref  <- TaskRef(List[String]())
+        ref <- TaskRef(List[String]())
         rsrc <- loggingRsrc(ref)
 
-        get  =  rsrc.get
-        rel  =  rsrc.release
+        get = rsrc.get
+        rel = rsrc.release
 
         _ <- Nondeterminism[Task].gatherUnordered(List.fill(10)(get))
 
         _ <- Nondeterminism[Task].gatherUnordered(List.fill(7)(rel))
 
-        log  <- ref.read
+        log <- ref.read
       } yield {
         log must_=== List("acq", "rel")
       }).timed(1000.milliseconds).unsafePerformSync
@@ -72,19 +71,18 @@ class TaskResourceSpec extends QuasarSpecification {
       (for {
         rsrc <- failingRsrc
 
-        rez  <- rsrc.get.attempt.map(_.swap.as(()))
+        rez <- rsrc.get.attempt.map(_.swap.as(()))
       } yield {
         rez must beRightDisjunction
       }).timed(1000.milliseconds).unsafePerformSync
     }
 
-
     "fail multiple requests immediately when first acquire fails" in {
       (for {
         rsrc <- failingRsrc
 
-        acq  =  rsrc.get.attempt.map(_.swap.as(()))
-        rez  <- Nondeterminism[Task].gatherUnordered(List.fill(10)(acq))
+        acq = rsrc.get.attempt.map(_.swap.as(()))
+        rez <- Nondeterminism[Task].gatherUnordered(List.fill(10)(acq))
       } yield {
         rez must_=== List.fill(10)(\/-(()))
       }).timed(1000.milliseconds).unsafePerformSync

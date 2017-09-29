@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.{Variables, VarName, VarValue}
+import quasar.{VarName, VarValue, Variables}
 import quasar.sql._
 
 import argonaut._, Argonaut._, JsonScalaz._
@@ -34,54 +34,56 @@ class MountConfigSpec extends quasar.Qspec {
 
     "encode" >> {
       "no vars" in {
-        viewConfig(read, Variables(Map()))
-          .asJson must_= viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29")
+        viewConfig(read, Variables(Map())).asJson must_= viewJson(
+          "sql2:///?q=%28select%20%2A%20from%20zips%29")
       }
 
       "with var" in {
-        viewConfig(read, Variables(Map(VarName("a") -> VarValue("1"))))
-          .asJson must_= viewJson("sql2:///?q=%28select%20%2A%20from%20zips%29&var.a=1")
+        viewConfig(read, Variables(Map(VarName("a") -> VarValue("1")))).asJson must_= viewJson(
+          "sql2:///?q=%28select%20%2A%20from%20zips%29&var.a=1")
       }
     }
 
     "decode" >> {
       "no vars" >> {
-        viewJson("sql2:///?q=%28select+*+from+zips%29")
-          .as[MountConfig].toEither must
-            beRight(ViewConfig(read, Variables(Map())))
+        viewJson("sql2:///?q=%28select+*+from+zips%29").as[MountConfig].toEither must
+          beRight(ViewConfig(read, Variables(Map())))
       }
 
       "decode with var" in {
         // NB: the _last_ value for a given var name is used.
         viewJson("sql2:///?q=%28select+*+from+zips%29&var.a=1&var.b=2&var.b=3")
-          .as[MountConfig].toEither must
-            beRight(
-              ViewConfig(read, Variables(Map(
-                VarName("a") -> VarValue("1"),
-                VarName("b") -> VarValue("3")))))
+          .as[MountConfig]
+          .toEither must
+          beRight(
+            ViewConfig(
+              read,
+              Variables(Map(VarName("a") -> VarValue("1"), VarName("b") -> VarValue("3")))))
       }
 
       "decode with missing query" in {
-        viewJson("sql2:///?p=foo")
-          .as[MountConfig].toEither.leftMap(_._1) must
-            beLeft("missing query: sql2:///?p=foo")
+        viewJson("sql2:///?p=foo").as[MountConfig].toEither.leftMap(_._1) must
+          beLeft("missing query: sql2:///?p=foo")
       }
 
       "decode with bad scheme" in {
         viewJson("foo:///?q=%28select+*+from+zips%29")
-          .as[MountConfig].toEither.leftMap(_._1) must
-            beLeft("unrecognized scheme: foo")
+          .as[MountConfig]
+          .toEither
+          .leftMap(_._1) must
+          beLeft("unrecognized scheme: foo")
       }
 
       "decode with unparseable URI" in {
-        viewJson("?")
-          .as[MountConfig].toEither.leftMap(_._1) must
-            beLeft("missing URI scheme: ?")
+        viewJson("?").as[MountConfig].toEither.leftMap(_._1) must
+          beLeft("missing URI scheme: ?")
       }
 
       "decode with bad encoding" in {
         viewJson("sql2:///?q=%F%28select+*+from+zips%29")
-          .as[MountConfig].toEither.leftMap(_._1) must beLeft
+          .as[MountConfig]
+          .toEither
+          .leftMap(_._1) must beLeft
       }
     }
   }

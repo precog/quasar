@@ -19,7 +19,7 @@ package quasar.precog
 final case class JPath(nodes: List[JPathNode]) extends ToString {
   def to_s: String = nodes match {
     case Nil => "."
-    case _   => nodes mkString ""
+    case _ => nodes mkString ""
   }
 }
 

@@ -30,16 +30,16 @@ import scalaz.{Failure => _, _}, Scalaz._
 class FileSystemMountHandlerSpec extends quasar.Qspec {
   import BackendDef._
 
-  type Abort[A]  = Failure[String, A]
+  type Abort[A] = Failure[String, A]
   type AbortM[A] = Free[Abort, A]
 
-  type ResMnts     = Mounts[DefinitionResult[AbortM]]
+  type ResMnts = Mounts[DefinitionResult[AbortM]]
   type ResMntsS[A] = State[ResMnts, A]
 
-  type MountedFs[A]  = AtomicRef[ResMnts, A]
+  type MountedFs[A] = AtomicRef[ResMnts, A]
 
   type Eff0[A] = Coproduct[Abort, MountedFs, A]
-  type Eff[A]  = Coproduct[AbortM, Eff0, A]
+  type Eff[A] = Coproduct[AbortM, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
   type EffR[A] = (ResMnts, String \/ A)
@@ -49,7 +49,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
   def eval(rms: ResMnts): EffM ~> EffR =
     new (EffM ~> EffR) {
       type MT[F[_], A] = EitherT[F, String, A]
-      type M[A]        = MT[ResMntsS, A]
+      type M[A] = MT[ResMntsS, A]
       import EitherT.eitherTMonad
 
       val evalAbort: Abort ~> M =
@@ -60,13 +60,12 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
       val evalEff: Eff ~> M =
         free.foldMapNT(evalAbort) :+:
-        evalAbort                 :+:
-        (liftMT[ResMntsS, MT] compose evalMnts)
+          evalAbort :+:
+          (liftMT[ResMntsS, MT] compose evalMnts)
 
       def apply[A](ma: EffM[A]) =
         ma.foldMap(evalEff).run(rms)
     }
-
 
   val abortFs: BackendEffect ~> AbortM =
     new (BackendEffect ~> AbortM) {
@@ -85,8 +84,8 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
 
   val invalidPath =
     MountingError.pathError composePrism
-    PathError.invalidPath  composeLens
-    Field1.first
+      PathError.invalidPath composeLens
+      Field1.first
 
   val fsMounter = FileSystemMountHandler(fsDef)
   val testType = FileSystemType("test")

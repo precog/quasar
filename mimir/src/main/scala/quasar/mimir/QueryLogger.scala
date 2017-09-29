@@ -28,56 +28,56 @@ import scala.collection.JavaConverters._
 
 trait QueryLogger[M[+ _], -P] { self =>
   def contramap[P0](f: P0 => P): QueryLogger[M, P0] = new QueryLogger[M, P0] {
-    def die(): M[Unit]                        = self.die()
-    def error(pos: P0, msg: String): M[Unit]  = self.error(f(pos), msg)
-    def warn(pos: P0, msg: String): M[Unit]   = self.warn(f(pos), msg)
-    def info(pos: P0, msg: String): M[Unit]   = self.info(f(pos), msg)
-    def log(pos: P0, msg: String): M[Unit]    = self.log(f(pos), msg)
+    def die(): M[Unit] = self.die()
+    def error(pos: P0, msg: String): M[Unit] = self.error(f(pos), msg)
+    def warn(pos: P0, msg: String): M[Unit] = self.warn(f(pos), msg)
+    def info(pos: P0, msg: String): M[Unit] = self.info(f(pos), msg)
+    def log(pos: P0, msg: String): M[Unit] = self.log(f(pos), msg)
     def timing(pos: P0, nanos: Long): M[Unit] = self.timing(f(pos), nanos)
-    def done: M[Unit]                         = self.done
+    def done: M[Unit] = self.done
   }
 
   def die(): M[Unit]
 
   /**
-    * This reports a error to the user. Depending on the implementation, this may
-    * also stop computation completely.
-    */
+   * This reports a error to the user. Depending on the implementation, this may
+   * also stop computation completely.
+   */
   def error(pos: P, msg: String): M[Unit]
 
   /**
-    * Report a warning to the user.
-    */
+   * Report a warning to the user.
+   */
   def warn(pos: P, msg: String): M[Unit]
 
   /**
-    * Report an informational message to the user.
-    */
+   * Report an informational message to the user.
+   */
   def info(pos: P, msg: String): M[Unit]
 
   /**
-    * Report an information message for internal use only
-    */
+   * Report an information message for internal use only
+   */
   def log(pos: P, msg: String): M[Unit]
 
   /**
-    * Record timing information for a particular position.  Note that a position
-    * may record multiple timing events, which should be aggregated according to
-    * simple summary statistics.
-    *
-    * Please note the following:
-    *
-    * kx = 303 seconds
-    *   where
-    *     2^63 - 1 = sum i from 0 to k, x^2
-    *     x > 0
-    *     k = 10000    (an arbitrary, plausible iteration count)
-    *
-    * This is to say that, for a particular position which is hit 10,000 times,
-    * the total time spent in that particular position must be bounded by 303
-    * seconds to avoid signed Long value overflow.  Conveniently, our query timeout
-    * is 300 seconds, so this is not an issue.
-    */
+   * Record timing information for a particular position.  Note that a position
+   * may record multiple timing events, which should be aggregated according to
+   * simple summary statistics.
+   *
+   * Please note the following:
+   *
+   * kx = 303 seconds
+   *   where
+   *     2^63 - 1 = sum i from 0 to k, x^2
+   *     x > 0
+   *     k = 10000    (an arbitrary, plausible iteration count)
+   *
+   * This is to say that, for a particular position which is hit 10,000 times,
+   * the total time spent in that particular position must be bounded by 303
+   * seconds to avoid signed Long value overflow.  Conveniently, our query timeout
+   * is 300 seconds, so this is not an issue.
+   */
   def timing(pos: P, nanos: Long): M[Unit]
 
   def done: M[Unit]
@@ -148,7 +148,10 @@ trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
   def done: M[Unit] = {
     val logging = table.asScala map {
       case (pos, stats) =>
-        log(pos, """{"count":%d,"sum":%d,"sumSq":%d,"min":%d,"max":%d}""".format(stats.count, stats.sum, stats.sumSq, stats.min, stats.max))
+        log(
+          pos,
+          """{"count":%d,"sum":%d,"sumSq":%d,"min":%d,"max":%d}"""
+            .format(stats.count, stats.sum, stats.sumSq, stats.min, stats.max))
     }
 
     logging reduceOption { _ >> _ } getOrElse (M point ())
@@ -156,7 +159,12 @@ trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
 
   private case class Stats(count: Long, sum: Long, sumSq: Long, min: Long, max: Long) {
     final def derive(nanos: Long): Stats = {
-      copy(count = count + 1, sum = sum + nanos, sumSq = sumSq + (nanos * nanos), min = min min nanos, max = max max nanos)
+      copy(
+        count = count + 1,
+        sum = sum + nanos,
+        sumSq = sumSq + (nanos * nanos),
+        min = min min nanos,
+        max = max max nanos)
     }
   }
 }

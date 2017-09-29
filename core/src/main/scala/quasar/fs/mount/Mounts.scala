@@ -23,40 +23,42 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 /** A mapping of values to directory paths, maintains the invariant that no
-  * path is a prefix of any other path.
-  *
-  * The current implementation is linear in the number of mounts, might be able
-  * to do better using a different data structure that takes advantage of the
-  * invariant and structure of the `ADir` keys.
-  */
+ * path is a prefix of any other path.
+ *
+ * The current implementation is linear in the number of mounts, might be able
+ * to do better using a different data structure that takes advantage of the
+ * invariant and structure of the `ADir` keys.
+ */
 final class Mounts[A] private (val toMap: Map[ADir, A]) {
+
   /** Returns whether the given directory is a candidate as a mapping key,
-    * a "left" result describes why the key is not a candidate and a "right"
-    * signifies a valid candidate.
-    */
+   * a "left" result describes why the key is not a candidate and a "right"
+   * signifies a valid candidate.
+   */
   def candidacy(d: ADir): String \/ Unit =
     if (toMap contains d)
       ().right
     else
       toMap.keys.toStream.traverse_ { mnt =>
-        mnt.relativeTo(d)
+        mnt
+          .relativeTo(d)
           .as("existing mount below: " + posixCodec.printPath(mnt))
           .toLeftDisjunction(()) *>
-        d.relativeTo(mnt)
-          .as("existing mount above: " + posixCodec.printPath(mnt))
-          .toLeftDisjunction(())
+          d.relativeTo(mnt)
+            .as("existing mount above: " + posixCodec.printPath(mnt))
+            .toLeftDisjunction(())
       }
 
   def add(at: ADir, a: A): String \/ Mounts[A] =
     candidacy(at) as (new Mounts(toMap + (at -> a)))
 
-  def + (mount: (ADir, A)): String \/ Mounts[A] =
+  def +(mount: (ADir, A)): String \/ Mounts[A] =
     add(mount._1, mount._2)
 
   def remove(at: ADir): Mounts[A] =
     new Mounts(toMap - at)
 
-  def - (at: ADir): Mounts[A] =
+  def -(at: ADir): Mounts[A] =
     remove(at)
 
   def lookup(at: ADir): Option[A] =
@@ -87,7 +89,7 @@ object Mounts {
     entries.foldLeftM[String \/ ?, Mounts[A]](empty[A])(_ + _)
 
   implicit val MountsTraverse: Traverse[Mounts] = new Traverse[Mounts] {
-    def traverseImpl[G[_]:Applicative, A, B](fa: Mounts[A])(f: A => G[B]): G[Mounts[B]] = 
+    def traverseImpl[G[_]: Applicative, A, B](fa: Mounts[A])(f: A => G[B]): G[Mounts[B]] =
       fa.toMap.traverse(f).map(new Mounts(_))
   }
 

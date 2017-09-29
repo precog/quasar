@@ -16,9 +16,9 @@
 
 package quasar.std
 
-import quasar.{Data, Type, Func, BinaryFunc, Mapping, SemanticError}, SemanticError._
+import quasar.{BinaryFunc, Data, Func, Mapping, SemanticError, Type}, SemanticError._
 
-import scalaz._, NonEmptyList.nels, Validation.{success, failure}
+import scalaz._, NonEmptyList.nels, Validation.{failure, success}
 import shapeless._
 
 trait ArrayLib extends Library {
@@ -31,14 +31,14 @@ trait ArrayLib extends Library {
     partialTyperV[nat._2] {
       case Sized(_, Type.Const(Data.Int(dim))) if (dim < 1) =>
         failure(nels(GenericError("array dimension out of range")))
-      case Sized(Type.Const(Data.Arr(arr)), Type.Const(Data.Int(i)))
-          if (i == 1) =>
+      case Sized(Type.Const(Data.Arr(arr)), Type.Const(Data.Int(i))) if (i == 1) =>
         // TODO: we should support dims other than 1, but it's work
         success(Type.Const(Data.Int(arr.length)))
       case Sized(Type.AnyArray, Type.Const(Data.Int(_))) =>
         success(Type.Int)
     },
-    basicUntyper)
+    basicUntyper
+  )
 }
 
 object ArrayLib extends ArrayLib

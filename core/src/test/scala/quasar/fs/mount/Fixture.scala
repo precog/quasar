@@ -31,10 +31,11 @@ object Fixture {
 
   def constant[F[_]: Applicative, K, V](m: Map[K, V]): KeyValueStore[K, V, ?] ~> F =
     KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
-    evalNT[Id, Map[K, V]](m) andThen pointNT[F]
+      evalNT[Id, Map[K, V]](m) andThen pointNT[F]
 
   def runConstantMount[F[_]: Monad](mnts: Map[APath, MountConfig]): Mounting ~> F =
-    Mounter.trivial[MountConfigs] andThen foldMapNT[MountConfigs, F](constant[F, APath, MountConfig](mnts))
+    Mounter.trivial[MountConfigs] andThen foldMapNT[MountConfigs, F](
+      constant[F, APath, MountConfig](mnts))
 
   def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCache ~> F =
     constant[F, AFile, ViewCache](vcache)

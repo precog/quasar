@@ -33,8 +33,7 @@ class TablePathSpec extends Qspec {
   "TablePath" should {
     "extract table name" in {
       prop { (file: AFile) =>
-        TablePath.create(file).table must_=== TableName(
-          Path.fileName(file).value)
+        TablePath.create(file).table must_=== TableName(Path.fileName(file).value)
       }
     }
 
@@ -58,8 +57,7 @@ class TablePathSpec extends Qspec {
     "extract some schema name for 2 levels of depth" in {
       prop { (dirName1: DirName, dirName2: DirName, fileName: FileName) =>
         {
-          val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(
-            fileName)
+          val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(fileName)
           create(file).schema must_=== CustomSchema(dirName1.value + Separator + dirName2.value)
         }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
@@ -67,19 +65,14 @@ class TablePathSpec extends Qspec {
 
     "extract some schema name for 3 levels of depth" in {
 
-      prop {
-        (
-            dirName1: DirName,
-            dirName2: DirName,
-            dirName3: DirName,
-            fileName: FileName) =>
-          {
-            val path = rootDir </> dir1(dirName1) </> dir1(dirName2) </> dir1(
-              dirName3) </> file1(fileName)
-            create(path).schema must_===
-              CustomSchema(
-                dirName1.value + Separator + dirName2.value + Separator + dirName3.value)
-          }
+      prop { (dirName1: DirName, dirName2: DirName, dirName3: DirName, fileName: FileName) =>
+        {
+          val path = rootDir </> dir1(dirName1) </> dir1(dirName2) </> dir1(dirName3) </> file1(
+            fileName)
+          create(path).schema must_===
+            CustomSchema(
+              dirName1.value + Separator + dirName2.value + Separator + dirName3.value)
+        }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
     }
   }

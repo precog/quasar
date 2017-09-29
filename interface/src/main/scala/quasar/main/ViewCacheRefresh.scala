@@ -45,17 +45,17 @@ import scalaz.concurrent.Task
 object ViewCacheRefresh {
 
   def updateCache[S[_]](
-    viewPath: AFile,
-    assigneeId: String
-  )(implicit
-    Q: QueryFile.Ops[S],
-    T: Timing.Ops[S],
-    S0: WriteFile :<: S,
-    S1: ManageFile :<: S,
-    S2: Mounting :<: S,
-    S3: ConnectionIO :<: S,
-    S4: Task :<: S
-  ): Q.transforms.CompExecM[Unit] = {
+      viewPath: AFile,
+      assigneeId: String
+  )(
+      implicit
+      Q: QueryFile.Ops[S],
+      T: Timing.Ops[S],
+      S0: WriteFile :<: S,
+      S1: ManageFile :<: S,
+      S2: Mounting :<: S,
+      S3: ConnectionIO :<: S,
+      S4: Task :<: S): Q.transforms.CompExecM[Unit] = {
     import Q.transforms._
 
     val M = ManageFile.Ops[S]
@@ -64,77 +64,99 @@ object ViewCacheRefresh {
       lift(MetaStoreAccess.lookupViewCache(viewPath) ∘ (_ \/> pathErr(pathNotFound(viewPath))))
 
     def updatePerSuccessfulCacheRefresh(
-      viewPath: AFile, lastUpdate: Instant, executionMillis: Long, refreshAfter: Instant
+        viewPath: AFile,
+        lastUpdate: Instant,
+        executionMillis: Long,
+        refreshAfter: Instant
     ): CompExecM[Unit] =
-      lift(Queries.updatePerSuccesfulCacheRefresh(viewPath, lastUpdate, executionMillis, refreshAfter).run.void ∘ (
-        _.right[FileSystemError]))
+      lift(
+        Queries
+          .updatePerSuccesfulCacheRefresh(viewPath, lastUpdate, executionMillis, refreshAfter)
+          .run
+          .void ∘ (_.right[FileSystemError]))
 
     for {
-      vc  <- getCachedView
-      tf  <- lift(M.tempFile(viewPath).run)
+      vc <- getCachedView
+      tf <- lift(M.tempFile(viewPath).run)
       ts1 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
-      _   <- lift(assigneeStart(viewPath, assigneeId, ts1, tf) ∘ (_.right[FileSystemError]))
-      _   <- writeViewCache[S](fileParent(viewPath), tf, vc.viewConfig)
-      _   <- lift(M.moveFile(tf, vc.dataFile, Overwrite).run)
+      _ <- lift(assigneeStart(viewPath, assigneeId, ts1, tf) ∘ (_.right[FileSystemError]))
+      _ <- writeViewCache[S](fileParent(viewPath), tf, vc.viewConfig)
+      _ <- lift(M.moveFile(tf, vc.dataFile, Overwrite).run)
       ts2 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
-      em  <- lift(free.lift(Task.delay(JDuration.between(ts1, ts2).toMillis)).into[S] ∘ (_.right[FileSystemError]))
-      e   <- lift(free.lift(
-               Task.fromDisjunction(ViewCache.expireAt(ts2, vc.maxAgeSeconds.seconds))
-             ).into[S] ∘ (_.right[FileSystemError]))
-      _   <- updatePerSuccessfulCacheRefresh(viewPath, ts2, em, e)
+      em <- lift(
+        free
+          .lift(Task.delay(JDuration.between(ts1, ts2).toMillis))
+          .into[S] ∘ (_.right[FileSystemError]))
+      e <- lift(
+        free
+          .lift(
+            Task.fromDisjunction(ViewCache.expireAt(ts2, vc.maxAgeSeconds.seconds))
+          )
+          .into[S] ∘ (_.right[FileSystemError]))
+      _ <- updatePerSuccessfulCacheRefresh(viewPath, ts2, em, e)
     } yield ()
   }
 
   // Naïve stale cache selection for the moment
-  def selectCacheForRefresh[S[_]](implicit
-    Q: QueryFile.Ops[S],
-    T: Timing.Ops[S],
-    S0: ConnectionIO :<: S
-  ): Q.transforms.CompExecM[Option[PathedViewCache]] =
+  def selectCacheForRefresh[S[_]](
+      implicit
+      Q: QueryFile.Ops[S],
+      T: Timing.Ops[S],
+      S0: ConnectionIO :<: S): Q.transforms.CompExecM[Option[PathedViewCache]] =
     lift(T.timestamp ∘ (_.right[FileSystemError])) >>= (ts =>
       lift(MetaStoreAccess.staleCachedViews(ts) ∘ (_.right[FileSystemError])) ∘ (_.headOption))
 
-  def assigneeStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): ConnectionIO[Int] =
+  def assigneeStart(
+      path: AFile,
+      assigneeId: String,
+      start: Instant,
+      tmpDataPath: AFile): ConnectionIO[Int] =
     Queries.cacheRefreshAssigneStart(path, assigneeId, start, tmpDataPath).run
 
   def writeViewCache[S[_]](
-    basePath: ADir, tmpDataPath: AFile, view: MountConfig.ViewConfig
-  )(implicit
-    Q: QueryFile.Ops[S],
-    W: WriteFile.Ops[S],
-    S1: ManageFile :<: S,
-    S2: Mounting :<: S,
-    S3: Task :<: S
-  ): Q.transforms.CompExecM[Unit] = {
+      basePath: ADir,
+      tmpDataPath: AFile,
+      view: MountConfig.ViewConfig
+  )(
+      implicit
+      Q: QueryFile.Ops[S],
+      W: WriteFile.Ops[S],
+      S1: ManageFile :<: S,
+      S2: Mounting :<: S,
+      S3: Task :<: S): Q.transforms.CompExecM[Unit] = {
     val fsQ = new FilesystemQueries[S]
 
     for {
-      q       <- EitherT(EitherT(
-                   (quasar.resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
-                     .liftM[PhaseResultT]))
-      _       <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
+      q <- EitherT(
+        EitherT(
+          (quasar
+            .resolveImports_[S](view.query, basePath)
+            .leftMap(nels(_))
+            .run
+            .run ∘ (_.sequence)).liftM[PhaseResultT]))
+      _ <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
     } yield ()
   }
 
   def lift[S[_], A](
-    v: FileSystemError \/ A
-  )(implicit
-    Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+      v: FileSystemError \/ A
+  )(
+      implicit
+      Q: QueryFile.Ops[S]): Q.transforms.CompExecM[A] =
     lift(v.η[Free[S, ?]])
 
   def lift[S[_], A](
-    v: Free[S, FileSystemError \/ A]
-  )(implicit
-    Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+      v: Free[S, FileSystemError \/ A]
+  )(
+      implicit
+      Q: QueryFile.Ops[S]): Q.transforms.CompExecM[A] =
     EitherT(v.liftM[PhaseResultT].liftM[SemanticErrsT])
 
   def lift[S[_], A](
-    cio: ConnectionIO[FileSystemError \/ A]
-  )(implicit
-    S0: ConnectionIO :<: S,
-    Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+      cio: ConnectionIO[FileSystemError \/ A]
+  )(
+      implicit
+      S0: ConnectionIO :<: S,
+      Q: QueryFile.Ops[S]): Q.transforms.CompExecM[A] =
     lift(Free.liftF(S0(cio)))
 }

@@ -30,11 +30,15 @@ trait DefinedAtIndex {
   def isDefinedAt(row: Int) = defined(row)
 }
 
-trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends DefinedAtIndex with ExtensibleColumn {
+trait ArrayColumn[@specialized(Boolean, Long, Double) A]
+    extends DefinedAtIndex
+    with ExtensibleColumn {
   def update(row: Int, value: A): Unit
 }
 
-class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(val tpe: CArrayType[A])
+class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](
+    val defined: BitSet,
+    values: Array[Array[A]])(val tpe: CArrayType[A])
     extends HomogeneousArrayColumn[A]
     with ArrayColumn[Array[A]] {
   def apply(row: Int) = values(row)
@@ -47,17 +51,23 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
 
 object ArrayHomogeneousArrayColumn {
   def apply[@specialized(Boolean, Long, Double) A: CValueType](values: Array[Array[A]]) =
-    new ArrayHomogeneousArrayColumn(BitSetUtil.range(0, values.length), values)(CArrayType(CValueType[A]))
-  def apply[@specialized(Boolean, Long, Double) A: CValueType](defined: BitSet, values: Array[Array[A]]) =
+    new ArrayHomogeneousArrayColumn(BitSetUtil.range(0, values.length), values)(
+      CArrayType(CValueType[A]))
+  def apply[@specialized(Boolean, Long, Double) A: CValueType](
+      defined: BitSet,
+      values: Array[Array[A]]) =
     new ArrayHomogeneousArrayColumn(defined.copy, values)(CArrayType(CValueType[A]))
-  def empty[@specialized(Boolean, Long, Double) A](size: Int)(implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
+  def empty[@specialized(Boolean, Long, Double) A](size: Int)(
+      implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
     implicit val m: CTag[A] = elemType.classTag
 
     new ArrayHomogeneousArrayColumn(new BitSet, new Array[Array[A]](size))(CArrayType(elemType))
   }
 }
 
-class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColumn[Boolean] with BoolColumn {
+class ArrayBoolColumn(val defined: BitSet, val values: BitSet)
+    extends ArrayColumn[Boolean]
+    with BoolColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Boolean) = {
@@ -81,7 +91,9 @@ object ArrayBoolColumn {
     new ArrayBoolColumn(new BitSet, new BitSet)
 }
 
-class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends ArrayColumn[Long] with LongColumn {
+class ArrayLongColumn(val defined: BitSet, val values: Array[Long])
+    extends ArrayColumn[Long]
+    with LongColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Long) = {
@@ -99,7 +111,9 @@ object ArrayLongColumn {
     new ArrayLongColumn(new BitSet, new Array[Long](size))
 }
 
-class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends ArrayColumn[Double] with DoubleColumn {
+class ArrayDoubleColumn(val defined: BitSet, values: Array[Double])
+    extends ArrayColumn[Double]
+    with DoubleColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Double) = {
@@ -117,7 +131,9 @@ object ArrayDoubleColumn {
     new ArrayDoubleColumn(new BitSet, new Array[Double](size))
 }
 
-class ArrayNumColumn(val defined: BitSet, values: Array[BigDecimal]) extends ArrayColumn[BigDecimal] with NumColumn {
+class ArrayNumColumn(val defined: BitSet, values: Array[BigDecimal])
+    extends ArrayColumn[BigDecimal]
+    with NumColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: BigDecimal) = {
@@ -135,7 +151,9 @@ object ArrayNumColumn {
     new ArrayNumColumn(new BitSet, new Array[BigDecimal](size))
 }
 
-class ArrayStrColumn(val defined: BitSet, values: Array[String]) extends ArrayColumn[String] with StrColumn {
+class ArrayStrColumn(val defined: BitSet, values: Array[String])
+    extends ArrayColumn[String]
+    with StrColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: String) = {
@@ -153,7 +171,9 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayDateColumn(val defined: BitSet, values: Array[ZonedDateTime]) extends ArrayColumn[ZonedDateTime] with DateColumn {
+class ArrayDateColumn(val defined: BitSet, values: Array[ZonedDateTime])
+    extends ArrayColumn[ZonedDateTime]
+    with DateColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: ZonedDateTime) = {
@@ -171,7 +191,9 @@ object ArrayDateColumn {
     new ArrayDateColumn(new BitSet, new Array[ZonedDateTime](size))
 }
 
-class ArrayPeriodColumn(val defined: BitSet, values: Array[Period]) extends ArrayColumn[Period] with PeriodColumn {
+class ArrayPeriodColumn(val defined: BitSet, values: Array[Period])
+    extends ArrayColumn[Period]
+    with PeriodColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Period) = {
@@ -189,7 +211,9 @@ object ArrayPeriodColumn {
     new ArrayPeriodColumn(new BitSet, new Array[Period](size))
 }
 
-class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] with EmptyArrayColumn {
+class MutableEmptyArrayColumn(val defined: BitSet)
+    extends ArrayColumn[Boolean]
+    with EmptyArrayColumn {
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
   }
@@ -199,7 +223,9 @@ object MutableEmptyArrayColumn {
   def empty(): MutableEmptyArrayColumn = new MutableEmptyArrayColumn(new BitSet)
 }
 
-class MutableEmptyObjectColumn(val defined: BitSet) extends ArrayColumn[Boolean] with EmptyObjectColumn {
+class MutableEmptyObjectColumn(val defined: BitSet)
+    extends ArrayColumn[Boolean]
+    with EmptyObjectColumn {
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
   }

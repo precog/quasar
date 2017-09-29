@@ -27,37 +27,34 @@ import scalaz._, Scalaz._
 sealed abstract class MountingError
 
 object MountingError {
-  final case class PError private (err: PathError)
-    extends MountingError
+  final case class PError private (err: PathError) extends MountingError
 
-  final case class EError private (err: EnvironmentError)
-    extends MountingError
+  final case class EError private (err: EnvironmentError) extends MountingError
 
   final case class InvalidConfig private (config: MountConfig, reasons: NonEmptyList[String])
-    extends MountingError
-
-  final case class InvalidMount private (`type`: MountType, error: String)
       extends MountingError
+
+  final case class InvalidMount private (`type`: MountType, error: String) extends MountingError
 
   val pathError: Prism[MountingError, PathError] =
     Prism.partial[MountingError, PathError] {
       case PError(err) => err
-    } (PError)
+    }(PError)
 
   val environmentError: Prism[MountingError, EnvironmentError] =
     Prism.partial[MountingError, EnvironmentError] {
       case EError(err) => err
-    } (EError)
+    }(EError)
 
   val invalidConfig: Prism[MountingError, (MountConfig, NonEmptyList[String])] =
     Prism.partial[MountingError, (MountConfig, NonEmptyList[String])] {
       case InvalidConfig(cfg, reasons) => (cfg, reasons)
-    } (InvalidConfig.tupled)
+    }(InvalidConfig.tupled)
 
   val invalidMount: Prism[MountingError, (MountType, String)] =
     Prism.partial[MountingError, (MountType, String)] {
       case InvalidMount(t, e) => (t, e)
-    } (InvalidMount.tupled)
+    }(InvalidMount.tupled)
 
   implicit val mountingErrorShow: Show[MountingError] =
     Show.shows {
@@ -72,11 +69,11 @@ object MountingError {
     }
 
   implicit val equal: Equal[MountingError] = Equal.equal {
-    case (PError(a), PError(b))                     => a ≟ b
-    case (EError(a), EError(b))                     => a ≟ b
+    case (PError(a), PError(b)) => a ≟ b
+    case (EError(a), EError(b)) => a ≟ b
     case (InvalidConfig(a, b), InvalidConfig(c, d)) => a ≟ c && b ≟ d
-    case (InvalidMount(a, b), InvalidMount(c, d))   => a ≟ c && b ≟ d
-    case _                                          => false
+    case (InvalidMount(a, b), InvalidMount(c, d)) => a ≟ c && b ≟ d
+    case _ => false
   }
 
 }

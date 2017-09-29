@@ -29,31 +29,37 @@ import shapeless.syntax.sized._
 import shapeless.ops.nat.ToInt
 
 sealed abstract class DimensionalEffect
+
 /** Describes a function that reduces a set of values to a single value. */
 final case object Reduction extends DimensionalEffect
+
 /** Describes a function that expands a compound value into a set of values for
-  * an operation.
-  */
+ * an operation.
+ */
 final case object Expansion extends DimensionalEffect
+
 /** Describes a function that maps each individual value. */
 final case object Mapping extends DimensionalEffect
+
 /** Describes a function that compresses the identity information. */
 final case object Squashing extends DimensionalEffect
+
 /** Describes a function that operates on the set containing values, not
-  * modifying individual values. (EG, filter, sort, take)
-  */
+ * modifying individual values. (EG, filter, sort, take)
+ */
 final case object Sifting extends DimensionalEffect
+
 /** Describes a function that operates on the set containing values, potentially
-  * modifying individual values. (EG, joins).
-  */
+ * modifying individual values. (EG, joins).
+ */
 final case object Transformation extends DimensionalEffect
 
 object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
 }
 
-final case class NullaryFunc
-  (val effect: DimensionalEffect,
+final case class NullaryFunc(
+    val effect: DimensionalEffect,
     val help: String,
     val codomain: Func.Codomain,
     val simplify: Func.Simplifier)
@@ -75,7 +81,8 @@ final case class UnaryFunc(
     val domain: Func.Domain[nat._1],
     val simplify: Func.Simplifier,
     val typer0: Func.Typer[nat._1],
-    val untyper0: Func.Untyper[nat._1]) extends GenericFunc[nat._1] {
+    val untyper0: Func.Untyper[nat._1])
+    extends GenericFunc[nat._1] {
 
   def apply[A](a1: A): LP[A] =
     applyGeneric(Func.Input1[A](a1))
@@ -88,7 +95,8 @@ final case class BinaryFunc(
     val domain: Func.Domain[nat._2],
     val simplify: Func.Simplifier,
     val typer0: Func.Typer[nat._2],
-    val untyper0: Func.Untyper[nat._2]) extends GenericFunc[nat._2] {
+    val untyper0: Func.Untyper[nat._2])
+    extends GenericFunc[nat._2] {
 
   def apply[A](a1: A, a2: A): LP[A] =
     applyGeneric(Func.Input2[A](a1, a2))
@@ -101,7 +109,8 @@ final case class TernaryFunc(
     val domain: Func.Domain[nat._3],
     val simplify: Func.Simplifier,
     val typer0: Func.Typer[nat._3],
-    val untyper0: Func.Untyper[nat._3]) extends GenericFunc[nat._3] {
+    val untyper0: Func.Untyper[nat._3])
+    extends GenericFunc[nat._3] {
 
   def apply[A](a1: A, a2: A, a3: A): LP[A] =
     applyGeneric(Func.Input3[A](a1, a2, a3))
@@ -141,118 +150,118 @@ trait GenericFuncInstances {
     import std.StdLib._
 
     Show.shows {
-      case agg.Count                      => "Count"
-      case agg.Sum                        => "Sum"
-      case agg.Min                        => "Min"
-      case agg.Max                        => "Max"
-      case agg.Avg                        => "Avg"
-      case agg.First                      => "First"
-      case agg.Last                       => "Last"
-      case agg.Arbitrary                  => "Arbitrary"
-      case array.ArrayLength              => "ArrayLength"
-      case date.ExtractCentury            => "ExtractCentury"
-      case date.ExtractDayOfMonth         => "ExtractDayOfMonth"
-      case date.ExtractDecade             => "ExtractDecade"
-      case date.ExtractDayOfWeek          => "ExtractDayOfWeek"
-      case date.ExtractDayOfYear          => "ExtractDayOfYear"
-      case date.ExtractEpoch              => "ExtractEpoch"
-      case date.ExtractHour               => "ExtractHour"
-      case date.ExtractIsoDayOfWeek       => "ExtractIsoDayOfWeek"
-      case date.ExtractIsoYear            => "ExtractIsoYear"
-      case date.ExtractMicroseconds       => "ExtractMicroseconds"
-      case date.ExtractMillennium         => "ExtractMillennium"
-      case date.ExtractMilliseconds       => "ExtractMilliseconds"
-      case date.ExtractMinute             => "ExtractMinute"
-      case date.ExtractMonth              => "ExtractMonth"
-      case date.ExtractQuarter            => "ExtractQuarter"
-      case date.ExtractSecond             => "ExtractSecond"
-      case date.ExtractTimezone           => "ExtractTimezone"
-      case date.ExtractTimezoneHour       => "ExtractTimezoneHour"
-      case date.ExtractTimezoneMinute     => "ExtractTimezoneMinute"
-      case date.ExtractWeek               => "ExtractWeek"
-      case date.ExtractYear               => "ExtractYear"
-      case date.Date                      => "Date"
-      case date.Now                       => "Now"
-      case date.Time                      => "Time"
-      case date.Timestamp                 => "Timestamp"
-      case date.Interval                  => "Interval"
-      case date.StartOfDay                => "StartOfDay"
-      case date.TimeOfDay                 => "TimeOfDay"
-      case date.ToTimestamp               => "ToTimestamp"
-      case identity.Squash                => "Squash"
-      case identity.ToId                  => "ToId"
-      case math.Add                       => "Add"
-      case math.Abs                       => "Abs"
-      case math.Multiply                  => "Multiply"
-      case math.Power                     => "Power"
-      case math.Subtract                  => "Subtract"
-      case math.Divide                    => "Divide"
-      case math.Negate                    => "Negate"
-      case math.Modulo                    => "Modulo"
-      case math.Ceil                      => "Ceil"
-      case math.Floor                     => "Floor"
-      case math.Trunc                     => "Trunc"
-      case relations.Eq                   => "Eq"
-      case relations.Neq                  => "Neq"
-      case relations.Lt                   => "Lt"
-      case relations.Lte                  => "Lte"
-      case relations.Gt                   => "Gt"
-      case relations.Gte                  => "Gte"
-      case relations.Between              => "Between"
-      case relations.IfUndefined          => "IfUndefined"
-      case relations.And                  => "And"
-      case relations.Or                   => "Or"
-      case relations.Not                  => "Not"
-      case relations.Cond                 => "Cond"
-      case set.Sample                     => "Sample"
-      case set.Take                       => "Take"
-      case set.Drop                       => "Drop"
-      case set.Range                      => "Range"
-      case set.Filter                     => "Filter"
-      case set.InnerJoin                  => "InnerJoin"
-      case set.LeftOuterJoin              => "LeftOuterJoin"
-      case set.RightOuterJoin             => "RightOuterJoin"
-      case set.FullOuterJoin              => "FullOuterJoin"
-      case set.GroupBy                    => "GroupBy"
-      case set.Union                      => "Union"
-      case set.Intersect                  => "Intersect"
-      case set.Except                     => "Except"
-      case set.In                         => "In"
-      case set.Within                     => "Within"
-      case set.Constantly                 => "Constantly"
-      case string.Concat                  => "Concat"
-      case string.Like                    => "Like"
-      case string.Search                  => "Search"
-      case string.Length                  => "Length"
-      case string.Lower                   => "Lower"
-      case string.Upper                   => "Upper"
-      case string.Substring               => "Substring"
-      case string.Split                   => "Split"
-      case string.Boolean                 => "Boolean"
-      case string.Integer                 => "Integer"
-      case string.Decimal                 => "Decimal"
-      case string.Null                    => "Null"
-      case string.ToString                => "ToString"
-      case structural.MakeObject          => "MakeObject"
-      case structural.MakeArray           => "MakeArray"
-      case structural.Meta                => "Meta"
-      case structural.ObjectConcat        => "ObjectConcat"
-      case structural.ArrayConcat         => "ArrayConcat"
-      case structural.ConcatOp            => "ConcatOp"
-      case structural.ObjectProject       => "ObjectProject"
-      case structural.ArrayProject        => "ArrayProject"
-      case structural.DeleteField         => "DeleteField"
-      case structural.FlattenMap          => "FlattenMap"
-      case structural.FlattenArray        => "FlattenArray"
-      case structural.FlattenMapKeys      => "FlattenMapKeys"
+      case agg.Count => "Count"
+      case agg.Sum => "Sum"
+      case agg.Min => "Min"
+      case agg.Max => "Max"
+      case agg.Avg => "Avg"
+      case agg.First => "First"
+      case agg.Last => "Last"
+      case agg.Arbitrary => "Arbitrary"
+      case array.ArrayLength => "ArrayLength"
+      case date.ExtractCentury => "ExtractCentury"
+      case date.ExtractDayOfMonth => "ExtractDayOfMonth"
+      case date.ExtractDecade => "ExtractDecade"
+      case date.ExtractDayOfWeek => "ExtractDayOfWeek"
+      case date.ExtractDayOfYear => "ExtractDayOfYear"
+      case date.ExtractEpoch => "ExtractEpoch"
+      case date.ExtractHour => "ExtractHour"
+      case date.ExtractIsoDayOfWeek => "ExtractIsoDayOfWeek"
+      case date.ExtractIsoYear => "ExtractIsoYear"
+      case date.ExtractMicroseconds => "ExtractMicroseconds"
+      case date.ExtractMillennium => "ExtractMillennium"
+      case date.ExtractMilliseconds => "ExtractMilliseconds"
+      case date.ExtractMinute => "ExtractMinute"
+      case date.ExtractMonth => "ExtractMonth"
+      case date.ExtractQuarter => "ExtractQuarter"
+      case date.ExtractSecond => "ExtractSecond"
+      case date.ExtractTimezone => "ExtractTimezone"
+      case date.ExtractTimezoneHour => "ExtractTimezoneHour"
+      case date.ExtractTimezoneMinute => "ExtractTimezoneMinute"
+      case date.ExtractWeek => "ExtractWeek"
+      case date.ExtractYear => "ExtractYear"
+      case date.Date => "Date"
+      case date.Now => "Now"
+      case date.Time => "Time"
+      case date.Timestamp => "Timestamp"
+      case date.Interval => "Interval"
+      case date.StartOfDay => "StartOfDay"
+      case date.TimeOfDay => "TimeOfDay"
+      case date.ToTimestamp => "ToTimestamp"
+      case identity.Squash => "Squash"
+      case identity.ToId => "ToId"
+      case math.Add => "Add"
+      case math.Abs => "Abs"
+      case math.Multiply => "Multiply"
+      case math.Power => "Power"
+      case math.Subtract => "Subtract"
+      case math.Divide => "Divide"
+      case math.Negate => "Negate"
+      case math.Modulo => "Modulo"
+      case math.Ceil => "Ceil"
+      case math.Floor => "Floor"
+      case math.Trunc => "Trunc"
+      case relations.Eq => "Eq"
+      case relations.Neq => "Neq"
+      case relations.Lt => "Lt"
+      case relations.Lte => "Lte"
+      case relations.Gt => "Gt"
+      case relations.Gte => "Gte"
+      case relations.Between => "Between"
+      case relations.IfUndefined => "IfUndefined"
+      case relations.And => "And"
+      case relations.Or => "Or"
+      case relations.Not => "Not"
+      case relations.Cond => "Cond"
+      case set.Sample => "Sample"
+      case set.Take => "Take"
+      case set.Drop => "Drop"
+      case set.Range => "Range"
+      case set.Filter => "Filter"
+      case set.InnerJoin => "InnerJoin"
+      case set.LeftOuterJoin => "LeftOuterJoin"
+      case set.RightOuterJoin => "RightOuterJoin"
+      case set.FullOuterJoin => "FullOuterJoin"
+      case set.GroupBy => "GroupBy"
+      case set.Union => "Union"
+      case set.Intersect => "Intersect"
+      case set.Except => "Except"
+      case set.In => "In"
+      case set.Within => "Within"
+      case set.Constantly => "Constantly"
+      case string.Concat => "Concat"
+      case string.Like => "Like"
+      case string.Search => "Search"
+      case string.Length => "Length"
+      case string.Lower => "Lower"
+      case string.Upper => "Upper"
+      case string.Substring => "Substring"
+      case string.Split => "Split"
+      case string.Boolean => "Boolean"
+      case string.Integer => "Integer"
+      case string.Decimal => "Decimal"
+      case string.Null => "Null"
+      case string.ToString => "ToString"
+      case structural.MakeObject => "MakeObject"
+      case structural.MakeArray => "MakeArray"
+      case structural.Meta => "Meta"
+      case structural.ObjectConcat => "ObjectConcat"
+      case structural.ArrayConcat => "ArrayConcat"
+      case structural.ConcatOp => "ConcatOp"
+      case structural.ObjectProject => "ObjectProject"
+      case structural.ArrayProject => "ArrayProject"
+      case structural.DeleteField => "DeleteField"
+      case structural.FlattenMap => "FlattenMap"
+      case structural.FlattenArray => "FlattenArray"
+      case structural.FlattenMapKeys => "FlattenMapKeys"
       case structural.FlattenArrayIndices => "FlattenArrayIndices"
-      case structural.ShiftMap            => "ShiftMap"
-      case structural.ShiftArray          => "ShiftArray"
-      case structural.ShiftMapKeys        => "ShiftMapKeys"
-      case structural.ShiftArrayIndices   => "ShiftArrayIndices"
-      case structural.UnshiftMap          => "UnshiftMap"
-      case structural.UnshiftArray        => "UnshiftArray"
-      case f                              => "unknown function: " + f.help
+      case structural.ShiftMap => "ShiftMap"
+      case structural.ShiftArray => "ShiftArray"
+      case structural.ShiftMapKeys => "ShiftMapKeys"
+      case structural.ShiftArrayIndices => "ShiftArrayIndices"
+      case structural.UnshiftMap => "UnshiftMap"
+      case structural.UnshiftArray => "UnshiftArray"
+      case f => "unknown function: " + f.help
     }
   }
 
@@ -263,17 +272,17 @@ trait GenericFuncInstances {
 object GenericFunc extends GenericFuncInstances
 
 object Func {
+
   /** This handles rewrites that constant-folding (handled by the typers) can’t.
-    * I.e., any rewrite where either the result or one of the relevant arguments
-    * is a non-Constant expression. It _could_ cover all the rewrites, but
-    * there’s no need to duplicate the cases that must also be handled by the
-    * typer.
-    */
+   * I.e., any rewrite where either the result or one of the relevant arguments
+   * is a non-Constant expression. It _could_ cover all the rewrites, but
+   * there’s no need to duplicate the cases that must also be handled by the
+   * typer.
+   */
   trait Simplifier {
-    def apply[T]
-      (orig: LP[T])
-      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
-        : Option[LP[T]]
+    def apply[T](orig: LP[T])(
+        implicit TR: Recursive.Aux[T, LP],
+        TC: Corecursive.Aux[T, LP]): Option[LP[T]]
   }
 
   type Input[A, N <: Nat] = Sized[List[A], N]

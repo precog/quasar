@@ -19,13 +19,10 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 
 /** A subset of the information available from the collStats command. Many more
-  * fields are available, some only in particular MongoDB versions or with
-  * particular storage engines.
-  * @param count The number of documents in the collection.
-  * @param dataSize The total size "in memory" in bytes of all documents in the
-  *   collection, not including headers or indexes.
-  */
-final case class CollectionStatistics(
-  count: Long,
-  dataSize: Long,
-  sharded: Boolean)
+ * fields are available, some only in particular MongoDB versions or with
+ * particular storage engines.
+ * @param count The number of documents in the collection.
+ * @param dataSize The total size "in memory" in bytes of all documents in the
+ *   collection, not including headers or indexes.
+ */
+final case class CollectionStatistics(count: Long, dataSize: Long, sharded: Boolean)

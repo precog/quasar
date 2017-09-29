@@ -20,8 +20,8 @@ import pathy._, Path._
 
 class File2ESSpec extends quasar.Qspec {
 
-  import SparkElastic.{separator, file2ES}
-  
+  import SparkElastic.{file2ES, separator}
+
   "file2ES" should {
     "create IndexType for first lvl file" in {
       val IndexType(index, typ) = file2ES(rootDir </> dir("folder") </> file("file"))
@@ -30,7 +30,8 @@ class File2ESSpec extends quasar.Qspec {
     }
 
     "create IndexType for n-th lvl file" in {
-      val IndexType(index, typ) = file2ES(rootDir </> dir("folder") </> dir("subfolder") </> file("file"))
+      val IndexType(index, typ) =
+        file2ES(rootDir </> dir("folder") </> dir("subfolder") </> file("file"))
       index must_== s"folder${separator}subfolder"
       typ must_== "file"
     }

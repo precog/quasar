@@ -26,29 +26,34 @@ import scalaz.{Cofree, Free, Functor}
 // TODO{matryoshka}: This exists as matryoshka depends on a shapshot version of
 //                   scalacheck at the moment.
 trait CorecursiveArbitrary {
-  def corecursiveArbitrary[T, F[_]: Functor]
-    (implicit T: Corecursive.Aux[T, F], fArb: Delay[Arbitrary, F])
-      : Arbitrary[T] =
-    Arbitrary(Gen.sized(size =>
-      fArb(Arbitrary(
-        if (size <= 0)
+  def corecursiveArbitrary[T, F[_]: Functor](
+      implicit T: Corecursive.Aux[T, F],
+      fArb: Delay[Arbitrary, F]): Arbitrary[T] =
+    Arbitrary(
+      Gen.sized(size =>
+        fArb(Arbitrary(if (size <= 0)
           Gen.fail[T]
         else
           Gen.resize(size - 1, corecursiveArbitrary[T, F].arbitrary))).arbitrary map (_.embed)))
 
-  implicit def fixArbitrary[F[_]: Functor](implicit fArb: Delay[Arbitrary, F]): Arbitrary[Fix[F]] =
+  implicit def fixArbitrary[F[_]: Functor](
+      implicit fArb: Delay[Arbitrary, F]): Arbitrary[Fix[F]] =
     corecursiveArbitrary[Fix[F], F]
 
-  implicit def muArbitrary[F[_]: Functor](implicit fArb: Delay[Arbitrary, F]): Arbitrary[Mu[F]] =
+  implicit def muArbitrary[F[_]: Functor](
+      implicit fArb: Delay[Arbitrary, F]): Arbitrary[Mu[F]] =
     corecursiveArbitrary[Mu[F], F]
 
-  implicit def nuArbitrary[F[_]: Functor](implicit fArb: Delay[Arbitrary, F]): Arbitrary[Nu[F]] =
+  implicit def nuArbitrary[F[_]: Functor](
+      implicit fArb: Delay[Arbitrary, F]): Arbitrary[Nu[F]] =
     corecursiveArbitrary[Nu[F], F]
 
-  implicit def cofreeArbitrary[F[_]: Functor, A](implicit envTArb: Delay[Arbitrary, EnvT[A, F, ?]]): Arbitrary[Cofree[F, A]] =
+  implicit def cofreeArbitrary[F[_]: Functor, A](
+      implicit envTArb: Delay[Arbitrary, EnvT[A, F, ?]]): Arbitrary[Cofree[F, A]] =
     corecursiveArbitrary[Cofree[F, A], EnvT[A, F, ?]]
 
-  implicit def freeArbitrary[F[_]: Functor, A](implicit coEnvArb: Delay[Arbitrary, CoEnv[A, F, ?]]): Arbitrary[Free[F, A]] =
+  implicit def freeArbitrary[F[_]: Functor, A](
+      implicit coEnvArb: Delay[Arbitrary, CoEnv[A, F, ?]]): Arbitrary[Free[F, A]] =
     corecursiveArbitrary[Free[F, A], CoEnv[A, F, ?]]
 }
 

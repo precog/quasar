@@ -30,17 +30,20 @@ private[qscript] final class ReadFilePlanner[M[_]: Applicative: MonadPlanErr, FM
 
   import MarkLogicPlannerError._
 
-  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]]
-  ): AlgebraM[M, Const[Read[AFile], ?], Search[Q] \/ XQuery] = {
+  def plan[Q](implicit Q: Birecursive.Aux[Q, Query[J, ?]])
+    : AlgebraM[M, Const[Read[AFile], ?], Search[Q] \/ XQuery] = {
     case Const(Read(file)) =>
       val fileUri = UriPathCodec.printPath(file)
 
-      Uri.getOption(fileUri).cata(uri =>
-        Search(
-          Q.embed(Query.Document[J, Q](IList(uri))),
-          ExcludeId,
-          IList()
-        ).left[XQuery].point[M],
-        MonadPlanErr[M].raiseError(invalidUri(fileUri)))
+      Uri
+        .getOption(fileUri)
+        .cata(
+          uri =>
+            Search(
+              Q.embed(Query.Document[J, Q](IList(uri))),
+              ExcludeId,
+              IList()
+            ).left[XQuery].point[M],
+          MonadPlanErr[M].raiseError(invalidUri(fileUri)))
   }
 }

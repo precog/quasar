@@ -34,8 +34,7 @@ object HttpNumbers {
   case class LongNumber(number: Long) extends HttpNumber
 }
 
-
-trait HttpNumberImplicits { 
+trait HttpNumberImplicits {
   implicit def int2HttpNumber(num: Int): HttpNumber =
     HttpNumbers.LongNumber(num)
 

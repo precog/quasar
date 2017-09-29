@@ -36,71 +36,83 @@ import scalaz._, Scalaz._
 class SparkStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Skipped("TODO").left
 
-  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(
+      run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
+      case (ExtractFunc(MapFuncsCore.Eq(_, _)), Data.Date(_), Data.Timestamp(_)) =>
+        Skipped("TODO")
       case _ => run
     }
 
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
-    case MFC(ExtractIsoYear(_))  => TODO
-    case MFC(ExtractWeek(_))     => TODO
-    case MFD(Trunc(_))           => TODO
-    case MFC(Power(_, _))        => Pending("TODO: handle large value").left
+    case MFC(ExtractIsoYear(_)) => TODO
+    case MFC(ExtractWeek(_)) => TODO
+    case MFD(Trunc(_)) => TODO
+    case MFC(Power(_, _)) => Pending("TODO: handle large value").left
     case MFC(ConcatArrays(_, _)) => Pending("TODO: handle mixed string/array").left
-    case MFC(IfUndefined(_, _))  => Pending("TODO: pack arrays/objects with undefined values").left
-    case _                       => ().right
+    case MFC(IfUndefined(_, _)) =>
+      Pending("TODO: pack arrays/objects with undefined values").left
+    case _ => ().right
   }
 
   // TODO: figure out how to pass the args to shortCircuit so they can be inspected
   def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
-    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
+    fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit))
+      .swap
+      .toOption
 
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
   def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
-    val run = fm.cataM(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
-      a => κ(args(a)).right, CoreMap.change))
+    val run = fm.cataM(
+      interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
+        a => κ(args(a)).right,
+        CoreMap.change))
     (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }
 
   val runner = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(
-      prg: FreeMapA[Fix, Nothing],
-      expected: Data
+        prg: FreeMapA[Fix, Nothing],
+        expected: Data
     ): Result =
       pending
 
     def unaryMapFunc(
-      prg: FreeMapA[Fix, UnaryArg],
-      arg: Data,
-      expected: Data
+        prg: FreeMapA[Fix, UnaryArg],
+        arg: Data,
+        expected: Data
     ): Result =
       check(prg, List(arg)) getOrElse
         run(prg, κ(arg), expected)
 
     def binaryMapFunc(
-      prg: FreeMapA[Fix, BinaryArg],
-      arg1: Data, arg2: Data,
-      expected: Data
+        prg: FreeMapA[Fix, BinaryArg],
+        arg1: Data,
+        arg2: Data,
+        expected: Data
     ): Result =
-      ignoreSome(prg, arg1, arg2)(check(prg, List(arg1, arg2)) getOrElse
-       run[BinaryArg](prg, _.fold(arg1, arg2), expected))
+      ignoreSome(prg, arg1, arg2)(
+        check(prg, List(arg1, arg2)) getOrElse
+          run[BinaryArg](prg, _.fold(arg1, arg2), expected))
 
     def ternaryMapFunc(
-      prg: FreeMapA[Fix, TernaryArg],
-      arg1: Data, arg2: Data, arg3: Data,
-      expected: Data
+        prg: FreeMapA[Fix, TernaryArg],
+        arg1: Data,
+        arg2: Data,
+        arg3: Data,
+        expected: Data
     ): Result =
       check(prg, List(arg1, arg2, arg3)) getOrElse
-       run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected)
+        run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected)
 
     def intDomain = arbitrary[BigInt]
 
     // NB: BigDecimal parsing cannot handle values that are too close to the
     // edges of its range.
-    def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
+    def decDomain =
+      arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
     def stringDomain = arbitrary[String]
 

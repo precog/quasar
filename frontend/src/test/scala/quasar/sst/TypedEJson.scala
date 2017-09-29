@@ -17,7 +17,18 @@
 package quasar.sst
 
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson.{EJson, Common, Extension, CommonEJson, ExtEJson, Meta, Type => EType, SizedType => ESizedType, EJsonArbitrary, Null => ENull}
+import quasar.ejson.{
+  EJson,
+  Common,
+  Extension,
+  CommonEJson,
+  ExtEJson,
+  Meta,
+  Type => EType,
+  SizedType => ESizedType,
+  EJsonArbitrary,
+  Null => ENull
+}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.pkg.tests._
@@ -34,12 +45,12 @@ object TypedEJson extends TypedEJsonInstances {
   type TEJson[A] = Coproduct[TypeMetadata, EJson, A]
 
   def absorbMetadata[J](implicit J: Birecursive.Aux[J, EJson]): Transform[J, TEJson, EJson] = {
-    case TM(TypeMetadata.Type(tag, j))            => ExtEJson(Meta(j, EType(tag)))
+    case TM(TypeMetadata.Type(tag, j)) => ExtEJson(Meta(j, EType(tag)))
     case TM(TypeMetadata.SizedType(tag, size, j)) => ExtEJson(Meta(j, ESizedType(tag, size)))
-    case TM(TypeMetadata.Absent(j))               => J.project(j)
-    case TM(TypeMetadata.Null())                  => CommonEJson(ENull())
-    case CJ(cj)                                   => CommonEJson(cj)
-    case EJ(ej)                                   => ExtEJson(ej)
+    case TM(TypeMetadata.Absent(j)) => J.project(j)
+    case TM(TypeMetadata.Null()) => CommonEJson(ENull())
+    case CJ(cj) => CommonEJson(cj)
+    case EJ(ej) => ExtEJson(ej)
   }
 
   ////

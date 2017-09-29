@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import slamdata.Predef.{ -> => _, _ }
+import slamdata.Predef.{-> => _, _}
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
@@ -35,11 +35,18 @@ import scalaz._, Scalaz._
 object metadata {
   import ToApiError.ops._
 
-  final case class FsNode(name: String, typ: String, mount: Option[String], args: Option[List[String]])
+  final case class FsNode(
+      name: String,
+      typ: String,
+      mount: Option[String],
+      args: Option[List[String]])
 
   object FsNode {
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String], args: Option[List[String]]): FsNode =
+    def apply(
+        pathSegment: PathSegment,
+        mount: Option[String],
+        args: Option[List[String]]): FsNode =
       FsNode(
         pathSegment.fold(_.value, _.value),
         pathSegment.fold(κ("directory"), κ("file")),
@@ -47,18 +54,20 @@ object metadata {
         args)
 
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode = apply(pathSegment, mount, args = None)
+    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
+      apply(pathSegment, mount, args = None)
 
     implicit val fsNodeOrder: Order[FsNode] =
       Order.orderBy(n => (n.name, n.typ, n.mount, n.args))
 
     implicit val fsNodeEncodeJson: EncodeJson[FsNode] =
-      EncodeJson { case FsNode(name, typ, mount, args) =>
-        ("name" := name)    ->:
-        ("type" := typ)     ->:
-        ("mount" :=? mount) ->?:
-        ("args" :=? args)   ->?:
-        jEmptyObject
+      EncodeJson {
+        case FsNode(name, typ, mount, args) =>
+          ("name" := name) ->:
+            ("type" := typ) ->:
+            ("mount" :=? mount) ->?:
+            ("args" :=? args) ->?:
+            jEmptyObject
       }
 
     implicit val fsNodeDecodeJson: DecodeJson[FsNode] =
@@ -74,18 +83,18 @@ object metadata {
       Order.orderBy(n => (n.name, n.`type`, n.error.toApiError.status, n.error.shows))
 
     implicit val invalidMountNodeEncodeJson: EncodeJson[InvalidMountNode] =
-      EncodeJson { case InvalidMountNode(name, tpe, error) =>
-        ("name" := name)                               ->:
-        ("type" :=? tpe)                               ->?:
-        ("mount" := Json("error" := error.toApiError)) ->:
-        jEmptyObject
+      EncodeJson {
+        case InvalidMountNode(name, tpe, error) =>
+          ("name" := name) ->:
+            ("type" :=? tpe) ->?:
+            ("mount" := Json("error" := error.toApiError)) ->:
+            jEmptyObject
       }
   }
 
   implicit def invalidMountNodeFsNodeEncodeJson: EncodeJson[InvalidMountNode \/ FsNode] =
-    EncodeJson(_.fold(
-      InvalidMountNode.invalidMountNodeEncodeJson(_),
-      FsNode.fsNodeEncodeJson(_)))
+    EncodeJson(
+      _.fold(InvalidMountNode.invalidMountNodeEncodeJson(_), FsNode.fsNodeEncodeJson(_)))
 
   def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
 
@@ -96,51 +105,66 @@ object metadata {
       // We go through the trouble of "overlaying" things here as opposed to just using the MountConfig
       // so that interpreters are free to modify the results of `QueryFile` and those changes will be
       // reflected here
-      M.lookupConfig(parent).run
+      M.lookupConfig(parent)
+        .run
         .flatMap(i => OptionT((i.toOption >>= (c => moduleConfig.getOption(c))).point[M.FreeS]))
         .map { statements =>
           val args = statements.collect {
-            case FunctionDecl(name, args, _ ) => name.value -> args.map(_.value)
+            case FunctionDecl(name, args, _) => name.value -> args.map(_.value)
           }.toMap
 
-          names.map(name => FsNode(name, mount = None, args = args.get(stringValue(name))).right[InvalidMountNode])
+          names.map(
+            name =>
+              FsNode(name, mount = None, args = args.get(stringValue(name)))
+                .right[InvalidMountNode])
         }
         // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
         .getOrElseF {
           M.havingPrefix(parent).map { mounts =>
             names map { name =>
               val path = name.fold(parent </> dir1(_), parent </> file1(_))
-              mounts.get(path).cata(
-                _.bimap(
-                  e => InvalidMountNode(
-                    name.fold(_.value, _.value),
-                    MountingError.invalidMount.getOption(e) ∘ (_._1.fold(_.value, "view", "module")),
-                    e),
-                  t => FsNode(name, t.fold(_.value, "view", "module").some, none)),
-                FsNode(name, none, none).right)
+              mounts
+                .get(path)
+                .cata(
+                  _.bimap(
+                    e =>
+                      InvalidMountNode(
+                        name.fold(_.value, _.value),
+                        MountingError.invalidMount
+                          .getOption(e) ∘ (_._1.fold(_.value, "view", "module")),
+                        e),
+                    t => FsNode(name, t.fold(_.value, "view", "module").some, none)
+                  ),
+                  FsNode(name, none, none).right
+                )
             }
           }
-        }.liftM[FileSystemErrT]
+        }
+        .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir, offset: Natural, limit: Option[Positive]): Free[S, QResponse[S]] = respond(
-      (offset.value.toIntSafe.toRightDisjunction(ApiError.fromMsg(BadRequest, "offset value is too large")) |@|
-       limit.traverse(_.value.toIntSafe.toRightDisjunction(ApiError.fromMsg(BadRequest, "limit value is too large")))) { (off, lim) =>
-        Q.ls(d)
-          .flatMap(mkNodes(d, _))
-          .map { nodes =>
-            val withOffset = nodes.toIList.sorted.drop(off)
-            Json.obj("children" := lim.fold(withOffset)(l => withOffset.take(l)))
-          }.run
-      }.sequence)
+    def dirMetadata(d: ADir, offset: Natural, limit: Option[Positive]): Free[S, QResponse[S]] =
+      respond(
+        (offset.value.toIntSafe.toRightDisjunction(
+          ApiError.fromMsg(BadRequest, "offset value is too large")) |@|
+          limit.traverse(_.value.toIntSafe.toRightDisjunction(
+            ApiError.fromMsg(BadRequest, "limit value is too large")))) { (off, lim) =>
+          Q.ls(d)
+            .flatMap(mkNodes(d, _))
+            .map { nodes =>
+              val withOffset = nodes.toIList.sorted.drop(off)
+              Json.obj("children" := lim.fold(withOffset)(l => withOffset.take(l)))
+            }
+            .run
+        }.sequence)
 
-    def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
-      Q.fileExists(f)
-        .map(_ either Json() or PathError.pathNotFound(f)))
+    def fileMetadata(f: AFile): Free[S, QResponse[S]] =
+      respond(Q.fileExists(f).map(_ either Json() or PathError.pathNotFound(f)))
 
     QHttpService {
       case GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
-        respond((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
-          refineType(path).fold(dirMetadata(_, offset, limit), fileMetadata)
+        respond((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) {
+          (offset, limit) =>
+            refineType(path).fold(dirMetadata(_, offset, limit), fileMetadata)
         }.sequence)
     }
   }

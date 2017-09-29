@@ -24,7 +24,8 @@ import scalaz._, Scalaz._
 
 trait CoreConfigArbitrary {
   implicit val coreConfigArbitrary: Arbitrary[CoreConfig] =
-    Arbitrary(Arbitrary.arbitrary[DbConnectionConfig] map (c => CoreConfig(MetaStoreConfig(c).some)))
+    Arbitrary(
+      Arbitrary.arbitrary[DbConnectionConfig] map (c => CoreConfig(MetaStoreConfig(c).some)))
 }
 
 object CoreConfigArbitrary extends CoreConfigArbitrary

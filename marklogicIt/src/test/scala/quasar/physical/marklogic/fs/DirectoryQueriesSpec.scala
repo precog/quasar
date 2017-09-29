@@ -34,9 +34,9 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
     "Querying directory paths" >> {
       "results in a dataset comprised of immediate child documents" >> {
         val loc: ADir = rootDir </> dir("childdocs")
-        val a: Data   = Data.Obj("a" -> Data._int(1))
-        val b: Data   = Data.Obj("b" -> Data._int(2))
-        val c: Data   = Data.Obj("c" -> Data._int(3))
+        val a: Data = Data.Obj("a" -> Data._int(1))
+        val b: Data = Data.Obj("b" -> Data._int(2))
+        val c: Data = Data.Obj("c" -> Data._int(3))
 
         val setup = List(
           FileName("a") -> a,
@@ -48,23 +48,25 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
 
         // NB: We left shift here to get the flattend set of documents as the
         //     root of each file is an array of data.
-        val lp   = fullCompileExp(sqlE"select (*)[*] from `/childdocs`")
+        val lp = fullCompileExp(sqlE"select (*)[*] from `/childdocs`")
         val eval = query.evaluate(lp) translate dropPhases
 
         (setup.liftM[Process] *> eval)
           .translate(runFsE(js))
-          .runLog.run.map (_.toEither must beRight(contain(exactly(a, b, c))))
+          .runLog
+          .run
+          .map(_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
       }
 
       "only includes child documents of the format configured for the mount" >> {
         val loc: ADir = rootDir </> dir("onlyfmt")
-        val a: Data   = Data.Obj("a" -> Data._int(1))
-        val b: Data   = Data.Obj("b" -> Data._int(2))
-        val c: Data   = Data.Obj("c" -> Data._int(3))
-        val d: Data   = Data.Obj("d" -> Data._int(4))
-        val e: Data   = Data.Obj("e" -> Data._int(5))
-        val f: Data   = Data.Obj("f" -> Data._int(6))
+        val a: Data = Data.Obj("a" -> Data._int(1))
+        val b: Data = Data.Obj("b" -> Data._int(2))
+        val c: Data = Data.Obj("c" -> Data._int(3))
+        val d: Data = Data.Obj("d" -> Data._int(4))
+        val e: Data = Data.Obj("e" -> Data._int(5))
+        val f: Data = Data.Obj("f" -> Data._int(6))
 
         val saveJs = List(
           FileName("a") -> a,
@@ -82,14 +84,14 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
           case (n, o) => write.saveThese(loc </> file1(n), Vector(o)).void
         }
 
-        val lp   = fullCompileExp(sqlE"select (*)[*] from `/onlyfmt`")
+        val lp = fullCompileExp(sqlE"select (*)[*] from `/onlyfmt`")
         val eval = query.evaluate(lp) translate dropPhases
 
         val loadAndQueryJs =
           (saveJs.liftM[Process] *> eval).translate(runFsE(js)).runLog
 
-        (runFsE(xml)(saveXml) *> loadAndQueryJs)
-          .run.map (_.toEither must beRight(contain(exactly(a, b, c))))
+        (runFsE(xml)(saveXml) *> loadAndQueryJs).run
+          .map(_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
       }
     }

@@ -37,17 +37,17 @@ package object xquery {
 
   type XPath = String
 
-  type Prologs          = ISet[Prolog]
+  type Prologs = ISet[Prolog]
   type PrologT[F[_], A] = WriterT[F, Prologs, A]
-  type PrologW[F[_]]    = MonadTell_[F, Prologs]
-  type PrologL[F[_]]    = MonadListen_[F, Prologs]
+  type PrologW[F[_]] = MonadTell_[F, Prologs]
+  type PrologL[F[_]] = MonadListen_[F, Prologs]
 
   def PrologW[F[_]](implicit F: PrologW[F]): PrologW[F] = F
   def PrologL[F[_]](implicit F: PrologL[F]): PrologL[F] = F
 
   sealed abstract class SortDirection {
     def asOrderModifier: String = this match {
-      case SortDirection.Ascending  => "ascending"
+      case SortDirection.Ascending => "ascending"
       case SortDirection.Descending => "descending"
     }
   }
@@ -55,10 +55,10 @@ package object xquery {
   object SortDirection {
 
     case object Descending extends SortDirection
-    case object Ascending  extends SortDirection
+    case object Ascending extends SortDirection
 
     def fromQScript(s: SortDir): SortDirection = s match {
-      case SortDir.Ascending  => Ascending
+      case SortDir.Ascending => Ascending
       case SortDir.Descending => Descending
     }
   }
@@ -129,7 +129,10 @@ package object xquery {
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
 
-  def module(prefix: String Refined IsNCName, uri: String Refined Uri, locs: (String Refined Uri)*): ModuleImport =
+  def module(
+      prefix: String Refined IsNCName,
+      uri: String Refined Uri,
+      locs: (String Refined Uri)*): ModuleImport =
     ModuleImport(Some(NSPrefix(NCName(prefix))), NSUri(uri), locs.map(NSUri(_)).toIList)
 
   def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =

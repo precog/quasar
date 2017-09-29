@@ -44,17 +44,20 @@ object Skeleton extends BackendModule {
   type M[A] = Nothing
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
   def MonadM = ??? // Monad[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    implicitly[Unirewrite[T, QS[T]]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
+    Unicoalesce.Capture[T, QS[T]]
 
   type Config = Unit
 
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
-      : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = quasar.fp.ski.ι
+    : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = quasar.fp.ski.ι
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] = ???
 
@@ -62,8 +65,8 @@ object Skeleton extends BackendModule {
 
   val Type = FileSystemType("skeleton")
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): Backend[Repr] = ???
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] =
+    ???
 
   object QueryFileModule extends QueryFileModule {
     import QueryFile._

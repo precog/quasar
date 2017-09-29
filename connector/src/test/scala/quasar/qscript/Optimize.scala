@@ -32,28 +32,34 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
   "optimizer" should {
     "move subset before map" in {
       val from: QS[FreeQS] =
-        QC.inj(Map(
-          Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
-          ProjectFieldR(HoleF, StrLit("foo"))))
+        QC.inj(
+          Map(
+            Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
+            ProjectFieldR(HoleF, StrLit("foo"))))
 
       val count: QS[FreeQS] =
         QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
 
       val input: QS[Fix[QS]] =
-        QC.inj(Subset(
-          RootR.embed,
-          Free.roll(QST[QS].inject(from)),
-          Take,
-          Free.roll(QST[QS].inject(count))))
+        QC.inj(
+          Subset(
+            RootR.embed,
+            Free.roll(QST[QS].inject(from)),
+            Take,
+            Free.roll(QST[QS].inject(count))))
 
       val output: QS[Fix[QS]] =
-        QC.inj(Map(
-          QC.inj(Subset(
-            RootR.embed,
-            Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
-            Take,
-            Free.roll(QST[QS].inject(count)))).embed,
-          ProjectFieldR(HoleF, StrLit("foo"))))
+        QC.inj(
+          Map(
+            QC.inj(
+                Subset(
+                  RootR.embed,
+                  Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
+                  Take,
+                  Free.roll(QST[QS].inject(count))))
+              .embed,
+            ProjectFieldR(HoleF, StrLit("foo"))
+          ))
 
       optimizeExpr(input.embed) must equal(output.embed)
     }
@@ -66,22 +72,29 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
         QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
 
       val input: QS[Fix[QS]] =
-        QC.inj(Filter(
-          QC.inj(Union(
-            RootR.embed,
-            Free.roll(QST[QS].inject(lBranch)),
-            Free.roll(QST[QS].inject(rBranch)))).embed,
-          EqR(AddR(HoleF, IntLit(1)), IntLit(5))))
+        QC.inj(
+          Filter(
+            QC.inj(
+                Union(
+                  RootR.embed,
+                  Free.roll(QST[QS].inject(lBranch)),
+                  Free.roll(QST[QS].inject(rBranch))))
+              .embed,
+            EqR(AddR(HoleF, IntLit(1)), IntLit(5))))
 
       val output: QS[Fix[QS]] =
-        QC.inj(Union(
-          RootR.embed,
-          Free.roll(QST[QS].inject(QC.inj(Filter(
-            Free.roll(QST[QS].inject(lBranch)),
-            EqR(AddR(HoleF, IntLit(1)), IntLit(5)))))),
-          Free.roll(QST[QS].inject(QC.inj(Filter(
-            Free.roll(QST[QS].inject(rBranch)),
-            EqR(AddR(HoleF, IntLit(1)), IntLit(5))))))))
+        QC.inj(
+          Union(
+            RootR.embed,
+            Free.roll(
+              QST[QS].inject(QC.inj(Filter(
+                Free.roll(QST[QS].inject(lBranch)),
+                EqR(AddR(HoleF, IntLit(1)), IntLit(5)))))),
+            Free.roll(
+              QST[QS].inject(QC.inj(Filter(
+                Free.roll(QST[QS].inject(rBranch)),
+                EqR(AddR(HoleF, IntLit(1)), IntLit(5))))))
+          ))
 
       optimizeExpr(input.embed) must equal(output.embed)
     }

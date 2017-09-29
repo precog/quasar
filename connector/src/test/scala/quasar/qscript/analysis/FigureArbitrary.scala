@@ -24,10 +24,11 @@ trait FigureArbitrary {
   import CompositeTypeArbitrary._
 
   implicit val figureArbitrary: Arbitrary[Figure] =
-    Arbitrary(Gen.oneOf(
-      Gen.const(Figure.undefined),
-      Gen.const(Figure.unknown),
-      arbitrary[CompositeType] map Figure.struct))
+    Arbitrary(
+      Gen.oneOf(
+        Gen.const(Figure.undefined),
+        Gen.const(Figure.unknown),
+        arbitrary[CompositeType] map Figure.struct))
 }
 
 object FigureArbitrary extends FigureArbitrary

@@ -37,14 +37,13 @@ trait Interpreter {
   def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
     (
       TaskRef(Map.empty[ReadHandle, SqlReadCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, TablePath]) |@|
+        TaskRef(Map.empty[WriteHandle, TablePath]) |@|
         xa.map(_.trans) |@|
         TaskRef(0L) |@|
         GenUUID.type1[Task]
     )(
       (kvR, kvW, x, i, genUUID) =>
-
-          x :+:
+        x :+:
           MonotonicSeq.fromTaskRef(i) :+:
           genUUID :+:
           KeyValueStore.impl.fromTaskRef(kvR) :+:

@@ -26,14 +26,12 @@ import _root_.matryoshka.patterns._
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
+
   /** Chains multiple transformations together, each of which can fail to change
-    * anything.
-    */
-  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*)
-      : A => Option[A] =
-    rest.foldLeft(
-      first)(
-      (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
+   * anything.
+   */
+  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*): A => Option[A] =
+    rest.foldLeft(first)((prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 
   object convertToFree {
     def apply[F[_], A] = new PartiallyApplied[F, A]
@@ -49,12 +47,14 @@ package object matryoshka {
   def envTIso[E, W[_], A]: Iso[EnvT[E, W, A], (E, W[A])] =
     Iso((_: EnvT[E, W, A]).runEnvT)(EnvT(_))
 
-  def ginterpret[W[_], F[_], A, B](f: A => B, φ: GAlgebra[W, F, B])
-      : GAlgebra[W, CoEnv[A, F, ?], B] =
+  def ginterpret[W[_], F[_], A, B](
+      f: A => B,
+      φ: GAlgebra[W, F, B]): GAlgebra[W, CoEnv[A, F, ?], B] =
     ginterpretM[W, Id, F, A, B](f, φ)
 
-  def einterpret[W[_]: Traverse, F[_], A, B](f: A => B, φ: ElgotAlgebra[W, F, B])
-      : ElgotAlgebra[W, CoEnv[A, F, ?], B] =
+  def einterpret[W[_]: Traverse, F[_], A, B](
+      f: A => B,
+      φ: ElgotAlgebra[W, F, B]): ElgotAlgebra[W, CoEnv[A, F, ?], B] =
     _.traverse(_.run).fold(f, φ)
 
   def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
@@ -65,7 +65,8 @@ package object matryoshka {
     orOriginal(pf.lift)
 
   /** Derive a recursive instance over the functor transformed by EnvT by forgetting the annotation. */
-  def forgetRecursive[T, E, F[_]](implicit T: Recursive.Aux[T, EnvT[E, F, ?]]): Recursive.Aux[T, F] =
+  def forgetRecursive[T, E, F[_]](
+      implicit T: Recursive.Aux[T, EnvT[E, F, ?]]): Recursive.Aux[T, F] =
     new Recursive[T] {
       type Base[B] = F[B]
 
@@ -74,7 +75,8 @@ package object matryoshka {
     }
 
   /** Derive a corecursive instance over the functor transformed by EnvT using the zero of the annotation monoid. */
-  def rememberCorecursive[T, E: Monoid, F[_]](implicit T: Corecursive.Aux[T, EnvT[E, F, ?]]): Corecursive.Aux[T, F] =
+  def rememberCorecursive[T, E: Monoid, F[_]](
+      implicit T: Corecursive.Aux[T, EnvT[E, F, ?]]): Corecursive.Aux[T, F] =
     new Corecursive[T] {
       type Base[B] = F[B]
 
@@ -85,7 +87,9 @@ package object matryoshka {
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
     F(A)
 
-  implicit def coproductOrder[F[_], G[_]](implicit F: Delay[Order, F], G: Delay[Order, G]): Delay[Order, Coproduct[F, G, ?]] =
+  implicit def coproductOrder[F[_], G[_]](
+      implicit F: Delay[Order, F],
+      G: Delay[Order, G]): Delay[Order, Coproduct[F, G, ?]] =
     new Delay[Order, Coproduct[F, G, ?]] {
       def apply[A](ord: Order[A]): Order[Coproduct[F, G, A]] = {
         implicit val ordA: Order[A] = ord
@@ -93,10 +97,9 @@ package object matryoshka {
       }
     }
 
-  implicit def AlgebraMZip[M[_]: Applicative, F[_]: Functor]
-      : Zip[AlgebraM[M, F, ?]] =
+  implicit def AlgebraMZip[M[_]: Applicative, F[_]: Functor]: Zip[AlgebraM[M, F, ?]] =
     new Zip[AlgebraM[M, F, ?]] {
-      def zip[A, B](a: ⇒ AlgebraM[M, F, A], b: ⇒ AlgebraM[M, F, B]) =
+      def zip[A, B](a: => AlgebraM[M, F, A], b: => AlgebraM[M, F, B]) =
         w => Bitraverse[(?, ?)].bisequence((a(w ∘ (_._1)), b(w ∘ (_._2))))
     }
 }

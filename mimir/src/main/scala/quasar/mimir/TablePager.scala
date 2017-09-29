@@ -26,7 +26,7 @@ import fs2.async
 import fs2.async.mutable.Queue
 import fs2.interop.scalaz._
 
-import scalaz.{\/, -\/, \/-, ~>, StreamT}
+import scalaz.{-\/, \/, \/-, ~>, StreamT}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 

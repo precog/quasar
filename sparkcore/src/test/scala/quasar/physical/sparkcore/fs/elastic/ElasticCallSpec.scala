@@ -22,9 +22,10 @@ import com.sksamuel.elastic4s.embedded.LocalNode
 import scalaz._, Scalaz._, concurrent.Task
 import org.specs2.specification.BeforeAfterEach
 
-class ElasticCallSpec extends quasar.Qspec
+class ElasticCallSpec
+    extends quasar.Qspec
     with AlwaysNewLocalNodeProvider
-    with BeforeAfterEach  {
+    with BeforeAfterEach {
 
   sequential
 
@@ -36,8 +37,8 @@ class ElasticCallSpec extends quasar.Qspec
 
   var node: Option[LocalNode] = None
 
-  def healthCheck(tried: Int): Task[Boolean] = 
-    if(tried > 5)
+  def healthCheck(tried: Int): Task[Boolean] =
+    if (tried > 5)
       false.point[Task]
     else {
       val attemptedConnection = elastic.listIndices.foldMap(interpreter).void.attempt
@@ -86,7 +87,7 @@ class ElasticCallSpec extends quasar.Qspec
   "CreateIndex" should {
     "create new index" in {
       val program = for {
-        _      <- elastic.createIndex("hello")
+        _ <- elastic.createIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists
 
@@ -96,8 +97,8 @@ class ElasticCallSpec extends quasar.Qspec
 
     "not fail if index already exitst" in {
       val program = for {
-        _      <- elastic.createIndex("hello")
-        _      <- elastic.createIndex("hello")
+        _ <- elastic.createIndex("hello")
+        _ <- elastic.createIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists
 
@@ -109,8 +110,8 @@ class ElasticCallSpec extends quasar.Qspec
   "DeleteIndex" should {
     "delete existing index" in {
       val program = for {
-        _      <- elastic.createIndex("hello")
-        _      <- elastic.deleteIndex("hello")
+        _ <- elastic.createIndex("hello")
+        _ <- elastic.deleteIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists
 
@@ -120,7 +121,7 @@ class ElasticCallSpec extends quasar.Qspec
 
     "not fail if index does not exists" in {
       val program = for {
-        _      <- elastic.deleteIndex("hello")
+        _ <- elastic.deleteIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists
 
@@ -132,7 +133,7 @@ class ElasticCallSpec extends quasar.Qspec
       val program = for {
         _ <- elastic.createIndex("foo")
         _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
-        _      <- elastic.deleteIndex("hello")
+        _ <- elastic.deleteIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists
 

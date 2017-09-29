@@ -19,6 +19,6 @@ package quasar.cli
 sealed abstract class Cmd
 
 object Cmd {
-  object Start               extends Cmd
+  object Start extends Cmd
   object InitUpdateMetaStore extends Cmd
 }

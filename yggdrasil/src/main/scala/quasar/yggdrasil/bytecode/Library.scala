@@ -28,20 +28,20 @@ object IdentityPolicy {
     case object Right extends Retain
 
     /**
-      * All IDs are kept. Prefix first, then remaining left IDs, then remaining
-      * right IDs. The result is in order of the prefix/key.
-      *
-      * This should also be used in Morph1 to indicate the IDs are retained.
-      *
-      * TODO: Much like join, custom Morph2's should be allowed to specify order
-      *       after the join.
-      */
+     * All IDs are kept. Prefix first, then remaining left IDs, then remaining
+     * right IDs. The result is in order of the prefix/key.
+     *
+     * This should also be used in Morph1 to indicate the IDs are retained.
+     *
+     * TODO: Much like join, custom Morph2's should be allowed to specify order
+     *       after the join.
+     */
     case object Merge extends Retain
 
     /**
-      * Both IDs are kept, with the left sides first. The left IDs remain in
-      * order.
-      */
+     * Both IDs are kept, with the left sides first. The left IDs remain in
+     * order.
+     */
     case object Cross extends Retain
   }
 
@@ -52,9 +52,9 @@ object IdentityPolicy {
   case object Strip extends IdentityPolicy
 
   /** Both identity policies are adhered to, and then concatenated uniquely.
-    * Differs from `Retain.Cross` in that it distincts its identities, whereas
-    * cross retains all identities.
-    */
+   * Differs from `Retain.Cross` in that it distincts its identities, whereas
+   * cross retains all identities.
+   */
   case class Product(left: IdentityPolicy, right: IdentityPolicy) extends IdentityPolicy
 }
 
@@ -65,15 +65,17 @@ sealed trait FunctionLike[T] {
   val opcode: Int
   val rowLevel: Boolean
 
-  lazy val fqn          = namespace :+ name mkString "::"
+  lazy val fqn = namespace :+ name mkString "::"
   override def toString = "[0x%06x]".format(opcode) + fqn
 }
 
 trait Morphism1Like extends FunctionLike[UnaryOperationType] {
+
   /** This specifies how identities are returned by the Morphism1. */
   val idPolicy: IdentityPolicy = IdentityPolicy.Strip // TODO remove this default
 }
 trait Morphism2Like extends FunctionLike[BinaryOperationType] {
+
   /** This specifies how identities are returned by the Morphism2. */
   val idPolicy: IdentityPolicy = IdentityPolicy.Strip // TODO remove this default
 }

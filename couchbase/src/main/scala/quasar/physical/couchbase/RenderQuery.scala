@@ -37,13 +37,13 @@ object RenderQuery {
 
     a.project match {
       case s: Select[T[N1QL]] => q ∘ (s => s"select v from $s v")
-      case _                  => q ∘ ("select " ⊹ _)
+      case _ => q ∘ ("select " ⊹ _)
     }
   }
 
   val alg: AlgebraM[PlannerError \/ ?, N1QL, String] = {
     case Data(QData.Str(v)) =>
-      ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
+      ("'" ⊹ v.flatMap { case ''' => "''"; case v => v.toString } ⊹ "'").right
     case Data(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Id(v) =>
@@ -201,20 +201,20 @@ object RenderQuery {
       s"(array $a1 for $a2 in $a3 end)".right
     case Select(v, re, ks, jn, un, lt, ft, gb, ob) =>
       def alias(a: Option[Id[String]]) = ~(a ∘ (i => s" as `${i.v}`"))
-      val value       = v.v.fold("value ", "")
+      val value = v.v.fold("value ", "")
       val resultExprs = (re ∘ (r => r.expr ⊹ alias(r.alias))).intercalate(", ")
-      val kSpace      = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
-      val join        = ~(jn ∘ (j =>
-                          j.joinType.fold(κ(""), κ(" left outer")) ⊹ s" join `${j.id.v}`" ⊹ alias(j.alias) ⊹
-                          " on keys " ⊹ j.pred))
-      val unnest      = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
-      val let         = lt.toNel.foldMap(
-                          " let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
-      val filter      = ~(ft ∘ (f  => s" where ${f.v}"))
-      val groupBy     = ~(gb ∘ (g  => s" group by ${g.v}"))
-      val orderBy     =
+      val kSpace = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
+      val join = ~(jn ∘ (j =>
+        j.joinType.fold(κ(""), κ(" left outer")) ⊹ s" join `${j.id.v}`" ⊹ alias(j.alias) ⊹
+          " on keys " ⊹ j.pred))
+      val unnest = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
+      val let =
+        lt.toNel.foldMap(" let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
+      val filter = ~(ft ∘ (f => s" where ${f.v}"))
+      val groupBy = ~(gb ∘ (g => s" group by ${g.v}"))
+      val orderBy =
         ~((ob ∘ {
-          case OrderBy(a, Ascending)  => s"$a ASC"
+          case OrderBy(a, Ascending) => s"$a ASC"
           case OrderBy(a, Descending) => s"$a DESC"
         }).toNel ∘ (" order by " ⊹ _.intercalate(", ")))
       s"(select $value$resultExprs$kSpace$join$unnest$let$filter$groupBy$orderBy)".right

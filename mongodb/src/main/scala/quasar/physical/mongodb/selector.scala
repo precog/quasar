@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.{RenderTree, Terminal, NonTerminal}
+import quasar.{NonTerminal, RenderTree, Terminal}
 import quasar.fp._
 import quasar.javascript._
 
@@ -43,11 +43,13 @@ sealed abstract class Selector {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def mapUpFieldsM[M[_]: Monad](f: BsonField => M[BsonField]): M[Selector] =
     this match {
-      case Doc(pairs)       => pairs.toList.traverse { case (field, expr) => f(field).map(_ -> expr) }.map(ps => Doc(ps.toListMap))
+      case Doc(pairs) =>
+        pairs.toList.traverse { case (field, expr) => f(field).map(_ -> expr) }.map(ps =>
+          Doc(ps.toListMap))
       case And(left, right) => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(And(_, _))
-      case Or(left, right)  => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(Or(_, _))
+      case Or(left, right) => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(Or(_, _))
       case Nor(left, right) => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(Nor(_, _))
-      case Where(_)         => this.point[M] // FIXME: need to rename fields referenced in the JS (#383)
+      case Where(_) => this.point[M] // FIXME: need to rename fields referenced in the JS (#383)
     }
 
   def negate: Selector = {
@@ -59,14 +61,13 @@ sealed abstract class Selector {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(s: Selector): Selector = s match {
       case Selector.Doc(pairs) =>
-        pairs.toList
-          .map { case (f, x) => Selector.Doc(ListMap(f -> expr(x))) }
+        pairs.toList.map { case (f, x) => Selector.Doc(ListMap(f -> expr(x))) }
           .reduceOption[Selector](Selector.Or(_, _))
           .getOrElse(Selector.Where(Js.Bool(false)))
       case Selector.And(l, r) => Selector.Or(loop(l), loop(r))
-      case Selector.Or(l, r)  => Selector.Nor(l, r)
+      case Selector.Or(l, r) => Selector.Nor(l, r)
       case Selector.Nor(l, r) => Selector.Or(l, r)
-      case Selector.Where(x)  => Selector.Where(Js.UnOp("!", x))
+      case Selector.Where(x) => Selector.Where(Js.UnOp("!", x))
     }
 
     loop(this)
@@ -80,11 +81,12 @@ object Selector {
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def render(sel: Selector) = sel match {
-        case and: And     => NonTerminal("And" :: SelectorNodeType, None, and.flatten.map(render))
-        case or: Or       => NonTerminal("Or" :: SelectorNodeType, None, or.flatten.map(render))
-        case nor: Nor     => NonTerminal("Nor" :: SelectorNodeType, None, nor.flatten.map(render))
-        case where: Where => Terminal("Where" :: SelectorNodeType, Some(where.bson.toJs.pprint(0)))
-        case Doc(pairs)   => {
+        case and: And => NonTerminal("And" :: SelectorNodeType, None, and.flatten.map(render))
+        case or: Or => NonTerminal("Or" :: SelectorNodeType, None, or.flatten.map(render))
+        case nor: Nor => NonTerminal("Nor" :: SelectorNodeType, None, nor.flatten.map(render))
+        case where: Where =>
+          Terminal("Where" :: SelectorNodeType, Some(where.bson.toJs.pprint(0)))
+        case Doc(pairs) => {
           val children = pairs.map {
             case (field, Expr(expr)) =>
               Terminal("Expr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
@@ -127,15 +129,23 @@ object Selector {
   }
 
   sealed trait Evaluation extends Condition
-  final case class Mod(divisor: Int, remainder: Int) extends SimpleCondition("$mod") with Evaluation {
+  final case class Mod(divisor: Int, remainder: Int)
+      extends SimpleCondition("$mod")
+      with Evaluation {
     protected def rhs = Bson.Arr(Bson.Int32(divisor) :: Bson.Int32(remainder) :: Nil)
   }
-  final case class Regex(pattern: String, caseInsensitive: Boolean, multiLine: Boolean, extended: Boolean, dotAll: Boolean) extends Evaluation {
+  final case class Regex(
+      pattern: String,
+      caseInsensitive: Boolean,
+      multiLine: Boolean,
+      extended: Boolean,
+      dotAll: Boolean)
+      extends Evaluation {
     def bson = {
       val options = (if (caseInsensitive) "i" else "") +
-                    (if (multiLine)       "m" else "") +
-                    (if (extended)        "x" else "") +
-                    (if (dotAll)          "s" else "")
+        (if (multiLine) "m" else "") +
+        (if (extended) "x" else "") +
+        (if (dotAll) "s" else "")
       Bson.Regex(pattern, options)
     }
   }
@@ -145,35 +155,54 @@ object Selector {
   // in its own Bson.Doc.
   final case class Where(code: Js.Expr) extends Selector {
     def bson =
-      Bson.Doc(ListMap(
-        "$where" -> Bson.JavaScript(Js.AnonFunDecl(Nil, List(Js.Return(code))))))
+      Bson.Doc(ListMap("$where" -> Bson.JavaScript(Js.AnonFunDecl(Nil, List(Js.Return(code))))))
   }
 
   sealed trait Geospatial extends Condition
-  final case class GeoWithin(geometry: String, coords: List[List[(Double, Double)]]) extends SimpleCondition("$geoWithin") with Geospatial {
-    protected def rhs = Bson.Doc(ListMap(
-      "$geometry" -> Bson.Doc(ListMap(
-        "type"        -> Bson.Text(geometry),
-        "coordinates" -> Bson.Arr(coords.map(v => Bson.Arr(v.map(t => Bson.Arr(Bson.Dec(t._1) :: Bson.Dec(t._2) :: Nil)))))))))
+  final case class GeoWithin(geometry: String, coords: List[List[(Double, Double)]])
+      extends SimpleCondition("$geoWithin")
+      with Geospatial {
+    protected def rhs =
+      Bson.Doc(
+        ListMap(
+          "$geometry" -> Bson.Doc(ListMap(
+            "type" -> Bson.Text(geometry),
+            "coordinates" -> Bson.Arr(coords.map(v =>
+              Bson.Arr(v.map(t => Bson.Arr(Bson.Dec(t._1) :: Bson.Dec(t._2) :: Nil)))))))))
   }
-  final case class GeoIntersects(geometry: String, coords: List[List[(Double, Double)]]) extends SimpleCondition("$geoIntersects") with Geospatial {
-    protected def rhs = Bson.Doc(ListMap(
-      "$geometry" -> Bson.Doc(ListMap(
-        "type"        -> Bson.Text(geometry),
-        "coordinates" -> Bson.Arr(coords.map(v => Bson.Arr(v.map(t => Bson.Arr(Bson.Dec(t._1) :: Bson.Dec(t._2) :: Nil)))))))))
+  final case class GeoIntersects(geometry: String, coords: List[List[(Double, Double)]])
+      extends SimpleCondition("$geoIntersects")
+      with Geospatial {
+    protected def rhs =
+      Bson.Doc(
+        ListMap(
+          "$geometry" -> Bson.Doc(ListMap(
+            "type" -> Bson.Text(geometry),
+            "coordinates" -> Bson.Arr(coords.map(v =>
+              Bson.Arr(v.map(t => Bson.Arr(Bson.Dec(t._1) :: Bson.Dec(t._2) :: Nil)))))))))
   }
-  final case class Near(lat: Double, long: Double, maxDistance: Double) extends SimpleCondition("$near") with Geospatial {
-    protected def rhs = Bson.Doc(ListMap(
-      "$geometry" -> Bson.Doc(ListMap(
-        "type"        -> Bson.Text("Point"),
-        "coordinates" -> Bson.Arr(Bson.Dec(long) :: Bson.Dec(lat) :: Nil)))))
+  final case class Near(lat: Double, long: Double, maxDistance: Double)
+      extends SimpleCondition("$near")
+      with Geospatial {
+    protected def rhs =
+      Bson.Doc(
+        ListMap(
+          "$geometry" -> Bson.Doc(ListMap(
+            "type" -> Bson.Text("Point"),
+            "coordinates" -> Bson.Arr(Bson.Dec(long) :: Bson.Dec(lat) :: Nil)))))
   }
-  final case class NearSphere(lat: Double, long: Double, maxDistance: Double) extends SimpleCondition("$nearSphere") with Geospatial {
-    protected def rhs = Bson.Doc(ListMap(
-      "$geometry" -> Bson.Doc(ListMap(
-        "type"        -> Bson.Text("Point"),
-        "coordinates" -> Bson.Arr(Bson.Dec(long) :: Bson.Dec(lat) :: Nil))),
-      "$maxDistance" -> Bson.Dec(maxDistance)))
+  final case class NearSphere(lat: Double, long: Double, maxDistance: Double)
+      extends SimpleCondition("$nearSphere")
+      with Geospatial {
+    protected def rhs =
+      Bson.Doc(
+        ListMap(
+          "$geometry" -> Bson.Doc(
+            ListMap(
+              "type" -> Bson.Text("Point"),
+              "coordinates" -> Bson.Arr(Bson.Dec(long) :: Bson.Dec(lat) :: Nil))),
+          "$maxDistance" -> Bson.Dec(maxDistance)
+        ))
   }
 
   sealed trait Arr extends Condition
@@ -181,7 +210,8 @@ object Selector {
     protected def rhs = Bson.Arr(selectors.map(_.bson))
   }
   final case class ElemMatch(selector: Selector \/ SimpleCondition)
-      extends SimpleCondition("$elemMatch") with Arr {
+      extends SimpleCondition("$elemMatch")
+      with Arr {
     protected def rhs = selector.fold(_.bson, _.bson)
   }
   final case class Size(size: Int) extends SimpleCondition("$size") with Arr {
@@ -203,7 +233,7 @@ object Selector {
       // NB: there is no $eq operator, and MongoDB does not allow $not around
       // a simple value, so this pattern _must_ be rewritten with $ne.
       case Eq(bson) => Neq(bson).bson
-      case _        => Bson.Doc(ListMap("$not" -> value.bson))
+      case _ => Bson.Doc(ListMap("$not" -> value.bson))
     }
   }
 
@@ -282,10 +312,10 @@ object Selector {
       def overlapping[A](s1: Set[A], s2: Set[A]) = !(s1 & s2).isEmpty
 
       (s1, s2) match {
-        case _ if (s1 == s2)  => s1
-        case (Doc(pairs1), Doc(pairs2)) if (!overlapping(pairs1.keySet, pairs2.keySet))
-                              => Doc(pairs1 ++ pairs2)
-        case _                => And(s1, s2)
+        case _ if (s1 == s2) => s1
+        case (Doc(pairs1), Doc(pairs2)) if (!overlapping(pairs1.keySet, pairs2.keySet)) =>
+          Doc(pairs1 ++ pairs2)
+        case _ => And(s1, s2)
       }
     }
   }

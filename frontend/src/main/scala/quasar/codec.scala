@@ -38,7 +38,8 @@ object DataEncodingError {
     def message = s"un-escaped key: ${json.pretty(minspace)}"
   }
 
-  final case class UnexpectedValueError(expected: String, json: Json) extends DataEncodingError {
+  final case class UnexpectedValueError(expected: String, json: Json)
+      extends DataEncodingError {
     def message = s"expected $expected, found: ${json.pretty(minspace)}"
   }
 
@@ -85,26 +86,28 @@ object DataCodec {
     def encode(data: Data): Option[Json] = {
       import Data._
       data match {
-        case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
+        case d @ (Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
         // For Object, if we find one of the above keys, which means we serialized something particular
         // to the precise encoding, wrap this object in another object with a single field with the name ObjKey
         case Obj(value) =>
-          val obj = Json.obj(value.toList.map { case (k, v) => encode(v).map(k -> _) }.unite: _*)
+          val obj =
+            Json.obj(value.toList.map { case (k, v) => encode(v).map(k -> _) }.unite: _*)
           value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
 
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
-        case Set(_)     => None
+        case Set(_) => None
 
-        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
-        case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
-        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(timeFormatter))).some
-        case Interval(value)  => Json.obj(IntervalKey  -> jString(value.toString)).some
+        case Timestamp(value) =>
+          Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
+        case Date(value) => Json.obj(DateKey -> jString(value.toString)).some
+        case Time(value) => Json.obj(TimeKey -> jString(value.format(timeFormatter))).some
+        case Interval(value) => Json.obj(IntervalKey -> jString(value.toString)).some
 
-        case bin @ Binary(_)  => Json.obj(BinaryKey    -> jString(bin.base64)).some
+        case bin @ Binary(_) => Json.obj(BinaryKey -> jString(bin.base64)).some
 
-        case Id(value)        => Json.obj(IdKey        -> jString(value)).some
+        case Id(value) => Json.obj(IdKey -> jString(value)).some
 
-        case NA               => None
+        case NA => None
       }
     }
 
@@ -113,9 +116,10 @@ object DataCodec {
       json.fold(
         \/-(Data.Null),
         bool => \/-(Data.Bool(bool)),
-        num => num match {
-          case JsonLong(x) => \/-(Data.Int(x))
-          case _           => \/-(Data.Dec(num.toBigDecimal))
+        num =>
+          num match {
+            case JsonLong(x) => \/-(Data.Int(x))
+            case _ => \/-(Data.Dec(num.toBigDecimal))
         },
         str => \/-(Data.Str(str)),
         arr => arr.traverse(decode).map(Data.Arr(_)),
@@ -126,21 +130,39 @@ object DataCodec {
             (a \/> UnexpectedValueError(expected, json)) flatMap f
 
           def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
-            obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
+            obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs =>
+              Data.Obj(ListMap(pairs: _*)))
 
           obj.toList match {
-            case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
-            case (`DateKey`, value) :: Nil      => unpack(value.string, "string value for $date")(parseDate(_).leftMap(err => ParseError(err.message)))
-            case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseTime(_).leftMap(err => ParseError(err.message)))
-            case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
-            case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
-              \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
-            }
-            case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
-            case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
+            case (`TimestampKey`, value) :: Nil =>
+              unpack(value.string, "string value for $timestamp")(
+                parseTimestamp(_).leftMap(err => ParseError(err.message)))
+            case (`DateKey`, value) :: Nil =>
+              unpack(value.string, "string value for $date")(parseDate(_).leftMap(err =>
+                ParseError(err.message)))
+            case (`TimeKey`, value) :: Nil =>
+              unpack(value.string, "string value for $time")(parseTime(_).leftMap(err =>
+                ParseError(err.message)))
+            case (`IntervalKey`, value) :: Nil =>
+              unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err =>
+                ParseError(err.message)))
+            case (`ObjKey`, value) :: Nil =>
+              unpack(value.obj, "object value for $obj")(decodeObj)
+            case (`BinaryKey`, value) :: Nil =>
+              unpack(value.string, "string value for $binary") { str =>
+                \/.fromTryCatchNonFatal(
+                  Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str)))
+                  .leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
+              }
+            case (`IdKey`, value) :: Nil =>
+              unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
+            case _ =>
+              obj.fields
+                .find(_.startsWith("$"))
+                .fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
-        })
+        }
+      )
   }
 
   val Readable = new DataCodec {
@@ -151,26 +173,27 @@ object DataCodec {
         case Null => jNull.some
         case Bool(true) => jTrue.some
         case Bool(false) => jFalse.some
-        case Int(x)   =>
+        case Int(x) =>
           if (x.isValidLong) jNumber(JsonLong(x.longValue)).some
           else jNumber(JsonBigDecimal(new java.math.BigDecimal(x.underlying))).some
-        case Dec(x)   => jNumber(JsonBigDecimal(x)).some
-        case Str(s)   => jString(s).some
+        case Dec(x) => jNumber(JsonBigDecimal(x)).some
+        case Str(s) => jString(s).some
 
-        case Obj(value) => Json.obj(value.toList.map({ case (k, v) => encode(v) strengthL k }).unite: _*).some
+        case Obj(value) =>
+          Json.obj(value.toList.map({ case (k, v) => encode(v) strengthL k }).unite: _*).some
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
-        case Set(_)     => None
+        case Set(_) => None
 
         case Timestamp(value) => jString(value.toString).some
-        case Date(value)      => jString(value.toString).some
-        case Time(value)      => jString(value.toString).some
-        case Interval(value)  => jString(value.toString).some
+        case Date(value) => jString(value.toString).some
+        case Time(value) => jString(value.toString).some
+        case Interval(value) => jString(value.toString).some
 
-        case bin @ Binary(_)  => jString(bin.base64).some
+        case bin @ Binary(_) => jString(bin.base64).some
 
-        case Id(value)        => jString(value).some
+        case Id(value) => jString(value).some
 
-        case NA               => None
+        case NA => None
       }
     }
 
@@ -179,22 +202,23 @@ object DataCodec {
       json.fold(
         \/-(Data.Null),
         bool => \/-(Data.Bool(bool)),
-        num => num match {
-          case JsonLong(x) => \/-(Data.Int(x))
-          case _           => \/-(Data.Dec(num.toBigDecimal))
+        num =>
+          num match {
+            case JsonLong(x) => \/-(Data.Int(x))
+            case _ => \/-(Data.Dec(num.toBigDecimal))
         },
         str => {
           import std.DateLib._
 
-          val converted = List(
-              parseTimestamp(str),
-              parseDate(str),
-              parseTime(str),
-              parseInterval(str))
+          val converted =
+            List(parseTimestamp(str), parseDate(str), parseTime(str), parseInterval(str))
           \/-(converted.flatMap(_.toList).headOption.getOrElse(Data.Str(str)))
         },
         arr => arr.traverse(decode).map(Data.Arr(_)),
-        obj => obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*))))
+        obj =>
+          obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs =>
+            Data.Obj(ListMap(pairs: _*)))
+      )
   }
 
   // Identify the sub-set of values that can be represented in Precise JSON in
@@ -204,17 +228,17 @@ object DataCodec {
   // - Data.NA
   // NB: For Readable, this does not account for Str values that will be confused with
   // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
-  @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
   def representable(data: Data, codec: DataCodec): Boolean = data match {
     case (Data.Binary(_) | Data.Id(_)) if codec == Readable => false
-    case Data.Set(_) | Data.NA                              => false
-    case Data.Int(x)                                        => x.isValidLong
-    case Data.Arr(list)                                     => list.forall(representable(_, codec))
-    case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
+    case Data.Set(_) | Data.NA => false
+    case Data.Int(x) => x.isValidLong
+    case Data.Arr(list) => list.forall(representable(_, codec))
+    case Data.Obj(map) => map.values.forall(representable(_, codec))
     // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
     // and although it would appear to work for a human observer,
     // the runtime instances are not found to be "equal" which is breaking tests
-    case Data.Interval(_)                                   => false
-    case _                                                  => true
+    case Data.Interval(_) => false
+    case _ => true
   }
 }

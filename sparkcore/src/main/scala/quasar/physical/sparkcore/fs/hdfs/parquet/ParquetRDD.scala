@@ -29,19 +29,20 @@ import org.apache.spark.rdd._
 import scala.reflect.ClassTag
 import scala.collection.Iterator
 
-class ParquetRDDPartition[T](val index: Int,
-                             val readSupport: ReadSupport[T],
-                             s: FileSplit,
-                             c: Configuration)
+class ParquetRDDPartition[T](
+    val index: Int,
+    val readSupport: ReadSupport[T],
+    s: FileSplit,
+    c: Configuration)
     extends Partition {
 
   val split = new SerializableWritable[FileSplit](s)
-  val conf  = new SerializableWritable[Configuration](c)
+  val conf = new SerializableWritable[Configuration](c)
 }
 
 class RecordReaderIterator[T](prr: ParquetRecordReader[T]) extends Iterator[T] {
   override def hasNext: Boolean = prr.nextKeyValue()
-  override def next(): T        = prr.getCurrentValue()
+  override def next(): T = prr.getCurrentValue()
 }
 
 class ParquetRDD[T: ClassTag](
@@ -52,17 +53,17 @@ class ParquetRDD[T: ClassTag](
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   override def compute(raw: Partition, context: TaskContext): Iterator[T] = {
     val partition = raw.asInstanceOf[ParquetRDDPartition[T]]
-    val prr       = new ParquetRecordReader(partition.readSupport)
+    val prr = new ParquetRecordReader(partition.readSupport)
     prr.initialize(partition.split.value, partition.conf.value, Reporter.NULL)
     new RecordReaderIterator(prr)
   }
 
   override protected def getPartitions: Array[Partition] = {
-    val path       = new Path(pathStr)
-    val conf       = _sc.hadoopConfiguration
-    val fs         = path.getFileSystem(conf)
+    val path = new Path(pathStr)
+    val conf = _sc.hadoopConfiguration
+    val fs = path.getFileSystem(conf)
     val fileStatus = fs.getFileStatus(path)
-    val blocks     = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen())
+    val blocks = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen())
     val readSupport = new DataReadSupport
     blocks.zipWithIndex.map {
       case (b, i) =>

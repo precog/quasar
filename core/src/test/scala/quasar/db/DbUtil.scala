@@ -24,11 +24,12 @@ import scalaz.~>
 import scalaz.concurrent.Task
 
 object DbUtil {
+
   /** Configuration for an in-memory DB that persists only as long
-    * as the process is running. The same db can be accessed by connecting
-    * multiple times with the same name.
-    * @param name Should not contain `;`.
-    */
+   * as the process is running. The same db can be accessed by connecting
+   * multiple times with the same name.
+   * @param name Should not contain `;`.
+   */
   def inMemoryConfig(name: String): DbConnectionConfig =
     // LOCK_TIMEOUT: Some tests were hitting the default time limit
     //               of 1 second, 10 seconds seems like a reasonable

@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import slamdata.Predef.{Eq =>_, _}
+import slamdata.Predef.{Eq => _, _}
 import quasar.fp._
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._

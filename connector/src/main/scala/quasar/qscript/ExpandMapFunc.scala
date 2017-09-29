@@ -39,21 +39,22 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
     type OUT[A] = OUTʹ[A]
   }
 
-  def expand[T[_[_]]: CorecursiveT, F[_]: Monad, A]
-    (core: AlgebraM[F, MapFuncCore[T, ?], A],
+  def expand[T[_[_]]: CorecursiveT, F[_]: Monad, A](
+      core: AlgebraM[F, MapFuncCore[T, ?], A],
       derived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], A])
-      : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
+    : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
     derived(f).getOrElse(
-      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
+      Free
+        .roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f))
+        .cataM(interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
   }
 }
 
 sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 
-  implicit def mapFuncDerived[T[_[_]]: CorecursiveT, OUTʹ[_]]
-    (implicit MFC: MapFuncCore[T, ?] :<: OUTʹ, OUTʹ: Functor[OUTʹ])
-      : ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
+  implicit def mapFuncDerived[T[_[_]]: CorecursiveT, OUTʹ[_]](
+      implicit MFC: MapFuncCore[T, ?] :<: OUTʹ,
+      OUTʹ: Functor[OUTʹ]): ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
     new ExpandMapFunc[MapFuncDerived[T, ?]] {
       type OUT[A] = OUTʹ[A]
       type OutFree[A] = (OUT ∘ Free[OUT, ?])#λ[A]
@@ -65,9 +66,7 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
         Free.roll[OUT, A](trunc(a))
 
       def trunc[A](a: Free[OUT, A]): (OUT ∘ Free[OUT, ?])#λ[A] =
-        MFC(Subtract(
-          a,
-          moduloR(a, intR(1))))
+        MFC(Subtract(a, moduloR(a, intR(1))))
 
       def addR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
         Free.roll(MFC(Add(a1, a2)))
@@ -93,33 +92,38 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
       val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
           case D.Abs(a) =>
-            MFC(Cond(
-              ltR(a.point[Free[OUT, ?]], intR(0)),
-              negateR(a.point[Free[OUT, ?]]),
-              a.point[Free[OUT, ?]]))
+            MFC(
+              Cond(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                negateR(a.point[Free[OUT, ?]]),
+                a.point[Free[OUT, ?]]))
           case D.Ceil(a) =>
-            MFC(Cond(
-              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
-              a.point[Free[OUT, ?]],
-              condR(
-                ltR(a.point[Free[OUT, ?]], intR(0)),
-                truncR(a.point[Free[OUT, ?]]),
-                addR(truncR(a.point[Free[OUT, ?]]), intR(1)))))
+            MFC(
+              Cond(
+                eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+                a.point[Free[OUT, ?]],
+                condR(
+                  ltR(a.point[Free[OUT, ?]], intR(0)),
+                  truncR(a.point[Free[OUT, ?]]),
+                  addR(truncR(a.point[Free[OUT, ?]]), intR(1)))
+              ))
           case D.Floor(a) =>
-            MFC(Cond(
-              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
-              a.point[Free[OUT, ?]],
-              condR(
-                ltR(a.point[Free[OUT, ?]], intR(0)),
-                subtractR(truncR(a.point[Free[OUT, ?]]), intR(1)),
-                truncR(a.point[Free[OUT, ?]]))))
+            MFC(
+              Cond(
+                eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+                a.point[Free[OUT, ?]],
+                condR(
+                  ltR(a.point[Free[OUT, ?]], intR(0)),
+                  subtractR(truncR(a.point[Free[OUT, ?]]), intR(1)),
+                  truncR(a.point[Free[OUT, ?]]))
+              ))
           case D.Trunc(a) => trunc(a.point[Free[OUT, ?]])
         }
     }
 
-  implicit def coproduct[T[_[_]]: CorecursiveT, F[_], G[_], OUTʹ[_]]
-    (implicit F: ExpandMapFunc.Aux[F, OUTʹ], G: ExpandMapFunc.Aux[G, OUTʹ])
-      : ExpandMapFunc.Aux[Coproduct[F, G, ?], OUTʹ] =
+  implicit def coproduct[T[_[_]]: CorecursiveT, F[_], G[_], OUTʹ[_]](
+      implicit F: ExpandMapFunc.Aux[F, OUTʹ],
+      G: ExpandMapFunc.Aux[G, OUTʹ]): ExpandMapFunc.Aux[Coproduct[F, G, ?], OUTʹ] =
     new ExpandMapFunc[Coproduct[F, G, ?]] {
       type OUT[A] = OUTʹ[A]
 
@@ -132,15 +136,15 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 }
 
 sealed abstract class ExpandMapFuncInstancesʹ {
-  implicit def default[T[_[_]]: CorecursiveT, IN[_]: Functor, OUTʹ[_]]
-    (implicit IN: IN :<: OUTʹ, OUTʹ: Functor[OUTʹ])
-      : ExpandMapFunc.Aux[IN, OUTʹ] =
+  implicit def default[T[_[_]]: CorecursiveT, IN[_]: Functor, OUTʹ[_]](
+      implicit IN: IN :<: OUTʹ,
+      OUTʹ: Functor[OUTʹ]): ExpandMapFunc.Aux[IN, OUTʹ] =
     new ExpandMapFunc[IN] {
       type OUT[A] = OUTʹ[A]
 
       val expand: IN ~> ((OUT ∘ Free[OUT, ?])#λ) =
-        λ[IN ~> (OUT ∘ Free[OUT, ?])#λ] {
-          f => IN(f.map(_.point[Free[OUT, ?]]))
+        λ[IN ~> (OUT ∘ Free[OUT, ?])#λ] { f =>
+          IN(f.map(_.point[Free[OUT, ?]]))
         }
     }
 }

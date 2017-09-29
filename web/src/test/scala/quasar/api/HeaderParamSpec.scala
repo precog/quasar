@@ -18,8 +18,7 @@ package quasar.api
 
 import slamdata.Predef._
 
-
-import scalaz.{\/-, -\/}
+import scalaz.{-\/, \/-}
 
 class HeaderParamSpec extends quasar.Qspec {
   import org.http4s.util._
@@ -76,7 +75,8 @@ class HeaderParamSpec extends quasar.Qspec {
         Map(CaseInsensitiveString("user-agent") -> List("some_phone_browser/0.0.1")))
 
       headers.get(`Accept`) must beSome(`Accept`(MediaType.`text/csv`))
-      headers.get(`User-Agent`) must beSome(`User-Agent`(AgentProduct("some_phone_browser", Some("0.0.1"))))
+      headers.get(`User-Agent`) must beSome(
+        `User-Agent`(AgentProduct("some_phone_browser", Some("0.0.1"))))
     }
   }
 }

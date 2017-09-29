@@ -18,7 +18,7 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
-import java.lang.{Throwable, RuntimeException}
+import java.lang.{RuntimeException, Throwable}
 
 import scalaz._, Scalaz._, Leibniz.===
 import scalaz.concurrent.Task
@@ -29,6 +29,7 @@ trait CatchableInstances {
 }
 
 final class CatchableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Catchable[F]) {
+
   /** Reify thrown non-fatal exceptions as a value. */
   def attemptNonFatal(implicit F: Monad[F]): F[Throwable \/ A] =
     new CatchableOps(self map (_.right[Throwable])).handleNonFatal {
@@ -36,37 +37,38 @@ final class CatchableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Catc
     }
 
   /** Ensures `f` is sequenced after `fa`, whether the latter succeeded or not.
-    *
-    * Useful for releasing resources that may have been acquired in order to
-    * produce `fa`.
-    */
+   *
+   * Useful for releasing resources that may have been acquired in order to
+   * produce `fa`.
+   */
   def ensuring(f: Option[Throwable] => F[Unit])(implicit F: Bind[F]): F[A] =
     F0.attempt(self) flatMap {
       case -\/(t) => f(some(t)) *> F0.fail(t)
-      case \/-(a) => f(none)    as a
+      case \/-(a) => f(none) as a
     }
 
   /** Handle caught exceptions using the given partial function, reraising any
-    * unhandled exceptions.
-    */
+   * unhandled exceptions.
+   */
   def handle[B >: A](pf: PartialFunction[Throwable, B])(implicit F: Monad[F]): F[B] =
     handleWith[B](pf andThen (F.point(_)))
 
   /** Handle caught non-fatal exceptions using the given partial function,
-    * reraising any unhandled exceptions.
-    */
+   * reraising any unhandled exceptions.
+   */
   def handleNonFatal[B >: A](pf: PartialFunction[Throwable, B])(implicit F: Monad[F]): F[B] =
     handleNonFatalWith[B](pf andThen (F.point(_)))
 
   /** Handle caught non-fatal exceptions using the given effectful partial
-    * function, reraising any unhandled exceptions.
-    */
-  def handleNonFatalWith[B >: A](pf: PartialFunction[Throwable, F[B]])(implicit F: Monad[F]): F[B] =
+   * function, reraising any unhandled exceptions.
+   */
+  def handleNonFatalWith[B >: A](pf: PartialFunction[Throwable, F[B]])(
+      implicit F: Monad[F]): F[B] =
     handleWith[B](nonFatal andThen pf)
 
   /** Handle caught exceptions using the given effectful partial function,
-    * reraising any unhandled exceptions.
-    */
+   * reraising any unhandled exceptions.
+   */
   def handleWith[B >: A](pf: PartialFunction[Throwable, F[B]])(implicit F: Monad[F]): F[B] =
     F0.attempt(self) flatMap {
       case -\/(t) => pf.lift(t) getOrElse F0.fail(t)
@@ -80,7 +82,8 @@ final class CatchableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Catc
   }
 }
 
-final class CatchableOfDisjunctionOps[F[_], A, B] private[scalaz] (self: F[A \/ B])(implicit F: Catchable[F]) {
+final class CatchableOfDisjunctionOps[F[_], A, B] private[scalaz] (self: F[A \/ B])(
+    implicit F: Catchable[F]) {
   def unattempt(implicit M: Monad[F], T: A === Throwable): F[B] =
     self flatMap (_.fold(a => F.fail[B](T(a)), M.point(_)))
 
@@ -94,7 +97,8 @@ trait ToCatchableOps {
   implicit def toCatchableOps[F[_]: Catchable, A](self: F[A]): CatchableOps[F, A] =
     new CatchableOps(self)
 
-  implicit def toCatchableOfDisjunctionOps[F[_]: Catchable, A, B](self: F[A \/ B]): CatchableOfDisjunctionOps[F, A, B] =
+  implicit def toCatchableOfDisjunctionOps[F[_]: Catchable, A, B](
+      self: F[A \/ B]): CatchableOfDisjunctionOps[F, A, B] =
     new CatchableOfDisjunctionOps(self)
 }
 
@@ -105,9 +109,9 @@ object catchable extends CatchableInstances with ToCatchableOps {
 
       private val attemptT: S ~> ExceptT[Free[S, ?], ?] =
         λ[S ~> ExceptT[Free[S, ?], ?]](sa =>
-          EitherT(I.prj(sa).fold(
-            Free.liftF(sa) map (_.right[Throwable]))
-            { case fa => Free.liftF(I(F.attempt(fa))) }))
+          EitherT(I.prj(sa).fold(Free.liftF(sa) map (_.right[Throwable])) {
+            case fa => Free.liftF(I(F.attempt(fa)))
+          }))
 
       def attempt[A](fa: Free[S, A]) =
         fa.foldMap(attemptT).run

@@ -39,7 +39,8 @@ object JsonASTSpec extends quasar.Qspec {
   }*/
 
   "Monoid identity" in {
-    val identityProp = (json: JValue) => (json ++ JUndefined == json) && (JUndefined ++ json == json)
+    val identityProp =
+      (json: JValue) => (json ++ JUndefined == json) && (JUndefined ++ json == json)
     prop(identityProp)
   }
 
@@ -49,7 +50,8 @@ object JsonASTSpec extends quasar.Qspec {
   }
 
   "Merge identity" in {
-    val identityProp = (json: JValue) => (json merge JUndefined) == json && (JUndefined merge json) == json
+    val identityProp =
+      (json: JValue) => (json merge JUndefined) == json && (JUndefined merge json) == json
     prop(identityProp)
   }
 
@@ -80,27 +82,30 @@ object JsonASTSpec extends quasar.Qspec {
   }
 
   "Diff result is same when fields are reordered" in {
-    val reorderProp = (x: JObject) => (x diff reorderFields(x)) == Diff(JUndefined, JUndefined, JUndefined)
+    val reorderProp =
+      (x: JObject) => (x diff reorderFields(x)) == Diff(JUndefined, JUndefined, JUndefined)
     prop(reorderProp)
   }
 
   "delete" in {
-    JParser.parseUnsafe("""{ "foo": { "bar": 1, "baz": 2 } }""").delete(JPath("foo.bar")) must beSome(JParser.parseUnsafe("""{ "foo": { "baz": 2 } }"""))
+    JParser
+      .parseUnsafe("""{ "foo": { "bar": 1, "baz": 2 } }""")
+      .delete(JPath("foo.bar")) must beSome(JParser.parseUnsafe("""{ "foo": { "baz": 2 } }"""))
   }
 
   "Remove all" in {
     val removeAllProp = (x: JValue) =>
       (x remove { _ =>
-            true
-          }) == JUndefined
+        true
+      }) == JUndefined
     prop(removeAllProp)
   }
 
   "Remove nothing" in {
     val removeNothingProp = (x: JValue) =>
       (x remove { _ =>
-            false
-          }) == x
+        false
+      }) == x
     prop(removeNothingProp)
   }
 
@@ -145,7 +150,7 @@ object JsonASTSpec extends quasar.Qspec {
     }""")
 
     val expected = List(
-      JPath(".c")        -> JNum("2"),
+      JPath(".c") -> JNum("2"),
       JPath(".fn[0].fr") -> JNum("-2")
     )
 
@@ -173,7 +178,7 @@ object JsonASTSpec extends quasar.Qspec {
     val v1 = JObject(
       JField("a", JNum(1)) ::
         JField("b", JNum(2)) ::
-          JField("c", JNum(3)) :: Nil
+        JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
@@ -188,13 +193,13 @@ object JsonASTSpec extends quasar.Qspec {
     val v1 = JObject(
       JField("a", JNum(1)) ::
         JField("b", JNum(2)) ::
-          JField("c", JNum(3)) :: Nil
+        JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
       JField("a", JNum(2)) ::
         JField("b", JNum(3)) ::
-          JField("c", JNum(4)) :: Nil
+        JField("c", JNum(4)) :: Nil
     )
 
     ((v1: JValue) ?|? v2) must_== LT
@@ -204,13 +209,13 @@ object JsonASTSpec extends quasar.Qspec {
     val v1 = JObject(
       JField("a", JUndefined) ::
         JField("b", JNum(2)) ::
-          JField("c", JNum(3)) :: Nil
+        JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
       JField("a", JNum(2)) ::
         JField("b", JNum(3)) ::
-          JField("c", JNum(4)) :: Nil
+        JField("c", JNum(4)) :: Nil
     )
 
     ((v1: JValue) ?|? v2) must_== GT
@@ -233,7 +238,8 @@ object JsonASTSpec extends quasar.Qspec {
     val insertProp = (jv: JValue, p: JPath, toSet: JValue) => {
       (!badPath(jv, p) && (jv(p) == JUndefined)) ==> {
         (jv, p.nodes) match {
-          case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) | (JNull | JUndefined, _) =>
+          case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) |
+              (JNull | JUndefined, _) =>
             ((p == NoJPath) && (jv.unsafeInsert(p, toSet) == toSet)) ||
               (jv.unsafeInsert(p, toSet).get(p) == toSet)
 
@@ -248,11 +254,11 @@ object JsonASTSpec extends quasar.Qspec {
 
   private def reorderFields(json: JValue) = json mapUp {
     case JObject(xs) => JObject(scala.collection.immutable.TreeMap(xs.toSeq: _*))
-    case x           => x
+    case x => x
   }
 
   private def typePredicate(clazz: Class[_])(json: JValue) = json match {
     case x if x.getClass == clazz => true
-    case _                        => false
+    case _ => false
   }
 }

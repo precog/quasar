@@ -21,5 +21,5 @@ import slamdata.Predef._
 import java.sql.SQLException
 
 /** Thrown when doobie applies a custom mapping to a value which should never
-  * appear in the metastore DB. */
+ * appear in the metastore DB. */
 final class UnexpectedValueException(msg: String) extends SQLException

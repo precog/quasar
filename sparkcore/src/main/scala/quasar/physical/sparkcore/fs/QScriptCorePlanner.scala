@@ -45,21 +45,21 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
     def order(d1: Data, d2: Data) = (d1, d2) match {
-      case Data.Null -> Data.Null                 => Ordering.EQ
-      case Data.Str(a) -> Data.Str(b)             => a cmp b
-      case Data.Bool(a) -> Data.Bool(b)           => a cmp b
-      case Data.Number(a) -> Data.Number(b)       => a cmp b
-      case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
-      case Data.Arr(a) -> Data.Arr(b)             => a cmp b
-      case Data.Set(a) -> Data.Set(b)             => a cmp b
+      case Data.Null -> Data.Null => Ordering.EQ
+      case Data.Str(a) -> Data.Str(b) => a cmp b
+      case Data.Bool(a) -> Data.Bool(b) => a cmp b
+      case Data.Number(a) -> Data.Number(b) => a cmp b
+      case Data.Obj(a) -> Data.Obj(b) => a.toList cmp b.toList
+      case Data.Arr(a) -> Data.Arr(b) => a cmp b
+      case Data.Set(a) -> Data.Set(b) => a cmp b
       case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
-      case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
-      case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
-      case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
-      case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
-      case Data.Id(a) -> Data.Id(b)               => a cmp b
-      case Data.NA -> Data.NA                 => Ordering.EQ
-      case a -> b                       => a.getClass.## cmp b.getClass.##
+      case Data.Date(a) -> Data.Date(b) => Ordering fromInt (a compareTo b)
+      case Data.Time(a) -> Data.Time(b) => Ordering fromInt (a compareTo b)
+      case Data.Interval(a) -> Data.Interval(b) => Ordering fromInt (a compareTo b)
+      case Data.Binary(a) -> Data.Binary(b) => a.toArray.toList cmp b.toArray.toList
+      case Data.Id(a) -> Data.Id(b) => a cmp b
+      case Data.NA -> Data.NA => Ordering.EQ
+      case a -> b => a.getClass.## cmp b.getClass.##
     }
   }
 
@@ -71,15 +71,14 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
     def compare(x: Data, y: Data) = dataOrder.order(x, y).toInt
   }
 
-
   private def filterOut(
-    fromFile: AFile => Free[S, RDD[Data]],
-    first: RDD[Data] => Free[S, Data],
-    src: RDD[Data],
-    from: FreeQS[T],
-    count: FreeQS[T],
-    predicate: (Index, Count) => Boolean ):
-      StateT[EitherT[Free[S, ?], PlannerError, ?], SparkContext, RDD[Data]] = {
+      fromFile: AFile => Free[S, RDD[Data]],
+      first: RDD[Data] => Free[S, Data],
+      src: RDD[Data],
+      from: FreeQS[T],
+      count: FreeQS[T],
+      predicate: (Index, Count) => Boolean)
+    : StateT[EitherT[Free[S, ?], PlannerError, ?], SparkContext, RDD[Data]] = {
 
     val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
     val srcState = src.point[SparkState[S, ?]]
@@ -87,58 +86,82 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
     val fromState: SparkState[S, RDD[Data]] = from.cataM(interpretM(κ(srcState), algebraM))
     val countState: SparkState[S, RDD[Data]] = count.cataM(interpretM(κ(srcState), algebraM))
 
-    val countEval: SparkState[S, Long] = countState >>= (rdd => EitherT(first(rdd).map {
-      case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-      case Data.Int(v) => InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
-      case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
-    }).liftM[StateT[?[_], SparkContext, ?]])
+    val countEval: SparkState[S, Long] = countState >>= (rdd =>
+      EitherT(first(rdd).map {
+        case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
+        case Data.Int(v) =>
+          InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
+        case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
+      }).liftM[StateT[?[_], SparkContext, ?]])
     (fromState |@| countEval)((rdd, count) =>
       rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
   }
 
   private def reduceData: ReduceFunc[_] => (Data, Data) => Data = {
-    case Count(_) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
-      case _ => Data.NA
-    }
-    case Sum(_) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
-      case (Data.Number(a), Data.Number(b)) => Data.Dec(a + b)
-      case _ => Data.NA
-    }
-    case Min(_) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Int(a), Data.Int(b)) => Data.Int(a.min(b))
-      case (Data.Number(a), Data.Number(b)) => Data.Dec(a.min(b))
-      case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) < 0).fold(a, b))
-      case _ => Data.NA
-    }
-    case Max(_) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Int(a), Data.Int(b)) => Data.Int(a.max(b))
-      case (Data.Number(a), Data.Number(b)) => Data.Dec(a.max(b))
-      case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) > 0).fold(a, b))
-      case _ => Data.NA
-    }
-    case Avg(_) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Arr(List(Data.Dec(s1), Data.Int(c1))), Data.Arr(List(Data.Dec(s2), Data.Int(c2)))) =>
-        Data.Arr(List(Data.Dec(s1 + s2), Data.Int(c1 + c2)))
-    }
-    case Arbitrary(_) => (d1: Data, d2: Data) => d1
-    case First(_)     => (d1: Data, d2: Data) => d1
-    case Last(_)      => (d1: Data, d2: Data) => d2
-    case UnshiftArray(a) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Arr(a), Data.Arr(b)) => Data.Arr(a ++ b)
-      case _ => Data.NA
-    }
-    case UnshiftMap(a1, a2) => (d1: Data, d2: Data) => (d1, d2) match {
-      case (Data.Obj(a), Data.Obj(b)) => Data.Obj(a ++ b)
-      case _ => Data.NA
-    }
+    case Count(_) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
+          case _ => Data.NA
+        }
+    case Sum(_) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a + b)
+          case _ => Data.NA
+        }
+    case Min(_) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a.min(b))
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a.min(b))
+          case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) < 0).fold(a, b))
+          case _ => Data.NA
+        }
+    case Max(_) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a.max(b))
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a.max(b))
+          case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) > 0).fold(a, b))
+          case _ => Data.NA
+        }
+    case Avg(_) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (
+              Data.Arr(List(Data.Dec(s1), Data.Int(c1))),
+              Data.Arr(List(Data.Dec(s2), Data.Int(c2)))) =>
+            Data.Arr(List(Data.Dec(s1 + s2), Data.Int(c1 + c2)))
+        }
+    case Arbitrary(_) =>
+      (d1: Data, d2: Data) =>
+        d1
+    case First(_) =>
+      (d1: Data, d2: Data) =>
+        d1
+    case Last(_) =>
+      (d1: Data, d2: Data) =>
+        d2
+    case UnshiftArray(a) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Arr(a), Data.Arr(b)) => Data.Arr(a ++ b)
+          case _ => Data.NA
+        }
+    case UnshiftMap(a1, a2) =>
+      (d1: Data, d2: Data) =>
+        (d1, d2) match {
+          case (Data.Obj(a), Data.Obj(b)) => Data.Obj(a ++ b)
+          case _ => Data.NA
+        }
 
   }
 
   def plan(
-    fromFile: AFile => Free[S, RDD[Data]],
-    first: RDD[Data] => Free[S, Data]
+      fromFile: AFile => Free[S, RDD[Data]],
+      first: RDD[Data] => Free[S, Data]
   ): AlgebraM[SparkState[S, ?], QScriptCore[T, ?], RDD[Data]] = {
     case qscript.Map(src, f) =>
       StateT((sc: SparkContext) =>
@@ -148,65 +171,70 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
         bucket.traverse(CoreMap.changeFreeMap[T])
 
       val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
-        case Count(a) => a >>> {
-          case Data.NA => Data.Int(0)
-          case _ => Data.Int(1)
-        }
+        case Count(a) =>
+          a >>> {
+            case Data.NA => Data.Int(0)
+            case _ => Data.Int(1)
+          }
         case Sum(a) => a
         case Min(a) => a
         case Max(a) => a
-        case Avg(a) => a >>> {
-          case Data.Int(v) => Data.Arr(List(Data.Dec(BigDecimal(v)), Data.Int(1)))
-          case Data.Dec(v) => Data.Arr(List(Data.Dec(v.apply(BigDecimal.defaultMathContext)), Data.Int(1)))
-          case _ => Data.NA
-        }
+        case Avg(a) =>
+          a >>> {
+            case Data.Int(v) => Data.Arr(List(Data.Dec(BigDecimal(v)), Data.Int(1)))
+            case Data.Dec(v) =>
+              Data.Arr(List(Data.Dec(v.apply(BigDecimal.defaultMathContext)), Data.Int(1)))
+            case _ => Data.NA
+          }
         case Arbitrary(a) => a
         case First(a) => a
         case Last(a) => a
         case UnshiftArray(a) => a >>> ((d: Data) => Data.Arr(List(d)))
-        case UnshiftMap(a1, a2) => ((d: Data) => a1(d) match {
-          case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))
-          case Data.Int(i) => Data.Obj(ListMap(i.shows -> a2(d)))
-          case _ => Data.NA
-        })
+        case UnshiftMap(a1, a2) =>
+          ((d: Data) =>
+            a1(d) match {
+              case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))
+              case Data.Int(i) => Data.Obj(ListMap(i.shows -> a2(d)))
+              case _ => Data.NA
+            })
       }
 
       val maybeTransformers: PlannerError \/ List[Data => Data] =
         reducers.traverse(_.traverse(CoreMap.changeFreeMap[T]).map(extractFunc))
 
-      val reducersFuncs: List[(Data,Data) => Data] =
+      val reducersFuncs: List[(Data, Data) => Data] =
         reducers.map(reduceData)
 
       val maybeRepair: PlannerError \/ ((List[Data], List[Data]) => Data) =
         CoreMap.changeReduceFunc(repair)
 
-      def merge
-        (a: List[Data], b: List[Data], f: List[(Data, Data) => Data])
-          : List[Data] =
-        Zip[List].zipWith(f,(a.zip(b)))(_.tupled(_))
+      def merge(a: List[Data], b: List[Data], f: List[(Data, Data) => Data]): List[Data] =
+        Zip[List].zipWith(f, (a.zip(b)))(_.tupled(_))
 
       val avgReducers = reducers.map {
         case Avg(_) => true
-        case _  => false
+        case _ => false
       }
 
-      StateT((sc: SparkContext) =>
-        EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair)(
-          (partitioner, trans, repair) =>
-            src.map(d => (partitioner.map(_(d)), trans.map(_(d))))
-              .reduceByKey(merge(_,_, reducersFuncs))
-              .map {
-                case (k, vs) =>
-                  val v = Zip[List].zipWith(vs, avgReducers) {
-                    case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), true) => Data.Dec(sum / BigDecimal(count))
-                    case (d, _) => d
-                  }
-                  repair(k, v)
-              }
-        )).map((sc, _)).point[Free[S, ?]])
-      )
+      StateT(
+        (sc: SparkContext) =>
+          EitherT(
+            ((maybePartitioner |@| maybeTransformers |@| maybeRepair)(
+              (partitioner, trans, repair) =>
+                src
+                  .map(d => (partitioner.map(_(d)), trans.map(_(d))))
+                  .reduceByKey(merge(_, _, reducersFuncs))
+                  .map {
+                    case (k, vs) =>
+                      val v = Zip[List].zipWith(vs, avgReducers) {
+                        case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), true) =>
+                          Data.Dec(sum / BigDecimal(count))
+                        case (d, _) => d
+                      }
+                      repair(k, v)
+                }
+            )).map((sc, _)).point[Free[S, ?]]))
     case Sort(src, bucket, orders) =>
-
       val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
         orders.traverse {
           case (freemap, sdir) => CoreMap.changeFreeMap(freemap).map((_, sdir))
@@ -220,12 +248,13 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         implicit val KOOrdering: SOrdering[KO] = new SOrdering[KO] {
           override def compare(ko1: KO, ko2: KO): Int = (ko1, ko2) match {
-            case (KO((d1, sd1) :: tail1, _), KO((d2, sd2) :: tail2, _)) if ord.compare(d1, d2) === 0 =>
+            case (KO((d1, sd1) :: tail1, _), KO((d2, sd2) :: tail2, _))
+                if ord.compare(d1, d2) === 0 =>
               compare(ko1.copy(keys = tail1), ko2.copy(keys = tail2))
             case (KO((d1, sd1) :: tail1, main), KO((d2, sd2) :: tail2, _)) if sd1 === main =>
               ord.compare(d1, d2)
             case (KO((d1, _) :: tail1, _), KO((d2, _) :: tail2, _)) =>
-              (- ord.compare(d1, d2))
+              (-ord.compare(d1, d2))
             case (KO(Nil, _), KO(_, _)) => 0
           }
         }
@@ -241,23 +270,37 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
     case Filter(src, f) =>
       StateT((sc: SparkContext) =>
         EitherT {
-          CoreMap.changeFreeMap(f).map(df => (sc, src.filter(
-            df >>> {
-              case Data.Bool(b) => b
-              case _            => false
-            }))).point[Free[S, ?]]
-        })
+          CoreMap
+            .changeFreeMap(f)
+            .map(df =>
+              (sc, src.filter(df >>> {
+                case Data.Bool(b) => b
+                case _ => false
+              })))
+            .point[Free[S, ?]]
+      })
     case Subset(src, from, sel, count) =>
-      filterOut(fromFile, first, src, from, count,
+      filterOut(
+        fromFile,
+        first,
+        src,
+        from,
+        count,
         sel match {
-          case Drop => (i: Index, c: Count) => i >= c
-          case Take => (i: Index, c: Count) => i < c
+          case Drop =>
+            (i: Index, c: Count) =>
+              i >= c
+          case Take =>
+            (i: Index, c: Count) =>
+              i < c
           // TODO: Better sampling
-          case Sample => (i: Index, c: Count) => i < c
-        })
+          case Sample =>
+            (i: Index, c: Count) =>
+              i < c
+        }
+      )
 
     case LeftShift(src, struct, id, repair) =>
-
       val structFunc: PlannerError \/ (Data => Data) =
         CoreMap.changeFreeMap(struct)
 
@@ -266,18 +309,22 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
 
       StateT((sc: SparkContext) =>
         EitherT((structFunc ⊛ repairFunc)((df, rf) =>
-          src.flatMap((input: Data) => df(input) match {
-            case Data.Arr(list) => id match {
-              case ExcludeId => list.map(rf(input, _))
-              case IncludeId => list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
-              case IdOnly => list.indices.map(i => rf(input, Data.Int(i)))
-            }
-            case Data.Obj(m) => id match {
-              case ExcludeId => m.values.map(rf(input, _))
-              case IncludeId => m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
-              case IdOnly => m.keys.map(k => rf(input, Data.Str(k)))
-            }
-            case _ => List.empty[Data]
+          src.flatMap((input: Data) =>
+            df(input) match {
+              case Data.Arr(list) =>
+                id match {
+                  case ExcludeId => list.map(rf(input, _))
+                  case IncludeId =>
+                    list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
+                  case IdOnly => list.indices.map(i => rf(input, Data.Int(i)))
+                }
+              case Data.Obj(m) =>
+                id match {
+                  case ExcludeId => m.values.map(rf(input, _))
+                  case IncludeId => m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
+                  case IdOnly => m.keys.map(k => rf(input, Data.Str(k)))
+                }
+              case _ => List.empty[Data]
           })).map((sc, _)).point[Free[S, ?]]))
 
     case Union(src, lBranch, rBranch) =>
@@ -288,7 +335,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
         rBranch.cataM(interpretM(κ(srcState), algebraM)))(_ ++ _)
     case Unreferenced() =>
       StateT((sc: SparkContext) => {
-        EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Free[S, ?]])
+        EitherT(
+          (sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Free[S, ?]])
       })
   }
 }

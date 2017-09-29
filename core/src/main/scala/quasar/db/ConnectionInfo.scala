@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 /** Connection parameters for JDBC. */
 final case class ConnectionInfo(
-  driverClassName: String,
-  url: String,
-  userName: String,
-  password: String)
+    driverClassName: String,
+    url: String,
+    userName: String,
+    password: String)

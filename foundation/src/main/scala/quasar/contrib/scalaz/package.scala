@@ -27,16 +27,16 @@ package object scalaz {
   object HasThis {
     def unapply[A](these: A \&/ _): Option[A] = these match {
       case Both(a, _) => a.some
-      case This(a)    => a.some
-      case That(_)    => none
+      case This(a) => a.some
+      case That(_) => none
     }
   }
 
   object HasThat {
     def unapply[B](these: _ \&/ B): Option[B] = these match {
       case Both(_, b) => b.some
-      case This(_)    => none
-      case That(b)    => b.some
+      case This(_) => none
+      case That(b) => b.some
     }
   }
 
@@ -45,9 +45,11 @@ package object scalaz {
       OptionT(self.run.map(opt => opt: Option[B]))
   }
 
-  implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
+  implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(
+      implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 
-  implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(implicit F: MonadError_[F, E]): MonadError_Ops[F, E, A] =
+  implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(
+      implicit F: MonadError_[F, E]): MonadError_Ops[F, E, A] =
     new MonadError_Ops[F, E, A](fa)
 }

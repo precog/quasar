@@ -45,8 +45,7 @@ import scalaz._
   // TODO abstract `Hole`
   type CoEnvF[F[_]] = CoEnv[Hole, F, Free[F, Hole]]
 
-  def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-    : F[A] => F[A]
+  def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]]): F[A] => F[A]
 }
 
 object Branches {
@@ -55,8 +54,8 @@ object Branches {
 
   type CoEnvF[F[_]] = CoEnv[Hole, F, Free[F, Hole]]
 
-  def applyToFreeQS[T[_[_]]](alg: CoEnvF[QScriptTotal[T, ?]] => CoEnvF[QScriptTotal[T, ?]])
-      : FreeQS[T] => FreeQS[T] =
+  def applyToFreeQS[T[_[_]]](
+      alg: CoEnvF[QScriptTotal[T, ?]] => CoEnvF[QScriptTotal[T, ?]]): FreeQS[T] => FreeQS[T] =
     _.transCata[FreeQS[T]](alg)
 
   implicit def const[T[_[_]], A]: Branches.Aux[T, Const[A, ?]] =
@@ -64,17 +63,17 @@ object Branches {
       type IT[F[_]] = T[F]
 
       def run[B](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : Const[A, B] => Const[A, B] = ι
+        : Const[A, B] => Const[A, B] = ι
     }
 
-  implicit def coproduct[T[_[_]], F[_], G[_]]
-    (implicit F: Branches.Aux[T, F], G: Branches.Aux[T, G])
-      : Branches.Aux[T, Coproduct[F, G, ?]] =
+  implicit def coproduct[T[_[_]], F[_], G[_]](
+      implicit F: Branches.Aux[T, F],
+      G: Branches.Aux[T, G]): Branches.Aux[T, Coproduct[F, G, ?]] =
     new Branches[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : Coproduct[F, G, A] => Coproduct[F, G, A] =
+        : Coproduct[F, G, A] => Coproduct[F, G, A] =
         cp => Coproduct(cp.run.bimap(F.run(alg)(_), G.run(alg)(_)))
     }
 
@@ -83,16 +82,11 @@ object Branches {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : QScriptCore[IT, A] => QScriptCore[IT, A] = _ match {
+        : QScriptCore[IT, A] => QScriptCore[IT, A] = _ match {
         case Union(src, left, right) =>
-          Union(src,
-            applyToFreeQS[IT](alg)(left),
-            applyToFreeQS[IT](alg)(right))
+          Union(src, applyToFreeQS[IT](alg)(left), applyToFreeQS[IT](alg)(right))
         case Subset(src, from, op, count) =>
-          Subset(src,
-            applyToFreeQS[IT](alg)(from),
-            op,
-            applyToFreeQS[IT](alg)(count))
+          Subset(src, applyToFreeQS[IT](alg)(from), op, applyToFreeQS[IT](alg)(count))
         case qs => qs
       }
     }
@@ -102,7 +96,7 @@ object Branches {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : ProjectBucket[IT, A] => ProjectBucket[IT, A] = ι
+        : ProjectBucket[IT, A] => ProjectBucket[IT, A] = ι
     }
 
   implicit def thetaJoin[T[_[_]]]: Branches.Aux[T, ThetaJoin[T, ?]] =
@@ -110,9 +104,10 @@ object Branches {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : ThetaJoin[IT, A] => ThetaJoin[IT, A] = {
+        : ThetaJoin[IT, A] => ThetaJoin[IT, A] = {
         case ThetaJoin(src, left, right, key, func, combine) =>
-          ThetaJoin(src,
+          ThetaJoin(
+            src,
             applyToFreeQS[IT](alg)(left),
             applyToFreeQS[IT](alg)(right),
             key,
@@ -126,9 +121,10 @@ object Branches {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
-          : EquiJoin[IT, A] => EquiJoin[IT, A] = {
+        : EquiJoin[IT, A] => EquiJoin[IT, A] = {
         case EquiJoin(src, left, right, key, func, combine) =>
-          EquiJoin(src,
+          EquiJoin(
+            src,
             applyToFreeQS[IT](alg)(left),
             applyToFreeQS[IT](alg)(right),
             key,

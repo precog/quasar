@@ -17,22 +17,22 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Func, Type, SemanticError}
+import quasar.{Func, SemanticError, Type}
 import quasar.contrib.shapeless._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
-import scalaz._, Validation.{success, failure}
+import scalaz._, Validation.{failure, success}
 import shapeless.{:: => _, _}
 
 trait Library {
   import Func._
 
   protected val noSimplification: Simplifier = new Simplifier {
-    def apply[T]
-      (orig: LogicalPlan[T])
-      (implicit TR: Recursive.Aux[T, LogicalPlan], TC: Corecursive.Aux[T, LogicalPlan]) =
+    def apply[T](orig: LogicalPlan[T])(
+        implicit TR: Recursive.Aux[T, LogicalPlan],
+        TC: Corecursive.Aux[T, LogicalPlan]) =
       None
   }
 
@@ -58,18 +58,18 @@ trait Library {
 
   protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] = {
     case ((funcDomain, funcCodomain), rez) =>
-      Type.typecheck(rez, funcCodomain).fold(
-        κ(f(rez)),
-        κ(success(funcDomain)))
+      Type.typecheck(rez, funcCodomain).fold(κ(f(rez)), κ(success(funcDomain)))
   }
 
   private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {
-    case ((funcDomain, funcCodomain), rez) => Type.typecheck(rez, funcCodomain).fold(
-      e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))),
-      κ(success(funcDomain)))
+    case ((funcDomain, funcCodomain), rez) =>
+      Type
+        .typecheck(rez, funcCodomain)
+        .fold(e => f(rez).getOrElse(failure(e.map(ι[SemanticError]))), κ(success(funcDomain)))
   }
 
-  protected def partialUntyperV[N <: Nat](f: PartialFunction[Codomain, VDomain[N]]): Untyper[N] =
+  protected def partialUntyperV[N <: Nat](
+      f: PartialFunction[Codomain, VDomain[N]]): Untyper[N] =
     partialUntyperOV(f.lift)
 
   protected def partialUntyper[N <: Nat](f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
@@ -82,7 +82,7 @@ trait Library {
     }
 
     val half: PartialFunction[Domain[nat._2], Codomain] = {
-      case Sized(t1, t2)       if t1 contains t2       => t1
+      case Sized(t1, t2) if t1 contains t2 => t1
       case Sized(Type.Dec, t2) if Type.Int contains t2 => Type.Dec
       case Sized(Type.Int, t2) if Type.Dec contains t2 => Type.Dec
     }
@@ -91,7 +91,7 @@ trait Library {
   }
 
   protected implicit class TyperW[N <: Nat](self: Typer[N]) {
-    def ||| (that: Typer[N]): Typer[N] = { args =>
+    def |||(that: Typer[N]): Typer[N] = { args =>
       self(args) ||| that(args)
     }
   }

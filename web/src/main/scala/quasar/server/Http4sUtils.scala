@@ -35,21 +35,22 @@ object Http4sUtils {
   final case class ServerBlueprint(port: Int, idleTimeout: Duration, svc: HttpService)
 
   /**
-    * Wait for the user to press enter before returning. This is a blocking operation,
-    * so the thread will be suspended until it is notified of the user pressing Enter following which
-    * the `Task` will complete. If the standard input stream is ended, which would usually
-    * indicate that this application was launched from a script, then this Task will
-    * immediately complete with a return value of `false`
-    * @return `true` if we waited on user input before returning, false if returning
-    *        immediately for lack of any possibility of receiving user input
-    */
+   * Wait for the user to press enter before returning. This is a blocking operation,
+   * so the thread will be suspended until it is notified of the user pressing Enter following which
+   * the `Task` will complete. If the standard input stream is ended, which would usually
+   * indicate that this application was launched from a script, then this Task will
+   * immediately complete with a return value of `false`
+   * @return `true` if we waited on user input before returning, false if returning
+   *        immediately for lack of any possibility of receiving user input
+   */
   def waitForUserEnter: Task[Boolean] = Task.delay {
     Option(scala.io.StdIn.readLine).isDefined
   }
 
   def openBrowser(port: Int): Task[Unit] = {
     val url = s"http://localhost:$port/"
-    Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
+    Task
+      .delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
       .or(stderr(s"Failed to open browser, please navigate to $url"))
   }
 
@@ -57,8 +58,8 @@ object Http4sUtils {
   def unavailableReason(port: Int): OptionT[Task, String] =
     OptionT(Task.delay(new java.net.ServerSocket(port)).attempt.flatMap {
       case -\/(err: java.net.BindException) => Task.now(Some(err.getMessage))
-      case -\/(err)                         => Task.fail(err)
-      case \/-(s)                           => Task.delay(s.close()).as(None)
+      case -\/(err) => Task.fail(err)
+      case \/-(s) => Task.delay(s.close()).as(None)
     })
 
   /** An available port number. */
@@ -67,24 +68,29 @@ object Http4sUtils {
   /** Available port numbers. */
   def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Int], N]] = Task.delay {
     Sized.wrap(
-      List.tabulate(toInt[N]){_ => val s = new java.net.ServerSocket(0); (s, s.getLocalPort)}
-          .map { case (s, p) => s.close; p})
+      List
+        .tabulate(toInt[N]) { _ =>
+          val s = new java.net.ServerSocket(0); (s, s.getLocalPort)
+        }
+        .map { case (s, p) => s.close; p })
   }
 
   /** Returns the requested port if available, or the next available port. */
   def choosePort(requested: Int): Task[Int] =
     unavailableReason(requested)
-      .flatMapF(rsn => stderr(s"Requested port not available: $requested; $rsn") *>
-        anyAvailablePort)
+      .flatMapF(
+        rsn =>
+          stderr(s"Requested port not available: $requested; $rsn") *>
+          anyAvailablePort)
       .getOrElse(requested)
 
   /** Start `Server` with supplied [[ServerBlueprint]]
-    * @return Server that has been started along with the port on which it was started
-    */
+   * @return Server that has been started along with the port on which it was started
+   */
   def startServerOnAnyPort(blueprint: ServerBlueprint): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- choosePort(blueprint.port)
-      server     <- startServer(blueprint.copy(port = actualPort))
+      server <- startServer(blueprint.copy(port = actualPort))
     } yield (server, actualPort)
   }
 
@@ -93,10 +99,13 @@ object Http4sUtils {
     def newPool(name: String, min: Int, cpuFactor: Double, timeout: Boolean) = {
       val cpus = java.lang.Runtime.getRuntime.availableProcessors
       val exec = new java.util.concurrent.ThreadPoolExecutor(
-        scala.math.max(min, cpus), scala.math.max(min, (cpus * cpuFactor).ceil.toInt),
-        10L, java.util.concurrent.TimeUnit.SECONDS,
+        scala.math.max(min, cpus),
+        scala.math.max(min, (cpus * cpuFactor).ceil.toInt),
+        10L,
+        java.util.concurrent.TimeUnit.SECONDS,
         new java.util.concurrent.LinkedBlockingQueue[java.lang.Runnable],
-        org.http4s.util.threads.threadFactory(i => s"${name}-$i", daemon = false))
+        org.http4s.util.threads.threadFactory(i => s"${name}-$i", daemon = false)
+      )
       exec.allowCoreThreadTimeOut(timeout)
       exec
     }

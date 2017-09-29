@@ -26,7 +26,7 @@ object SortDir {
   final case object Ascending extends SortDir
   final case object Descending extends SortDir
 
-  val asc: SortDir  = Ascending
+  val asc: SortDir = Ascending
   val desc: SortDir = Descending
 
   implicit val equal: Equal[SortDir] = Equal.equalRef

@@ -26,10 +26,12 @@ import scalaz.scalacheck.ScalazArbitrary._
 
 trait EnvironmentErrorArbitrary {
   implicit val arbEnvironmentError: Arbitrary[EnvironmentError] =
-    Arbitrary(Gen.oneOf(
-      arb[Throwable] ∘ (EnvironmentError.ConnectionFailed(_)),
-      arb[String] ∘ (EnvironmentError.InvalidCredentials(_)),
-      (arb[String] ⊛ arb[String])(EnvironmentError.UnsupportedVersion(_, _))))
+    Arbitrary(
+      Gen.oneOf(
+        arb[Throwable] ∘ (EnvironmentError.ConnectionFailed(_)),
+        arb[String] ∘ (EnvironmentError.InvalidCredentials(_)),
+        (arb[String] ⊛ arb[String])(EnvironmentError.UnsupportedVersion(_, _))
+      ))
 }
 
 object EnvironmentErrorArbitrary extends EnvironmentErrorArbitrary

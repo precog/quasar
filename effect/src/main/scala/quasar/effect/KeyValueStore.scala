@@ -24,44 +24,40 @@ import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 /** Provides the ability to read, write and delete from a store of values
-  * indexed by keys.
-  *
-  * @tparam K the type of keys used to index values
-  * @tparam V the type of values in the store
-  */
+ * indexed by keys.
+ *
+ * @tparam K the type of keys used to index values
+ * @tparam V the type of values in the store
+ */
 sealed abstract class KeyValueStore[K, V, A]
 
 object KeyValueStore {
   // NB: Switch to cursor style terms for Keys once backing stores exist where all keys won't fit into memory.
-  final case class Keys[K, V]()
-    extends KeyValueStore[K, V, Vector[K]]
+  final case class Keys[K, V]() extends KeyValueStore[K, V, Vector[K]]
 
-  final case class Get[K, V](k: K)
-    extends KeyValueStore[K, V, Option[V]]
+  final case class Get[K, V](k: K) extends KeyValueStore[K, V, Option[V]]
 
-  final case class Put[K, V](k: K, v: V)
-    extends KeyValueStore[K, V, Unit]
+  final case class Put[K, V](k: K, v: V) extends KeyValueStore[K, V, Unit]
 
   final case class CompareAndPut[K, V](k: K, expect: Option[V], update: V)
-    extends KeyValueStore[K, V, Boolean]
+      extends KeyValueStore[K, V, Boolean]
 
-  final case class Delete[K, V](k: K)
-    extends KeyValueStore[K, V, Unit]
+  final case class Delete[K, V](k: K) extends KeyValueStore[K, V, Unit]
 
   final class Ops[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S)
-    extends LiftedOps[KeyValueStore[K, V, ?], S] {
+      extends LiftedOps[KeyValueStore[K, V, ?], S] {
 
     /** Atomically associates the given key with the first part of the result
-      * of applying the given function to the value currently associated with
-      * the key, returning the second part of the result.
-      */
+     * of applying the given function to the value currently associated with
+     * the key, returning the second part of the result.
+     */
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alterS[A](k: K, f: Option[V] => (V, A)): FreeS[A] =
       for {
-        cur       <- get(k).run
-        (nxt, a0) =  f(cur)
-        updated   <- compareAndPut(k, cur, nxt)
-        a         <- if (updated) a0.point[FreeS] else alterS(k, f)
+        cur <- get(k).run
+        (nxt, a0) = f(cur)
+        updated <- compareAndPut(k, cur, nxt)
+        a <- if (updated) a0.point[FreeS] else alterS(k, f)
       } yield a
 
     /** Returns whether a value is associated with the given key. */
@@ -69,10 +65,10 @@ object KeyValueStore {
       get(k).isDefined
 
     /** Associate `update` with the given key if the current value at the key
-      * is `expect`, passing `None` for `expect` indicates that they key is
-      * expected not to be associated with a value.
-      * @return whether the value was updated.
-      */
+     * is `expect`, passing `None` for `expect` indicates that they key is
+     * expected not to be associated with a value.
+     * @return whether the value was updated.
+     */
     def compareAndPut(k: K, expect: Option[V], update: V): FreeS[Boolean] =
       lift(CompareAndPut(k, expect, update))
 
@@ -93,8 +89,8 @@ object KeyValueStore {
       get(src).flatMapF(delete(src) *> put(dst, _)).run.void
 
     /** Atomically updates the value associated with the given key with the
-      * result of applying the given function to the current value, if defined.
-      */
+     * result of applying the given function to the current value, if defined.
+     */
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def modify(k: K, f: V => V): FreeS[Unit] =
       get(k) flatMapF { v =>
@@ -114,43 +110,43 @@ object KeyValueStore {
   object impl {
 
     /** The default implementation of an in-memory KeyValueStore.
-      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
-      */
+     * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+     */
     def default[K, V]: Task[KeyValueStore[K, V, ?] ~> Task] = defaultWith(Map.empty)
 
     /** The default implementation of an in-memory KeyValueStore.
-      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
-      * @param initialState The initial state of the key value store to begin with
-      */
-    def defaultWith[K, V](initialState: Map[K, V]) : Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
-      val state = scala.collection.concurrent.TrieMap(initialState.toList: _*)
-      new (KeyValueStore[K, V, ?] ~> Task) {
-        def apply[A](fa: KeyValueStore[K, V, A]): Task[A] = fa match {
-          case Keys() => Task.delay(state.keys.toVector)
-          case Get(k) => Task.delay(state.get(k))
-          case Put(k, v) => Task.delay(state.update(k, v))
-          case CompareAndPut(k, expect, v) =>
-            // Beware, type-checking does not work properly in this block as of scala 2.11.8
-            Task.delay(expect.cata(
-              e => state.replace(k, e, v),
-              state.putIfAbsent(k, v).isEmpty))
-          case Delete(k) => Task.delay(state.remove(k)).void
+     * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+     * @param initialState The initial state of the key value store to begin with
+     */
+    def defaultWith[K, V](initialState: Map[K, V]): Task[KeyValueStore[K, V, ?] ~> Task] =
+      Task.delay {
+        val state = scala.collection.concurrent.TrieMap(initialState.toList: _*)
+        new (KeyValueStore[K, V, ?] ~> Task) {
+          def apply[A](fa: KeyValueStore[K, V, A]): Task[A] = fa match {
+            case Keys() => Task.delay(state.keys.toVector)
+            case Get(k) => Task.delay(state.get(k))
+            case Put(k, v) => Task.delay(state.update(k, v))
+            case CompareAndPut(k, expect, v) =>
+              // Beware, type-checking does not work properly in this block as of scala 2.11.8
+              Task.delay(
+                expect.cata(e => state.replace(k, e, v), state.putIfAbsent(k, v).isEmpty))
+            case Delete(k) => Task.delay(state.remove(k)).void
+          }
         }
       }
-    }
 
     /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `Task`, given a
-      * `TaskRef[Map[K, V]]`.
-      */
+     * `TaskRef[Map[K, V]]`.
+     */
     def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
       new (KeyValueStore[K, V, ?] ~> Task) {
-        val toST = toState[State[Map[K,V],?]](Lens.id[Map[K,V]])
+        val toST = toState[State[Map[K, V], ?]](Lens.id[Map[K, V]])
         def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
           ref.modifyS(toST(fa).run)
       }
 
     /** Interpret `KeyValueStore[K, V, ?]` into `AtomicRef[Map[K, V], ?]`, plus Free.
-      * Usage: `toAtomicRef[K, V]()`. */
+     * Usage: `toAtomicRef[K, V]()`. */
     object toAtomicRef {
       def apply[K, V]: Aux[K, V] = new Aux[K, V]
 
@@ -174,9 +170,10 @@ object KeyValueStore {
                 R.modify(_ + (path -> cfg)).void
 
               case CompareAndPut(path, expect, update) =>
-                R.modifyS(m =>
-                  if (m.get(path) == expect) (m + (path -> update), true)
-                  else (m, false))
+                R.modifyS(
+                  m =>
+                    if (m.get(path) == expect) (m + (path -> update), true)
+                    else (m, false))
 
               case Delete(path) =>
                 R.modify(_ - path).void
@@ -186,19 +183,19 @@ object KeyValueStore {
     }
 
     /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `F[S, ?]`,
-      * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
-      *
-      * NB: Uses partial application of `F[_, _]` for better type inference, usage:
-      *   `toState[F](lens)`
-      */
+     * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
+     *
+     * NB: Uses partial application of `F[_, _]` for better type inference, usage:
+     *   `toState[F](lens)`
+     */
     object toState {
       def apply[F[_]]: Aux[F] =
         new Aux[F]
 
       final class Aux[F[_]] {
-        def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
-                          : KeyValueStore[K, V, ?] ~> F =
-          new(KeyValueStore[K, V, ?] ~> F) {
+        def apply[K, V, S](l: Lens[S, Map[K, V]])(
+            implicit F: MonadState[F, S]): KeyValueStore[K, V, ?] ~> F =
+          new (KeyValueStore[K, V, ?] ~> F) {
             // FIXME
             @SuppressWarnings(Array("org.wartremover.warts.Equals"))
             def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {

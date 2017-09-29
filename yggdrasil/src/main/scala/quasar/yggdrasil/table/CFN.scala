@@ -25,9 +25,9 @@ import quasar.yggdrasil.bytecode.JType
 import java.time.ZonedDateTime
 
 sealed trait CFId
-case class LeafCFId(identity: String)            extends CFId
-case class ComposedCFId(l: CFId, r: CFId)        extends CFId
-case class PartialLeftCFId(cv: CValue, r: CFId)  extends CFId
+case class LeafCFId(identity: String) extends CFId
+case class ComposedCFId(l: CFId, r: CFId) extends CFId
+case class PartialLeftCFId(cv: CValue, r: CFId) extends CFId
 case class PartialRightCFId(l: CFId, cv: CValue) extends CFId
 
 object CFId {
@@ -39,7 +39,7 @@ trait CF {
 
   override final def equals(other: Any): Boolean = other match {
     case cf: CF => identity == cf.identity
-    case _      => false
+    case _ => false
   }
 
   override final def hashCode: Int = identity.hashCode
@@ -138,7 +138,9 @@ object CFNP {
 }
 
 object CF2Array {
-  def apply[A, M[+ _]](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
+  def apply[A, M[+ _]](name: String)(
+      pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)])
+    : CMapper[M] = new ArrayMapperS[M] {
     def apply(columns0: Map[ColumnRef, Column], range: Range) = {
       for {
         (ColumnRef(CPath(CPathIndex(0)), _), col1) <- columns0
@@ -190,13 +192,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
 
     val columns = results flatMap {
       case (tpe @ CString, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[String]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new StrColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -204,13 +206,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CBoolean, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Boolean]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new BoolColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -218,13 +220,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CLong, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Long]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new LongColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -232,13 +234,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CDouble, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Double]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new DoubleColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -246,13 +248,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CNum, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[BigDecimal]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new NumColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -260,7 +262,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CNull, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
@@ -273,7 +275,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CEmptyObject, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
@@ -286,7 +288,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CEmptyArray, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
@@ -299,13 +301,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CDate, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[ZonedDateTime]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new DateColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -313,13 +315,13 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
       }
 
       case (tpe @ CPeriod, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
+        val max = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Period]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new PeriodColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
+            def apply(row: Int) = cols(row)(i)
           }
         })(collection.breakOut)
 
@@ -332,7 +334,9 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
     columns
   }
 
-  def apply(columns0: Map[ColumnRef, Column], range: Range): Map[CType, (Array[Array[_]], BitSet)]
+  def apply(
+      columns0: Map[ColumnRef, Column],
+      range: Range): Map[CType, (Array[Array[_]], BitSet)]
 
   private[this] def maxIds(arr: Array[Array[_]], mask: BitSet): Int = {
     var back = -1

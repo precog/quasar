@@ -27,13 +27,14 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 final class XmlStructuralPlannerSpec
-  extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, DocType.Xml] {
+    extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, DocType.Xml] {
 
   import XmlStructuralPlannerSpec.XmlPlan
   import expr._
 
-  val SP  = StructuralPlanner[XmlPlan, DocType.Xml]
-  val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
+  val SP = StructuralPlanner[XmlPlan, DocType.Xml]
+  val toM =
+    λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
 
   def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
     xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
@@ -50,23 +51,26 @@ final class XmlStructuralPlannerSpec
 
     "nodeMetadata" >> {
       "returns element attributes as an object" >> {
-        val book = element("book".xs)(mkSeq_(
-          attribute("author".xs)("Ursula K. LeGuin".xs),
-          attribute("published".xs)(1972.xqy),
-          "The Farthest Shore".xs
-        ))
+        val book = element("book".xs)(
+          mkSeq_(
+            attribute("author".xs)("Ursula K. LeGuin".xs),
+            attribute("published".xs)(1972.xqy),
+            "The Farthest Shore".xs
+          ))
 
-        eval(SP.nodeMetadata(book)) must resultIn(Data.Obj(
-          "author"    -> Data._str("Ursula K. LeGuin"),
-          "published" -> Data._str("1972")
-        ))
+        eval(SP.nodeMetadata(book)) must resultIn(
+          Data.Obj(
+            "author" -> Data._str("Ursula K. LeGuin"),
+            "published" -> Data._str("1972")
+          ))
       }
 
       "returns attributes of an empty element" >> {
         val person = element("person".xs)(attribute("name".xs)("Alice".xs))
-        eval(SP.nodeMetadata(person)) must resultIn(Data.Obj(
-          "name" -> Data._str("Alice")
-        ))
+        eval(SP.nodeMetadata(person)) must resultIn(
+          Data.Obj(
+            "name" -> Data._str("Alice")
+          ))
       }
 
       "returns an empty object when element has no attributes" >> {
@@ -110,7 +114,8 @@ final class XmlStructuralPlannerSpec
 
       "merges non-QName keys and QName keys" >> prop { (x: Data, y: Data) =>
         val obj1 = (lit(x) >>= (SP.mkObjectEntry("1".xs, _))) >>= (e => SP.mkObject(mkSeq_(e)))
-        val obj2 = (lit(y) >>= (SP.mkObjectEntry(xs.QName("fd".xs), _))) >>= (e => SP.mkObject(mkSeq_(e)))
+        val obj2 = (lit(y) >>= (SP.mkObjectEntry(xs.QName("fd".xs), _))) >>= (e =>
+          SP.mkObject(mkSeq_(e)))
 
         val merged = (obj1 |@| obj2)(SP.objectMerge(_, _)).join
 
@@ -120,33 +125,38 @@ final class XmlStructuralPlannerSpec
 
     "objectDelete" >> {
       "deletes non-QName keys" >> prop { (x: Data, y: Data) =>
-        val obj = (lit(x) |@| lit(y))((a, b) => for {
-          e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
-          e2 <- SP.mkObjectEntry("12 not qname".xs, b)
-          o  <- SP.mkObject(mkSeq_(e1, e2))
-        } yield o).join
+        val obj = (lit(x) |@| lit(y))((a, b) =>
+          for {
+            e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
+            e2 <- SP.mkObjectEntry("12 not qname".xs, b)
+            o <- SP.mkObject(mkSeq_(e1, e2))
+          } yield o).join
 
-        eval(obj.flatMap(SP.objectDelete(_, "12 not qname".xs))) must resultIn(Data.Obj("bar" -> x))
+        eval(obj.flatMap(SP.objectDelete(_, "12 not qname".xs))) must resultIn(
+          Data.Obj("bar" -> x))
       }
     }
 
     "objectLookup" >> {
       "returns repeated elements as an array" >> prop { (x: Data, y: Data, z: Data) =>
-        val obj = (lit(x) |@| lit(y) |@| lit(z))((a, b, c) => for {
-                    e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
-                    e2 <- SP.mkObjectEntry(xs.QName("baz".xs), b)
-                    e3 <- SP.mkObjectEntry(xs.QName("baz".xs), c)
-                    o  <- SP.mkObject(mkSeq_(e1, e2, e3))
-                  } yield o).join
+        val obj = (lit(x) |@| lit(y) |@| lit(z))((a, b, c) =>
+          for {
+            e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
+            e2 <- SP.mkObjectEntry(xs.QName("baz".xs), b)
+            e3 <- SP.mkObjectEntry(xs.QName("baz".xs), c)
+            o <- SP.mkObject(mkSeq_(e1, e2, e3))
+          } yield o).join
 
-        eval(obj >>= (SP.objectLookup(_, xs.QName("baz".xs)))) must resultIn(Data._arr(List(y, z)))
+        eval(obj >>= (SP.objectLookup(_, xs.QName("baz".xs)))) must resultIn(
+          Data._arr(List(y, z)))
       }
 
       "returns non-QName keys" >> prop { x: Data =>
-        val obj = lit(x).flatMap(a     => SP.mkObjectEntry("12 not qname".xs, a))
-                        .flatMap(entry => SP.mkObject(mkSeq_(entry)))
+        val obj = lit(x)
+          .flatMap(a => SP.mkObjectEntry("12 not qname".xs, a))
+          .flatMap(entry => SP.mkObject(mkSeq_(entry)))
 
-        eval(obj >>= (SP.objectLookup(_, "12 not qname".xs))) must resultIn (x)
+        eval(obj >>= (SP.objectLookup(_, "12 not qname".xs))) must resultIn(x)
       }
     }
   }

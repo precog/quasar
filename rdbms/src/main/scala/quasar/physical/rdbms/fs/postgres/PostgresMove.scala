@@ -33,16 +33,15 @@ trait PostgresMove extends RdbmsMove {
     (fr"DROP TABLE IF EXISTS" ++ Fragment.const(table.shows)).update.run.void
 
   override def moveTableToSchema(table: TablePath, dst: Schema): ConnectionIO[TablePath] =
-    (fr"ALTER TABLE" ++ Fragment.const(table.shows) ++ fr"SET SCHEMA" ++ Fragment.const(dst.shows))
-      .update.run.map(_ => table.copy(schema = dst))
+    (fr"ALTER TABLE" ++ Fragment.const(table.shows) ++ fr"SET SCHEMA" ++ Fragment.const(
+      dst.shows)).update.run.map(_ => table.copy(schema = dst))
 
   override def renameTable(table: TablePath, newName: TableName): ConnectionIO[TablePath] =
-    (fr"ALTER TABLE" ++ Fragment.const(table.shows) ++ fr"RENAME TO" ++ Fragment.const(newName.shows))
-      .update.run.map(_ => table.copy(table = newName))
-
+    (fr"ALTER TABLE" ++ Fragment.const(table.shows) ++ fr"RENAME TO" ++ Fragment.const(
+      newName.shows)).update.run.map(_ => table.copy(table = newName))
 
   override def renameSchema(schema: CustomSchema, newName: CustomSchema): ConnectionIO[Unit] =
-    (fr"ALTER SCHEMA" ++ Fragment.const(schema.shows) ++ fr"RENAME TO" ++ Fragment.const(newName.shows))
-      .update.run.void
+    (fr"ALTER SCHEMA" ++ Fragment.const(schema.shows) ++ fr"RENAME TO" ++ Fragment.const(
+      newName.shows)).update.run.void
 
 }

@@ -32,24 +32,24 @@ object SimpleType {
   final case object Bool extends SimpleType
   final case object Byte extends SimpleType
   final case object Char extends SimpleType
-  final case object Int  extends SimpleType
-  final case object Dec  extends SimpleType
+  final case object Int extends SimpleType
+  final case object Dec extends SimpleType
 
   val name: Prism[String, SimpleType] =
     Prism.partial[String, SimpleType] {
-      case "null"      => Null
-      case "boolean"   => Bool
-      case "byte"      => Byte
+      case "null" => Null
+      case "boolean" => Bool
+      case "byte" => Byte
       case "character" => Char
-      case "integer"   => Int
-      case "decimal"   => Dec
+      case "integer" => Int
+      case "decimal" => Dec
     } {
-      case Null        => "null"
-      case Bool        => "boolean"
-      case Byte        => "byte"
-      case Char        => "character"
-      case Int         => "integer"
-      case Dec         => "decimal"
+      case Null => "null"
+      case Bool => "boolean"
+      case Byte => "byte"
+      case Char => "character"
+      case Int => "integer"
+      case Dec => "decimal"
     }
 
   implicit val enum: Enum[SimpleType] =
@@ -62,8 +62,8 @@ object SimpleType {
         case Bool => Null
         case Byte => Bool
         case Char => Byte
-        case Int  => Char
-        case Dec  => Int
+        case Int => Char
+        case Dec => Int
       }
 
       def succ(st: SimpleType): SimpleType = st match {
@@ -71,8 +71,8 @@ object SimpleType {
         case Bool => Byte
         case Byte => Char
         case Char => Int
-        case Int  => Dec
-        case Dec  => Null
+        case Int => Dec
+        case Dec => Null
       }
 
       override val min: Option[SimpleType] =
@@ -88,8 +88,8 @@ object SimpleType {
         case Bool => 1
         case Byte => 2
         case Char => 3
-        case Int  => 4
-        case Dec  => 5
+        case Int => 4
+        case Dec => 5
       }
     }
 

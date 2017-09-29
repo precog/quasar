@@ -25,21 +25,22 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative] extends Planner[T, F, ReduceFunc] {
+final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Applicative]
+    extends Planner[T, F, ReduceFunc] {
 
   def plan: AlgebraM[F, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[F])
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val planʹ: Transform[T[N1QL], ReduceFunc, N1QL] = {
-    case RF.Arbitrary(a1)      => Min(a1)
-    case RF.Avg(a1)            => Avg(a1)
-    case RF.Count(a1)          => Count(a1)
-    case RF.First(a1)          => ???
-    case RF.Last(a1)           => ???
-    case RF.Max(a1)            => Max(a1)
-    case RF.Min(a1)            => Min(a1)
-    case RF.Sum(a1)            => Sum(a1)
-    case RF.UnshiftArray(a1)   => ArrAgg(a1)
+    case RF.Arbitrary(a1) => Min(a1)
+    case RF.Avg(a1) => Avg(a1)
+    case RF.Count(a1) => Count(a1)
+    case RF.First(a1) => ???
+    case RF.Last(a1) => ???
+    case RF.Max(a1) => Max(a1)
+    case RF.Min(a1) => Min(a1)
+    case RF.Sum(a1) => Sum(a1)
+    case RF.UnshiftArray(a1) => ArrAgg(a1)
     case RF.UnshiftMap(a1, a2) => Obj(List(a1 -> a2))
   }
 

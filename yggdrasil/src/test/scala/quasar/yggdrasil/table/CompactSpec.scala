@@ -25,17 +25,20 @@ import quasar.yggdrasil._
 import scala.util.Random
 import scalaz._, Scalaz._
 
-trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CompactSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with SpecificationLike
+    with ScalaCheck {
   import SampleData._
   import trans._
 
-  def tableStats(table: Table) : List[(Int, Int)] = table match {
+  def tableStats(table: Table): List[(Int, Int)] = table match {
     case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint
       val sizes = slices.map(_.size).toList
       val undefined = slices.map { slice =>
         (0 until slice.size).foldLeft(0) {
-          case (acc, i) => if(!slice.columns.values.exists(_.isDefinedAt(i))) acc+1 else acc
+          case (acc, i) => if (!slice.columns.values.exists(_.isDefinedAt(i))) acc + 1 else acc
         }
       }.toList
 
@@ -44,8 +47,8 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def mkDeref(path: CPath): TransSpec1 = {
     def mkDeref0(nodes: List[CPathNode]): TransSpec1 = nodes match {
-      case (f : CPathField) :: rest => DerefObjectStatic(mkDeref0(rest), f)
-      case (i : CPathIndex) :: rest => DerefArrayStatic(mkDeref0(rest), i)
+      case (f: CPathField) :: rest => DerefObjectStatic(mkDeref0(rest), f)
+      case (i: CPathIndex) :: rest => DerefArrayStatic(mkDeref0(rest), i)
       case _ => Leaf(Source)
     }
 
@@ -65,7 +68,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       cTable.slices.toStream.copoint.headOption.map { slice =>
         val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
         mkDeref(chosenPath)
-      } getOrElse(mkDeref(CPath.Identity))
+      } getOrElse (mkDeref(CPath.Identity))
   }
 
   def undefineTable(fullTable: Table): Table = fullTable match {
@@ -74,19 +77,21 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val numSlices = slices.size
 
       val maskedSlices = slices.map { slice =>
-        if(numSlices > 1 && Random.nextDouble < 0.25) {
+        if (numSlices > 1 && Random.nextDouble < 0.25) {
           new Slice {
             val size = slice.size
-            val columns = slice.columns.mapValues { col => (col |> cf.util.filter(0, slice.size, new BitSet)).get }
+            val columns = slice.columns.mapValues { col =>
+              (col |> cf.util.filter(0, slice.size, new BitSet)).get
+            }
           }
         } else {
-          val retained = (0 until slice.size).flatMap {
-            x => if (scala.util.Random.nextDouble < 0.75) Some(x) else None
+          val retained = (0 until slice.size).flatMap { x =>
+            if (scala.util.Random.nextDouble < 0.75) Some(x) else None
           }
           new Slice {
             val size = slice.size
-            val columns = slice.columns.mapValues {
-              col => (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
+            val columns = slice.columns.mapValues { col =>
+              (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
           }
         }
@@ -105,10 +110,12 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
         val maskedSlice = colRef.map { colRef =>
           val col = slice.columns(colRef)
           val maskedCol =
-            if(numSlices > 1 && Random.nextDouble < 0.25)
+            if (numSlices > 1 && Random.nextDouble < 0.25)
               (col |> cf.util.filter(0, slice.size, new BitSet)).get
             else {
-              val retained = (0 until slice.size).map { (x : Int) => if(scala.util.Random.nextDouble < 0.75) Some(x) else None }.flatten
+              val retained = (0 until slice.size).map { (x: Int) =>
+                if (scala.util.Random.nextDouble < 0.75) Some(x) else None
+              }.flatten
               (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
           new Slice {
@@ -157,7 +164,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val compactStats = tableStats(compactTable)
       val results = toJson(compactTable)
 
-      compactStats.map(_._2).foldLeft(0)(_+_) must_== 0
+      compactStats.map(_._2).foldLeft(0)(_ + _) must_== 0
     }
   }
 
@@ -206,7 +213,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val resultKey = compactTable.transform(key)
       val resultKeyStats = tableStats(resultKey)
 
-      resultKeyStats.map(_._2).foldLeft(0)(_+_) must_== 0
+      resultKeyStats.map(_._2).foldLeft(0)(_ + _) must_== 0
     }
   }
 

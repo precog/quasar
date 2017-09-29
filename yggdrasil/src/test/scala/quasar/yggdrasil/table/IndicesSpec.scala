@@ -25,7 +25,10 @@ import scalaz._, Scalaz._
 
 // TODO: mix in a trait rather than defining Table directly
 
-trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableModuleSpec[M] with IndicesModule[M] {
+trait IndicesSpec[M[+ _]]
+    extends ColumnarTableModuleTestSupport[M]
+    with TableModuleSpec[M]
+    with IndicesModule[M] {
   type GroupId = Int
 
   import TableModule._
@@ -37,8 +40,13 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = sys.error("todo")
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) =
+      sys.error("todo")
+    def groupByN(
+        groupKeys: Seq[TransSpec1],
+        valueSpec: TransSpec1,
+        sortOrder: DesiredSortOrder = SortAscending,
+        unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
@@ -46,8 +54,11 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
     def singleton(slice: Slice) = new Table(slice :: StreamT.empty[M, Slice], ExactSize(1))
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1):
-        M[(Table, Table)] = sys.error("not implemented here")
+    def align(
+        sourceLeft: Table,
+        alignOnL: TransSpec1,
+        sourceRight: Table,
+        alignOnR: TransSpec1): M[(Table, Table)] = sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
@@ -84,14 +95,18 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 {"a": 1, "c": [666]}
 """
 
-    val table             = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
-    val keySpecs          = Array(groupkey("a"), groupkey("b"))
-    val valSpec           = valuekey("c")
+    val table = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
+    val keySpecs = Array(groupkey("a"), groupkey("b"))
+    val valSpec = valuekey("c")
     val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
     "determine unique groupkey values" in {
       index.getUniqueKeys(0) must_== Set[RValue](CLong(1), CLong(2), CLong(3), CString("foo"))
-      index.getUniqueKeys(1) must_== Set[RValue](CLong(2), CLong(999), CString("bar"), CString(""))
+      index.getUniqueKeys(1) must_== Set[RValue](
+        CLong(2),
+        CLong(999),
+        CString("bar"),
+        CString(""))
     }
 
     "determine unique groupkey sets" in {
@@ -139,13 +154,21 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
       test(Array(CString("foo"), CLong(999)), empty)
     }
 
-    val index1 = TableIndex.createFromTable(
-      table, Array(groupkey("a")), valuekey("c")
-    ).copoint
+    val index1 = TableIndex
+      .createFromTable(
+        table,
+        Array(groupkey("a")),
+        valuekey("c")
+      )
+      .copoint
 
-    val index2 = TableIndex.createFromTable(
-      table, Array(groupkey("b")), valuekey("c")
-    ).copoint
+    val index2 = TableIndex
+      .createFromTable(
+        table,
+        Array(groupkey("b")),
+        valuekey("c")
+      )
+      .copoint
 
     "efficiently combine to produce unions" in {
 

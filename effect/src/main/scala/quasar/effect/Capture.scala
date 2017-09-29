@@ -22,13 +22,14 @@ import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
 
 /** Monad with effect-capturing unit.
-  *
-  * Cribbed from [doobie](http://github.com/tpolecat/doobie)
-  */
+ *
+ * Cribbed from [doobie](http://github.com/tpolecat/doobie)
+ */
 trait Capture[F[_]] {
+
   /** Captures the effect of producing `A`, including any exceptions that may
-    * be thrown.
-    */
+   * be thrown.
+   */
   def capture[A](a: => A): F[A]
 
   /** Alias for `capture`. */
@@ -78,11 +79,11 @@ private[effect] class TaskCapture extends Capture[Task] {
 }
 
 private[effect] class TransCapture[F[_]: Monad: Capture, T[_[_], _]: MonadTrans]
-  extends Capture[T[F, ?]] {
+    extends Capture[T[F, ?]] {
   def capture[A](a: => A) = Capture[F].capture(a).liftM[T]
 }
 
 private[effect] class FreeCapture[F[_], S[_]](implicit F: Capture[F], I: F :<: S)
-  extends Capture[Free[S, ?]] {
+    extends Capture[Free[S, ?]] {
   def capture[A](a: => A) = Free.liftF(I(F.capture(a)))
 }

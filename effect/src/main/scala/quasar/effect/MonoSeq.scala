@@ -22,17 +22,17 @@ import simulacrum.typeclass
 import scalaz._, Scalaz._
 
 /** Represents the ability to request the next element of a monotonically
-  * increasing numeric sequence.
-  *
-  * That is,
-  *
-  *   for {
-  *     a <- next
-  *     b <- next
-  *   } yield a < b
-  *
-  * must always be true.
-  */
+ * increasing numeric sequence.
+ *
+ * That is,
+ *
+ *   for {
+ *     a <- next
+ *     b <- next
+ *   } yield a < b
+ *
+ * must always be true.
+ */
 @typeclass
 trait MonoSeq[F[_]] {
   def next: F[Long]
@@ -47,7 +47,9 @@ sealed abstract class MonoSeqInstances extends MonoSeqInstances0 {
   implicit val monotonicSeq: MonoSeq[MonotonicSeq] =
     new MonoSeq[MonotonicSeq] { val next = MonotonicSeq.Next }
 
-  implicit def freeMonoSeq[F[_], S[_]](implicit F: MonoSeq[F], I: F :<: S): MonoSeq[Free[S, ?]] =
+  implicit def freeMonoSeq[F[_], S[_]](
+      implicit F: MonoSeq[F],
+      I: F :<: S): MonoSeq[Free[S, ?]] =
     new MonoSeq[Free[S, ?]] { def next = Free.liftF(I(F.next)) }
 }
 

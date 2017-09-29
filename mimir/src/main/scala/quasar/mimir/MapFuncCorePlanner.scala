@@ -31,13 +31,13 @@ import scalaz.Applicative
 import scalaz.syntax.applicative._
 
 final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
-  extends MapFuncPlanner[T, F, MapFuncCore[T, ?]] {
+    extends MapFuncPlanner[T, F, MapFuncCore[T, ?]] {
 
   def plan(cake: Precog): PlanApplicator[cake.type] =
     new PlanApplicatorCore(cake)
 
   final class PlanApplicatorCore[P <: Precog](override val cake: P)
-    extends PlanApplicator[P](cake) {
+      extends PlanApplicator[P](cake) {
 
     import cake.trans._
     import cake.Library._
@@ -110,7 +110,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.TypeOf(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>
-        Unary.Neg.spec(a1).point[F]   // NB: don't use math.Negate here; it does weird things to booleans
+        Unary.Neg
+          .spec(a1)
+          .point[F] // NB: don't use math.Negate here; it does weird things to booleans
       case MapFuncsCore.Add(a1, a2) =>
         Infix.Add.spec(a1, a2).point[F]
       case MapFuncsCore.Multiply(a1, a2) =>
@@ -156,7 +158,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.IfUndefined(a1, a2) =>
         (DerefObjectStatic(
-          OuterObjectConcat(    // this operation is right-biased, so we default to a1
+          OuterObjectConcat( // this operation is right-biased, so we default to a1
             WrapObject(a2, "foo"),
             WrapObject(a1, "foo")),
           CPathField("foo")): TransSpec[A]).point[F]
@@ -166,7 +168,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Or(a1, a2) =>
         Infix.Or.spec(a1, a2).point[F]
       case MapFuncsCore.Between(a1, a2, a3) =>
-        (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
+        (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[
+          A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
@@ -191,12 +194,17 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         split.spec[A](a1, a2).point[F]
 
       // significantly faster fast path
-      case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
+      case MapFuncsCore.Search(
+          src,
+          ConstLiteral(CString(pattern), _),
+          ConstLiteral(CBoolean(flag), _)) =>
         search(pattern, flag).spec[A](src).point[F]
 
       // this case is hideously slow; hopefully we don't see it too often
       case MapFuncsCore.Search(src, pattern, flag) =>
-        (MapN((OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))), searchDynamic): TransSpec[A]).point[F]
+        (MapN(
+          (OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))),
+          searchDynamic): TransSpec[A]).point[F]
 
       case MapFuncsCore.Substring(string, from, count) =>
         val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))

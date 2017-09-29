@@ -67,9 +67,10 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
     lpr.invoke1(IdentityLib.Squash, lpr.read(file))
 
   def stateForFile(file: AFile, contents: Vector[Data]) =
-    InMemState.empty.copy(queryResps = Map(
-      analysis.sampled(simpleRead(file), schema.DefaultSampleSize) -> contents
-    ))
+    InMemState.empty.copy(
+      queryResps = Map(
+        analysis.sampled(simpleRead(file), schema.DefaultSampleSize) -> contents
+      ))
 
   def baseUri(file: AFile) =
     pathUri(rootDir) +? ("q", s"select * from `${posixCodec.printPath(file)}`")
@@ -80,12 +81,15 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
   def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json = {
     type P[X] = StructuralType[J, X]
 
-    Process.emitAll(dataset)
+    Process
+      .emitAll(dataset)
       .pipe(analysis.extractSchema[J, Double](cfg))
       .map(Population.subst[P, TypeStat[Double]] _)
       .map(psst => DataCodec.Precise.encode(analysis.schemaToData(psst.right)))
       .pipe(process1.stripNone)
-      .toVector.headOption.getOrElse(Json.jNull)
+      .toVector
+      .headOption
+      .getOrElse(Json.jNull)
   }
 
   case class SmallPositive(p: Positive)
@@ -106,16 +110,15 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
     "query missing" >> prop { dir: ADir =>
       service(InMemState.empty)(Request(uri = pathUri(dir)))
         .flatMap(_.as[ApiError])
-        .map(_ must equal(ApiError.fromStatus(
-          BadRequest withReason "No SQL^2 query found in URL.")))
+        .map(_ must equal(
+          ApiError.fromStatus(BadRequest withReason "No SQL^2 query found in URL.")))
         .unsafePerformSync
     }
 
     "query malformed" >> prop { dir: ADir =>
       service(InMemState.empty)(Request(uri = pathUri(dir) +? ("q", "select foo from")))
         .flatMap(_.as[ApiError])
-        .map(_ must beApiErrorWithMessage(
-          BadRequest withReason "Malformed SQL^2 query."))
+        .map(_ must beApiErrorWithMessage(BadRequest withReason "Malformed SQL^2 query."))
         .unsafePerformSync
     }
 
@@ -128,17 +131,17 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
         .unsafePerformSync
     }
 
-    addFragments(Fragments(List("arrayMaxLength", "mapMaxSize", "stringMaxLength", "unionMaxSize") map { param =>
-      s"non-positive $param given" >> prop { (file: AFile, i: Int) =>
-        val ruri = pathUri(file) +? (param, nonPos(i).toString)
+    addFragments(Fragments(
+      List("arrayMaxLength", "mapMaxSize", "stringMaxLength", "unionMaxSize") map { param =>
+        s"non-positive $param given" >> prop { (file: AFile, i: Int) =>
+          val ruri = pathUri(file) +? (param, nonPos(i).toString)
 
-        service(InMemState.empty)(Request(uri = ruri))
-          .flatMap(_.as[ApiError])
-          .map(_ must beApiErrorWithMessage(
-            BadRequest withReason "Invalid query parameter."))
-          .unsafePerformSync
-      }
-    } : _*))
+          service(InMemState.empty)(Request(uri = ruri))
+            .flatMap(_.as[ApiError])
+            .map(_ must beApiErrorWithMessage(BadRequest withReason "Invalid query parameter."))
+            .unsafePerformSync
+        }
+      }: _*))
   }
 
   "successful response" >> {
@@ -158,10 +161,9 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
     def testReq(f: Uri => Uri) =
       Request(uri = f(baseUri(testFile)))
 
-    "includes the sst for the query results as JSON-encoded EJson" >> prop { (x: Data, y: Data) =>
-      shouldSucceed(x, y,
-        analysis.CompressionSettings.Default,
-        testReq(a => a))
+    "includes the sst for the query results as JSON-encoded EJson" >> prop {
+      (x: Data, y: Data) =>
+        shouldSucceed(x, y, analysis.CompressionSettings.Default, testReq(a => a))
     }
 
     "applies arrayMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallPositive) =>
@@ -207,13 +209,18 @@ object SchemaServiceSpec {
     }
 
   def service(mem: InMemState): Service[Request, Response] =
-    HttpService.lift(req => runQueryFile(mem).tuple(runMounting) flatMap {
-      case (runQF, runM) =>
-        schema.service[SchemaEff].toHttpService(
-          runM                               :+:
-          runQF                              :+:
-          failureResponseOr[FileSystemError] :+:
-          liftMT[Task, ResponseT]
-        )(req)
-    }).orNotFound
+    HttpService
+      .lift(req =>
+        runQueryFile(mem).tuple(runMounting) flatMap {
+          case (runQF, runM) =>
+            schema
+              .service[SchemaEff]
+              .toHttpService(
+                runM :+:
+                  runQF :+:
+                  failureResponseOr[FileSystemError] :+:
+                  liftMT[Task, ResponseT]
+              )(req)
+      })
+      .orNotFound
 }

@@ -30,18 +30,29 @@ import org.slf4s.Logging
 
 import scalaz.Monad
 
-final class NIHDBProjection(snapshot: NIHDBSnapshot, val authorities: Authorities, projectionId: Int) extends ProjectionLike[Future, Slice] with Logging {
+final class NIHDBProjection(
+    snapshot: NIHDBSnapshot,
+    val authorities: Authorities,
+    projectionId: Int)
+    extends ProjectionLike[Future, Slice]
+    with Logging {
   type Key = Long
 
   private[this] val readers = snapshot.readers
 
   val length = readers.map(_.length.toLong).sum
 
-  override def toString = "NIHDBProjection(id = %d, len = %d, authorities = %s)".format(projectionId, length, authorities)
+  override def toString =
+    "NIHDBProjection(id = %d, len = %d, authorities = %s)".format(
+      projectionId,
+      length,
+      authorities)
 
-  def structure(implicit M: Monad[Future]) = M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
+  def structure(implicit M: Monad[Future]) =
+    M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
 
-  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] = MP.point {
+  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(
+      implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] = MP.point {
     val id = id0.map(_ + 1)
     val index = id getOrElse 0L
     getSnapshotBlock(id, columns.map(_.map(_.selector))) map {

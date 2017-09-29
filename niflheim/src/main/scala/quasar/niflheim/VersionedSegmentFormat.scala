@@ -18,7 +18,7 @@ package quasar.niflheim
 
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
-import scalaz.{Validation, Failure}
+import scalaz.{Failure, Validation}
 import scalaz.syntax.monad._
 
 import java.io.IOException
@@ -32,7 +32,9 @@ import java.io.IOException
  * of the segment. If no format exists for that version, then we return an
  * error.
  */
-case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends SegmentFormat with Versioning {
+case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat])
+    extends SegmentFormat
+    with Versioning {
   val magic: Short = 0x0536.toShort
   val (version, format) = {
     val (ver, format) = formats.maxBy(_._1)

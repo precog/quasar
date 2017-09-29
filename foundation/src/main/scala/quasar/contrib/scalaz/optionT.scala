@@ -21,14 +21,13 @@ import slamdata.Predef._
 import scalaz._, Scalaz._
 
 trait OptionTInstances {
-  implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
+  implicit def optionTCatchable[F[_]: Catchable: Functor]: Catchable[OptionT[F, ?]] =
     new Catchable[OptionT[F, ?]] {
       def attempt[A](fa: OptionT[F, A]) =
-        OptionT[F, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)  => Some(\/.left(t))
-            case \/-(oa) => oa map (\/.right)
-          })
+        OptionT[F, Throwable \/ A](Catchable[F].attempt(fa.run) map {
+          case -\/(t) => Some(\/.left(t))
+          case \/-(oa) => oa map (\/.right)
+        })
 
       def fail[A](t: Throwable) =
         OptionT[F, A](Catchable[F].fail(t))

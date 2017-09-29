@@ -17,7 +17,7 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+import quasar.{BinaryFunc, Data, Func, GenericFunc, Mapping, TernaryFunc, Type, UnaryFunc}
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
@@ -37,12 +37,13 @@ trait RelationsLib extends Library {
         Type.Const(Data.Bool(data1 == data2))
 
       case Sized(type1, type2)
-        if Type.lub(type1, type2) == Type.Top && type1 != Type.Top && type2 != Type.Top =>
-          Type.Const(Data.Bool(false))
+          if Type.lub(type1, type2) == Type.Top && type1 != Type.Top && type2 != Type.Top =>
+        Type.Const(Data.Bool(false))
 
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Neq = BinaryFunc(
     Mapping,
@@ -55,12 +56,13 @@ trait RelationsLib extends Library {
         Type.Const(Data.Bool(data1 != data2))
 
       case Sized(type1, type2)
-        if Type.lub(type1, type2) == Type.Top && type1 != Type.Top && type2 != Type.Top =>
-          Type.Const(Data.Bool(true))
+          if Type.lub(type1, type2) == Type.Top && type1 != Type.Top && type2 != Type.Top =>
+        Type.Const(Data.Bool(true))
 
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Lt = BinaryFunc(
     Mapping,
@@ -69,14 +71,20 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 < v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 < v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 < v2))
-      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) < 0))
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Lte = BinaryFunc(
     Mapping,
@@ -85,14 +93,20 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Gt = BinaryFunc(
     Mapping,
@@ -101,14 +115,20 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 > v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 > v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 > v2))
-      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) > 0))
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Gte = BinaryFunc(
     Mapping,
@@ -117,14 +137,20 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Between = TernaryFunc(
     Mapping,
@@ -137,7 +163,8 @@ trait RelationsLib extends Library {
       case Sized(_, _, _) => Type.Bool
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val IfUndefined = BinaryFunc(
     Mapping,
@@ -147,9 +174,10 @@ trait RelationsLib extends Library {
     noSimplification,
     partialTyper {
       case Sized(Type.Bottom, fallback) => fallback
-      case Sized(value,       fallback) => value ⨿ fallback
+      case Sized(value, fallback) => value ⨿ fallback
     },
-    partialUntyper[nat._2] { case t => Func.Input2(t, t) })
+    partialUntyper[nat._2] { case t => Func.Input2(t, t) }
+  )
 
   val And = BinaryFunc(
     Mapping,
@@ -157,24 +185,24 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.True)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.True)))) => l.some
-          case _                                                       => None
+          case _ => None
         }
     },
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 && v2))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 && v2))
       case Sized(Type.Const(Data.Bool(false)), _) => Type.Const(Data.Bool(false))
       case Sized(_, Type.Const(Data.Bool(false))) => Type.Const(Data.Bool(false))
       case Sized(Type.Const(Data.Bool(true)), x) => x
       case Sized(x, Type.Const(Data.Bool(true))) => x
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Or = BinaryFunc(
     Mapping,
@@ -182,24 +210,24 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.False)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.False)))) => l.some
-          case _                                                        => None
+          case _ => None
         }
     },
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 || v2))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 || v2))
       case Sized(Type.Const(Data.Bool(true)), _) => Type.Const(Data.Bool(true))
       case Sized(_, Type.Const(Data.Bool(true))) => Type.Const(Data.Bool(true))
       case Sized(Type.Const(Data.Bool(false)), x) => x
       case Sized(x, Type.Const(Data.Bool(false))) => x
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Not = UnaryFunc(
     Mapping,
@@ -211,7 +239,8 @@ trait RelationsLib extends Library {
       case Sized(Type.Const(Data.Bool(v))) => Type.Const(Data.Bool(!v))
       case _ => Type.Bool
     },
-    basicUntyper)
+    basicUntyper
+  )
 
   val Cond = TernaryFunc(
     Mapping,
@@ -219,13 +248,11 @@ trait RelationsLib extends Library {
     Type.Bottom,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      def apply[T](orig: LP[T])(implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case Invoke(_, Sized(Embed(Constant(Data.True)),  Embed(c), _)) => c.some
+          case Invoke(_, Sized(Embed(Constant(Data.True)), Embed(c), _)) => c.some
           case Invoke(_, Sized(Embed(Constant(Data.False)), _, Embed(a))) => a.some
-          case _                                                            => None
+          case _ => None
         }
     },
     partialTyper[nat._3] {
@@ -233,28 +260,29 @@ trait RelationsLib extends Library {
       case Sized(Type.Const(Data.Bool(false)), ifTrue, ifFalse) => ifFalse
       case Sized(Type.Bool, ifTrue, ifFalse) => Type.lub(ifTrue, ifFalse)
     },
-    untyper[nat._3](t => success(Func.Input3(Type.Bool, t, t))))
+    untyper[nat._3](t => success(Func.Input3(Type.Bool, t, t)))
+  )
 
   def flip(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
-    case Eq  => Some(Eq)
+    case Eq => Some(Eq)
     case Neq => Some(Neq)
-    case Lt  => Some(Gt)
+    case Lt => Some(Gt)
     case Lte => Some(Gte)
-    case Gt  => Some(Lt)
+    case Gt => Some(Lt)
     case Gte => Some(Lte)
     case And => Some(And)
-    case Or  => Some(Or)
-    case _   => None
+    case Or => Some(Or)
+    case _ => None
   }
 
   def negate(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
-    case Eq  => Some(Neq)
+    case Eq => Some(Neq)
     case Neq => Some(Eq)
-    case Lt  => Some(Gte)
+    case Lt => Some(Gte)
     case Lte => Some(Gt)
-    case Gt  => Some(Lte)
+    case Gt => Some(Lte)
     case Gte => Some(Lt)
-    case _   => None
+    case _ => None
   }
 }
 

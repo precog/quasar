@@ -24,13 +24,13 @@ class ExamplesSpec extends Specification {
   import JParser._
 
   "Lotto example" in {
-    val json          = parseUnsafe(lotto)
+    val json = parseUnsafe(lotto)
     val renderedLotto = json.renderCompact
     json mustEqual parseUnsafe(renderedLotto)
   }
 
   "Person example" in {
-    val json           = parseUnsafe(person)
+    val json = parseUnsafe(person)
     val renderedPerson = json.renderPretty
     json mustEqual parseUnsafe(renderedPerson)
     //render(json) mustEqual render(personDSL)
@@ -39,8 +39,10 @@ class ExamplesSpec extends Specification {
   }
 
   "Transformation example" in {
-    val uppercased = parseUnsafe(person).transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
-    val rendered   = uppercased.renderCompact
+    val uppercased = parseUnsafe(person).transform(JField.liftCollect {
+      case JField(n, v) => JField(n.toUpperCase, v)
+    })
+    val rendered = uppercased.renderCompact
     rendered.contains(""""NAME":"Joe"""") mustEqual true
     rendered.contains(""""AGE":35.0""") mustEqual true
     //rendered mustEqual
@@ -65,7 +67,8 @@ class ExamplesSpec extends Specification {
   }
 
   "Unicode example" in {
-    parseUnsafe("[\" \\u00e4\\u00e4li\\u00f6t\"]") mustEqual JArray(List(JString(" \u00e4\u00e4li\u00f6t")))
+    parseUnsafe("[\" \\u00e4\\u00e4li\\u00f6t\"]") mustEqual JArray(
+      List(JString(" \u00e4\u00e4li\u00f6t")))
   }
 
   "Exponent example" in {
@@ -76,8 +79,9 @@ class ExamplesSpec extends Specification {
   }
 
   "JSON building example" in {
-    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++
-        JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
+    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(
+      JField("age", JNum(34)) :: Nil) ++
+      JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
 
     json.renderCompact mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
   }
@@ -87,7 +91,7 @@ class ExamplesSpec extends Specification {
     val ints = json.foldDown(JUndefined: JValue) { (a, v) =>
       v match {
         case x: JNum => a ++ x
-        case _       => a
+        case _ => a
       }
     }
     val out = ints.renderCompact
@@ -171,17 +175,18 @@ object Examples {
         JObject(
           JField("name", JString("Joe")) ::
             JField("age", JNum(35)) ::
+            JField(
+            "spouse",
+            JObject(
               JField(
-                "spouse",
+                "person",
                 JObject(
-                  JField(
-                    "person",
-                    JObject(
-                      JField("name", JString("Marilyn")) ::
-                        JField("age", JNum(33)) :: Nil
-                    )) :: Nil
+                  JField("name", JString("Marilyn")) ::
+                    JField("age", JNum(33)) :: Nil
                 )) :: Nil
-        )) :: Nil
+            )) :: Nil
+        )
+      ) :: Nil
     )
 
   val objArray = """
@@ -203,6 +208,6 @@ object Examples {
 }
 """
 
-  val quoted  = """["foo \" \n \t \r bar"]"""
+  val quoted = """["foo \" \n \t \r bar"]"""
   val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
 }

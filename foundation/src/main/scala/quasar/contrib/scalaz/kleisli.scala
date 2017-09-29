@@ -21,7 +21,8 @@ import quasar.fp.ski._
 import scalaz._
 
 trait KleisliInstances {
-  implicit def kleisliMonadState[F[_], S, R](implicit F: MonadState[F, S]): MonadState[Kleisli[F, R, ?], S] =
+  implicit def kleisliMonadState[F[_], S, R](
+      implicit F: MonadState[F, S]): MonadState[Kleisli[F, R, ?], S] =
     new MonadState[Kleisli[F, R, ?], S] {
       def init = Kleisli(κ(F.init))
       def get = Kleisli(κ(F.get))

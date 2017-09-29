@@ -27,11 +27,11 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
 
 /** An ADT representing the two forms of type tagging that quasar does in EJson.
-  *
-  * This exists primarily for the arbitrary instance, used by TypedEJson to
-  * generate arbitrary EJson that contains the particular `Meta` nodes that
-  * represent type tags.
-  */
+ *
+ * This exists primarily for the arbitrary instance, used by TypedEJson to
+ * generate arbitrary EJson that contains the particular `Meta` nodes that
+ * represent type tags.
+ */
 private[sst] sealed abstract class TypeMetadata[A]
 
 object TypeMetadata {
@@ -58,12 +58,13 @@ object TypeMetadata {
 
   implicit val traverse: Traverse[TypeMetadata] =
     new Traverse[TypeMetadata] with Foldable.FromFoldr[TypeMetadata] {
-      def traverseImpl[G[_]: Applicative, A, B](fa: TypeMetadata[A])(f: A => G[B]): G[TypeMetadata[B]] =
+      def traverseImpl[G[_]: Applicative, A, B](fa: TypeMetadata[A])(
+          f: A => G[B]): G[TypeMetadata[B]] =
         fa match {
-          case Type(t, a)         => f(a) map (Type(t, _))
+          case Type(t, a) => f(a) map (Type(t, _))
           case SizedType(t, n, a) => f(a) map (SizedType(t, n, _))
-          case Absent(a)          => f(a) map (Absent(_))
-          case Null()             => (Null(): TypeMetadata[B]).point[G]
+          case Absent(a) => f(a) map (Absent(_))
+          case Null() => (Null(): TypeMetadata[B]).point[G]
         }
     }
 }

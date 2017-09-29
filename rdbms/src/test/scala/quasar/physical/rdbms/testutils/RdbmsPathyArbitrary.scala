@@ -20,9 +20,9 @@ import org.scalacheck.{Arbitrary, Gen}
 import pathy.Path.{DirName, FileName}
 
 /**
-  * Arbitrary instances for directory and file names conforming to RDBMS constraints for allowed characters
-  * in identifiers.
-  */
+ * Arbitrary instances for directory and file names conforming to RDBMS constraints for allowed characters
+ * in identifiers.
+ */
 object RdbmsPathyArbitrary {
 
   object Generators {

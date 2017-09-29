@@ -29,8 +29,7 @@ object Errors {
 
   type ETask[E, X] = EitherT[Task, E, X]
 
-  def handle[E, A, B>:A](t: ETask[E, A])(f: PartialFunction[Throwable, B]):
-      ETask[E, B] = {
+  def handle[E, A, B >: A](t: ETask[E, A])(f: PartialFunction[Throwable, B]): ETask[E, B] = {
     type G[F[_], X] = EitherT[F, E, X]
     Catchable[G[Task, ?]].attempt(t) flatMap {
       case -\/(t) => f.lift(t).cata(Task.now, Task.fail(t)).liftM[G]
@@ -38,8 +37,8 @@ object Errors {
     }
   }
 
-  def handleWith[E, A, B>:A](t: ETask[E, A])(f: PartialFunction[Throwable, ETask[E, B]]):
-      ETask[E, B] = {
+  def handleWith[E, A, B >: A](t: ETask[E, A])(
+      f: PartialFunction[Throwable, ETask[E, B]]): ETask[E, B] = {
     Catchable[ETask[E, ?]].attempt(t) flatMap {
       case -\/(t) => f.lift(t) getOrElse liftE(Task.fail(t))
       case \/-(a) => Applicative[ETask[E, ?]].point(a)
@@ -50,11 +49,11 @@ object Errors {
 }
 
 /** Given a function A => B, returns a natural transformation from
-  * EitherT[F, A, ?] ~> EitherT[F, B, ?].
-  *
-  * Partially applies the monad, `F`, for better inference, so use like
-  *   `convertError[F](f)`
-  */
+ * EitherT[F, A, ?] ~> EitherT[F, B, ?].
+ *
+ * Partially applies the monad, `F`, for better inference, so use like
+ *   `convertError[F](f)`
+ */
 object convertError {
   def apply[F[_]]: Aux[F] =
     new Aux[F]

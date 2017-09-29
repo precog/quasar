@@ -28,11 +28,12 @@ import java.time.LocalDateTime
 
 import scala.collection.mutable
 
-class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) extends APIKeyManager[M] {
+class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M])
+    extends APIKeyManager[M] {
   import Permission._
 
   val (rootAPIKeyRecord, grants, apiKeys) = {
-    val rootAPIKey  = APIKeyManager.newAPIKey()
+    val rootAPIKey = APIKeyManager.newAPIKey()
     val rootGrantId = APIKeyManager.newGrantId()
 
     val rootGrant = Grant(
@@ -50,36 +51,59 @@ class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) exte
       None
     )
 
-    val rootAPIKeyRecord = APIKeyRecord(rootAPIKey, some("root-apiKey"), some("The root API key"), rootAPIKey, Set(rootGrantId), true)
+    val rootAPIKeyRecord = APIKeyRecord(
+      rootAPIKey,
+      some("root-apiKey"),
+      some("The root API key"),
+      rootAPIKey,
+      Set(rootGrantId),
+      true)
 
-    (rootAPIKeyRecord, mutable.HashMap(rootGrantId -> rootGrant), mutable.HashMap(rootAPIKey -> rootAPIKeyRecord))
+    (
+      rootAPIKeyRecord,
+      mutable.HashMap(rootGrantId -> rootGrant),
+      mutable.HashMap(rootAPIKey -> rootAPIKeyRecord))
   }
 
-  def rootAPIKey: M[APIKey]   = rootAPIKeyRecord.apiKey.point[M]
+  def rootAPIKey: M[APIKey] = rootAPIKeyRecord.apiKey.point[M]
   def rootGrantId: M[GrantId] = rootAPIKeyRecord.grants.head.point[M]
 
   private val deletedAPIKeys = mutable.HashMap[APIKey, APIKeyRecord]()
-  private val deletedGrants  = mutable.HashMap[GrantId, Grant]()
+  private val deletedGrants = mutable.HashMap[GrantId, Grant]()
 
-  def createAPIKey(name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId]): M[APIKeyRecord] = {
-    val record = APIKeyRecord(APIKeyManager.newAPIKey(), name, description, issuerKey, grants, false)
+  def createAPIKey(
+      name: Option[String],
+      description: Option[String],
+      issuerKey: APIKey,
+      grants: Set[GrantId]): M[APIKeyRecord] = {
+    val record =
+      APIKeyRecord(APIKeyManager.newAPIKey(), name, description, issuerKey, grants, false)
     apiKeys.put(record.apiKey, record)
     record.point[M]
   }
 
-  def createGrant(name: Option[String],
-                  description: Option[String],
-                  issuerKey: APIKey,
-                  parentIds: Set[GrantId],
-                  perms: Set[Permission],
-                  expiration: Option[LocalDateTime]): M[Grant] = {
-    val grant = Grant(APIKeyManager.newGrantId(), name, description, issuerKey, parentIds, perms, clock.instant(), expiration)
+  def createGrant(
+      name: Option[String],
+      description: Option[String],
+      issuerKey: APIKey,
+      parentIds: Set[GrantId],
+      perms: Set[Permission],
+      expiration: Option[LocalDateTime]): M[Grant] = {
+    val grant = Grant(
+      APIKeyManager.newGrantId(),
+      name,
+      description,
+      issuerKey,
+      parentIds,
+      perms,
+      clock.instant(),
+      expiration)
     grants.put(grant.grantId, grant)
     grant.point[M]
   }
 
   def listAPIKeys() = apiKeys.values.toList.point[M]
-  def listGrants()  = grants.values.toList.point[M]
+  def listGrants() = grants.values.toList.point[M]
 
   def findAPIKey(apiKey: APIKey) = apiKeys.get(apiKey).point[M]
   def findAPIKeyChildren(parent: APIKey) = {

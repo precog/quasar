@@ -27,21 +27,22 @@ import scalaz._, Scalaz._
 sealed abstract class XccError
 
 object XccError {
+
   /** Indicates a problem with an XCC request. */
-  final case class RequestError(cause: RequestException)
-    extends XccError
+  final case class RequestError(cause: RequestException) extends XccError
 
   /** Indicates a problem (syntactic or semantic) with some XQuery submitted for
-    * evaluation.
-    */
+   * evaluation.
+   */
   final case class XQueryError(
-    module: MainModule,
-    cause: RetryableXQueryException \/ XQueryException
+      module: MainModule,
+      cause: RetryableXQueryException \/ XQueryException
   ) extends XccError
 
   object QueryError {
     def unapply(xerr: XccError): Option[(MainModule, QueryException)] =
-      Functor[Option].compose[(MainModule, ?)]
+      Functor[Option]
+        .compose[(MainModule, ?)]
         .map(xqueryError.getOption(xerr))(widenXQueryCause)
   }
 
@@ -53,7 +54,7 @@ object XccError {
     val string = Prism.partial[String, Code] {
       case "XDMP-DIREXISTS" => DirExists
     } {
-      case DirExists        => "XDMP-DIREXISTS"
+      case DirExists => "XDMP-DIREXISTS"
     }
 
     implicit val equal: Equal[Code] =
@@ -68,24 +69,25 @@ object XccError {
 
   val cause: Getter[XccError, RequestException] =
     Getter {
-      case RequestError(ex)  => ex
+      case RequestError(ex) => ex
       case XQueryError(_, c) => widenXQueryCause(c)
     }
 
   val requestError = Prism.partial[XccError, RequestException] {
     case RequestError(ex) => ex
-  } (RequestError)
+  }(RequestError)
 
-  val xqueryError = Prism.partial[XccError, (MainModule, RetryableXQueryException \/ XQueryException)] {
-    case XQueryError(xqy, cause) => (xqy, cause)
-  } (XQueryError.tupled)
+  val xqueryError =
+    Prism.partial[XccError, (MainModule, RetryableXQueryException \/ XQueryException)] {
+      case XQueryError(xqy, cause) => (xqy, cause)
+    }(XQueryError.tupled)
 
   implicit val show: Show[XccError] = Show.shows {
     case RequestError(cause) =>
       cause.toString
 
     case XQueryError(main, c) =>
-      val error   = widenXQueryCause(c)
+      val error = widenXQueryCause(c)
       val lineNum = error.getStack.headOption map (sf => s" on line ${sf.getLineNumber}")
       s"${error.getFormatString}${~lineNum}\n---BEGIN QUERY---\n${main.render}\n--- END QUERY ---"
   }

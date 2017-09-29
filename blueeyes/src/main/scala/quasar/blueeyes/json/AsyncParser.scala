@@ -28,9 +28,9 @@ import scala.collection.mutable
 case class AsyncParse(errors: Seq[ParseException], values: Seq[JValue])
 
 /**
-  * This class is used internally by AsyncParser to signal that we've reached
-  * the end of the particular input we were given.
-  */
+ * This class is used internally by AsyncParser to signal that we've reached
+ * the end of the particular input we were given.
+ */
 private[json] class AsyncException extends Exception
 
 private[json] class FailureException extends Exception
@@ -44,23 +44,50 @@ object AsyncParser {
   def apply(): AsyncParser = stream()
 
   /**
-    * Asynchronous parser for a stream of (whitespace-delimited) JSON values.
-    */
+   * Asynchronous parser for a stream of (whitespace-delimited) JSON values.
+   */
   def stream(): AsyncParser =
-    new AsyncParser(state = -1, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = 0)
+    new AsyncParser(
+      state = -1,
+      curr = 0,
+      stack = Nil,
+      data = new Array[Byte](131072),
+      len = 0,
+      allocated = 131072,
+      offset = 0,
+      done = false,
+      streamMode = 0)
 
   /**
-    * Asynchronous parser for a single JSON value.
-    */
+   * Asynchronous parser for a single JSON value.
+   */
   def json(): AsyncParser =
-    new AsyncParser(state = -1, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = -1)
+    new AsyncParser(
+      state = -1,
+      curr = 0,
+      stack = Nil,
+      data = new Array[Byte](131072),
+      len = 0,
+      allocated = 131072,
+      offset = 0,
+      done = false,
+      streamMode = -1)
 
   /**
-    * Asynchronous parser which can unwrap a single JSON array into a stream of
-    * values (or return a single value otherwise).
-    */
+   * Asynchronous parser which can unwrap a single JSON array into a stream of
+   * values (or return a single value otherwise).
+   */
   def unwrap(): AsyncParser =
-    new AsyncParser(state = -5, curr = 0, stack = Nil, data = new Array[Byte](131072), len = 0, allocated = 131072, offset = 0, done = false, streamMode = 1)
+    new AsyncParser(
+      state = -5,
+      curr = 0,
+      stack = Nil,
+      data = new Array[Byte](131072),
+      len = 0,
+      allocated = 131072,
+      offset = 0,
+      done = false,
+      streamMode = 1)
 }
 
 /*
@@ -114,7 +141,7 @@ final class AsyncParser protected[json] (
   import AsyncParser._
 
   protected[this] var line = 0
-  protected[this] var pos  = 0
+  protected[this] var pos = 0
   protected[this] final def newline(i: Int) { line += 1; pos = i + 1 }
   protected[this] final def column(i: Int) = i - pos
 
@@ -126,7 +153,7 @@ final class AsyncParser protected[json] (
   protected[this] final def absorb(buf: ByteBuffer): Unit = {
     done = false
     val buflen = buf.limit - buf.position
-    val need   = len + buflen
+    val need = len + buflen
 
     // if we don't have enough free space available we'll need to grow our
     // data array. we never shrink the data array, assuming users will call
@@ -165,19 +192,19 @@ final class AsyncParser protected[json] (
   // ASYNC_PREVAL: We are in an array and we just saw a comma. We
   // expect to see whitespace or a JSON value.
   @inline private[this] final def ASYNC_PRESTART = -5
-  @inline private[this] final def ASYNC_START    = -4
-  @inline private[this] final def ASYNC_END      = -3
-  @inline private[this] final def ASYNC_POSTVAL  = -2
-  @inline private[this] final def ASYNC_PREVAL   = -1
+  @inline private[this] final def ASYNC_START = -4
+  @inline private[this] final def ASYNC_END = -3
+  @inline private[this] final def ASYNC_POSTVAL = -2
+  @inline private[this] final def ASYNC_PREVAL = -1
 
   protected[json] def feed(b: Input): (AsyncParse, AsyncParser) = {
     b match {
-      case Done      => done = true
+      case Done => done = true
       case More(buf) => absorb(buf)
     }
 
     // accumulates errors and results
-    val errors  = mutable.ArrayBuffer.empty[ParseException]
+    val errors = mutable.ArrayBuffer.empty[ParseException]
     val results = mutable.ArrayBuffer.empty[JValue]
 
     // we rely on exceptions to tell us when we run out of data
@@ -285,14 +312,14 @@ final class AsyncParser protected[json] (
   }
 
   /**
-    * We use this to keep track of the last recoverable place we've
-    * seen. If we hit an AsyncException, we can later resume from this
-    * point.
-    *
-    * This method is called during every loop of rparse, and the
-    * arguments are the exact arguments we can pass to rparse to
-    * continue where we left off.
-    */
+   * We use this to keep track of the last recoverable place we've
+   * seen. If we hit an AsyncException, we can later resume from this
+   * point.
+   *
+   * This method is called during every loop of rparse, and the
+   * arguments are the exact arguments we can pass to rparse to
+   * continue where we left off.
+   */
   protected[this] final def checkpoint(state: Int, i: Int, stack: List[Context]) {
     this.state = state
     this.curr = i
@@ -300,9 +327,9 @@ final class AsyncParser protected[json] (
   }
 
   /**
-    * This is a specialized accessor for the case where our underlying data are
-    * bytes not chars.
-    */
+   * This is a specialized accessor for the case where our underlying data are
+   * bytes not chars.
+   */
   protected[this] final def byte(i: Int): Byte =
     if (i >= len)
       throw new AsyncException
@@ -317,16 +344,16 @@ final class AsyncParser protected[json] (
       data(i).toChar
 
   /**
-    * Access a byte range as a string.
-    *
-    * Since the underlying data are UTF-8 encoded, i and k must occur on unicode
-    * boundaries. Also, the resulting String is not guaranteed to have length
-    * (k - i).
-    */
+   * Access a byte range as a string.
+   *
+   * Since the underlying data are UTF-8 encoded, i and k must occur on unicode
+   * boundaries. Also, the resulting String is not guaranteed to have length
+   * (k - i).
+   */
   protected[this] final def at(i: Int, k: Int): String = {
     if (k > len) throw new AsyncException
     val size = k - i
-    val arr  = new Array[Byte](size)
+    val arr = new Array[Byte](size)
     System.arraycopy(data, i, arr, 0, size)
     new String(arr, Utf8Charset)
   }

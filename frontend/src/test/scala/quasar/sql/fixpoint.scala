@@ -24,13 +24,12 @@ import matryoshka.implicits._
 
 package object fixpoint {
   def SelectR(
-    isDistinct:   IsDistinct,
-    projections:  List[Proj[Fix[Sql]]],
-    relations:    Option[SqlRelation[Fix[Sql]]],
-    filter:       Option[Fix[Sql]],
-    groupBy:      Option[GroupBy[Fix[Sql]]],
-    orderBy:      Option[OrderBy[Fix[Sql]]]):
-      Fix[Sql] =
+      isDistinct: IsDistinct,
+      projections: List[Proj[Fix[Sql]]],
+      relations: Option[SqlRelation[Fix[Sql]]],
+      filter: Option[Fix[Sql]],
+      groupBy: Option[GroupBy[Fix[Sql]]],
+      orderBy: Option[OrderBy[Fix[Sql]]]): Fix[Sql] =
     select(isDistinct, projections, relations, filter, groupBy, orderBy).embed
   def VariR(symbol: String): Fix[Sql] = vari[Fix[Sql]](symbol).embed
   def SetLiteralR(exprs: List[Fix[Sql]]): Fix[Sql] = setLiteral(exprs).embed
@@ -44,8 +43,7 @@ package object fixpoint {
   def IdentR(name: String): Fix[Sql] = ident[Fix[Sql]](name).embed
   def InvokeFunctionR(name: CIName, args: List[Fix[Sql]]): Fix[Sql] =
     invokeFunction(name, args).embed
-  def MatchR(expr: Fix[Sql], cases: List[Case[Fix[Sql]]], default: Option[Fix[Sql]]):
-      Fix[Sql] =
+  def MatchR(expr: Fix[Sql], cases: List[Case[Fix[Sql]]], default: Option[Fix[Sql]]): Fix[Sql] =
     matc(expr, cases, default).embed
   def SwitchR(cases: List[Case[Fix[Sql]]], default: Option[Fix[Sql]]): Fix[Sql] =
     switch(cases, default).embed

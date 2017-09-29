@@ -22,7 +22,7 @@ import quasar.frontend.logicalplan._
 
 import matryoshka.data.Fix
 import org.scalacheck.Arbitrary
-import java.time.{Instant, Duration}
+import java.time.{Duration, Instant}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
@@ -79,12 +79,12 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
         beSome(Free[Fix[LogicalPlan]]('x))
     }
 
-    "eliminate multiply by dec zero (on the right)" >> prop { (c : Const) =>
+    "eliminate multiply by dec zero (on the right)" >> prop { (c: Const) =>
       val expr = Multiply.tpe(Func.Input2(c, Const(Dec(0.0))))
       expr should beSuccessful(TZero())
     }
 
-    "eliminate multiply by zero (on the left)" >> prop { (c : Const) =>
+    "eliminate multiply by zero (on the left)" >> prop { (c: Const) =>
       val expr = Multiply.tpe(Func.Input2(TZero(), c))
       expr should beSuccessful(TZero())
     }
@@ -163,7 +163,8 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     }.setArbitrary(arbitraryNumeric)
 
     "typecheck constant raised to int constant" in {
-      Power.tpe(Func.Input2(Const(Dec(7.2)), Const(Int(2)))) should beSuccessful(Const(Dec(51.84)))
+      Power.tpe(Func.Input2(Const(Dec(7.2)), Const(Int(2)))) should beSuccessful(
+        Const(Dec(51.84)))
     }
 
     "simplify expression raised to 1st power" in {
@@ -173,14 +174,9 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
 
     "fold a complex expression (10-4)/3 + (5*8)" in {
       val expr = for {
-        x1 <- Subtract.tpe(Func.Input2(
-                Const(Int(10)),
-                Const(Int(4))));
-        x2 <- Divide.tpe(Func.Input2(x1,
-                Const(Int(3))));
-        x3 <- Multiply.tpe(Func.Input2(
-                Const(Int(5)),
-                Const(Int(8))))
+        x1 <- Subtract.tpe(Func.Input2(Const(Int(10)), Const(Int(4))));
+        x2 <- Divide.tpe(Func.Input2(x1, Const(Int(3))));
+        x3 <- Multiply.tpe(Func.Input2(Const(Int(5)), Const(Int(8))))
         x4 <- Add.tpe(Func.Input2(x2, x3))
       } yield x4
       expr should beSuccessful(Const(Int(42)))
@@ -197,13 +193,17 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     }
 
     "add timestamp and interval" in {
-      val expr = Add.tpe(Func.Input2(
-        Type.Const(Timestamp(Instant.parse("2015-01-21T00:00:00Z"))),
-        Type.Const(Interval(Duration.ofHours(9)))))
+      val expr = Add.tpe(
+        Func.Input2(
+          Type.Const(Timestamp(Instant.parse("2015-01-21T00:00:00Z"))),
+          Type.Const(Interval(Duration.ofHours(9)))))
       expr should beSuccessful(Type.Const(Timestamp(Instant.parse("2015-01-21T09:00:00Z"))))
     }
 
-    def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
+    def permute(
+        f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type],
+        t1: Const,
+        t2: Const)(exp1: Const, exp2: Type) = {
       f(Func.Input2(t1, t2)) should beSuccessful(exp1)
       f(Func.Input2(t1, t2.value.dataType)) should beSuccessful(exp2)
       f(Func.Input2(t1.value.dataType, t2)) should beSuccessful(exp2)
@@ -226,8 +226,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     // TODO: tests for unapply() in general
   }
 
-  implicit def genConst : Arbitrary[Const] = Arbitrary {
-    for { i <- Arbitrary.arbitrary[scala.Int] }
-      yield Const(Int(i))
+  implicit def genConst: Arbitrary[Const] = Arbitrary {
+    for { i <- Arbitrary.arbitrary[scala.Int] } yield Const(Int(i))
   }
 }

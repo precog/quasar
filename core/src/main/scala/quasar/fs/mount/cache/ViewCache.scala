@@ -26,41 +26,43 @@ import scala.concurrent.duration._
 import scalaz._, Scalaz._
 
 final case class ViewCache(
-  viewConfig: MountConfig.ViewConfig,
-  lastUpdate: Option[Instant],
-  executionMillis: Option[Long],
-  cacheReads: Int,
-  assignee: Option[String],
-  assigneeStart: Option[Instant],
-  maxAgeSeconds: Long,
-  refreshAfter: Instant,
-  status: ViewCache.Status,
-  errorMsg: Option[String],
-  dataFile: AFile,
-  tmpDataFile: Option[AFile])
+    viewConfig: MountConfig.ViewConfig,
+    lastUpdate: Option[Instant],
+    executionMillis: Option[Long],
+    cacheReads: Int,
+    assignee: Option[String],
+    assigneeStart: Option[Instant],
+    maxAgeSeconds: Long,
+    refreshAfter: Instant,
+    status: ViewCache.Status,
+    errorMsg: Option[String],
+    dataFile: AFile,
+    tmpDataFile: Option[AFile])
 
 object ViewCache {
   sealed trait Status
   object Status {
-    final case object Pending    extends Status
+    final case object Pending extends Status
     final case object Successful extends Status
-    final case object Failed     extends Status
+    final case object Failed extends Status
 
     implicit val equal: Equal[Status] = Equal.equalRef
   }
 
   // Hard coded to 80% of maxAge for now
   def expireAt(ts: Instant, maxAge: Duration): Throwable \/ Instant =
-    \/.fromTryCatchNonFatal(ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))
+    \/.fromTryCatchNonFatal(
+      ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))
 
   implicit val equal: Equal[ViewCache] = {
     implicit val equalInstant: Equal[Instant] = Equal.equalA
 
     Equal.equal {
-      case (ViewCache(l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12),
-            ViewCache(r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)) =>
+      case (
+          ViewCache(l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12),
+          ViewCache(r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)) =>
         (l1: MountConfig) ≟ (r1: MountConfig) && l2 ≟ r2 && l3 ≟ r3 && l4 ≟ r4 && l5 ≟ r5 && l6 ≟ r6 &&
-        l7 ≟ r7 && l8 ≟ r8 && l9 ≟ r9 && l10 ≟ r10 && l11 ≟ r11 && l12 ≟ r12
+          l7 ≟ r7 && l8 ≟ r8 && l9 ≟ r9 && l10 ≟ r10 && l11 ≟ r11 && l12 ≟ r12
     }
   }
 

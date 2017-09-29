@@ -33,8 +33,7 @@ object ExecutionPlan {
     Equal.equalBy(p => (p.typ, p.physicalPlan, p.inputs))
 
   implicit val show: Show[ExecutionPlan] =
-    Show.shows(p =>
-      s"ExecutionPlan[${p.typ}](inputs = ${p.inputs.shows})\n\n${p.physicalPlan}")
+    Show.shows(p => s"ExecutionPlan[${p.typ}](inputs = ${p.inputs.shows})\n\n${p.physicalPlan}")
 
   implicit val codecJson: CodecJson[ExecutionPlan] =
     casecodec3(ExecutionPlan.apply, ExecutionPlan.unapply)("type", "physicalPlan", "inputs")

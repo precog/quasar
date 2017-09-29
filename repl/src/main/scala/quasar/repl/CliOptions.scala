@@ -21,7 +21,7 @@ import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
 
 import java.io.File
-import scala.collection.Seq     // uh, yeah
+import scala.collection.Seq // uh, yeah
 import scala.util.{Left, Right}
 
 import scalaz.std.either._
@@ -44,10 +44,10 @@ object CliOptions {
 
     opt[String]('c', "config") action { (x, c) =>
       c.copy(config = Some(x))
-    } text("path to the config file to use")
+    } text ("path to the config file to use")
 
     opt[(String, Seq[File])]("backend").required.unbounded validate { x =>
-      import scala.language.postfixOps   // thanks, SIP-18, this is valuable...
+      import scala.language.postfixOps // thanks, SIP-18, this is valuable...
 
       x._2.toList traverse { file =>
         if (file.exists())
@@ -60,7 +60,7 @@ object CliOptions {
       c.copy(backends = pair :: c.backends)
     }
 
-    help("help") text("prints this usage text\n")
+    help("help") text ("prints this usage text\n")
 
     cmd("initUpdateMetaStore")
       .text("Initialize and update the metastore\n")

@@ -28,25 +28,30 @@ abstract class MapFuncPlanner[F[_], FMT, MF[_]] {
 
 object MapFuncPlanner {
 
-  def apply[F[_], FMT, MF[_]](implicit ev: MapFuncPlanner[F, FMT, MF]): MapFuncPlanner[F, FMT, MF] = ev
+  def apply[F[_], FMT, MF[_]](
+      implicit ev: MapFuncPlanner[F, FMT, MF]): MapFuncPlanner[F, FMT, MF] = ev
 
   implicit def coproduct[F[_], FMT, G[_], H[_], T[_[_]]: RecursiveT](
-    implicit G: MapFuncPlanner[F, FMT, G], H: MapFuncPlanner[F, FMT, H]
+      implicit G: MapFuncPlanner[F, FMT, G],
+      H: MapFuncPlanner[F, FMT, H]
   ): MapFuncPlanner[F, FMT, Coproduct[G, H, ?]] =
     new MapFuncPlanner[F, FMT, Coproduct[G, H, ?]] {
       def plan: AlgebraM[F, Coproduct[G, H, ?], XQuery] =
         _.run.fold(G.plan, H.plan)
     }
 
-  implicit def mapFuncCore[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
-    implicit
-    SP: StructuralPlanner[M, FMT]
+  implicit def mapFuncCore[
+      M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+      FMT,
+      T[_[_]]: RecursiveT](
+      implicit
+      SP: StructuralPlanner[M, FMT]
   ): MapFuncPlanner[M, FMT, MapFuncCore[T, ?]] =
     new MapFuncCorePlanner[M, FMT, T]
 
   implicit def mapFuncDerived[M[_]: Monad, FMT, T[_[_]]: CorecursiveT](
-    implicit
-    CP: MapFuncPlanner[M, FMT, MapFuncCore[T, ?]]
+      implicit
+      CP: MapFuncPlanner[M, FMT, MapFuncCore[T, ?]]
   ): MapFuncPlanner[M, FMT, MapFuncDerived[T, ?]] =
     new MapFuncDerivedPlanner[M, FMT, T]
 

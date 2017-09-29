@@ -23,6 +23,7 @@ import scalaz._, Scalaz._, Ordering._
 sealed abstract class MongoQueryModel(val s: String)
 
 object MongoQueryModel {
+
   /** The oldest supported version. */
   case object `2.6` extends MongoQueryModel("2.6")
 
@@ -30,15 +31,15 @@ object MongoQueryModel {
   case object `3.0` extends MongoQueryModel("3.0")
 
   /** Adds \$lookup and \$distinct, several new operators, and makes
-    * accumulation operators available in \$project. */
+   * accumulation operators available in \$project. */
   case object `3.2` extends MongoQueryModel("3.2")
   case object `3.4` extends MongoQueryModel("3.4")
 
   def apply(version: ServerVersion): MongoQueryModel =
-    if (version >= ServerVersion.MongoDb3_4)      MongoQueryModel.`3.4`
+    if (version >= ServerVersion.MongoDb3_4) MongoQueryModel.`3.4`
     else if (version >= ServerVersion.MongoDb3_2) MongoQueryModel.`3.2`
     else if (version >= ServerVersion.MongoDb3_0) MongoQueryModel.`3.0`
-    else                                          MongoQueryModel.`2.6`
+    else MongoQueryModel.`2.6`
 
   def toBsonVersion(v: MongoQueryModel): BsonVersion =
     if (v lt `3.4`) BsonVersion.`1.0`

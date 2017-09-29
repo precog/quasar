@@ -42,9 +42,9 @@ final class TypeStatSpec extends Spec with ScalazMatchers with TypeStatArbitrary
   }
 
   "combining string and coll treats string as collection" >> {
-    val strStat  = str[Real](Real(3), Real(3), Real(4), "foo", "quux")
+    val strStat = str[Real](Real(3), Real(3), Real(4), "foo", "quux")
     val collStat = coll[Real](Real(2), Some(Real(2)), None)
-    val expStat  = coll[Real](Real(5), Some(Real(2)), Some(Real(4)))
+    val expStat = coll[Real](Real(5), Some(Real(2)), Some(Real(4)))
 
     (strStat + collStat) must equal(expStat)
   }

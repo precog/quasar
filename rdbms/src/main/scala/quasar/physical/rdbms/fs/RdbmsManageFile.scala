@@ -37,10 +37,7 @@ import pathy.Path._
 import scalaz._
 import Scalaz._
 
-trait RdbmsManageFile
-    extends RdbmsDescribeTable
-    with RdbmsCreate
-    with RdbmsMove {
+trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreate with RdbmsMove {
   this: Rdbms =>
   implicit def MonadM: Monad[M]
 
@@ -63,8 +60,7 @@ trait RdbmsManageFile
   override def ManageFileModule = new ManageFileModule {
 
     def dropSchemaWithChildren(parent: CustomSchema): ConnectionIO[Unit] = {
-      findChildSchemas(parent)
-        .flatMap(cs => (cs :+ parent).foldMap(dropSchema))
+      findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema))
     }
 
     def tempSchema: M[CustomSchema] = {
@@ -77,8 +73,9 @@ trait RdbmsManageFile
         .flatMap(s => lift(createSchema(s).map(_ => s)).into[Eff])
     }
 
-    override def move(scenario: ManageFile.MoveScenario,
-                      semantics: MoveSemantics): Backend[Unit] = {
+    override def move(
+        scenario: ManageFile.MoveScenario,
+        semantics: MoveSemantics): Backend[Unit] = {
 
       def moveFile(src: AFile, dst: AFile): M[Unit] = {
         val dstPath = TablePath.create(dst)
@@ -101,7 +98,6 @@ trait RdbmsManageFile
 
         val dbCalls = schemas.traverse {
           case (srcSchema, dstSchema) =>
-
             for {
               dstSchemaExists <- schemaExists(dstSchema)
               _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
@@ -123,15 +119,13 @@ trait RdbmsManageFile
       scenario match {
         case FileToFile(sf, df) =>
           for {
-            _ <- (((ensureMoveSemantics(sf, df, fExists, semantics)
-              .toLeft(()) *>
+            _ <- (((ensureMoveSemantics(sf, df, fExists, semantics).toLeft(()) *>
               moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
           } yield ()
 
         case DirToDir(sd, dd) =>
           for {
-            _ <- (((ensureMoveSemantics(sd, dd, fExists, semantics)
-              .toLeft(()) *>
+            _ <- (((ensureMoveSemantics(sd, dd, fExists, semantics).toLeft(()) *>
               moveDir(sd, dd)).run).liftB).unattempt
           } yield ()
       }
@@ -141,10 +135,8 @@ trait RdbmsManageFile
       val dbTablePath = TablePath.create(aFile)
       for {
         exists <- tableExists(dbTablePath).liftB
-        _ <- exists.unlessM(
-          ME.raiseError(pathErr(pathNotFound(aFile))))
-        _ <- (fr"DROP TABLE" ++ Fragment
-          .const(dbTablePath.shows)).update.run.liftB
+        _ <- exists.unlessM(ME.raiseError(pathErr(pathNotFound(aFile))))
+        _ <- (fr"DROP TABLE" ++ Fragment.const(dbTablePath.shows)).update.run.liftB
       } yield ()
     }
 
@@ -152,8 +144,7 @@ trait RdbmsManageFile
       ME.unattempt(dirToCustomSchema(aDir).traverse { schema =>
         for {
           exists <- schemaExists(schema).liftB
-          _ <- exists.unlessM(
-            ME.raiseError(pathErr(pathNotFound(aDir))))
+          _ <- exists.unlessM(ME.raiseError(pathErr(pathNotFound(aDir))))
           _ <- dropSchemaWithChildren(schema).liftB
         } yield ()
       })

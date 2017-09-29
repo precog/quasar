@@ -23,9 +23,9 @@ import scalaz.syntax.show._
 import xml.name._
 
 /** XPath [Axes](https://www.w3.org/TR/xquery/#axes) expressions.
-  *
-  * TODO: This is incomplete, need to add the rest of the axes/node tests and variants.
-  */
+ *
+ * TODO: This is incomplete, need to add the rest of the axes/node tests and variants.
+ */
 object axes {
   // attribute::
   val attribute: Axis = Axis("attribute")

@@ -30,15 +30,20 @@ trait DbConnectionConfigArbitrary {
       Gen.oneOf(
         arbitrary[String].map(H2),
         for {
-          host       <- arbitrary[Option[String]]
-          port       <- Gen.option(Gen.choose(0, 65535))
-          database   <- arbitrary[Option[String]]
-          userName   <- arbitrary[String]
-          password   <- arbitrary[String]
+          host <- arbitrary[Option[String]]
+          port <- Gen.option(Gen.choose(0, 65535))
+          database <- arbitrary[Option[String]]
+          userName <- arbitrary[String]
+          password <- arbitrary[String]
           parameters <- arbitrary[Map[String, String]]
-        } yield PostgreSql(
-          host.map(name => HostInfo(name, port)),
-          database, userName, password, parameters)))
+        } yield
+          PostgreSql(
+            host.map(name => HostInfo(name, port)),
+            database,
+            userName,
+            password,
+            parameters)
+      ))
 }
 
 object DbConnectionConfigArbitrary extends DbConnectionConfigArbitrary

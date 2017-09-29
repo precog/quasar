@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 final case class CIName(value: String) {
   override def equals(other: Any) = other match {
     case CIName(otherValue) => otherValue.toLowerCase === value.toLowerCase
-    case _                  => false
+    case _ => false
   }
 
   override def hashCode: Int = value.toLowerCase.hashCode

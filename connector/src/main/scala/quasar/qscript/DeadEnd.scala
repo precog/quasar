@@ -23,8 +23,8 @@ import scalaz._
 sealed abstract class DeadEnd
 
 /** The top level of a filesystem. During compilation this represents `/`, but
-  * in the structure a backend sees, it represents the mount point.
-  */
+ * in the structure a backend sees, it represents the mount point.
+ */
 final case object Root extends DeadEnd
 
 object DeadEnd {

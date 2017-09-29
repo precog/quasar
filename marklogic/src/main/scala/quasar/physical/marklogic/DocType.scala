@@ -25,27 +25,27 @@ sealed abstract class DocType {
   def fold[A](json: => A, xml: => A): A =
     this match {
       case DocType.JsonDoc => json
-      case DocType.XmlDoc  => xml
+      case DocType.XmlDoc => xml
     }
 }
 
 object DocType {
   case object JsonDoc extends DocType
-  case object XmlDoc  extends DocType
+  case object XmlDoc extends DocType
 
   type Json = JsonDoc.type
-  type Xml  = XmlDoc.type
+  type Xml = XmlDoc.type
 
   val json: DocType = JsonDoc
-  val xml:  DocType = XmlDoc
+  val xml: DocType = XmlDoc
 
   val name: Prism[String, DocType] =
     Prism.partial[String, DocType] {
-      case "json"  => json
-      case "xml"   => xml
+      case "json" => json
+      case "xml" => xml
     } {
       case JsonDoc => "json"
-      case XmlDoc  => "xml"
+      case XmlDoc => "xml"
     }
 
   implicit val equal: Equal[DocType] =

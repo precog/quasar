@@ -29,9 +29,9 @@ class PathSpec extends Specification with ScalaCheck {
       val sample = Path("/my/fancy/path")
       sample.rollups(3) must containTheSameElementsAs(
         sample ::
-        Path("/my/fancy") ::
-        Path("/my") ::
-        Path("/") :: Nil
+          Path("/my/fancy") ::
+          Path("/my") ::
+          Path("/") :: Nil
       )
     }
 
@@ -39,8 +39,8 @@ class PathSpec extends Specification with ScalaCheck {
       val sample = Path("/my/fancy/path")
       sample.rollups(2) must containTheSameElementsAs(
         sample ::
-        Path("/my/fancy") ::
-        Path("/my") :: Nil
+          Path("/my/fancy") ::
+          Path("/my") :: Nil
       )
     }
 

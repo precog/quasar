@@ -21,8 +21,8 @@ import quasar.fp.free
 import scalaz._
 
 /** Encapsulates boilerplate useful in defining lifted operations on free
-  * monads over effect algebras.
-  */
+ * monads over effect algebras.
+ */
 abstract class LiftedOps[G[_], S[_]](implicit S: G :<: S) {
   type FreeS[A] = Free[S, A]
 

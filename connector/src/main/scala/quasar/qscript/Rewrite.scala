@@ -513,25 +513,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
-  private def applyNormalizations0[F[_]: Traverse: Normalizable, G[_]: Traverse](
-    prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]])(
-    implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
-      F[T[G]] => G[T[G]] =
-    (repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) _) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
-      liftFG(injectRepeatedly(compactLeftShift[F, G](prism).apply(_: QScriptCore[T[G]]))) ⋙
-      liftFF(repeatedly(applyTransforms(
-        uniqueBuckets(_: QScriptCore[T[G]]),
-        compactReductions(_: QScriptCore[T[G]])))) ⋙
-      repeatedly(C.coalesceQCNormalize[G](prism)) ⋙
-      liftFG(injectRepeatedly(C.coalesceEJNormalize[G](prism.get))) ⋙
-      (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
-
-
   private def normalizeWithBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
@@ -551,26 +532,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
     normalizeWithBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
-
-  private def normalizeWithBijection0[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
-    bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]])(
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
-      F[A] => G[A] =
-    fa => applyNormalizations0[F, G](prism, rebase)
-      .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
-
-  def normalize0[F[_]: Traverse: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
-      F[T[F]] => F[T[F]] =
-    normalizeWithBijection0[F, F, T[F]](bijectionId)(idPrism, rebaseT)
 
   def normalizeCoEnv[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],

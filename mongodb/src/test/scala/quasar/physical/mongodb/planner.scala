@@ -2280,7 +2280,7 @@ class PlannerSpec extends
             $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
             $limit(5))
         }
-    }
+    }.pendingWithActual("#2772", testFile("plan sort and limit"))
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
@@ -2292,7 +2292,7 @@ class PlannerSpec extends
               reshape("value" -> $field("city")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
+    }
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must

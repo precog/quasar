@@ -1422,9 +1422,6 @@ object MongoDbPlanner {
     val O = new Optimize[T]
     val R = new Rewrite[T]
 
-    implicit def qScriptToQScriptTotal: Injectable.Aux[MQS, QScriptTotal[T, ?]] =
-      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
     for {
       rewrite <- applyTrans(qs)(mapBeforeSort[T]).point[M]
       optimized <- rewrite
@@ -1434,10 +1431,11 @@ object MongoDbPlanner {
 
       prefPrj = PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQsOpt)
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Prefer Projection; Mongo-specific)", prefPrj))
-
-      mongoQs <- prefPrj.transCata[T[MQS]](R.normalize0[MQS]).point[M]
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Normalized; Mongo-specific)", mongoQs))
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
+
+      // TODO: apply all of Rewrite.normalize, not only elideNopQC
+      mongoQs <- prefPrj.transCata[T[MQS]](liftFG(R.elideNopQC(reflNT[MQS]))).point[M]
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Elided nops; Mongo-specific)", mongoQs))
     } yield mongoQs
   }
 

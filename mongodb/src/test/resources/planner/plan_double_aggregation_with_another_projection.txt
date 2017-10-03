@@ -122,18 +122,11 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> ["$left", "$right"])
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("0" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("0" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
    ├─ Name("1" -> {
    │       "$arrayElemAt": [
-   │         { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
+   │         { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] },
    │         { "$literal": NumberInt("1") }]
    │     })
    ╰─ IgnoreId

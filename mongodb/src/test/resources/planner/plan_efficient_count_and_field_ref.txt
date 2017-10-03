@@ -54,20 +54,15 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> ["$left", "$right"])
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ Arr
-│  │     ├─ Obj
-│  │     │  ├─ Key(city: (isObject(_.src[0][1]) && (! Array.isArray(_.src[0][1]))) ? _.src[0][1].city : undefined)
-│  │     │  ╰─ Key(cnt: _.src[1])
-│  │     ╰─ JsCore(_.src)
+│  │  ╰─ Let(__val)
+│  │     ├─ JsCore([_.left, _.right])
+│  │     ╰─ Arr
+│  │        ├─ Obj
+│  │        │  ├─ Key(city: (isObject(__val[0][1]) && (! Array.isArray(__val[0][1]))) ? __val[0][1].city : undefined)
+│  │        │  ╰─ Key(cnt: __val[1])
+│  │        ╰─ Ident(__val)
 │  ╰─ Scope(Map())
 ├─ $ProjectF
 │  ├─ Name("0" -> {

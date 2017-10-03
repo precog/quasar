@@ -114,30 +114,21 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Arr
-│  │     ├─ Arr
-│  │     │  ├─ JsCore(_.left[0][0])
-│  │     │  ├─ Obj
-│  │     │  │  ╰─ Key(pop: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].pop : undefined)
-│  │     │  ╰─ Obj
-│  │     │     ╰─ Key(1: _.left[1])
-│  │     ╰─ JsCore(_.right[2])
-│  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ SpliceObjects
-   │     ├─ SpliceObjects
-   │     │  ├─ JsCore(_.src[0][1])
-   │     │  ╰─ JsCore(_.src[0][2])
-   │     ╰─ Obj
-   │        ╰─ Key(2: ((isNumber(_.src[1][1]) || ((_.src[1][1] instanceof NumberInt) || (_.src[1][1] instanceof NumberLong))) || (_.src[1][1] instanceof Date)) ? _.src[1][2] : undefined)
+   │  ╰─ Let(__val)
+   │     ├─ Arr
+   │     │  ├─ Arr
+   │     │  │  ├─ JsCore(_.left[0][0])
+   │     │  │  ├─ Obj
+   │     │  │  │  ╰─ Key(pop: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].pop : undefined)
+   │     │  │  ╰─ Obj
+   │     │  │     ╰─ Key(1: _.left[1])
+   │     │  ╰─ JsCore(_.right[2])
+   │     ╰─ SpliceObjects
+   │        ├─ SpliceObjects
+   │        │  ├─ JsCore(__val[0][1])
+   │        │  ╰─ JsCore(__val[0][2])
+   │        ╰─ Obj
+   │           ╰─ Key(2: ((isNumber(__val[1][1]) || ((__val[1][1] instanceof NumberInt) || (__val[1][1] instanceof NumberLong))) || (__val[1][1] instanceof Date)) ? __val[1][2] : undefined)
    ╰─ Scope(Map())

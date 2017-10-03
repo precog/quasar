@@ -73,18 +73,11 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("src" -> ["$left", "$right"])
-│  ╰─ IgnoreId
-├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(city: _.src[0][2].city)
-│  │     ╰─ Key(1: _.src[1])
+│  │     ├─ Key(city: [_.left, _.right][0][2].city)
+│  │     ╰─ Key(1: [_.left, _.right][1])
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("city" -> true)

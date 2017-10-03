@@ -1318,6 +1318,15 @@ object MongoDbPlanner {
       }
   }
 
+  object FreeShiftedRead {
+    def unapply[T[_[_]]](fq: FreeQS[T])(
+      implicit QSR: Const[ShiftedRead[AFile], ?] :<: QScriptTotal[T, ?]
+    ) : Option[ShiftedRead[AFile]] = fq match {
+      case Embed(CoEnv(\/-(QSR(qsr: Const[ShiftedRead[AFile], _])))) => qsr.getConst.some
+      case _ => none
+    }
+  }
+
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -1335,6 +1344,7 @@ object MongoDbPlanner {
         case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
            | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
            | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
            | SR(Const(ShiftedRead(_, ExcludeId))) =>
           ((MapFuncCore.flattenAnd(cond))
             .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
@@ -1352,6 +1362,7 @@ object MongoDbPlanner {
         case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
            | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
            | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
            | SR(Const(ShiftedRead(_, ExcludeId))) =>
           struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (struct => QC.inj(LeftShift(src, struct, id, repair)))
@@ -1362,6 +1373,7 @@ object MongoDbPlanner {
         case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
            | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
            | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
            | SR(Const(ShiftedRead(_, ExcludeId))) =>
           mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))
@@ -1372,6 +1384,7 @@ object MongoDbPlanner {
         case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
            | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
            | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
            | SR(Const(ShiftedRead(_, ExcludeId))) =>
           (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
             red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
@@ -1395,21 +1408,26 @@ object MongoDbPlanner {
     implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
+    type MQS[A] = fs.MongoQScript[T, A]
+
     val O = new Optimize[T]
+    val R = new Rewrite[T]
 
     for {
       rewrite <- applyTrans(qs)(mapBeforeSort[T]).point[M]
       optimized <- rewrite
-        .transCata[T[fs.MongoQScript[T, ?]]](
-          liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
-            repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](reflNT[fs.MongoQScript[T, ?]]))))
-        .point[M]
-      mongoQs <- optimized.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
+        .transCata[T[MQS]](liftFF[QScriptCore[T, ?], MQS, T[MQS]](
+          repeatedly(O.subsetBeforeMap[MQS, MQS](reflNT[MQS])))).point[M]
+      mongoQsOpt <- optimized.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+
+      prefPrj = PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQsOpt)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Prefer Projection; Mongo-specific)", prefPrj))
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      prefPrj = PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQs)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Prefer Projection)", prefPrj))
-    } yield prefPrj
+
+      // TODO: apply all of Rewrite.normalize, not only elideNopQC
+      mongoQs <- prefPrj.transCata[T[MQS]](liftFG(R.elideNopQC(reflNT[MQS]))).point[M]
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Elided nops; Mongo-specific)", mongoQs))
+    } yield mongoQs
   }
 
   def plan0

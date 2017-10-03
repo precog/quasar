@@ -1170,7 +1170,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp5")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("prefer projection+filter over nested JS filter"))
+    }.pendingWithActual("#2541", testFile("prefer projection+filter over nested JS filter"))
 
     "filter on constant true" in {
       plan(sqlE"select * from zips where true") must
@@ -1230,14 +1230,14 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("bar")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with field in projection"))
+    }.pendingWithActual("#2771", testFile("plan simple sort with field in projection"))
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
+    }.pendingWithActual("#2771", testFile("plan simple sort with wildcard"))
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
@@ -1377,7 +1377,7 @@ class PlannerSpec extends
           $project(
             reshape("name" -> $field("name")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with field not in projections"))
+    }.pendingWithActual("#2771", testFile("plan simple sort with field not in projections"))
 
     "plan sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -2395,7 +2395,7 @@ class PlannerSpec extends
               "city"  -> $field("_id", "0"),
               "state" -> $field("_id", "1")),
             IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple distinct"))
+    }.pendingWithActual("#2771", testFile("plan simple distinct"))
 
     "plan distinct as expression" in {
       plan(sqlE"select count(distinct(city)) from zips") must

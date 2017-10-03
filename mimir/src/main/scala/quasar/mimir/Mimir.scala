@@ -331,7 +331,7 @@ object Mimir extends BackendModule with Logging {
           case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
           case ReduceFuncs.First(f) => (Library.First, f)
           case ReduceFuncs.Last(f) => (Library.Last, f)
-          case ReduceFuncs.UnshiftArray(f) => ???
+          case ReduceFuncs.UnshiftArray(f) => (Library.UnshiftArray, f)
           case ReduceFuncs.UnshiftMap(f1, f2) => ???
         }
 

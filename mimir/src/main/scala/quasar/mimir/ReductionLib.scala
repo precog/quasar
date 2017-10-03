@@ -815,5 +815,36 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = res.map(_())
     }
+
+    object UnshiftArray extends Reduction(ReductionNamespace, "unshiftArray") {
+      type Result = List[RValue]
+
+      implicit val monoid = Scalaz.listMonoid[RValue]
+
+      val tpe = UnaryOperationType(JType.JUniverseT, JArrayUnfixedT)
+
+      def reducer: Reducer[Result] = new CReducer[Result] {
+        def reduce(schema: CSchema, range: Range) = {
+          val slice = new Slice {
+            val size = range.end
+            val columns = schema.columnMap(JType.JUniverseT)
+          }
+
+          val buffer = mutable.ListBuffer[RValue]()
+          RangeUtil.loop(range) { i =>
+            if (slice.isDefinedAt(i)) {
+              buffer += slice.toRValue(i)
+            }
+          }
+
+          buffer.toList
+        }
+      }
+
+      def extract(res: Result): Table =
+        Table.fromRValues(extractValue(res).toStream, Some(1))
+
+      def extractValue(res: Result) = Some(RArray(res))
+    }
   }
 }

@@ -245,6 +245,9 @@ object InMemory {
   val fileSystem: FileSystem ~> InMemoryFs =
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
+  val fileSystem0: BackendEffect ~> InMemoryFs =
+    interpretBackendEffect(Empty.analyze[InMemoryFs], queryFile, readFile, writeFile, manageFile)
+
   def runStatefully(initial: InMemState): Task[InMemoryFs ~> Task] =
     runInspect(initial).map(_._1)
 
@@ -260,6 +263,9 @@ object InMemory {
 
   def runFs(initial: InMemState): Task[FileSystem ~> Task] =
     runStatefully(initial).map(_ compose fileSystem)
+
+  def runBackend(initial: InMemState): Task[BackendEffect ~> Task] =
+    runStatefully(initial).map(_ compose fileSystem0)
 
   ////
 

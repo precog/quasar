@@ -23,11 +23,9 @@ import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
 import quasar.fp._
-import quasar.fp.free, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._
-import quasar.fs.mount.Fixture._
-import quasar.fs.mount.cache.VCache
+import quasar.main.CoreEffIO
 import quasar.sql._
 import quasar.sql.Arbitraries._
 
@@ -36,38 +34,21 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
-import org.http4s.dsl._
 import org.http4s.argonaut._
+import org.http4s.syntax.service._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
 import scalaz.Scalaz._
-import scalaz.concurrent.Task
 import shapeless.tag.@@
 
 object MetadataFixture {
 
-  type Eff[A] = (Task :\: QueryFile :\: Mounting :/: VCache)#M[A]
-
-  def runQuery(mem: InMemState): QueryFile ~> Task =
-    queryFile andThen evalNT[Id, InMemState](mem) andThen pointNT[Task]
-
-  def runQueryWithMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
-    val run: Eff ~> Task = reflNT[Task] :+: runQuery(mem) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty)
-    val addViews = view.queryFile[Eff]
-    val addModules = flatMapSNT(transformIn[QueryFile, Eff, Free[Eff, ?]](module.queryFile[Eff], liftFT))
-    addViews andThen addModules andThen foldMapNT(run)
-  }
-
   def service(mem: InMemState, mnts: Map[APath, MountConfig]): Service[Request, Response] = {
-    metadata.service[Eff].toHttpService(
-      liftMT[Task, ResponseT] compose (
-        reflNT[Task]                  :+:
-        runQueryWithMounts(mem, mnts) :+:
-        runConstantMount[Task](mnts)  :+:
-        runConstantVCache[Task](Map.empty)
-      )).orNotFound
+    val inter = Fixture.inMemFSWeb(mem, MountingsConfig(mnts)).unsafePerformSync
+    metadata.service[CoreEffIO].toHttpService(inter).orNotFound
   }
+
 }
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {

@@ -119,7 +119,8 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused"),          // anytime the Spark dependency itselft is updated
+      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
+      .excludeAll(ExclusionRule(organization = "io.netty")),
     ("org.apache.spark" %% "spark-sql" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // Same limitation
       .exclude("javax.inject", "javax.inject")                // as above for
@@ -128,10 +129,13 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // in near future with
       .exclude("commons-logging", "commons-logging")          // classloaders magic
       .exclude("com.esotericsoftware.minlog", "minlog")       // Keep calm and
-      .exclude("org.spark-project.spark", "unused"),          // ignore Spark.
+      .exclude("org.spark-project.spark", "unused")           // ignore Spark.
+      .excludeAll(ExclusionRule(organization = "io.netty")),
+    "io.netty" % "netty-all" % "4.0.43.Final",    // we need THIS version
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
-    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.3",
+    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.3"
+      excludeAll(ExclusionRule(organization = "io.netty")),
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",

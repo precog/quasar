@@ -7,35 +7,113 @@ sudo: required
 services:
   - docker
 
-# travis installs postgres by default this will stop and free up the psql port
-# needed by the  postgreql container
-before_install:
+stages:
+  - name: clean
+    if: NOT type = pull_request
+  - name: compile
+  - name: unit test
+  - name: test
+  - name: publish
+    # weirdly, we have to add the extra PR check
+    if: NOT type = pull_request
+
+# this all goes in the test stage
+env:
+  matrix:
+    - CONNECTOR=couchbase
+    - CONNECTOR=marklogic_json
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=mimir
+    - CONNECTOR=mongodb_2_6
+    - CONNECTOR=mongodb_3_0
+    - CONNECTOR=mongodb_3_2
+    - CONNECTOR=mongodb_3_4
+    - CONNECTOR=mongodb_read_only
+    # - CONNECTOR=spark_local_test
+    # - CONNECTOR=spark_hdfs
+  global:
+    - COURSIER_PROGRESS=0
+
+# this is also the test stage :eyeroll:
+script:
+  - set -e
+
+  # travis installs postgres by default this will stop and free up the psql port
+  # needed by the  postgreql container
   - sudo /etc/init.d/postgresql stop
   - sudo /etc/init.d/mysql stop
   - sudo service memcached stop
 
-# create all the docker containers we need for IT testing per matrix build
-install:
   - docker/scripts/setupContainers -u quasar_metastore
   - docker/scripts/setupContainers -u quasar_$CONNECTOR
   - docker ps
 
-# populate the it/testing.conf file
-before_script:
+  # populate the it/testing.conf file
   - docker/scripts/assembleTestingConf -c quasar_metastore
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
 
-# export some needed env vars, build, then publish and tag resources
-script:
-  - cd $TRAVIS_BUILD_DIR
-  - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
-  - export -f travis_wait travis_jigger
-  - ./scripts/build
-  - ./scripts/quasarPublishAndTag
+  - |-
+    SPECIFIC_DELEGATE=
 
-after_success:
-  - ./scripts/afterSuccess
+    case $CONNECTOR in
+      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly" ;;
+      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly" ;;
+      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly" ;;
+      *) ;;
+    esac
+
+  # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
+  - |-
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+      it/sideEffectTestFSConfig \
+      "it/testOnly -- xonly" \
+      "$SPECIFIC_DELEGATE"
+
+  - set +e
+
+jobs:
+  include:
+    - stage: clean
+      env:
+      script: ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
+
+    - stage: compile
+      env:
+      script:
+        - set -e
+
+        - |-
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+            checkHeaders \
+            test:compile
+
+        - set +e
+
+    # note that the "test" stage has special significance to Travis (it's the only matrix-able stage)
+    - stage: unit test
+      env:
+      script:
+        - |-
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+            it/sideEffectTestFSConfig \
+            "testOnly -- xonly" \
+            "exclusive:testOnly -- xonly"
+
+    - stage: publish
+      env:
+      script:
+        - set -e
+        - './sbt ++$TRAVIS_SCALA_VERSION doc web/assembly'
+        - scripts/testJar
+
+        # release to sonatype
+        - scripts/quasarPublishAndTag
+
+        # release to github
+        - scripts/publishJar
+
+        - set +e
 
 notifications:
   irc:
@@ -46,9 +124,9 @@ notifications:
     secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
 
 branches:
-  except:
-    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
-    - mimir
+  only:
+    - master
+    - /^backport.*$/
 
 cache:
   directories:
@@ -64,24 +142,3 @@ cache:
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
   - find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
-
-env:
-  matrix:
-    - CONNECTOR=couchbase
-    - CONNECTOR=marklogic_json
-    - CONNECTOR=marklogic_xml
-    - CONNECTOR=mimir
-    - CONNECTOR=mongodb_2_6
-    - CONNECTOR=mongodb_3_0
-    - CONNECTOR=mongodb_3_2
-    - CONNECTOR=mongodb_3_4
-    - CONNECTOR=mongodb_read_only
-    # - CONNECTOR=spark_local_test
-    # - CONNECTOR=spark_hdfs
-  # - CONNECTOR=spark_cassandra
-  # - CONNECTOR=spark_elasticsearch
-  # - CONNECTOR=spark_ftp
-  # - CONNECTOR=spark_s3
-
-  global:
-    - COURSIER_PROGRESS=0

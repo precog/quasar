@@ -17,21 +17,29 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import quasar.contrib.pathy.APath
+import quasar.api.ResponseOr
+import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fs._
+import quasar.fs.InMemory.InMemState
 import quasar.fs.mount._
+import quasar.fs.mount.module.Module
+import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.metastore.MetaStoreFixture
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
+import quasar.main._
+import quasar.server.Server
 
 import argonaut.{Json, Argonaut}
 import Argonaut._
 import org.http4s.{MediaType, Charset, EntityEncoder}
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Arbitrary
-import scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object Fixture {
@@ -93,4 +101,72 @@ object Fixture {
       foldMapNT(meff) compose mounter
     }
   }
+
+  def runFsWithViewsAndModules(
+    fs: BackendEffect ~> Task,
+    initial: InMemState,
+    mounts: MountingsConfig,
+    vc: VCache ~> Task,
+    mount: Mounting ~> Task
+  ): Task[BackendEffect ~> QErrs_TaskM] = {
+
+    type V[A] = (
+      VCache
+        :\: Task
+        :\: Mounting
+        :\: MountingFailure
+        :/: PathMismatchFailure
+      )#M[A]
+
+    CompositeFileSystem.overlayModulesViews[V, Task](fs andThen liftFT[Task]).map { toV =>
+      val vToTask =
+        (vc andThen injectFT[Task, QErrs_Task])    :+:
+        injectFT[Task, QErrs_Task]                 :+:
+        (mount andThen injectFT[Task, QErrs_Task]) :+:
+        injectFT[MountingFailure, QErrs_Task]      :+:
+        injectFT[PathMismatchFailure, QErrs_Task]
+      toV andThen foldMapNT(vToTask)
+    }
+  }
+
+  def inMemFS(
+    state: InMemState = InMemState.empty,
+    mounts: MountingsConfig = MountingsConfig.empty,
+    persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
+  ): Task[CoreEffIO ~> QErrs_TaskM] = {
+    val viewCache: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+    val metaRefTask = MetaStoreFixture.createNewTestMetastore.flatMap(TaskRef(_))
+    type MountingFileSystem[A] = Coproduct[Mounting, BackendEffect, A]
+    for {
+      vc        <- viewCache
+      mount     <- mountingInter(mounts.toMap)
+      fs0       <- InMemory.runBackend(state)
+      fs        <- runFsWithViewsAndModules(fs0, state, mounts, vc, mount)
+      metaRef   <- metaRefTask
+    } yield {
+      val module = Module.impl.default[MountingFileSystem] andThen foldMapNT(mount :+: fs0) andThen injectFT[Task, QErrs_Task]
+      injectFT[Task, QErrs_Task]                                                          :+:
+      (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_Task]) :+:
+      module                                                                              :+:
+      (mount andThen injectFT[Task, QErrs_Task])                                          :+:
+      (Empty.analyze[Task] andThen injectFT[Task, QErrs_Task])                            :+:
+      (injectNT[QueryFile, BackendEffect] andThen fs)     :+:
+      (injectNT[ReadFile, BackendEffect] andThen fs)      :+:
+      (injectNT[WriteFile, BackendEffect] andThen fs)     :+:
+      (injectNT[ManageFile, BackendEffect] andThen fs)    :+:
+      (vc andThen injectFT[Task, QErrs_Task])                                             :+:
+      (Timing.toTask andThen injectFT[Task, QErrs_Task])                                  :+:
+      injectFT[Module.Failure, QErrs_Task]                                                :+:
+      injectFT[PathMismatchFailure, QErrs_Task]                                           :+:
+      injectFT[MountingFailure, QErrs_Task]                                               :+:
+      injectFT[FileSystemFailure, QErrs_Task]
+    }
+  }
+
+  def inMemFSWeb(
+    state: InMemState = InMemState.empty,
+    mounts: MountingsConfig = MountingsConfig.empty,
+    persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
+  ): Task[CoreEffIO ~> ResponseOr] =
+    inMemFS(state, mounts, persist).map(Server.webInter)
 }

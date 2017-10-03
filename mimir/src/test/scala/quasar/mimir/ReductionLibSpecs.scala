@@ -63,6 +63,20 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       determineResult(input, 13)
     }
 
+    "unshiftArray" >> {
+      val input = dag.Reduce(UnshiftArray,
+        dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
+
+      val result = testEval(input)
+
+      result must haveSize(1)
+
+      result.head must beLike {
+        case (ids, SArray(elems)) =>
+          elems mustEqual Vector(42, 12, 77, 1, 13).map(SDecimal(_))
+      }
+    }
+
     "singleton count" >> {
       val input = dag.Reduce(Count, Const(CString("alpha"))(line))(line)
 

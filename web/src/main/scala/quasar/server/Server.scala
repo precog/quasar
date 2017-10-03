@@ -96,6 +96,9 @@ object Server {
 
   }
 
+  def webInter[S[_]](eval: S ~> QErrs_TaskM): S ~> ResponseOr =
+    foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]) compose eval
+
   def serviceStarter(
     defaultPort: Int,
     staticContent: List[StaticContent],
@@ -105,12 +108,9 @@ object Server {
   ): PortChangingServer.ServiceStarter = {
     import RestApi._
 
-    val f: QErrs_Task ~> ResponseOr =
-      liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]
-
     (reload: Int => Task[String \/ Unit]) =>
       finalizeServices(
-        toHttpServices(liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval), coreServices[CoreEffIO]) ++
+        toHttpServices(liftMT[Task, ResponseT] :+: webInter(eval), coreServices[CoreEffIO]) ++
         additionalServices
       ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
   }

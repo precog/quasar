@@ -28,13 +28,12 @@ import quasar.api.PathUtils._
 import quasar.api.services.Fixture._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
-import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.InMemory._
 import quasar.fs.mount._
-import quasar.fs.mount.Fixture.runConstantMount
 import quasar.fs.mount.module.Module
+import quasar.main.CoreEffIO
 import quasar.sql._
 
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
@@ -57,19 +56,9 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
   import FileSystemError.pathErr
   import PathError.pathNotFound
 
-  type Eff0[A] = Coproduct[Module.Failure, Module, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
-
-  def effRespOr(inter: Module ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]              :+:
-    failureResponseOr[Module.Error]      :+:
-    (liftMT[Task, ResponseT] compose inter)
-
   def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
-    HttpService.lift(req => runFs(mem).flatMap { fs =>
-      val module = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
-      val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
-      invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
+    HttpService.lift(req => Fixture.inMemFSWeb(mem, MountingsConfig(mounts)).flatMap { fs =>
+      invoke.service[CoreEffIO].toHttpService(fs).apply(req)
     }).orNotFound
 
   def sampleStatement(name: String): Statement[Fix[Sql]] = {

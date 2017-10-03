@@ -33,17 +33,10 @@ import scalaz._, Scalaz._, concurrent.Task
 
 class MetastoreServiceSpec extends quasar.Qspec {
 
-  type Eff[A] = Coproduct[Task, MetaStoreLocation, A]
-
-  val metastore = MetaStoreFixture.createNewTestMetastore.unsafePerformSync
-  val metaRef   = TaskRef(metastore).unsafePerformSync
-
-  def inter(persist: DbConnectionConfig => MainTask[Unit]): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT] :+:
-    (liftMT[Task, ResponseT] compose MetaStoreLocation.impl.default(metaRef, persist))
-
-  def service(persist: DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]): Service[Request, Response] =
-    quasar.api.services.metastore.service[Eff].toHttpService(inter(persist)).orNotFound
+  def service(persist: DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]): Service[Request, Response] = {
+    val inter = Fixture.inMemFSWeb(persist = persist).unsafePerformSync
+    quasar.api.services.metastore.service[CoreEffIO].toHttpService(inter).orNotFound
+  }
 
   "Metastore service" should {
     "return current metastore with password obscured" in {
@@ -53,6 +46,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
         userName = "bob",
         password = "bobIsAwesome",
         parameters = Map.empty)
+      type Eff[A] = Coproduct[Task, MetaStoreLocation, A]
       val inter = liftMT[Task, ResponseT] compose (reflNT[Task] :+: MetaStoreLocation.impl.constant(dbConfig))
       val service = quasar.api.services.metastore.service[Eff].toHttpService(inter).orNotFound
       val get = Request()

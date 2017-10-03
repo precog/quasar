@@ -2,12 +2,6 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: [_.foo])
-│  │  │  │     ╰─ Key(content: _)
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ├─ Name("f0" -> {
@@ -15,10 +9,10 @@ Chain
 │  │  │  │  │         "$cond": [
 │  │  │  │  │           {
 │  │  │  │  │             "$and": [
-│  │  │  │  │               { "$lt": [{ "$literal": null }, "$content.pop"] },
-│  │  │  │  │               { "$lt": ["$content.pop", { "$literal": "" }] }]
+│  │  │  │  │               { "$lt": [{ "$literal": null }, "$pop"] },
+│  │  │  │  │               { "$lt": ["$pop", { "$literal": "" }] }]
 │  │  │  │  │           },
-│  │  │  │  │           "$content.pop",
+│  │  │  │  │           "$pop",
 │  │  │  │  │           { "$literal": undefined }]
 │  │  │  │  │       }
 │  │  │  │  │     })
@@ -29,21 +23,21 @@ Chain
 │  │  │  │                "$or": [
 │  │  │  │                  {
 │  │  │  │                    "$and": [
-│  │  │  │                      { "$lt": [{ "$literal": null }, "$content.city"] },
-│  │  │  │                      { "$lt": ["$content.city", { "$literal": {  } }] }]
+│  │  │  │                      { "$lt": [{ "$literal": null }, "$city"] },
+│  │  │  │                      { "$lt": ["$city", { "$literal": {  } }] }]
 │  │  │  │                  },
 │  │  │  │                  {
 │  │  │  │                    "$and": [
-│  │  │  │                      { "$lte": [{ "$literal": false }, "$content.city"] },
-│  │  │  │                      { "$lt": ["$content.city", { "$literal": new RegExp("", "") }] }]
+│  │  │  │                      { "$lte": [{ "$literal": false }, "$city"] },
+│  │  │  │                      { "$lt": ["$city", { "$literal": new RegExp("", "") }] }]
 │  │  │  │                  }]
 │  │  │  │              },
-│  │  │  │              "$content.city",
+│  │  │  │              "$city",
 │  │  │  │              { "$literal": undefined }]
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$0")
+│  │  │     ╰─ Name("0" -> ["$foo"])
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0, [[_._id["0"]], _.f1]])
@@ -65,12 +59,6 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: [_.foo])
-│     │  │     ╰─ Key(content: _)
-│     │  ╰─ Scope(Map())
 │     ├─ $GroupF
 │     │  ├─ Grouped
 │     │  │  ├─ Name("f0" -> {
@@ -78,10 +66,10 @@ Chain
 │     │  │  │         "$cond": [
 │     │  │  │           {
 │     │  │  │             "$and": [
-│     │  │  │               { "$lt": [{ "$literal": null }, "$content.pop"] },
-│     │  │  │               { "$lt": ["$content.pop", { "$literal": "" }] }]
+│     │  │  │               { "$lt": [{ "$literal": null }, "$pop"] },
+│     │  │  │               { "$lt": ["$pop", { "$literal": "" }] }]
 │     │  │  │           },
-│     │  │  │           "$content.pop",
+│     │  │  │           "$pop",
 │     │  │  │           { "$literal": undefined }]
 │     │  │  │       }
 │     │  │  │     })
@@ -92,21 +80,21 @@ Chain
 │     │  │                "$or": [
 │     │  │                  {
 │     │  │                    "$and": [
-│     │  │                      { "$lt": [{ "$literal": null }, "$content.city"] },
-│     │  │                      { "$lt": ["$content.city", { "$literal": {  } }] }]
+│     │  │                      { "$lt": [{ "$literal": null }, "$city"] },
+│     │  │                      { "$lt": ["$city", { "$literal": {  } }] }]
 │     │  │                  },
 │     │  │                  {
 │     │  │                    "$and": [
-│     │  │                      { "$lte": [{ "$literal": false }, "$content.city"] },
-│     │  │                      { "$lt": ["$content.city", { "$literal": new RegExp("", "") }] }]
+│     │  │                      { "$lte": [{ "$literal": false }, "$city"] },
+│     │  │                      { "$lt": ["$city", { "$literal": new RegExp("", "") }] }]
 │     │  │                  }]
 │     │  │              },
-│     │  │              "$content.city",
+│     │  │              "$city",
 │     │  │              { "$literal": undefined }]
 │     │  │          }
 │     │  │        })
 │     │  ╰─ By
-│     │     ╰─ Name("0" -> "$0")
+│     │     ╰─ Name("0" -> ["$foo"])
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ JsCore([[_._id["0"]], _.f0, [[_._id["0"]], _.f1]])
@@ -134,13 +122,11 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.left, _.right][0])
-│  │     ╰─ Key(1: [_.left, _.right][1][1])
-│  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("0" -> true)
-   ├─ Name("1" -> true)
+   ├─ Name("0" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
+   ├─ Name("1" -> {
+   │       "$arrayElemAt": [
+   │         { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] },
+   │         { "$literal": NumberInt("1") }]
+   │     })
    ╰─ IgnoreId

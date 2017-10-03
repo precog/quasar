@@ -1,11 +1,5 @@
 Chain
 ├─ $ReadF(db; caloriesBurnedData)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [(_.date instanceof Date) ? _.date.getUTCMonth() + 1 : undefined])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
    │  ├─ Name("a" -> {
@@ -13,10 +7,10 @@ Chain
    │  │         "$cond": [
    │  │           {
    │  │             "$and": [
-   │  │               { "$lt": [{ "$literal": null }, "$content.score"] },
-   │  │               { "$lt": ["$content.score", { "$literal": "" }] }]
+   │  │               { "$lt": [{ "$literal": null }, "$score"] },
+   │  │               { "$lt": ["$score", { "$literal": "" }] }]
    │  │           },
-   │  │           "$content.score",
+   │  │           "$score",
    │  │           { "$literal": undefined }]
    │  │       }
    │  │     })
@@ -28,13 +22,27 @@ Chain
    │                  {
    │                    "$lte": [
    │                      { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
-   │                      "$content.date"]
+   │                      "$date"]
    │                  },
-   │                  { "$lt": ["$content.date", { "$literal": new RegExp("", "") }] }]
+   │                  { "$lt": ["$date", { "$literal": new RegExp("", "") }] }]
    │              },
-   │              { "$month": "$content.date" },
+   │              { "$month": "$date" },
    │              { "$literal": undefined }]
    │          }
    │        })
    ╰─ By
-      ╰─ Name("0" -> "$0")
+      ╰─ Name("0" -> [
+              {
+                "$cond": [
+                  {
+                    "$and": [
+                      {
+                        "$lte": [
+                          { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+                          "$date"]
+                      },
+                      { "$lt": ["$date", { "$literal": new RegExp("", "") }] }]
+                  },
+                  { "$month": "$date" },
+                  { "$literal": undefined }]
+              }])

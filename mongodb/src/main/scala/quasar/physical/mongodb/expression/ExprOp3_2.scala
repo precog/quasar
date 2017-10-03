@@ -39,6 +39,11 @@ object ExprOp3_2F {
   final case class $ceilF[A](value: A)                extends ExprOp3_2F[A]
   final case class $floorF[A](value: A)               extends ExprOp3_2F[A]
   final case class $arrayElemAtF[A](array: A, idx: A) extends ExprOp3_2F[A]
+  // This refers to square brackets [] in MongoDB.
+  // From the mongo docs:
+  // Changed in version 3.2: Starting in MongoDB 3.2, $project stage supports
+  // using the square brackets [] to directly create new array fields.
+  final case class $arrayLitF[A](values: List[A])     extends ExprOp3_2F[A]
   final case class $concatArraysF[A](arrays: List[A]) extends ExprOp3_2F[A]
   final case class $isArrayF[A](array: A)             extends ExprOp3_2F[A]
 
@@ -57,6 +62,7 @@ object ExprOp3_2F {
           case ($ceilF(v1), $ceilF(v2))                       => v1 ≟ v2
           case ($floorF(v1), $floorF(v2))                     => v1 ≟ v2
           case ($arrayElemAtF(a1, i1), $arrayElemAtF(a2, i2)) => a1 ≟ a2 && i1 ≟ i2
+          case ($arrayLitF(a1), $arrayLitF(a2))               => a1 ≟ a2
           case ($concatArraysF(a1), $concatArraysF(a2))       => a1 ≟ a2
           case ($isArrayF(a1), $isArrayF(a2))                 => a1 ≟ a2
           case _                                              => false
@@ -79,6 +85,7 @@ object ExprOp3_2F {
         case $ceilF(v)           => G.map(f(v))($ceilF(_))
         case $floorF(v)          => G.map(f(v))($floorF(_))
         case $arrayElemAtF(a, i) => (f(a) |@| f(i))($arrayElemAtF(_, _))
+        case $arrayLitF(a)       => G.map(a.traverse(f))($arrayLitF(_))
         case $concatArraysF(a)   => G.map(a.traverse(f))($concatArraysF(_))
         case $isArrayF(a)        => G.map(f(a))($isArrayF(_))
       }
@@ -100,6 +107,7 @@ object ExprOp3_2F {
       case $ceilF(value)             => Bson.Doc("$ceil" -> value)
       case $floorF(value)            => Bson.Doc("$floor" -> value)
       case $arrayElemAtF(array, idx) => Bson.Doc("$arrayElemAt" -> Bson.Arr(array, idx))
+      case $arrayLitF(value)         => Bson.Arr(value: _*)
       case $concatArraysF(value)     => Bson.Doc("$concatArrays" -> Bson.Arr(value: _*))
       case $isArrayF(value)          => Bson.Doc("$isArray" -> value)
     }
@@ -125,6 +133,7 @@ object ExprOp3_2F {
     def $ceil(value: T): T                = convert($ceilF(value))
     def $floor(value: T): T               = convert($floorF(value))
     def $arrayElemAt(array: T, idx: T): T = convert($arrayElemAtF(array, idx))
+    def $arrayLit(value: List[T]): T      = convert($arrayLitF(value))
     def $concatArrays(value: List[T]): T  = convert($concatArraysF(value))
     def $isArray(value: T): T             = convert($isArrayF(value))
   }
@@ -178,4 +187,14 @@ object $ceilF {
 object $floorF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$floorF(value))
+}
+
+object $arrayLitF {
+  def apply[EX[_], A](value: List[A])(implicit I: ExprOp3_2F :<: EX): EX[A] =
+    I.inj(ExprOp3_2F.$arrayLitF(value))
+
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[List[A]] =
+    I.prj(expr) collect {
+      case ExprOp3_2F.$arrayLitF(value) => value
+    }
 }

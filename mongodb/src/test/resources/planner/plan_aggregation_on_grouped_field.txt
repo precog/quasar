@@ -1,14 +1,8 @@
 Chain
 ├─ $ReadF(db; zips)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.city])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
-   │  ├─ Name("city" -> { "$first": "$content.city" })
+   │  ├─ Name("city" -> { "$first": "$city" })
    │  ╰─ Name("1" -> { "$sum": { "$literal": NumberInt("1") } })
    ╰─ By
-      ╰─ Name("0" -> "$0")
+      ╰─ Name("0" -> ["$city"])

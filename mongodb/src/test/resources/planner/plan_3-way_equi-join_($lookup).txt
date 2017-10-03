@@ -1,93 +1,11 @@
 Chain
 ├─ $FoldLeftF
 │  ├─ Chain
-│  │  ├─ $FoldLeftF
-│  │  │  ├─ Chain
-│  │  │  │  ├─ $ReadF(db; foo)
-│  │  │  │  ├─ $SimpleMapF
-│  │  │  │  │  ├─ Map
-│  │  │  │  │  │  ╰─ JsCore([_._id, _])
-│  │  │  │  │  ╰─ Scope(Map())
-│  │  │  │  ├─ $ProjectF
-│  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-│  │  │  │  │  ├─ Name("1" -> { "$literal": true })
-│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
-│  │  │  │  │  ╰─ IgnoreId
-│  │  │  │  ├─ $MatchF
-│  │  │  │  │  ╰─ And
-│  │  │  │  │     ├─ Doc
-│  │  │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │  │  │     ╰─ Doc
-│  │  │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-│  │  │  │  ├─ $SimpleMapF
-│  │  │  │  │  ├─ Map
-│  │  │  │  │  │  ╰─ Obj
-│  │  │  │  │  │     ├─ Key(0: _.src[1].id)
-│  │  │  │  │  │     ╰─ Key(content: _.src)
-│  │  │  │  │  ╰─ Scope(Map())
-│  │  │  │  ├─ $GroupF
-│  │  │  │  │  ├─ Grouped
-│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-│  │  │  │  │  ╰─ By
-│  │  │  │  │     ╰─ Name("0" -> "$0")
-│  │  │  │  ╰─ $ProjectF
-│  │  │  │     ├─ Name("_id" -> "$_id")
-│  │  │  │     ├─ Name("value")
-│  │  │  │     │  ├─ Name("left" -> "$0")
-│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-│  │  │  │     ╰─ IncludeId
-│  │  │  ╰─ Chain
-│  │  │     ├─ $ReadF(db; bar)
-│  │  │     ├─ $SimpleMapF
-│  │  │     │  ├─ Map
-│  │  │     │  │  ╰─ JsCore([_._id, _])
-│  │  │     │  ╰─ Scope(Map())
-│  │  │     ├─ $ProjectF
-│  │  │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-│  │  │     │  ├─ Name("1" -> { "$literal": true })
-│  │  │     │  ├─ Name("src" -> "$$ROOT")
-│  │  │     │  ╰─ IgnoreId
-│  │  │     ├─ $MatchF
-│  │  │     │  ╰─ And
-│  │  │     │     ├─ Doc
-│  │  │     │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │     │     ╰─ Doc
-│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
-│  │  │     ├─ $MapF
-│  │  │     │  ├─ JavaScript(function (key, value) {
-│  │  │     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-│  │  │     │  │             })
-│  │  │     │  ╰─ Scope(Map())
-│  │  │     ╰─ $ReduceF
-│  │  │        ├─ JavaScript(function (key, values) {
-│  │  │        │               var result = { "left": [], "right": [] };
-│  │  │        │               values.forEach(
-│  │  │        │                 function (value) {
-│  │  │        │                   result.left = result.left.concat(value.left);
-│  │  │        │                   result.right = result.right.concat(value.right)
-│  │  │        │                 });
-│  │  │        │               return result
-│  │  │        │             })
-│  │  │        ╰─ Scope(Map())
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ├─ NotExpr($left -> Size(0))
-│  │  │     ╰─ NotExpr($right -> Size(0))
-│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
-│  │  │  ╰─ Scope(Map())
+│  │  ├─ $ReadF(db; baz)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> {
-│  │  │  │       "$arrayElemAt": [
-│  │  │  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │  │  │         { "$literal": NumberInt("1") }]
-│  │  │  │     })
+│  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │  ├─ Name("1" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ IgnoreId
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
@@ -98,7 +16,7 @@ Chain
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _.src[1][1].id)
+│  │  │  │     ├─ Key(0: _.src[1].bar_id)
 │  │  │  │     ╰─ Key(content: _.src)
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
@@ -109,18 +27,88 @@ Chain
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
-│  │     │  ├─ Name("left" -> "$0")
-│  │     │  ├─ Name("right" -> { "$literal": [] })
+│  │     │  ├─ Name("right" -> "$0")
+│  │     │  ├─ Name("left" -> { "$literal": [] })
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; baz)
+│     ├─ $FoldLeftF
+│     │  ├─ Chain
+│     │  │  ├─ $ReadF(db; foo)
+│     │  │  ├─ $ProjectF
+│     │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│     │  │  │  ├─ Name("1" -> { "$literal": true })
+│     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
+│     │  │  │  ╰─ IgnoreId
+│     │  │  ├─ $MatchF
+│     │  │  │  ╰─ And
+│     │  │  │     ├─ Doc
+│     │  │  │     │  ╰─ Expr($0 -> Type(Doc))
+│     │  │  │     ╰─ Doc
+│     │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  │  ├─ $SimpleMapF
+│     │  │  │  ├─ Map
+│     │  │  │  │  ╰─ Obj
+│     │  │  │  │     ├─ Key(0: _.src[1].id)
+│     │  │  │  │     ╰─ Key(content: _.src)
+│     │  │  │  ╰─ Scope(Map())
+│     │  │  ├─ $GroupF
+│     │  │  │  ├─ Grouped
+│     │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
+│     │  │  │  ╰─ By
+│     │  │  │     ╰─ Name("0" -> "$0")
+│     │  │  ╰─ $ProjectF
+│     │  │     ├─ Name("_id" -> "$_id")
+│     │  │     ├─ Name("value")
+│     │  │     │  ├─ Name("left" -> "$0")
+│     │  │     │  ├─ Name("right" -> { "$literal": [] })
+│     │  │     │  ╰─ Name("_id" -> "$_id")
+│     │  │     ╰─ IncludeId
+│     │  ╰─ Chain
+│     │     ├─ $ReadF(db; bar)
+│     │     ├─ $ProjectF
+│     │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│     │     │  ├─ Name("1" -> { "$literal": true })
+│     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
+│     │     │  ╰─ IgnoreId
+│     │     ├─ $MatchF
+│     │     │  ╰─ And
+│     │     │     ├─ Doc
+│     │     │     │  ╰─ Expr($0 -> Type(Doc))
+│     │     │     ╰─ Doc
+│     │     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │     ├─ $MapF
+│     │     │  ├─ JavaScript(function (key, value) {
+│     │     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
+│     │     │  │             })
+│     │     │  ╰─ Scope(Map())
+│     │     ╰─ $ReduceF
+│     │        ├─ JavaScript(function (key, values) {
+│     │        │               var result = { "left": [], "right": [] };
+│     │        │               values.forEach(
+│     │        │                 function (value) {
+│     │        │                   result.left = result.left.concat(value.left);
+│     │        │                   result.right = result.right.concat(value.right)
+│     │        │                 });
+│     │        │               return result
+│     │        │             })
+│     │        ╰─ Scope(Map())
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ├─ NotExpr($left -> Size(0))
+│     │     ╰─ NotExpr($right -> Size(0))
+│     ├─ $UnwindF(DocField(BsonField.Name("right")))
+│     ├─ $UnwindF(DocField(BsonField.Name("left")))
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ JsCore([_._id, _])
+│     │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
 │     │  ╰─ Scope(Map())
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
+│     │  ├─ Name("0" -> {
+│     │  │       "$arrayElemAt": [
+│     │  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│     │  │         { "$literal": NumberInt("1") }]
+│     │  │     })
 │     │  ├─ Name("1" -> { "$literal": true })
 │     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ IgnoreId
@@ -132,26 +120,26 @@ Chain
 │     │        ╰─ Expr($1 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [{ "0": value.src[1].bar_id }, { "left": [], "right": [value.src] }]
+│     │  │               return [{ "0": value.src[1][1].id }, { "right": [], "left": [value.src] }]
 │     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
-│        │               var result = { "left": [], "right": [] };
+│        │               var result = { "right": [], "left": [] };
 │        │               values.forEach(
 │        │                 function (value) {
-│        │                   result.left = result.left.concat(value.left);
-│        │                   result.right = result.right.concat(value.right)
+│        │                   result.right = result.right.concat(value.right);
+│        │                   result.left = result.left.concat(value.left)
 │        │                 });
 │        │               return result
 │        │             })
 │        ╰─ Scope(Map())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
+│     ├─ NotExpr($right -> Size(0))
+│     ╰─ NotExpr($left -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj

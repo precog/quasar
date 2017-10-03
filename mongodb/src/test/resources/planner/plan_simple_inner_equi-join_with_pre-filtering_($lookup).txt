@@ -2,14 +2,10 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; foo)
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ JsCore([_._id, _])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
+│  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │  ├─ Name("1" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ IgnoreId
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
@@ -37,15 +33,16 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; bar)
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│     │  ╰─ IgnoreId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].rating : undefined)
-│     │  │        ├─ Key(1: __val[1])
-│     │  │        ├─ Key(2: __val[1].rating)
-│     │  │        ╰─ Key(src: __val)
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].rating : undefined)
+│     │  │     ├─ Key(1: _["0"][1])
+│     │  │     ├─ Key(2: _["0"][1].rating)
+│     │  │     ╰─ Key(src: _["0"])
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ And

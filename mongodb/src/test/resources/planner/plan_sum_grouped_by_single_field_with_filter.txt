@@ -3,12 +3,6 @@ Chain
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($state -> Eq(Text(CO)))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.city])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
    │  ╰─ Name("sm" -> {
@@ -16,12 +10,12 @@ Chain
    │            "$cond": [
    │              {
    │                "$and": [
-   │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-   │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
+   │                  { "$lt": [{ "$literal": null }, "$pop"] },
+   │                  { "$lt": ["$pop", { "$literal": "" }] }]
    │              },
-   │              "$content.pop",
+   │              "$pop",
    │              { "$literal": undefined }]
    │          }
    │        })
    ╰─ By
-      ╰─ Name("0" -> "$0")
+      ╰─ Name("0" -> ["$city"])

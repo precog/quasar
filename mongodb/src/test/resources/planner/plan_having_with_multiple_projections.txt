@@ -75,14 +75,10 @@ Chain
 │  │  │  │  │     ╰─ NotExpr($right -> Size(0))
 │  │  │  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
 │  │  │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-│  │  │  │  ├─ $SimpleMapF
-│  │  │  │  │  ├─ Map
-│  │  │  │  │  │  ╰─ JsCore([_.left, _.right])
-│  │  │  │  │  ╰─ Scope(Map())
 │  │  │  │  ├─ $ProjectF
 │  │  │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  │  │  ├─ Name("1" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  │  │  ├─ Name("1" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] })
+│  │  │  │  │  ├─ Name("src" -> ["$left", "$right"])
 │  │  │  │  │  ╰─ IgnoreId
 │  │  │  │  ├─ $MatchF
 │  │  │  │  │  ╰─ And
@@ -90,16 +86,62 @@ Chain
 │  │  │  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  │  │  │     ╰─ Doc
 │  │  │  │  │        ╰─ Expr($1 -> Gt(Int32(50000)))
-│  │  │  │  ├─ $SimpleMapF
-│  │  │  │  │  ├─ Map
-│  │  │  │  │  │  ╰─ JsCore([
-│  │  │  │  │  │            _.src[0][0],
-│  │  │  │  │  │            (isObject(_.src[0][1]) && (! Array.isArray(_.src[0][1]))) ? _.src[0][1] : undefined,
-│  │  │  │  │  │            _.src[1] > 50000])
-│  │  │  │  │  ╰─ Scope(Map())
 │  │  │  │  ├─ $GroupF
 │  │  │  │  │  ├─ Grouped
-│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│  │  │  │  │  │  ╰─ Name("0" -> {
+│  │  │  │  │  │          "$push": {
+│  │  │  │  │  │            "$let": {
+│  │  │  │  │  │              "vars": {
+│  │  │  │  │  │                "a": [
+│  │  │  │  │  │                  {
+│  │  │  │  │  │                    "$arrayElemAt": [
+│  │  │  │  │  │                      { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] },
+│  │  │  │  │  │                      { "$literal": NumberInt("0") }]
+│  │  │  │  │  │                  },
+│  │  │  │  │  │                  {
+│  │  │  │  │  │                    "$cond": [
+│  │  │  │  │  │                      {
+│  │  │  │  │  │                        "$and": [
+│  │  │  │  │  │                          {
+│  │  │  │  │  │                            "$lte": [
+│  │  │  │  │  │                              { "$literal": {  } },
+│  │  │  │  │  │                              {
+│  │  │  │  │  │                                "$arrayElemAt": [
+│  │  │  │  │  │                                  {
+│  │  │  │  │  │                                    "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }]
+│  │  │  │  │  │                                  },
+│  │  │  │  │  │                                  { "$literal": NumberInt("1") }]
+│  │  │  │  │  │                              }]
+│  │  │  │  │  │                          },
+│  │  │  │  │  │                          {
+│  │  │  │  │  │                            "$lt": [
+│  │  │  │  │  │                              {
+│  │  │  │  │  │                                "$arrayElemAt": [
+│  │  │  │  │  │                                  {
+│  │  │  │  │  │                                    "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }]
+│  │  │  │  │  │                                  },
+│  │  │  │  │  │                                  { "$literal": NumberInt("1") }]
+│  │  │  │  │  │                              },
+│  │  │  │  │  │                              { "$literal": [] }]
+│  │  │  │  │  │                          }]
+│  │  │  │  │  │                      },
+│  │  │  │  │  │                      {
+│  │  │  │  │  │                        "$arrayElemAt": [
+│  │  │  │  │  │                          { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] },
+│  │  │  │  │  │                          { "$literal": NumberInt("1") }]
+│  │  │  │  │  │                      },
+│  │  │  │  │  │                      { "$literal": undefined }]
+│  │  │  │  │  │                  },
+│  │  │  │  │  │                  {
+│  │  │  │  │  │                    "$gt": [
+│  │  │  │  │  │                      { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
+│  │  │  │  │  │                      { "$literal": NumberInt("50000") }]
+│  │  │  │  │  │                  }]
+│  │  │  │  │  │              },
+│  │  │  │  │  │              "in": "$$a"
+│  │  │  │  │  │            }
+│  │  │  │  │  │          }
+│  │  │  │  │  │        })
 │  │  │  │  │  ╰─ By({ "$literal": null })
 │  │  │  │  ╰─ $ProjectF
 │  │  │  │     ├─ Name("_id" -> "$_id")
@@ -144,14 +186,15 @@ Chain
 │  │  │     ╰─ NotExpr($right -> Size(0))
 │  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
 │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> ["$left", "$right"])
+│  │  │  ╰─ IgnoreId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([_.left, _.right])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(f0: __val[0][1].city)
-│  │  │  │        ╰─ Key(b0: [
-│  │  │  │               (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].city : undefined])
+│  │  │  │  ╰─ Obj
+│  │  │  │     ├─ Key(f0: _["0"][0][1].city)
+│  │  │  │     ╰─ Key(b0: [
+│  │  │  │            (isObject(_["0"][1][1]) && (! Array.isArray(_["0"][1][1]))) ? _["0"][1][1].city : undefined])
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
@@ -250,14 +293,10 @@ Chain
 │     │     ╰─ NotExpr($right -> Size(0))
 │     ├─ $UnwindF(DocField(BsonField.Name("right")))
 │     ├─ $UnwindF(DocField(BsonField.Name("left")))
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ JsCore([_.left, _.right])
-│     │  ╰─ Scope(Map())
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("1" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-│     │  ├─ Name("src" -> "$$ROOT")
+│     │  ├─ Name("1" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] })
+│     │  ├─ Name("src" -> ["$left", "$right"])
 │     │  ╰─ IgnoreId
 │     ├─ $MatchF
 │     │  ╰─ And
@@ -296,13 +335,7 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(city: [_.left, _.right][0])
-│  │     ╰─ Key(1: [_.left, _.right][1])
-│  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("city" -> true)
-   ├─ Name("1" -> true)
+   ├─ Name("city" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
+   ├─ Name("1" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] })
    ╰─ IgnoreId

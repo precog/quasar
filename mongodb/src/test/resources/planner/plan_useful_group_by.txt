@@ -1,11 +1,5 @@
 Chain
 ├─ $ReadF(db; zips)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.city, _.state])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped
 │  │  ├─ Name("f0" -> {
@@ -15,16 +9,16 @@ Chain
 │  │  │             "$or": [
 │  │  │               {
 │  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": [] }, "$content.city"] },
-│  │  │                   { "$lt": ["$content.city", { "$literal": BinData(0, "") }] }]
+│  │  │                   { "$lte": [{ "$literal": [] }, "$city"] },
+│  │  │                   { "$lt": ["$city", { "$literal": BinData(0, "") }] }]
 │  │  │               },
 │  │  │               {
 │  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": "" }, "$content.city"] },
-│  │  │                   { "$lt": ["$content.city", { "$literal": {  } }] }]
+│  │  │                   { "$lte": [{ "$literal": "" }, "$city"] },
+│  │  │                   { "$lt": ["$city", { "$literal": {  } }] }]
 │  │  │               }]
 │  │  │           },
-│  │  │           "$content.city",
+│  │  │           "$city",
 │  │  │           { "$literal": undefined }]
 │  │  │       }
 │  │  │     })
@@ -35,16 +29,16 @@ Chain
 │  │  │             "$or": [
 │  │  │               {
 │  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": [] }, "$content.state"] },
-│  │  │                   { "$lt": ["$content.state", { "$literal": BinData(0, "") }] }]
+│  │  │                   { "$lte": [{ "$literal": [] }, "$state"] },
+│  │  │                   { "$lt": ["$state", { "$literal": BinData(0, "") }] }]
 │  │  │               },
 │  │  │               {
 │  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": "" }, "$content.state"] },
-│  │  │                   { "$lt": ["$content.state", { "$literal": {  } }] }]
+│  │  │                   { "$lte": [{ "$literal": "" }, "$state"] },
+│  │  │                   { "$lt": ["$state", { "$literal": {  } }] }]
 │  │  │               }]
 │  │  │           },
-│  │  │           "$content.state",
+│  │  │           "$state",
 │  │  │           { "$literal": undefined }]
 │  │  │       }
 │  │  │     })
@@ -53,15 +47,15 @@ Chain
 │  │            "$cond": [
 │  │              {
 │  │                "$and": [
-│  │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-│  │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
+│  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│  │                  { "$lt": ["$pop", { "$literal": "" }] }]
 │  │              },
-│  │              "$content.pop",
+│  │              "$pop",
 │  │              { "$literal": undefined }]
 │  │          }
 │  │        })
 │  ╰─ By
-│     ╰─ Name("0" -> "$0")
+│     ╰─ Name("0" -> ["$city", "$state"])
 ╰─ $ProjectF
    ├─ Name("0" -> {
    │       "$let": {

@@ -1,28 +1,22 @@
 Chain
 ├─ $ReadF(db; zips)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.state])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped
-│  │  ├─ Name("f0" -> { "$first": "$content.state" })
+│  │  ├─ Name("f0" -> { "$first": "$state" })
 │  │  ╰─ Name("f1" -> {
 │  │          "$min": {
 │  │            "$cond": [
 │  │              {
 │  │                "$and": [
-│  │                  { "$lte": [{ "$literal": "" }, "$content.city"] },
-│  │                  { "$lt": ["$content.city", { "$literal": {  } }] }]
+│  │                  { "$lte": [{ "$literal": "" }, "$city"] },
+│  │                  { "$lt": ["$city", { "$literal": {  } }] }]
 │  │              },
-│  │              "$content.city",
+│  │              "$city",
 │  │              { "$literal": undefined }]
 │  │          }
 │  │        })
 │  ╰─ By
-│     ╰─ Name("0" -> "$0")
+│     ╰─ Name("0" -> ["$state"])
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj

@@ -2,12 +2,6 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: [(isObject(_) && (! Array.isArray(_))) ? _.state : undefined])
-│  │  │  │     ╰─ Key(content: _)
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("f0" -> {
@@ -15,15 +9,25 @@ Chain
 │  │  │  │            "$cond": [
 │  │  │  │              {
 │  │  │  │                "$and": [
-│  │  │  │                  { "$lte": [{ "$literal": {  } }, "$content"] },
-│  │  │  │                  { "$lt": ["$content", { "$literal": [] }] }]
+│  │  │  │                  { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │                  { "$lt": ["$$ROOT", { "$literal": [] }] }]
 │  │  │  │              },
-│  │  │  │              "$content.state",
+│  │  │  │              "$state",
 │  │  │  │              { "$literal": undefined }]
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$0")
+│  │  │     ╰─ Name("0" -> [
+│  │  │             {
+│  │  │               "$cond": [
+│  │  │                 {
+│  │  │                   "$and": [
+│  │  │                     { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                     { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │                 },
+│  │  │                 "$state",
+│  │  │                 { "$literal": undefined }]
+│  │  │             }])
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0])
@@ -46,30 +50,33 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: (isObject(_) && (! Array.isArray(_))) ? _.city : undefined)
-│     │  │     ├─ Key(1: [(isObject(_) && (! Array.isArray(_))) ? _.state : undefined])
-│     │  │     ╰─ Key(content: _)
-│     │  ╰─ Scope(Map())
 │     ├─ $GroupF
 │     │  ├─ Grouped
-│     │  │  ╰─ Name("f0" -> {
-│     │  │          "$first": {
-│     │  │            "$cond": [
-│     │  │              {
-│     │  │                "$and": [
-│     │  │                  { "$lte": [{ "$literal": {  } }, "$content"] },
-│     │  │                  { "$lt": ["$content", { "$literal": [] }] }]
-│     │  │              },
-│     │  │              "$content.city",
-│     │  │              { "$literal": undefined }]
-│     │  │          }
-│     │  │        })
 │     │  ╰─ By
-│     │     ├─ Name("0" -> "$0")
-│     │     ╰─ Name("1" -> "$1")
+│     │     ├─ Name("0" -> {
+│     │     │       "$cond": [
+│     │     │         {
+│     │     │           "$and": [
+│     │     │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │     │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │     │         },
+│     │     │         "$city",
+│     │     │         { "$literal": undefined }]
+│     │     │     })
+│     │     ╰─ Name("1" -> [
+│     │             {
+│     │               "$cond": [
+│     │                 {
+│     │                   "$and": [
+│     │                     { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │                     { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │                 },
+│     │                 "$state",
+│     │                 { "$literal": undefined }]
+│     │             }])
+│     ├─ $ProjectF
+│     │  ├─ Name("f0" -> "$_id.0")
+│     │  ╰─ IgnoreId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ JsCore([[_._id["0"], _._id["1"]], _.f0])

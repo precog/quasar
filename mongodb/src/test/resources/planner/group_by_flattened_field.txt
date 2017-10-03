@@ -21,11 +21,6 @@ Chain
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Flatten
 │  │  │  │  ╰─ JsCore(_["0"])
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: [
-│  │  │  │     │      isString(_["0"].sha) ? (0 < 0) ? "" : (1 < 0) ? _["0"].sha.substr(0, _["0"].sha.length) : _["0"].sha.substr(0, 1) : undefined])
-│  │  │  │     ╰─ Key(content: _["0"])
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
@@ -34,8 +29,8 @@ Chain
 │  │  │  │            "$cond": [
 │  │  │  │              {
 │  │  │  │                "$and": [
-│  │  │  │                  { "$lte": [{ "$literal": "" }, "$content.sha"] },
-│  │  │  │                  { "$lt": ["$content.sha", { "$literal": {  } }] }]
+│  │  │  │                  { "$lte": [{ "$literal": "" }, "$0.sha"] },
+│  │  │  │                  { "$lt": ["$0.sha", { "$literal": {  } }] }]
 │  │  │  │              },
 │  │  │  │              {
 │  │  │  │                "$cond": [
@@ -47,9 +42,7 @@ Chain
 │  │  │  │                          { "$literal": NumberInt("0") }]
 │  │  │  │                      },
 │  │  │  │                      {
-│  │  │  │                        "$gt": [
-│  │  │  │                          { "$literal": NumberInt("0") },
-│  │  │  │                          { "$strLenCP": "$content.sha" }]
+│  │  │  │                        "$gt": [{ "$literal": NumberInt("0") }, { "$strLenCP": "$0.sha" }]
 │  │  │  │                      }]
 │  │  │  │                  },
 │  │  │  │                  { "$literal": "" },
@@ -62,13 +55,13 @@ Chain
 │  │  │  │                      },
 │  │  │  │                      {
 │  │  │  │                        "$substrCP": [
-│  │  │  │                          "$content.sha",
+│  │  │  │                          "$0.sha",
 │  │  │  │                          { "$literal": NumberInt("0") },
-│  │  │  │                          { "$strLenCP": "$content.sha" }]
+│  │  │  │                          { "$strLenCP": "$0.sha" }]
 │  │  │  │                      },
 │  │  │  │                      {
 │  │  │  │                        "$substrCP": [
-│  │  │  │                          "$content.sha",
+│  │  │  │                          "$0.sha",
 │  │  │  │                          { "$literal": NumberInt("0") },
 │  │  │  │                          { "$literal": NumberInt("1") }]
 │  │  │  │                      }]
@@ -78,7 +71,51 @@ Chain
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$0")
+│  │  │     ╰─ Name("0" -> [
+│  │  │             {
+│  │  │               "$cond": [
+│  │  │                 {
+│  │  │                   "$and": [
+│  │  │                     { "$lte": [{ "$literal": "" }, "$0.sha"] },
+│  │  │                     { "$lt": ["$0.sha", { "$literal": {  } }] }]
+│  │  │                 },
+│  │  │                 {
+│  │  │                   "$cond": [
+│  │  │                     {
+│  │  │                       "$or": [
+│  │  │                         {
+│  │  │                           "$lt": [
+│  │  │                             { "$literal": NumberInt("0") },
+│  │  │                             { "$literal": NumberInt("0") }]
+│  │  │                         },
+│  │  │                         {
+│  │  │                           "$gt": [{ "$literal": NumberInt("0") }, { "$strLenCP": "$0.sha" }]
+│  │  │                         }]
+│  │  │                     },
+│  │  │                     { "$literal": "" },
+│  │  │                     {
+│  │  │                       "$cond": [
+│  │  │                         {
+│  │  │                           "$lt": [
+│  │  │                             { "$literal": NumberInt("1") },
+│  │  │                             { "$literal": NumberInt("0") }]
+│  │  │                         },
+│  │  │                         {
+│  │  │                           "$substrCP": [
+│  │  │                             "$0.sha",
+│  │  │                             { "$literal": NumberInt("0") },
+│  │  │                             { "$strLenCP": "$0.sha" }]
+│  │  │                         },
+│  │  │                         {
+│  │  │                           "$substrCP": [
+│  │  │                             "$0.sha",
+│  │  │                             { "$literal": NumberInt("0") },
+│  │  │                             { "$literal": NumberInt("1") }]
+│  │  │                         }]
+│  │  │                     }]
+│  │  │                 },
+│  │  │                 { "$literal": undefined }]
+│  │  │             }])
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0])

@@ -148,23 +148,19 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ JsCore([_.left, _.right])
-│  ╰─ Scope(Map())
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$literal": true })
 │  ├─ Name("1" -> {
 │  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│  │         { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] },
 │  │         { "$literal": NumberInt("0") }]
 │  │     })
 │  ├─ Name("2" -> {
 │  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│  │         { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] },
 │  │         { "$literal": NumberInt("1") }]
 │  │     })
-│  ├─ Name("src" -> "$$ROOT")
+│  ├─ Name("src" -> ["$left", "$right"])
 │  ╰─ IgnoreId
 ├─ $MatchF
 │  ╰─ And

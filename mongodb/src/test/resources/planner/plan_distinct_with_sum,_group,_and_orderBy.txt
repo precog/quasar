@@ -106,19 +106,27 @@ Chain
 │  │  ╰─ Name("f0" -> { "$first": "$f0" })
 │  ╰─ By
 │     ╰─ Name("0" -> "$b0")
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ JsCore([_._id["0"], _.f0, _.f0.totalPop])
-│  │     ╰─ JsCore([__val[1], __val])
-│  ╰─ Scope(Map())
 ├─ $ProjectF
 │  ├─ Name("0" -> {
 │  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│  │         {
+│  │           "$arrayElemAt": [
+│  │             [
+│  │               {
+│  │                 "$arrayElemAt": [
+│  │                   ["$_id.0", "$f0", "$f0.totalPop"],
+│  │                   { "$literal": NumberInt("1") }]
+│  │               },
+│  │               ["$_id.0", "$f0", "$f0.totalPop"]],
+│  │             { "$literal": NumberInt("1") }]
+│  │         },
 │  │         { "$literal": NumberInt("2") }]
 │  │     })
-│  ├─ Name("src" -> "$$ROOT")
+│  ├─ Name("src" -> [
+│  │       {
+│  │         "$arrayElemAt": [["$_id.0", "$f0", "$f0.totalPop"], { "$literal": NumberInt("1") }]
+│  │       },
+│  │       ["$_id.0", "$f0", "$f0.totalPop"]])
 │  ╰─ IgnoreId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Descending)

@@ -2,15 +2,24 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([_._id, _])
-│  │  │  │     ╰─ JsCore([__val[0], __val[1]])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│  │  │  │  ╰─ Name("0" -> {
+│  │  │  │          "$push": {
+│  │  │  │            "$let": {
+│  │  │  │              "vars": {
+│  │  │  │                "a": [
+│  │  │  │                  {
+│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }]
+│  │  │  │                  },
+│  │  │  │                  {
+│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                  }]
+│  │  │  │              },
+│  │  │  │              "in": "$$a"
+│  │  │  │            }
+│  │  │  │          }
+│  │  │  │        })
 │  │  │  ╰─ By({ "$literal": null })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
@@ -21,12 +30,6 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ JsCore([__val[0], __val[1]])
-│     │  ╰─ Scope(Map())
 │     ├─ $GroupF
 │     │  ├─ Grouped
 │     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })

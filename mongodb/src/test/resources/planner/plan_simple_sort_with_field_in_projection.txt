@@ -1,12 +1,13 @@
 Chain
 ├─ $ReadF(db; foo)
+├─ $ProjectF
+│  ├─ Name("0" -> ["$bar", "$$ROOT"])
+│  ╰─ IgnoreId
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ JsCore([_.bar, _])
-│  │     ╰─ Obj
-│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined)
-│  │        ╰─ Key(src: __val)
+│  │  ╰─ Obj
+│  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].bar : undefined)
+│  │     ╰─ Key(src: _["0"])
 │  ╰─ Scope(Map())
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)

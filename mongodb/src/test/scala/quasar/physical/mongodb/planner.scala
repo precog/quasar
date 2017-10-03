@@ -459,6 +459,26 @@ class PlannerSpec extends
            ExcludeId)))
     }
 
+    "plan select array" in {
+      plan(sqlE"select [city, loc, pop] from zips") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "zips")),
+         $project(
+           reshape("value" ->
+             $arrayLit(List($field("city"), $field("loc"), $field("pop")))),
+           ExcludeId)))
+    }
+
+    "plan select array (map-reduce)" in {
+      plan2_6(sqlE"select [city, loc, pop] from zips") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "zips")),
+         $simpleMap(
+           NonEmptyList(MapExpr(JsFn(Name("x"),
+             Arr(List(Select(ident("x"), "city"), Select(ident("x"), "loc"), Select(ident("x"), "pop")))))),
+             ListMap())))
+    }
+
     "plan now() with a literal timestamp" in {
       val time = Instant.parse("2016-08-25T00:00:00.000Z")
       val bsTime = Bson.Date.fromInstant(time).get
@@ -1485,12 +1505,12 @@ class PlannerSpec extends
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
         $group(
-          grouped(),
-          -\/(reshape("0" -> $field("city")))),
+          grouped("f0" -> $first($field("city"))),
+          -\/(reshape("0" -> $arrayLit(List($field("city")))))),
         $project(
-          reshape("value" -> $field("_id", "0")),
+          reshape("value" -> $field("f0")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan trivial group by"))
+    }
 
     "plan useless group by expression" in {
       plan(sqlE"select city from zips group by lower(city)") must
@@ -1619,25 +1639,25 @@ class PlannerSpec extends
     }
 
     "plan count grouped by single field" in {
-      plan(sqlE"select count(*) from bar group by baz") must
+      plan(sqlE"select count(*) from zips group by state") must
         beWorkflow0 {
           chain[Workflow](
-            $read(collection("db", "bar")),
+            $read(collection("db", "zips")),
             $group(
-              grouped("__tmp0" -> $sum($literal(Bson.Int32(1)))),
-              -\/(reshape("0" -> $field("baz")))),
+              grouped("f0" -> $sum($literal(Bson.Int32(1)))),
+              -\/(reshape("0" -> $arrayLit(List($field("state")))))),
             $project(
               reshape(
-                "value" -> $field("__tmp0")),
+                "value" -> $field("f0")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan count grouped by single field"))
+    }
 
     "plan count and sum grouped by single field" in {
-      plan(sqlE"select count(*) as cnt, sum(biz) as sm from bar group by baz") must
+      plan(sqlE"select count(*) as cnt, sum(pop) as sm from zips group by state") must
         beWorkflow0 {
           chain[Workflow](
-            $read(collection("db", "bar")),
+            $read(collection("db", "zips")),
             $group(
               grouped(
                 "cnt" -> $sum($literal(Bson.Int32(1))),
@@ -1645,13 +1665,13 @@ class PlannerSpec extends
                   $sum(
                     $cond(
                       $and(
-                        $lt($literal(Bson.Null), $field("biz")),
-                        $lt($field("biz"), $literal(Bson.Text("")))),
-                      $field("biz"),
+                        $lt($literal(Bson.Null), $field("pop")),
+                        $lt($field("pop"), $literal(Bson.Text("")))),
+                      $field("pop"),
                       $literal(Bson.Undefined)))),
-              -\/(reshape("0" -> $field("baz")))))
+              -\/(reshape("0" -> $arrayLit(List($field("state")))))))
         }
-    }.pendingWithActual(notOnPar, testFile("plan count and sum grouped by single field"))
+    }
 
     "plan sum grouped by single field with filter" in {
       plan(sqlE"""select sum(pop) as sm from zips where state="CO" group by city""") must

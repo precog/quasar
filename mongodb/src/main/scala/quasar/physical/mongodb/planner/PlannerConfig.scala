@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.physical.mongodb.planner
 
-import slamdata.Predef._
-import quasar.Planner.PlannerError
+import quasar.qscript.MapFunc
+import quasar.physical.mongodb.BsonVersion
 
 import scalaz._
 
-package object planner {
-  type OptionFree[F[_], A] = Option[Free[F, A]]
-
-  // TODO: Remove this type.
-  type WBM[X] = PlannerError \/ X
-}
+final case class PlannerConfig[T[_[_]], EX[_], WF[_]](
+  joinHandler: JoinHandler[WF, WBM],
+  funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
+  staticHandler: StaticHandler[T, EX],
+  bsonVersion: BsonVersion)

@@ -69,13 +69,9 @@ Chain
 │  │  │     ╰─ NotExpr($right -> Size(0))
 │  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
 │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ JsCore([_.left, _.right])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│  │  │  │  ╰─ Name("0" -> { "$push": { "$let": { "vars": { "a": ["$left", "$right"] }, "in": "$$a" } } })
 │  │  │  ╰─ By({ "$literal": null })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")

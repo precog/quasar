@@ -21,7 +21,7 @@ import quasar._, Planner.PlannerError
 import quasar.contrib.scalaz._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.planner.FuncHandler
+import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.qscript.{Coalesce => _, _}
@@ -101,19 +101,23 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     val bsonVersion = MongoQueryModel.toBsonVersion(queryModel)
     queryModel match {
       case MongoQueryModel.`3.4` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](FuncHandler.handle3_4(bsonVersion))(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](
+          FuncHandler.handle3_4(bsonVersion), StaticHandler.v3_2)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case MongoQueryModel.`3.2` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](FuncHandler.handle3_2(bsonVersion))(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](
+          FuncHandler.handle3_2(bsonVersion), StaticHandler.v3_2)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case MongoQueryModel.`3.0` =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](FuncHandler.handle3_0(bsonVersion))(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](
+          FuncHandler.handle3_0(bsonVersion), StaticHandler.v2_6)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
-        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](FuncHandler.handle2_6(bsonVersion))(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
+        (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](
+          FuncHandler.handle2_6(bsonVersion), StaticHandler.v2_6)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
     }

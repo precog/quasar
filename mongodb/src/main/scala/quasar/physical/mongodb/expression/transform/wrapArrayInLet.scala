@@ -14,16 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.physical.mongodb.expression.transform
 
 import slamdata.Predef._
-import quasar.Planner.PlannerError
 
+import quasar.physical.mongodb.expression._
+
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._
 
-package object planner {
-  type OptionFree[F[_], A] = Option[Free[F, A]]
-
-  // TODO: Remove this type.
-  type WBM[X] = PlannerError \/ X
+object wrapArrayInLet {
+  def apply[T[_[_]]: CorecursiveT, EX[_]: Functor]
+    (expr: EX[T[EX]])
+    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+      : EX[T[EX]] = expr match {
+    case a @ $arrayLitF(_) =>
+      $letF(ListMap(DocVar.Name("a") -> a.embed),
+        $varF[EX, T[EX]](DocVar.Name("a")()).embed)
+    case x => x
+  }
 }

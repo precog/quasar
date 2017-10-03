@@ -59,14 +59,42 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(cnt: [_.left, _.right][0])
-│  │     ╰─ Key(1: (function (__val) { return isString(__val[1][1]) ? __val[1][2] : undefined })(
-│  │            [_.left, _.right]))
-│  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("cnt" -> true)
-   ├─ Name("1" -> true)
+   ├─ Name("cnt" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
+   ├─ Name("1" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             {
+   │               "$lte": [
+   │                 { "$literal": "" },
+   │                 {
+   │                   "$arrayElemAt": [
+   │                     {
+   │                       "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
+   │                     },
+   │                     { "$literal": NumberInt("1") }]
+   │                 }]
+   │             },
+   │             {
+   │               "$lt": [
+   │                 {
+   │                   "$arrayElemAt": [
+   │                     {
+   │                       "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
+   │                     },
+   │                     { "$literal": NumberInt("1") }]
+   │                 },
+   │                 { "$literal": {  } }]
+   │             }]
+   │         },
+   │         {
+   │           "$arrayElemAt": [
+   │             {
+   │               "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
+   │             },
+   │             { "$literal": NumberInt("2") }]
+   │         },
+   │         { "$literal": undefined }]
+   │     })
    ╰─ IgnoreId

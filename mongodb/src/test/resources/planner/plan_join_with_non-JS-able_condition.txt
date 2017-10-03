@@ -2,14 +2,15 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│  │  │  ╰─ IgnoreId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([_._id, _])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(0: Array.isArray(
-│  │  │  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined) ? true : false)
-│  │  │  │        ╰─ Key(src: __val)
+│  │  │  │  ╰─ Obj
+│  │  │  │     ├─ Key(0: Array.isArray(
+│  │  │  │     │      (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined) ? true : false)
+│  │  │  │     ╰─ Key(src: _["0"])
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -65,14 +66,15 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│     │  ╰─ IgnoreId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: Array.isArray(
-│     │  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined) ? true : false)
-│     │  │        ╰─ Key(src: __val)
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(0: Array.isArray(
+│     │  │     │      (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined) ? true : false)
+│     │  │     ╰─ Key(src: _["0"])
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ Doc

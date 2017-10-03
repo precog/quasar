@@ -2,16 +2,17 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│  │  │  ╰─ IgnoreId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([_._id, _])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(0: __val[1].pop)
-│  │  │  │        ├─ Key(1: true)
-│  │  │  │        ├─ Key(2: __val[1])
-│  │  │  │        ├─ Key(3: true)
-│  │  │  │        ╰─ Key(src: __val)
+│  │  │  │  ╰─ Obj
+│  │  │  │     ├─ Key(0: _["0"][1].pop)
+│  │  │  │     ├─ Key(1: true)
+│  │  │  │     ├─ Key(2: _["0"][1])
+│  │  │  │     ├─ Key(3: true)
+│  │  │  │     ╰─ Key(src: _["0"])
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
@@ -47,16 +48,17 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips2)
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│     │  ╰─ IgnoreId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: __val[1].pop)
-│     │  │        ├─ Key(1: true)
-│     │  │        ├─ Key(2: __val[1])
-│     │  │        ├─ Key(3: true)
-│     │  │        ╰─ Key(src: __val)
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(0: _["0"][1].pop)
+│     │  │     ├─ Key(1: true)
+│     │  │     ├─ Key(2: _["0"][1])
+│     │  │     ├─ Key(3: true)
+│     │  │     ╰─ Key(src: _["0"])
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ And

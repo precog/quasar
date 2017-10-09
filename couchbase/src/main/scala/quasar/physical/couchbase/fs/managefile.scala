@@ -28,7 +28,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 abstract class managefile {
-  def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] =
+  def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] =
     for {
       ctx       <- MR.asks(_.ctx)
       src       =  docTypeValueFromPath(scenario.src)
@@ -51,6 +51,9 @@ abstract class managefile {
                        where `${ctx.docTypeKey.v}` like "${src.v}%""""
       _         <- ME.unattempt(lift(query(ctx.bucket, qStr)).into[Eff].liftB)
     } yield ()
+
+  def copy(pair: PathPair): Backend[Unit] =
+    ME.raiseError(FileSystemError.unsupportedOperation("Couchbase does not currently support copying"))
 
   def delete(path: APath): Backend[Unit] =
     for {

@@ -287,11 +287,14 @@ sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Posit
   object ManageFileModule extends ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] =
+    def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] =
       scenario match {
-        case MoveScenario.FileToFile(src, dst) => moveFile(src, dst, semantics)
-        case MoveScenario.DirToDir(src, dst)   => moveDir(src, dst, semantics)
+        case PathPair.FileToFile(src, dst) => moveFile(src, dst, semantics)
+        case PathPair.DirToDir(src, dst)   => moveDir(src, dst, semantics)
       }
+
+    def copy(pair: PathPair): Backend[Unit] =
+      unsupportedOperation("Marklogic connector does not currently support copy").raiseError[Backend, Unit]
 
     def delete(path: APath): Backend[Unit] =
       config[Backend] >>= { cfg =>

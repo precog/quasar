@@ -69,9 +69,9 @@ object nonFsMounts {
         else
           srcMounts
             .traverse_ { mountPath =>
-              val scenario = refineType(mountPath).fold[MoveScenario](
-                m => MoveScenario.DirToDir(src </> m, dst </> m),
-                m => MoveScenario.FileToFile(src </> m, dst </> m))
+              val scenario = refineType(mountPath).fold[PathPair](
+                m => PathPair.DirToDir(src </> m, dst </> m),
+                m => PathPair.FileToFile(src </> m, dst </> m))
               mountMove(scenario, semantics)
             }
 
@@ -84,14 +84,14 @@ object nonFsMounts {
         * ignore the latter as views can exist outside any filesystem so
         * there may be "directories" comprised of nothing but views.
         *
-        * Otherwise, attempt to move the views, emitting any errors that may
+        * Otherwise, attempt to move the non-fs mounts, emitting any errors that may
         * occur in the process.
         */
       def onFileSystemError(mounts: Set[RPath], err: FileSystemError): Free[S, FileSystemError \/ Unit] =
         fsErrorPath.getOption(err).exists(_ === dst)
           .fold(err.left[Unit].point[Free[S, ?]], moveAll(mounts).run)
 
-      /** Attempt to move views, but silence any 'src not found' errors since
+      /** Attempt to move non-fs mounts, but silence any 'src not found' errors since
         * this means there aren't any views to move, which isn't an error in this
         * case.
         */
@@ -109,10 +109,10 @@ object nonFsMounts {
       }
     }
 
-    def mountMove(scenario: MoveScenario, semantics: MoveSemantics): manage.M[Unit] = {
+    def mountMove(scenario: PathPair, semantics: MoveSemantics): manage.M[Unit] = {
       val destinationNonEmpty = scenario match {
-        case MoveScenario.FileToFile(_, dst) => query.fileExists(dst)
-        case MoveScenario.DirToDir(_, dst)   => query.ls(dst).run.map(_.toOption.map(_.nonEmpty).getOrElse(false))
+        case PathPair.FileToFile(_, dst) => query.fileExists(dst)
+        case PathPair.DirToDir(_, dst)   => query.ls(dst).run.map(_.toOption.map(_.nonEmpty).getOrElse(false))
       }
 
       def cacheMove(s: AFile) =
@@ -169,7 +169,10 @@ object nonFsMounts {
       case Move(scenario, semantics) =>
         scenario.fold(
           (src, dst) => dirToDirMove(src, dst, semantics),
-          (src, dst) => mountMove(MoveScenario.FileToFile(src, dst), semantics).run)
+          (src, dst) => mountMove(PathPair.FileToFile(src, dst), semantics).run)
+
+      case Copy(pair) =>
+        unsupportedOperation("It is not yet possible to copy views and modules").left.point[Free[S, ?]]
 
       case Delete(path) =>
         mountDelete(path)

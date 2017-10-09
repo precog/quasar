@@ -53,6 +53,7 @@ object Empty {
 
   def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
     case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
+    case ManageFile.Copy(pair)   => fsPathNotFound(pair.src)
     case ManageFile.Delete(p)    => fsPathNotFound(p)
     case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
   }

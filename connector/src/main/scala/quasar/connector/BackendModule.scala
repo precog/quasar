@@ -124,9 +124,9 @@ trait BackendModule {
     }
 
     val mfInter: ManageFile ~> Configured = λ[ManageFile ~> Configured] {
-      case ManageFile.Move(scenario, semantics) =>
-        ManageFileModule.move(scenario, semantics).run.value
-
+      case ManageFile.Move(pathPair, semantics) =>
+        ManageFileModule.move(pathPair, semantics).run.value
+      case ManageFile.Copy(pathPair) => ManageFileModule.copy(pathPair).run.value
       case ManageFile.Delete(path) => ManageFileModule.delete(path).run.value
       case ManageFile.TempFile(near) => ManageFileModule.tempFile(near).run.value
     }
@@ -237,7 +237,8 @@ trait BackendModule {
   trait ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit]
+    def move(pair: PathPair, semantics: MoveSemantics): Backend[Unit]
+    def copy(pair: PathPair): Backend[Unit]
     def delete(path: APath): Backend[Unit]
     def tempFile(near: APath): Backend[AFile]
   }

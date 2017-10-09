@@ -1,0 +1,28 @@
+{
+  "name": "bug-2226",
+  "data": "revenue.data",
+  "backends": {
+    "couchbase":         "ignoreFieldOrder",
+    "marklogic_json":    "ignoreFieldOrder",
+    "mimir":             "ignoreFieldOrder"
+  },
+  "query": "SELECT DISTINCT Value AS value, Q AS dimension, Region AS series, null AS parallel FROM (SELECT quarter AS Q, value AS Value, region AS Region from revenue) as meh",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "expected": [
+    { "value": 35000, "dimension": "2015-Q1", "series": "east", "parallel": null },
+    { "value": 30000, "dimension": "2015-Q1", "series": "east", "parallel": null },
+    { "value": 25000, "dimension": "2015-Q1", "series": "east", "parallel": null },
+    { "value": 45000, "dimension": "2015-Q2", "series": "east", "parallel": null },
+    { "value": 23000, "dimension": "2015-Q2", "series": "west", "parallel": null },
+    { "value": 12000, "dimension": "2015-Q2", "series": "west", "parallel": null },
+    { "value": 13500, "dimension": "2015-Q2", "series": "west", "parallel": null },
+    { "value": 25000, "dimension": "2015-Q1", "series": "north", "parallel": null },
+    { "value": 30000, "dimension": "2015-Q1", "series": "north", "parallel": null },
+    { "value": 42000, "dimension": "2015-Q2", "series": "north", "parallel": null },
+    { "value": 53000, "dimension": "2015-Q2", "series": "north", "parallel": null },
+    { "value": 45000, "dimension": "2015-Q2", "series": "north", "parallel": null },
+    { "value": 27000, "dimension": "2015-Q2", "series": "south", "parallel": null },
+    { "value": 20000, "dimension": "2015-Q2", "series": "south", "parallel": null }
+  ]
+}

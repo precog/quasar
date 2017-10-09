@@ -110,7 +110,7 @@ object transformPaths {
   )(implicit
     S: ManageFile :<: S
   ): S ~> Free[S, ?] = {
-    import ManageFile._, MoveScenario._
+    import ManageFile._, PathPair._
 
     val M = ManageFile.Ops[S]
     val g = λ[ManageFile ~> Free[S, ?]] {
@@ -121,6 +121,12 @@ object transformPaths {
             (src, dst) => fileToFile(inPath(src), inPath(dst))),
           sem
         ).leftMap(transformErrorPath(outPath)).run
+
+      case Copy(pair) =>
+        M.copy(
+          pair.fold(
+            (src, dst) => dirToDir(inPath(src), inPath(dst)),
+            (src, dst) => fileToFile(inPath(src), inPath(dst)))).leftMap(transformErrorPath(outPath)).run
 
       case Delete(p) =>
         M.delete(inPath(p))

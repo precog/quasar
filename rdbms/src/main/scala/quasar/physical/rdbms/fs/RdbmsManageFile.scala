@@ -22,7 +22,7 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp.free.lift
-import quasar.fs.ManageFile.MoveScenario.{DirToDir, FileToFile}
+import quasar.fs.ManageFile.PathPair.{DirToDir, FileToFile}
 import quasar.fs._
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
@@ -77,7 +77,7 @@ trait RdbmsManageFile
         .flatMap(s => lift(createSchema(s).map(_ => s)).into[Eff])
     }
 
-    override def move(scenario: ManageFile.MoveScenario,
+    override def move(scenario: ManageFile.PathPair,
                       semantics: MoveSemantics): Backend[Unit] = {
 
       def moveFile(src: AFile, dst: AFile): M[Unit] = {
@@ -136,6 +136,9 @@ trait RdbmsManageFile
           } yield ()
       }
     }
+
+    def copy(pair: ManageFile.PathPair): Backend[Unit] =
+      ME.raiseError(unsupportedOperation("Rdbms connector does not currently support copying"))
 
     def deleteFile(aFile: AFile): Backend[Unit] = {
       val dbTablePath = TablePath.create(aFile)

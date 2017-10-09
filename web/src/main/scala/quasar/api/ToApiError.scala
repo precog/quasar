@@ -96,6 +96,10 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         e.toApiError :+ ("logicalplan" := lp.render)
       case QScriptPlanningFailed(e) =>
         e.toApiError
+      case UnsupportedOperation(reason) =>
+        fromMsg(
+          BadRequest withReason "Unsupported Operation",
+          reason)
       case UnknownReadHandle(ReadHandle(path, id)) =>
         apiError(
           InternalServerError withReason "Unknown read handle.",

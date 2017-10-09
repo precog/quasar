@@ -261,12 +261,15 @@ object MongoDb
       *   2) Currently, parsing a directory like "/../foo/bar/" as an absolute
       *      dir succeeds, this should probably be changed to fail.
       */
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+    def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] = {
       val mm: MongoManage[FileSystemError \/ Unit] =
         scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
           .run.liftM[ManageInT]
       toBackend(mm)
     }
+
+    def copy(pair: PathPair): Backend[Unit] =
+      toBackend(FileSystemError.unsupportedOperation("MongoDb connector does not currently support copying").left[Unit].point[MongoDbIO])
 
     def delete(path: APath): Backend[Unit] = {
       val mm: MongoManage[FileSystemError \/ Unit] =

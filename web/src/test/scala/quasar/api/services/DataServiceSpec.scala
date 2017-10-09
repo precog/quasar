@@ -70,7 +70,7 @@ import shapeless.tag.@@
 class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
-  import PathError.{pathExists, pathNotFound}
+  import PathError.pathNotFound
 
   type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
   type Eff1[A] = Coproduct[VCache, Eff2, A]
@@ -750,19 +750,21 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
         ref.unsafePerformSync.contents must_=== expectedNewContents
       }
-      "be 400 for missing Destination header" >> prop { path: AbsFile[Sandboxed] =>
+      "be 400 for missing Destination header" >> prop { path: AFile =>
         val request = Request(uri = pathUri(path), method = Method.MOVE)
         val response = service(emptyMem)(request).unsafePerformSync
         response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
       }
       "be 404 for missing source file" >> prop { (file: AFile, destFile: AFile) =>
-        testMove(
-          from = file,
-          to = destFile,
-          state = emptyMem,
-          status = Status.NotFound,
-          body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
-          newState = Unchanged)
+        file ≠ destFile ==> {
+          testMove(
+            from = file,
+            to = destFile,
+            state = emptyMem,
+            status = Status.NotFound,
+            body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
+            newState = Unchanged)
+        }
       }
       "be 400 if attempting to move a dir into a file" >> prop {(fs: NonEmptyDir, file: AFile) =>
         testMove(
@@ -809,24 +811,140 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
 
-      "be 409 with file to same location" >> prop {(fs: SingleFileMemState) =>
+      "be 400 with file to same location" >> prop {(fs: SingleFileMemState) =>
         testMove(
           from = fs.file,
           to = fs.file,
           state = fs.state,
-          status = Status.Conflict,
-          body = (_: ApiError) must beApiErrorLike(pathExists(fs.file)),
+          status = Status.BadRequest,
+          body = (_: ApiError) must_=== ApiError.fromMsg(
+            Status.BadRequest withReason "Destination is same path as source",
+            s"Destination is same path as source",
+            "path" := fs.file),
           newState = Unchanged)
       }
-      "be 409 with dir to same location" >> prop {(fs: NonEmptyDir) =>
+      "be 400 with dir to same location" >> prop {(fs: NonEmptyDir) =>
         testMove(
           from = fs.dir,
           to = fs.dir,
           state = fs.state,
-          status = Status.Conflict,
+          status = Status.BadRequest,
           body = { err: ApiError =>
             (err.status.reason must_=== "Path exists.") and
             (err.detail("path") must beSome)
+          },
+          newState = Unchanged)
+      }.set(minTestsOk = 10).flakyTest("Gave up after only 1 passed tests. 10 tests were discarded.")
+      // NB: this test is slow because NonEmptyDir instances are still relatively large
+    }
+    "COPY" >> {
+      trait StateChange
+      object Unchanged extends StateChange
+      case class Changed(newContents: FileMap) extends StateChange
+
+      def testCopy[A: EntityDecoder, R: AsResult](
+        from: APath,
+        to: APath,
+        state: InMemState,
+        body: A => R,
+        status: Status,
+        newState: StateChange) = {
+        // TODO: Consider if it's possible to invent syntax Copy(...)
+        val request = Request(
+          uri = pathUri(from),
+          headers = Headers(Header("Destination", UriPathCodec.printPath(to))),
+          method = Method.COPY)
+        val (service, ref) = serviceRef(state)
+        val response = service(request).unsafePerformSync
+        response.status must_=== status
+        body(response.as[A].unsafePerformSync)
+        val expectedNewContents = newState match {
+          case Unchanged => state.contents
+          case Changed(newContents) => newContents
+        }
+        ref.unsafePerformSync.contents must_=== expectedNewContents
+      }
+      "be 400 for missing Destination header" >> prop { path: AFile =>
+        val request = Request(uri = pathUri(path), method = Method.COPY)
+        val response = service(emptyMem)(request).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
+      }
+      "be 404 for missing source file" >> prop { (file: AFile, destFile: AFile) =>
+        file ≠ destFile ==> {
+          testCopy(
+            from = file,
+            to = destFile,
+            state = emptyMem,
+            status = Status.NotFound,
+            body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
+            newState = Unchanged)
+        }
+      }
+      "be 400 if attempting to copy a dir into a file" >> prop {(fs: NonEmptyDir, file: AFile) =>
+        testCopy(
+          from = fs.dir,
+          to = file,
+          state = fs.state,
+          status = Status.BadRequest,
+          body = (_: ApiError) must beApiErrorWithMessage(
+            Status.BadRequest withReason "Illegal move.",
+            "srcPath" := fs.dir,
+            "dstPath" := file),
+          newState = Unchanged)
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      "be 400 if attempting to copy a file into a dir" >> prop {(fs: SingleFileMemState, dir: ADir) =>
+        testCopy(
+          from = fs.file,
+          to = dir,
+          state = fs.state,
+          status = Status.BadRequest,
+          body = (_: ApiError) must beApiErrorWithMessage(
+            Status.BadRequest withReason "Illegal move.",
+            "srcPath" := fs.file,
+            "dstPath" := dir),
+          newState = Unchanged)
+      }
+      "be 201 with file" >> prop {(fs: SingleFileMemState, file: AFile) =>
+        (fs.file ≠ file) ==>
+          testCopy(
+            from = fs.file,
+            to = file,
+            state = fs.state,
+            status = Status.Created,
+            body = (str: String) => str must_=== "",
+            newState = Changed(Map(file -> fs.contents, fs.file -> fs.contents)))
+      }
+      "be 201 with dir" >> prop {(fs: NonEmptyDir, dir: ADir) =>
+        (fs.dir ≠ dir) ==>
+          testCopy(
+            from = fs.dir,
+            to = dir,
+            state = fs.state,
+            status = Status.Created,
+            body = (str: String) => str must_=== "",
+            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap ++ fs.state.contents))
+      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      "be 400 with file to same location" >> prop {(fs: SingleFileMemState) =>
+        testCopy(
+          from = fs.file,
+          to = fs.file,
+          state = fs.state,
+          status = Status.BadRequest,
+          body = (_: ApiError) must_=== ApiError.fromMsg(
+            Status.BadRequest withReason "Destination is same path as source",
+            s"Destination is same path as source",
+            "path" := fs.file),
+          newState = Unchanged)
+      }
+      "be 400 with dir to same location" >> prop {(fs: NonEmptyDir) =>
+        testCopy(
+          from = fs.dir,
+          to = fs.dir,
+          state = fs.state,
+          status = Status.BadRequest,
+          body = { err: ApiError =>
+            (err.status.reason must_=== "Path exists.") and
+              (err.detail("path") must beSome)
           },
           newState = Unchanged)
       }.set(minTestsOk = 10).flakyTest("Gave up after only 1 passed tests. 10 tests were discarded.")

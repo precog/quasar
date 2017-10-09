@@ -104,7 +104,8 @@ object Skeleton extends BackendModule with DefaultAnalyzeModule {
   object ManageFileModule extends ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ???
+    def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] = ???
+    def copy(pair: PathPair): Backend[Unit] = ???
     def delete(path: APath): Backend[Unit] = ???
     def tempFile(near: APath): Backend[AFile] = ???
   }

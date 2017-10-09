@@ -166,6 +166,24 @@ object hierarchical {
             )).raiseError[MES, Unit]
         }.run
 
+      case Copy(pair) =>
+        val src = lookup(pair.src).toRightDisjunction(
+          pathErr(pathNotFound(pair.src)))
+
+        val dst = lookup(pair.dst).toRightDisjunction(
+          noMountError(pair.dst))
+
+        EitherT.fromDisjunction[M](src tuple dst).flatMap {
+          case ((srcMnt, g), (dstMnt, _)) if srcMnt === dstMnt =>
+            EitherT(g(Copy(pair)))
+
+          case _ =>
+            pathErr(invalidPath(
+              pair.dst,
+              s"must refer to the same filesystem as '${posixCodec.printPath(pair.src)}'"
+            )).raiseError[MES, Unit]
+        }.run
+
       case Delete(path) =>
         refineType(path).fold(deleteDir, deleteFile)
 

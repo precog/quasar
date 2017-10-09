@@ -309,7 +309,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   }
 
   "ManageFile.move" should {
-    import ManageFile._, MoveScenario._, MoveSemantics._
+    import ManageFile._, PathPair._, MoveSemantics._
 
     val srcPath = rootDir </> dir("view") </> file("simpleZips")
     val dstPath = rootDir </> dir("foo") </> file("bar")

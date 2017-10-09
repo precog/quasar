@@ -1,0 +1,14 @@
+{ "quarter": "2015-Q1", "value": 35000, "region": "east" }
+{ "quarter": "2015-Q1", "value": 30000, "region": "east" }
+{ "quarter": "2015-Q1", "value": 25000, "region": "east" }
+{ "quarter": "2015-Q2", "value": 45000, "region": "east" }
+{ "quarter": "2015-Q2", "value": 23000, "region": "west" }
+{ "quarter": "2015-Q2", "value": 12000, "region": "west" }
+{ "quarter": "2015-Q2", "value": 13500, "region": "west" }
+{ "quarter": "2015-Q1", "value": 25000, "region": "north" }
+{ "quarter": "2015-Q1", "value": 30000, "region": "north" }
+{ "quarter": "2015-Q2", "value": 42000, "region": "north" }
+{ "quarter": "2015-Q2", "value": 53000, "region": "north" }
+{ "quarter": "2015-Q2", "value": 45000, "region": "north" }
+{ "quarter": "2015-Q2", "value": 27000, "region": "south" }
+{ "quarter": "2015-Q2", "value": 20000, "region": "south" }

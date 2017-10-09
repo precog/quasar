@@ -694,8 +694,19 @@ Removes all data and views at the specified path. Single files are deleted atomi
 
 ### MOVE /data/fs/[path]
 
-Moves data from one path to another within the same backend. The new path must
-be provided in the `Destination` request header. Single files are moved atomically.
+Moves data from one path to another. Currently, both the source and destination must be within the same backend. The new path is provided in the `Destination` request header. Single files are moved atomically.
+
+A 400 BadRequest is returned if the destination header is missing or if the source and destination are the same.
+A 409 Conflict is returned if a file or directory already exists at the specified destination
+A 201 Created is returned if the operation completed successfully
+
+### COPY /data/fs/[path]
+
+Copy a file or directory in the filesystem. Currently, both the source and destination must be within the same backend. The destination path is provided in the `Destination` request header.
+
+A 400 BadRequest is returned if the destination header is missing or if the source and destination are the same.
+A 409 Conflict is returned if a file or directory already exists at the specified destination
+A 201 Created is returned if the operation completed successfully
 
 ### GET /invoke/fs/[path]
 

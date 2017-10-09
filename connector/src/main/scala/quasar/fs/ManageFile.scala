@@ -30,8 +30,8 @@ import scalaz._, Scalaz._
 sealed abstract class ManageFile[A]
 
 object ManageFile {
-  sealed abstract class MoveScenario {
-    import MoveScenario._
+  sealed abstract class PathPair {
+    import PathPair._
 
     def fold[X](
       d2d: (ADir, ADir) => X,
@@ -47,21 +47,23 @@ object ManageFile {
     def dst: APath
   }
 
-  object MoveScenario {
+  object PathPair {
     final case class DirToDir private (src: ADir, dst: ADir)
-        extends MoveScenario
+        extends PathPair
     final case class FileToFile private (src: AFile, dst: AFile)
-        extends MoveScenario
+        extends PathPair
 
-    val dirToDir: Prism[MoveScenario, (ADir, ADir)] =
-      Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ2(none)))(DirToDir.tupled)
+    val dirToDir: Prism[PathPair, (ADir, ADir)] =
+      Prism((_: PathPair).fold((s, d) => (s, d).some, κ2(none)))(DirToDir.tupled)
 
-    val fileToFile: Prism[MoveScenario, (AFile, AFile)] =
-      Prism((_: MoveScenario).fold(κ2(none), (s, d) => (s, d).some))(FileToFile.tupled)
+    val fileToFile: Prism[PathPair, (AFile, AFile)] =
+      Prism((_: PathPair).fold(κ2(none), (s, d) => (s, d).some))(FileToFile.tupled)
   }
 
-  final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
+  final case class Move(pair: PathPair, semantics: MoveSemantics)
     extends ManageFile[FileSystemError \/ Unit]
+
+  final case class Copy(pair: PathPair) extends ManageFile[FileSystemError \/ Unit]
 
   final case class Delete(path: APath)
     extends ManageFile[FileSystemError \/ Unit]
@@ -77,16 +79,22 @@ object ManageFile {
     /** Request the given move scenario be applied to the file system, using the
       * given semantics.
       */
-    def move(scenario: MoveScenario, semantics: MoveSemantics): M[Unit] =
-      EitherT(lift(Move(scenario, semantics)))
+    def move(pair: PathPair, semantics: MoveSemantics): M[Unit] =
+      EitherT(lift(Move(pair, semantics)))
 
     /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
     def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): M[Unit] =
-      move(MoveScenario.dirToDir(src, dst), sem)
+      move(PathPair.dirToDir(src, dst), sem)
 
     /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
     def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): M[Unit] =
-      move(MoveScenario.fileToFile(src, dst), sem)
+      move(PathPair.fileToFile(src, dst), sem)
+
+    def copy(pair: PathPair): M[Unit] = EitherT(lift(Copy(pair)))
+
+    def copyDir(src: ADir, dst: ADir): M[Unit] = copy(PathPair.dirToDir(src, dst))
+
+    def copyFile(src: AFile, dst: AFile): M[Unit] = copy(PathPair.fileToFile(src, dst))
 
     /** Rename the `src` file in the same directory. */
     def renameFile(src: AFile, name: String): M[AFile] = {
@@ -117,6 +125,8 @@ object ManageFile {
           scenario.fold(
             (from, to) => List(from.render, to.render),
             (from, to) => List(from.render, to.render)))
+        case Copy(pair) => NonTerminal(List("Copy"), None,
+          List(pair.src.render, pair.dst.render))
         case Delete(path) => NonTerminal(List("Delete"), None, List(path.render))
         case TempFile(nearTo) => NonTerminal(List("TempFile"), None, List(nearTo.render))
       }

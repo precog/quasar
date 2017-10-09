@@ -183,6 +183,23 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
       }
 
+      "copying" >> {
+        val f1 = managePrefix </> dir("d1") </> file("f1")
+        val f2 = managePrefix </> dir("d2") </> file("f2")
+        val p =
+          write.save(f1, oneDoc.toProcess).drain ++
+          manage.copyFile(f1, f2).liftM[Process].drain ++
+          read.scanAll(f2) ++
+          read.scanAll(f1)
+
+        val result = runLogT(run, p).map(_.toVector).runEither
+        result match {
+          case Left(UnsupportedOperation(_)) => skipped("This connector does not seem to support copy which is fine")
+          case Left(error)                   => org.specs2.execute.Failure("Received filesystem error: " + error.shows)
+          case Right(res)                    => (res must_=== (oneDoc ++ oneDoc)).toResult
+        }
+      }
+
       "deleting a nonexistent file returns PathNotFound" >> {
         val f = managePrefix </> file("delfilenotfound")
         runT(run)(manage.delete(f)).runEither must beLeft(pathErr(pathNotFound(f)))

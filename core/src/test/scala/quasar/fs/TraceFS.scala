@@ -94,6 +94,7 @@ object TraceFS {
       WriterT.writer((Vector(mf.render),
         mf match {
           case Move(scenario, semantics) => \/-(())
+          case Copy(pair)                => \/-(())
           case Delete(path)              => \/-(())
           case TempFile(near) =>
             \/-(refineType(near).fold(ι, fileParent) </> file("tmp"))

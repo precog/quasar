@@ -223,14 +223,14 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   def QueryFileModule: QueryFileModule = SparkQueryFileModule
 
   abstract class SparkCoreManageFileModule extends ManageFileModule {
-    import ManageFile._, ManageFile.MoveScenario._
+    import ManageFile._, ManageFile.PathPair._
     import quasar.fs.impl.ensureMoveSemantics
 
     def moveFile(src: AFile, dst: AFile): M[Unit]
     def moveDir(src: ADir, dst: ADir): M[Unit]
     def doesPathExist: APath => M[Boolean]
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ((scenario, semantics) match {
+    def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] = ((scenario, semantics) match {
       case (FileToFile(sf, df), semantics) => for {
         _  <- (((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
           moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
@@ -241,6 +241,9 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
           moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB).unattempt
       } yield ()
     })
+
+    def copy(pair: PathPair): Backend[Unit] =
+      unsupportedOperation("Spark connector does not currently support copy operation").left[Unit].point[M].liftB.unattempt
 
     def tempFile(near: APath): Backend[AFile] = lift(Task.delay {
       val parent: ADir = refineType(near).fold(d => d, fileParent(_))

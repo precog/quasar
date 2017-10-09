@@ -63,6 +63,8 @@ object FileSystemError {
     extends FileSystemError
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
+  final case class UnsupportedOperation(reason: String)
+    extends FileSystemError
 
   val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
     case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
@@ -107,6 +109,10 @@ object FileSystemError {
     case WriteFailed(d, r) => (d, r)
   } (WriteFailed.tupled)
 
+  val unsupportedOperation = Prism.partial[FileSystemError, String] {
+    case UnsupportedOperation(reason) => reason
+  } (UnsupportedOperation)
+
   implicit val fileSystemErrorEqual: Equal[FileSystemError] = Equal.equalA
 
   implicit def fileSystemErrorShow: Show[FileSystemError] =
@@ -131,5 +137,7 @@ object FileSystemError {
         s"Failed to write $n data."
       case WriteFailed(d, r) =>
         s"Failed to write datum: reason='$r', datum=${d.shows}"
+      case UnsupportedOperation(reason) =>
+        s"Operation is unsupported because $reason"
     }
 }

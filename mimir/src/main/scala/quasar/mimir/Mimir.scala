@@ -991,7 +991,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
     import ManageFile._
 
     // TODO directory moving and varying semantics
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+    def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] = {
       scenario.fold(
         d2d = { (from, to) =>
           for {
@@ -1044,6 +1044,9 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
           } yield ()
         })
     }
+
+    def copy(pair: PathPair): Backend[Unit] =
+      MonadError_[Backend, FileSystemError].raiseError(unsupportedOperation("Mimir currently does not support copy"))
 
     def delete(path: APath): Backend[Unit] = {
       for {

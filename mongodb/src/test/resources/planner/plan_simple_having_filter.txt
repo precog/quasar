@@ -88,7 +88,7 @@ Chain
 │     │  ├─ Name("0" -> { "$literal": true })
 │     │  ├─ Name("1" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] })
 │     │  ├─ Name("src" -> ["$left", "$right"])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ And
 │     │     ├─ Doc
@@ -137,7 +137,7 @@ Chain
 │     │  │           { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
 │     │  │           { "$literal": NumberInt("10") }]
 │     │  │       }])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [null, { "right": [], "left": [value["0"]] }] })
 │     │  ╰─ Scope(Map())
@@ -174,5 +174,5 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$b0")
 ╰─ $ProjectF
-   ├─ Name("value" -> "$f0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$f0")
    ╰─ ExcludeId

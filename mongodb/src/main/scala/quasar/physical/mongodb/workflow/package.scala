@@ -75,12 +75,16 @@ package object workflow {
       Inject[WorkflowOpCoreF, WorkflowF].prj(p.op)
   }
 
-  val ExprLabel  = "value"
-  val ExprName   = BsonField.Name(ExprLabel)
+  /** Quasar result sigil. */
+  val QuasarSigilName  = BsonField.Name(sigil.Quasar)
+  val QuasarSigilVar   = DocVar.ROOT(QuasarSigilName)
+
+  /** MapReduce result expression key. */
+  val ExprName   = BsonField.Name(sigil.Value)
   val ExprVar    = DocVar.ROOT(ExprName)
 
-  val IdLabel  = "_id"
-  val IdName   = BsonField.Name(IdLabel)
+  /** MapReduce result identity key. */
+  val IdName   = BsonField.Name(sigil.Id)
   val IdVar    = DocVar.ROOT(IdName)
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
@@ -618,62 +622,81 @@ package object workflow {
       // NB: We don’t convert a $ProjectF after a map/reduce op because it could
       //     affect the final shape unnecessarily.
       def crystallize(op: Fix[F]) = {
-        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-        def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
-          uw.src.project match {
-            case I(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
-            case src => src
-          }
-
-        val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
-          case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-            case I(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
-              mr.singleSource.fmap(ι, I).reparentW(I.inj(uw.flatmapop).embed).project
-            case _                        => I.inj(mr)
-          }
-          case I($FoldLeftF(head, tail)) =>
-            I.inj($FoldLeftF[Fix[F]](
-              chain(head,
-                $project[F](
-                  Reshape(ListMap(ExprName -> \/-($$ROOT))),
-                  IncludeId)),
-              tail.map(x => x.project match {
-                case I($ReduceF(_, _, _)) => x
-                case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
-              })))
-          case I(g @ $GroupF(src, grouped, by)) =>
-            // We can't use arrays directly inside accumulators because of
-            // https://jira.mongodb.org/browse/SERVER-23839
-            // so let's wrap arrays in a let
-            I($GroupF(src, wrapArrayLitExprInLet(grouped), by))
-
-          case op => op
-        }
 
         val finished =
           deleteUnusedFields(reorderOps(simplifyGroup[F](op)))
 
         def fixShape(wf: Fix[F]) =
-          simpleShape(wf).fold(
-            finished)(
-            n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
+          simpleShape(wf).fold(finished) { n =>
+            $project[F](Reshape(n.strengthR($include().right).toListMap)).apply(finished)
+          }
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.project match {
-          case I($SimpleMapF(_, _, _))   => fixShape(wf)
-          case IsShapePreserving(sp) => promoteKnownShape(sp.src)
-          case _                     => finished
+          case I($SimpleMapF(_, _, _)) => fixShape(wf)
+          case IsShapePreserving(sp)   => promoteKnownShape(sp.src)
+          case _                       => finished
         }
 
-        // FIXME: This _may_ be causing the failure.
         Crystallized(
-          promoteKnownShape(finished).transHylo(Coalesce[F].coalesce, crystallizeƒ)
-            // TODO: this can coalesce more cases, but hasn’t been done thus far
-            //       and requires rewriting many tests in a much less readable
-            //       way.
-            // .cata[Workflow](x => coalesce(uncleanƒ(x).project))
-        )
+          wrapFinalMapReduceValue(
+            promoteKnownShape(finished)
+              .transHylo(Coalesce[F].coalesce, crystallizeƒ)))
       }
+
+      val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
+        case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
+          case I(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
+            mr.singleSource.fmap(ι, I).reparentW(I.inj(uw.flatmapop).embed).project
+          case _                        => I.inj(mr)
+        }
+        case I($FoldLeftF(head, tail)) =>
+          I.inj($FoldLeftF[Fix[F]](
+            chain(head,
+              $project[F](
+                Reshape(ListMap(ExprName -> \/-($$ROOT))),
+                IncludeId)),
+            tail.map(x => x.project match {
+              case I($ReduceF(_, _, _)) => x
+              case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
+            })))
+        case I(g @ $GroupF(src, grouped, by)) =>
+          // We can't use arrays directly inside accumulators because of
+          // https://jira.mongodb.org/browse/SERVER-23839
+          // so let's wrap arrays in a let
+          I($GroupF(src, wrapArrayLitExprInLet(grouped), by))
+
+        case op => op
+      }
+
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
+        uw.src.project match {
+          case I(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
+          case src => src
+        }
+
+      /** Wraps the result of a map-reduce in the Sigil, if it is the last
+        * stage in the workflow, so it may be identified and unwrapped
+        * when reading and querying.
+        *
+        * TODO: This doesn't appear to be necessary when returning "inline"
+        *       map-reduce results, but we don't have enough information to
+        *       know if this is the case here. It may be worth refactoring
+        *       to be a transformation on WorkflowTask.
+        */
+      val wrapFinalMapReduceValue: Fix[F] => Fix[F] = {
+        case mr @ Embed(I(_: MapReduceF[Fix[F]])) =>
+          $simpleMap[F](
+            NonEmptyList(MapExpr(jscore.JsFn(
+              finalValue,
+              jscore.obj(sigil.Quasar -> jscore.Ident(finalValue))))),
+            ListMap()).apply(mr)
+
+        case other => other
+      }
+
+      val finalValue = jscore.Name("__finalVal")
     }
 
   implicit def workflowRenderTree[T[_[_]]: RecursiveT, F[_]: Traverse: Classify](implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[F[Unit]]): RenderTree[T[F]] =

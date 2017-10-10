@@ -22,7 +22,6 @@ import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.{logErrors, stdout}
-import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
@@ -63,7 +62,8 @@ object Server {
       val loadConfigM: Task[BackendConfig] = opts.loadConfig.fold(
         { plugins =>
           val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
-          ADir.fromFile(plugins).getOrElseF(err).map(BackendConfig.JarDirectory(_))
+          val check = Task.delay(plugins.exists() && !plugins.isFile())
+          check.ifM(Task.now(BackendConfig.JarDirectory(plugins)), err)
         },
         backends => BackendConfig.fromBackends(IList.fromList(backends)))
 

@@ -251,7 +251,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           ListMap()))
 
       toJS(wf) must beRightDisjunction(
-        """db.zips.mapReduce(
+        s"""db.zips.mapReduce(
           |  function () {
           |    emit.apply(
           |      null,
@@ -260,7 +260,10 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           |        this))
           |  },
           |  function (key, values) { return Array.sum(values) },
-          |  { "out": { "inline": NumberLong("1") } });
+          |  {
+          |    "out": { "inline": NumberLong("1") },
+          |    "finalize": function (key, value) { return { "${sigil.Quasar}": value } }
+          |  });
           |""".stripMargin)
     }
 

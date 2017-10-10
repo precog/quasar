@@ -36,6 +36,7 @@ trait QuasarSpecification extends AnyRef
         with org.specs2.matcher.ShouldExpectations
         with org.specs2.matcher.MatchResultCombinators
         with org.specs2.matcher.ValueChecks
+        with org.specs2.matcher.MatcherZipOperators
         with org.specs2.execute.PendingUntilFixed
         with org.specs2.ScalaCheck
         with org.specs2.scalaz.ScalazMatchers

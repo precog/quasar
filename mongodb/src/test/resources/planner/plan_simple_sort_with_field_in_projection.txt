@@ -2,7 +2,7 @@ Chain
 ├─ $ReadF(db; foo)
 ├─ $ProjectF
 │  ├─ Name("0" -> ["$bar", "$$ROOT"])
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
@@ -12,5 +12,5 @@ Chain
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
    ╰─ ExcludeId

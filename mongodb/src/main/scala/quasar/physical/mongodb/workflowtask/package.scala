@@ -84,12 +84,12 @@ package object workflowtask {
                   ExcludeId).pipeline)))
 
         case None =>
-          (ExprVar,
+          (QuasarSigilVar,
             PipelineTask(
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape[ExprOp](ListMap(ExprName -> $var(base).right)),
+                  Reshape[ExprOp](ListMap(QuasarSigilName -> $var(base).right)),
                   ExcludeId).pipeline)))
       }
     case _ => (base, task)

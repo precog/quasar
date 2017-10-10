@@ -19,6 +19,7 @@ package quasar.regression
 import slamdata.Predef._
 
 import argonaut._, Argonaut._
+import scalaz.Equal
 
 sealed abstract class TestDirective
 
@@ -46,4 +47,7 @@ object TestDirective {
       case "ignoreResultOrder" => ok(IgnoreResultOrder)
       case str => fail("\"" + str + "\" is not a valid backend directive.", c.history)
     })
+
+  implicit val equal: Equal[TestDirective] =
+    Equal.equalA
 }

@@ -148,22 +148,21 @@ abstract class QueryRegressionTest[S[_]](
     }
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
-      test.backends.get(backendName) match {
-        case Some(TestDirective.Skip)    => skipped
-        case Some(TestDirective.SkipCI)  =>
+      collectFirstDirective(test.backends, backendName) {
+        case TestDirective.Skip    => skipped
+        case TestDirective.SkipCI  =>
           BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
-        case Some(TestDirective.Timeout)  =>
+        case TestDirective.Timeout =>
           // NB: To locally skip tests that time out, make `Skipped` unconditional.
           BuildInfo.isCIBuild.fold(
             execute.Skipped("(skipped because it times out)"),
             runTest)
-        case Some(TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder) =>
+        case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
           if (BuildInfo.coverageEnabled)
             execute.Skipped("(pending example skipped during coverage run)")
           else
             runTest.pendingUntilFixed
-        case _                           => runTest
-      }
+      } getOrElse runTest
     }
   }
 
@@ -181,19 +180,6 @@ abstract class QueryRegressionTest[S[_]](
     Task.gatherUnordered(locs.toList map ensureTestFile) map (_ any ι)
   }
 
-  /** This is a workaround for issue where Mongo can only return objects. The
-    * fallback evaluator will allow us to fix this in the right way, but for now
-    * we just work around it in the tests.
-    */
-  val promoteValue: Json => Option[Json] =
-    json => json.obj.fold(
-      json.some)(
-      _.toList match {
-        case Nil                      => None
-        case ("value", result) :: Nil => result.some
-        case _                        => json.some
-      })
-
   val TestContext = new MathContext(13, RoundingMode.DOWN)
 
   /** This helps us get identical results on different connectors, even though
@@ -202,8 +188,8 @@ abstract class QueryRegressionTest[S[_]](
   val reducePrecision =
     λ[EndoK[ejson.Common]](ejson.dec.modify(_.round(TestContext))(_))
 
-  val normalizeJson: Json => Option[Json] =
-    j => promoteValue(Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json])))
+  val normalizeJson: Json => Json =
+    j => Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json]))
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
@@ -231,31 +217,34 @@ abstract class QueryRegressionTest[S[_]](
       w.value
     })
 
-    def deleteFields: Json => Json =
+    val deleteFields: Json => Json =
       _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
 
     val result =
       exp.predicate(
         exp.rows.toVector,
-        act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
-        // TODO: Error if a backend ignores field order when the query already does.
-        if (exp.ignoreFieldOrder) OrderIgnored
-        else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder) =>
-            OrderIgnored
-          case _ =>
-            OrderPreserved
-        },
-        if (exp.ignoreResultOrder) OrderIgnored
-        else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder) =>
-            OrderIgnored
-          case _ =>
-            OrderPreserved
-        })
+        act.map(normalizeJson <<< deleteFields <<< (_.asJson)).translate[Task](liftRun),
 
-    exp.backends.get(backendName) match {
-        case Some(TestDirective.Timeout) => result.map {
+        // TODO: Error if a backend ignores field order when the query already does.
+        if (exp.ignoreFieldOrder)
+          OrderIgnored
+        else
+          collectFirstDirective[OrderSignificance](exp.backends, backendName) {
+            case TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder =>
+              OrderIgnored
+          } | OrderPreserved,
+
+        if (exp.ignoreResultOrder)
+          OrderIgnored
+        else
+          collectFirstDirective[OrderSignificance](exp.backends, backendName) {
+            case TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder =>
+              OrderIgnored
+          } | OrderPreserved)
+
+    collectFirstDirective(exp.backends, backendName) {
+      case TestDirective.Timeout =>
+        result.map {
           case execute.Success(_, _) =>
             execute.Failure(s"Fixed now, you should remove the “timeout” status.")
           case execute.Failure(m, _, _, _) =>
@@ -265,10 +254,9 @@ abstract class QueryRegressionTest[S[_]](
           case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
           case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
         }
-      case _ => result.handle {
-        case e: java.util.concurrent.TimeoutException =>
-          execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
-      }
+    } getOrElse result.handle {
+      case e: java.util.concurrent.TimeoutException =>
+        execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
     }
   }
 
@@ -372,6 +360,19 @@ abstract class QueryRegressionTest[S[_]](
         else
           Process.halt)
 
+  /** Whether the backend has the specified directive in the given test. */
+  private def hasDirective(td: TestDirective, dirs: Directives, name: BackendName): Boolean =
+    Foldable[Option].compose[NonEmptyList].any(dirs get name)(_ ≟ td)
+
+  /** Returns the result of the given partial function applied to the first directive
+    * for which it is defined, or `None` if it is undefined for all directives.
+    */
+  private def collectFirstDirective[A]
+      (dirs: Directives, name: BackendName)
+      (pf: PartialFunction[TestDirective, A])
+      : Option[A] =
+    Foldable[Option].compose[NonEmptyList]
+      .findMapM[Id, TestDirective, A](dirs get name)(pf.lift)
 }
 
 object QueryRegressionTest {

@@ -20,5 +20,5 @@ Chain
 │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
 │  ╰─ By({ "$literal": null })
 ╰─ $ProjectF
-   ├─ Name("value" -> "$f0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$f0")
    ╰─ ExcludeId

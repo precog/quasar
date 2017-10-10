@@ -1,16 +1,20 @@
 Chain
 ├─ $ReadF(db; zips)
 ├─ $ProjectF
-│  ├─ Name("0" -> ["$$ROOT", "$$ROOT"])
-│  ╰─ IgnoreId
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined)
-│  │     ╰─ Key(src: _["0"])
-│  ╰─ Scope(Map())
+│  ├─ Name("0" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │         },
+│  │         "$pop",
+│  │         { "$literal": undefined }]
+│  │     })
+│  ├─ Name("src" -> "$$ROOT")
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

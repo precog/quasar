@@ -17,7 +17,7 @@ Chain
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("3") }] })
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Flatten
 │  │  │  │  ╰─ JsCore(_["0"])
@@ -183,7 +183,7 @@ Chain
 │     │  │         },
 │     │  │         { "$literal": undefined }]
 │     │  │     })
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Flatten
 │     │  │  ╰─ JsCore(_.f)
@@ -225,4 +225,4 @@ Chain
 ╰─ $ProjectF
    ├─ Name("0" -> { "$arrayElemAt": ["$left", { "$literal": NumberInt("1") }] })
    ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
-   ╰─ IgnoreId
+   ╰─ ExcludeId

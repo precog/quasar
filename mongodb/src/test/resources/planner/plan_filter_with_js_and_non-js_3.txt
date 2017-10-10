@@ -31,5 +31,5 @@ Chain
 │     ╰─ Doc
 │        ╰─ Expr($3 -> Lt(Int32(20000)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

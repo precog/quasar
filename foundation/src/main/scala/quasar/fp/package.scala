@@ -175,10 +175,18 @@ package object fp
       G[A] => M[G[A]] =
     ftf => F.prj(ftf).fold(ftf.point[M])(orig)
 
+  def liftFGTrans[F[_], G[_], A](prism: PrismNT[G, F])(f: F[A] => Option[G[A]])
+      : G[A] => Option[G[A]] =
+    ga => prism.get(ga).flatMap(f)
+
 
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
+  def liftFFTrans[F[_], G[_], A](prism: PrismNT[G, F])(f: F[A] => Option[F[A]])
+      : G[A] => Option[G[A]] =
+    ga => prism.get(ga).flatMap(f).map(prism.reverseGet(_))
 
   def liftR[T[_[_]]: BirecursiveT, F[_]: Traverse, G[_]: Traverse](orig: T[F] => T[F])(implicit F: F:<: G):
       T[G] => T[G] =

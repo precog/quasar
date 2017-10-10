@@ -23,11 +23,11 @@ import quasar.fs.PhysicalError
 import quasar.namegen._
 
 import com.mongodb.async.AsyncBatchCursor
-import org.bson.BsonDocument
+import org.bson.BsonValue
 import scalaz._
 
 package object mongodb {
-  type BsonCursor         = AsyncBatchCursor[BsonDocument]
+  type BsonCursor         = AsyncBatchCursor[BsonValue]
 
   type MongoErrT[F[_], A] = EitherT[F, PhysicalError, A]
 

@@ -14,5 +14,5 @@ Chain
 │     ╰─ Doc
 │        ╰─ Expr($1 -> Lt(Int32(4)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

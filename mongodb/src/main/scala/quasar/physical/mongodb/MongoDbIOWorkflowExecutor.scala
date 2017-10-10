@@ -100,13 +100,20 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
   protected def mapReduce(src: Collection, dst: OutputCollection, mr: MapReduce) =
     MongoDbIO.mapReduce(src, dst, mr)
 
-  protected def mapReduceCursor(src: Collection, mr: MapReduce) =
-    toCursor(MongoDbIO.mapReduceIterable(src, mr))
+  protected def mapReduceCursor(src: Collection, mr: MapReduce) = {
+    // NB: MapReduce results look like { _id: <reduce key>, value: <reduced value> }
+    def unwrap(doc: BsonDocument): BsonValue =
+      doc.get(sigil.Value, doc)
 
-  private def toCursor[I <: MongoIterable[BsonDocument]](
+    toCursor(MongoDbIO.mapReduceIterable(src, mr).map(Functor[MongoIterable].map(_)(unwrap)))
+  }
+
+  private def toCursor[I <: MongoIterable[_ <: BsonValue]](
     bcIO: MongoDbIO[I]
   ): MongoDbIO[BsonCursor] =
-    bcIO flatMap (bc => MongoDbIO.async(bc.batchCursor))
+    bcIO flatMap { bc =>
+      MongoDbIO.async((bc: MongoIterable[_ <: BsonValue]).widen[BsonValue].batchCursor)
+    }
 }
 
 private[mongodb] object MongoDbIOWorkflowExecutor {

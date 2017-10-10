@@ -153,7 +153,7 @@ Chain
 │  │         "$left"]
 │  │     })
 │  ├─ Name("right" -> "$right")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
@@ -197,4 +197,4 @@ Chain
    ├─ Name("name" -> true)
    ├─ Name("address" -> true)
    ├─ Name("zip" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

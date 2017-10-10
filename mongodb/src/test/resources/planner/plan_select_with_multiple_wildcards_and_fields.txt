@@ -19,16 +19,18 @@ Chain
 │        ╰─ Expr($pop -> Lt(Int32(1000)))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ SpliceObjects
-   │     ├─ SpliceObjects
-   │     │  ├─ SpliceObjects
-   │     │  │  ├─ SpliceObjects
-   │     │  │  │  ├─ Obj
-   │     │  │  │  │  ╰─ Key(state2: _.state)
-   │     │  │  │  ╰─ Ident(_)
-   │     │  │  ╰─ Obj
-   │     │  │     ╰─ Key(city2: _.city)
-   │     │  ╰─ Ident(_)
-   │     ╰─ Obj
-   │        ╰─ Key(pop2: _.pop)
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ SpliceObjects
+   │           │  ├─ SpliceObjects
+   │           │  │  ├─ SpliceObjects
+   │           │  │  │  ├─ Obj
+   │           │  │  │  │  ╰─ Key(state2: _.state)
+   │           │  │  │  ╰─ Ident(_)
+   │           │  │  ╰─ Obj
+   │           │  │     ╰─ Key(city2: _.city)
+   │           │  ╰─ Ident(_)
+   │           ╰─ Obj
+   │              ╰─ Key(pop2: _.pop)
    ╰─ Scope(Map())

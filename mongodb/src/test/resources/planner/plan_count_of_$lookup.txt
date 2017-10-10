@@ -8,7 +8,7 @@ Chain
 │  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │  │  │  ├─ Name("1" -> { "$literal": true })
 │  │  │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  │  │  ╰─ IgnoreId
+│  │  │  │  │  ╰─ ExcludeId
 │  │  │  │  ├─ $MatchF
 │  │  │  │  │  ╰─ And
 │  │  │  │  │     ├─ Doc
@@ -39,7 +39,7 @@ Chain
 │  │  │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │     │  ├─ Name("1" -> { "$literal": true })
 │  │  │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │     │  ╰─ IgnoreId
+│  │  │     │  ╰─ ExcludeId
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ And
 │  │  │     │     ├─ Doc
@@ -158,7 +158,7 @@ Chain
 │     │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │     │  │  │  ├─ Name("1" -> { "$literal": true })
 │     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │  │  │  ╰─ IgnoreId
+│     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $MatchF
 │     │  │  │  ╰─ And
 │     │  │  │     ├─ Doc
@@ -189,7 +189,7 @@ Chain
 │     │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │     │     │  ├─ Name("1" -> { "$literal": true })
 │     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │     │  ╰─ IgnoreId
+│     │     │  ╰─ ExcludeId
 │     │     ├─ $MatchF
 │     │     │  ╰─ And
 │     │     │     ├─ Doc

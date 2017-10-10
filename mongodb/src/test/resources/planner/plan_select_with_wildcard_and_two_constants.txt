@@ -2,11 +2,13 @@ Chain
 ├─ $ReadF(db; zips)
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ SpliceObjects
-   │     ├─ SpliceObjects
-   │     │  ├─ Ident(_)
-   │     │  ╰─ Obj
-   │     │     ╰─ Key(1: "1")
-   │     ╰─ Obj
-   │        ╰─ Key(2: "2")
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ SpliceObjects
+   │           │  ├─ Ident(_)
+   │           │  ╰─ Obj
+   │           │     ╰─ Key(1: "1")
+   │           ╰─ Obj
+   │              ╰─ Key(2: "2")
    ╰─ Scope(Map())

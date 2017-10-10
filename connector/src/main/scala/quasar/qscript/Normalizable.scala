@@ -74,8 +74,9 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 
+  // FIXME: Should this be a version that also normalizes EquiJoin
   def freeTC(free: FreeQS): FreeQS =
-    free.transCata[FreeQS](liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
+    free.transCata[FreeQS](liftCo(rewrite.normalizeTJCoEnv[QScriptTotal]))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)

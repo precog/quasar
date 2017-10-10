@@ -127,9 +127,9 @@ Chain
 │  │         "$arrayElemAt": [["$_id.0", "$f0", "$f0.totalPop"], { "$literal": NumberInt("1") }]
 │  │       },
 │  │       ["$_id.0", "$f0", "$f0.totalPop"]])
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Descending)
 ╰─ $ProjectF
-   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
    ╰─ ExcludeId

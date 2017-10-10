@@ -21,7 +21,7 @@ import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
-import quasar.main.{ClassName, ClassPath, BackendConfig}
+import quasar.main.BackendConfig
 
 import knobs.{Required, Optional, FileResource}
 import pathy.Path._
@@ -192,23 +192,13 @@ object TestConfig {
     confStrM flatMap { confStr =>
       import java.io.File
 
-      val backendsM = IList(confStr.split(";"): _*) traverse { backend =>
+      val backends = IList(confStr.split(";"): _*) map { backend =>
         val List(name, classpath) = backend.split("=").toList
 
-        for {
-          unflattened <- IList(classpath.split(":"): _*) traverse { path =>
-            val file = new File(path)
-            val results =
-              ADir.fromFile(file).covary[APath].orElse(AFile.fromFile(file).covary[APath])
-
-            results.toListT.run.map(IList.fromList(_))
-          }
-
-          apaths = unflattened.flatten
-        } yield ClassName(name) -> ClassPath(apaths)
+        name -> classpath.split(":").map(new File(_)).toSeq
       }
 
-      backendsM.map(BackendConfig.ExplodedDirs(_))
+      BackendConfig.fromBackends(backends)
     }
   }
 

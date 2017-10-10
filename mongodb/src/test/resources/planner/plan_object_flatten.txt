@@ -11,11 +11,11 @@ Chain
 │  │         "$geo",
 │  │         { "$literal": undefined }]
 │  │     })
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Flatten
 │  │  ╰─ JsCore(_["0"])
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("value" -> "$0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$0")
    ╰─ ExcludeId

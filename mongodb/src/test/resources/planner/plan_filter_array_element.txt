@@ -57,10 +57,10 @@ Chain
 │  │         { "$literal": undefined }]
 │  │     })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src.loc")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src.loc")
    ╰─ ExcludeId

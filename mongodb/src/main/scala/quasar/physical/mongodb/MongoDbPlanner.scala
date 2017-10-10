@@ -21,7 +21,7 @@ import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultTell, SortDir}
 import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
-import quasar.contrib.pathy.{ADir, AFile, PathSegment}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -45,6 +45,7 @@ import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+import org.bson.BsonDocument
 import scalaz._, Scalaz.{ToIdOps => _, _}
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
@@ -69,6 +70,9 @@ object MongoDbPlanner {
 
   type OutputM[A]      = PlannerError \/ A
   type ExecTimeR[F[_]] = MonadReader_[F, Instant]
+
+  implicit def mongoQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   private def raiseErr[M[_], A](err: FileSystemError)(
     implicit ev: MonadFsErr[M]
@@ -1459,10 +1463,12 @@ object MongoDbPlanner {
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
-  def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
-    qs: T[fs.MongoQScript[T, ?]],
-    listContents: DiscoverPath.ListContents[M])(
-    implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
+  def toMongoQScript[
+      T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
+      M[_]: Monad: MonadFsErr: PhaseResultTell]
+      (anyDoc: Collection => OptionT[M, BsonDocument],
+        qs: T[fs.MongoQScript[T, ?]])
+      (implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
     type MQS[A] = fs.MongoQScript[T, A]
@@ -1470,23 +1476,27 @@ object MongoDbPlanner {
     val O = new Optimize[T]
     val R = new Rewrite[T]
 
+    // TODO: All of these need to be applied through branches. We may also be able to compose
+    //       them with normalization as the last step and run until fixpoint. Currently plans are
+    //       too sensitive to the order in which these are applied.
     for {
-      rewrite <- applyTrans(qs)(mapBeforeSort[T]).point[M]
-      optimized <- rewrite
-        .transCata[T[MQS]](liftFF[QScriptCore[T, ?], MQS, T[MQS]](
-          repeatedly(O.subsetBeforeMap[MQS, MQS](reflNT[MQS])))).point[M]
+      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
+      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, fs.MongoQScript[T, ?], M](anyDoc))
+      mongoQS2 =  mongoQS1.transCata[T[fs.MongoQScript[T, ?]]](R.normalizeEJ[fs.MongoQScript[T, ?]])
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS2))
 
-      mongoQsOpt <- optimized.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Assume Read Type)", mongoQsOpt))
+      // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
+      mongoQS3 =  applyTrans(mongoQS2)(mapBeforeSort[T])
+      mongoQS4 =  mongoQS3.transCata[T[fs.MongoQScript[T, ?]]](
+                    liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
+                      repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](
+                        reflNT[fs.MongoQScript[T, ?]]))))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS4))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      prefPrj = PreferProjection.preferProjection[MQS](mongoQsOpt)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", prefPrj))
-
-      // TODO: apply all of Rewrite.normalize, not only elideNopQC
-      mongoQs <- prefPrj.transCata[T[MQS]](liftFG(R.elideNopQC(reflNT[MQS]))).point[M]
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Elided Nops)", mongoQs))
-    } yield mongoQs
+      mongoQS5 =  PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQS4)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS5))
+    } yield mongoQS5
   }
 
   def plan0
@@ -1494,9 +1504,9 @@ object MongoDbPlanner {
       M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
-    (listContents: DiscoverPath.ListContents[M],
+    (anyDoc: Collection => OptionT[M, BsonDocument],
       cfg: PlannerConfig[T, EX, WF])
-      (qs: T[fs.MongoQScript[T, ?]])
+    (qs: T[fs.MongoQScript[T, ?]])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
@@ -1505,7 +1515,7 @@ object MongoDbPlanner {
       : M[Crystallized[WF]] = {
 
     for {
-      opt <- toMongoQScript(qs, listContents)
+      opt <- toMongoQScript[T, M](anyDoc, qs)
       wb  <- log(
         "Workflow Builder",
         opt.cataM[M, WorkflowBuilder[WF]](
@@ -1519,30 +1529,36 @@ object MongoDbPlanner {
   }
 
   def planExecTime[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    M[_]: Monad: PhaseResultTell: MonadFsErr](
-    qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M],
-    queryModel: MongoQueryModel, execTime: Instant
-    ): M[Crystallized[WorkflowF]] = {
-
-    val lc: qscript.DiscoverPath.ListContents[ReaderT[M, Instant, ?]] =
-      queryContext.listContents.map(f => Kleisli[M, Instant, Set[PathSegment]](_ => f))
-    val ctx: fs.QueryContext[ReaderT[M, Instant, ?]] = queryContext.copy(listContents = lc)
-    plan[T, ReaderT[M, Instant, ?]](qs, ctx, queryModel).run(execTime)
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      M[_]: Monad: PhaseResultTell: MonadFsErr](
+      qs: T[fs.MongoQScript[T, ?]],
+      queryContext: fs.QueryContext,
+      queryModel: MongoQueryModel,
+      anyDoc: Collection => OptionT[M, BsonDocument],
+      execTime: Instant)
+      : M[Crystallized[WorkflowF]] = {
+    val peek = anyDoc andThen (r => OptionT(r.run.liftM[ReaderT[?[_], Instant, ?]]))
+    plan[T, ReaderT[M, Instant, ?]](qs, queryContext, queryModel, peek).run(execTime)
   }
 
   /** Translate the QScript plan to an executable MongoDB "physical"
     * plan, taking into account the current runtime environment as captured by
     * the given context.
+    *
     * Internally, the type of the plan being built constrains which operators
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
+    *
+    * @param anyDoc returns any document in the given `Collection`
     */
   def plan[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR]
-    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M], queryModel: MongoQueryModel
-    ): M[Crystallized[WorkflowF]] = {
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR](
+      qs: T[fs.MongoQScript[T, ?]],
+      queryContext: fs.QueryContext,
+      queryModel: MongoQueryModel,
+      anyDoc: Collection => OptionT[M, BsonDocument])
+      : M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     val bsonVersion = toBsonVersion(queryModel)
@@ -1558,7 +1574,7 @@ object MongoDbPlanner {
           FuncHandler.handle3_4(bsonVersion),
           StaticHandler.v3_2,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, cfg)(qs)
+        plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
         val joinHandler: JoinHandler[Workflow3_2F, WBM] =
@@ -1570,7 +1586,7 @@ object MongoDbPlanner {
           FuncHandler.handle3_2(bsonVersion),
           StaticHandler.v3_2,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, cfg)(qs)
+        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 
       case `3.0` =>
         val cfg = PlannerConfig[T, Expr3_0, Workflow2_6F](
@@ -1578,7 +1594,7 @@ object MongoDbPlanner {
           FuncHandler.handle3_0(bsonVersion),
           StaticHandler.v2_6,
           bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, cfg)(qs).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr3_0](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
 
       case _ =>
         val cfg = PlannerConfig[T, Expr2_6, Workflow2_6F](
@@ -1586,7 +1602,7 @@ object MongoDbPlanner {
           FuncHandler.handle2_6(bsonVersion),
           StaticHandler.v2_6,
           bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, cfg)(qs).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr2_6](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
     }
   }
 }

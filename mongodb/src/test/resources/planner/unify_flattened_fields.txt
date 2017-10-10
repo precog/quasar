@@ -32,7 +32,7 @@ Chain
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($0 -> Eq(Bool(true)))
@@ -41,4 +41,7 @@ Chain
    │  ╰─ JsCore(Array.isArray(_.src[0].loc) ? _.src[0].loc : undefined)
    ├─ Flatten
    │  ╰─ Ident(_)
+   ├─ Map
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil: _)
    ╰─ Scope(Map())

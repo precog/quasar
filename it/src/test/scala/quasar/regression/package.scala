@@ -30,6 +30,8 @@ import scalaz.syntax.apply._
 package object regression {
   import quasar.fs.mount.hierarchical.MountedResultH
 
+  type Directives = Map[BackendName, NonEmptyList[TestDirective]]
+
   type BackendEffectIO[A] = Coproduct[Task, BackendEffect, A]
 
   type HfsIO0[A] = Coproduct[MountedResultH, Task, A]

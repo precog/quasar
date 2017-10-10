@@ -1,7 +1,7 @@
 Chain
 ├─ $ReadF(db; zips)
 ╰─ $ProjectF
-   ├─ Name("value" -> {
+   ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [
    │         {
    │           "$or": [

@@ -76,10 +76,10 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(city: [_.left, _.right][0][2].city)
-│  │     ╰─ Key(1: [_.left, _.right][1])
+│  │     ├─ Key(city: _.left[2].city)
+│  │     ╰─ Key(1: _.right)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("city" -> true)
    ├─ Name("1" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

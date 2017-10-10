@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fs._
 import quasar.physical.mongodb._
@@ -30,10 +29,9 @@ import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-final case class QueryContext[M[_]](
+final case class QueryContext(
   statistics: Collection => Option[CollectionStatistics],
-  indexes: Collection => Option[Set[Index]],
-  listContents: qscript.DiscoverPath.ListContents[M])
+  indexes: Collection => Option[Set[Index]])
 
 object QueryContext {
 
@@ -54,30 +52,30 @@ object QueryContext {
       .traverse(file => Collection.fromFile(mkAbsolute(rootDir, file)))
       .map(_.toSet)
 
-  def lookup[T[_[_]]: BirecursiveT, A](qs: T[MongoDb.QSM[T, ?]], f: Collection => MongoDbIO[A])
-      : EitherT[MongoDbIO, FileSystemError, Map[Collection, A]] =
-    for {
-      colls <- EitherT.fromDisjunction[MongoDbIO](collections(qs).leftMap(pathErr(_)))
-      a     <- colls.toList.traverse(c => f(c).strengthL(c)).map(Map(_: _*)).liftM[FileSystemErrT]
-    } yield a
-
   def queryContext[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]]
-    (qs: T[MongoDb.QSM[T, ?]], lc: qscript.DiscoverPath.ListContents[M])
-      : MQPhErr[QueryContext[M]] = {
+    (qs: T[MongoDb.QSM[T, ?]])
+      : MQPhErr[QueryContext] = {
 
     def lift[A](fa: FileSystemErrT[MongoDbIO, A]): MongoLogWFR[BsonCursor, A] =
       EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, A](
         fa.run.liftM[QueryRT[?[_], BsonCursor, ?]].liftM[PhaseResultT])
 
-    val x: FileSystemErrT[MongoDbIO, QueryContext[M]] =
-      (lookup(qs, MongoDbIO.collectionStatistics) |@|
-       lookup(qs, MongoDbIO.indexes))((stats, idxs) =>
-        QueryContext(
-          stats.get(_),
-          idxs.get(_),
-          lc))
+    val qctx: FileSystemErrT[MongoDbIO, QueryContext] =
+      for {
+        colls <- EitherT.fromDisjunction[MongoDbIO](collections(qs) leftMap (pathErr(_)))
+        stats <- byCollection(colls, MongoDbIO.collectionStatistics).liftM[FileSystemErrT]
+        idxs  <- byCollection(colls, MongoDbIO.indexes).liftM[FileSystemErrT]
+      } yield QueryContext(stats.get, idxs.get)
 
-    lift(x).run.run
+    lift(qctx).run.run
   }
+
+  ////
+
+  private def byCollection[A](colls: Set[Collection], f: Collection => MongoDbIO[A])
+      : MongoDbIO[Map[Collection, A]] =
+    colls.foldLeftM(Map[Collection, A]()) { (m, c) =>
+      f(c) map (m.updated(c, _))
+    }
 }

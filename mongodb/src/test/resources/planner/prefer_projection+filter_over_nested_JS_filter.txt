@@ -5,7 +5,7 @@ Chain
 │  ├─ Name("1" -> { "$ne": ["$city", "$state"] })
 │  ├─ Name("2" -> "$pop")
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ And
 │     ├─ Or
@@ -26,5 +26,5 @@ Chain
 │     ╰─ Doc
 │        ╰─ Expr($2 -> Lt(Int32(10000)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

@@ -1,8 +1,12 @@
 Chain
 ├─ $ReadF(db; zips)
-╰─ $GroupF
-   ├─ Grouped
-   │  ├─ Name("city" -> { "$first": "$city" })
-   │  ╰─ Name("1" -> { "$sum": { "$literal": NumberInt("1") } })
-   ╰─ By
-      ╰─ Name("0" -> ["$city"])
+├─ $GroupF
+│  ├─ Grouped
+│  │  ├─ Name("f0" -> { "$first": "$city" })
+│  │  ╰─ Name("f1" -> { "$sum": { "$literal": NumberInt("1") } })
+│  ╰─ By
+│     ╰─ Name("0" -> ["$city"])
+╰─ $ProjectF
+   ├─ Name("city" -> "$f0")
+   ├─ Name("1" -> "$f1")
+   ╰─ ExcludeId

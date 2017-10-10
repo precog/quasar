@@ -101,7 +101,7 @@ Chain
 │     │  ╰─ Scope(Map())
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] })
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value["0"]] }] })
 │     │  ╰─ Scope(Map())
@@ -123,10 +123,6 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("0" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
-   ├─ Name("1" -> {
-   │       "$arrayElemAt": [
-   │         { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }] },
-   │         { "$literal": NumberInt("1") }]
-   │     })
-   ╰─ IgnoreId
+   ├─ Name("0" -> "$left")
+   ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
+   ╰─ ExcludeId

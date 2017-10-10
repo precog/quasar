@@ -9,7 +9,7 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$$ROOT")
 ╰─ $ProjectF
-   ├─ Name("value" -> {
+   ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [
    │         {
    │           "$and": [

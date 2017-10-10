@@ -42,6 +42,7 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+import org.bson.{BsonDocument, BsonDouble}
 import org.scalacheck._
 import org.specs2.execute._
 import org.specs2.matcher.{Matcher, Expectable}
@@ -138,6 +139,9 @@ class PlannerSpec extends
           FileName("usa_factbook").right,
           FileName("cities").right)).point[EitherWriter]
 
+  val emptyDoc: Collection => OptionT[EitherWriter, BsonDocument] =
+    _ => OptionT.some(new BsonDocument)
+
   implicit val monadTell: MonadTell[EitherT[PhaseResultT[Id, ?], FileSystemError, ?], PhaseResults] =
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
@@ -154,14 +158,18 @@ class PlannerSpec extends
   }
 
   def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
-    (sql: Fix[Sql], model: MongoQueryModel, stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]], lc: DiscoverPath.ListContents[M],
-    execTime: Instant)
+      (sql: Fix[Sql],
+        model: MongoQueryModel,
+        stats: Collection => Option[CollectionStatistics],
+        indexes: Collection => Option[Set[Index]],
+        lc: DiscoverPath.ListContents[M],
+        anyDoc: Collection => OptionT[M, BsonDocument],
+        execTime: Instant)
       : M[Crystallized[WorkflowF]] = {
     for {
       lp <- compileSqlToLP[M](sql)
       qs <- MongoDb.lpToQScript(lp, lc)
-      repr <- MongoDb.doPlan(qs, fs.QueryContext(stats, indexes, lc), model, execTime)
+      repr <- MongoDb.doPlan[Fix, M](qs, fs.QueryContext(stats, indexes), model, anyDoc, execTime)
     } yield repr
   }
 
@@ -174,44 +182,49 @@ class PlannerSpec extends
     val map: Map[Collection, Set[Index]] = ps.toList.foldMap { case (c, f) => Map(c -> Set(Index(f.asText + "_", NonEmptyList(f -> IndexType.Ascending), false))) }
     c => map.get(c).orElse(defaultIndexes(c))
   }
-  def plan0(query: Fix[Sql], model: MongoQueryModel,
+  def plan0(
+    query: Fix[Sql],
+    model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]
+    indexes: Collection => Option[Set[Index]],
+    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes, listContents, Instant.now).run.value.toEither
+    queryPlanner(query, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
+    plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None), emptyDoc)
 
   def plan3_0(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None))
+    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None), emptyDoc)
 
   def plan3_2(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
+    plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)
 
-  def plan3_4(query: Fix[Sql],
+  def plan3_4(
+    query: Fix[Sql],
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]
+    indexes: Collection => Option[Set[Index]],
+    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.4`, stats, indexes)
+    plan0(query, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.4`, defaultStats, defaultIndexes)
+    plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, time).run.value.toEither
+    queryPlanner(query, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
 
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
      _  <- emit("Input", logical)
      simplified <- emit("Simplified", optimizer.simplify(logical))
      qs <- MongoDb.lpToQScript(simplified, listContents)
-     phys <- MongoDb.doPlan(qs, fs.QueryContext(defaultStats, defaultIndexes, listContents), MongoQueryModel.`3.2`, Instant.now)
+     phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.2`, emptyDoc, Instant.now)
     } yield phys).run.value.toEither
   }
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, Instant.now).run.written
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
@@ -239,6 +252,9 @@ class PlannerSpec extends
           $literal(Bson.Dec(Double.NegativeInfinity)))),
       $divide(a1, a2))
 
+  val underSigil: JsFn =
+    JsFn(Name("__to_sigil"), obj(sigil.Quasar -> ident("__to_sigil")))
+
   "plan from query string" should {
     "plan simple select *" in {
       plan(sqlE"select * from foo") must beWorkflow(
@@ -253,7 +269,7 @@ class PlannerSpec extends
             grouped("f0" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape("value" -> $field("f0")),
+            reshape(sigil.Quasar -> $field("f0")),
             ExcludeId)))
     }
 
@@ -262,7 +278,7 @@ class PlannerSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $project(
-            reshape("value" -> $field("bar")),
+            reshape(sigil.Quasar -> $field("bar")),
             ExcludeId)))
     }
 
@@ -271,7 +287,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" -> $field("bar")),
+           reshape(sigil.Quasar -> $field("bar")),
            ExcludeId)))
     }
 
@@ -283,7 +299,7 @@ class PlannerSpec extends
            reshape(
              "bar" -> $field("bar"),
              "baz" -> $field("baz")),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan simple addition on two fields" in {
@@ -291,7 +307,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "baz")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("bar")),
@@ -315,7 +331,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lte($literal(Bson.Text("")), $field("baz")),
@@ -335,7 +351,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lte($literal(Bson.Text("")), $field("baz")),
@@ -359,7 +375,7 @@ class PlannerSpec extends
          $read(collection("db", "zips")),
          $project(
            reshape(
-             "value" ->
+             sigil.Quasar ->
                $cond(
                  $or(
                    $and(
@@ -423,7 +439,7 @@ class PlannerSpec extends
                      $literal(Bson.Text("..."))),
                    $literal(Bson.Undefined)),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }.pendingUntilFixed("SD-639")
 
     "plan concat with unknown types" in {
@@ -436,7 +452,7 @@ class PlannerSpec extends
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $project(
-          reshape("value" ->
+          reshape(sigil.Quasar ->
             $cond(
               $and(
                 $lte($literal(Bson.Text("")), $field("bar")),
@@ -451,7 +467,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $eq($field("bar"), $literal(Bson.Null)),
                $field("baz"),
@@ -464,7 +480,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "zips")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $arrayLit(List($field("city"), $field("loc"), $field("pop")))),
            ExcludeId)))
     }
@@ -475,7 +491,7 @@ class PlannerSpec extends
          $read(collection("db", "zips")),
          $simpleMap(
            NonEmptyList(MapExpr(JsFn(Name("x"),
-             Arr(List(Select(ident("x"), "city"), Select(ident("x"), "loc"), Select(ident("x"), "pop")))))),
+             underSigil(Arr(List(Select(ident("x"), "city"), Select(ident("x"), "loc"), Select(ident("x"), "pop"))))))),
              ListMap())))
     }
 
@@ -485,7 +501,7 @@ class PlannerSpec extends
          $read(collection("db", "zips")),
          $project(
            reshape("p" -> $field("pop")),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan select map with field" in {
@@ -496,7 +512,7 @@ class PlannerSpec extends
            reshape(
              "0" -> objectLit("p" -> $field("pop")),
              "state" -> $field("state")),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan now() with a literal timestamp" in {
@@ -515,7 +531,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lte($literal(Check.minDate), $field("baz")),
@@ -531,7 +547,7 @@ class PlannerSpec extends
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "value" ->
+             sigil.Quasar ->
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("baz")),
@@ -552,7 +568,7 @@ class PlannerSpec extends
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "value" ->
+             sigil.Quasar ->
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("baz")),
@@ -568,7 +584,7 @@ class PlannerSpec extends
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "value" ->
+             sigil.Quasar ->
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("baz")),
@@ -599,7 +615,7 @@ class PlannerSpec extends
            BsonField.Name("__tmp2") -> Selector.Eq(Bson.Bool(true)))),
          $project(
            reshape(
-             "value" -> $field("__tmp3")),
+             sigil.Quasar -> $field("__tmp3")),
            ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan filter by date field (SD-1508)"))
 
@@ -625,7 +641,7 @@ class PlannerSpec extends
             BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
             ident("undefined")).toJs)),
         $project(
-          reshape("value" -> $field("loc")),
+          reshape(sigil.Quasar -> $field("loc")),
           ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan filter array element"))
 
@@ -634,9 +650,9 @@ class PlannerSpec extends
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-          jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
+          underSigil(jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
             Access(Select(ident("x"), "loc"), jscore.Literal(Js.Num(0, false))),
-            ident("undefined"))))),
+            ident("undefined")))))),
           ListMap())))
     }
 
@@ -646,7 +662,7 @@ class PlannerSpec extends
         $read(collection("db", "zips")),
         $project(
           reshape(
-            "value" ->
+            sigil.Quasar ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr(List())), $field("loc")),
@@ -661,7 +677,7 @@ class PlannerSpec extends
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
-          reshape("value" ->
+          reshape(sigil.Quasar ->
             $cond(
               $and($lte($literal(Bson.Arr()), $field("bar")),
                 $lt($field("bar"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
@@ -676,10 +692,10 @@ class PlannerSpec extends
          $read(collection("db", "zips")),
          $simpleMap(
            NonEmptyList(MapExpr(JsFn(Name("x"),
-             If(
+             underSigil(If(
                Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "bar"))),
                Call(ident("NumberLong"), List(Select(Select(ident("x"), "bar"), "length"))),
-               ident(Js.Undefined.ident))))),
+               ident(Js.Undefined.ident)))))),
              ListMap())))
     }
 
@@ -698,7 +714,7 @@ class PlannerSpec extends
                 $literal(Bson.Undefined)))),
           \/-($literal(Bson.Null))),
         $project(
-          reshape("value" -> $multiply($field("f0"), $literal(Bson.Int32(100)))),
+          reshape(sigil.Quasar -> $multiply($field("f0"), $literal(Bson.Int32(100)))),
           ExcludeId)))
     }
 
@@ -708,7 +724,7 @@ class PlannerSpec extends
          $read(collection("db", "zips")),
          $project(
            reshape(
-             "value" ->
+             sigil.Quasar ->
                $cond(
                  $or(
                    $and(
@@ -729,7 +745,7 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("bar")),
@@ -768,7 +784,7 @@ class PlannerSpec extends
            Selector.Doc(
              BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10))))),
          $project(
-           reshape("value" ->
+           reshape(sigil.Quasar ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("b")),
@@ -807,7 +823,7 @@ class PlannerSpec extends
           ListMap()),
         $match(Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("src")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
     }.pendingWithActual("#2541", testFile("plan simple js filter 3.2"))
 
@@ -845,7 +861,7 @@ class PlannerSpec extends
           Selector.Doc(
             BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("src")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
     }.pendingWithActual("#2541", testFile("plan filter with js and non-js 3.2"))
 
@@ -1001,7 +1017,7 @@ class PlannerSpec extends
               Selector.Doc(BsonField.Name("2") -> Selector.Eq(Bson.Bool(true))),
               Selector.Doc(BsonField.Name("3") -> Selector.Eq(Bson.Bool(true)))))),
         $project(
-          reshape("value" -> $field("src")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
     }
 
@@ -1118,7 +1134,7 @@ class PlannerSpec extends
         $match(Selector.Doc(
           BsonField.Name("__tmp1") -> Selector.Gt(Bson.Int32(10)))),
         $project(
-          reshape("value" -> $field("_id", "0")),
+          reshape(sigil.Quasar -> $field("_id", "0")),
           ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan simple having filter"))
 
@@ -1154,12 +1170,12 @@ class PlannerSpec extends
           reshape(
             "0" -> $neq($field("city"), $field("state")),
             "src" -> $$ROOT),
-          IgnoreId),
+          ExcludeId),
         $match(
           Selector.Doc(
             BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("src")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
     }
 
@@ -1188,7 +1204,7 @@ class PlannerSpec extends
           Selector.Doc(
             BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("__tmp5")),
+          reshape(sigil.Quasar -> $field("__tmp5")),
           ExcludeId)))
     }.pendingWithActual("#2541", testFile("prefer projection+filter over nested JS filter"))
 
@@ -1203,7 +1219,7 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $project(
             reshape(
-              "value" ->
+              sigil.Quasar ->
                 $cond(
                   $and(
                     $lt($literal(Bson.Null), $field("pop")),
@@ -1228,7 +1244,7 @@ class PlannerSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $project(
-            reshape("value" ->
+            reshape(sigil.Quasar ->
               $cond(
                 $or(
                   $and(
@@ -1248,7 +1264,7 @@ class PlannerSpec extends
           $read(collection("db", "foo")),
           $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending)),
           $project(
-            reshape("value" -> $field("bar")),
+            reshape(sigil.Quasar -> $field("bar")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan simple sort with field in projection"))
 
@@ -1290,10 +1306,10 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
-              SpliceObjects(List(
+              underSigil(SpliceObjects(List(
                 ident("x"),
                 obj(
-                  "pop" -> Select(ident("x"), "pop"))))))),
+                  "pop" -> Select(ident("x"), "pop")))))))),
             ListMap())))
     }
 
@@ -1349,7 +1365,7 @@ class PlannerSpec extends
                     "pop2" -> Select(ident("x"), "pop")))))))),
             ListMap()),
           $project(
-            reshape("value" -> $field("__tmp2")),
+            reshape(sigil.Quasar -> $field("__tmp2")),
             ExcludeId)))
     }.pendingWithActual("#2841", testFile("plan select with multiple wildcards and fields"))
 
@@ -1380,7 +1396,7 @@ class PlannerSpec extends
             ListMap()),
           $sort(NonEmptyList(BsonField.Name("__tmp3") -> SortDir.Descending)),
           $project(
-            reshape("value" -> $field("__tmp2")),
+            reshape(sigil.Quasar -> $field("__tmp2")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan sort with wildcard and expression in key"))
 
@@ -1528,7 +1544,7 @@ class PlannerSpec extends
           grouped("f0" -> $first($field("city"))),
           -\/(reshape("0" -> $arrayLit(List($field("city")))))),
         $project(
-          reshape("value" -> $field("f0")),
+          reshape(sigil.Quasar -> $field("f0")),
           ExcludeId)))
     }
 
@@ -1537,7 +1553,7 @@ class PlannerSpec extends
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
-          reshape("value" -> $field("city")),
+          reshape(sigil.Quasar -> $field("city")),
           ExcludeId)))
     }
 
@@ -1668,7 +1684,7 @@ class PlannerSpec extends
               -\/(reshape("0" -> $arrayLit(List($field("state")))))),
             $project(
               reshape(
-                "value" -> $field("f0")),
+                sigil.Quasar -> $field("f0")),
               ExcludeId))
         }
     }
@@ -1680,8 +1696,8 @@ class PlannerSpec extends
             $read(collection("db", "zips")),
             $group(
               grouped(
-                "cnt" -> $sum($literal(Bson.Int32(1))),
-                "sm" ->
+                "f0" -> $sum($literal(Bson.Int32(1))),
+                "f1" ->
                   $sum(
                     $cond(
                       $and(
@@ -1689,7 +1705,12 @@ class PlannerSpec extends
                         $lt($field("pop"), $literal(Bson.Text("")))),
                       $field("pop"),
                       $literal(Bson.Undefined)))),
-              -\/(reshape("0" -> $arrayLit(List($field("state")))))))
+              -\/(reshape("0" -> $arrayLit(List($field("state")))))),
+            $project(
+              reshape(
+                "cnt" -> $field("f0"),
+                "sm" -> $field("f1")),
+              ExcludeId))
         }
     }
 
@@ -1962,9 +1983,14 @@ class PlannerSpec extends
             ListMap()),
           $group(
             grouped(
-              "len" -> $first($field("f0")),
-              "cnt" -> $sum($literal(Bson.Int32(1)))),
-            -\/(reshape("0" -> $field("b0"))))))
+              "f0" -> $first($field("f0")),
+              "f1" -> $sum($literal(Bson.Int32(1)))),
+            -\/(reshape("0" -> $field("b0")))),
+          $project(
+            reshape(
+              "len" -> $field("f0"),
+              "cnt" -> $field("f1")),
+            ExcludeId)))
     }
 
     "plan simple JS inside expression" in {
@@ -1972,12 +1998,12 @@ class PlannerSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            If(Call(ident("isString"), List(Select(ident("x"), "city"))),
+            underSigil(If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 BinOp(jscore.Add,
                   Call(ident("NumberLong"),
                     List(Select(Select(ident("x"), "city"), "length"))),
                   jscore.Literal(Js.Num(1, false))),
-                ident("undefined"))))),
+                ident("undefined")))))),
             ListMap())))
     }
 
@@ -2013,7 +2039,7 @@ class PlannerSpec extends
             "1" -> $include(),
             "2" -> $include(),
             "3" -> $include()),
-          IgnoreId)))
+          ExcludeId)))
     }
 
     "plan object flatten" in {
@@ -2035,7 +2061,7 @@ class PlannerSpec extends
                 FlatExpr(JsFn(Name("x"), Select(ident("x"), "__tmp2")))),
               ListMap()),
             $project(
-              reshape("value" -> $field("__tmp2")),
+              reshape(sigil.Quasar -> $field("__tmp2")),
               ExcludeId))
         }
     }.pendingWithActual(notOnPar, testFile("plan object flatten"))
@@ -2058,7 +2084,7 @@ class PlannerSpec extends
               reshape(
                 "city" -> $include(),
                 "1"    -> $include()),
-              IgnoreId))
+              ExcludeId))
         }
     }
 
@@ -2077,7 +2103,7 @@ class PlannerSpec extends
                       $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                     $arrayElemAt($field("loc"), $literal(Bson.Int32(0))),
                     $literal(Bson.Undefined))),
-              IgnoreId))
+              ExcludeId))
         }
     }
 
@@ -2100,7 +2126,7 @@ class PlannerSpec extends
                   ident("undefined")))))),
               ListMap()),
             $project(
-              reshape("value" -> $field("__tmp4")),
+              reshape(sigil.Quasar -> $field("__tmp4")),
               ExcludeId))
         }
     }.pendingWithActual(notOnPar, testFile("plan array concat with filter"))
@@ -2122,7 +2148,7 @@ class PlannerSpec extends
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp2"))),
             $project(
-              reshape("value" -> $field("__tmp2")),
+              reshape(sigil.Quasar -> $field("__tmp2")),
               ExcludeId))
         }
     }.pendingWithActual(notOnPar, testFile("plan array flatten"))
@@ -2148,7 +2174,7 @@ class PlannerSpec extends
                     ident("undefined"))))))),
             ListMap()),
           $project(
-            reshape("value" -> $field("__tmp4")),
+            reshape(sigil.Quasar -> $field("__tmp4")),
             ExcludeId))
       }
     }.pendingWithActual(notOnPar, testFile("plan array concat"))
@@ -2197,7 +2223,7 @@ class PlannerSpec extends
         $match(Selector.Doc(
           BsonField.Name("__tmp6") -> Selector.Lt(Bson.Int32(0)))),
         $project(
-          reshape("value" -> $field("__tmp6")),
+          reshape(sigil.Quasar -> $field("__tmp6")),
           ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("unify flattened fields"))
 
@@ -2295,7 +2321,7 @@ class PlannerSpec extends
           Selector.Doc(
             BsonField.Name("__tmp18") -> Selector.Regex("^.*Dr.*$", false, true, false, false)))),
         $project(
-          reshape("value" -> $field("__tmp19", "__tmp15")),
+          reshape(sigil.Quasar -> $field("__tmp19", "__tmp15")),
           ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("unify flattened with double-flattened"))
 
@@ -2316,7 +2342,7 @@ class PlannerSpec extends
               reshape(
                 "city" -> $field("city"),
                 "pop"  -> $field("pop")),
-              IgnoreId),
+              ExcludeId),
             $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
             $limit(5))
         }
@@ -2329,10 +2355,10 @@ class PlannerSpec extends
             $read(collection("db", "zips")),
             $limit(5),
             $project(
-              reshape("value" -> $field("city")),
+              reshape(sigil.Quasar -> $field("city")),
               ExcludeId))
         }
-    }
+    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
@@ -2366,7 +2392,7 @@ class PlannerSpec extends
           $match(Selector.Doc(
             BsonField.Name("foo") -> Selector.Eq(Bson.Null))),
           $project(
-            reshape("value" -> $eq($field("foo"), $literal(Bson.Null))),
+            reshape(sigil.Quasar -> $eq($field("foo"), $literal(Bson.Null))),
             ExcludeId)))
     }
 
@@ -2378,7 +2404,7 @@ class PlannerSpec extends
             BsonField.Name("state") -> Selector.Eq(Bson.Text("CO")))),
           $group(
             grouped(
-              "0" ->
+              "f0" ->
                 $avg(
                   $cond(
                     $and(
@@ -2386,7 +2412,7 @@ class PlannerSpec extends
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $field("pop"),
                     $literal(Bson.Undefined))),
-              "1" ->
+              "f1" ->
                 $min(
                   $cond($or(
                     $and(
@@ -2397,7 +2423,12 @@ class PlannerSpec extends
                       $lt($field("city"), $literal(Bson.Regex("", ""))))),
                     $field("city"),
                     $literal(Bson.Undefined)))),
-            \/-($literal(Bson.Null)))))
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape(
+              "0" -> $field("f0"),
+              "1" -> $field("f1")),
+            ExcludeId)))
     }
 
     "plan simple distinct" in {
@@ -2411,7 +2442,7 @@ class PlannerSpec extends
               "0" -> objectLit("city" -> $field("city"), "state" -> $field("state"))))),
           $project(
             reshape(
-              "value" -> $field("_id", "0")),
+              sigil.Quasar -> $field("_id", "0")),
             ExcludeId)))
     }
 
@@ -2426,7 +2457,7 @@ class PlannerSpec extends
             grouped("__tmp2" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape("value" -> $field("__tmp2")),
+            reshape(sigil.Quasar -> $field("__tmp2")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct as expression"))
 
@@ -2451,7 +2482,7 @@ class PlannerSpec extends
             grouped("__tmp8" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape("value" -> $field("__tmp8")),
+            reshape(sigil.Quasar -> $field("__tmp8")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct of expression as expression"))
 
@@ -2469,7 +2500,7 @@ class PlannerSpec extends
             grouped(),
             -\/(reshape("0" -> $field("__tmp1")))),
           $project(
-            reshape("value" -> $field("_id", "0")),
+            reshape(sigil.Quasar -> $field("_id", "0")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard"))
 
@@ -2490,7 +2521,7 @@ class PlannerSpec extends
             grouped("__tmp6" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape("value" -> $field("__tmp6")),
+            reshape(sigil.Quasar -> $field("__tmp6")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard as expression"))
 
@@ -2662,10 +2693,10 @@ class PlannerSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            If(Call(ident("isString"),
+            underSigil(If(Call(ident("isString"),
               List(Select(ident("x"), "city"))),
               Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
-              ident("undefined"))))),
+              ident("undefined")))))),
           ListMap())))
     }
 
@@ -2682,7 +2713,7 @@ class PlannerSpec extends
                 $lt($field("city"), $literal(Bson.Doc()))),
                 $strLenCP($field("city")),
                 $literal(Bson.Undefined))),
-          IgnoreId)))
+          ExcludeId)))
     }
 
     "plan select length() and simple field 3.2" in {
@@ -2701,7 +2732,7 @@ class PlannerSpec extends
           reshape(
             "city" -> $include(),
             "1"    -> $include()),
-          IgnoreId)))
+          ExcludeId)))
     }
 
     "plan combination of two distinct sets" in {
@@ -2749,7 +2780,7 @@ class PlannerSpec extends
             Selector.Doc(
               BsonField.Name("__tmp6") -> Selector.Eq(Bson.Bool(true)))),
           $project(
-            reshape("value" -> $field("__tmp7")),
+            reshape(sigil.Quasar -> $field("__tmp7")),
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan filter with timestamp and interval"))
 
@@ -2765,7 +2796,7 @@ class PlannerSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "days")),
           $project(
-            reshape("value" ->
+            reshape(sigil.Quasar ->
               $cond(
                 $and(
                   $lte($literal(Check.minDate), $field("ts")),
@@ -2836,7 +2867,7 @@ class PlannerSpec extends
               reshape(
                 "0" -> $include(),
                 "1" -> $include()),
-              IgnoreId))))
+              ExcludeId))))
     }
 
     "plan convert to timestamp" in {
@@ -2845,7 +2876,7 @@ class PlannerSpec extends
           $read(collection("db", "foo")),
           $project(
             reshape(
-              "value" ->
+              sigil.Quasar ->
                 $cond(
                   $and(
                     $lt($literal(Bson.Null), $field("epoch")),
@@ -2881,7 +2912,7 @@ class PlannerSpec extends
             reshape(
               "0" -> $include(),
               "1" -> $include()),
-            IgnoreId))
+            ExcludeId))
       }
     }
 
@@ -2964,7 +2995,7 @@ class PlannerSpec extends
               $unwind(DocField(JoinHandler.LeftName)),
               $unwind(DocField(JoinHandler.RightName)),
               $project(
-                reshape("value" -> $field(JoinDir.Right.name, "city")),
+                reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
     }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
@@ -2983,7 +3014,7 @@ class PlannerSpec extends
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $project(
-            reshape("value" -> $field(JoinDir.Right.name, "city")),
+            reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
             ExcludeId)))
     }.pendingWithActual("#1560", testFile("plan simple join ($lookup)"))
 
@@ -2994,7 +3025,8 @@ class PlannerSpec extends
         c => Map(
           collection("db", "zips") -> CollectionStatistics(10, 100, true),
           collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
-        defaultIndexes) must_==
+        defaultIndexes,
+        emptyDoc) must_==
         plan2_6(query)
     }.pendingUntilFixed(notOnPar)
 
@@ -3068,7 +3100,7 @@ class PlannerSpec extends
               Selector.Doc(
                 BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("value" -> $field("__tmp11", "city")),
+              reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
     }.pendingWithActual("#1560", testFile("plan non-equi join"))
@@ -3081,7 +3113,7 @@ class PlannerSpec extends
           $read(collection("db", "foo")), "__tmp0", $$ROOT,
           $read(collection("db", "bar")),
           reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
+          Obj(ListMap(Name("0") -> Select(ident(sigil.Quasar), "foo_id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
@@ -3112,7 +3144,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "foo")),
         $match(Selector.Doc(
@@ -3146,7 +3179,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select foo.name, bar.address from foo join bar on lower(foo.id) = bar.foo_id",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "foo")),
         $project(reshape(
@@ -3184,7 +3218,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where bar.rating >= 4",
         defaultStats,
-        indexes(collection("db", "foo") -> BsonField.Name("id"))) must
+        indexes(collection("db", "foo") -> BsonField.Name("id")),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "bar")),
         $match(
@@ -3267,7 +3302,7 @@ class PlannerSpec extends
                         ident("undefined"))))))),
               ListMap()),
             $project(
-              reshape("value" -> $field("__tmp7")),
+              reshape(sigil.Quasar -> $field("__tmp7")),
               ExcludeId)),
           false).op)
     }.pendingWithActual("#1560", testFile("plan simple outer equi-join with wildcard"))
@@ -3318,7 +3353,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "foo")),
         $project(reshape(JoinDir.Left.name -> $$ROOT)),
@@ -3350,7 +3386,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select foo.name, bar.address from foo right join bar on foo.id = bar.foo_id",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "bar")),
         $project(reshape(JoinDir.Right.name -> $$ROOT)),
@@ -3454,7 +3491,8 @@ class PlannerSpec extends
         defaultStats,
         indexes(
           collection("db", "bar") -> BsonField.Name("foo_id"),
-          collection("db", "baz") -> BsonField.Name("bar_id"))) must
+          collection("db", "baz") -> BsonField.Name("bar_id")),
+        emptyDoc) must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "foo")),
           $match(Selector.Doc(
@@ -3514,7 +3552,8 @@ class PlannerSpec extends
       plan3_4(
         sqlE"select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
-        indexes()) must
+        indexes(),
+        emptyDoc) must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "largeZips")),
         $match(Selector.Doc(
@@ -3733,7 +3772,7 @@ class PlannerSpec extends
               Selector.Doc(
                 BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("value" -> $field("__tmp11", "city")),
+              reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
     }.pendingWithActual("#1560", testFile("plan simple cross"))
@@ -3787,7 +3826,7 @@ class PlannerSpec extends
     def appropriateColumns(wf: Workflow, q: Select[Fix[Sql]]) = {
       val fields = fieldNames(wf).map(_.filterNot(_ ≟ "_id"))
       (fields aka "column order" must beSome(columnNames(q))) or
-        (fields must beSome(List("value"))) // NB: some edge cases (all constant projections) end up under "value" and aren't interesting anyway
+        (fields must beSome(List(sigil.Quasar))) // NB: some edge cases (all constant projections) end up under "value" and aren't interesting anyway
     }
 
     "plan multiple reducing projections (all, distinct, orderBy)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
@@ -4015,10 +4054,10 @@ class PlannerSpec extends
           reshape(
             "0" -> divide($field("bar"), $literal(Bson.Dec(10.0))),
             "src" -> $$ROOT),
-          IgnoreId),
+          ExcludeId),
         $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
         $project(
-          reshape("value" -> $field("src")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
     }
 
@@ -4154,6 +4193,45 @@ class PlannerSpec extends
     }.pendingWithActual(notOnPar, testFile("plan with extra squash and flattening"))
   }
 
+  "sigil detection" should {
+    "project away root-level sigil" >> {
+      val getDoc: Collection => OptionT[EitherWriter, BsonDocument] =
+        _ => OptionT.some(new BsonDocument(
+          sigil.Quasar,
+          new BsonDocument("bar", new BsonDouble(4.2))))
+
+      plan3_4(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
+        beWorkflow(
+          chain[Workflow](
+            $read(collection("db", "foo")),
+            $project(
+              reshape(
+                "bar" -> $field(sigil.Quasar, "bar"),
+                "baz" -> $field(sigil.Quasar, "baz")),
+              ExcludeId)))
+    }
+
+    "project away sigil nested in map-reduce result" >> {
+      val getDoc: Collection => OptionT[EitherWriter, BsonDocument] =
+        _ => OptionT.some(
+          new BsonDocument(
+            sigil.Value,
+            new BsonDocument(
+              sigil.Quasar,
+              new BsonDocument("bar", new BsonDouble(4.2)))))
+
+      plan3_4(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
+        beWorkflow(
+          chain[Workflow](
+            $read(collection("db", "foo")),
+            $project(
+              reshape(
+                "bar" -> $field(sigil.Value, sigil.Quasar, "bar"),
+                "baz" -> $field(sigil.Value, sigil.Quasar, "baz")),
+              ExcludeId)))
+    }
+  }
+
   "planner log" should {
     "include all phases when successful" in {
       planLog(sqlE"select city from zips").map(_.name) must_===
@@ -4161,8 +4239,8 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript Mongo (Assume Read Type)",
-          "QScript Mongo (Prefer Projection)", "QScript Mongo (Elided Nops)",
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
+          "QScript Mongo", "QScript Mongo (Shuffle Maps)", "QScript Mongo (Prefer Projection)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 
@@ -4178,8 +4256,8 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript Mongo (Assume Read Type)",
-          "QScript Mongo (Prefer Projection)", "QScript Mongo (Elided Nops)")
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
+          "QScript Mongo", "QScript Mongo (Shuffle Maps)", "QScript Mongo (Prefer Projection)")
     }
   }
 }

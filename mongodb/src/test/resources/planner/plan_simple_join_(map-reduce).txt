@@ -74,5 +74,6 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ JsCore(_.right[1].city)
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil: _.right[1].city)
    ╰─ Scope(Map())

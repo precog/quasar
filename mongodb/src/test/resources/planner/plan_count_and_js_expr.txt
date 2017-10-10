@@ -60,7 +60,7 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("cnt" -> { "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("0") }] })
+   ├─ Name("cnt" -> "$left")
    ├─ Name("1" -> {
    │       "$cond": [
    │         {
@@ -68,33 +68,15 @@ Chain
    │             {
    │               "$lte": [
    │                 { "$literal": "" },
-   │                 {
-   │                   "$arrayElemAt": [
-   │                     {
-   │                       "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
-   │                     },
-   │                     { "$literal": NumberInt("1") }]
-   │                 }]
+   │                 { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] }]
    │             },
    │             {
    │               "$lt": [
-   │                 {
-   │                   "$arrayElemAt": [
-   │                     {
-   │                       "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
-   │                     },
-   │                     { "$literal": NumberInt("1") }]
-   │                 },
+   │                 { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] },
    │                 { "$literal": {  } }]
    │             }]
    │         },
-   │         {
-   │           "$arrayElemAt": [
-   │             {
-   │               "$arrayElemAt": [["$left", "$right"], { "$literal": NumberInt("1") }]
-   │             },
-   │             { "$literal": NumberInt("2") }]
-   │         },
+   │         { "$arrayElemAt": ["$right", { "$literal": NumberInt("2") }] },
    │         { "$literal": undefined }]
    │     })
-   ╰─ IgnoreId
+   ╰─ ExcludeId

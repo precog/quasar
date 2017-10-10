@@ -6,7 +6,7 @@ Chain
 │  ├─ Name("2" -> "$date")
 │  ├─ Name("3" -> { "$subtract": ["$date", { "$literal": 4.32E7 }] })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ And
 │     ├─ Or
@@ -36,5 +36,5 @@ Chain
 │     ╰─ Doc
 │        ╰─ Expr($3 -> Gt(Date(1416182400000)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

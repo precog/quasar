@@ -61,7 +61,7 @@ object QueryFile {
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
       mergeable: Mergeable.Aux[T, QS],
       render: Delay[RenderTree, QS],
-      eq: Delay[Equal, QS],
+      eql: Delay[Equal, QS],
       show: Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
@@ -89,16 +89,18 @@ object QueryFile {
       QC: QScriptCore[T, ?] :<: QS,
       TJ:   ThetaJoin[T, ?] :<: QS,
       render: Delay[RenderTree, QS],
+      equal: Delay[Equal, QS],
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val rewrite = new Rewrite[T]
 
-    // TODO: This would be `transHylo` if there were such a thing.
-    _.transAna[T[QS]](SP.simplifyProjection)
-      // TODO: Rather than explicitly applying multiple times, we should apply
-      //       repeatedly until unchanged.
-      .transAna[T[QS]](rewrite.normalize)
-      .transAna[T[QS]](rewrite.normalize)
+    val normUntilFixpoint: T[QS] => Option[T[QS]] = tqs => {
+      val next = tqs.transAna[T[QS]](rewrite.normalizeTJ)
+      (next =/= tqs) option next
+    }
+
+    iqs => repeatedly(normUntilFixpoint)(
+      iqs.transAna[T[QS]](SP.simplifyProjection))
       .pruneArraysF
   }
 
@@ -126,6 +128,7 @@ object QueryFile {
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
+      eql: Delay[Equal, QS],
       show: Delay[Show, QS],
       renderI: Delay[RenderTree, QScriptInternal[T, ?]],
       render: Delay[RenderTree, QS])
@@ -134,7 +137,7 @@ object QueryFile {
     val rewrite = new Rewrite[T]
 
     val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
         .leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)) ∘
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
@@ -157,6 +160,7 @@ object QueryFile {
       CQ: Coalesce.Aux[T, QS, QS],
       PA: PruneArrays[QS],
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
+      eql: Delay[Equal, QS],
       show: Delay[Show, QS],
       renderI: Delay[RenderTree, QScriptInternal[T, ?]],
       render: Delay[RenderTree, QS])
@@ -175,7 +179,7 @@ object QueryFile {
             Injectable.coproduct(Injectable.inject[Const[Read[ADir], ?], QScriptTotal[T, ?]],
               Injectable.inject[Const[Read[AFile], ?], QScriptTotal[T, ?]]))))
 
-    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
       .fold(
         perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
         _.point[M])

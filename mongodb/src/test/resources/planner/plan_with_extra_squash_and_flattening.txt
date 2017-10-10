@@ -32,7 +32,7 @@ Chain
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($0 -> Eq(Bool(true)))
@@ -43,4 +43,4 @@ Chain
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("city" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

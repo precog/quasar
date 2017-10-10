@@ -44,7 +44,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
 
       val newQScript =
         qScript.codyna(
-          rewrite.normalize[QST] >>> (_.embed),
+          rewrite.normalizeTJ[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))
 
       newQScript must
@@ -60,7 +60,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           lpf.constant(Data.Str("0")),
           agg.Count(lpRead("/foo/bar")).embed).embed).map(
         _.codyna(
-          rewrite.normalize[QST] >>> (_.embed),
+          rewrite.normalizeTJ[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
       beTreeEqual(chain(
         SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](

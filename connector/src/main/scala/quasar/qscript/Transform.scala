@@ -622,7 +622,7 @@ class Transform
 
       val reifiedCondition: F[T[F]] =
         QC.inj(reifyResult(func.ann, func.value)).embed
-          .transCata[T[F]](rewrite.normalize).project
+          .transCata[T[F]](rewrite.normalizeTJ).project
 
       reifiedCondition match {
         case QC(Map(_, mf)) if mf.count ≟ 0 =>

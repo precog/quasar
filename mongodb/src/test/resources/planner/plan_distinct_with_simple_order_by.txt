@@ -24,9 +24,9 @@ Chain
 │  ├─ Name("src" -> [
 │  │       { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] },
 │  │       ["$_id.0", "$f0"]])
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
    ╰─ ExcludeId

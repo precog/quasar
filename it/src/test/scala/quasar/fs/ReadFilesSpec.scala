@@ -64,8 +64,6 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
   def deleteForReading(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(readsPrefix))
 
-  implicit val setDataEq = Equal.equalA[Set[Data]]
-
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
@@ -99,8 +97,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
 
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, 0L, None))
-
-        r.run_\/.map(_.toSet) must_= smallFile.data.toSet.right
+        r.runEither must beRight(completelySubsume(smallFile.data))
       }
 
       "scan with offset = |file| and no limit yields no data" >> {
@@ -125,7 +122,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
 
           val d = rFull.map(_.drop(k))
 
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (rFull.toEither must beRight(completelySubsume(smallFile.data))) and
           (r must_= d)
         }.set(minTestsOk = 10)
       }
@@ -139,7 +136,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
 
           val d = rFull.map(_.take(j.value))
 
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (rFull.toEither must beRight(completelySubsume(smallFile.data))) and
           (r must_= d)
         }.set(minTestsOk = 10)
       }
@@ -154,7 +151,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
 
           val d = rFull.map(_.drop(k).take(j.value))
 
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (rFull.toEither must beRight(completelySubsume(smallFile.data))) and
           (r must_= d)
         }.set(minTestsOk = 5)
       }
@@ -168,8 +165,8 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
 
           val d = rFull.map(_.take(j.value))
 
-          (j.value must beGreaterThan(smallFile.data.length))    and
-          (rFull.map(_.toSet) must_= smallFile.data.toSet.right) and
+          (j.value must beGreaterThan(smallFile.data.length))              and
+          (rFull.toEither must beRight(completelySubsume(smallFile.data))) and
           (r must_= d)
         }.set(minTestsOk = 10)
       }

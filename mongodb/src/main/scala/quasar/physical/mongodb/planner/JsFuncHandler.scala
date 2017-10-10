@@ -359,7 +359,9 @@ object JsFuncHandler {
                       If(Call(select(ident("Array"), "isArray"), List(v)),
                         Literal(Js.Str("array")),
                         Literal(Js.Str("map")))),
-                    ident("typ")))
+                    If(BinOp(jscore.Eq, ident("typ"), Literal(Js.Str("string"))),
+                      Literal(Js.Str("array")),
+                      ident("typ"))))
 
               case Cond(i, t, e) => If(i, t, e)
             }

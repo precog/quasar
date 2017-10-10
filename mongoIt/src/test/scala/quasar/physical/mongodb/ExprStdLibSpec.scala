@@ -95,7 +95,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   ) =
     WorkflowBuilder.build[PlannerError \/ ?, WF](
       WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[WF].read(coll),
-        ListMap(BsonField.Name("value") -> \&/-(expr))))
+        ListMap(QuasarSigilName -> \&/-(expr))))
       .leftMap(qscriptPlanningFailed.reverseGet(_))
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix]
@@ -107,22 +107,22 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       case MongoQueryModel.`3.4` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](
           FuncHandler.handle3_4(bsonVersion), StaticHandler.v3_2)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
-          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.2` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](
           FuncHandler.handle3_2(bsonVersion), StaticHandler.v3_2)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
-          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.0` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_0](
           FuncHandler.handle3_0(bsonVersion), StaticHandler.v2_6)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
-          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case _                     =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr2_6](
           FuncHandler.handle2_6(bsonVersion), StaticHandler.v2_6)(mf).run(runAt) >>= (build[Workflow2_6F](_, coll)))
-          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
+          .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
     }
   }

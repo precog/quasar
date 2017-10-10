@@ -36,6 +36,7 @@ import quasar.physical._
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
+import java.io.File
 import scala.util.control.NonFatal
 
 import doobie.imports._
@@ -58,7 +59,7 @@ package object main extends Logging {
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
   final case class ClassName(value: String) extends AnyVal
-  final case class ClassPath(value: IList[APath]) extends AnyVal
+  final case class ClassPath(value: IList[File]) extends AnyVal
 
   // all of the backends which are included in the core distribution
   private val CoreFS = IList(
@@ -82,7 +83,6 @@ package object main extends Logging {
    */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
   def physicalFileSystems(config: BackendConfig): Task[BackendDef[PhysFsEffM]] = {
-    import java.io.File
     import java.lang.{
       ClassCastException,
       ClassNotFoundException,
@@ -136,11 +136,10 @@ package object main extends Logging {
     }
 
     val isolatedFS: Task[BackendDef[Task]] = config match {
-      case JarDirectory(dir) =>
+      case JarDirectory(file) =>
         import java.util.jar.JarFile
 
         for {
-          file <- Task.delay(new File(posixCodec.unsafePrintPath(dir)))
           children <- Task.delay(file.listFiles().toList)
           jars = IList.fromList(children.filter(_.getName.endsWith(".jar")).toList)
 
@@ -171,11 +170,8 @@ package object main extends Logging {
         val maybeDefinitionsM: Task[IList[Option[BackendDef[Task]]]] = backends traverse {
           case (ClassName(cn), ClassPath(paths)) =>
             val back = for {
-              urls <- (paths traverse { path =>
-                for {
-                  file <- Task.delay(new File(posixCodec.unsafePrintPath(path)))
-                  url <- Task.delay(file.toURI.toURL)
-                } yield url
+              urls <- (paths traverse { file =>
+                Task.delay(file.toURI.toURL)
               }).liftM[OptionT]
 
               cl <- Task.delay(new URLClassLoader(urls.toList.toArray, ParentCL)).liftM[OptionT]

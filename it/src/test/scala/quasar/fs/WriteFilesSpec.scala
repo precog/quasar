@@ -75,7 +75,7 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
         val f = writesPrefix </> file("saveone")
         val p = write.append(f, oneDoc.toProcess).drain ++ read.scanAll(f)
 
-        runLogT(run, p).runEither must beRight(oneDoc)
+        runLogT(run, p).runEither must beRight(completelySubsume(oneDoc))
       }
 
       "append two files, one in subdir of the other's parent, should succeed" >> {

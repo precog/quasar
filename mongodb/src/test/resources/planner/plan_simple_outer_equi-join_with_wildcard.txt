@@ -6,7 +6,7 @@ Chain
 │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │  ├─ Name("1" -> { "$literal": true })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
 │  │  │     ├─ Doc
@@ -37,7 +37,7 @@ Chain
 │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │     │  ├─ Name("1" -> { "$literal": true })
 │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ And
 │     │     ├─ Doc
@@ -73,18 +73,17 @@ Chain
 │  │         { "$literal": [{  }] },
 │  │         "$right"]
 │  │     })
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ If
-   │     ├─ JsCore(isObject(_.right[1]) && (! Array.isArray(_.right[1])))
-   │     ├─ If
-   │     │  ├─ JsCore(isObject(_.left[1]) && (! Array.isArray(_.left[1])))
-   │     │  ├─ SpliceObjects
-   │     │  │  ├─ JsCore(_.left[1])
-   │     │  │  ╰─ JsCore(_.right[1])
-   │     │  ╰─ Ident(undefined)
-   │     ╰─ Ident(undefined)
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ If
+   │           ├─ JsCore((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) && (isObject(_.left[1]) && (! Array.isArray(_.left[1]))))
+   │           ├─ SpliceObjects
+   │           │  ├─ JsCore(_.left[1])
+   │           │  ╰─ JsCore(_.right[1])
+   │           ╰─ Ident(undefined)
    ╰─ Scope(Map())

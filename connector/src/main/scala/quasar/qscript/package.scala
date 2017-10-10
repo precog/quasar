@@ -226,6 +226,7 @@ package object qscript {
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
+  // FIXME: Should this also normalize EquiJoins?
   def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
     br: FreeQS[T],
     fm: FreeMap[T]
@@ -234,7 +235,7 @@ package object qscript {
 
     (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
       Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))
-      .transCata[FreeQS[T]](liftCo(rewrite.normalizeCoEnv[QScriptTotal[T, ?]]))
+      .transCata[FreeQS[T]](liftCo(rewrite.normalizeTJCoEnv[QScriptTotal[T, ?]]))
   }
 
   def rebaseT[T[_[_]]: BirecursiveT, F[_]: Traverse](

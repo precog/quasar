@@ -3,19 +3,22 @@ Chain
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($state -> Eq(Text(CO)))
-╰─ $GroupF
-   ├─ Grouped
-   │  ╰─ Name("sm" -> {
-   │          "$sum": {
-   │            "$cond": [
-   │              {
-   │                "$and": [
-   │                  { "$lt": [{ "$literal": null }, "$pop"] },
-   │                  { "$lt": ["$pop", { "$literal": "" }] }]
-   │              },
-   │              "$pop",
-   │              { "$literal": undefined }]
-   │          }
-   │        })
-   ╰─ By
-      ╰─ Name("0" -> ["$city"])
+├─ $GroupF
+│  ├─ Grouped
+│  │  ╰─ Name("f0" -> {
+│  │          "$sum": {
+│  │            "$cond": [
+│  │              {
+│  │                "$and": [
+│  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│  │                  { "$lt": ["$pop", { "$literal": "" }] }]
+│  │              },
+│  │              "$pop",
+│  │              { "$literal": undefined }]
+│  │          }
+│  │        })
+│  ╰─ By
+│     ╰─ Name("0" -> ["$city"])
+╰─ $ProjectF
+   ├─ Name("sm" -> "$f0")
+   ╰─ ExcludeId

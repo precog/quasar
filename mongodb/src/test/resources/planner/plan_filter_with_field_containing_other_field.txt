@@ -10,5 +10,5 @@ Chain
 │  ╰─ Doc
 │     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("value" -> "$src")
+   ├─ Name("__quasar_mongodb_sigil" -> "$src")
    ╰─ ExcludeId

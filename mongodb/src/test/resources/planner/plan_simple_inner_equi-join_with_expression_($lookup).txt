@@ -6,7 +6,7 @@ Chain
 │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
 │  │  │  ├─ Name("1" -> { "$literal": true })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
 │  │  │     ├─ Doc
@@ -35,7 +35,7 @@ Chain
 │     ├─ $ReadF(db; foo)
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
@@ -86,4 +86,4 @@ Chain
 ╰─ $ProjectF
    ├─ Name("name" -> true)
    ├─ Name("address" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

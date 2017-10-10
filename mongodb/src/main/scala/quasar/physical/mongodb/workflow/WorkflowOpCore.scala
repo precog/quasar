@@ -24,10 +24,11 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
-  MapReduce.Scope
+import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, Reshape, Selector, sortDirToBson}
+import quasar.physical.mongodb.MapReduce, MapReduce.Scope
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.sigil
 import quasar.physical.mongodb.workflowtask._
 
 import scala.collection.immutable.Iterable
@@ -86,7 +87,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
     }
   // NB: this is exposed separately so that the type can be narrower
   def pipelineRhs: Bson.Doc = idExclusion match {
-    case ExcludeId => Bson.Doc(shape.bson.value + (IdLabel -> Bson.Bool(false)))
+    case ExcludeId => Bson.Doc(shape.bson.value + (sigil.Id -> Bson.Bool(false)))
     case _         => shape.bson
   }
   def empty: $ProjectF[A] = $ProjectF.EmptyDoc(src)
@@ -159,7 +160,7 @@ object $project {
     : FixOp[F] =
     $project[F](
       shape,
-      shape.get(IdName).fold[IdHandling](IgnoreId)(κ(IncludeId)))
+      shape.get(IdName).fold[IdHandling](ExcludeId)(κ(IncludeId)))
 }
 
 final case class $RedactF[A](src: A, value: Fix[ExprOp])
@@ -259,7 +260,7 @@ final case class $GroupF[A](src: A, grouped: Grouped[ExprOp], by: Reshape.Shape[
       def op = "$group"
       def rhs = {
         val Bson.Doc(m) = grouped.bson
-        Bson.Doc(m + (IdLabel -> by.fold(_.bson, _.cata(exprOps.bson))))
+        Bson.Doc(m + (sigil.Id -> by.fold(_.bson, _.cata(exprOps.bson))))
       }
     }
 
@@ -448,7 +449,7 @@ object $MapF {
       List(Js.Call(Js.Select(Js.Ident("emit"), "apply"),
         List(
           Js.Null,
-          Js.Call(fn, List(Js.Select(Js.This, IdLabel), Js.This))))))
+          Js.Call(fn, List(Js.Select(Js.This, sigil.Id), Js.This))))))
 }
 object $map {
   def apply[F[_]: Coalesce](fn: Js.AnonFunDecl, scope: Scope)
@@ -684,7 +685,7 @@ object $FlatMapF {
       List(
         Call(
           Select(
-            Call(fn, List(Select(This, IdLabel), This)),
+            Call(fn, List(Select(This, sigil.Id), This)),
             "map"),
           List(AnonFunDecl(List("__rez"),
             List(Call(Select(Ident("emit"), "apply"),

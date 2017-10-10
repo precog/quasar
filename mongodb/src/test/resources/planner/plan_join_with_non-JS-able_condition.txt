@@ -4,7 +4,7 @@ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -68,7 +68,7 @@ Chain
 │     ├─ $ReadF(db; zips)
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
@@ -140,4 +140,4 @@ Chain
    ├─ Name("loc" -> true)
    ├─ Name("city2" -> true)
    ├─ Name("pop" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

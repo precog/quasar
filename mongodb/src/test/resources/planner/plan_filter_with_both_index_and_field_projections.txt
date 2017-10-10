@@ -13,7 +13,10 @@ Chain
 │  ├─ Map
 │  │  ╰─ Obj
 │  ╰─ Scope(Map())
-╰─ $GroupF
-   ├─ Grouped
-   │  ╰─ Name("count" -> { "$sum": { "$literal": NumberInt("1") } })
-   ╰─ By({ "$literal": null })
+├─ $GroupF
+│  ├─ Grouped
+│  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
+│  ╰─ By({ "$literal": null })
+╰─ $ProjectF
+   ├─ Name("count" -> "$f0")
+   ╰─ ExcludeId

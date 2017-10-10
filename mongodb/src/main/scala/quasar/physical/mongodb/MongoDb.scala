@@ -29,16 +29,19 @@ import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.physical.mongodb.fs.bsoncursor._
+import quasar.physical.mongodb.mongoiterable._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.qscript.analysis._
 
 import java.time.Instant
+import scala.Predef.implicitly
+
 import matryoshka._
 import matryoshka.data._
+import org.bson.{BsonDocument, BsonValue}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scala.Predef.implicitly
 
 object MongoDb
     extends BackendModule
@@ -107,10 +110,16 @@ object MongoDb
     toBackendP(e.run.run)
   }
 
-  def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+  def doPlan[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       N[_]: Monad: MonadFsErr: PhaseResultTell]
-      (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], queryModel: MongoQueryModel, execTime: Instant): N[Repr] =
-      MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, execTime)
+      (qs: T[QSM[T, ?]],
+        ctx: fs.QueryContext,
+        queryModel: MongoQueryModel,
+        anyDoc: Collection => OptionT[N, BsonDocument],
+        execTime: Instant)
+      : N[Repr] =
+    MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, anyDoc, execTime)
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -120,10 +129,11 @@ object MongoDb
       qs: T[QSM[T, ?]]): Backend[Repr] =
     for {
       v <- config[Backend].map(_.serverVersion)
-      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, QueryFileModule.listContents))
+      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs))
       _ <- checkPathsExist(qs)
       execTime <- QueryFileModule.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
-      p <- doPlan[T, Backend](qs, ctx, MongoQueryModel(v), execTime)
+      anyDoc = (c: Collection) => MongoDbIO.first(c).mapT(x => toM(x).liftB)
+      p <- doPlan[T, Backend](qs, ctx, MongoQueryModel(v), anyDoc, execTime)
     } yield p
 
   private type PhaseRes[A] = PhaseResultT[ConfiguredT[M, ?], A]
@@ -196,7 +206,7 @@ object MongoDb
         iter <- MongoDbIO.find(coll)
         iter2 =  iter.skip(offset.value.toInt)
         iter3 = limit.map(l => iter2.limit(l.value.toInt)).getOrElse(iter2)
-        cur  <- MongoDbIO.async(iter3.batchCursor)
+        cur  <- MongoDbIO.async(iter3.widen[BsonValue].batchCursor)
       } yield cur
 
     def readCursor(f: AFile, offset: Natural, limit: Option[Positive])

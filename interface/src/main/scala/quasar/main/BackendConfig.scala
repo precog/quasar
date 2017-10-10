@@ -17,8 +17,6 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{ADir, AFile, APath}
-import quasar.contrib.scalaz._
 
 import java.io.File
 import scala.collection.Seq   // uh, yeah
@@ -41,18 +39,11 @@ object BackendConfig {
   val Empty: BackendConfig = ExplodedDirs(IList.empty)
 
   def fromBackends(backends: IList[(String, Seq[File])]): Task[BackendConfig] = {
-    val entriesM: Task[IList[(ClassName, ClassPath)]] = backends traverse {
+    val entriesM = backends traverse {
       case (name, paths) =>
-        for {
-          unflattened <- IList(paths: _*) traverse { path =>
-            val results =
-              ADir.fromFile(path).covary[APath].orElse(AFile.fromFile(path).covary[APath])
-
-            results.toListT.run.map(IList.fromList(_))
-          }
-
-          apaths = unflattened.flatten
-        } yield ClassName(name) -> ClassPath(apaths)
+        Task delay {
+          ClassName(name) -> ClassPath(IList(paths.filter(_.exists()): _*))
+        }
     }
 
     entriesM.map(BackendConfig.ExplodedDirs(_))
@@ -63,7 +54,7 @@ object BackendConfig {
    * loaded as a backend.  With each jar, the `BackendModule` class
    * name will be determined from the `Manifest.mf` file.
    */
-  final case class JarDirectory(dir: ADir) extends BackendConfig
+  final case class JarDirectory(dir: File) extends BackendConfig
 
   /**
    * Any files in the classpath will be loaded as jars; any directories

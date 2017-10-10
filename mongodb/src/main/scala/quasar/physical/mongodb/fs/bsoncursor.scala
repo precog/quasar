@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.fs
 
-import slamdata.Predef.{Boolean, Vector}
+import slamdata.Predef._
 import quasar.Data
 import quasar.fs.DataCursor
 import quasar.physical.mongodb._
@@ -24,11 +24,12 @@ import quasar.physical.mongodb._
 import scala.Option
 import scala.collection.JavaConverters._
 
-import org.bson.BsonDocument
-import scalaz._, Id._
+import org.bson.BsonValue
 import scalaz.concurrent.Task
+import scalaz.syntax.compose._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
+import scalaz.std.function._
 import scalaz.std.vector._
 
 object bsoncursor {
@@ -49,11 +50,8 @@ object bsoncursor {
 
       ////
 
-      val withoutId: BsonDocument => BsonDocument =
-        d => (d: Id[BsonDocument]) map (_ remove "_id") as d
-
-      val toData: BsonDocument => Data =
-        (BsonCodec.toData _) compose Bson.fromRepr compose withoutId
+      val toData: BsonValue => Data =
+        (BsonCodec.toData _) <<< Bson.fromRepr <<< sigil.elideQuasarSigil
 
       def isClosed(cursor: BsonCursor): MongoDbIO[Boolean] =
         MongoDbIO.liftTask(Task.delay(cursor.isClosed))

@@ -83,4 +83,4 @@ Chain
 ╰─ $ProjectF
    ├─ Name("name" -> true)
    ├─ Name("address" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

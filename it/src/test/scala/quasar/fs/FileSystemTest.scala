@@ -34,8 +34,9 @@ import scala.Either
 import eu.timepit.refined.auto._
 import monocle.Optional
 import monocle.function.Index
-import org.specs2.specification.core.{Fragment, Fragments}
 import org.specs2.execute.{Failure => _, _}
+import org.specs2.matcher.{ContainWithResultSeq, Expectable, Matcher, ValueCheck}
+import org.specs2.specification.core.{Fragment, Fragments}
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -86,6 +87,40 @@ abstract class FileSystemTest[S[_]](
 
   def pendingForF[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(fa: => F[A])(implicit run: Run): Result =
     pendingFor(fs)(toPend)(run(fa).unsafePerformSync)
+
+  /** Matches `Data` that is equal to `superType` or, for Objects, has a
+    * superset of the key -> value associations.
+    *
+    * This exists to allow data stores having synthetic primary keys
+    * (MongoDB, RDBMS, etc.) to still pass the tests even though
+    * their results may contain extra identity keys.
+    */
+  def subsume(superType: Data): Matcher[Data] =
+    new Matcher[Data] {
+      def apply[S <: Data](s: Expectable[S]) = {
+        val d = s.value
+        (superType, d) match {
+          case (Data.Obj(sup), Data.Obj(sub)) =>
+            result(
+              sup.forall { case (k, v) => sub.get(k).exists(_ === v) },
+              s"$sub subsumes $sup",
+              s"$sub does not subsume $sup",
+              s)
+
+          case (sup, sub) =>
+            sub must equal(sup)
+        }
+      }
+    }
+
+  def subsumingEachOf[F[_]: Foldable](these: F[Data]): ContainWithResultSeq[Data] =
+    eachOf(these.foldRight(List[ValueCheck[Data]]())((d, vcs) => subsume(d) :: vcs) : _*)
+
+  /** Matches a `Traversable[Data]` that subsumes all the `Data` in the provided
+    * `Foldable`.
+    */
+  def completelySubsume[F[_]: Foldable](these: F[Data]): ContainWithResultSeq[Data] =
+    contain(subsumingEachOf(these)).onDistinctValues
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)

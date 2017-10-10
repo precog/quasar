@@ -26,7 +26,7 @@ Chain
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("3") }] })
 │  │  │  ├─ Name("src" -> "$$ROOT")
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
 │  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
@@ -80,13 +80,13 @@ Chain
 │     │  │         { "$literal": NumberInt("2") }]
 │     │  │     })
 │     │  ├─ Name("src" -> "$$ROOT")
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("4") }] })
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [
@@ -124,4 +124,4 @@ Chain
    ├─ Name("c_auth" -> true)
    ├─ Name("parent" -> true)
    ├─ Name("p_auth" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

@@ -30,10 +30,12 @@ Chain
    ├─ Flatten
    │  ╰─ JsCore(_.f)
    ├─ Map
-   │  ╰─ SpliceObjects
-   │     ├─ SpliceObjects
-   │     │  ├─ JsCore(_.s[0])
-   │     │  ╰─ JsCore(_.s[1])
-   │     ╰─ Obj
-   │        ╰─ Key(coord: _.f)
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ SpliceObjects
+   │           │  ├─ JsCore(_.s[0])
+   │           │  ╰─ JsCore(_.s[1])
+   │           ╰─ Obj
+   │              ╰─ Key(coord: _.f)
    ╰─ Scope(Map())

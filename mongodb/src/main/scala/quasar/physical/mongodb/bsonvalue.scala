@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.physical.mongodb
 
-import slamdata.Predef._
+import quasar.fp.ski.ι
 
-import argonaut._, Json._
+import monocle.Prism
+import org.bson.{BsonValue, BsonDocument}
 
-case class ExpectedResult(
-  rows:              List[Json],
-  predicate:         Predicate,
-  ignoredFields:     List[JsonField],
-  ignoreFieldOrder:  Boolean,
-  ignoreResultOrder: Boolean,
-  backends:          Directives)
+object bsonvalue {
+  val document: Prism[BsonValue, BsonDocument] =
+    Prism.partial[BsonValue, BsonDocument] {
+      case doc: BsonDocument => doc
+    } (ι)
+}

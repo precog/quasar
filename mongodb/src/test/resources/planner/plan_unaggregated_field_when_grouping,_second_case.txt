@@ -34,7 +34,7 @@ Chain
 │     │  ├─ Name("0" -> [
 │     │  │       { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] },
 │     │  │       { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] }])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
@@ -68,13 +68,10 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(0: [_.left, _.right][0] / 1000)
-│  │     ╰─ Key(pop: (function (__val) {
-│  │            return (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].pop : undefined
-│  │          })(
-│  │            [_.left, _.right]))
+│  │     ├─ Key(0: _.left / 1000)
+│  │     ╰─ Key(pop: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].pop : undefined)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("0" -> true)
    ├─ Name("pop" -> true)
-   ╰─ IgnoreId
+   ╰─ ExcludeId

@@ -1,0 +1,15 @@
+Chain
+├─ $ReadF(db; zips)
+├─ $LimitF(5)
+╰─ $ProjectF
+   ├─ Name("__quasar_mongodb_sigil" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+   │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+   │         },
+   │         "$city",
+   │         { "$literal": undefined }]
+   │     })
+   ╰─ ExcludeId

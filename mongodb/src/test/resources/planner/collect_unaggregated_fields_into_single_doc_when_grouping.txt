@@ -69,12 +69,12 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ Let(__val)
-   │     ├─ JsCore([_.left, _.right])
-   │     ╰─ SpliceObjects
-   │        ├─ SpliceObjects
-   │        │  ├─ JsCore(__val[0][1])
-   │        │  ╰─ JsCore(__val[0][2])
-   │        ╰─ Obj
-   │           ╰─ Key(2: __val[1])
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ SpliceObjects
+   │           │  ├─ JsCore(_.left[1])
+   │           │  ╰─ JsCore(_.left[2])
+   │           ╰─ Obj
+   │              ╰─ Key(2: _.right)
    ╰─ Scope(Map())

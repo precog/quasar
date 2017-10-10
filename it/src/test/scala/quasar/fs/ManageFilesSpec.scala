@@ -58,7 +58,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                   .map(_.right[Data])
 
         runLogT(run, p).map(_.toVector.separate)
-          .runEither must beRight((oneDoc, Vector(false)))
+          .runEither must beRight((oneDoc, Vector(false)).zip(completelySubsume(_), equal(_)))
       }
 
       "moving a file to an existing path using FailIfExists semantics should fail with PathExists" >> {
@@ -87,7 +87,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                   .map(_.right[Data])
 
         runLogT(run, p).map(_.toVector.separate)
-          .runEither must beRight((oneDoc, Vector(false)))
+          .runEither must beRight((oneDoc, Vector(false)).zip(completelySubsume(_), equal(_)))
       }
 
       "moving a file that doesn't exist to a file that does should fail with src NotFound" >> {
@@ -178,8 +178,8 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           write.saveThese(uf3, thirdDoc)   *>
           manage.moveDir(src, dst, MoveSemantics.FailIfExists)
 
-        (runT(run)(setupAndMove).runOption must beNone) and
-        (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(oneDoc)) and
+        (runT(run)(setupAndMove).runOption must beNone)                                                     and
+        (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(completelySubsume(oneDoc))) and
         (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
       }
 
@@ -224,7 +224,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
         (execT(run, p).runOption must beNone)                                       and
         (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
-        (runLogT(run, read.scanAll(f2)).runEither must beRight(anotherDoc))
+        (runLogT(run, read.scanAll(f2)).runEither must beRight(completelySubsume(anotherDoc)))
       }
 
       "deleting a directory deletes all files therein" >> {
@@ -258,7 +258,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                   manage.delete(tf).liftM[Process].drain
                 }
 
-        runLogT(run, p).runEither must beRight(anotherDoc)
+        runLogT(run, p).runEither must beRight(completelySubsume(anotherDoc))
       }
 
       "write/read from temp dir near non existing" >> {
@@ -270,7 +270,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                   manage.delete(tf).liftM[Process].drain
                 }
 
-        runLogT(run, p).runEither must beRight(anotherDoc)
+        runLogT(run, p).runEither must beRight(completelySubsume(anotherDoc))
       }
 
       "temp file should be generated in hint directory" >> prop { rdir: RDir =>

@@ -37,4 +37,4 @@ Chain
    │         },
    │         { "$divide": ["$f1", { "$literal": NumberInt("1000") }] }]
    │     })
-   ╰─ IgnoreId
+   ╰─ ExcludeId

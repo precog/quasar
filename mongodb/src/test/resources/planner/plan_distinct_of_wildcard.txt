@@ -9,5 +9,5 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$$ROOT")
 ╰─ $ProjectF
-   ├─ Name("value" -> "$_id.0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$_id.0")
    ╰─ ExcludeId

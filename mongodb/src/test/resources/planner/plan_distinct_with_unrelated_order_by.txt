@@ -11,7 +11,7 @@ Chain
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Descending)
 ├─ $SimpleMapF
@@ -43,9 +43,9 @@ Chain
 │  │         { "$literal": NumberInt("2") }]
 │  │     })
 │  ├─ Name("src" -> "$$ROOT")
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Descending)
 ╰─ $ProjectF
-   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
    ╰─ ExcludeId

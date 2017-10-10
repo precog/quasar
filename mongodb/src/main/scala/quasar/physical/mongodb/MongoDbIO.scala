@@ -143,6 +143,10 @@ object MongoDbIO {
   def ensureCollection(c: Collection): MongoDbIO[Unit] =
     collectionExists(c).ifM(().point[MongoDbIO], createCollection(c))
 
+  /** Returns the first document in the collection. */
+  def first(coll: Collection): OptionT[MongoDbIO, BsonDocument] =
+    OptionT(find(coll) >>= (c => async(c.limit(1).first) map (Option(_))))
+
   /** Returns the name of the first database where an insert to the collection
     * having the given name succeeds.
     */

@@ -117,4 +117,4 @@ Chain
 ╰─ $ProjectF
    ├─ Name("state" -> { "$arrayElemAt": ["$left", { "$literal": NumberInt("1") }] })
    ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
-   ╰─ IgnoreId
+   ╰─ ExcludeId

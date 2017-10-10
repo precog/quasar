@@ -69,7 +69,7 @@ Chain
 │     │  │         },
 │     │  │         { "$literal": undefined }]
 │     │  │     })
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ SubMap
 │     │  │  ├─ JsCore(_.f)
@@ -119,7 +119,7 @@ Chain
 │     │  │         },
 │     │  │         { "$literal": undefined }]
 │     │  │     })
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Flatten
 │     │  │  ╰─ JsCore(_.f)
@@ -161,7 +161,7 @@ Chain
 │  │         { "$literal": NumberInt("1") }]
 │  │     })
 │  ├─ Name("src" -> ["$left", "$right"])
-│  ╰─ IgnoreId
+│  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ And
 │     ├─ Doc
@@ -172,7 +172,7 @@ Chain
 │        ╰─ Doc
 │           ╰─ Expr($2 -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("value" -> {
+   ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [
    │         {
    │           "$and": [

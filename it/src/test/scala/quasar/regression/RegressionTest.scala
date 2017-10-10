@@ -21,13 +21,14 @@ import quasar.BackendName
 import quasar.fp._
 
 import argonaut._, Argonaut._
+import argonaut.DecodeJsonScalaz._
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import scalaz._, Scalaz._
 
 case class RegressionTest(
   name:      String,
-  backends:  Map[BackendName, TestDirective],
+  backends:  Directives,
   data:      List[RelFile[Unsandboxed]],
   query:     String,
   variables: Map[String, String],
@@ -37,13 +38,22 @@ case class RegressionTest(
 object RegressionTest {
   import DecodeResult._
 
+  final case class OneOrMore[A](value: NonEmptyList[A])
+
+  object OneOrMore {
+    implicit def decodeJson[A: DecodeJson]: DecodeJson[OneOrMore[A]] =
+      DecodeJson(c => c.as[A].map(NonEmptyList(_)) ||| c.as[NonEmptyList[A]])
+        .map(OneOrMore(_))
+  }
+
   implicit val RegressionTestDecodeJson: DecodeJson[RegressionTest] =
     DecodeJson(c => for {
       name              <- (c --\ "name").as[String]
-      backends          <- if ((c --\ "backends").succeeded)
-                             (c --\ "backends").as[Map[String, TestDirective]]
+      backends0         <- if ((c --\ "backends").succeeded)
+                             (c --\ "backends").as[Map[String, OneOrMore[TestDirective]]]
                                .map(_ mapKeys (BackendName(_)))
-                           else ok(Map[BackendName, TestDirective]())
+                           else ok(Map[BackendName, OneOrMore[TestDirective]]())
+      backends          =  backends0 mapValues (_.value)
       data              <- (c --\ "data").as[List[RelFile[Unsandboxed]]] |||
                            optional[RelFile[Unsandboxed]](c--\ "data").map(_.toList)
       query             <- (c --\ "query").as[String]

@@ -133,15 +133,15 @@ object Predicate {
           }
           .runLog.map(_.foldMap()(Result.ResultMonoid))
       case OrderIgnored =>
-        actual0.scan((expected0.toSet, Set.empty[Json], None: Option[Json])) {
+        actual0.scan((expected0, Vector.empty[Json], None: Option[Json])) {
           case ((expected, wrongOrder, extra), e) =>
-            expected.find(_ == e) match {
-              case Some(e1) if jsonMatches(e1, e) =>
-                (expected.filterNot(_ == e), wrongOrder, extra)
-              case Some(_) =>
-                (expected.filterNot(_ == e), wrongOrder + e, extra)
-              case None =>
+            expected.indexOf(e) match {
+              case -1 =>
                 (expected, wrongOrder, extra.orElse(e.some))
+              case k if jsonMatches(expected(k), e) =>
+                (deleteAt(k, expected), wrongOrder, extra)
+              case k =>
+                (deleteAt(k, expected), wrongOrder :+ e, extra)
             }
         }
           .runLast
@@ -155,6 +155,10 @@ object Predicate {
               failure
           }
     }
+
+    // Removes the element at `idx` from `as`.
+    private def deleteAt[A](idx: Int, as: Vector[A]): Vector[A] =
+      as.patch(idx, Nil, 1)
   }
 
   /** Must START WITH the elements, in order. */

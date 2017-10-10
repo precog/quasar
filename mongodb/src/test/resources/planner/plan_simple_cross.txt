@@ -4,7 +4,7 @@ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ IgnoreId
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -50,7 +50,7 @@ Chain
 │     ├─ $ReadF(db; zips2)
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│     │  ╰─ IgnoreId
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
@@ -128,5 +128,6 @@ Chain
 │        ╰─ Expr($1 -> Eq(Bool(true)))
 ╰─ $SimpleMapF
    ├─ Map
-   │  ╰─ JsCore((isObject(_.src[1][2]) && (! Array.isArray(_.src[1][2]))) ? _.src[1][2].city : undefined)
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil: (isObject(_.src[1][2]) && (! Array.isArray(_.src[1][2]))) ? _.src[1][2].city : undefined)
    ╰─ Scope(Map())

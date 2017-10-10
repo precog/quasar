@@ -78,8 +78,8 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         val e = EitherT((query.execute(aToc, c) *> query.execute(bToc, c).void).run.value)
         val p = e.liftM[Process].drain ++ read.scanAll(c)
 
-        runLogT(fs.testInterpM, p).runEither must beRight(containTheSameElementsAs(Vector[Data](
-          Data.Obj("c" -> Data._int(2)))))
+        runLogT(fs.testInterpM, p).runEither must
+          beRight(completelySubsume(Vector[Data](Data.Obj("c" -> Data._int(2)))))
       } }
 
       "listing directory returns immediate child nodes" >> {

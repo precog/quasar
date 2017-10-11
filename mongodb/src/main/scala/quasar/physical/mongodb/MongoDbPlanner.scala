@@ -678,62 +678,47 @@ object MongoDbPlanner {
     List(Here[T]()))
 
   def typeSelector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
-
-    // type GAlgebra[W[_], F[_], A] = F[W[A]] => A
-    //      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]]
-    //      MapFunc[T, (T[MapFunc[T, ?]], PlannerError \/ PartialSelector[T])] => PlannerError \/ PartialSelector[T]
-    //
-    // type ElgotAlgebra[W[_], F[_], A] = W[F[A]] => A
-    //      ElgotAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]]
-    //      (T[MapFunc[T, ?]], MapFunc[T, PlannerError \/ PartialSelector[T]]) => PlannerError \/ PartialSelector[T]
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
 
     import MapFuncsCore._
 
-    type Output = OutputM[PartialSelector[T]]
-    val default: PartialSelector[T] = defaultSelector[T]
-
-    def invoke(func: MapFunc[T, (T[MapFunc[T, ?]], Output)]): Output = {
-      func match {
-        case MFC(Guard(_, typ, cont, _)) =>
-          def selCheck: Type => Option[BsonField => Selector] =
-            generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
-              case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
-              case Type.Dec => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Dec)))
-              case Type.Int =>
-                ((f: BsonField) => Selector.Or(
+    {
+      case node @ MFC(Guard(_, typ, cont, _)) =>
+        def selCheck: Type => Option[BsonField => Selector] =
+          generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
+            case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
+            case Type.Dec => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Dec)))
+            case Type.Int =>
+              ((f: BsonField) => Selector.Or(
+                Selector.Doc(f -> Selector.Type(BsonType.Int32)),
+                Selector.Doc(f -> Selector.Type(BsonType.Int64))))
+            case Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
+              ((f: BsonField) =>
+                Selector.Or(
                   Selector.Doc(f -> Selector.Type(BsonType.Int32)),
-                  Selector.Doc(f -> Selector.Type(BsonType.Int64))))
-              case Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
-                ((f: BsonField) =>
-                  Selector.Or(
-                    Selector.Doc(f -> Selector.Type(BsonType.Int32)),
-                    Selector.Doc(f -> Selector.Type(BsonType.Int64)),
-                    Selector.Doc(f -> Selector.Type(BsonType.Dec))))
-              case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
-              case Type.Obj(_, _) =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
-              case Type.Binary =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
-              case Type.Id =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
-              case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
-              case Type.Date =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
-            }
-          selCheck(typ).fold[OutputM[PartialSelector[T]]](
-            -\/(InternalError.fromMsg(node.map(_._1).shows)))(
-            f =>
-            \/-(cont._2.fold[PartialSelector[T]](
-              κ(({ case List(field) => f(field) }, List(There(0, Here[T]())))),
-              { case (f2, p2) => ({ case head :: tail => Selector.And(f(head), f2(tail)) }, There(0, Here[T]()) :: p2.map(There(1, _)))
-              })))
+                  Selector.Doc(f -> Selector.Type(BsonType.Int64)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Dec))))
+            case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
+            case Type.Obj(_, _) =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
+            case Type.Binary =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
+            case Type.Id =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
+            case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
+            case Type.Date =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
+          }
+        selCheck(typ).fold[OutputM[PartialSelector[T]]](
+          -\/(InternalError.fromMsg(node.map(_._1).shows)))(
+          f =>
+          \/-(cont._2.fold[PartialSelector[T]](
+            κ(({ case List(field) => f(field) }, List(There(0, Here[T]())))),
+            { case (f2, p2) => ({ case head :: tail => Selector.And(f(head), f2(tail)) }, There(0, Here[T]()) :: p2.map(There(1, _)))
+            })))
 
-        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
-      }
+      case node @ _ => -\/(InternalError fromMsg node.map(_._1).shows)
     }
-
-    invoke(node)
   }
 
 

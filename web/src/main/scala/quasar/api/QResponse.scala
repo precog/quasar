@@ -17,6 +17,7 @@
 package quasar.api
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure
 import quasar.fp._
@@ -27,7 +28,8 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.dsl._
 import scalaz.{Optional => _, _}
-import scalaz.syntax.monad._
+import scalaz.std.iterable._
+import scalaz.Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
@@ -97,21 +99,63 @@ object QResponse {
       E.headers,
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
 
+  /**
+    * This QResponse constructor attempts to eliminate all effects in this
+    * stream that aren't actually part of the response stream by eagerly evaluating
+    * the "first few" effects of the stream. Examples of such effects are
+    * opening a quasar filesystem file, initiating a query to a connector, etc. Doing so
+    * allows us to provide a proper error response to clients instead of sending a
+    * Http OK and then failing to stream the response body because actually it
+    * turned out the file didn't exist after all.
+    *
+    * The better fix for this problem would probably be to avoid constructing
+    * such processes (at least for use in the web layer) and instead make a
+    * distinction between the effects that create a stream and the effects
+    * that "run" the stream.
+    *
+    * In the meantime, this constructor should mostly do the right thing if
+    * provided with such processes.
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def streaming[S[_], A]
       (p: Process[Free[S, ?], A])
       (implicit E: EntityEncoder[A], S0: Task :<: S)
-      : QResponse[S] =
-    QResponse(
-      Ok,
-      E.headers,
-      p.flatMap[Free[S, ?], ByteVector](a =>
-        Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT)))
+      : Free[S, QResponse[S]] = {
+    val responseBody = p.flatMap[Free[S, ?], ByteVector](a =>
+      Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
+
+    /** Producing this many bytes from a `Process[F, ByteVector]` should require
+      * at least one `F` effect.
+      *
+      * The scenarios this is intended to handle involve prepending a small wrapper
+      * around a stream, like "[\n" when outputting JSON data in an array, and thus
+      * 100 bytes seemed large enough to contain these cases and small enough as to
+      * not force more than is needed.
+      *
+      * We cannot just `Process.unemit` the `Process` as there may be non-`F` `Await`
+      * steps encountered before an actual `F` effect (from many of the combinators
+      * in `process1` and the like).
+      *
+      * This leads us to the current workaround which is to define this threshold
+      * which should be, ideally, just large enough to require the first `F` to
+      * produce the bytes, but not more. We then consume the byte stream until it
+      * ends or we've consumed this many bytes. Finally we have a chance to inspect
+      * the `F` and see if anything failed before handing the rest of the process
+      * to http4s to continue streaming to the client as normal.
+      */
+    val PROCESS_EFFECT_THRESHOLD_BYTES = 100L
+
+    guardStream(responseBody, PROCESS_EFFECT_THRESHOLD_BYTES).map(guardedStream =>
+      QResponse(
+        Ok,
+        E.headers,
+        guardedStream))
+  }
 
   def streaming[S[_], A, E]
       (p: Process[EitherT[Free[S, ?], E, ?], A])
       (implicit A: EntityEncoder[A], S0: Task :<: S, S1: Failure[E, ?] :<: S)
-      : QResponse[S] = {
+      : Free[S, QResponse[S]] = {
     val failure = Failure.Ops[E, S]
     streaming(p.translate(failure.unattemptT))
   }
@@ -121,4 +165,11 @@ object QResponse {
       status,
       Headers(`Content-Type`(MediaType.`text/plain`, Some(Charset.`UTF-8`))),
       Process.emit(ByteVector.view(s.getBytes(Charset.`UTF-8`.nioCharset))))
+
+  /**
+    * If any errors were to occur before lookAhead bytes would be read from `stream`, these errors will
+    * now happen whenever the outer `M` is first evaluated.
+    */
+  private def guardStream[M[_]: Catchable: Monad](stream: Process[M, ByteVector], lookAhead: Long): M[Process[M, ByteVector]] =
+    stream.stepUntil(_.foldMap(_.length) >= lookAhead)
 }

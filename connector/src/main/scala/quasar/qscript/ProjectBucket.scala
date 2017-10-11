@@ -112,19 +112,26 @@ object ProjectBucket {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
-        p1: ProjectBucket[IT, ExternallyManaged],
-        p2: ProjectBucket[IT, ExternallyManaged]) =
-        (p1, p2) match {
+        left: Mergeable.MergeSide[IT, ProjectBucket[T, ?]],
+        right: Mergeable.MergeSide[IT, ProjectBucket[T, ?]]) =
+        (left.source, right.source) match {
+
           case (BucketField(s1, v1, n1), BucketField(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] = BucketField(s1, v1 >> left, n1 >> left)
-            val new2: ProjectBucket[T, ExternallyManaged] = BucketField(s2, v2 >> right, n2 >> right)
+            val new1: ProjectBucket[T, ExternallyManaged] =
+              BucketField(s1, v1 >> left.access, n1 >> left.access)
+            val new2: ProjectBucket[T, ExternallyManaged] =
+              BucketField(s2, v2 >> right.access, n2 >> right.access)
+
             (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
+
           case (BucketIndex(s1, v1, n1), BucketIndex(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] = BucketIndex(s1, v1 >> left, n1 >> left)
-            val new2: ProjectBucket[T, ExternallyManaged] = BucketIndex(s2, v2 >> right, n2 >> right)
+            val new1: ProjectBucket[T, ExternallyManaged] =
+              BucketIndex(s1, v1 >> left.access, n1 >> left.access)
+            val new2: ProjectBucket[T, ExternallyManaged] =
+              BucketIndex(s2, v2 >> right.access, n2 >> right.access)
+
             (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
+
           case (_, _) => None
       }
     }

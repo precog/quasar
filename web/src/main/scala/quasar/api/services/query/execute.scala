@@ -21,7 +21,6 @@ import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
@@ -68,12 +67,14 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          resolveImports[S](xpr, basePath).run.map { block =>
-            block.leftMap(_.wrapNel).flatMap(block =>
-              queryPlan(block, requestVars(req), basePath, off, lim)
-                .run.value map (lp => formattedDataResponse(
+          resolveImports[S](xpr, basePath).run.flatMap { block =>
+            val lpOrSemanticErr =
+              block.leftMap(_.wrapNel).flatMap(block =>
+                queryPlan(block, requestVars(req), basePath, off, lim)
+                .run.value)
+            lpOrSemanticErr traverse (lp => formattedDataResponse(
                 MessageFormat.fromAccept(req.headers.get(Accept)),
-                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases))))
+                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases)))
           }
         })
 

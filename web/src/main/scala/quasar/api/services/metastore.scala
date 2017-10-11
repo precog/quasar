@@ -18,7 +18,6 @@ package quasar.api.services
 
 import slamdata.Predef.StringContext
 import quasar.api._
-import quasar.contrib.scalaz.catchable._
 import quasar.db.DbConnectionConfig
 import quasar.fp.free._
 import quasar.main.{MainErrT, MetaStoreLocation}

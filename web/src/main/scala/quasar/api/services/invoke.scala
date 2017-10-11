@@ -21,7 +21,6 @@ import quasar.api._
 import quasar.api.ApiError._
 import quasar.api.ToQResponse._
 import quasar.api.ToQResponse.ops._
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._, numeric._
@@ -43,15 +42,15 @@ object invoke {
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
-      respond_ {
+      respond {
         (offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
           refineType(path).fold(
-            dir => apiError(BadRequest withReason "Path must be a file").toResponse[S],
+            dir => apiError(BadRequest withReason "Path must be a file").toResponse[S].point[Free[S, ?]],
             file => {
               val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
               invoke[S](requestedFormat, file, req.params, offset, limit)
             })
-        }
+        }.sequence
       }
   }
 
@@ -67,6 +66,6 @@ object invoke {
     I: Module.Ops[S],
     S0: Failure[Module.Error, ?] :<: S,
     S1: Task :<: S
-  ): QResponse[S] =
+  ): Free[S, QResponse[S]] =
       formattedDataResponse(format, I.invokeFunction(filePath, args, offset, limit))
 }

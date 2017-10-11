@@ -105,21 +105,19 @@ object ThetaJoin {
       val rewrite = new Rewrite[IT]
 
       def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
-        p1: ThetaJoin[IT, ExternallyManaged],
-        p2: ThetaJoin[IT, ExternallyManaged]) =
-        (p1, p2) match {
+        left: Mergeable.MergeSide[IT, ThetaJoin[T, ?]],
+        right: Mergeable.MergeSide[IT, ThetaJoin[T, ?]]) =
+        (left.source, right.source) match {
           case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2)) if f1 ≟ f2 => {
-            val left1 = rebaseBranch(l1, left)
-            val right1 = rebaseBranch(r1, left)
-            val left2 = rebaseBranch(l2, right)
-            val right2 = rebaseBranch(r2, right)
+            val left1 = rebaseBranch(l1, left.access)
+            val right1 = rebaseBranch(r1, left.access)
+            val left2 = rebaseBranch(l2, right.access)
+            val right2 = rebaseBranch(r2, right.access)
 
-            def updateJoin(func: JoinFunc[IT], left: FreeMap[IT], right: FreeMap[IT]): JoinFunc[IT] =
+            def updateJoin(func: JoinFunc[IT], l: FreeMap[IT], r: FreeMap[IT]): JoinFunc[IT] =
               func.flatMap {
-                case LeftSide => left.as(LeftSide)
-                case RightSide => right.as(RightSide)
+                case LeftSide => l.as(LeftSide)
+                case RightSide => r.as(RightSide)
               }
 
             merge.tryMergeBranches(rewrite)(left1, right1, left2, right2).toOption.map {
@@ -134,9 +132,9 @@ object ThetaJoin {
 
                 val cL: JoinFunc[IT] = updateJoin(c1, resL.lval, resR.lval)
                 val cR: JoinFunc[IT] = updateJoin(c2, resL.rval, resR.rval)
-                val (cond, left, right) = concat(cL, cR)
+                val (cond, l, r) = concat(cL, cR)
 
-                SrcMerge(ThetaJoin(s1, resL.src, resR.src, on, f1, cond), left, right)
+                SrcMerge(ThetaJoin(s1, resL.src, resR.src, on, f1, cond), l, r)
               }
             }
           }

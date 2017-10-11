@@ -17,24 +17,22 @@
 package quasar.api
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.catchable._
 import quasar.fp._, free._
 import quasar.fp.ski._
 
+import scala.concurrent.duration._
+
 import org.http4s.dsl._
 import org.http4s.headers.Host
-import org.http4s.{Request, Uri}
+import org.http4s.{Request, Response, Uri}
 import org.http4s.util.CaseInsensitiveString
 import scalaz._
 import scalaz.syntax.applicative._
 import scalaz.concurrent.Task
 import scalaz.syntax.std.option._
 import scalaz.stream.Process
-import scodec.bits.ByteVector
-import scala.math.max
 
 class QHttpServiceSpec extends quasar.Qspec {
-  import QHttpService.PROCESS_EFFECT_THRESHOLD_BYTES
   import QResponse.HttpResponseStreamFailureException
   import QHttpServiceSpec._
 
@@ -86,7 +84,7 @@ class QHttpServiceSpec extends quasar.Qspec {
         val qr = QResponse.streaming[StrIO, String](
           strs("a", "b", "c", "d", "e"))
 
-        QHttpService { case _ => qr.η[Free[StrIO, ?]] }
+        QHttpService { case _ => qr }
           .toHttpService(evalStr())(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must_=== "abcde"
@@ -94,60 +92,67 @@ class QHttpServiceSpec extends quasar.Qspec {
     }
 
     "failed evaluation" >> {
-      val failStream =
-        QResponse.streaming[StrIO, String](strs("one", "two", "three"))
+      val failStream = strs("one", "two", "three")
 
       "has alternate response status" >> {
-        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+        QHttpService { case _ => QResponse.streaming(failStream) }
           .toHttpService(evalStr("one"))(request)
           .map(_.orNotFound.status)
           .unsafePerformSync must_=== BadRequest
       }
 
       "has alternate response headers" >> {
-        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+        QHttpService { case _ => QResponse.streaming(failStream) }
           .toHttpService(evalStr("one"))(request)
           .map(_.orNotFound.headers.get(Host))
           .unsafePerformSync must_=== errHost.some
       }
 
       "has alternate response body" >> {
-        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+        QHttpService { case _ => QResponse.streaming(failStream) }
           .toHttpService(evalStr("one"))(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must_=== "FAIL"
       }
 
       "responds with alternate response when a small amount of data before first effect" >> {
-        val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
-        val padStream = failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
+        val pad = Process.emit("small amount")
+        val padStream = pad.append[StrIOM, String](failStream)
 
-        QHttpService { case _ => padStream.η[Free[StrIO, ?]] }
+        QHttpService { case _ => QResponse.streaming(padStream) }
           .toHttpService(evalStr("one"))(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must_=== "FAIL"
       }
 
       "responds with alternate response when other internal effects before first effect" >> {
-        val hi  = ByteVector.high(1)
-        val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
-        val stm = pad.append[StrIOM, ByteVector](failStream.body intersperse hi)
+        val hi  = "hi"
+        val pad = Process.emit("small amount")
+        val stm = pad.append[StrIOM, String](failStream intersperse hi)
 
-        QHttpService { case _ => QResponse.streaming(stm).η[Free[StrIO, ?]] }
+        QHttpService { case _ => QResponse.streaming(stm) }
           .toHttpService(evalStr("one"))(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must_=== "FAIL"
       }
 
-      "results in response stream failure exception when fails in middle of stream" >> {
-        val pad = Process.emit(ByteVector.low(PROCESS_EFFECT_THRESHOLD_BYTES))
+      "results in response stream failure exception when failure appears too far away in stream" >> {
+        val pad = Process.emitAll[String](List.fill(50)("jsdfsdfsdfsf"))
 
-        QHttpService { case _ =>
-          failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body)).η[Free[StrIO, ?]]
-        }
+        QHttpService { case _ => QResponse.streaming(pad.append[StrIOM, String](failStream)) }
           .toHttpService(evalStr("two"))(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must throwA[HttpResponseStreamFailureException]
+      }
+
+      "supports infinite streams without loading everything into memory" >> {
+        val continuous: Process[StrIOM, String] = Process.constant("filler")
+
+        // If we were no longer properly streaming and instead loading everything
+        // into memory before sending a response, this `Task` will timeout
+        QHttpService { case _ => QResponse.streaming(continuous) }
+          .toHttpService(evalStr("two")).orNotFound(request)
+          .timed(10.seconds).unsafePerformSync must beAnInstanceOf[Response]
       }
     }
   }

@@ -28,7 +28,7 @@ env:
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=spark_local_test
-    # - CONNECTOR=spark_hdfs
+    - CONNECTOR=spark_hdfs
   global:
     - COURSIER_PROGRESS=0
 
@@ -58,8 +58,12 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly" ;;
+      spark_hdfs) ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly ;;
       *) ;;
     esac
+
+  # workaround for the fact that travis caching isn't working. when it starts working again, remove this
+  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-

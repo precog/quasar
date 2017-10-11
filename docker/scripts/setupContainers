@@ -59,29 +59,13 @@ init_spark_local() {
   fi
 }
 
-init_spark_connector() {
-  # Just in case we have to configure
-  # the spark companion connectors
-  echo "no configuration needed for: $1"
-}
-
-init_spark_cluster() {
-  if [[ ${TRAVIS:-} ]]
-  then
-    echo "in travis the scripts/build script builds sparkcore.jar"
-  else
-    echo "building sparkcore.jar"
-    cd $SCRIPTS_DIR/../..
-    ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
-  fi
-}
-
 ##########################################
 # parse arguments and run various
 # database configuration scripts
 #
 apply_configuration() {
   CONTAINER=$1
+  echo "apply configuration for " $CONTAINER
   if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
   if [[ $CONTAINER == "quasar_couchbase"           ]]; then init_couchbase;                              fi
   if [[ $CONTAINER == "quasar_marklogic_xml"       ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
@@ -89,11 +73,6 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_postgres"            ]]; then init_postgres;                               fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
   if [[ $CONTAINER == "quasar_spark_local_test"    ]]; then init_spark_local;                            fi
-  if [[ $CONTAINER == "quasar_spark_cassandra"     ]]; then init_spark_connector $CONTAINER;             fi
-  if [[ $CONTAINER == "quasar_spark_elasticsearch" ]]; then init_spark_connector $CONTAINER;             fi
-  if [[ $CONTAINER == "quasar_spark_hdfs"          ]]; then init_spark_connector $CONTAINER;             fi
-  if [[ $CONTAINER == "quasar_spark_ftp"           ]]; then init_spark_connector $CONTAINER;             fi
-  if [[ $CONTAINER == "quasar_spark_cluster"       ]]; then init_spark_cluster;                          fi
 }
 
 
@@ -149,48 +128,48 @@ function upContainer() {
 }
 
 create_database() {
-  CONTAINER=$1
-  if [[ $CONTAINER == "quasar_spark_local_test" ]]
+  local LOCAL_CONTAINER=$1
+  if [[ $LOCAL_CONTAINER == "quasar_spark_local_test" ]]
   then
-    echo "$CONTAINER: not starting a container for spark_local_test..."
-  elif [[ $CONTAINER == "quasar_mimir" ]]
+    echo "$LOCAL_CONTAINER: not starting a container for spark_local_test..."
+  elif [[ $LOCAL_CONTAINER == "quasar_mimir" ]]
   then
-    echo "$CONTAINER: not starting a container for mimir..."
-  elif [[ $CONTAINER =~ "marklogic" ]]
+    echo "$LOCAL_CONTAINER: not starting a container for mimir..."
+  elif [[ $LOCAL_CONTAINER =~ "marklogic" ]]
   then
     $SCRIPTS_DIR/../Dockerfiles/Marklogic/getMLRpm
-    upContainer $CONTAINER
-  elif [[ $CONTAINER == "quasar_spark_cluster" ]]
+    upContainer $LOCAL_CONTAINER
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_cluster" ]]
   then
-    upContainer $CONTAINER
-  elif [[ $CONTAINER == "quasar_spark_hdfs" ]]
+    upContainer $LOCAL_CONTAINER
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_hdfs" ]]
   then
-    upContainer $CONTAINER
+    upContainer $LOCAL_CONTAINER
     create_database quasar_spark_cluster
-  elif [[ $CONTAINER == "quasar_spark_ftp" ]]
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_ftp" ]]
   then
-    upContainer $CONTAINER
+    upContainer $LOCAL_CONTAINER
     create_database quasar_spark_cluster
-  elif [[ $CONTAINER == "quasar_spark_elasticsearch" ]]
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_elasticsearch" ]]
   then
-    upContainer $CONTAINER
+    upContainer $LOCAL_CONTAINER
     create_database quasar_spark_cluster
-  elif [[ $CONTAINER == "quasar_spark_cassandra" ]]
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_cassandra" ]]
   then
-    upContainer $CONTAINER
+    upContainer $LOCAL_CONTAINER
     create_database quasar_spark_cluster
-  elif [[ $CONTAINER == "quasar_spark_s3" ]]
+  elif [[ $LOCAL_CONTAINER == "quasar_spark_s3" ]]
   then
     create_database quasar_spark_cluster
-  elif [[ $CONTAINER == "quasar_metastore" ]]
+  elif [[ $LOCAL_CONTAINER == "quasar_metastore" ]]
   then
-    upContainer $CONTAINER
-  elif [[ $CONTAINER == "quasar_postgres" ]]
+    upContainer $LOCAL_CONTAINER
+  elif [[ $LOCAL_CONTAINER == "quasar_postgres" ]]
   then
-    upContainer $CONTAINER
+    upContainer $LOCAL_CONTAINER
   else
-    echo "creating $CONTAINER"
-    upContainer $CONTAINER
+    echo "creating $LOCAL_CONTAINER"
+    upContainer $LOCAL_CONTAINER
   fi
 }
 

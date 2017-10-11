@@ -20,7 +20,6 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.disjunction._
 import quasar.effect.Timing
 import quasar.fp._, numeric._
@@ -130,7 +129,7 @@ object data {
         val headers =
           `Content-Type`(MediaType.`application/zip`) ::
             (format.disposition.toList: List[Header])
-        QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p)).η[Free[S, ?]]
+        QResponse.streaming(p).map(QResponse.headers.modify(_ ++ headers))
       },
       filePath => {
         val statusFile: Free[S, (Headers, AFile)] =
@@ -149,12 +148,12 @@ object data {
             _  <- VC.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
           } yield cr) | ((Headers.empty, filePath))
 
-        statusFile ∘ { case (h, f) =>
+        statusFile flatMap { case (h, f) =>
           val d = R.scan(f, offset, limit)
           zipped.fold(
             formattedZipDataResponse(format, f, d),
             formattedDataResponse(format, d)
-          ).modifyHeaders(_ ++ h)
+          ).map(_.modifyHeaders(_ ++ h))
         }
       })
 

@@ -82,6 +82,13 @@ package object matryoshka {
         T.embed(envT(∅[E], ft))
     }
 
+  def selfAndChildren[F[_]: Functor: Foldable, A](alg: Algebra[F, A])
+      : Algebra[F, (A, List[A])] =
+    faas => {
+      val fa = faas map (_._1)
+      (alg(fa), fa.toList)
+    }
+
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
     F(A)
 

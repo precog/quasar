@@ -21,7 +21,6 @@ import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.catchable._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.Mounting

@@ -22,6 +22,7 @@ import quasar.Planner._
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp.{ ExternallyManaged => EM, _ }
+import quasar.qscript.analysis.DeepShape
 
 import matryoshka._
 import matryoshka.data._
@@ -30,13 +31,16 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
+
+  type ZipperList[G[_]] = List[(G[EM], DeepShape.FreeShape[T])]
+
   case class ZipperSides(
     lSide: FreeMap,
     rSide: FreeMap)
 
   case class ZipperTails[G[_]](
-    lTail: List[G[EM]],
-    rTail: List[G[EM]])
+    lTail: ZipperList[G],
+    rTail: ZipperList[G])
 
   case class ZipperAcc[G[_]](
     acc: List[G[EM]],
@@ -44,8 +48,11 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
     tails: ZipperTails[G])
 
   // TODO: Convert to NEL
-  private def linearize[G[_]: Traverse]: Algebra[G, List[G[EM]]] =
-    fl => fl.as[EM](Extern) :: fl.fold
+  private def linearize[G[_]: Traverse]
+      : Algebra[EnvT[DeepShape.FreeShape[T], G, ?], ZipperList[G]] =
+    _.run match {
+      case (shape, gshape) => (gshape.as[EM](Extern), shape) :: gshape.fold
+    }
 
   private def delinearizeInner[G[_]: Functor, H[_], A]
     (HtoG: H ~> G)
@@ -81,39 +88,52 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
         ZipperAcc[G] \/ ?,
         ListF[G[EM], ?],
         (ZipperSides, ZipperTails[G])] = {
-    case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc[G] \/ ListF[G[EM], (ZipperSides, ZipperTails[G])]](
-        ZipperAcc(Nil, zs, zt).left) {
-          case SrcMerge(inn, lmf, rmf) =>
-            ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc[G]]
-      }
+    case (zs @ ZipperSides(lm, rm), zt @ ZipperTails((l, lshape) :: ls, (r, rshape) :: rs)) =>
+      mergeable.mergeSrcs(Mergeable.MergeSide(lm, l, lshape), Mergeable.MergeSide(rm, r, rshape))
+        .fold[ZipperAcc[G] \/ ListF[G[EM], (ZipperSides, ZipperTails[G])]](
+          ZipperAcc(Nil, zs, zt).left) {
+            case SrcMerge(inn, lmf, rmf) =>
+              ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc[G]]
+        }
     case (sides, tails) =>
       ZipperAcc(Nil, sides, tails).left
   }
 
+  private def withShape[S[_[_]], G[_]: Functor: Foldable, H[_]]
+    (input: S[H])
+    (implicit
+      R: Recursive.Aux[S[H], G],
+      shape: DeepShape[T, G])
+      : Cofree[G, DeepShape.FreeShape[T]] =
+    DeepShape.annotated.apply[G].apply[T, S[H]](input)
+
   private def makeList[S[_[_]], G[_]: Traverse, H[_]]
     (input: S[H])
-    (implicit R: Recursive.Aux[S[H], G])
-      : List[G[EM]] =
-    R.cata(input)(linearize[G]).reverse
+    (implicit
+      R: Recursive.Aux[S[H], G],
+      shape: DeepShape[T, G])
+      : ZipperList[G] =
+    withShape[S, G, H](input).cata(linearize[G]).reverse
 
   private def makeZipper[S[_[_]], G[_]: Traverse, H[_]]
     (left: S[H], right: S[H])
     (implicit
       mergeable: Mergeable.Aux[T, G],
-      R: Recursive.Aux[S[H], G])
+      R: Recursive.Aux[S[H], G],
+      Eq: DeepShape[T, G])
       : ZipperAcc[G] =
     elgot((
       ZipperSides(HoleF[T], HoleF[T]),
       ZipperTails(makeList[S, G, H](left), makeList[S, G, H](right))))(consZipped[G], zipper[G])
 
-  def mergePair[S[_[_]], G[_]: Traverse, H[_]]
+  def mergePair[S[_[_]], G[_]: Traverse, H[_]: Functor]
     (left: S[H], right: S[H])
     (HtoG: H ~> G, unify: List[G[EM]] => FreeQS)
     (implicit
       mergeable: Mergeable.Aux[T, G],
       C: Corecursive.Aux[S[H], G],
       R: Recursive.Aux[S[H], G],
+      shape: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: H)
       : SrcMerge[S[H], FreeQS] = {
 
@@ -122,8 +142,8 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
 
     SrcMerge[S[H], FreeQS](
       common.reverse.ana[S[H]](delinearizeInner[G, H, EM](HtoG)),
-      rebaseBranch(unify(lTail), lMap),
-      rebaseBranch(unify(rTail), rMap))
+      rebaseBranch(unify(lTail.map(_._1)), lMap),
+      rebaseBranch(unify(rTail.map(_._1)), rMap))
   }
 
   def mergeT[G[_]: Traverse](left: T[G], right: T[G])(
@@ -131,6 +151,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
       mergeable: Mergeable.Aux[T, G],
       coalesce: Coalesce.Aux[T, G, G],
       N: Normalizable[G],
+      shape: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: G,
       QC: QScriptCore :<: G,
       FI: Injectable.Aux[G, QScriptTotal]):

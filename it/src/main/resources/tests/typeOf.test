@@ -7,9 +7,7 @@
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
-        "spark_hdfs":        "pending",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "nested_foo.data",
     "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from nested_foo",

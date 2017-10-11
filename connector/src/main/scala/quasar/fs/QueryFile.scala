@@ -29,6 +29,7 @@ import quasar.fp.ski._
 import quasar.frontend.SemanticErrsT
 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._
+import quasar.qscript.analysis.DeepShape
 
 import matryoshka.{Transform => _, _}
 import matryoshka.data.Fix
@@ -59,6 +60,7 @@ object QueryFile {
       TJ:      ThetaJoin[T, ?] :<: QS,
       PB:  ProjectBucket[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
+      shape: DeepShape[T, QS],
       mergeable: Mergeable.Aux[T, QS],
       render: Delay[RenderTree, QS],
       eql: Delay[Equal, QS],

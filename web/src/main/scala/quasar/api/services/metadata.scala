@@ -20,7 +20,6 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.std._
 import quasar.fp.numeric._
 import quasar.fs._

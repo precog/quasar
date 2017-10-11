@@ -19,7 +19,6 @@ package quasar.api.services
 import slamdata.Predef.{ -> => _, _ }
 import quasar.api._, ToApiError.ops._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.catchable._
 import quasar.effect.{KeyValueStore, Timing}
 import quasar.fp._, ski._
 import quasar.fs.mount._

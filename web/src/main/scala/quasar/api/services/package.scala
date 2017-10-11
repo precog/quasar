@@ -59,9 +59,9 @@ package object services {
     J : Recursive.Aux[J, EJson],
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
-  ): QResponse[S] = {
+  ): Free[S, QResponse[S]] = {
     val js = ejson.map(_.cata[Json](JsonCodec.encodeƒ[Json]))
-    contentJsonEncodedEJson(QResponse.streaming(js |> jsonArrayLines))
+    QResponse.streaming(js |> jsonArrayLines).map(contentJsonEncodedEJson)
   }
 
   // TODO: Handle when response isn't an object or array.
@@ -71,9 +71,9 @@ package object services {
     J : Recursive.Aux[J, EJson],
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
-  ): QResponse[S] = {
+  ): Free[S, QResponse[S]] = {
     val js = ejson.take(1).map(_.cata[Json](JsonCodec.encodeƒ[Json]).spaces2)
-    contentJsonEncodedEJson(QResponse.streaming(js))
+    QResponse.streaming(js).map(contentJsonEncodedEJson)
   }
 
   def formattedZipDataResponse[S[_], E](
@@ -83,7 +83,7 @@ package object services {
   )(implicit
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
-  ): QResponse[S] = {
+  ): Free[S, QResponse[S]] = {
     val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: 
       (format.disposition.toList: List[Header])
     val p = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
@@ -93,7 +93,7 @@ package object services {
         }
     val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath).changeExtension(κ(suffix))) 
     val z = Zip.zipFiles(Map(f -> p))
-    QResponse.headers.modify(_ ++ headers)(QResponse.streaming(z))
+    QResponse.streaming(z).map(QResponse.headers.modify(_ ++ headers))
   }
 
   def formattedDataResponse[S[_], E](
@@ -102,11 +102,10 @@ package object services {
   )(implicit
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
-  ): QResponse[S] = {
+  ): Free[S, QResponse[S]] = {
     val ctype = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))
-    QResponse.headers.modify(
-      _.put(ctype) ++ format.disposition.toList
-    )(QResponse.streaming(format.encode[EitherT[Free[S,?], E,?]](data)))
+    QResponse.streaming(format.encode[EitherT[Free[S,?], E,?]](data)).map(
+      QResponse.headers.modify(_.put(ctype) ++ format.disposition.toList))
   }
 
   /** Transform a stream of `Json` into a stream of text representing the lines

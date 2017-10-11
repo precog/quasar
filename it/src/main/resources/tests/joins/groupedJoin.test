@@ -2,13 +2,12 @@
     "name": "count grouped joined tables",
 
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mimir":             "pendingIgnoreFieldOrder"
+        "couchbase": "skip",
+        "marklogic_json": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
 
-    "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",
+    "NB": "The qscript for this query can be improved with better deep shape source merging.",
 
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 

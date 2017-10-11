@@ -105,23 +105,20 @@ object EquiJoin {
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
-      // TODO: merge two joins with different combine funcs
       def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
-        p1: EquiJoin[IT, ExternallyManaged],
-        p2: EquiJoin[IT, ExternallyManaged]) =
-        (p1, p2) match {
+        left: Mergeable.MergeSide[IT, EquiJoin[T, ?]],
+        right: Mergeable.MergeSide[IT, EquiJoin[T, ?]]) =
+        (left.source, right.source) match {
           case (EquiJoin(s1, l1, r1, k1, f1, c1),
                 EquiJoin(_, l2, r2, k2, f2, c2)) =>
-            val left1 = rebaseBranch(l1, left)
-            val right1 = rebaseBranch(r1, left)
-            val left2 = rebaseBranch(l2, right)
-            val right2 = rebaseBranch(r2, right)
+            val left1 = rebaseBranch(l1, left.access)
+            val right1 = rebaseBranch(r1, left.access)
+            val left2 = rebaseBranch(l2, right.access)
+            val right2 = rebaseBranch(r2, right.access)
 
             (left1 ≟ left2 && right1 ≟ right2 && k1 ≟ k2 && f1 ≟ f2).option {
-              val (merged, left, right) = concat(c1, c2)
-              SrcMerge(EquiJoin(s1, left1, right1, k1, f1, merged), left, right)
+              val (merged, l, r) = concat(c1, c2)
+              SrcMerge(EquiJoin(s1, left1, right1, k1, f1, merged), l, r)
             }
         }
     }

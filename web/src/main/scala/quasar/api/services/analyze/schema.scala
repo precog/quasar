@@ -20,7 +20,6 @@ import slamdata.Predef.{-> => _, _}
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.api.services.query._
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.disjunction._
 import quasar.contrib.scalaz.foldable._
 import quasar.ejson.EJson
@@ -94,10 +93,9 @@ object schema {
                            blob, requestVars(req), dir, DefaultSampleSize, settings
                          ).leftMap(_.toApiError)
           schema      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
-        } yield {
-          formattedDataResponse(
-            MessageFormat.fromAccept(req.headers.get(Accept)),
-            schema.map(analysis.schemaToData(_)).toProcess)
-        })
+          response    <- EitherT.right(formattedDataResponse(
+                           MessageFormat.fromAccept(req.headers.get(Accept)),
+                           schema.map(analysis.schemaToData(_)).toProcess))
+        } yield response)
     }
 }

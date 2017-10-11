@@ -1,0 +1,28 @@
+{
+    "name": "select a reduction from an inner select with reduction",
+
+    "backends": {
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "data": "olympics.data",
+
+    "query": "select sum(ct) as measure,
+                country as category,
+                null as stack,
+                null as parallel from
+              (select count(*) as ct, country from olympics group by country) as src
+              group by country
+              order by country asc",
+
+    "predicate": "initial",
+
+    "expected": [
+        {"measure": 6.0, "category": "AUS", "stack": null, "parallel": null},
+        {"measure": 185.0, "category": "AUT", "stack": null, "parallel": null},
+        {"measure": 5.0, "category": "BEL", "stack": null, "parallel": null},
+        {"measure": 6.0, "category": "BLR", "stack": null, "parallel": null},
+        {"measure": 6.0, "category": "BUL", "stack": null, "parallel": null}]
+}

@@ -741,11 +741,6 @@ object MongoDbPlanner {
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncsCore._
 
-    // F[W[A]] => A
-    // MapFunc[T, (T[MapFunc[T, ?]], OutputM[PartialSelector[T]])] => OutputM[PartialSelector[T]]
-    // MapFunc[T, (T[MapFunc[T, ?]], Output)] => Output
-
-
     type Output = OutputM[PartialSelector[T]]
 
     object IsBson {

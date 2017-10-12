@@ -908,7 +908,7 @@ object MongoDbPlanner {
         case MFC(Not((_, v))) =>
           v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case MFC(Guard(_, typ, (_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+        case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
         case _ => -\/(InternalError fromMsg node.map(_._1).shows)
       }
@@ -1062,16 +1062,13 @@ object MongoDbPlanner {
               case (Some((sel, inputs)), Some((typeSel, Nil))) =>
                 inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
                   .map(WB.filter(src, _, sel))
-              case (Some((sel, inputs)), Some((typeSel, typeInputs))) => {
-                val typeFilter: M[WorkflowBuilder[WF] => WorkflowBuilder[WF]] = typeInputs
-                  .traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(exprs => (src0 => WB.filter(src0, exprs, typeSel)))
+              case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>
+                typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, typeSel))
+                  .flatMap(src0 =>
+                    inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                      .map(WB.filter(src0, _, sel)))
 
-                typeFilter.map { typeFlt =>
-                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                    .map(WB.filter(typeFlt(src), _, sel))
-                }.join
-              }
               case (Some((sel, inputs)), None) =>
                 inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
                   .map(WB.filter(src, _, sel))
@@ -1447,6 +1444,7 @@ object MongoDbPlanner {
             (b, red) => QC.inj(Reduce(src, b, red, rep)))
         case _ => QC.inj(r).point[M]
       }
+
     case qc =>
       QC.inj(qc).point[M]
   }

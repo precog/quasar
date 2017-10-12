@@ -1056,10 +1056,25 @@ object MongoDbPlanner {
             val typeSelectors = getTypeSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
 
             (selectors, typeSelectors) match {
-              case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>
-                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond))).map(WB.filter(src, _, sel))
+              case (Some((sel, Nil)), Some((typeSel, typeInputs))) =>
+                typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, typeSel))
+              case (Some((sel, inputs)), Some((typeSel, Nil))) =>
+                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, sel))
+              case (Some((sel, inputs)), Some((typeSel, typeInputs))) => {
+                val typeFilter: M[WorkflowBuilder[WF] => WorkflowBuilder[WF]] = typeInputs
+                  .traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(exprs => (src0 => WB.filter(src0, exprs, typeSel)))
+
+                typeFilter.map { typeFlt =>
+                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                    .map(WB.filter(typeFlt(src), _, sel))
+                }.join
+              }
               case (Some((sel, inputs)), None) =>
-                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond))).map(WB.filter(src, _, sel))
+                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, sel))
               case _ => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
                 // TODO: Postpone decision until we know whether we are going to
                 //       need mapReduce anyway.

@@ -1051,36 +1051,39 @@ object MongoDbPlanner {
             val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
-          case Filter(src, cond) => {
-            val selectors = getSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
-            val typeSelectors = getTypeSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
+          case Filter(src, cond0) => {
+            // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
+            cond0.transCataM(elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
+              val selectors = getSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
+              val typeSelectors = getTypeSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
 
-            (selectors, typeSelectors) match {
-              case (Some((sel, Nil)), Some((typeSel, typeInputs))) =>
-                typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(WB.filter(src, _, typeSel))
-              case (Some((sel, inputs)), Some((typeSel, Nil))) =>
-                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(WB.filter(src, _, sel))
-              case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>
-                typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(WB.filter(src, _, typeSel))
-                  .flatMap(src0 =>
-                    inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                      .map(WB.filter(src0, _, sel)))
-
-              case (Some((sel, inputs)), None) =>
-                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(WB.filter(src, _, sel))
-              case _ => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
-                // TODO: Postpone decision until we know whether we are going to
-                //       need mapReduce anyway.
-                case cond @ HasThat(_) => WB.filter(src, List(cond), {
-                  case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-                })
-                case \&/.This(js) => WB.filter(src, Nil, {
-                  case Nil => Selector.Where(js(jscore.ident("this")).toJs)
-                })
+              (selectors, typeSelectors) match {
+                case (Some((sel, Nil)), Some((typeSel, typeInputs))) =>
+                  typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                    .map(WB.filter(src, _, typeSel))
+                case (Some((sel, inputs)), Some((typeSel, Nil))) =>
+                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                    .map(WB.filter(src, _, sel))
+                case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>
+                  typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                    .map(WB.filter(src, _, typeSel))
+                    .flatMap(src0 =>
+                      inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                        .map(WB.filter(src0, _, sel)))
+                case (Some((sel, inputs)), None) =>
+                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                    .map(WB.filter(src, _, sel))
+                case _ =>
+                  handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
+                    // TODO: Postpone decision until we know whether we are going to
+                    //       need mapReduce anyway.
+                    case cond @ HasThat(_) => WB.filter(src, List(cond), {
+                      case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
+                    })
+                    case \&/.This(js) => WB.filter(src, Nil, {
+                      case Nil => Selector.Where(js(jscore.ident("this")).toJs)
+                    })
+                  }
               }
             }
           }

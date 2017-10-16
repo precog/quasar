@@ -8,15 +8,18 @@ Chain
 │  │  │  │     ├─ JsCore([_._id, _])
 │  │  │  │     ╰─ Obj
 │  │  │  │        ├─ Key(0: __val[1])
-│  │  │  │        ├─ Key(1: true)
 │  │  │  │        ╰─ Key(src: __val)
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
-│  │  │  ╰─ And
-│  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Type(Doc))
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> { "$literal": true })
+│  │  │  ├─ Name("src" -> "$src")
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $MatchF
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -43,15 +46,18 @@ Chain
 │     │  │     ├─ JsCore([_._id, _])
 │     │  │     ╰─ Obj
 │     │  │        ├─ Key(0: __val[1])
-│     │  │        ├─ Key(1: true)
 │     │  │        ╰─ Key(src: __val)
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
-│     │  ╰─ And
-│     │     ├─ Doc
-│     │     │  ╰─ Expr($0 -> Type(Doc))
-│     │     ╰─ Doc
-│     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  ╰─ Doc
+│     │     ╰─ Expr($0 -> Type(Doc))
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> { "$literal": true })
+│     │  ├─ Name("src" -> "$src")
+│     │  ╰─ ExcludeId
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.src[1]._id }, { "left": [], "right": [value.src] }] })
 │     │  ╰─ Scope(Map())

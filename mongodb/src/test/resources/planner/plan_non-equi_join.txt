@@ -3,38 +3,16 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│  │  │  ├─ Name("0" -> { "$literal": true })
+│  │  │  ├─ Name("1" -> { "$literal": true })
+│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _["0"][1]._id)
-│  │  │  │     ├─ Key(1: true)
-│  │  │  │     ├─ Key(2: _["0"][1])
-│  │  │  │     ├─ Key(3: true)
-│  │  │  │     ╰─ Key(src: _["0"])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
-│  │  │     ├─ Or
-│  │  │     │  ├─ Doc
-│  │  │     │  │  ╰─ Expr($0 -> Type(Int32))
-│  │  │     │  ├─ Doc
-│  │  │     │  │  ╰─ Expr($0 -> Type(Int64))
-│  │  │     │  ├─ Doc
-│  │  │     │  │  ╰─ Expr($0 -> Type(Dec))
-│  │  │     │  ├─ Doc
-│  │  │     │  │  ╰─ Expr($0 -> Type(Text))
-│  │  │     │  ├─ Doc
-│  │  │     │  │  ╰─ Expr($0 -> Type(Date))
-│  │  │     │  ╰─ Doc
-│  │  │     │     ╰─ Expr($0 -> Type(Bool))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-│  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($2 -> Type(Doc))
+│  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($3 -> Eq(Bool(true)))
+│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
@@ -49,38 +27,16 @@ Chain
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips2)
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│     │  ├─ Name("0" -> { "$literal": true })
+│     │  ├─ Name("1" -> { "$literal": true })
+│     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: _["0"][1]._id)
-│     │  │     ├─ Key(1: true)
-│     │  │     ├─ Key(2: _["0"][1])
-│     │  │     ├─ Key(3: true)
-│     │  │     ╰─ Key(src: _["0"])
-│     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ And
-│     │     ├─ Or
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Text))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Date))
-│     │     │  ╰─ Doc
-│     │     │     ╰─ Expr($0 -> Type(Bool))
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-│     │     ├─ Doc
-│     │     │  ╰─ Expr($2 -> Type(Doc))
+│     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │     │     ╰─ Doc
-│     │        ╰─ Expr($3 -> Eq(Bool(true)))
+│     │        ╰─ Expr($1 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.src] }] })
 │     │  ╰─ Scope(Map())

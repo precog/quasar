@@ -883,10 +883,11 @@ class PlannerSpec extends
       plan(sqlE"select * from zips where 43.058514 in loc[_]") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
-          $match(Selector.Doc(BsonField.Name("loc") ->
-            Selector.ElemMatch(Selector.In(Bson.Arr(List(Bson.Dec(43.058514)))).right)))))
+          $match(Selector.And(
+            Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right)),
+            Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.In(Bson.Arr(List(Bson.Dec(43.058514)))).right))
+          ))))
     }
-    // missing a typecheck before $match?
 
     "filter field in single-element set" in {
       plan(sqlE"""select * from zips where state in ("NV")""") must
@@ -909,15 +910,15 @@ class PlannerSpec extends
       plan(sqlE"select * from zips where pop in loc[_]") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
-          $match(Selector.Where(
-            If(
-              Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
-              BinOp(Neq,
-                jscore.Literal(Js.Num(-1.0,false)),
-                Call(Select(Select(ident("this"), "loc"), "indexOf"),
-                  List(Select(ident("this"), "pop")))),
-              ident("undefined")).toJs))))
-    }.pendingWithActual(notOnPar, testFile("plan filter with field containing other field"))
+          $match(Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right))),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+            "0" ->  BinOp(jscore.Neq, Literal(Js.Num(-1, false)), Call(Select(Select(ident("x"), "loc"), "indexOf"), List(Select(ident("x"), "pop")))),
+            "src" -> ident("x"))))), ListMap()),
+          $match(Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+          $project(
+            reshape(sigil.Quasar -> $field("src")),
+            ExcludeId)))
+    }
 
     "plan filter with ~" in {
       plan(sqlE"""select * from zips where city ~ "^B[AEIOU]+LD.*" """) must beWorkflow(chain[Workflow](

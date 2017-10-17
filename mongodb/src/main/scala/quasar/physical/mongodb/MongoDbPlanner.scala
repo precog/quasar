@@ -701,6 +701,11 @@ object MongoDbPlanner {
             case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
             case Type.Obj(_, _) =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
+
+            // NB: Selector.Type(BsonType.Arr) will not match arrays, instead we use the suggestion in Mongo docs
+            // See: https://docs.mongodb.com/manual/reference/operator/query/type/#document-querying-by-array-type
+            case Type.FlexArr(_, _, _) =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.ElemMatch(Selector.Exists(true).right)))
             case Type.Binary =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
             case Type.Id =>
@@ -1058,10 +1063,10 @@ object MongoDbPlanner {
               val typeSelectors = getTypeSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
 
               (selectors, typeSelectors) match {
-                case (Some((sel, Nil)), Some((typeSel, typeInputs))) =>
+                case (Some((_, Nil)), Some((typeSel, typeInputs))) =>
                   typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
                     .map(WB.filter(src, _, typeSel))
-                case (Some((sel, inputs)), Some((typeSel, Nil))) =>
+                case (Some((sel, inputs)), Some((_, Nil))) =>
                   inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
                     .map(WB.filter(src, _, sel))
                 case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>

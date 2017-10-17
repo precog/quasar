@@ -42,14 +42,7 @@ trait StructuralLib extends Library {
       case Sized(Const(Data.Str(name)), valueType)   => Obj(Map(name -> valueType), None)
       case Sized(_, valueType)                       => Obj(Map(), Some(valueType))
     },
-    partialUntyperV[nat._2] {
-      case Obj(map, uk) => map.headOption.fold(
-        uk.fold[Func.VDomain[nat._2]](
-          failure(NonEmptyList(GenericError("MAKE_OBJECT can’t result in an empty object"))))(
-          t => success(Func.Input2(Str, t)))) {
-        case (key, value) => success(Func.Input2(Const(Data.Str(key)), value))
-      }
-    })
+    basicUntyper)
 
   val MakeArray = UnaryFunc(
     Mapping,

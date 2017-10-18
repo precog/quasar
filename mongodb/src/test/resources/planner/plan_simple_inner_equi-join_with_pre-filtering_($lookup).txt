@@ -3,15 +3,8 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; foo)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ ExcludeId
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Type(Doc))
-│  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$src")
+│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -42,32 +35,8 @@ Chain
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].rating : undefined)
-│     │  │     ├─ Key(1: _["0"][1])
+│     │  │     ├─ Key(0: _["0"][1].rating)
 │     │  │     ╰─ Key(src: _["0"])
-│     │  ╰─ Scope(Map())
-│     ├─ $MatchF
-│     │  ╰─ And
-│     │     ├─ Or
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Text))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Date))
-│     │     │  ╰─ Doc
-│     │     │     ╰─ Expr($0 -> Type(Bool))
-│     │     ╰─ Doc
-│     │        ╰─ Expr($1 -> Type(Doc))
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: _.src[1].rating)
-│     │  │     ╰─ Key(src: _.src)
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ Doc

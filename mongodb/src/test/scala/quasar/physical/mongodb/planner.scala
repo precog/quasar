@@ -618,27 +618,15 @@ class PlannerSpec extends
       plan(sqlE"select loc from zips where loc[0] < -73") must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
-        $match(Selector.Where(
-          If(
-            BinOp(And,
-              Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
-              BinOp(Or,
-                BinOp(Or,
-                  BinOp(jscore.Or,
-                    Call(ident("isNumber"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))))),
-                    BinOp(jscore.Or,
-                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberInt")),
-                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong")))),
-                  Call(ident("isString"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))))),
-                BinOp(Or,
-                  BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
-                  BinOp(Eq, UnOp(TypeOf, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))), jscore.Literal(Js.Str("boolean")))))),
-            BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
-            ident("undefined")).toJs)),
+        $match(Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right))),
         $project(
-          reshape(sigil.Quasar -> $field("loc")),
+          reshape("0" -> $arrayElemAt($field("loc"), $literal(Bson.Int32(0))), "src" -> $$ROOT),
+          ExcludeId),
+        $match(Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(-73)))),
+        $project(
+          reshape(sigil.Quasar -> $field("src.loc")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan filter array element"))
+    }
 
     "plan select array element (3.2+)" in {
       plan3_2(sqlE"select loc[0] from zips") must
@@ -1083,9 +1071,7 @@ class PlannerSpec extends
           $group(
             grouped("count" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar, testFile("plan filter with both index and field projections"))
-
-    // missing array type checks?
+    }
 
     "plan simple having filter" in {
       plan(sqlE"select city from zips group by city having count(*) > 10") must

@@ -4,18 +4,11 @@ Chain
 │  │  ├─ $ReadF(db; foo)
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([_._id, _])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(0: __val[1])
-│  │  │  │        ╰─ Key(src: __val)
+│  │  │  │  ╰─ JsCore([_._id, _])
 │  │  │  ╰─ Scope(Map())
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Type(Doc))
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$src")
+│  │  │  ├─ Name("src" -> "$$ROOT")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -42,18 +35,11 @@ Chain
 │     ├─ $ReadF(db; bar)
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: __val[1])
-│     │  │        ╰─ Key(src: __val)
+│     │  │  ╰─ JsCore([_._id, _])
 │     │  ╰─ Scope(Map())
-│     ├─ $MatchF
-│     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Type(Doc))
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("src" -> "$src")
+│     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc

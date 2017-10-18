@@ -5,15 +5,8 @@ Chain
 │  │  │  ├─ Chain
 │  │  │  │  ├─ $ReadF(db; zips)
 │  │  │  │  ├─ $ProjectF
-│  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  │  │  ╰─ ExcludeId
-│  │  │  │  ├─ $MatchF
-│  │  │  │  │  ╰─ Doc
-│  │  │  │  │     ╰─ Expr($0 -> Type(Doc))
-│  │  │  │  ├─ $ProjectF
 │  │  │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  │  │  ├─ Name("src" -> "$src")
+│  │  │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  │  │  ╰─ ExcludeId
 │  │  │  │  ├─ $MatchF
 │  │  │  │  │  ╰─ Doc
@@ -39,15 +32,8 @@ Chain
 │  │  │  ╰─ Chain
 │  │  │     ├─ $ReadF(db; largeZips)
 │  │  │     ├─ $ProjectF
-│  │  │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │     │  ╰─ ExcludeId
-│  │  │     ├─ $MatchF
-│  │  │     │  ╰─ Doc
-│  │  │     │     ╰─ Expr($0 -> Type(Doc))
-│  │  │     ├─ $ProjectF
 │  │  │     │  ├─ Name("0" -> { "$literal": true })
-│  │  │     │  ├─ Name("src" -> "$src")
+│  │  │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │     │  ╰─ ExcludeId
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ Doc
@@ -161,15 +147,8 @@ Chain
 │     │  ├─ Chain
 │     │  │  ├─ $ReadF(db; zips)
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │  │  │  ╰─ ExcludeId
-│     │  │  ├─ $MatchF
-│     │  │  │  ╰─ Doc
-│     │  │  │     ╰─ Expr($0 -> Type(Doc))
-│     │  │  ├─ $ProjectF
 │     │  │  │  ├─ Name("0" -> { "$literal": true })
-│     │  │  │  ├─ Name("src" -> "$src")
+│     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $MatchF
 │     │  │  │  ╰─ Doc
@@ -195,15 +174,8 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; largeZips)
 │     │     ├─ $ProjectF
-│     │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │     │  ╰─ ExcludeId
-│     │     ├─ $MatchF
-│     │     │  ╰─ Doc
-│     │     │     ╰─ Expr($0 -> Type(Doc))
-│     │     ├─ $ProjectF
 │     │     │  ├─ Name("0" -> { "$literal": true })
-│     │     │  ├─ Name("src" -> "$src")
+│     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │     │  ╰─ ExcludeId
 │     │     ├─ $MatchF
 │     │     │  ╰─ Doc

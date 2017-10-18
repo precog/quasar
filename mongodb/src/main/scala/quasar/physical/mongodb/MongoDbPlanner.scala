@@ -683,7 +683,7 @@ object MongoDbPlanner {
     import MapFuncsCore._
 
     {
-      case node @ MFC(Guard(_, typ, cont, _)) =>
+      case node @ MFC(Guard((Embed(MFC(ProjectField(Embed(MFC(Undefined())), _))  ), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))

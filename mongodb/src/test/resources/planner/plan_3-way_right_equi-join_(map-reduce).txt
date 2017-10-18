@@ -6,18 +6,11 @@ Chain
 │  │  │  │  ├─ $ReadF(db; foo)
 │  │  │  │  ├─ $SimpleMapF
 │  │  │  │  │  ├─ Map
-│  │  │  │  │  │  ╰─ Let(__val)
-│  │  │  │  │  │     ├─ JsCore([_._id, _])
-│  │  │  │  │  │     ╰─ Obj
-│  │  │  │  │  │        ├─ Key(0: __val[1])
-│  │  │  │  │  │        ╰─ Key(src: __val)
+│  │  │  │  │  │  ╰─ JsCore([_._id, _])
 │  │  │  │  │  ╰─ Scope(Map())
-│  │  │  │  ├─ $MatchF
-│  │  │  │  │  ╰─ Doc
-│  │  │  │  │     ╰─ Expr($0 -> Type(Doc))
 │  │  │  │  ├─ $ProjectF
 │  │  │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  │  │  ├─ Name("src" -> "$src")
+│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
 │  │  │  │  │  ╰─ ExcludeId
 │  │  │  │  ├─ $MatchF
 │  │  │  │  │  ╰─ Doc
@@ -44,18 +37,11 @@ Chain
 │  │  │     ├─ $ReadF(db; bar)
 │  │  │     ├─ $SimpleMapF
 │  │  │     │  ├─ Map
-│  │  │     │  │  ╰─ Let(__val)
-│  │  │     │  │     ├─ JsCore([_._id, _])
-│  │  │     │  │     ╰─ Obj
-│  │  │     │  │        ├─ Key(0: __val[1])
-│  │  │     │  │        ╰─ Key(src: __val)
+│  │  │     │  │  ╰─ JsCore([_._id, _])
 │  │  │     │  ╰─ Scope(Map())
-│  │  │     ├─ $MatchF
-│  │  │     │  ╰─ Doc
-│  │  │     │     ╰─ Expr($0 -> Type(Doc))
 │  │  │     ├─ $ProjectF
 │  │  │     │  ├─ Name("0" -> { "$literal": true })
-│  │  │     │  ├─ Name("src" -> "$src")
+│  │  │     │  ├─ Name("src" -> "$$ROOT")
 │  │  │     │  ╰─ ExcludeId
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ Doc
@@ -84,18 +70,11 @@ Chain
 │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(0: __val[1][1])
-│  │  │  │        ╰─ Key(src: __val)
+│  │  │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
 │  │  │  ╰─ Scope(Map())
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Type(Doc))
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$src")
+│  │  │  ├─ Name("src" -> "$$ROOT")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -122,18 +101,11 @@ Chain
 │     ├─ $ReadF(db; baz)
 │     ├─ $SimpleMapF
 │     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([_._id, _])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: __val[1])
-│     │  │        ╰─ Key(src: __val)
+│     │  │  ╰─ JsCore([_._id, _])
 │     │  ╰─ Scope(Map())
-│     ├─ $MatchF
-│     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Type(Doc))
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("src" -> "$src")
+│     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc

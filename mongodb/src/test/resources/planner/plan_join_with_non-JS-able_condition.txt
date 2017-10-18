@@ -3,20 +3,8 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ ExcludeId
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined)
-│  │  │  │     ╰─ Key(src: _["0"])
-│  │  │  ╰─ Scope(Map())
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> ElemMatch(\/-(Exists(true))))
-│  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> "$src")
+│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -73,20 +61,8 @@ Chain
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined)
-│     │  │     ╰─ Key(src: _["0"])
-│     │  ╰─ Scope(Map())
-│     ├─ $MatchF
-│     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> ElemMatch(\/-(Exists(true))))
-│     ├─ $ProjectF
 │     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("src" -> "$src")
+│     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc

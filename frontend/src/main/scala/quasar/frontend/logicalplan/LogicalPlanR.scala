@@ -422,6 +422,25 @@ final class LogicalPlanR[T]
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import StateT.stateTMonadState
 
+    // Firstly we infer the types in the LogicalPlan. We start with the assumption
+    // that the entire thing returns `Type.Top`, then we feed that into the outermost untyper,
+    // asking "if this expression returns `Type.Top`, what are the types of the arguments?"
+    // We then continue in a top-down fashion, calling untypers exclusively to infer all of the types.
+    // Only the type *checker* calls the typers, because untypers always have the option to "give up"
+    // and return a fixed input type regardless of the expected output.
+    // In several other areas where we have no type information, we feed in `Type.Top` as well.
+
+    // Secondly we check the types. Type checking means calling typers in a bottom-up
+    // fashion, to verify that all of the argument types returned by untypers actually correspond
+    // to the result types returned by untypers. This includes propagation of constant types.
+
+    // Note that this means there is *no reason* to return a constant type from an untyper.
+    // Not only do they not exist yet, because `Type.Top` is the starting assumption of
+    // type inference, but even if they did, they could only propagate backwards.
+    // Elaborating, there is no way to work back from the knowledge that a function returns a constant
+    // to the knowledge that the function's parameters are constants, because
+    // there is no way to know a function returns a constant unless you already know
+    // the parameters are constants!
     inferTypes(Type.Top, term).flatMap(
       _.cataM(liftTM(checkTypesƒ)).map(appConst(_, constant(Data.NA))).evalZero.validation)
   }

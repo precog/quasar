@@ -288,7 +288,6 @@ trait DateLib extends Library with Serializable {
         success(Type.Timestamp)
     },
     untyper[nat._1] {
-      case Type.Const(Data.Timestamp(ts)) => success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))
       case Type.Timestamp                 => success(Func.Input1(Type.Date))
       case t                              => success(Func.Input1(t))
     })

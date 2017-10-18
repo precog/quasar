@@ -55,7 +55,7 @@ class ServiceSpec extends quasar.Qspec {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
-      metastore  <- createNewTestMetastore.liftM[MainErrT]
+      metastore  <- createNewTestMetastore().liftM[MainErrT]
       transactor = metastore.trans.transactor
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
@@ -103,17 +103,20 @@ class ServiceSpec extends quasar.Qspec {
                 uri = baseUri / "mount" / "fs",
                 method = Method.POST,
                 headers = Headers(Header("X-File-Name", c.typ.value + "/")))
-              .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value}" } }""")
-            )(Task.now) *>
+              .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value.replace("\\", "\\\\")}" } }""")
+            )(_.body.run) *>
           client.fetch(
             Request(
               uri = baseUri / "mount" / "fs" / c.typ.value / "",
               method = Method.GET)
-            )(Task.now)
+            )(r => r.body.run.map(_ => r.status))
         }
       }
 
-      r.map(_.forall(_.status == Ok)) must beRightDisjunction(true)
+      r must beLike {
+        case \/-(statii) =>
+          statii must contain((s: Status) => s mustEqual Ok).foreach
+      }
     }
 
     "POST view" in {

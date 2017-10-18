@@ -1,0 +1,21 @@
+{
+  "name": "bug2228",
+  "data": ["customers.data", "orders.data", "ordered_items.data", "inventory_items.data"],
+  "backends": {
+    "couchbase":         "skip",
+    "marklogic_json":    "ignoreFieldOrder",
+    "mimir":             "pendingIgnoreFieldOrder"
+  },
+  "query": "SELECT o.order_key AS OrderKey, o.purchase_date AS PurchaseDate, c.last_name, c.city AS City, c.state AS State, oi.qty AS Quantity, i.price AS UnitPrice
+            FROM customers AS c JOIN orders AS o ON c.customer_key = o.customer_key JOIN ordered_items AS oi ON oi.order_key = o.order_key JOIN inventory_items AS i ON i.item_key = oi.item_key
+            ORDER BY c.last_name, o.purchase_date, oi.qty",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "expected": [
+    {"OrderKey":"order_key_4", "PurchaseDate":"2009-04-11T13:21:48Z","last_name":"Benitez","City":"BILLINGS","State":"MT","Quantity":2, "UnitPrice":7.7},
+    {"OrderKey":"order_key_4", "PurchaseDate":"2009-04-11T13:21:48Z","last_name":"Benitez","City":"BILLINGS","State":"MT","Quantity":1, "UnitPrice":13.48},
+    {"OrderKey":"order_key_0", "PurchaseDate":"2016-08-15T17:43:22Z","last_name":"Porter","City":"GRAYTOWN","State":"OH", "Quantity":2, "UnitPrice":4.4},
+    {"OrderKey":"order_key_0", "PurchaseDate":"2016-08-15T17:43:22Z","last_name":"Porter","City":"GRAYTOWN","State":"OH", "Quantity":2, "UnitPrice":12.42},
+    {"OrderKey":"order_key_1", "PurchaseDate":"2008-01-16T10:28:32Z","last_name":"Porter","City":"GRAYTOWN","State":"OH", "Quantity":2, "UnitPrice":8.82}
+  ]
+}

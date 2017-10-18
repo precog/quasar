@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.mimir
+package quasar.contrib.scalaz
 
-trait CondRewriter extends DAG {
-  import instructions._
-  import dag._
+import _root_.scalaz._, Scalaz._
 
-  def rewriteConditionals(node: DepGraph): DepGraph = {
-    node mapDown { recurse =>
-      {
-        case peer @ IUI(true, Filter(leftJoin, left, pred1), Filter(rightJoin, right, Operate(Comp, pred2))) if pred1 == pred2 =>
-          Cond(recurse(pred1), recurse(left), leftJoin, recurse(right), rightJoin)(peer.loc)
-      }
-    }
+trait bind {
+
+  implicit final class MoreBindOps[F[_], A](val self: F[A])(implicit val F: Bind[F]) extends _root_.scalaz.syntax.Ops[F[A]] {
+    def <<[B](b: => F[B]): F[A] = F.bind(self)(a => b.as(a))
   }
+
 }
+
+object bind extends bind

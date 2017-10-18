@@ -1,11 +1,8 @@
-[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
-[![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
+[![Travis](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/pr5he90wye6ii8ml/branch/master?svg=true)](https://ci.appveyor.com/project/djspiewak/quasar/branch/master)
+<!-- [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar) -->
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-# Thanks to Sponsors
-
-YourKit supports open source projects with its full-featured Java Profiler. YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and <a href="https://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>, innovative and intelligent tools for profiling Java and .NET applications.
 
 # Quasar
 
@@ -29,7 +26,7 @@ See the instructions below for running and configuring these JARs.
 
 ## Building from Source
 
-**Note**: This requires Java 8 and Bash (Linux, Mac, or Cygwin on Windows).
+**Note**: This requires Java 8 and Bash (Linux, Mac).  Bash is not required on Windows, but the non-SBT infrastructure (e.g. the docker scripts) currently only works on Unix platforms.
 
 ### Build
 
@@ -37,14 +34,13 @@ The following sections explain how to build and run the various subprojects.
 
 #### Basic Compile & Test
 
-To compile the project and run tests, first clone the quasar repo and then execute the following command:
+To compile the project and run tests, first clone the quasar repo and then execute the following command (if on Windows, reverse the slashes):
 
 ```bash
 ./sbt test
 ```
 
-Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
- done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
+Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
 Running the full test suite can be done using docker containers for various backends:
 
@@ -1125,6 +1121,10 @@ This will ensure that your local version is also passing the tests.
 Check to see if the problem you are having is mentioned in the [JIRA issues](https://slamdata.atlassian.net/) and, if it isn't, feel free to create a new issue.
 
 You can also discuss issues on Gitter: [quasar-analytics/quasar](https://gitter.im/quasar-analytics/quasar).
+
+## Thanks to Sponsors
+
+YourKit supports open source projects with its full-featured Java Profiler. YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and <a href="https://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>, innovative and intelligent tools for profiling Java and .NET applications.
 
 ## Legal
 

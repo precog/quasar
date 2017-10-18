@@ -374,11 +374,11 @@ object MongoDbFileSystemSpec {
     (Functor[Task] compose Functor[IList])
       .map(
         (TestConfig externalFileSystems {
-          case (tpe, uri) =>
+          case (tpe, uri) if tpe.value.startsWith("mongodb") =>
             filesystems.testFileSystem(
               MongoDb.definition.translate(injectFT[Task, filesystems.Eff]).apply(tpe, uri).run)
         }).handleWith[IList[SupportedFs[BackendEffect]]] {
-          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+          case _: RuntimeException => Task.now(IList.empty)  // filesystems.scala:39
         }
       )(_.liftIO)
 }

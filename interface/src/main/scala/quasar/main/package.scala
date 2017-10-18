@@ -200,6 +200,9 @@ package object main extends Logging {
       Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
       Failure.toRuntimeError[F, MountingError]             :+:
       Failure.toRuntimeError[F, FileSystemError]
+
+    def toMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
+      liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
   }
 
   /** Effect comprising the core Quasar apis. */
@@ -212,52 +215,51 @@ package object main extends Logging {
     )#M[A]
 
   object CoreEff {
-    def runFs[S[_]](
-      hfsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM]
-    )(
-      implicit
-      S0: Task :<: S,
-      S1: Mounting :<: S,
-      S2: PhysErr :<: S,
-      S3: MountingFailure :<: S,
-      S4: PathMismatchFailure :<: S,
-      S5: FileSystemFailure :<: S,
-      S6: Module.Failure    :<: S,
-      S7: MetaStoreLocation :<: S,
-      S8: Timing :<: S,
-      S9: ConnectionIO :<: S
-    ): Task[CoreEff ~> Free[S, ?]] = {
-      def moduleInter(fs: BackendEffect ~> Free[S,?]): Module ~> Free[S, ?] = {
-        val wtv: Coproduct[Mounting, BackendEffect, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
-        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, BackendEffect, ?]]
+    def defaultImpl(
+     fsThing: FS,
+     metaRef: TaskRef[MetaStore],
+     persist: quasar.db.DbConnectionConfig => MainTask[Unit]
+    ): Task[CoreEff ~> QErrs_TaskM] = {
+      val vcacheInterp: VCache ~> QErrs_TaskM =
+        foldMapNT(
+          (fsThing.core compose Inject[ManageFile, BackendEffect]) :+:
+            injectFT[FileSystemFailure, QErrs_Task]                     :+:
+            (connectionIOToTask(metaRef) andThen injectFT[Task, QErrs_Task])
+        ) compose
+          VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
+      type MountingFileSystem[A] = Coproduct[Mounting, BackendEffect, A]
+      val module = Module.impl.default[MountingFileSystem] andThen foldMapNT(fsThing.mounting :+: fsThing.core)
+      for {
+        fs <- runFsWithViewsAndModules(fsThing.core, vcacheInterp, fsThing.mounting)
+      } yield {
+        (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_Task]) :+:
+          module                                                                              :+:
+          fsThing.mounting                                                                    :+:
+          (injectNT[Analyze, BackendEffect] andThen fs)                                       :+:
+          (injectNT[QueryFile, BackendEffect] andThen fs)                                     :+:
+          (injectNT[ReadFile, BackendEffect] andThen fs)                                      :+:
+          (injectNT[WriteFile, BackendEffect] andThen fs)                                     :+:
+          (injectNT[ManageFile, BackendEffect] andThen fs)                                    :+:
+          vcacheInterp                                                                        :+:
+          (Timing.toTask andThen injectFT[Task, QErrs_Task])                                  :+:
+          injectFT[Module.Failure, QErrs_Task]                                                :+:
+          injectFT[PathMismatchFailure, QErrs_Task]                                           :+:
+          injectFT[MountingFailure, QErrs_Task]                                               :+:
+          injectFT[FileSystemFailure, QErrs_Task]
       }
-      CompositeFileSystem.interpreter[S](hfsRef) >>= { compFs =>
-        val vcacheInterp: VCache ~> Free[S, ?] =
-          foldMapNT(
-            (compFs compose Inject[ManageFile, BackendEffect]) :+:
-            injectFT[FileSystemFailure, S]                     :+:
-            injectFT[ConnectionIO, S]
-          ) compose
-            VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
+    }
 
-        CompositeFileSystem.overlayModulesViews[Coproduct[VCache, S, ?], S](compFs) ∘ { compFs0 =>
-          val compFs1: BackendEffect ~> Free[S, ?] = foldMapNT(vcacheInterp :+: liftFT[S]) compose compFs0
+    def runFsWithViewsAndModules(
+      fs: BackendEffect ~> QErrs_TaskM,
+      vc: VCache ~> QErrs_TaskM,
+      mount: Mounting ~> QErrs_TaskM
+    ): Task[BackendEffect ~> QErrs_TaskM] = {
 
-          injectFT[MetaStoreLocation, S]                      :+:
-          moduleInter(compFs1)                                :+:
-          injectFT[Mounting, S]                               :+:
-          (compFs1 compose Inject[Analyze, BackendEffect])    :+:
-          (compFs1 compose Inject[QueryFile, BackendEffect])  :+:
-          (compFs1 compose Inject[ReadFile, BackendEffect])   :+:
-          (compFs1 compose Inject[WriteFile, BackendEffect])  :+:
-          (compFs1 compose Inject[ManageFile, BackendEffect]) :+:
-          vcacheInterp                                        :+:
-          injectFT[Timing, S]                                 :+:
-          injectFT[Module.Failure, S]                         :+:
-          injectFT[PathMismatchFailure, S]                    :+:
-          injectFT[MountingFailure, S]                        :+:
-          injectFT[FileSystemFailure, S]
-        }
+      type V[A] = (VCache :\: Mounting :/: QErrs_Task)#M[A]
+
+      overlayModulesViews[V, QErrs_Task](fs).map { toV =>
+        val vToTask = vc :+: mount :+: injectFT[QErrs_Task, QErrs_Task]
+        toV andThen foldMapNT(vToTask)
       }
     }
   }
@@ -267,83 +269,10 @@ package object main extends Logging {
   type CoreErrs1[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
   type CoreErrs0[A]  = Coproduct[MountingFailure, FileSystemFailure, A]
 
+  def connectionIOToTask(metaRef: TaskRef[MetaStore]): ConnectionIO ~> Task =
+    λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans.apply(io)))
 
   //---- FileSystems ----
-
-  /** A FileSystem supporting views and physical filesystems mounted at various
-    * points in the hierarchy.
-    */
-  object CompositeFileSystem {
-    /** Interprets FileSystem given a TaskRef containing a hierarchical
-      * FileSystem interpreter.
-      *
-      * TODO: The TaskRef is used as a communications channel so that
-      *       the part of the system that deals with mounting can make
-      *       new interpreters available to the part of the system that
-      *       needs to interpret FileSystem operations.
-      *
-      *       This would probably be better served with a
-      *       `Process[Task, FileSystem ~> HierarchicalFsEffM]` to allow
-      *       for more flexible production of interpreters.
-      */
-    def interpreter[S[_]](
-      hfsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM]
-    )(implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S,
-      S2: Mounting :<: S,
-      S4: MountingFailure :<: S,
-      S5: PathMismatchFailure :<: S
-    ): Task[BackendEffect ~> Free[S, ?]] =
-      for {
-        startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
-        seqRef     <- TaskRef(startSeq)
-        mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
-      } yield
-        HierarchicalFsEff.dynamicFileSystem(
-          hfsRef,
-          HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
-
-    def overlayModulesViews[S[_], T[_]](
-      f: BackendEffect ~> Free[T, ?]
-    )(implicit
-      S0: T :<: S,
-      S1: Task :<: S,
-      S2: VCache :<: S,
-      S3: Mounting :<: S,
-      S4: MountingFailure :<: S,
-      S5: PathMismatchFailure :<: S
-    ): Task[BackendEffect ~> Free[S, ?]] = {
-      type V[A] = (
-        VCache
-          :\: ViewState
-          :\: MonotonicSeq
-          :\: Mounting
-          :\: MountingFailure
-          :\: PathMismatchFailure
-          :/: BackendEffect
-      )#M[A]
-
-      for {
-        startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
-        seqRef     <- TaskRef(startSeq)
-        viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
-      } yield {
-        val compFs: V ~> Free[S, ?] =
-          injectFT[VCache, S]                                                 :+:
-          injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
-          injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
-          injectFT[Mounting, S]                                               :+:
-          injectFT[MountingFailure, S]                                        :+:
-          injectFT[PathMismatchFailure, S]                                    :+:
-          (foldMapNT(injectFT[T, S]) compose f)
-
-        flatMapSNT(compFs) compose
-          flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.backendEffect[V], liftFT)) compose
-            view.backendEffect[V]
-      }
-    }
-  }
 
   /** The effects required by hierarchical FileSystem operations. */
   type HierarchicalFsEffM[A] = Free[HierarchicalFsEff, A]

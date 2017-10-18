@@ -50,15 +50,13 @@ object MetaStore {
     * @return A `MetaStore` object containing the `transactor` to use to perform operation on the MetaStore as
     *         well as it's location and expected Schema
     */
-  def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schemas: List[Schema[Int]]): EitherT[Task, MetastoreFailure, MetaStore] = {
+  def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schemas: List[Schema[Int]]): EitherT[Task, MetastoreFailure, MetaStore] =
     for {
       tx <- poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig).leftMap(f => f:MetastoreFailure)
       _  <- onFailOrLeft(initializeOrUpdate.whenM(schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None))) >>
             schemas.traverse(verifySchema(_, tx.transactor)) >>
             stdout(s"Using metastore: ${DbConnectionConfig.connectionInfo(dbConfig).url}").liftM[EitherT[?[_], MetastoreFailure, ?]])(tx.shutdown)
     } yield MetaStore(dbConfig, tx, schemas)
-
-  }
 
   private def onFailOrLeft[E, A](t: EitherT[Task, E, A])(f: Task[Unit]):EitherT[Task, E, A] =
     EitherT(t.run.onFinish {

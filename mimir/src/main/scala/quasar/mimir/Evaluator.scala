@@ -33,16 +33,11 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
-    extends CrossOrdering
-    with Memoizer
+    extends Memoizer
     with TypeInferencer
-    with CondRewriter
-    with JoinOptimizerModule[M]
     with OpFinderModule[M]
-    with StaticInlinerModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
-    with PredicatePullupsModule[M]
     with TableModule[M] // Remove this explicit dep!
     with TableLibModule[M] {
 
@@ -55,10 +50,7 @@ trait EvaluatorModule[M[+ _]]
 
   abstract class EvaluatorLike[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
       extends OpFinder
-      with ReductionFinder
-      with StaticInliner
-      with JoinOptimizer
-      with PredicatePullups {
+      with ReductionFinder {
 
     import library._
     import trans._
@@ -82,26 +74,14 @@ trait EvaluatorModule[M[+ _]]
       if (optimize) funcs.reverse.map(Endo[DepGraph]).suml.run else identity
 
     // Have to be idempotent on subgraphs
-    def stagedRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph = {
-      // rewrites are written in `andThen` order
-      // we reverse above because our semigroup uses `compose`
-      composeOptimizations(
-        optimize,
-        List(
-          inlineStatics(_, ctx),
-          optimizeJoins(_, ctx),
-          rewriteConditionals(_)
-        ))
-    }
+    def stagedRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph =
+      identity
 
     def fullRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph = {
       stagedRewriteDAG(optimize, ctx) andThen
-        (orderCrosses _) andThen
         composeOptimizations(
           optimize,
           List[DepGraph => DepGraph](
-            // TODO: Predicate pullups break a SnapEngage query (see PLATFORM-951)
-            //predicatePullups(_, ctx),
             inferTypes(JType.JUniverseT), { g =>
               megaReduce(g, findReductions(g, ctx))
             },

@@ -1493,16 +1493,15 @@ trait ColumnarTableModule[M[+ _]]
           val numSplits =
             math.ceil((slice.size * highWaterMark).toDouble / yggConfig.maxSliceSize).toInt
 
-          // this has accumulating rounding errors which can cause slices to exceed max by a small amount in rare cases
-          val targetIdx = slice.size / numSplits
+          val size = math.ceil(yggConfig.maxSliceSize.toDouble / highWaterMark).toInt
 
-          val (acc, last) = (0 until numSplits).foldLeft((Vector.empty[Slice], slice)) {
-            case ((acc, cur), _) =>
-              val (left, right) = cur.split(targetIdx)
-              (acc :+ left, right)
+          // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
+          val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {
+            case (acc, split) =>
+              acc :+ slice.takeRange(size * split, size)
           }
 
-          (acc :+ last).filterNot(_.isEmpty)
+          acc.filterNot(_.isEmpty)
         } else {
           Vector(slice)
         }

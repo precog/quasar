@@ -55,10 +55,17 @@ script:
     SPECIFIC_DELEGATE=
 
     case $CONNECTOR in
-      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly" ;;
-      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly" ;;
-      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly" ;;
-      spark_hdfs) ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly ;;
+      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
+      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
+      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
+
+      spark_hdfs)
+        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+          'set every assemblyJarName in assembly := "sparkcore.jar"' \
+          'set every sparkDependencyProvided := true' \
+          sparkcore/assembly
+        ;;
+
       *) ;;
     esac
 
@@ -69,7 +76,7 @@ script:
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
-      "it/testOnly -- xonly" \
+      "it/testOnly -- xonly failtrace" \
       "$SPECIFIC_DELEGATE"
 
   - set +e
@@ -99,18 +106,26 @@ jobs:
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
-            "testOnly -- xonly" \
-            "exclusive:testOnly -- xonly"
+            "testOnly -- xonly failtrace" \
+            "exclusive:testOnly -- xonly failtrace"
 
     - stage: publish
       env:
       script:
         - set -e
-        - './sbt ++$TRAVIS_SCALA_VERSION doc web/assembly'
+        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
         - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
+
+        # recreate sparkcore.jar, which is just going to hang out
+        - |-
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+            'set every assemblyJarName in assembly := "sparkcore.jar"' \
+            'set every sparkDependencyProvided := true' \
+            sparkcore/assembly
+          ;;
 
         # release to github
         - scripts/publishJar

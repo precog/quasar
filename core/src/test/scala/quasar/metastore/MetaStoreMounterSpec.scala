@@ -35,13 +35,7 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
 
   isolated  // NB: each test needs a fresh DB, or else need to get cleanup working in between
 
-  val xa = {
-    val tr = MetaStoreFixture.createNewTestTransactor.unsafePerformSync
-
-    Schema.schema.updateToLatest.transact(tr).unsafePerformSync
-
-    tr
-  }
+  val xa = MetaStoreFixture.createNewTestTransactor().unsafePerformSync
 
   val db: ConnectionIO ~> Task =
     λ[ConnectionIO ~> Task](_.transact(xa))

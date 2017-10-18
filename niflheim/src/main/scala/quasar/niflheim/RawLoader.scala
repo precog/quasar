@@ -93,7 +93,10 @@ private[niflheim] object RawLoader {
         ok = false
       }
     }
-    if (!ok) recover1(id, f, rows, events)
+    if (!ok) {
+      reader.close()    // release the file lock on Windows
+      recover1(id, f, rows, events)
+    }
     (rows, events.map(_._1), ok)
   }
 
@@ -112,24 +115,28 @@ private[niflheim] object RawLoader {
 
     // open a tempfile to write a "corrected" rawlog to, and write the header
     val tmp = File.createTempFile("nilfheim", "recovery")
-    val os = new BufferedOutputStream(new FileOutputStream(tmp, true))
-    writeHeader(os, id)
 
-    // for each event, write its rows to the rawlog
-    var row = 0
-    val values = mutable.ArrayBuffer.empty[JValue]
-    events.foreach { case (eventid, count) =>
-      var i = 0
-      while (i < count) {
-        values.append(rows(row))
-        row += 1
-        i += 1
+    val os = new BufferedOutputStream(new FileOutputStream(tmp, true))
+    try {
+      writeHeader(os, id)
+
+      // for each event, write its rows to the rawlog
+      var row = 0
+      val values = mutable.ArrayBuffer.empty[JValue]
+      events.foreach { case (eventid, count) =>
+        var i = 0
+        while (i < count) {
+          values.append(rows(row))
+          row += 1
+          i += 1
+        }
+        writeEvents(os, eventid, values)
+        values.clear()
       }
-      writeEvents(os, eventid, values)
-      values.clear()
+    } finally {
+      os.close()
     }
 
-    // rename the rawlog file to indicate corruption
     f.renameTo(getCorruptFile(f))
 
     // rename the tempfile to the rawlog file

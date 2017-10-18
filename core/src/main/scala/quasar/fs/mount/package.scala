@@ -100,4 +100,43 @@ package object mount {
     ): ViewFileSystem ~> F =
       mounting :+: mismatchFailure :+: mountingFailure :+: viewState :+: vcache :+: monotonicSeq :+: fileSystem
   }
+
+  def overlayModulesViews[S[_], T[_]](
+    f: BackendEffect ~> Free[T, ?]
+  )(implicit
+    S0: T :<: S,
+    S1: Task :<: S,
+    S2: VCache :<: S,
+    S3: Mounting :<: S,
+    S4: MountingFailure :<: S,
+    S5: PathMismatchFailure :<: S
+  ): Task[BackendEffect ~> Free[S, ?]] = {
+    type V[A] = (
+      VCache              :\:
+      ViewState           :\:
+      MonotonicSeq        :\:
+      Mounting            :\:
+      MountingFailure     :\:
+      PathMismatchFailure :/:
+      BackendEffect)#M[A]
+
+    for {
+      startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
+      seqRef     <- TaskRef(startSeq)
+      viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
+    } yield {
+      val compFs: V ~> Free[S, ?] =
+        injectFT[VCache, S]                                                 :+:
+        injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
+        injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
+        injectFT[Mounting, S]                                               :+:
+        injectFT[MountingFailure, S]                                        :+:
+        injectFT[PathMismatchFailure, S]                                    :+:
+        (foldMapNT(injectFT[T, S]) compose f)
+
+      flatMapSNT(compFs) compose
+        flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.backendEffect[V], liftFT)) compose
+        view.backendEffect[V]
+    }
+  }
 }

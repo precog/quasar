@@ -43,10 +43,6 @@ trait StructuralLib extends Library {
       case Sized(_, valueType)                       => Obj(Map(), Some(valueType))
     },
     partialUntyperV[nat._2] {
-      case Const(Data.Obj(map)) => map.headOption match {
-        case Some((key, value)) => success(Func.Input2(Const(Data.Str(key)), Const(value)))
-        case None => failure(NonEmptyList(GenericError("MAKE_OBJECT can’t result in an empty object")))
-      }
       case Obj(map, uk) => map.headOption.fold(
         uk.fold[Func.VDomain[nat._2]](
           failure(NonEmptyList(GenericError("MAKE_OBJECT can’t result in an empty object"))))(
@@ -68,7 +64,6 @@ trait StructuralLib extends Library {
       case Sized(valueType)             => Arr(List(valueType))
     },
     partialUntyper[nat._1] {
-      case Const(Data.Arr(List(elem))) => Func.Input1(Const(elem))
       case Arr(List(elemType))         => Func.Input1(elemType)
       case FlexArr(_, _, elemType)     => Func.Input1(elemType)
     })
@@ -231,7 +226,6 @@ trait StructuralLib extends Library {
       case Sized(v1, _) => Obj(Map(), v1.objectType)
     },
     partialUntyperV[nat._2] {
-      case Const(o @ Data.Obj(map)) => DeleteField.untpe(o.dataType)
       case Obj(map, _)              => success(Func.Input2(Obj(map, Some(Top)), Str))
     })
 

@@ -53,14 +53,14 @@ trait MetaStoreFixture {
 object MetaStoreFixture {
   def createNewTestMetaStoreConfig: Task[DbConnectionConfig] =
       Task.delay { DbUtil.inMemoryConfig(s"test_mem_$nextInt") }
-  def createNewTestTransactor: Task[Transactor[Task]] =
-    createNewTestMetastore.map(_.trans.transactor)
-  def createNewTestMetastore: Task[MetaStore] =
-    createNewTestMetaStoreConfig.map(testConfig =>
-      MetaStore(
-        testConfig,
-        StatefulTransactor(simpleTransactor(DbConnectionConfig.connectionInfo(testConfig)), Task.now(())),
-        List(quasar.metastore.Schema.schema)))
+  def createNewTestTransactor(schema: List[Schema[Int]] = List(quasar.metastore.Schema.schema)): Task[Transactor[Task]] =
+    createNewTestMetastore(schema).map(_.trans.transactor)
+  def createNewTestMetastore(schema: List[Schema[Int]] = List(quasar.metastore.Schema.schema)): Task[MetaStore] =
+    for {
+      testConfig <- createNewTestMetaStoreConfig
+      trans      =  simpleTransactor(DbConnectionConfig.connectionInfo(testConfig))
+      _          <- schema.traverse(_.updateToLatest).transact(trans)
+    } yield MetaStore(testConfig, StatefulTransactor(trans, Task.now(())), schema)
 }
 
 trait H2MetaStoreFixture extends MetaStoreFixture {

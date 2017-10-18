@@ -255,8 +255,7 @@ trait StdLibModule[M[+ _]]
     with TypeLibModule[M]
     with TimeLibModule[M]
     with StringLibModule[M]
-    with ReductionLibModule[M]
-    with RandomLibModule[M] {
+    with ReductionLibModule[M] {
   type Lib <: StdLib
 
   trait StdLib
@@ -268,7 +267,6 @@ trait StdLibModule[M[+ _]]
       with TimeLib
       with StringLib
       with ReductionLib
-      with RandomLib
 }
 
 object StdLib {

@@ -455,8 +455,11 @@ lazy val sparkcore = project
     )
   .settings(commonSettings)
   .settings(targetSettings)
-  // .settings(githubReleaseSettings)
-  .settings(assemblyJarName in assembly := "sparkcore.jar")
+  .settings(githubReleaseSettings)
+  // re-add the sparkcore.jar that we hopefully generated
+  // se really should generate this more explicitly, rather than relying on the CI script
+  // it's hard though because generating it requires setting and then un-setting some keys
+  .settings(GithubKeys.assets += crossTarget.value / "sparkcore.jar")
   .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,

@@ -1,0 +1,2 @@
+{ "city": "GRAYTOWN", "first_name": "Cyrus", "last_name": "Porter", "middle_name": "William", "loc": [ -83.26128, 41.564723 ], "customer_key": "customer_key_0", "gender": "male", "age": 33, "county": "OTTAWA", "state": "OH", "street_address": "6583 RUSH ST", "zip_code": 43432 }
+{ "city": "BILLINGS", "first_name": "German", "last_name": "Benitez", "middle_name": "Carl", "loc": [ -108.194508, 45.978288 ], "customer_key": "customer_key_1", "gender": "male", "age": 60, "county": "YELLOWSTONE", "state": "MT", "street_address": "9680 MT PROSPECT RD", "zip_code": 59117 }

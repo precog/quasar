@@ -79,10 +79,6 @@ trait IdentityLib extends Library {
                         ,
     partialUntyper[nat._1] {
       case Type.Bottom => Func.Input1(Type.Bottom)
-      case Type.Const(Data.Str(name)) =>
-        Func.Input1(PrimaryType.name.getOption(name).fold[Type](
-          Type.Top)(
-          Type.fromPrimaryType))
       case _ => Func.Input1(Type.Top)
     })
 }

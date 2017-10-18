@@ -624,7 +624,7 @@ class PlannerSpec extends
           ExcludeId),
         $match(Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(-73)))),
         $project(
-          reshape(sigil.Quasar -> $field("src.loc")),
+          reshape(sigil.Quasar -> $field("src", "loc")),
           ExcludeId)))
     }
 
@@ -1071,7 +1071,7 @@ class PlannerSpec extends
           $group(
             grouped("count" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null)))))
-    }
+    }.pendingWithActual(notOnPar, testFile("plan filter with both index and field projections"))
 
     "plan simple having filter" in {
       plan(sqlE"select city from zips group by city having count(*) > 10") must

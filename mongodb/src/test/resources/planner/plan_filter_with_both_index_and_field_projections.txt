@@ -1,14 +1,17 @@
 Chain
 ├─ $ReadF(db; slamengine_commits)
+├─ $MatchF
+│  ╰─ Doc
+│     ╰─ Expr($parents -> ElemMatch(\/-(Exists(true))))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(0: (Array.isArray(_.parents) && (isObject(_.parents[0]) && (! Array.isArray(_.parents[0])))) ? _.parents[0].sha === "56d1caf5d082d1a6840090986e277d36d03f1859" : undefined)
+│  │     ├─ Key(0: _.parents[0].sha)
 │  │     ╰─ Key(src: _)
 │  ╰─ Scope(Map())
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
+│     ╰─ Expr($0 -> Eq(Text(56d1caf5d082d1a6840090986e277d36d03f1859)))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj

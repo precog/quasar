@@ -1,40 +1,39 @@
 Chain
 ├─ $ReadF(db; logs)
 ╰─ $MatchF
-   ╰─ And
-      ├─ Or
+   ╰─ Or
+      ├─ And
+      │  ├─ Or
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Int32))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Int64))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Dec))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Text))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Date))
+      │  │  ╰─ Doc
+      │  │     ╰─ Expr($ts -> Type(Bool))
+      │  ├─ Or
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Int32))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Int64))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Dec))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Text))
+      │  │  ├─ Doc
+      │  │  │  ╰─ Expr($ts -> Type(Date))
+      │  │  ╰─ Doc
+      │  │     ╰─ Expr($ts -> Type(Bool))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int32))
+      │  │  ╰─ Expr($ts -> Gt(Date(1421884800000)))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int64))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Dec))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Text))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Date))
+      │  │  ╰─ Expr($ts -> Lte(Date(1422316800000)))
       │  ╰─ Doc
-      │     ╰─ Expr($ts -> Type(Bool))
-      ├─ Or
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int32))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int64))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Dec))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Text))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Date))
-      │  ╰─ Doc
-      │     ╰─ Expr($ts -> Type(Bool))
-      ╰─ Or
-         ├─ And
-         │  ├─ Doc
-         │  │  ╰─ Expr($ts -> Gt(Date(1421884800000)))
-         │  ├─ Doc
-         │  │  ╰─ Expr($ts -> Lte(Date(1422316800000)))
-         │  ╰─ Doc
-         │     ╰─ Expr($ts -> Neq(Date(1422144000000)))
-         ╰─ Doc
-            ╰─ Expr($ts -> Eq(Date(1422489600000)))
+      │     ╰─ Expr($ts -> Neq(Date(1422144000000)))
+      ╰─ Doc
+         ╰─ Expr($ts -> Eq(Date(1422489600000)))

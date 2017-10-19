@@ -849,12 +849,15 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(
-           Selector.And(
-             Selector.Doc(
-               BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
-             Selector.Or(
+           Selector.Or(
+             Selector.And(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false)),
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false))),
+             Selector.And(
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
     }
@@ -951,9 +954,12 @@ class PlannerSpec extends
     "plan filter with alternative ~" in {
       plan(sqlE"""select * from a where "foo" ~ pattern or target ~ pattern""") must beWorkflow0(chain[Workflow](
         $read(collection("db", "a")),
-        $match(Selector.And(
-          Selector.Doc(BsonField.Name("pattern") -> Selector.Type(BsonType.Text)),
-          Selector.Doc(BsonField.Name("target") -> Selector.Type(BsonType.Text)))),
+        $match(
+          Selector.Or(
+            Selector.Doc(BsonField.Name("pattern") -> Selector.Type(BsonType.Text)),
+            Selector.And(
+              Selector.Doc(BsonField.Name("pattern") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("target") -> Selector.Type(BsonType.Text))))),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "0" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),

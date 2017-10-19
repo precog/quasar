@@ -255,7 +255,9 @@ object MapFuncCore {
       //     doing that for certain MapFuncs, so we add explicit `none`s.
       case Guard(_, _, _, _)
          | IfUndefined(_, _)
-         | MakeArray(_) | MakeMap(_, _) => none
+         | MakeArray(_)
+         | MakeMap(_, _)
+         | Or(_, _) => none
       // TODO: This should be able to extract a guard where _either_ side is
       //       `Undefined`, and should also extract `Cond` with `Undefined` on a
       //       branch.

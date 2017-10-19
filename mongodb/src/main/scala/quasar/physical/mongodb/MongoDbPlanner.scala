@@ -666,7 +666,19 @@ object MongoDbPlanner {
 
     import MapFuncsCore._
 
+    def invoke2Nel(x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+        OutputM[PartialSelector[T]] =
+      (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
+        ({ case list =>
+          f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
+        },
+          p1.map(There(0, _)) ++ p2.map(There(1, _)))
+      }
+
     {
+      case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply(_, _))
+      case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply(_, _))
+
       case node @ MFC(Guard((Embed(MFC(ProjectField(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {

@@ -1,0 +1,27 @@
+{
+    "name": "filter on disjunction of expressions involving guards",
+    "backends": {
+        "couchbase":  "ignoreFieldOrder",
+        "marklogic_json": "pendingIgnoreFieldOrder",
+        "mimir":"pendingIgnoreFieldOrder"
+    },
+    "data": "zips.data",
+    "query": "select `_id`, city from zips where city ~ \"IN$\" or pop ~ \"IN$\"",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "_id": "01340", "city": "COLRAIN" }
+      , { "_id": "01503", "city": "BERLIN" }
+      , { "_id": "02038", "city": "FRANKLIN" }
+      , { "_id": "02130", "city": "JAMAICA PLAIN" }
+      , { "_id": "03235", "city": "FRANKLIN" }
+      , { "_id": "03444", "city": "DUBLIN" }
+      , { "_id": "03570", "city": "BERLIN" }
+      , { "_id": "04024", "city": "EAST BALDWIN" }
+      , { "_id": "04091", "city": "WEST BALDWIN" }
+      , { "_id": "04541", "city": "CHAMBERLAIN" }
+      , { "_id": "04616", "city": "BROOKLIN" }
+      , { "_id": "04634", "city": "FRANKLIN" }
+      , { "_id": "04661", "city": "NORTH BROOKLIN" }
+    ]
+}

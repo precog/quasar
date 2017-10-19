@@ -128,8 +128,7 @@ object MongoDbPlanner {
 
   def getSelector
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (v: BsonVersion)
-    (fm: FreeMap[T])
+    (fm: FreeMap[T], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
@@ -137,22 +136,7 @@ object MongoDbPlanner {
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
       ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
-        κ(defaultSelector[T].point[OutputM]),
-        selector[T](v)))
-
-  def getTypeSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (v: BsonVersion)
-    (fm: FreeMap[T])
-    (implicit inj: EX :<: ExprOp)
-      : OutputM[PartialSelector[T]] =
-    fm.zygo(
-      interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
-        κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
-        _.embed),
-      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
-        κ(defaultSelector[T].point[OutputM]),
-        typeSelector[T](v)))
+        κ(defaultSelector[T].point[OutputM]), galg))
 
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
     (fm: FreeMapA[T, A])(recovery: A => JsCore)
@@ -677,13 +661,13 @@ object MongoDbPlanner {
     },
     List(Here[T]()))
 
-  def typeSelector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
+  def typeSelector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
 
     import MapFuncsCore._
 
     {
-      case node @ MFC(Guard((Embed(MFC(ProjectField(Embed(MFC(Undefined())), _))  ), _), typ, cont, _)) =>
+      case node @ MFC(Guard((Embed(MFC(ProjectField(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -1059,8 +1043,8 @@ object MongoDbPlanner {
           case Filter(src, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
             cond0.transCataM(elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
-              val selectors = getSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
-              val typeSelectors = getTypeSelector[T, M, EX](cfg.bsonVersion)(cond).toOption
+              val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion)).toOption
+              val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T]).toOption
 
               (selectors, typeSelectors) match {
                 case (Some((_, Nil)), Some((typeSel, typeInputs))) =>

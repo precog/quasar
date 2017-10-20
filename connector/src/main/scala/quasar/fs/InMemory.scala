@@ -270,6 +270,9 @@ object InMemory {
   def runBackend(initial: InMemState): Task[BackendEffect ~> Task] =
     runStatefully(initial).map(_ compose fileSystem0)
 
+  def runBackendInspect(initial: InMemState): Task[(BackendEffect ~> Task, Task[InMemState])] =
+    runInspect(initial).map { case (inter, read) => (inter compose fileSystem0, read)}
+
   ////
 
   private val lpr = new LogicalPlanR[Fix[LogicalPlan]]

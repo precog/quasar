@@ -35,6 +35,7 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.MountConfig
 import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.main.CoreEffIO
 import quasar.sql._
 import quasar.Variables
 
@@ -87,14 +88,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   val vcache = VCache.Ops[Eff]
 
-  def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
-    vcacheInterp ∘ (vci =>
-      liftMT[Task, ResponseT]                                                  :+:
-      (liftMT[Task, ResponseT] compose timingInterp(Instant.ofEpochSecond(0))) :+:
-      (liftMT[Task, ResponseT] compose vci)                                    :+:
-      failureResponseOr[FileSystemError]                                       :+:
-      (liftMT[Task, ResponseT] compose fs))
-
   def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> Task =
     reflNT[Task]                                  :+:
     timingInterp(i)                               :+:
@@ -110,16 +103,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
     (liftMT[Task, ResponseT] compose fs)
 
   def service(mem: InMemState): Service[Request, Response] =
-    HeaderParam(GZip(HttpService.lift(req => runFs(mem) >>= (fs => effRespOr(fs) >>= (r =>
-      data.service[Eff].toHttpService(r).apply(req)))))).orNotFound
+    serviceRef(mem)._1
 
   def serviceRef(mem: InMemState): (Service[Request, Response], Task[InMemState]) = {
-    val (inter, ref) = runInspect(mem).unsafePerformSync
-    val svc =
-      HeaderParam(GZip(HttpService.lift(req =>
-        effRespOr(inter compose fileSystem) >>= (r =>
-          data.service[Eff].toHttpService(r).apply(req))))).orNotFound
-
+    val (inter, ref) = inMemFSWebInspect(mem).unsafePerformSync
+    val svc = HeaderParam(GZip(data.service[CoreEffIO].toHttpService(inter))).orNotFound
     (svc, ref)
   }
 
@@ -128,16 +116,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
     type RW[A] = ReadWriteT[ResponseOr, A]
-    HttpService.lift(req => runFs(mem) flatMap { fs =>
-      val fs0: Task[Eff ~> ResponseOr] = effRespOr(fs)
-      val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, Eff](i)))
-      val f: Task[Eff ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
-      val fsErrs: Task[Eff ~> ResponseOr] =
-        (f ⊛ g)((fʹ, gʹ) =>
-          evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
+    val fs0: Task[CoreEffIO ~> ResponseOr] = inMemFSWeb(mem)
+    val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, CoreEffIO](i)))
+    val f: Task[CoreEffIO ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
+    val fsErrs: Task[CoreEffIO ~> ResponseOr] =
+      (f ⊛ g)((fʹ, gʹ) =>
+        evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
 
-      fsErrs >>= (i => data.service[Eff].toHttpService(i).apply(req))
-    })
+    data.service[CoreEffIO].toHttpService(fsErrs.unsafePerformSync)
   }
 
   def evalViewTest[A](now: Instant)(p: (Eff ~> Task, Eff ~> ResponseOr) => Task[A]): Task[A] =
@@ -385,8 +371,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
 
-            val memState = InMemState.fromFiles(Map(g -> d))
-
             val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
@@ -414,8 +398,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
-
-            val memState = InMemState.fromFiles(Map(g -> d))
 
             val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
               (for {

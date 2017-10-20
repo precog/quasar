@@ -849,15 +849,15 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(
-           Selector.Or(
-             Selector.And(
+           Selector.And(
+             Selector.Or(
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false))),
-             Selector.And(
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text))),
+             Selector.Or(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
+                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false)),
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
     }

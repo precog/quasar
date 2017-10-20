@@ -490,9 +490,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   // - convert any remaning projects to maps
   // - coalesce nodes
   // - normalize mapfunc
-  private def applyNormalizations[F[_]: Traverse: Normalizable, G[_]: Traverse](
+  private def applyNormalizations[F[_]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C: Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
@@ -513,22 +512,20 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     ))(prism(ftf))
   }
 
-  private def normalizeWithBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
+  private def normalizeWithBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[A] => G[A] =
-    fa => applyNormalizations[F, G](prism, rebase, normalizeJoins)
+    fa => applyNormalizations[F, G](prism, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
 
-  private def normalizeEJBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
+  private def normalizeEJBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]])(
+    prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              EJ: EquiJoin :<: F,
@@ -538,26 +535,26 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     val normEJ =
       liftFFTrans(prism)(C.coalesceEJ[G](prism.get))
 
-    normalizeWithBijection[F, G, A](bij)(prism, rebase, normEJ compose (prism apply _))
+    normalizeWithBijection[F, G, A](bij)(prism, normEJ compose (prism apply _))
   }
 
-  def normalizeEJ[F[_]: Traverse: Normalizable](
+  def normalizeEJ[F[_]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              EJ: EquiJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
-    normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
+    normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism)
 
-  def normalizeEJCoEnv[F[_]: Traverse: Normalizable](
+  def normalizeEJCoEnv[F[_]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              EJ: EquiJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
+    normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 
-  private def normalizeTJBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
+  private def normalizeTJBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
     rebase: FreeQS => T[G] => Option[T[G]])(
@@ -571,7 +568,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       liftFFTrans(prism)(C.coalesceTJ[G](prism.get)),
       liftFFTrans(prism)((fa: F[T[G]]) => TJ.prj(fa).flatMap(elideNopJoin[F, T[G]](rebase))))
 
-    normalizeWithBijection[F, G, A](bij)(prism, rebase, normTJ compose (prism apply _))
+    normalizeWithBijection[F, G, A](bij)(prism, normTJ compose (prism apply _))
   }
 
   def normalizeTJ[F[_]: Traverse: Normalizable](

@@ -191,36 +191,13 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     } yield HdfsConfig(sparkConf, hdfsUrl, rootPath)
   }
 
-  private def sparkCoreJar: DefErrT[Task, APath] = {
-    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
-    val fetchProjectRootPath = Task.delay {
-      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
+  def getSparkConf: Config => SparkConf = _.sparkConf
+
+  def generateSC: (APath, HdfsConfig) => DefErrT[Task, SparkContext] =
+    (jar, conf) => initSC(conf).map { sc =>
+      sc.addJar(posixCodec.printPath(jar))
+      sc
     }
-    val jar: Task[Option[APath]] =
-      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
-    OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  private def initSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => EitherT(Task.delay {
-    // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
-
-    new SparkContext(config.sparkConf).right[DefinitionError]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      NonEmptyList("You can not mount second Spark based connector... " +
-        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
-
-  def generateSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => for {
-    sc  <- initSC(config)
-    jar <- sparkCoreJar
-  } yield {
-    sc.addJar(posixCodec.printPath(jar))
-    sc
-  }
 
   private def toPath(apath: APath): Free[Eff, Path] = lift(Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))

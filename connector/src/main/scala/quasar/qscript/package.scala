@@ -355,30 +355,6 @@ package object qscript {
 
     liftCo[T, F, Hole, Free[F, Hole]](partial)
   }
-
-  trait Trans[T[_[_]]] {
-    def trans[F[_], G[_]: Functor]
-      (GtoF: PrismNT[G, F])
-      (implicit QC: QScriptCore[T, ?] :<: F)
-        : QScriptCore[T, T[G]] => F[T[G]]
-  }
-
-  def applyTrans[T[_[_]]: BirecursiveT, F[_]: Functor]
-    (target: T[F])
-    (transform: Trans[T])
-    (implicit branches: Branches.Aux[T, F], QC: QScriptCore[T, ?] :<: F)
-      : T[F] = {
-
-    val rewriteF: T[F] =
-      target.transCata[T[F]](liftId[T, F](transform.trans[F, F](idPrism[F])))
-
-     branches
-      .run[T[F]](liftCoEnv[T, QScriptTotal[T, ?]](
-        transform.trans[QScriptTotal[T, ?], CoEnv[Hole, QScriptTotal[T, ?], ?]](
-	  coenvPrism[QScriptTotal[T, ?], Hole])))
-      .apply(rewriteF.project)
-      .embed
-  }
 }
 
 package qscript {

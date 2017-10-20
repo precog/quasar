@@ -22,7 +22,6 @@ import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect._
-import quasar.fp.ski._
 import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._,
@@ -36,8 +35,6 @@ import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
 import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
-
-import java.net.URLDecoder
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -181,35 +178,13 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
     }
   }
 
-  private def sparkCoreJar: DefErrT[Task, APath] = {
-    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
-    val fetchProjectRootPath = Task.delay {
-      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      posixCodec.parsePath[Option[APath]](
-        κ(None), _.some.map(unsafeSandboxAbs), κ(None), _.some.map(unsafeSandboxAbs)
-      )(pathStr)
+  def getSparkConf: Config => SparkConf = _.sparkConf
+
+  def generateSC: (APath, Config) => DefErrT[Task, SparkContext] =
+    (jar, conf) => initSC(conf).map { sc =>
+      sc.addJar(posixCodec.printPath(jar))
+      sc
     }
-    val jar: Task[Option[APath]] =
-      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
-    OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
-  }
-
-  private def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
-    new SparkContext(config.sparkConf).right[DefinitionError]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      NonEmptyList("You can not mount second Spark based connector... " +
-        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
-
-  def generateSC: Config => DefErrT[Task, SparkContext] = (config: Config) => for {
-    sc  <- initSC(config)
-    jar <- sparkCoreJar
-  } yield {
-    sc.addJar(posixCodec.printPath(jar))
-    sc
-  }
 
   object details {
 

@@ -26,7 +26,7 @@ import quasar.fp, fp.TaskRef, fp.free._
 import quasar.fs._,
   mount._,
   FileSystemError._, PathError._, WriteFile._,
-  BackendDef.{DefinitionError, DefErrT},
+  BackendDef.DefErrT,
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
@@ -115,16 +115,10 @@ object SparkLocal extends SparkCore with ChrootedInterpreter {
     })
   }
 
-  def generateSC: LocalConfig => DefErrT[Task, SparkContext] = (config: LocalConfig) => EitherT(Task.delay {
-    // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+  def getSparkConf: Config => SparkConf = _.sparkConf
 
-    new SparkContext(config.sparkConf).right[DefinitionError]
-  }.handleWith {
-    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-      NonEmptyList("You can not mount second Spark based connector... " +
-        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
+  def generateSC: (APath, LocalConfig) => DefErrT[Task, SparkContext] =
+    (jar: APath, config: LocalConfig) => initSC(config)
 
   object details {
 

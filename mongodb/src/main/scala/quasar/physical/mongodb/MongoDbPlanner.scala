@@ -35,9 +35,9 @@ import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
-import quasar.qscript.{MapFuncsCore => MF}
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -74,13 +74,6 @@ object MongoDbPlanner {
   implicit def mongoQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScript[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  private def raiseErr[M[_], A](err: FileSystemError)(
-    implicit ev: MonadFsErr[M]
-  ): M[A] = ev.raiseError(err)
-
-  private def handleErr[M[_], A](ma: M[A])(f: FileSystemError => M[A])(
-    implicit ev: MonadFsErr[M]
-  ): M[A] = ev.handleError(ma)(f)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
@@ -1054,7 +1047,7 @@ object MongoDbPlanner {
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
-            cond0.transCataM(elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
+            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
               val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion)).toOption
               val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T]).toOption
 
@@ -1329,130 +1322,6 @@ object MongoDbPlanner {
       CoalgebraM[A \/ ?, F, T[F]] =
     tf => (f.lift(tf) \/> tf.project).swap
 
-  def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
-    (subType: Type)
-      : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
-        if (typ.contains(subType)) cont.project.point[M]
-        // TODO: Error if there is no overlap between the types.
-        else {
-          val union = subType ⨯ typ
-          if (union ≟ Type.Bottom)
-            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-          else {
-            CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MFC(MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb)).right).point[M]
-          }
-        }
-      case x => x.point[M]
-    }
-    f
-  }
-
-  def mapBeforeSort[T[_[_]]: BirecursiveT]: Trans[T] =
-    new Trans[T] {
-      def trans[F[_], G[_]: Functor]
-          (GtoF: PrismNT[G, F])
-          (implicit QC: QScriptCore[T, ?] :<: F) = {
-        case qs @ Map(Embed(src), fm) =>
-          GtoF.get(src) >>= QC.prj match {
-            case Some(Sort(innerSrc, bucket, order)) =>
-              val innerMap =
-                GtoF.reverseGet(QC.inj(Map(
-                  innerSrc,
-                  MapFuncCore.StaticArray(List(fm, HoleF[T]))))).embed
-              QC.inj(Map(
-                GtoF.reverseGet(QC.inj(Sort(innerMap,
-                  bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
-                  order.map {
-                    case (fm, dir) =>
-                      (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
-                  }))).embed,
-                Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
-            case _ => QC.inj(qs)
-          }
-        case x => QC.inj(x)
-      }
-  }
-
-  object FreeShiftedRead {
-    def unapply[T[_[_]]](fq: FreeQS[T])(
-      implicit QSR: Const[ShiftedRead[AFile], ?] :<: QScriptTotal[T, ?]
-    ) : Option[ShiftedRead[AFile]] = fq match {
-      case Embed(CoEnv(\/-(QSR(qsr: Const[ShiftedRead[AFile], _])))) => qsr.getConst.some
-      case _ => none
-    }
-  }
-
-  // TODO: Allow backends to provide a “Read” type to the typechecker, which
-  //       represents the type of values that can be stored in a collection.
-  //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
-  //       generate more correct PatternGuards in the first place, rather than
-  //       trying to strip out unnecessary ones after the fact
-  // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
-  def assumeReadType[M[_]: Monad: MonadFsErr, T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor]
-    (typ: Type)
-    (implicit
-      QC: QScriptCore[T, ?] :<: F,
-      SR: Const[ShiftedRead[AFile], ?] :<: F)
-      : QScriptCore[T, T[F]] => M[F[T[F]]] = {
-    case f @ Filter(src, cond) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          ((MapFuncCore.flattenAnd(cond))
-            .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
-            .map(_.toList.filter {
-              case MapFuncsCore.BoolLit(true) => false
-              case _                      => true
-            } match {
-              case Nil    => src.project
-              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e))))))
-            })
-        case _ => QC.inj(f).point[M]
-      }
-    case ls @ LeftShift(src, struct, id, repair) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (struct => QC.inj(LeftShift(src, struct, id, repair)))
-        case _ => QC.inj(ls).point[M]
-      }
-    case m @ qscript.Map(src, mf) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (mf => QC.inj(qscript.Map(src, mf)))
-        case _ => QC.inj(m).point[M]
-      }
-    case r @ Reduce(src, b, red, rep) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
-            red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
-            (b, red) => QC.inj(Reduce(src, b, red, rep)))
-        case _ => QC.inj(r).point[M]
-      }
-
-    case qc =>
-      QC.inj(qc).point[M]
-  }
-
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
     (label: String, ma: M[A])
@@ -1465,10 +1334,11 @@ object MongoDbPlanner {
       M[_]: Monad: MonadFsErr: PhaseResultTell]
       (anyDoc: Collection => OptionT[M, BsonDocument],
         qs: T[fs.MongoQScript[T, ?]])
-      (implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
+      (implicit BR: Branches[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
     type MQS[A] = fs.MongoQScript[T, A]
+    type QST[A] = QScriptTotal[T, A]
 
     val O = new Optimize[T]
     val R = new Rewrite[T]
@@ -1477,23 +1347,26 @@ object MongoDbPlanner {
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
     for {
-      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
-      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, fs.MongoQScript[T, ?], M](anyDoc))
-      mongoQS2 =  mongoQS1.transCata[T[fs.MongoQScript[T, ?]]](R.normalizeEJ[fs.MongoQScript[T, ?]])
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS2))
+      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
+      mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
+      mongoQS3 =  BR.branches.modify(
+        _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
+        )(mongoQS2.project).embed
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS3 =  applyTrans(mongoQS2)(mapBeforeSort[T])
-      mongoQS4 =  mongoQS3.transCata[T[fs.MongoQScript[T, ?]]](
-                    liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
-                      repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](
-                        reflNT[fs.MongoQScript[T, ?]]))))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS4))
+      mongoQS4 =  Trans(mapBeforeSort[T], mongoQS3)
+      mongoQS5 =  mongoQS4.transCata[T[MQS]](
+                    liftFF[QScriptCore[T, ?], MQS, T[MQS]](
+                      repeatedly(O.subsetBeforeMap[MQS, MQS](
+                        reflNT[MQS]))))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS5))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      mongoQS5 =  PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQS4)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS5))
-    } yield mongoQS5
+      mongoQS6 =  PreferProjection.preferProjection[MQS](mongoQS5)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS6))
+    } yield mongoQS6
   }
 
   def plan0

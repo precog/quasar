@@ -18,11 +18,11 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar._
-import quasar.connector.{DefaultAnalyzeModule, BackendModule}
+import quasar.connector._
 import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.common._
-import quasar.fp._, free._
+import quasar.fp._, free._, ski.κ
 import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
@@ -31,9 +31,10 @@ import quasar.qscript.analysis._
 
 import java.lang.Thread
 import scala.Predef.implicitly
+import java.net.URLDecoder
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
+import org.apache.spark._
 import pathy.Path._
 import matryoshka._
 import matryoshka.data._
@@ -53,7 +54,8 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   def toLowerLevel[S[_]](sc: SparkContext, config: Config)(implicit
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[M ~> Free[S, ?]]
-  def generateSC: Config => DefErrT[Task, SparkContext]
+  def generateSC: (APath, Config) => DefErrT[Task, SparkContext]
+  def getSparkConf: Config => SparkConf
   def ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
   def MonotonicSeqInj: Inject[MonotonicSeq, Eff]
@@ -138,9 +140,44 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
     toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
 
+  def sparkCoreJar: DefErrT[Task, APath] = {
+
+    val absStrToAPath: String => Option[APath] = (str: String) => posixCodec.parsePath[Option[APath]](
+      κ(None), unsafeSandboxAbs(_).some, κ(None), unsafeSandboxAbs(_).some)(str)
+
+    val pathFromEnvVariable: Task[Option[APath]] = Task.delay {
+      scala.sys.env.get("SPARKCORE_JAR_PATH").map(absStrToAPath).join
+    }
+
+    val pathFromProjectRoot: OptionT[Task, APath] = for {
+      pluginFolderPath <- OptionT(Task.delay {
+        val encodedPathStr = this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath
+        absStrToAPath(URLDecoder.decode(encodedPathStr, "UTF-8"))
+      })
+      rootPath <- OptionT(parentDir(pluginFolderPath).map(parentDir(_)).join.point[Task])
+    } yield rootPath </> file("sparkcore.jar")
+
+    val finalPath: OptionT[Task, APath] = OptionT(pathFromEnvVariable >>= (_.cata(
+      path => path.some.point[Task], pathFromProjectRoot.run
+    )))
+    
+    finalPath.toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
+  }
+
+  def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
+    // look, I didn't make Spark the way it is...
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+    new SparkContext(getSparkConf(config)).right[DefinitionError]
+  }.handleWith {
+    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
+      NonEmptyList("You can not mount second Spark based connector... " +
+        "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
+  })
+
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
-    sc <- generateSC(cfg)
-    tt <- toTask(sc, cfg).liftM[DefErrT]
+    jar <- sparkCoreJar
+    sc  <- generateSC(jar, cfg)
+    tt  <- toTask(sc, cfg).liftM[DefErrT]
   } yield (tt, Task.delay(sc.stop()))
 
   def rddFrom: AFile => Configured[RDD[Data]] =

@@ -60,10 +60,16 @@ script:
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
 
       spark_hdfs)
+
         ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
           'set every assemblyJarName in assembly := "sparkcore.jar"' \
           'set every sparkDependencyProvided := true' \
           sparkcore/assembly
+
+        cp ./.targets/sparkcore/scala-2.11/sparkcore.jar $TRAVIS_BUILD_DIR
+
+        export SPARKCORE_JAR_PATH="$TRAVIS_BUILD_DIR/sparkcore.jar"
+
         ;;
 
       *) ;;
@@ -125,7 +131,6 @@ jobs:
             'set every assemblyJarName in assembly := "sparkcore.jar"' \
             'set every sparkDependencyProvided := true' \
             sparkcore/assembly
-          ;;
 
         # release to github
         - scripts/publishJar

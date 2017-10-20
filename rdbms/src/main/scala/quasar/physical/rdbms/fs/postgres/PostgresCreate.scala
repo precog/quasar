@@ -38,7 +38,8 @@ trait PostgresCreate extends RdbmsCreate {
       case c: CustomSchema => createSchema(c)
     }
 
-    (createSchemaQuery *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment.const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run)
+    (createSchemaQuery *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment.const(tablePath.shows) ++ fr"(" ++
+      JsonFieldFragment ++ fr"json NOT NULL)").update.run)
       .void
   }
 }

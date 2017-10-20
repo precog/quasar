@@ -152,14 +152,14 @@ trait RdbmsManageFile
     }
 
     def deleteDir(aDir: ADir): Backend[Unit] = {
-      ME.unattempt(dirToCustomSchema(aDir).traverse { schema =>
+      (dirToCustomSchema(aDir).traverse { schema =>
         for {
           exists <- schemaExists(schema).liftB
           _ <- exists.unlessM(
             ME.raiseError(pathErr(pathNotFound(aDir))))
           _ <- dropSchemaWithChildren(schema).liftB
         } yield ()
-      })
+      }).unattempt
     }
 
     override def delete(path: APath): Backend[Unit] = {

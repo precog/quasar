@@ -18,6 +18,7 @@ package quasar.physical.rdbms.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
@@ -54,7 +55,7 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         offset: Int,
         limit: Option[Int]
     ): ConnectionIO[Vector[Data]] = {
-      val streamWithOffset = (fr"select * from" ++ Fragment.const(dbPath.shows))
+      val streamWithOffset = (fr"select data from" ++ Fragment.const(dbPath.shows))
         .query[Data]
         .process
         .drop(offset)
@@ -81,8 +82,8 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
         handle = ReadHandle(file, i)
-        limitInt <- limit.traverse(l => ME.unattempt(toInt(l.unwrap, "limit")))
-        offsetInt <- ME.unattempt(toInt(offset.unwrap, "offset"))
+        limitInt <- limit.traverse(l => toInt(l.unwrap, "limit").unattempt)
+        offsetInt <- toInt(offset.unwrap, "offset").unattempt
         sqlResult <- readAll(dbPath, offsetInt, limitInt).liftB
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
       } yield handle
@@ -106,7 +107,7 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
 
     override def read(h: ReadHandle): Backend[Vector[Data]] = {
       for {
-        c <- ME.unattempt(kvs.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB)
+        c <- kvs.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB.unattempt
         data = c.data
         _ <- kvs.put(h, SqlReadCursor(Vector.empty)).liftB
       } yield data

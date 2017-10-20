@@ -19,6 +19,7 @@ package quasar.physical.rdbms.fs
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.Data
+import quasar.fp._
 import quasar.fp.free.lift
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
@@ -27,29 +28,66 @@ import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.{Schema, TablePath}
 import quasar.physical.rdbms.common.TablePath.showTableName
 import pathy.Path
+import quasar.physical.rdbms.planner.sql.RenderQuery
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 
-import scalaz.{-\/, Monad, \/-}
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.std.boolean._
-import scalaz.std.vector._
-
+import doobie.syntax.string._
+import doobie.util.fragment.Fragment
+import doobie.util.composite.Composite
+import scalaz._
+import Scalaz._
 
 trait RdbmsQueryFile {
   this: Rdbms =>
 
   import QueryFile._
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   implicit def MonadM: Monad[M]
+
+  def renderQuery: RenderQuery
+  def createComposite: Repr => Composite[Data]
+  private val kvs = KeyValueStore.Ops[ResultHandle, SqlReadCursor, Eff]
 
   def QueryFileModule: QueryFileModule = new QueryFileModule {
 
-    override def explain(repr: Repr): Backend[String] = ???
+    override def explain(repr: Repr): Backend[String] = {
+      ME.unattempt(renderQuery.asString(repr).leftMap(qscriptPlanningFailed(_)).traverse { q =>
+        (fr"explain" ++ Fragment.const(q))
+        .query[String]
+        .unique
+        .liftB
+      })
+    }
 
     override def executePlan(repr: Repr, out: AFile): Backend[Unit] = ???
 
-    override def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
+    override def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
+      ME.unattempt(renderQuery.asString(repr).leftMap(qscriptPlanningFailed(_)).traverse { q =>
 
-    override def more(h: ResultHandle): Backend[Vector[Data]] = ???
+        val loadedData = Fragment
+          .const(q)
+          .query[Data](createComposite(repr))
+          .vector
+          .liftB
+
+        for {
+          i <- MonotonicSeq.Ops[Eff].next.liftB
+          handle = ResultHandle(i)
+          data <- loadedData
+          _ <- kvs.put(handle, SqlReadCursor(data)).liftB
+        } yield handle
+      })
+    }
+
+    override def more(h: ResultHandle): Backend[Vector[Data]] = {
+      for {
+        c <- ME.unattempt(kvs.get(h).toRight(unknownResultHandle(h)).run.liftB)
+        data = c.data
+        _ <- kvs.put(h, SqlReadCursor(Vector.empty)).liftB
+      } yield data
+    }
 
     override def fileExists(file: AFile): Configured[Boolean] =
       lift(tableExists(TablePath.create(file))).into[Eff].liftM[ConfiguredT]
@@ -67,6 +105,6 @@ trait RdbmsQueryFile {
           .liftB
     }
 
-    override def close(h: ResultHandle): Configured[Unit] = ???
+    override def close(h: ResultHandle): Configured[Unit] =  kvs.delete(h).liftM[ConfiguredT]
   }
 }

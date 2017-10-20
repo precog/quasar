@@ -18,6 +18,7 @@ package quasar.physical.rdbms.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
@@ -42,18 +43,19 @@ trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreat
 
   override def WriteFileModule: WriteFileModule = new WriteFileModule {
 
-    private def getDbPath(h: WriteHandle) = ME.unattempt(
+    private def getDbPath(h: WriteHandle) =
       writeKvs
         .get(h)
         .toRight(FileSystemError.unknownWriteHandle(h))
         .run
-        .liftB)
+        .liftB
+      .unattempt
 
     override def write(
         h: WriteHandle,
         chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       (for {
-        _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
+        _ <- writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB.unattempt
         dbPath <- getDbPath(h)
         _ <- batchInsert(dbPath, chunk).liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))

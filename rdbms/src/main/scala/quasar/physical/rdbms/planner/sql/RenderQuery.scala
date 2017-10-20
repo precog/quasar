@@ -14,22 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs
+  
+package quasar.physical.rdbms.planner.sql
 
-import quasar.physical.rdbms.common._
+import slamdata.Predef._
+import quasar.Planner.PlannerError
 
-import doobie.util.fragment.Fragment
-import scalaz.Show
+import matryoshka._
+import scalaz.\/
 
-package object postgres {
-
-  val DefaultSchemaName = "public"
-
-  val JsonFieldName = "data"
-  val JsonFieldFragment: Fragment = Fragment.const(JsonFieldName)
-
-  implicit val showSchema: Show[Schema] = Show.shows {
-    case DefaultSchema => DefaultSchemaName
-    case c: CustomSchema => Schema.showCustomSchema.shows(c)
-  }
+trait RenderQuery {
+  def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String
 }

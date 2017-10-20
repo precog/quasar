@@ -437,7 +437,8 @@ lazy val skeleton = project
 
 lazy val rdbms = project
   .settings(name := "quasar-rdbms-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(connector % BothScopes,
+             core      % "test->compile")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(githubReleaseSettings)

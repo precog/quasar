@@ -1,13 +1,7 @@
 {
     "name": "filter on date part, where the field isn't a timestamp",
 
-    "backends": {
-        "mongodb_2_6": "pending",
-        "mongodb_3_0": "pending",
-        "mongodb_3_2": "pending",
-        "mongodb_3_4": "pending",
-        "mongodb_read_only": "pending"
-    },
+    "backends": {},
 
     "data": "../days.data",
 

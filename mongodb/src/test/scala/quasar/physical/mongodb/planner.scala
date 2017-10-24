@@ -598,62 +598,34 @@ class PlannerSpec extends
 
     "plan filter by date field (SD-1508)" in {
       plan(sqlE"""select * from foo where date_part("year", ts) = 2016""") must
-       beWorkflow0(chain[Workflow](
+       beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
+         $match(Selector.Doc(BsonField.Name("ts") -> Selector.Type(BsonType.Date))),
          $project(
            reshape(
-             "__tmp2" ->
-               $cond(
-                 $and(
-                   $lte($literal(Check.minDate), $field("ts")),
-                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
-                 $eq($year($field("ts")), $literal(Bson.Int32(2016))),
-                 $literal(Bson.Undefined)),
-             "__tmp3" -> $$ROOT),
-           IgnoreId),
+             "0"   -> $year($field("ts")),
+             "src" -> $$ROOT),
+           ExcludeId),
          $match(Selector.Doc(
-           BsonField.Name("__tmp2") -> Selector.Eq(Bson.Bool(true)))),
+           BsonField.Name("0") -> Selector.Eq(Bson.Int32(2016)))),
          $project(
            reshape(
-             sigil.Quasar -> $field("__tmp3")),
+             sigil.Quasar -> $field("src")),
            ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan filter by date field (SD-1508)"))
+    }
 
     "plan filter array element" in {
       plan(sqlE"select loc from zips where loc[0] < -73") must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
-        $match(Selector.Where(
-          If(
-            BinOp(And,
-              Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
-              BinOp(Or,
-                BinOp(Or,
-                  BinOp(jscore.Or,
-                    Call(ident("isNumber"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))))),
-                    BinOp(jscore.Or,
-                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberInt")),
-                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong")))),
-                  Call(ident("isString"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))))),
-                BinOp(Or,
-                  BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
-                  BinOp(Eq, UnOp(TypeOf, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))), jscore.Literal(Js.Str("boolean")))))),
-            BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
-            ident("undefined")).toJs)),
+        $match(Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right))),
         $project(
-          reshape(sigil.Quasar -> $field("loc")),
+          reshape("0" -> $arrayElemAt($field("loc"), $literal(Bson.Int32(0))), "src" -> $$ROOT),
+          ExcludeId),
+        $match(Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(-73)))),
+        $project(
+          reshape(sigil.Quasar -> $field("src", "loc")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan filter array element"))
-
-    "plan select array element (3.0-)" in {
-      plan3_0(sqlE"select loc[0] from zips") must
-      beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-          underSigil(jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
-            Access(Select(ident("x"), "loc"), jscore.Literal(Js.Num(0, false))),
-            ident("undefined")))))),
-          ListMap())))
     }
 
     "plan select array element (3.2+)" in {
@@ -804,66 +776,47 @@ class PlannerSpec extends
     }
 
     "plan simple js filter 3.2" in {
-      val mjs = javascript[JsCore](_.embed)
-      import mjs._
-
       plan3_2(sqlE"select * from zips where length(city) < 4") must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
-        // FIXME: Inline this $simpleMap with the $match (SD-456)
+        $match(Selector.Doc(BsonField.Name("city") -> Selector.Type(BsonType.Text))),
+
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "0" -> If(
-            isString(Select(ident("x"), "city")),
-            BinOp(Lt,
-              Call(ident("NumberLong"),
-                List(Select(Select(ident("x"), "city"), "length"))),
-                Literal(Js.Num(4, false))),
-            ident(Js.Undefined.ident)),
-          "src" -> ident("x"))))),
+            "0" -> Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
+            "src" -> ident("x")) ))),
           ListMap()),
-        $match(Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+        $match(Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(4)))),
         $project(
           reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
-    }.pendingWithActual("#2541", testFile("plan simple js filter 3.2"))
+    }
 
     "plan filter with js and non-js 3.2" in {
-      val mjs = javascript[JsCore](_.embed)
-      import mjs._
-
       plan3_2(sqlE"select * from zips where length(city) < 4 and pop < 20000") must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
-        // FIXME: Inline this $simpleMap with the $match (SD-456)
+        $match(Selector.And(
+          Selector.Or(
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
+            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))),
+          Selector.Doc(BsonField.Name("city") -> Selector.Type(BsonType.Text)))),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "0" ->
-            If(
-              BinOp(And,
-                binop(Or,
-                  BinOp(Or,
-                    isAnyNumber(Select(ident("x"), "pop")),
-                    isString(Select(ident("x"), "pop"))),
-                  isDate(Select(ident("x"), "pop")),
-                  isBoolean(Select(ident("x"), "pop"))),
-                Call(ident("isString"), List(Select(ident("x"), "city")))),
-              BinOp(And,
-                BinOp(Lt,
-                  Call(ident("NumberLong"),
-                    List(Select(Select(ident("x"), "city"), "length"))),
-                  Literal(Js.Num(4, false))),
-                BinOp(Lt,
-                  Select(ident("x"), "pop"),
-                  Literal(Js.Num(20000, false)))),
-            ident(Js.Undefined.ident)),
-          "src" -> ident("x"))))),
+            "0" -> Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
+            "1" -> Select(ident("x"), "pop"),
+            "src" -> ident("x"))))),
           ListMap()),
         $match(
-          Selector.Doc(
-            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+          Selector.And(
+            Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(4))),
+            Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(20000))))),
         $project(
           reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
-    }.pendingWithActual("#2541", testFile("plan filter with js and non-js 3.2"))
+    }
 
     "plan filter with between" in {
       plan(sqlE"select * from foo where bar between 10 and 100") must
@@ -896,15 +849,15 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(
-           Selector.Or(
-             Selector.And(
+           Selector.And(
+             Selector.Or(
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false))),
-             Selector.And(
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text))),
+             Selector.Or(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
+                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false)),
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
     }
@@ -921,11 +874,11 @@ class PlannerSpec extends
       plan(sqlE"select * from zips where 43.058514 in loc[_]") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
-          $match(Selector.Where(
-            If(Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
-              BinOp(Neq, jscore.Literal(Js.Num(-1, false)), Call(Select(Select(ident("this"), "loc"), "indexOf"), List(jscore.Literal(Js.Num(43.058514, true))))),
-            ident("undefined")).toJs))))
-    }.pendingWithActual(notOnPar, testFile("plan filter with field containing constant value"))
+          $match(Selector.And(
+            Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right)),
+            Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.In(Bson.Arr(List(Bson.Dec(43.058514)))).right))
+          ))))
+    }
 
     "filter field in single-element set" in {
       plan(sqlE"""select * from zips where state in ("NV")""") must
@@ -948,15 +901,15 @@ class PlannerSpec extends
       plan(sqlE"select * from zips where pop in loc[_]") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
-          $match(Selector.Where(
-            If(
-              Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
-              BinOp(Neq,
-                jscore.Literal(Js.Num(-1.0,false)),
-                Call(Select(Select(ident("this"), "loc"), "indexOf"),
-                  List(Select(ident("this"), "pop")))),
-              ident("undefined")).toJs))))
-    }.pendingWithActual(notOnPar, testFile("plan filter with field containing other field"))
+          $match(Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right))),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+            "0" ->  BinOp(jscore.Neq, Literal(Js.Num(-1, false)), Call(Select(Select(ident("x"), "loc"), "indexOf"), List(Select(ident("x"), "pop")))),
+            "src" -> ident("x"))))), ListMap()),
+          $match(Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+          $project(
+            reshape(sigil.Quasar -> $field("src")),
+            ExcludeId)))
+    }
 
     "plan filter with ~" in {
       plan(sqlE"""select * from zips where city ~ "^B[AEIOU]+LD.*" """) must beWorkflow(chain[Workflow](
@@ -1001,27 +954,24 @@ class PlannerSpec extends
     "plan filter with alternative ~" in {
       plan(sqlE"""select * from a where "foo" ~ pattern or target ~ pattern""") must beWorkflow0(chain[Workflow](
         $read(collection("db", "a")),
+        $match(
+          Selector.Or(
+            Selector.Doc(BsonField.Name("pattern") -> Selector.Type(BsonType.Text)),
+            Selector.And(
+              Selector.Doc(BsonField.Name("pattern") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("target") -> Selector.Type(BsonType.Text))))),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "0" -> Select(ident("x"), "pattern"),
-          "1" -> Call(
+          "0" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(jscore.Literal(Js.Str("foo")))),
-          "2" -> Select(ident("x"), "pattern"),
-          "3" -> Select(ident("x"), "target"),
-          "4" -> Call(
+          "1" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(Select(ident("x"), "target"))),
           "src" -> ident("x"))))),
           ListMap()),
-        $match(
-          Selector.Or(
-            Selector.And(
-              Selector.Doc(BsonField.Name("0") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("1") -> Selector.Eq(Bson.Bool(true)))),
-            Selector.And(
-              Selector.Doc(BsonField.Name("2") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("3") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("4") -> Selector.Eq(Bson.Bool(true)))))),
+        $match(Selector.Or(
+          Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))),
+          Selector.Doc(BsonField.Name("1") -> Selector.Eq(Bson.Bool(true))))),
         $project(
           reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
@@ -1189,30 +1139,27 @@ class PlannerSpec extends
       plan(sqlE"select * from zips where city <> state and pop < 10000") must
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
+        $match(Selector.Or(
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))
+        )),
         $project(
           reshape(
-            "__tmp4" ->
-              $cond(
-                $or(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Doc()))),
-                  $and(
-                    $lte($literal(Bson.Bool(false)), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                $and(
-                  $neq($field("city"), $field("state")),
-                  $lt($field("pop"), $literal(Bson.Int32(10000)))),
-                $literal(Bson.Undefined)),
-            "__tmp5" -> $$ROOT),
-          IgnoreId),
-        $match(
-          Selector.Doc(
-            BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
+            "0"   -> $neq($field("city"), $field("state")),
+            "1"   -> $field("pop"),
+            "src" -> $$ROOT),
+          ExcludeId),
+        $match(Selector.And(
+          Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))),
+          Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(10000))))),
         $project(
-          reshape(sigil.Quasar -> $field("__tmp5")),
+          reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
-    }.pendingWithActual("#2541", testFile("prefer projection+filter over nested JS filter"))
+    }
 
     "filter on constant true" in {
       plan(sqlE"select * from zips where true") must
@@ -2754,41 +2701,32 @@ class PlannerSpec extends
       plan(sqlE"""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "days")),
+          $match(Selector.And(
+            Selector.Or(
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date))),
+            Selector.Or(
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)),
+              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Bool))))),
           $project(
             reshape(
-              "__tmp6" ->
-                $cond(
-                  $or(
-                    $and(
-                      $lt($literal(Bson.Null), $field("date")),
-                      $lt($field("date"), $literal(Bson.Text("")))),
-                    $and(
-                      $lte($literal(Check.minDate), $field("date")),
-                      $lt($field("date"), $literal(Bson.Regex("", ""))))),
-                  $cond(
-                    $or(
-                      $and(
-                        $lt($literal(Bson.Null), $field("date")),
-                        $lt($field("date"), $literal(Bson.Doc()))),
-                      $and(
-                        $lte($literal(Bson.Bool(false)), $field("date")),
-                        $lt($field("date"), $literal(Bson.Regex("", ""))))),
-                    $and(
-                      $lt($field("date"), $literal(date22)),
-                      $gt(
-                        $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
-                        $literal(date0))),
-                    $literal(Bson.Undefined)),
-                  $literal(Bson.Undefined)),
-              "__tmp7" -> $$ROOT),
-            IgnoreId),
-          $match(
-            Selector.Doc(
-              BsonField.Name("__tmp6") -> Selector.Eq(Bson.Bool(true)))),
+              "0" -> $field("date"),
+              "1" -> $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
+              "src" -> $$ROOT),
+            ExcludeId),
+          $match(Selector.And(
+            Selector.Doc(BsonField.Name("0") -> Selector.Lt(date22)),
+            Selector.Doc(BsonField.Name("1") -> Selector.Gt(date0)))),
           $project(
-            reshape(sigil.Quasar -> $field("__tmp7")),
+            reshape(sigil.Quasar -> $field("src")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan filter with timestamp and interval"))
+    }
 
     "plan time_of_day (JS)" in {
       plan(sqlE"select time_of_day(ts) from days") must

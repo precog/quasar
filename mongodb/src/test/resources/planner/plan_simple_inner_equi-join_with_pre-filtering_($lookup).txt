@@ -3,16 +3,12 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; foo)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │  ├─ Name("1" -> { "$literal": true })
+│  │  │  ├─ Name("0" -> { "$literal": true })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
-│  │  │  ╰─ And
-│  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -39,30 +35,12 @@ Chain
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].rating : undefined)
-│     │  │     ├─ Key(1: _["0"][1])
-│     │  │     ├─ Key(2: _["0"][1].rating)
+│     │  │     ├─ Key(0: _["0"][1].rating)
 │     │  │     ╰─ Key(src: _["0"])
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
-│     │  ╰─ And
-│     │     ├─ Or
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Text))
-│     │     │  ├─ Doc
-│     │     │  │  ╰─ Expr($0 -> Type(Date))
-│     │     │  ╰─ Doc
-│     │     │     ╰─ Expr($0 -> Type(Bool))
-│     │     ├─ Doc
-│     │     │  ╰─ Expr($1 -> Type(Doc))
-│     │     ╰─ Doc
-│     │        ╰─ Expr($2 -> Gte(Int32(4)))
+│     │  ╰─ Doc
+│     │     ╰─ Expr($0 -> Gte(Int32(4)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [

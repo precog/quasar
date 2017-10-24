@@ -5,16 +5,12 @@ Chain
 │  │  │  ├─ Chain
 │  │  │  │  ├─ $ReadF(db; zips)
 │  │  │  │  ├─ $ProjectF
-│  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │  │  │  ├─ Name("1" -> { "$literal": true })
+│  │  │  │  │  ├─ Name("0" -> { "$literal": true })
 │  │  │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  │  │  ╰─ ExcludeId
 │  │  │  │  ├─ $MatchF
-│  │  │  │  │  ╰─ And
-│  │  │  │  │     ├─ Doc
-│  │  │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │  │  │     ╰─ Doc
-│  │  │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │  │  │  ╰─ Doc
+│  │  │  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  │  │  ├─ $SimpleMapF
 │  │  │  │  │  ├─ Map
 │  │  │  │  │  │  ╰─ Obj
@@ -36,16 +32,12 @@ Chain
 │  │  │  ╰─ Chain
 │  │  │     ├─ $ReadF(db; largeZips)
 │  │  │     ├─ $ProjectF
-│  │  │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │     │  ├─ Name("1" -> { "$literal": true })
+│  │  │     │  ├─ Name("0" -> { "$literal": true })
 │  │  │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │     │  ╰─ ExcludeId
 │  │  │     ├─ $MatchF
-│  │  │     │  ╰─ And
-│  │  │     │     ├─ Doc
-│  │  │     │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │     │     ╰─ Doc
-│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │     │  ╰─ Doc
+│  │  │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  │     ├─ $MapF
 │  │  │     │  ├─ JavaScript(function (key, value) {
 │  │  │     │  │               return [
@@ -155,16 +147,12 @@ Chain
 │     │  ├─ Chain
 │     │  │  ├─ $ReadF(db; zips)
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │  │  │  ├─ Name("1" -> { "$literal": true })
+│     │  │  │  ├─ Name("0" -> { "$literal": true })
 │     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $MatchF
-│     │  │  │  ╰─ And
-│     │  │  │     ├─ Doc
-│     │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│     │  │  │     ╰─ Doc
-│     │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  │  │  ╰─ Doc
+│     │  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     │  │  ├─ $SimpleMapF
 │     │  │  │  ├─ Map
 │     │  │  │  │  ╰─ Obj
@@ -186,16 +174,12 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; largeZips)
 │     │     ├─ $ProjectF
-│     │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │     │  ├─ Name("1" -> { "$literal": true })
+│     │     │  ├─ Name("0" -> { "$literal": true })
 │     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │     │  ╰─ ExcludeId
 │     │     ├─ $MatchF
-│     │     │  ╰─ And
-│     │     │     ├─ Doc
-│     │     │     │  ╰─ Expr($0 -> Type(Doc))
-│     │     │     ╰─ Doc
-│     │     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │     │  ╰─ Doc
+│     │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     │     ├─ $MapF
 │     │     │  ├─ JavaScript(function (key, value) {
 │     │     │  │               return [

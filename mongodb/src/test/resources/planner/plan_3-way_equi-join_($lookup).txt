@@ -3,16 +3,12 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; baz)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  │  │  ├─ Name("1" -> { "$literal": true })
+│  │  │  ├─ Name("0" -> { "$literal": true })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
-│  │  │  ╰─ And
-│  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -36,16 +32,12 @@ Chain
 │     │  ├─ Chain
 │     │  │  ├─ $ReadF(db; foo)
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │  │  │  ├─ Name("1" -> { "$literal": true })
+│     │  │  │  ├─ Name("0" -> { "$literal": true })
 │     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $MatchF
-│     │  │  │  ╰─ And
-│     │  │  │     ├─ Doc
-│     │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-│     │  │  │     ╰─ Doc
-│     │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  │  │  ╰─ Doc
+│     │  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     │  │  ├─ $SimpleMapF
 │     │  │  │  ├─ Map
 │     │  │  │  │  ╰─ Obj
@@ -67,16 +59,12 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; bar)
 │     │     ├─ $ProjectF
-│     │     │  ├─ Name("0" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │     │  ├─ Name("1" -> { "$literal": true })
+│     │     │  ├─ Name("0" -> { "$literal": true })
 │     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │     │  ╰─ ExcludeId
 │     │     ├─ $MatchF
-│     │     │  ╰─ And
-│     │     │     ├─ Doc
-│     │     │     │  ╰─ Expr($0 -> Type(Doc))
-│     │     │     ╰─ Doc
-│     │     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │     │  ╰─ Doc
+│     │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     │     ├─ $MapF
 │     │     │  ├─ JavaScript(function (key, value) {
 │     │     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
@@ -104,20 +92,12 @@ Chain
 │     │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
 │     │  ╰─ Scope(Map())
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> {
-│     │  │       "$arrayElemAt": [
-│     │  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│     │  │         { "$literal": NumberInt("1") }]
-│     │  │     })
-│     │  ├─ Name("1" -> { "$literal": true })
+│     │  ├─ Name("0" -> { "$literal": true })
 │     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
-│     │  ╰─ And
-│     │     ├─ Doc
-│     │     │  ╰─ Expr($0 -> Type(Doc))
-│     │     ╰─ Doc
-│     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  ╰─ Doc
+│     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [{ "0": value.src[1][1].id }, { "right": [], "left": [value.src] }]

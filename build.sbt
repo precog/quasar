@@ -560,7 +560,8 @@ lazy val it = project
       val _ = sideEffectTestFSConfig.value
 
       test in Test
-    }.value)
+    }.value,
+    (testOnly in Test) <<= (testOnly in Test) dependsOn sideEffectTestFSConfig)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicIt = project

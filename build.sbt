@@ -539,16 +539,15 @@ lazy val it = project
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
-      val parentCp = (fullClasspath in connector in Compile).value.files
-      val backends = isolatedBackends.value map {
-        case (name, childCp) =>
-          val classpathStr =
-            createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
-
-          name + "=" + classpathStr
-      }
-
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
+        val parentCp = (fullClasspath in connector in Compile).value.files
+        val backends = isolatedBackends.value map {
+          case (name, childCp) =>
+            val classpathStr =
+              createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
+
+            name + "=" + classpathStr
+        }
         // we aren't forking tests, so we just set the property in the current JVM
         java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
       }

@@ -19,15 +19,11 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.fp.{coproductShow, symbolShow}
 import quasar.frontend.logicalplan.LogicalPlan
 
-import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import matryoshka.data._
+import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{Applicative, Functor, Kleisli => K, Monad}
-import scalaz.std.map._
 import scalaz.syntax.applicative._
-import scalaz.syntax.show._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
@@ -60,16 +56,22 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
     lpToQs(lp)
   }
 
+  // import quasar.fp.{coproductShow, symbolShow}
+  // import matryoshka.data._
+  // import matryoshka.{delayShow, showTShow}
+  // import scalaz.std.map._
+  // import scalaz.syntax.show._
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def debugG[F[_]: Applicative](prefix: String): K[F, QSUGraph, QSUGraph] =
     K { g =>
-      println("\n\n" + prefix + g.shows)    // uh... yeah do better
+      // println("\n\n" + prefix + g.shows)    // uh... yeah do better
       g.point[F]
     }
 
   private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
     K { aqsu =>
-      println("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
+      // println("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
       aqsu.point[F]
     }
 }

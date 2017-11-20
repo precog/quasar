@@ -41,13 +41,15 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
   implicit val params = Parameters(maxSize = 10)
 
+  import qstdsl._
+
   val toFree = convertToFree[EJson, Figure](_: Fix[EJson])
   val rollS = Free.roll[EJson, Figure] _
 
   val joinFunc =
-    ConcatMapsR(
-      MakeMapR(ConstantR(Fix(CommonEJson(ejson.Str("left")))), LeftSideF),
-      MakeMapR(ConstantR(Fix(CommonEJson(ejson.Str("right")))), RightSideF))
+    func.ConcatMaps(
+      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("left")))), LeftSideF),
+      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("right")))), RightSideF))
 
   val modSides: (Shape, Shape) => Shape =
     (l, r) => rollS(ExtEJson(ejson.Map(List(
@@ -56,22 +58,22 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
   "Outline FreeMap" >> {
     val outlineFM = Outline.outlineF(_: FreeMap)(κ(unknownF))
-    val av = ConcatArraysR(HoleF, HoleF)
-    val mv = ConcatMapsR(HoleF, HoleF)
-    val uv = ProjectIndexR(HoleF, ConstantR(ejsonInt(42)))
+    val av = func.ConcatArrays(func.Hole, func.Hole)
+    val mv = func.ConcatMaps(func.Hole, func.Hole)
+    val uv = func.ProjectIndexI(func.Hole, 42)
 
     "unknown when no static structure" >> {
       outlineFM(uv) must_= unknownF
     }
 
     "constants are lifted into Free" >> prop { ejs: Fix[EJson] =>
-      outlineFM(ConstantR(ejs)).transCataM[Option, Fix[EJson], EJson](_.run.toOption) must_= Some(ejs)
+      outlineFM(func.Constant(ejs)).transCataM[Option, Fix[EJson], EJson](_.run.toOption) must_= Some(ejs)
     }
 
     "map construction with constant keys result in maps" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
-      val fm = ConcatMapsR(MakeMapR(ConstantR(k1), av), MakeMapR(ConstantR(k2), mv))
+      val fm = func.ConcatMaps(func.MakeMap(func.Constant(k1), av), func.MakeMap(func.Constant(k2), mv))
 
       val ss =
         rollS(ExtEJson(ejson.Map(List(
@@ -82,14 +84,14 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     }}
 
     "map construction with at least one non-constant key is not static" >> prop { k1: Fix[EJson] =>
-      val k2 = ProjectKeyR(HoleF, ConstantR(ejsonStr("keyName")))
-      val fm = ConcatMapsR(MakeMapR(ConstantR(k1), uv), MakeMapR(k2, uv))
+      val k2 = func.ProjectKeyS(func.Hole, "keyName")
+      val fm = func.ConcatMaps(func.MakeMap(func.Constant(k1), uv), func.MakeMap(k2, uv))
 
       outlineFM(fm) must_= mapF
     }
 
     "concatenation of maps is right-biased" >> prop { k: Fix[EJson] =>
-      val fm = ConcatMapsR(MakeMapR(ConstantR(k), mv), MakeMapR(ConstantR(k), av))
+      val fm = func.ConcatMaps(func.MakeMap(func.Constant(k), mv), func.MakeMap(func.Constant(k), av))
       val ss = rollS(ExtEJson(ejson.Map(List(toFree(k) -> arrF))))
 
       outlineFM(fm) must_= ss
@@ -99,7 +101,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k1 =/= k3 && k2 =/= k3) ==> {
 
       val l =
-        StaticMap[Fix, Hole](List(k1 -> HoleF, k2 -> HoleF, k3 -> HoleF))
+        StaticMap[Fix, Hole](List(k1 -> func.Hole, k2 -> func.Hole, k3 -> func.Hole))
 
       val r =
         StaticMap[Fix, Hole](List(k2 -> av))
@@ -109,16 +111,16 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
         toFree(k2) -> arrF,
         toFree(k3) -> unknownF))))
 
-      outlineFM(ConcatMapsR(l, r)) must_= ss
+      outlineFM(func.ConcatMaps(l, r)) must_= ss
     }}
 
     "key projection on static map results in key value" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val fm =
-        ProjectKeyR(
-          ConcatMapsR(MakeMapR(ConstantR(k1), mv), MakeMapR(ConstantR(k2), av)),
-          ConstantR(k1))
+        func.ProjectKey(
+          func.ConcatMaps(func.MakeMap(func.Constant(k1), mv), func.MakeMap(func.Constant(k2), av)),
+          func.Constant(k1))
 
       outlineFM(fm) must_= mapF
     }}
@@ -126,7 +128,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     "key projection on static map without key results in undefined" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
-      val fm = ProjectKeyR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
+      val fm = func.ProjectKey(func.MakeMap(func.Constant(k1), av), func.Constant(k2))
 
       outlineFM(fm) must_= undefinedF
     }}
@@ -135,9 +137,9 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val fm =
-        DeleteKeyR(
-          ConcatMapsR(MakeMapR(ConstantR(k2), av), MakeMapR(ConstantR(k1), mv)),
-          ConstantR(k1))
+        func.DeleteKey(
+          func.ConcatMaps(func.MakeMap(func.Constant(k2), av), func.MakeMap(func.Constant(k1), mv)),
+          func.Constant(k1))
 
       val ss =
         rollS(ExtEJson(ejson.Map(List(toFree(k2) -> arrF))))
@@ -148,7 +150,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     "key deletion of nonexistent on static map is identity" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
-      val fm = DeleteKeyR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
+      val fm = func.DeleteKey(func.MakeMap(func.Constant(k1), av), func.Constant(k2))
 
       val ss = rollS(ExtEJson(ejson.Map(List(toFree(k1) -> arrF))))
 
@@ -157,13 +159,13 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
     "array construction results in arrays" >> {
       val fm =
-        ConcatArraysR(
-          MakeArrayR(uv),
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(mv),
-              MakeArrayR(av)),
-            MakeArrayR(uv)))
+        func.ConcatArrays(
+          func.MakeArray(uv),
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(mv),
+              func.MakeArray(av)),
+            func.MakeArray(uv)))
 
       val ss =
         rollS(CommonEJson(ejson.Arr(List(unknownF, mapF, arrF, unknownF))))
@@ -173,30 +175,29 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
     "index projection on static array results in index value" >> {
       val fm =
-        ProjectIndexR(
-          ConcatArraysR(ConcatArraysR(MakeArrayR(av), MakeArrayR(mv)), MakeArrayR(uv)),
-          ConstantR(ejsonInt(1)))
+        func.ProjectIndexI(
+          func.ConcatArrays(func.ConcatArrays(func.MakeArray(av), func.MakeArray(mv)), func.MakeArray(uv)), 1)
 
       outlineFM(fm) must_= mapF
     }
 
     "index projection on static array with invalid index results in undefined" >> {
-      outlineFM(ProjectIndexR(MakeArrayR(mv), ConstantR(ejsonInt(-5)))) must_= undefinedF
+      outlineFM(func.ProjectIndexI(func.MakeArray(mv), -5)) must_= undefinedF
     }
 
     "index projection on static array with nonexistent index results in undefined" >> {
-      outlineFM(ProjectIndexR(MakeArrayR(mv), ConstantR(ejsonInt(7)))) must_= undefinedF
+      outlineFM(func.ProjectIndexI(func.MakeArray(mv), 7)) must_= undefinedF
     }
 
     "complex shape" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val fm =
-        ConcatArraysR(
-          MakeArrayR(uv),
-          MakeArrayR(ConcatMapsR(
-            MakeMapR(ConstantR(k1), MakeArrayR(mv)),
-            MakeMapR(ConstantR(k2), MakeMapR(ConstantR(k1), av)))))
+        func.ConcatArrays(
+          func.MakeArray(uv),
+          func.MakeArray(func.ConcatMaps(
+            func.MakeMap(func.Constant(k1), func.MakeArray(mv)),
+            func.MakeMap(func.Constant(k2), func.MakeMap(func.Constant(k1), av)))))
 
       val ss =
         rollS(CommonEJson(ejson.Arr(List(
@@ -213,25 +214,25 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     val outlineQC: QScriptCore[Shape] => Shape =
       Outline[QScriptCore].outlineƒ
 
-    val func =
-      ConcatArraysR(
-        MakeArrayR(HoleF),
-        MakeArrayR(ConstantR(Fix(ExtEJson(ejson.Int(75))))))
+    val fun =
+      func.ConcatArrays(
+        func.MakeArray(func.Hole),
+        func.MakeArray(func.Constant(Fix(ExtEJson(ejson.Int(75))))))
 
     val modSrc: Shape => Shape =
       s => rollS(CommonEJson(ejson.Arr(List(s, rollS(ExtEJson(ejson.Int(75)))))))
 
     "Map is shape of function applied to source" >> prop { srcShape: Shape =>
-      outlineQC(Map(srcShape, func)) must_= modSrc(srcShape)
+      outlineQC(Map(srcShape, fun)) must_= modSrc(srcShape)
     }
 
     "LeftShift(IncludeId) results in shape of repair applied to static array" >> prop { srcShape: Shape =>
       val r = rollS(CommonEJson(ejson.Arr(List(unknownF, unknownF))))
-      outlineQC(LeftShift(srcShape, HoleF, IncludeId, joinFunc)) must_= modSides(srcShape, r)
+      outlineQC(LeftShift(srcShape, func.Hole, IncludeId, joinFunc)) must_= modSides(srcShape, r)
     }
 
     "RightSide of repair is unknown when not IncludeId" >> prop { srcShape: Shape =>
-      outlineQC(LeftShift(srcShape, HoleF, ExcludeId, joinFunc)) must_= modSides(srcShape, unknownF)
+      outlineQC(LeftShift(srcShape, func.Hole, ExcludeId, joinFunc)) must_= modSides(srcShape, unknownF)
     }
 
     "Reduce tracks static input shape through buckets" >> prop { srcShape: Shape =>
@@ -242,7 +243,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
       val outShape = modSides(modSrc(srcShape), unknownF)
 
-      outlineQC(Reduce(srcShape, List(func), List(ReduceFuncs.Count(HoleF)), rfunc)) must_= outShape
+      outlineQC(Reduce(srcShape, List(fun), List(ReduceFuncs.Count(func.Hole)), rfunc)) must_= outShape
     }
 
     "Reduce tracks static input shape through parametric reducers" >> prop { srcShape: Shape =>
@@ -252,8 +253,8 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       }
 
       val reducers = List[ReduceFunc[FreeMap]](
-        ReduceFuncs.Count(HoleF),
-        ReduceFuncs.Last(func))
+        ReduceFuncs.Count(func.Hole),
+        ReduceFuncs.Last(fun))
 
       val outShape = modSides(unknownF, modSrc(srcShape))
 
@@ -267,8 +268,8 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       }
 
       val reducers = List[ReduceFunc[FreeMap]](
-        ReduceFuncs.UnshiftArray(HoleF),
-        ReduceFuncs.UnshiftMap(HoleF, HoleF))
+        ReduceFuncs.UnshiftArray(func.Hole),
+        ReduceFuncs.UnshiftMap(func.Hole, func.Hole))
 
       val outShape = modSides(arrF, mapF)
 
@@ -277,23 +278,23 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
     "Subset is the shape of `from` applied to the source shape" >> prop { srcShape: Shape =>
       val from: FreeQS =
-        Free.roll(QCT(Sort(
-          Free.roll(QCT(Map(HoleQS, func))),
+        free.Sort(
+          free.Map(free.Hole, fun),
           Nil,
-          NonEmptyList((HoleF, SortDir.Ascending)))))
+          NonEmptyList((func.Hole, SortDir.Ascending)))
 
       val count: FreeQS =
-        Free.roll(QCT(Map(HoleQS, ConstantR(Fix(ExtEJson(ejson.Int(2)))))))
+        free.Map(free.Hole, func.Constant(json.int(2)))
 
       outlineQC(Subset(srcShape, from, Take, count)) must_= modSrc(srcShape)
     }
 
     "Sort does not affect shape" >> prop { srcShape: Shape =>
-      outlineQC(Sort(srcShape, Nil, NonEmptyList((func, SortDir.Descending)))) must_= srcShape
+      outlineQC(Sort(srcShape, Nil, NonEmptyList((fun, SortDir.Descending)))) must_= srcShape
     }
 
     "Filter does not affect shape" >> prop { srcShape: Shape =>
-      outlineQC(Filter(srcShape, func)) must_= srcShape
+      outlineQC(Filter(srcShape, fun)) must_= srcShape
     }
 
     "Unreferenced has undefined shape" >> {
@@ -301,13 +302,13 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     }
   }
 
-  val lfn: FreeMap = MapFuncCore.StaticArray(List(HoleF, ConstantR(ejsonInt(53))))
-  val l: FreeQS = Free.roll(QCT(Map(HoleQS, lfn)))
+  val lfn: FreeMap = MapFuncCore.StaticArray(List(func.Hole, func.Constant(json.int(53))))
+  val l: FreeQS = free.Map(free.Hole, lfn)
   def lShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(srcShape, rollS(ExtEJson(ejson.Int(53)))))))
 
-  val rfn: FreeMap = MapFuncCore.StaticArray(List(ConstantR(ejsonInt(78)), HoleF))
-  val r: FreeQS = Free.roll(QCT(Map(HoleQS, rfn)))
+  val rfn: FreeMap = MapFuncCore.StaticArray(List(func.Constant(json.int(78)), func.Hole))
+  val r: FreeQS = free.Map(free.Hole, rfn)
   def rShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(rollS(ExtEJson(ejson.Int(78))), srcShape))))
 
@@ -316,7 +317,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
   "Outline ThetaJoin" >> {
     "results from applying combine to branch shapes" >> prop { (srcShape: Shape, jtype: JoinType) =>
-      val on = ConstantR[JoinSide](ejsonNull)
+      val on = func.Constant[JoinSide](json.nul())
       Outline[ThetaJoin].outlineƒ(ThetaJoin(srcShape, l, r, on, jtype, joinFunc)) must_= joinShape(srcShape)
     }
   }

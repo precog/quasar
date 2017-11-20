@@ -370,13 +370,15 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
       Failure.Ops[PhysicalError, Eff].unattempt(move)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def moveDir(src: ADir, dst: ADir): Free[Eff, Unit] = {
       val move: Free[Eff, PhysicalError \/ Unit] = (for {
         hdfs <- hdfsFSOps.ask
         srcPath <- toPath(src)
         dstPath <- toPath(dst)
       } yield {
-        val deleted = hdfs.delete(dstPath, true)
+        hdfs.delete(dstPath, true)
+        hdfs.mkdirs(dstPath.getParent)
         hdfs.rename(srcPath, dstPath)
       }).as(().right[PhysicalError])
 

@@ -3,7 +3,28 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$literal": true })
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             {
+│  │  │  │               "$lte": [
+│  │  │  │                 { "$literal": {  } },
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 }]
+│  │  │  │             },
+│  │  │  │             {
+│  │  │  │               "$lt": [
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 },
+│  │  │  │                 { "$literal": [] }]
+│  │  │  │             }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
@@ -30,7 +51,28 @@ Chain
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips2)
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> { "$literal": true })
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             {
+│     │  │               "$lte": [
+│     │  │                 { "$literal": {  } },
+│     │  │                 {
+│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │  │                 }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$lt": [
+│     │  │                 {
+│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │  │                 },
+│     │  │                 { "$literal": [] }]
+│     │  │             }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
 │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF

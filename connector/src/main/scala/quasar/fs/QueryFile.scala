@@ -19,6 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
+import quasar.qscript.RenderQScriptDSL._
 import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -144,7 +145,7 @@ object QueryFile {
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
-      qs.fold(κ(Vector()), a => Vector(PhaseResult.tree("QScript", a))),
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.treeAndCode("QScript", a))),
       qs))
   }
 
@@ -187,7 +188,7 @@ object QueryFile {
         _.point[M])
       .flatMap(rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents))
       .map(simplifyAndNormalize[T, InterimQS, QS])
-      .flatMap(qs => mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs))
+      .flatMap(qs => mtell.writer(Vector(PhaseResult.treeAndCode("QScript", qs)), qs))
   }
 
   /** The result of the query is stored in an output file, overwriting any existing

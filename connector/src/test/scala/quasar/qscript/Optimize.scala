@@ -17,11 +17,9 @@
 package quasar.qscript
 
 import quasar.fp._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._
 
 class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
   val optimize = new Optimize[Fix]
@@ -29,61 +27,63 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
   def optimizeExpr(expr: Fix[QS]): Fix[QS] =
     expr.transCata[Fix[QS]](optimize.optimize[QS, QS](reflNT))
 
+  import qsdsl._
+
   "optimizer" should {
     "move subset before map" in {
-      val from: QS[FreeQS] =
-        QC.inj(Map(
-          Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
-          ProjectKeyR(HoleF, StrLit("foo"))))
+      val from =
+        free.Map(
+          free.Filter(free.Hole, func.Constant(json.bool(true))),
+          func.ProjectKeyS(func.Hole, "foo"))
 
-      val count: QS[FreeQS] =
-        QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
+      val count =
+        free.Map(free.Hole, func.ProjectIndexI(func.Hole, 2))
 
-      val input: QS[Fix[QS]] =
-        QC.inj(Subset(
-          RootR.embed,
-          Free.roll(QST[QS].inject(from)),
+      val input =
+        fix.Subset(
+          fix.Root,
+          from,
           Take,
-          Free.roll(QST[QS].inject(count))))
+          count)
 
-      val output: QS[Fix[QS]] =
-        QC.inj(Map(
-          QC.inj(Subset(
-            RootR.embed,
-            Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
+      val output =
+        fix.Map(
+          fix.Subset(
+            fix.Root,
+            free.Filter(free.Hole, func.Constant(json.bool(true))),
             Take,
-            Free.roll(QST[QS].inject(count)))).embed,
-          ProjectKeyR(HoleF, StrLit("foo"))))
+            count),
+          func.ProjectKeyS(func.Hole, "foo"))
 
-      optimizeExpr(input.embed) must equal(output.embed)
+      optimizeExpr(input) must equal(output)
     }
 
     "move filter before union" in {
-      val lBranch: QS[FreeQS] =
-        QC.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("foo"))))
+      val lBranch =
+        free.Map(free.Hole, func.ProjectKeyS(func.Hole, "foo"))
 
-      val rBranch: QS[FreeQS] =
-        QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
+      val rBranch =
+        free.Map(free.Hole, func.ProjectIndexI(func.Hole, 2))
 
-      val input: QS[Fix[QS]] =
-        QC.inj(Filter(
-          QC.inj(Union(
-            RootR.embed,
-            Free.roll(QST[QS].inject(lBranch)),
-            Free.roll(QST[QS].inject(rBranch)))).embed,
-          EqR(AddR(HoleF, IntLit(1)), IntLit(5))))
+      val input =
+        fix.Filter(
+          fix.Union(
+            fix.Root,
+            lBranch,
+            rBranch),
+          func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5))))
 
-      val output: QS[Fix[QS]] =
-        QC.inj(Union(
-          RootR.embed,
-          Free.roll(QST[QS].inject(QC.inj(Filter(
-            Free.roll(QST[QS].inject(lBranch)),
-            EqR(AddR(HoleF, IntLit(1)), IntLit(5)))))),
-          Free.roll(QST[QS].inject(QC.inj(Filter(
-            Free.roll(QST[QS].inject(rBranch)),
-            EqR(AddR(HoleF, IntLit(1)), IntLit(5))))))))
+      val output =
+        fix.Union(
+          fix.Root,
+          free.Filter(
+            lBranch,
+            func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5)))),
+          free.Filter(
+            rBranch,
+            func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5)))))
 
-      optimizeExpr(input.embed) must equal(output.embed)
+      optimizeExpr(input) must equal(output)
     }
   }
 }

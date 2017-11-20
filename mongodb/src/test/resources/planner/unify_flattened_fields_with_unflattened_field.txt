@@ -25,20 +25,14 @@ Chain
 │  ├─ Flatten
 │  │  ╰─ JsCore(_.f)
 │  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ Arr
-│  │     │  ├─ Obj
-│  │     │  │  ├─ Key(zip: (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1]._id : undefined)
-│  │     │  │  ╰─ Key(loc: _.f)
-│  │     │  ╰─ JsCore(_.f)
-│  │     ╰─ JsCore([__val[0], __val])
+│  │  ╰─ Arr
+│  │     ├─ Obj
+│  │     │  ├─ Key(zip: (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1]._id : undefined)
+│  │     │  ╰─ Key(loc: _.f)
+│  │     ╰─ JsCore(_.f)
 │  ╰─ Scope(Map())
 ├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │         { "$literal": NumberInt("1") }]
-│  │     })
+│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
 │  ├─ Name("src" -> "$$ROOT")
 │  ╰─ ExcludeId
 ├─ $SortF

@@ -25,13 +25,14 @@ import quasar.fp.ski.κ
 import quasar.ejson.{EJson, EJsonArbitrary}
 import quasar.ejson.implicits._
 import quasar.qscript.analysis.Outline
-
 import matryoshka.data.Fix
 import matryoshka.data.free._
-import matryoshka.implicits._
 import org.specs2.scalacheck._
 import pathy.Path._
-import scalaz._, Scalaz._
+import quasar.contrib.pathy._
+
+import scalaz._
+import Scalaz._
 
 final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
   import EJsonArbitrary._
@@ -39,24 +40,26 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
 
   implicit val params = Parameters(maxSize = 10)
 
+  import qsdsl._
+
   "projectComplement" >> {
     "replace key deletion of statically known structure with projection of complement" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k2 =/= k3 && k1 =/= k3) ==> {
 
       val m =
-        ConcatMapsR(
-          ConcatMapsR(
-            MakeMapR(ConstantR(k1), HoleF),
-            MakeMapR(ConstantR(k2), HoleF)),
-          MakeMapR(ConstantR(k3), HoleF))
+        func.ConcatMaps(
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(k1), func.Hole),
+            func.MakeMap(func.Constant(k2), func.Hole)),
+          func.MakeMap(func.Constant(k3), func.Hole))
 
       val in =
-        DeleteKeyR(m, ConstantR(k2))
+        func.DeleteKey(m, func.Constant(k2))
 
       val out =
-        ConcatMapsR(
-          MakeMapR(ConstantR(k1), HoleF),
-          MakeMapR(ConstantR(k3), HoleF))
+        func.ConcatMaps(
+          func.MakeMap(func.Constant(k1), func.Hole),
+          func.MakeMap(func.Constant(k3), func.Hole))
 
       projectComplement(in)(κ(Outline.unknownF)) must_= out
     }}
@@ -65,14 +68,14 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k2 =/= k3 && k1 =/= k3) ==> {
 
       val m =
-        ConcatMapsR(
-          ConcatMapsR(
-            MakeMapR(ConstantR(k1), HoleF),
-            MakeMapR(ConstantR(k2), HoleF)),
-          HoleF)
+        func.ConcatMaps(
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(k1), func.Hole),
+            func.MakeMap(func.Constant(k2), func.Hole)),
+          func.Hole)
 
       val in =
-        DeleteKeyR(m, ConstantR(k2))
+        func.DeleteKey(m, func.Constant(k2))
 
       projectComplement(in)(κ(Outline.unknownF)) must_= in
     }}
@@ -81,14 +84,14 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       (k1: Fix[EJson], k2: Fix[EJson], v1: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val m =
-        ConcatMapsR(
-          ConcatMapsR(
-            MakeMapR(ConstantR(k1), HoleF),
-            MakeMapR(ConstantR(k2), HoleF)),
-          MakeMapR(ProjectIndexR(HoleF, ConstantR(ejsonInt(1))), ConstantR(v1)))
+        func.ConcatMaps(
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(k1), func.Hole),
+            func.MakeMap(func.Constant(k2), func.Hole)),
+          func.MakeMap(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(v1)))
 
       val in =
-        DeleteKeyR(m, ConstantR(k2))
+        func.DeleteKey(m, func.Constant(k2))
 
       projectComplement(in)(κ(Outline.unknownF)) must_= in
     }}
@@ -96,55 +99,52 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
 
   "preferProjection" >> {
     val base: Fix[QS] =
-      QC(LeftShift(
-        ReadR(rootDir </> dir("foo") </> file("bar")).embed,
-        HoleF,
+      fix.LeftShift(
+        fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+        func.Hole,
         ExcludeId,
         MapFuncCore.StaticMap(List(
-          ejsonStr("a") -> ProjectIndexR(RightSideF, ConstantR(ejsonInt(0))),
-          ejsonStr("b") -> ProjectIndexR(RightSideF, ConstantR(ejsonInt(2))),
-          ejsonStr("c") -> ProjectIndexR(RightSideF, ConstantR(ejsonInt(5))))))).embed
-
-    def keyF[A](name: String): FreeMapA[A] =
-      ConstantR[A](ejsonStr(name))
+          json.str("a") -> func.ProjectIndex(func.RightSide, func.Constant(json.int(0))),
+          json.str("b") -> func.ProjectIndex(func.RightSide, func.Constant(json.int(2))),
+          json.str("c") -> func.ProjectIndex(func.RightSide, func.Constant(json.int(5))))))
 
     def prjFrom[A](src: FreeMapA[A], key: String, keys: String*): FreeMapA[A] =
       MapFuncCore.StaticMap((key :: keys.toList) map { name =>
-        ejsonStr(name) -> ProjectKeyR(src, keyF(name))
+        json.str(name) -> func.ProjectKeyS(src, name)
       })
 
     "Map" >> {
       val q =
-        QC(Map(
+        fix.Map(
           base,
-          DeleteKeyR(HoleF, keyF("b")))).embed
+          func.DeleteKeyS(func.Hole, "b"))
 
       val e =
-        QC(Map(
+        fix.Map(
           base,
-          prjFrom(HoleF, "a", "c"))).embed
+          prjFrom(func.Hole, "a", "c"))
 
       preferProjection[QS](q) must_= e
     }
 
     "LeftShift" >> {
       val q =
-        QC(LeftShift(
+        fix.LeftShift(
           base,
-          DeleteKeyR(HoleF, keyF("c")),
+          func.DeleteKeyS(func.Hole, "c"),
           IncludeId,
           MapFuncCore.StaticArray(List(
-            DeleteKeyR(DeleteKeyR(LeftSideF, keyF("a")), keyF("b")),
-            RightSideF)))).embed
+            func.DeleteKeyS(func.DeleteKeyS(func.LeftSide, "a"), "b"),
+            func.RightSide)))
 
       val e =
-        QC(LeftShift(
+        fix.LeftShift(
           base,
-          prjFrom(HoleF, "a", "b"),
+          prjFrom(func.Hole, "a", "b"),
           IncludeId,
           MapFuncCore.StaticArray(List(
-            prjFrom(LeftSideF, "c"),
-            RightSideF)))).embed
+            prjFrom(func.LeftSide, "c"),
+            func.RightSide)))
 
       preferProjection[QS](q) must_= e
     }
@@ -153,122 +153,122 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       import ReduceFuncs._
 
       val q =
-        QC(Reduce(
+        fix.Reduce(
           base,
-          List(DeleteKeyR(HoleF, keyF("a"))),
-          List(Count(HoleF), First(DeleteKeyR(HoleF, keyF("b")))),
+          List(func.DeleteKeyS(func.Hole, "a")),
+          List(Count(func.Hole), First(func.DeleteKeyS(func.Hole, "b"))),
           MapFuncCore.StaticArray(List(
-            ReduceIndexF(0.right),
-            DeleteKeyR(ReduceIndexF(1.right), keyF("a")),
-            DeleteKeyR(ReduceIndexF(0.left), keyF("c")))))).embed
+            func.ReduceIndex(0.right),
+            func.DeleteKeyS(func.ReduceIndex(1.right), "a"),
+            func.DeleteKeyS(func.ReduceIndex(0.left), "c"))))
 
       val e =
-        QC(Reduce(
+        fix.Reduce(
           base,
-          List(prjFrom(HoleF, "b", "c")),
-          List(Count(HoleF), First(prjFrom(HoleF, "a", "c"))),
+          List(prjFrom(func.Hole, "b", "c")),
+          List(Count(func.Hole), First(prjFrom(func.Hole, "a", "c"))),
           MapFuncCore.StaticArray(List(
-            ReduceIndexF(0.right),
-            prjFrom(ReduceIndexF(1.right), "c"),
-            prjFrom(ReduceIndexF(0.left), "b"))))).embed
+            func.ReduceIndex(0.right),
+            prjFrom(func.ReduceIndex(1.right), "c"),
+            prjFrom(func.ReduceIndex(0.left), "b"))))
 
       preferProjection[QS](q) must_= e
     }
 
     "Sort" >> {
       val q =
-        QC(Sort(
+        fix.Sort(
           base,
-          List(DeleteKeyR(DeleteKeyR(HoleF, keyF("a")), keyF("c"))),
-          NonEmptyList((DeleteKeyR(HoleF, keyF("b")), SortDir.Ascending)))).embed
+          List(func.DeleteKeyS(func.DeleteKeyS(func.Hole, "a"), "c")),
+          NonEmptyList((func.DeleteKeyS(func.Hole, "b"), SortDir.Ascending)))
 
       val e =
-        QC(Sort(
+        fix.Sort(
           base,
-          List(prjFrom(HoleF, "b")),
-          NonEmptyList((prjFrom(HoleF, "a", "c"), SortDir.Ascending)))).embed
+          List(prjFrom(func.Hole, "b")),
+          NonEmptyList((prjFrom(func.Hole, "a", "c"), SortDir.Ascending)))
 
       preferProjection[QS](q) must_= e
     }
 
     "Filter" >> {
       val q =
-        QC(Filter(
+        fix.Filter(
           base,
-          EqR(DeleteKeyR(HoleF, keyF("a")), HoleF))).embed
+          func.Eq(func.DeleteKeyS(func.Hole, "a"), func.Hole))
 
       val e =
-        QC(Filter(
+        fix.Filter(
           base,
-          EqR(prjFrom(HoleF, "b", "c"), HoleF))).embed
+          func.Eq(prjFrom(func.Hole, "b", "c"), func.Hole))
 
       preferProjection[QS](q) must_= e
     }
 
     "Subset" >> {
       val q =
-        QC(Subset(
+        fix.Subset(
           base,
-          Free.roll(QCT(Map(
-            HoleQS,
-            DeleteKeyR(HoleF, keyF("c"))))),
+          free.Map(
+            free.Hole,
+            func.DeleteKeyS(func.Hole, "c")),
           Take,
-          Free.roll(QCT(Reduce(
-            HoleQS,
+          free.Reduce(
+            free.Hole,
             List(),
-            List(ReduceFuncs.First(DeleteKeyR(HoleF, keyF("a")))),
-            DeleteKeyR(ReduceIndexF(0.right), keyF("b"))))))).embed
+            List(ReduceFuncs.First(func.DeleteKeyS(func.Hole, "a"))),
+            func.DeleteKeyS(func.ReduceIndex(0.right), "b")))
 
       val e =
-        QC(Subset(
+        fix.Subset(
           base,
-          Free.roll(QCT(Map(
-            HoleQS,
-            prjFrom(HoleF, "a", "b")))),
+          free.Map(
+            free.Hole,
+            prjFrom(func.Hole, "a", "b")),
           Take,
-          Free.roll(QCT(Reduce(
-            HoleQS,
+          free.Reduce(
+            free.Hole,
             List(),
-            List(ReduceFuncs.First(prjFrom(HoleF, "b", "c"))),
-            prjFrom(ReduceIndexF(0.right), "c")))))).embed
+            List(ReduceFuncs.First(prjFrom(func.Hole, "b", "c"))),
+            prjFrom(func.ReduceIndex(0.right), "c")))
 
       preferProjection[QS](q) must_= e
     }
 
     "ThetaJoin" >> {
       val q =
-        TJ(ThetaJoin(
+        fix.ThetaJoin(
           base,
-          Free.roll(QCT(Map(
-            HoleQS,
-            DeleteKeyR(HoleF, keyF("a"))))),
-          Free.roll(QCT(Map(
-            HoleQS,
-            DeleteKeyR(HoleF, keyF("b"))))),
-          EqR(
-            DeleteKeyR(LeftSideF, keyF("b")),
-            DeleteKeyR(RightSideF, keyF("a"))),
+          free.Map(
+            free.Hole,
+            func.DeleteKeyS(func.Hole, "a")),
+          free.Map(
+            free.Hole,
+            func.DeleteKeyS(func.Hole, "b")),
+          func.Eq(
+            func.DeleteKeyS(func.LeftSide, "b"),
+            func.DeleteKeyS(func.RightSide, "a")),
           JoinType.Inner,
           MapFuncCore.StaticMap(List(
-            ejsonStr("left") -> DeleteKeyR(LeftSideF, keyF("c")),
-            ejsonStr("right") -> DeleteKeyR(RightSideF, keyF("c")))))).embed
+            json.str("left") -> func.DeleteKeyS(func.LeftSide, "c"),
+            json.str("right") -> func.DeleteKeyS(func.RightSide, "c"))))
 
       val e =
-        TJ(ThetaJoin(
+        fix.ThetaJoin(
           base,
-          Free.roll(QCT(Map(
-            HoleQS,
-            prjFrom(HoleF, "b", "c")))),
-          Free.roll(QCT(Map(
-            HoleQS,
-            prjFrom(HoleF, "a", "c")))),
-          EqR(
-            prjFrom(LeftSideF, "c"),
-            prjFrom(RightSideF, "c")),
+          free.Map(
+            free.Hole,
+            prjFrom(func.Hole, "b", "c")),
+          free.Map(
+            free.Hole,
+            prjFrom(func.Hole, "a", "c")),
+          func.Eq(
+            prjFrom(func.LeftSide, "c"),
+            prjFrom(func.RightSide, "c")),
           JoinType.Inner,
           MapFuncCore.StaticMap(List(
-            ejsonStr("left") -> prjFrom(LeftSideF, "b"),
-            ejsonStr("right") -> prjFrom(RightSideF, "a"))))).embed
+            json.str("left") -> prjFrom(func.LeftSide, "b"),
+            json.str("right") -> prjFrom(func.RightSide, "a"))))
 
       preferProjection[QS](q) must_= e
     }

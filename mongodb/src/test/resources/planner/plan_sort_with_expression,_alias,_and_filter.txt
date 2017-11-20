@@ -17,19 +17,64 @@ Chain
 │     │     ╰─ Expr($pop -> Type(Bool))
 │     ╰─ Doc
 │        ╰─ Expr($pop -> Gte(Int32(1000)))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ Arr
-│  │     │  ├─ Obj
-│  │     │  │  ╰─ Key(popInK: (isNumber(_.pop) || ((_.pop instanceof NumberInt) || (_.pop instanceof NumberLong))) ? _.pop / 1000 : undefined)
-│  │     │  ╰─ Ident(_)
-│  │     ╰─ Obj
-│  │        ├─ Key(0: (isNumber(__val[1].pop) || ((__val[1].pop instanceof NumberInt) || (__val[1].pop instanceof NumberLong))) ? __val[1].pop / 1000 : undefined)
-│  │        ╰─ Key(src: __val)
-│  ╰─ Scope(Map())
+├─ $ProjectF
+│  ├─ Name("0" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lt": [{ "$literal": null }, "$pop"] },
+│  │             { "$lt": ["$pop", { "$literal": "" }] }]
+│  │         },
+│  │         {
+│  │           "$cond": [
+│  │             {
+│  │               "$eq": [{ "$literal": NumberInt("1000") }, { "$literal": NumberInt("0") }]
+│  │             },
+│  │             {
+│  │               "$cond": [
+│  │                 { "$eq": ["$pop", { "$literal": NumberInt("0") }] },
+│  │                 { "$literal": NaN },
+│  │                 {
+│  │                   "$cond": [
+│  │                     { "$gt": ["$pop", { "$literal": NumberInt("0") }] },
+│  │                     { "$literal": Infinity },
+│  │                     { "$literal": -Infinity }]
+│  │                 }]
+│  │             },
+│  │             { "$divide": ["$pop", { "$literal": NumberInt("1000") }] }]
+│  │         },
+│  │         { "$literal": undefined }]
+│  │     })
+│  ├─ Name("src" -> "$$ROOT")
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("popInK" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lt": [{ "$literal": null }, "$src.pop"] },
+   │             { "$lt": ["$src.pop", { "$literal": "" }] }]
+   │         },
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$eq": [{ "$literal": NumberInt("1000") }, { "$literal": NumberInt("0") }]
+   │             },
+   │             {
+   │               "$cond": [
+   │                 { "$eq": ["$src.pop", { "$literal": NumberInt("0") }] },
+   │                 { "$literal": NaN },
+   │                 {
+   │                   "$cond": [
+   │                     { "$gt": ["$src.pop", { "$literal": NumberInt("0") }] },
+   │                     { "$literal": Infinity },
+   │                     { "$literal": -Infinity }]
+   │                 }]
+   │             },
+   │             { "$divide": ["$src.pop", { "$literal": NumberInt("1000") }] }]
+   │         },
+   │         { "$literal": undefined }]
+   │     })
    ╰─ ExcludeId

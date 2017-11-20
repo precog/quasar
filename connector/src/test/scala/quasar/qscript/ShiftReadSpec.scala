@@ -19,9 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.{Data, TreeMatchers}
 import quasar.contrib.pathy.AFile
-import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.MapFuncsCore._
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -38,9 +36,9 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       val sampleFile = rootDir </> file("bar")
 
       val qScript =
-        chain(
-          ReadR(sampleFile),
-          QC.inj(LeftShift((), HoleF, ExcludeId, Free.point(RightSide))))
+        chainQS(
+          qsdsl.fix.Read[AFile](sampleFile),
+          qsdsl.fix.LeftShift(_, qsdsl.func.Hole, ExcludeId, qsdsl.func.RightSide))
 
       val newQScript =
         qScript.codyna(
@@ -48,13 +46,14 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))
 
       newQScript must
-      beTreeEqual(
-        Fix(QCT.inj(Map(
-          Fix(SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
-          Free.roll(MFC(ProjectIndex(HoleF, IntLit(1))))))))
+        beTreeEqual(
+          qstdsl.fix.Map(
+            qstdsl.fix.ShiftedRead[AFile](sampleFile, ExcludeId),
+            qstdsl.func.ProjectIndexI(qstdsl.func.Hole, 1)))
     }
 
     "shift a simple aggregated read" in {
+      import qstdsl._
       convert(lc.some,
         structural.MakeMap(
           lpf.constant(Data.Str("0")),
@@ -62,13 +61,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
         _.codyna(
           rewrite.normalizeTJ[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
-      beTreeEqual(chain(
-        SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](
-          ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
-        QCT.inj(Reduce((),
-          Nil,
-          List(ReduceFuncs.Count(Free.roll(MFC(ProjectIndex(HoleF, IntLit[Fix, Hole](1)))))),
-          Free.roll(MFC(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right)))))))).some)
+        beTreeEqual(
+          fix.Reduce(
+            fix.ShiftedRead[AFile](rootDir </> dir("foo") </> file("bar"), IncludeId),
+            Nil,
+            List(ReduceFuncs.Count(func.ProjectIndexI(func.Hole, 1))),
+            func.MakeMapS("0", func.ReduceIndex(0.right))).some)
     }
   }
 }

@@ -63,6 +63,7 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
   ): Result
 
   val qsr = new Transform[Fix, QScriptTotal[Fix, ?]]
+  val func = construction.Func[Fix]
 
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
@@ -88,10 +89,10 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
       case lp.Constant(data) =>
         qsr.fromData(data).fold(
           _ => sys.error("invalid Data"),
-          ej => Free.roll(MFC(MapFuncsCore.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej))))
+          func.Constant)
 
       case lp.TemporalTrunc(part, src) =>
-        Free.roll(MFC(MapFuncsCore.TemporalTrunc(part, src)))
+        func.TemporalTrunc(part, src)
     }
 
   def absurd[A, B](a: A): B = sys.error("impossible!")

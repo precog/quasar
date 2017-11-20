@@ -24,7 +24,6 @@ import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
-import quasar.qscript.{MapFuncsCore => MFCore}
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
@@ -39,20 +38,20 @@ import scalaz._, Scalaz._
 final class FilterPlannerSpec extends quasar.Qspec {
   val comparisons = List(ComparisonOp.EQ , ComparisonOp.NE , ComparisonOp.LT , ComparisonOp.LE , ComparisonOp.GT , ComparisonOp.GE)
 
-  def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
-    Free.roll(MFC(MFCore.ProjectKey(src, MFCore.StrLit(str))))
+  val func = construction.Func[Fix]
+  val json = Fixed[Fix[EJson]]
 
   def makeComp(op: ComparisonOp, src: FreeMap[Fix], str: String): FreeMap[Fix] = {
-    val searchExpr = MFCore.StrLit[Fix, Hole](str)
+    val searchExpr = func.Constant[Hole](json.str(str))
 
-    Free.roll(MFC(op match {
-      case ComparisonOp.EQ => MFCore.Eq(src, searchExpr)
-      case ComparisonOp.NE => MFCore.Neq(src,searchExpr)
-      case ComparisonOp.LT => MFCore.Lt(src, searchExpr)
-      case ComparisonOp.LE => MFCore.Lte(src,searchExpr)
-      case ComparisonOp.GT => MFCore.Gt(src, searchExpr)
-      case ComparisonOp.GE => MFCore.Gte(src,searchExpr)
-    }))
+    op match {
+      case ComparisonOp.EQ => func.Eq(src, searchExpr)
+      case ComparisonOp.NE => func.Neq(src,searchExpr)
+      case ComparisonOp.LT => func.Lt(src, searchExpr)
+      case ComparisonOp.LE => func.Lte(src,searchExpr)
+      case ComparisonOp.GT => func.Gt(src, searchExpr)
+      case ComparisonOp.GE => func.Gte(src,searchExpr)
+    }
   }
 
   case class ProjectTestCase(fm: FreeMap[Fix], path: ADir, op: ComparisonOp, expr: String)
@@ -63,7 +62,7 @@ final class FilterPlannerSpec extends quasar.Qspec {
       first <- Gen.alphaStr
       path = rebaseA(rootDir[Sandboxed] </> dir(first))(dir0)
       nested = flatten(None, None, None, Some(_), Some(_), dir0).tail.unite.foldLeft(
-        projectField(HoleF, first))((prj: FreeMap[Fix], nxt: String) => projectField(prj, nxt))
+        func.ProjectKeyS(func.Hole, first))((prj: FreeMap[Fix], nxt: String) => func.ProjectKeyS(prj, nxt))
     } yield (nested, path)
 
   val genProjectTestCase: Gen[ProjectTestCase] =

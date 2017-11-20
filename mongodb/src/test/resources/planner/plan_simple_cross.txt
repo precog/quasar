@@ -3,10 +3,15 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("1" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
+│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
+│  │  ├─ $SimpleMapF
+│  │  │  ├─ Map
+│  │  │  │  ╰─ Obj
+│  │  │  │     ├─ Key(0: (((isNumber(_["0"][1].pop) || ((_["0"][1].pop instanceof NumberInt) || (_["0"][1].pop instanceof NumberLong))) || isString(_["0"][1].pop)) || ((_["0"][1].pop instanceof Date) || ((typeof _["0"][1].pop) === "boolean"))) ? true : false)
+│  │  │  │     ├─ Key(1: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? true : false)
+│  │  │  │     ╰─ Key(src: _["0"])
+│  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
 │  │  │  ╰─ And
 │  │  │     ├─ Doc
@@ -27,10 +32,15 @@ Chain
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips2)
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("1" -> { "$literal": true })
-│     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
+│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
 │     │  ╰─ ExcludeId
+│     ├─ $SimpleMapF
+│     │  ├─ Map
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(0: (((isNumber(_["0"][1].pop) || ((_["0"][1].pop instanceof NumberInt) || (_["0"][1].pop instanceof NumberLong))) || isString(_["0"][1].pop)) || ((_["0"][1].pop instanceof Date) || ((typeof _["0"][1].pop) === "boolean"))) ? true : false)
+│     │  │     ├─ Key(1: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? true : false)
+│     │  │     ╰─ Key(src: _["0"])
+│     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ And
 │     │     ├─ Doc

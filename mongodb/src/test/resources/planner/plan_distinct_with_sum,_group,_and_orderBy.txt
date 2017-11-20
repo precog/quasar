@@ -106,28 +106,12 @@ Chain
 │     ╰─ Name("0" -> "$b0")
 ├─ $ProjectF
 │  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         {
-│  │           "$arrayElemAt": [
-│  │             [
-│  │               {
-│  │                 "$arrayElemAt": [
-│  │                   ["$_id.0", "$f0", "$f0.totalPop"],
-│  │                   { "$literal": NumberInt("1") }]
-│  │               },
-│  │               ["$_id.0", "$f0", "$f0.totalPop"]],
-│  │             { "$literal": NumberInt("1") }]
-│  │         },
-│  │         { "$literal": NumberInt("2") }]
+│  │       "$arrayElemAt": [["$_id.0", "$f0", "$f0.totalPop"], { "$literal": NumberInt("2") }]
 │  │     })
-│  ├─ Name("src" -> [
-│  │       {
-│  │         "$arrayElemAt": [["$_id.0", "$f0", "$f0.totalPop"], { "$literal": NumberInt("1") }]
-│  │       },
-│  │       ["$_id.0", "$f0", "$f0.totalPop"]])
+│  ├─ Name("src" -> ["$_id.0", "$f0", "$f0.totalPop"])
 │  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Descending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] })
    ╰─ ExcludeId

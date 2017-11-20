@@ -101,6 +101,7 @@ object Http4sUtils {
       exec
     }
     BlazeBuilder
+      .enableHttp2(true)
       .withIdleTimeout(blueprint.idleTimeout)
       .bindHttp(blueprint.port, "0.0.0.0")
       .mountService(blueprint.svc)

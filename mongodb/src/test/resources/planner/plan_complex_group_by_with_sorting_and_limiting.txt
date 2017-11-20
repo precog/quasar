@@ -19,25 +19,19 @@ Chain
 │     ╰─ Name("0" -> ["$city"])
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ Arr
-│  │     │  ├─ JsCore(_._id["0"])
-│  │     │  ├─ Obj
-│  │     │  │  ├─ Key(city: _.f0)
-│  │     │  │  ╰─ Key(pop: _.f1)
-│  │     │  ╰─ JsCore(_.f1)
-│  │     ╰─ JsCore([__val[1], __val])
+│  │  ╰─ Arr
+│  │     ├─ JsCore(_._id["0"])
+│  │     ├─ Obj
+│  │     │  ├─ Key(city: _.f0)
+│  │     │  ╰─ Key(pop: _.f1)
+│  │     ╰─ JsCore(_.f1)
 │  ╰─ Scope(Map())
 ├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │         { "$literal": NumberInt("2") }]
-│  │     })
+│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] })
 │  ├─ Name("src" -> "$$ROOT")
 │  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] })
    ╰─ ExcludeId

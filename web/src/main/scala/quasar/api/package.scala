@@ -233,8 +233,8 @@ package object api {
     // to avoid getting into a loop.
     case GET -> path if path.startsWith(HPath(basePath)) => NotFound()
 
-    case GET -> AsPath(path) =>
+    case req @ GET -> AsPath(path) =>
       // TODO: probably need a URL-specific codec here
-      TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
+      TemporaryRedirect(req.uri.copy(path = basePath + posixCodec.printPath(path)))
   }
 }

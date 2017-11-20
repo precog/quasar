@@ -487,6 +487,7 @@ lazy val interface = project
     skeleton,
     mimir)
   .settings(commonSettings)
+  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
   .enablePlugins(AutomateHeaderPlugin)

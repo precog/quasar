@@ -17,7 +17,7 @@ SET CMD_LINE_ARGS=%*
 set NL=^
 
 
-java -Xms512m -Xmx4g -Xss2m -Dfile.encoding=UTF8 -Djna.nosys=true -Dline.separator=^%NL%%NL% -jar "%LAUNCHER_PATH%" launch org.scala-sbt:sbt-launch:1.0.2 -- %CMD_LINE_ARGS%
+java -Xms512m -Xmx4g -Xss2m -XX:ReservedCodeCacheSize=512m -Dfile.encoding=UTF8 -Djna.nosys=true -Dline.separator=^%NL%%NL% -jar "%LAUNCHER_PATH%" launch org.scala-sbt:sbt-launch:1.0.2 -- %CMD_LINE_ARGS%
 
 IF ERRORLEVEL 1 GOTO error
 GOTO end

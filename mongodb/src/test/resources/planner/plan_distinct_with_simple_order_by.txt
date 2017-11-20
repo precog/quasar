@@ -8,25 +8,11 @@ Chain
 │  ├─ Name("f0" -> "$_id.0")
 │  ╰─ IgnoreId
 ├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         {
-│  │           "$arrayElemAt": [
-│  │             [
-│  │               {
-│  │                 "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }]
-│  │               },
-│  │               ["$_id.0", "$f0"]],
-│  │             { "$literal": NumberInt("1") }]
-│  │         },
-│  │         { "$literal": NumberInt("1") }]
-│  │     })
-│  ├─ Name("src" -> [
-│  │       { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] },
-│  │       ["$_id.0", "$f0"]])
+│  ├─ Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
+│  ├─ Name("src" -> ["$_id.0", "$f0"])
 │  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] })
    ╰─ ExcludeId

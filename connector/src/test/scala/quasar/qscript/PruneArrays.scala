@@ -24,518 +24,519 @@ import quasar.qscript.MapFuncsCore._
 import quasar.sql.CompilerHelpers
 
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  private def makeLeftShift3[A](src: A): QST[A] =
-    QCT.inj(LeftShift(
+  import qstdsl._
+
+  private def makeLeftShift3[A](src: A, dsl: construction.Dsl[Fix, QST, A]): A =
+    dsl.LeftShift(
       src,
-      HoleF,
+      func.Hole,
       ExcludeId,
-      ConcatArraysR(
-        ConcatArraysR(
-          MakeArrayR(IntLit(6)),
-          MakeArrayR(IntLit(7))),
-        MakeArrayR(IntLit(8)))))
+      func.ConcatArrays(
+        func.ConcatArrays(
+          func.MakeArray(func.Constant(json.int(6))),
+          func.MakeArray(func.Constant(json.int(7)))),
+        func.MakeArray(func.Constant(json.int(8)))))
 
   private val arrayBranch3: FreeQS =
-    Free.roll(makeLeftShift3[FreeQS](HoleQS))
+    makeLeftShift3[FreeQS](free.Hole, free)
 
   private val array3: Fix[QST] =
-    makeLeftShift3[Fix[QST]](UnreferencedRT.embed).embed
+    makeLeftShift3[Fix[QST]](fix.Unreferenced, fix)
 
   "prune arrays" should {
     "rewrite map-filter with unused array elements" in {
-      def initial(src: QST[Fix[QST]]): Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Filter(
-            QCT.inj(LeftShift(
-              src.embed,
-              HoleF,
+      def initial(src: Fix[QST]): Fix[QST] =
+        fix.Map(
+          fix.Filter(
+            fix.LeftShift(
+              src,
+              func.Hole,
               ExcludeId,
-              ConcatArraysR(
-                MakeArrayR(IntLit(6)),
-                MakeArrayR(BoolLit(true))))).embed,
-            ProjectIndexR(HoleF, IntLit(1)))).embed,
-          ProjectIndexR(HoleF, IntLit(1)))).embed
+              func.ConcatArrays(
+                func.MakeArray(func.Constant(json.int(6))),
+                func.MakeArray(func.Constant(json.bool(true))))),
+            func.ProjectIndexI(func.Hole, 1)),
+          func.ProjectIndexI(func.Hole, 1))
 
-      def expected(src: QST[Fix[QST]]): Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Filter(
-            QCT.inj(LeftShift(
-              src.embed,
-              HoleF,
+      def expected(src: Fix[QST]): Fix[QST] =
+        fix.Map(
+          fix.Filter(
+            fix.LeftShift(
+              src,
+              func.Hole,
               ExcludeId,
-              BoolLit(true))).embed,
-            HoleF)).embed,
-          HoleF)).embed
+              func.Constant(json.bool(true))),
+            func.Hole),
+          func.Hole)
 
-      initial(UnreferencedRT).pruneArraysF must equal(expected(UnreferencedRT))
-      initial(RootRT).pruneArraysF must equal(expected(RootRT))
+      initial(fix.Unreferenced).pruneArraysF must equal(expected(fix.Unreferenced))
+      initial(fix.Root).pruneArraysF must equal(expected(fix.Root))
 
       val data = rootDir </> file("zips")
-      initial(ReadRT(data)).pruneArraysF must equal(expected(ReadRT(data)))
+      initial(fix.Read[AFile](data)).pruneArraysF must equal(expected(fix.Read[AFile](data)))
     }
 
     "not rewrite map-filter with no unused array elements" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Filter(
-            QCT.inj(LeftShift(
-              UnreferencedRT.embed,
-              HoleF,
+        fix.Map(
+          fix.Filter(
+            fix.LeftShift(
+              fix.Unreferenced,
+              func.Hole,
               ExcludeId,
-              ConcatArraysR(
-                MakeArrayR(IntLit(6)),
-                MakeArrayR(BoolLit(true))))).embed,
-            ProjectIndexR(HoleF, IntLit(1)))).embed,
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+              func.ConcatArrays(
+                func.MakeArray(func.Constant(json.int(6))),
+                func.MakeArray(func.Constant(json.bool(true))))),
+            func.ProjectIndexI(func.Hole, 1)),
+          func.ProjectIndexI(func.Hole, 0))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "rewrite map-sort with unused array elements" in {
       val initialArray: JoinFunc =
-        ConcatArraysR(
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(7))),
-            MakeArrayR(IntLit(8))),
-          MakeArrayR(IntLit(9)))
+        func.ConcatArrays(
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(7)))),
+            func.MakeArray(func.Constant(json.int(8)))),
+          func.MakeArray(func.Constant(json.int(9))))
 
-      def initial(src: QST[Fix[QST]]): Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Sort(
-            QCT.inj(LeftShift(
-              src.embed,
-              HoleF,
+      def initial(src: Fix[QST]): Fix[QST] =
+        fix.Map(
+          fix.Sort(
+            fix.LeftShift(
+              src,
+              func.Hole,
               ExcludeId,
-              initialArray)).embed,
-            List(ProjectIndexR(HoleF, IntLit(0))),
+              initialArray),
+            List(func.ProjectIndexI(func.Hole, 0)),
             NonEmptyList(
-              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
-              (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
-          ProjectIndexR(HoleF, IntLit(1)))).embed
+              (func.ProjectIndexI(func.Hole, 1), SortDir.Ascending),
+              (func.ProjectIndexI(func.Hole, 3), SortDir.Ascending))),
+          func.ProjectIndexI(func.Hole, 1))
 
       val expectedArray: JoinFunc =
-        ConcatArraysR(
-          ConcatArraysR(
-            MakeArrayR(IntLit(6)),
-            MakeArrayR(IntLit(7))),
-          MakeArrayR(IntLit(9)))
+        func.ConcatArrays(
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(6))),
+            func.MakeArray(func.Constant(json.int(7)))),
+          func.MakeArray(func.Constant(json.int(9))))
 
-      def expected(src: QST[Fix[QST]]): Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Sort(
-            QCT.inj(LeftShift(
-              src.embed,
-              HoleF,
+      def expected(src: Fix[QST]): Fix[QST] =
+        fix.Map(
+          fix.Sort(
+            fix.LeftShift(
+              src,
+              func.Hole,
               ExcludeId,
-              expectedArray)).embed,
-            List(ProjectIndexR(HoleF, IntLit(0))),
+              expectedArray),
+            List(func.ProjectIndexI(func.Hole, 0)),
             NonEmptyList(
-              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
-              (ProjectIndexR(HoleF, IntLit(2)), SortDir.Ascending)))).embed,
-          ProjectIndexR(HoleF, IntLit(1)))).embed
+              (func.ProjectIndexI(func.Hole, 1), SortDir.Ascending),
+              (func.ProjectIndexI(func.Hole, 2), SortDir.Ascending))),
+          func.ProjectIndexI(func.Hole, 1))
 
-      initial(UnreferencedRT).pruneArraysF must equal(expected(UnreferencedRT))
-      initial(RootRT).pruneArraysF must equal(expected(RootRT))
+      initial(fix.Unreferenced).pruneArraysF must equal(expected(fix.Unreferenced))
+      initial(fix.Root).pruneArraysF must equal(expected(fix.Root))
 
       val data = rootDir </> file("zips")
-      initial(ReadRT(data)).pruneArraysF must equal(expected(ReadRT(data)))
+      initial(fix.Read[AFile](data)).pruneArraysF must equal(expected(fix.Read[AFile](data)))
     }
 
     "not rewrite map-sort with no unused array elements" in {
       val initialArray: JoinFunc =
-        ConcatArraysR(
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(7))),
-            MakeArrayR(IntLit(8))),
-          MakeArrayR(IntLit(9)))
+        func.ConcatArrays(
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(7)))),
+            func.MakeArray(func.Constant(json.int(8)))),
+          func.MakeArray(func.Constant(json.int(9))))
 
       def initial: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Sort(
-            QCT.inj(LeftShift(
-              UnreferencedRT.embed,
-              HoleF,
+        fix.Map(
+          fix.Sort(
+            fix.LeftShift(
+              fix.Unreferenced,
+              func.Hole,
               ExcludeId,
-              initialArray)).embed,
-            List(ProjectIndexR(HoleF, IntLit(0))),
+              initialArray),
+            List(func.ProjectIndexI(func.Hole, 0)),
             NonEmptyList(
-              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
-              (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
-          ProjectIndexR(HoleF, IntLit(2)))).embed
+              (func.ProjectIndexI(func.Hole, 1), SortDir.Ascending),
+              (func.ProjectIndexI(func.Hole, 3), SortDir.Ascending))),
+          func.ProjectIndexI(func.Hole, 2))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite filter with unused array elements" in {
       val initial: Fix[QST] =
-        QCT.inj(Filter(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Filter(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(BoolLit(true))))).embed,
-          ProjectIndexR(HoleF, IntLit(1)))).embed
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.bool(true))))),
+          func.ProjectIndexI(func.Hole, 1))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite sort with unused array elements" in {
       val initial: Fix[QST] =
-        QCT.inj(Sort(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Sort(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(7))))).embed,
-          List(ProjectIndexR(HoleF, IntLit(1))),
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(7))))),
+          List(func.ProjectIndexI(func.Hole, 1)),
           NonEmptyList(
-            (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
-            (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
+            (func.ProjectIndexI(func.Hole, 1), SortDir.Ascending),
+            (func.ProjectIndexI(func.Hole, 1), SortDir.Descending)))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite map with entire array referenced" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          HoleF)).embed
+          func.Hole)
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite map with entire array and specific index referenced" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          ConcatArraysR(
-            MakeArrayR(ProjectIndexR(HoleF, IntLit(0))),
-            MakeArrayR(HoleF)))).embed
+          func.ConcatArrays(
+            func.MakeArray(func.ProjectIndexI(func.Hole, 0)),
+            func.MakeArray(func.Hole)))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "rewrite map with unused array elements 1,2" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+          func.ProjectIndexI(func.Hole, 0))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Map(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            IntLit(6))).embed,
-          HoleF)).embed
+            func.Constant(json.int(6))),
+          func.Hole)
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements 0,2" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          ProjectIndexR(HoleF, IntLit(1)))).embed
+          func.ProjectIndexI(func.Hole, 1))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Map(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            IntLit(7))).embed,
-          HoleF)).embed
+            func.Constant(json.int(7))),
+          func.Hole)
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements 0,1" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          ProjectIndexR(HoleF, IntLit(2)))).embed
+          func.ProjectIndexI(func.Hole, 2))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Map(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            IntLit(8))).embed,
-          HoleF)).embed
+            func.Constant(json.int(8))),
+          func.Hole)
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements in a binary map func" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          AddR(
-            ProjectIndexR(HoleF, IntLit(2)),
-            ProjectIndexR(HoleF, IntLit(0))))).embed
+          func.Add(
+            func.ProjectIndexI(func.Hole, 2),
+            func.ProjectIndexI(func.Hole, 0)))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.Map(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(8))))).embed,
-          AddR(
-            ProjectIndexR(HoleF, IntLit(1)),
-            ProjectIndexR(HoleF, IntLit(0))))).embed
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(8))))),
+          func.Add(
+            func.ProjectIndexI(func.Hole, 1),
+            func.ProjectIndexI(func.Hole, 0)))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite leftshift with nonstatic array dereference" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
+        fix.Map(
           array3,
-          AddR(
-            ProjectIndexR(HoleF, IntLit(2)),
-            ProjectIndexR(HoleF, AddR(IntLit(0), IntLit(1)))))).embed
+          func.Add(
+            func.ProjectIndexI(func.Hole, 2),
+            func.ProjectIndex(func.Hole, func.Add(func.Constant(json.int(0)), func.Constant(json.int(1))))))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "rewrite two leftshift arrays" in {
       val innerInitial: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(      // [6, [7], 8]
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(MakeArrayR(IntLit(7)))),
-            MakeArrayR(IntLit(8))))).embed
+          func.ConcatArrays(      // [6, [7], 8]
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.MakeArray(func.Constant(json.int(7))))),
+            func.MakeArray(func.Constant(json.int(8)))))
 
       val initial: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            QCT.inj(Map(
+        fix.Map(
+          fix.LeftShift(
+            fix.Map(
               innerInitial,
-              ProjectIndexR(HoleF, IntLit(1)))).embed,
-            HoleF,
+              func.ProjectIndexI(func.Hole, 1)),
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+            func.ConcatArrays(func.MakeArray(func.LeftSide), func.MakeArray(func.RightSide))),
+          func.ProjectIndexI(func.Hole, 0))
 
       val innerExpected: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          MakeArrayR(IntLit(7)))).embed
+          func.MakeArray(func.Constant(json.int(7))))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(LeftShift(
-            QCT.inj(Map(
+        fix.Map(
+          fix.LeftShift(
+            fix.Map(
               innerExpected,
-              HoleF)).embed,
-            HoleF,
+              func.Hole),
+            func.Hole,
             ExcludeId,
-            LeftSideF)).embed,
-          HoleF)).embed
+            func.LeftSide),
+          func.Hole)
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite filter-map-filter-leftshift" in {
       val innerArray: JoinFunc =
-        ConcatArraysR(     // [7, 8, 9]
-          ConcatArraysR(
-            MakeArrayR(IntLit(7)),
-            MakeArrayR(IntLit(8))),
-          MakeArrayR(IntLit(9)))
+        func.ConcatArrays(     // [7, 8, 9]
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(7))),
+            func.MakeArray(func.Constant(json.int(8)))),
+          func.MakeArray(func.Constant(json.int(9))))
 
       val srcInitial: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(      // ["a", [7, 8, 9], true]
-            ConcatArraysR(
-              MakeArrayR(StrLit("a")),
-              MakeArrayR(innerArray)),
-            MakeArrayR(BoolLit(true))))).embed
+          func.ConcatArrays(      // ["a", [7, 8, 9], true]
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.str("a"))),
+              func.MakeArray(innerArray)),
+            func.MakeArray(func.Constant(json.bool(true)))))
 
       val initial: Fix[QST] =
-        QCT.inj(Filter(
-          QCT.inj(Map(
-            QCT.inj(Filter(
+        fix.Filter(
+          fix.Map(
+            fix.Filter(
               srcInitial,
-              ProjectIndexR(HoleF, IntLit(2)))).embed,
-            ProjectIndexR(HoleF, IntLit(1)))).embed,
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+              func.ProjectIndexI(func.Hole, 2)),
+            func.ProjectIndexI(func.Hole, 1)),
+          func.ProjectIndexI(func.Hole, 0))
 
       val srcExpected: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(      // [[7, 8, 9], true]
-            MakeArrayR(innerArray),
-            MakeArrayR(BoolLit(true))))).embed
+          func.ConcatArrays(      // [[7, 8, 9], true]
+            func.MakeArray(innerArray),
+            func.MakeArray(func.Constant(json.bool(true)))))
 
       val expected: Fix[QST] =
-        QCT.inj(Filter(
-          QCT.inj(Map(
-            QCT.inj(Filter(
+        fix.Filter(
+          fix.Map(
+            fix.Filter(
               srcExpected,
-              ProjectIndexR(HoleF, IntLit(1)))).embed,
-            ProjectIndexR(HoleF, IntLit(0)))).embed,
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+              func.ProjectIndexI(func.Hole, 1)),
+            func.ProjectIndexI(func.Hole, 0)),
+          func.ProjectIndexI(func.Hole, 0))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite reduce-filter-leftshift" in {
       val srcInitial: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            ConcatArraysR(
-              ConcatArraysR(
-                MakeArrayR(StrLit("a")),
-                MakeArrayR(StrLit("b"))),
-              MakeArrayR(StrLit("c"))),
-            MakeArrayR(StrLit("d"))))).embed
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.ConcatArrays(
+                func.MakeArray(func.Constant(json.str("a"))),
+                func.MakeArray(func.Constant(json.str("b")))),
+              func.MakeArray(func.Constant(json.str("c")))),
+            func.MakeArray(func.Constant(json.str("d")))))
 
-      val initial: QST[Fix[QST]] =
-        QCT.inj(Reduce(
-          QCT.inj(Filter(
+      val initial: Fix[QST] =
+        fix.Reduce(
+          fix.Filter(
             srcInitial,
-            ProjectIndexR(HoleF, IntLit(3)))).embed,
+            func.ProjectIndexI(func.Hole, 3)),
           Nil,
-          List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(2)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
+          List(ReduceFuncs.Count(func.ProjectIndexI(func.Hole, 2))),
+          func.MakeMap(func.Constant(json.int(0)), func.ReduceIndex(0.right)))
 
       val srcExpected: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            MakeArrayR(StrLit("c")),
-            MakeArrayR(StrLit("d"))))).embed
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.str("c"))),
+            func.MakeArray(func.Constant(json.str("d")))))
 
-      val expected: QST[Fix[QST]] =
-        QCT.inj(Reduce(
-          QCT.inj(Filter(
+      val expected: Fix[QST] =
+        fix.Reduce(
+          fix.Filter(
             srcExpected,
-            ProjectIndexR(HoleF, IntLit(1)))).embed,
+            func.ProjectIndexI(func.Hole, 1)),
           Nil,
-          List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
+          List(ReduceFuncs.Count(func.ProjectIndexI(func.Hole, 0))),
+          func.MakeMap(func.Constant(json.int(0)), func.ReduceIndex(0.right)))
 
-      initial.embed.pruneArraysF must equal(expected.embed)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite bucket key with unused array elements" in {
       val initial: Fix[QST] =
-        PBT.inj(BucketKey(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.BucketKey(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              ConcatArraysR(
-                MakeArrayR(IntLit(6)),
-                MakeArrayR(IntLit(7))),
-              MakeArrayR(StrLit("foo"))))).embed,
-          ProjectIndexR(HoleF, IntLit(2)),
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+            func.ConcatArrays(
+              func.ConcatArrays(
+                func.MakeArray(func.Constant(json.int(6))),
+                func.MakeArray(func.Constant(json.int(7)))),
+              func.MakeArray(func.Constant(json.str("foo"))))),
+          func.ProjectIndexI(func.Hole, 2),
+          func.ProjectIndexI(func.Hole, 0))
 
       val expected: Fix[QST] =
-        PBT.inj(BucketKey(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.BucketKey(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(StrLit("foo"))))).embed,
-          ProjectIndexR(HoleF, IntLit(1)),
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.str("foo"))))),
+          func.ProjectIndexI(func.Hole, 1),
+          func.ProjectIndexI(func.Hole, 0))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite bucket index with unused array elements" in {
       val initial: Fix[QST] =
-        PBT.inj(BucketIndex(
+        fix.BucketIndex(
           array3,
-          ProjectIndexR(HoleF, IntLit(2)),
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+          func.ProjectIndexI(func.Hole, 2),
+          func.ProjectIndexI(func.Hole, 0))
 
       val expected: Fix[QST] =
-        PBT.inj(BucketIndex(
-          QCT.inj(LeftShift(
-            UnreferencedRT.embed,
-            HoleF,
+        fix.BucketIndex(
+          fix.LeftShift(
+            fix.Unreferenced,
+            func.Hole,
             ExcludeId,
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(8))))).embed,
-          ProjectIndexR(HoleF, IntLit(1)),
-          ProjectIndexR(HoleF, IntLit(0)))).embed
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(8))))),
+          func.ProjectIndexI(func.Hole, 1),
+          func.ProjectIndexI(func.Hole, 0))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite array used in from of subset" in {
       val initial: Fix[QST] =
-        QCT.inj(Reduce(
-          QCT.inj(Subset(
-            UnreferencedRT.embed,
-            Free.roll(QCT.inj(LeftShift(
-              Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("zips"))))),
-              HoleF,
+        fix.Reduce(
+          fix.Subset(
+            fix.Unreferenced,
+            free.LeftShift(
+              free.Read[AFile](rootDir </> file("zips")),
+              func.Hole,
               IncludeId,
-              ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF))))),
+              func.ConcatArrays(func.MakeArray(func.LeftSide), func.MakeArray(func.RightSide))),
             Drop,
-            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
+            free.Map(free.Unreferenced, func.Constant(json.int(10)))),
           Nil,
-          List(ReduceFuncs.Count(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)))),
-          ReduceIndexF(0.right))).embed
+          List(ReduceFuncs.Count(func.ProjectIndexI(func.ProjectIndexI(func.Hole, 1), 1))),
+          func.ReduceIndex(0.right))
 
       val expected: Fix[QST] =
-        QCT.inj(Reduce(
-          QCT.inj(Subset(
-            UnreferencedRT.embed,
-            Free.roll(QCT.inj(LeftShift(
-              Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("zips"))))),
-              HoleF,
+        fix.Reduce(
+          fix.Subset(
+            fix.Unreferenced,
+            free.LeftShift(
+              free.Read[AFile](rootDir </> file("zips")),
+              func.Hole,
               IncludeId,
-              RightSideF))),
+              func.RightSide),
             Drop,
-            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit[Fix, Hole](10)))))).embed,
+            free.Map(free.Unreferenced, func.Constant(json.int(10)))),
           Nil,
-          List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(1)))),
-          ReduceIndexF(0.right))).embed
+          List(ReduceFuncs.Count(func.ProjectIndexI(func.Hole, 1))),
+          func.ReduceIndex(0.right))
 
       initial.pruneArraysF must equal(expected)
     }
@@ -543,15 +544,15 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite subset with unused array elements" in {
       val initial: Fix[QST] =
-        QCT.inj(Subset(
+        fix.Subset(
           array3,
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 2)),
           Drop,
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](0))))))).embed
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 0)))
 
       initial.pruneArraysF must equal(initial)
     }
@@ -559,14 +560,14 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite union with unused array elements" in {
       val initial: Fix[QST] =
-        QCT.inj(Union(
+        fix.Union(
           array3,
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))))).embed
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 2)),
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 1)))
 
       initial.pruneArraysF must equal(initial)
     }
@@ -574,15 +575,15 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite theta join with unused array elements in source" in {
       val initial: Fix[QST] =
-        TJT.inj(ThetaJoin(
+        fix.ThetaJoin(
           array3,
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
-          HoleQS,
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 2)),
+          free.Hole,
           BoolLit[Fix, JoinSide](true),
           JoinType.Inner,
-          MakeMapR(StrLit("xyz"), LeftSideF))).embed
+          func.MakeMapS("xyz", func.LeftSide))
 
       initial.pruneArraysF must equal(initial)
     }
@@ -590,77 +591,77 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite equi join with unused array elements in source" in {
       val initial: Fix[QST] =
-        EJT.inj(EquiJoin(
+        fix.EquiJoin(
           array3,
-          Free.roll(QCT.inj(Map(
-            HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
-          HoleQS,
-          List((HoleF, HoleF)),
+          free.Map(
+            free.Hole,
+            func.ProjectIndexI(func.Hole, 2)),
+          free.Hole,
+          List((func.Hole, func.Hole)),
           JoinType.Inner,
-          MakeMapR(StrLit("xyz"), LeftSideF))).embed
+          func.MakeMapS("xyz", func.LeftSide))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite equi join with entire array branch referenced in key" in {
       val initial: Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
+        fix.EquiJoin(
+          fix.Unreferenced,
           arrayBranch3,
-          HoleQS,
-          List((HoleF, HoleF)),
+          free.Hole,
+          List((func.Hole, func.Hole)),
           JoinType.Inner,
-          MakeMapR(
-            StrLit("xyz"),
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2))))).embed
+          func.MakeMapS(
+            "xyz",
+            func.ProjectIndexI(func.LeftSide, 2)))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite theta join with entire array branch referenced in condition" in {
       val initial: Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
+        fix.ThetaJoin(
+          fix.Unreferenced,
           arrayBranch3,
-          HoleQS,
-          EqR(
-            AddR(LeftSideF, IntLit[Fix, JoinSide](2)),  // reference entire left branch
-            RightSideF),
+          free.Hole,
+          func.Eq(
+            func.Add(func.LeftSide, func.Constant(json.int(2))),  // reference entire left branch
+            func.RightSide),
           JoinType.Inner,
-          MakeMapR(
-            StrLit("xyz"),
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2))))).embed
+          func.MakeMapS(
+            "xyz",
+            func.ProjectIndexI(func.LeftSide, 2)))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite equi join with entire array branch referenced in combine" in {
       val initial: Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
+        fix.EquiJoin(
+          fix.Unreferenced,
           arrayBranch3,
-          HoleQS,
-          List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
+          free.Hole,
+          List((func.ProjectIndexI(func.Hole, 2), func.Hole)),
           JoinType.Inner,
-          MakeMapR(
-            StrLit("xyz"),
-            LeftSideF))).embed  // reference entire left branch
+          func.MakeMapS(
+            "xyz",
+            func.LeftSide))  // reference entire left branch
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite theta join with entire array branch referenced in combine" in {
       val initial: Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
+        fix.ThetaJoin(
+          fix.Unreferenced,
           arrayBranch3,
-          HoleQS,
-          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+          free.Hole,
+          func.ProjectIndexI(func.LeftSide, 2),
           JoinType.Inner,
-          MakeMapR(
-            StrLit("xyz"),
-            LeftSideF))).embed  // reference entire left branch
+          func.MakeMapS(
+            "xyz",
+            func.LeftSide))  // reference entire left branch
 
       initial.pruneArraysF must equal(initial)
     }
@@ -669,17 +670,15 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // but it might require more work in addition to array pruning
     "not rewrite equi join with array branch referenced outside of join" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
-          EJT.inj(EquiJoin(
-            UnreferencedRT.embed,
+        fix.Map(
+          fix.EquiJoin(
+            fix.Unreferenced,
             arrayBranch3,
-            HoleQS,
-            List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
+            free.Hole,
+            List((func.ProjectIndexI(func.Hole, 2), func.Hole)),
             JoinType.Inner,
-            ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
-          ProjectIndexR(
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
-            IntLit[Fix, Hole](2)))).embed
+            func.ConcatArrays(func.MakeArray(func.LeftSide), func.MakeArray(func.RightSide))),
+          func.ProjectIndexI(func.ProjectIndexI(func.Hole, 0), 2))
 
       initial.pruneArraysF must equal(initial)
     }
@@ -687,17 +686,17 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite theta join with filtered left shift as branch" in {
       val initial: Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
-          Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
-          HoleQS,
-          EqR(
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-            StrLit[Fix, JoinSide]("foo")),
+        fix.ThetaJoin(
+          fix.Unreferenced,
+          free.Filter(arrayBranch3, func.ProjectIndexI(func.Hole, 1)),
+          free.Hole,
+          func.Eq(
+            func.ProjectIndexI(func.LeftSide, 2),
+            func.Constant(json.str("foo"))),
           JoinType.Inner,
-          MakeMapR(
-            StrLit[Fix, JoinSide]("bar"),
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
+          func.MakeMapS(
+            "bar",
+            func.ProjectIndexI(func.LeftSide, 1)))
 
       initial.pruneArraysF must equal(initial)
     }
@@ -705,322 +704,322 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
     // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite equi join with filtered left shift as branch" in {
       val initial: Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
-          Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
-          HoleQS,
+        fix.EquiJoin(
+          fix.Unreferenced,
+          free.Filter(arrayBranch3, func.ProjectIndexI(func.Hole, 1)),
+          free.Hole,
           List(
-            (EqR(
-              ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-              StrLit[Fix, Hole]("foo")),
-              HoleF)),
+            (func.Eq(
+              func.ProjectIndexI(func.Hole, 2),
+              func.Constant(json.str("foo"))),
+              func.Hole)),
           JoinType.Inner,
-          MakeMapR(
-            StrLit[Fix, JoinSide]("bar"),
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
+          func.MakeMapS(
+            "bar",
+            func.ProjectIndexI(func.LeftSide, 1)))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "rewrite theta join with unused array elements in both branches" in {
       val rBranch: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(1)),
-              MakeArrayR(IntLit(2))),
-            MakeArrayR(StrLit("xyz"))))))
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(1))),
+              func.MakeArray(func.Constant(json.int(2)))),
+            func.MakeArray(func.Constant(json.str("xyz")))))
 
       val initial: Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
+        fix.ThetaJoin(
+          fix.Unreferenced,
           arrayBranch3,
           rBranch,
-          EqR(
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+          func.Eq(
+            func.ProjectIndexI(func.LeftSide, 2),
+            func.ProjectIndexI(func.RightSide, 0)),
           JoinType.Inner,
-          MakeMapR(
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](2))))).embed
+          func.MakeMap(
+            func.ProjectIndexI(func.LeftSide, 2),
+            func.ProjectIndexI(func.RightSide, 2)))
 
       val lBranchExpected: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          IntLit(8))))
+          func.Constant(json.int(8)))
 
       val rBranchExpected: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            MakeArrayR(IntLit(1)),
-            MakeArrayR(StrLit("xyz"))))))
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(1))),
+            func.MakeArray(func.Constant(json.str("xyz")))))
 
 
       val expected: Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
+        fix.ThetaJoin(
+          fix.Unreferenced,
           lBranchExpected,
           rBranchExpected,
-          EqR(
-            LeftSideF,
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+          func.Eq(
+            func.LeftSide,
+            func.ProjectIndexI(func.RightSide, 0)),
           JoinType.Inner,
-          MakeMapR(
-            LeftSideF,
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))).embed
+          func.MakeMap(
+            func.LeftSide,
+            func.ProjectIndexI(func.RightSide, 1)))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite equi join with unused array elements in both branches" in {
       val rBranch: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(1)),
-              MakeArrayR(IntLit(2))),
-            MakeArrayR(StrLit("xyz"))))))
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(1))),
+              func.MakeArray(func.Constant(json.int(2)))),
+            func.MakeArray(func.Constant(json.str("xyz")))))
 
       val initial: Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
+        fix.EquiJoin(
+          fix.Unreferenced,
           arrayBranch3,
           rBranch,
           List(
-            (ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-              ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
+            (func.ProjectIndexI(func.Hole, 2),
+              func.ProjectIndexI(func.Hole, 0))),
           JoinType.Inner,
-          MakeMapR(
-            ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](2))))).embed
+          func.MakeMap(
+            func.ProjectIndexI(func.LeftSide, 2),
+            func.ProjectIndexI(func.RightSide, 2)))
 
       val lBranchExpected: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          IntLit(8))))
+          func.Constant(json.int(8)))
 
       val rBranchExpected: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          HoleQS,
-          HoleF,
+        free.LeftShift(
+          free.Hole,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            MakeArrayR(IntLit(1)),
-            MakeArrayR(StrLit("xyz"))))))
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(1))),
+            func.MakeArray(func.Constant(json.str("xyz")))))
 
 
       val expected: Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
+        fix.EquiJoin(
+          fix.Unreferenced,
           lBranchExpected,
           rBranchExpected,
-          List((HoleF, ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
+          List((func.Hole, func.ProjectIndexI(func.Hole, 0))),
           JoinType.Inner,
-          MakeMapR(
-            LeftSideF,
-            ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))).embed
+          func.MakeMap(
+            func.LeftSide,
+            func.ProjectIndexI(func.RightSide, 1)))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with array referenced through struct" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          func.ProjectIndexI(func.Hole, 2),
           ExcludeId,
-          MakeMapR(StrLit("xyz"), RightSideF))).embed
+          func.MakeMapS("xyz", func.RightSide))
 
       val expectedSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          IntLit(8))).embed
+          func.Constant(json.int(8)))
 
       val expected: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           expectedSrc,
-          HoleF,
+          func.Hole,
           ExcludeId,
-          MakeMapR(StrLit("xyz"), RightSideF))).embed
+          func.MakeMapS("xyz", func.RightSide))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift when struct projects an index pruned from repair" in {
       val initial: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Filter(
-            QCT.inj(LeftShift(
-              ReadRT(rootDir </> file("data")).embed,
-              ProjectIndexR(ProjectIndexR(HoleF, IntLit(2)), IntLit(1)),
+        fix.Map(
+          fix.Filter(
+            fix.LeftShift(
+              fix.Read[AFile](rootDir </> file("data")),
+              func.ProjectIndexI(func.ProjectIndexI(func.Hole, 2), 1),
               ExcludeId,
-              ConcatArraysR(
-                ConcatArraysR(
-                  MakeArrayR(IntLit(3)),
-                  MakeArrayR(IntLit(6))),
-                MakeArrayR(BoolLit(true))))).embed,
-            ProjectIndexR(HoleF, IntLit(2)))).embed,
-        ProjectIndexR(HoleF, IntLit(1)))).embed
+              func.ConcatArrays(
+                func.ConcatArrays(
+                  func.MakeArray(func.Constant(json.int(3))),
+                  func.MakeArray(func.Constant(json.int(6)))),
+                func.MakeArray(func.Constant(json.bool(true))))),
+            func.ProjectIndexI(func.Hole, 2)),
+        func.ProjectIndexI(func.Hole, 1))
 
       val expected: Fix[QST] =
-        QCT.inj(Map(
-          QCT.inj(Filter(
-            QCT.inj(LeftShift(
-              ReadRT(rootDir </> file("data")).embed,
-              ProjectIndexR(ProjectIndexR(HoleF, IntLit(2)), IntLit(1)),
+        fix.Map(
+          fix.Filter(
+            fix.LeftShift(
+              fix.Read[AFile](rootDir </> file("data")),
+              func.ProjectIndexI(func.ProjectIndexI(func.Hole, 2), 1),
               ExcludeId,
-              ConcatArraysR(
-                MakeArrayR(IntLit(6)),
-                MakeArrayR(BoolLit(true))))).embed,
-            ProjectIndexR(HoleF, IntLit(1)))).embed,
-        ProjectIndexR(HoleF, IntLit(0)))).embed
+              func.ConcatArrays(
+                func.MakeArray(func.Constant(json.int(6))),
+                func.MakeArray(func.Constant(json.bool(true))))),
+            func.ProjectIndexI(func.Hole, 1)),
+        func.ProjectIndexI(func.Hole, 0))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite left shift with entire array referenced through left side" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          func.ProjectIndexI(func.Hole, 2),
           ExcludeId,
-          MakeMapR(StrLit("xyz"), LeftSideF))).embed
+          func.MakeMapS("xyz", func.LeftSide))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite left shift with array referenced non-statically through struct" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          ProjectIndexR(HoleF, AddR(IntLit(0), IntLit(1))),
+          func.ProjectIndex(func.Hole, func.Add(func.Constant(json.int(0)), func.Constant(json.int(1)))),
           ExcludeId,
-          MakeMapR(StrLit("xyz"), LeftSideF))).embed
+          func.MakeMapS("xyz", func.LeftSide))
 
       initial.pruneArraysF must equal(initial)
     }
 
     "rewrite left shift with array referenced through left side and struct" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          func.ProjectIndexI(func.Hole, 2),
           ExcludeId,
-          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1)))).embed
+          func.ProjectIndexI(func.LeftSide, 1))
 
       val expectedSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            MakeArrayR(IntLit(7)),
-            MakeArrayR(IntLit(8))))).embed
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(7))),
+            func.MakeArray(func.Constant(json.int(8)))))
 
       val expected: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           expectedSrc,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](1)),
+          func.ProjectIndexI(func.Hole, 1),
           ExcludeId,
-          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)))).embed
+          func.ProjectIndexI(func.LeftSide, 0))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with array referenced through struct with a right side reference" in {
       val initialSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(7))),
-            MakeArrayR(ConcatArraysR(MakeArrayR(IntLit(8)), MakeArrayR(IntLit(9))))))).embed
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.Constant(json.int(6))),
+              func.MakeArray(func.Constant(json.int(7)))),
+            func.MakeArray(func.ConcatArrays(func.MakeArray(func.Constant(json.int(8))), func.MakeArray(func.Constant(json.int(9)))))))
 
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           initialSrc,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          func.ProjectIndexI(func.Hole, 2),
           ExcludeId,
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1)))).embed
+          func.ProjectIndexI(func.RightSide, 1))
 
       val expectedSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          ConcatArraysR(MakeArrayR(IntLit(8)), MakeArrayR(IntLit(9))))).embed
+          func.ConcatArrays(func.MakeArray(func.Constant(json.int(8))), func.MakeArray(func.Constant(json.int(9)))))
 
       val expected: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           expectedSrc,
-          HoleF,
+          func.Hole,
           ExcludeId,
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1)))).embed
+          func.ProjectIndexI(func.RightSide, 1))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with entire array unreferenced" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          IntLit(2),
+          func.Constant(json.int(2)),
           ExcludeId,
-          AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
+          func.Add(func.Constant(json.int(2)), func.Constant(json.int(3))))
 
       val expectedSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
+        fix.LeftShift(
+          fix.Unreferenced,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(Constant(ejsonArr()))))).embed
+          func.Constant(json.arr(Nil)))
 
       val expected: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           expectedSrc,
-          IntLit(2),
+          func.Constant(json.int(2)),
           ExcludeId,
-          AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
+          func.Add(func.Constant(json.int(2)), func.Constant(json.int(3))))
 
       initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite left shift with entire array referenced by the right side" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          HoleF,
+          func.Hole,
           ExcludeId,
-          RightSideF)).embed
+          func.RightSide)
 
       initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite left shift with entire array referenced by the left side" in {
       val initial: Fix[QST] =
-        QCT.inj(LeftShift(
+        fix.LeftShift(
           array3,
-          HoleF,
+          func.Hole,
           ExcludeId,
-          LeftSideF)).embed
+          func.LeftSide)
 
       initial.pruneArraysF must equal(initial)
     }
@@ -1028,148 +1027,148 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
 
   "prune arrays branches" should {
     val rBranch: FreeQS =
-      Free.roll(QCT.inj(LeftShift(
-        HoleQS,
-        HoleF,
+      free.LeftShift(
+        free.Hole,
+        func.Hole,
         ExcludeId,
-        ConcatArraysR(
-          ConcatArraysR(
-            MakeArrayR(IntLit(1)),
-            MakeArrayR(IntLit(2))),
-          MakeArrayR(StrLit("xyz"))))))
+        func.ConcatArrays(
+          func.ConcatArrays(
+            func.MakeArray(func.Constant(json.int(1))),
+            func.MakeArray(func.Constant(json.int(2)))),
+          func.MakeArray(func.Constant(json.str("xyz")))))
 
     val innerInitial: FreeQS =
-      Free.roll(TJT.inj(ThetaJoin(
-        Free.roll(QCT.inj(Unreferenced())),
+      free.ThetaJoin(
+        free.Unreferenced,
         arrayBranch3,
         rBranch,
-        EqR(
-          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+        func.Eq(
+          func.ProjectIndexI(func.LeftSide, 2),
+          func.ProjectIndexI(func.RightSide, 0)),
         JoinType.Inner,
-        MakeMapR(
-          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](2))))))
+        func.MakeMap(
+          func.ProjectIndexI(func.LeftSide, 2),
+          func.ProjectIndexI(func.RightSide, 2)))
 
     val lBranchExpected: FreeQS =
-      Free.roll(QCT.inj(LeftShift(
-        HoleQS,
-        HoleF,
+      free.LeftShift(
+        free.Hole,
+        func.Hole,
         ExcludeId,
-        IntLit(8))))
+        func.Constant(json.int(8)))
 
     val rBranchExpected: FreeQS =
-      Free.roll(QCT.inj(LeftShift(
-        HoleQS,
-        HoleF,
+      free.LeftShift(
+        free.Hole,
+        func.Hole,
         ExcludeId,
-        ConcatArraysR(
-          MakeArrayR(IntLit(1)),
-          MakeArrayR(StrLit("xyz"))))))
+        func.ConcatArrays(
+          func.MakeArray(func.Constant(json.int(1))),
+          func.MakeArray(func.Constant(json.str("xyz")))))
 
     val innerExpected: FreeQS =
-      Free.roll(TJT.inj(ThetaJoin(
-        Free.roll(QCT.inj(Unreferenced())),
+      free.ThetaJoin(
+        free.Unreferenced,
         lBranchExpected,
         rBranchExpected,
-        EqR(
-          LeftSideF,
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+        func.Eq(
+          func.LeftSide,
+          func.ProjectIndexI(func.RightSide, 0)),
         JoinType.Inner,
-        MakeMapR(
-          LeftSideF,
-          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))))
+        func.MakeMap(
+          func.LeftSide,
+          func.ProjectIndexI(func.RightSide, 1)))
 
     "rewrite left branch of theta join" in {
       def outer(branch: FreeQS): Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
+        fix.ThetaJoin(
+          fix.Unreferenced,
           branch,
-          HoleQS,
-          EqR(LeftSideF, RightSideF),
+          free.Hole,
+          func.Eq(func.LeftSide, func.RightSide),
           JoinType.Inner,
-          MakeMapR(LeftSideF, RightSideF))).embed
+          func.MakeMap(func.LeftSide, func.RightSide))
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite right branch of theta join" in {
       def outer(branch: FreeQS): Fix[QST] =
-        TJT.inj(ThetaJoin(
-          UnreferencedRT.embed,
-          HoleQS,
+        fix.ThetaJoin(
+          fix.Unreferenced,
+          free.Hole,
           branch,
-          EqR(LeftSideF, RightSideF),
+          func.Eq(func.LeftSide, func.RightSide),
           JoinType.Inner,
-          MakeMapR(LeftSideF, RightSideF))).embed
+          func.MakeMap(func.LeftSide, func.RightSide))
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite left branch of equi join" in {
       def outer(branch: FreeQS): Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
+        fix.EquiJoin(
+          fix.Unreferenced,
           branch,
-          HoleQS,
-          List((HoleF, HoleF)),
+          free.Hole,
+          List((func.Hole, func.Hole)),
           JoinType.Inner,
-          MakeMapR(LeftSideF, RightSideF))).embed
+          func.MakeMap(func.LeftSide, func.RightSide))
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite right branch of equi join" in {
       def outer(branch: FreeQS): Fix[QST] =
-        EJT.inj(EquiJoin(
-          UnreferencedRT.embed,
-          HoleQS,
+        fix.EquiJoin(
+          fix.Unreferenced,
+          free.Hole,
           branch,
-          List((HoleF, HoleF)),
+          List((func.Hole, func.Hole)),
           JoinType.Inner,
-          MakeMapR(LeftSideF, RightSideF))).embed
+          func.MakeMap(func.LeftSide, func.RightSide))
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite left branch of union" in {
       def outer(branch: FreeQS): Fix[QST] =
-        QCT.inj(Union(
-          UnreferencedRT.embed,
+        fix.Union(
+          fix.Unreferenced,
           branch,
-          HoleQS)).embed
+          free.Hole)
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite right branch of union" in {
       def outer(branch: FreeQS): Fix[QST] =
-        QCT.inj(Union(
-          UnreferencedRT.embed,
-          HoleQS,
-          branch)).embed
+        fix.Union(
+          fix.Unreferenced,
+          free.Hole,
+          branch)
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite from branch of subset" in {
       def outer(branch: FreeQS): Fix[QST] =
-        QCT.inj(Subset(
-          UnreferencedRT.embed,
+        fix.Subset(
+          fix.Unreferenced,
           branch,
           Drop,
-          HoleQS)).embed
+          free.Hole)
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
 
     "rewrite count branch of subset" in {
       def outer(branch: FreeQS): Fix[QST] =
-        QCT.inj(Subset(
-          UnreferencedRT.embed,
-          HoleQS,
+        fix.Subset(
+          fix.Unreferenced,
+          free.Hole,
           Drop,
-          branch)).embed
+          branch)
 
       outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }

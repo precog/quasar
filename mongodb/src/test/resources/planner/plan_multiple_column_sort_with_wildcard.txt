@@ -1,41 +1,35 @@
 Chain
 ├─ $ReadF(db; zips)
 ├─ $ProjectF
-│  ├─ Name("0" -> [
-│  │       {
-│  │         "$cond": [
-│  │           {
-│  │             "$and": [
-│  │               {
-│  │                 "$lte": [
-│  │                   { "$literal": {  } },
-│  │                   {
-│  │                     "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │                   }]
-│  │               },
-│  │               {
-│  │                 "$lt": [
-│  │                   {
-│  │                     "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │                   },
-│  │                   { "$literal": [] }]
-│  │               }]
-│  │           },
-│  │           { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] },
-│  │           { "$literal": undefined }]
-│  │       },
-│  │       ["$_id", "$$ROOT"]])
+│  ├─ Name("0" -> ["$_id", "$$ROOT"])
 │  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(0: (isObject(_["0"][1][1]) && (! Array.isArray(_["0"][1][1]))) ? _["0"][1][1].pop : undefined)
-│  │     ├─ Key(1: (isObject(_["0"][1][1]) && (! Array.isArray(_["0"][1][1]))) ? _["0"][1][1].city : undefined)
+│  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined)
+│  │     ├─ Key(1: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].city : undefined)
 │  │     ╰─ Key(src: _["0"])
 │  ╰─ Scope(Map())
 ├─ $SortF
 │  ├─ SortKey(0 -> Ascending)
 │  ╰─ SortKey(1 -> Descending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("__quasar_mongodb_sigil" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             {
+   │               "$lte": [
+   │                 { "$literal": {  } },
+   │                 { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] }]
+   │             },
+   │             {
+   │               "$lt": [
+   │                 { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
+   │                 { "$literal": [] }]
+   │             }]
+   │         },
+   │         { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
+   │         { "$literal": undefined }]
+   │     })
    ╰─ ExcludeId

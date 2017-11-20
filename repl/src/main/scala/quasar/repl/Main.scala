@@ -111,7 +111,7 @@ object Main {
     S4: ManageFile :<: S,
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
-    TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
+    TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, 10, OutputFormat.Table, Map())).map { ref =>
       val i: ReplEff[S, ?] ~> DriverEffM =
         injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(ref)) :+:
         injectFT[ConsoleIO, DriverEff]                                :+:

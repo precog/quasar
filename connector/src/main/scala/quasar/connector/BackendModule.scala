@@ -36,6 +36,7 @@ import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
 import quasar.qscript.qsu.LPtoQS
+import quasar.qscript.RenderQScriptDSL._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -160,12 +161,12 @@ trait BackendModule {
       _ <- logPhase[M](PhaseResult.tree("QScript (Educated)", qs))
 
       shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
-      _ <- logPhase[M](PhaseResult.tree("QScript (ShiftRead)", shifted))
+      _ <- logPhase[M](PhaseResult.treeAndCode("QScript (ShiftRead)", shifted))
 
       optimized =
         shifted.transHylo(optimize[T], Unicoalesce.Capture[T, QS[T]].run)
 
-      _ <- logPhase[M](PhaseResult.tree("QScript (Optimized)", optimized))
+      _ <- logPhase[M](PhaseResult.treeAndCode("QScript (Optimized)", optimized))
     } yield optimized
   }
 

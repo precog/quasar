@@ -25,7 +25,7 @@ import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.Planner.PlannerError
-import quasar.qscript.{Map => _, Read => _, _}, MapFuncsCore._
+import quasar.qscript.{Map => _, Read => _, _}
 import quasar.sql._
 
 import scala.collection.JavaConverters._
@@ -137,14 +137,14 @@ class BasicQueryEnablementSpec
   "QScript to N1QL" should {
 
     "read followed by a map" in {
+      import qstdsl._
       // select (a + b) from foo
       val qs =
-        chain[Fix[QST], QST](
-          SRTF.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(qscript.Map((),
-            Free.roll(MFC(Add(
-              ProjectKeyR(HoleF, StrLit("a")),
-              ProjectKeyR(HoleF, StrLit("b"))))))))
+        fix.Map(
+          fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          func.Add(
+            func.ProjectKeyS(func.Hole, "a"),
+            func.ProjectKeyS(func.Hole, "b")))
 
       val n1ql = n1qlFromQS(qs)
 

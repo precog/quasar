@@ -27,6 +27,8 @@ import matryoshka.data._
 import scalaz._, Scalaz._
 
 final class RewriteNullSpec extends quasar.Qspec {
+  val func = construction.Func[Fix]
+
   def eq[T[_[_]]: BirecursiveT, A](lhs: FreeMapA[T, A], rhs: FreeMapA[T, A]): FreeMapA[T, A] =
     Free.roll(MFC(Eq(lhs, rhs)))
 
@@ -44,19 +46,19 @@ final class RewriteNullSpec extends quasar.Qspec {
 
   "rewriteNullCheck" should {
     "rewrite Eq(Null, rhs) into Eq(TypeOf(rhs), 'null')" in {
-      rewrite(eq(NullLit(), expr)) must equal(eq(typeOf(expr), nullStr))
+      rewrite(func.Eq(NullLit(), expr)) must equal(func.Eq(func.TypeOf(expr), nullStr))
     }
 
     "rewrite Eq(lhs, Null) into Eq(TypeOf(lhs), 'null')" in {
-      rewrite(eq(expr, NullLit())) must equal(eq(typeOf(expr), nullStr))
+      rewrite(func.Eq(expr, NullLit())) must equal(func.Eq(func.TypeOf(expr), nullStr))
     }
 
     "rewrite Neq(Null, rhs) into Neq(TypeOf(rhs), 'null')" in {
-      rewrite(neq(NullLit(), expr)) must equal(neq(typeOf(expr), nullStr))
+      rewrite(func.Neq(NullLit(), expr)) must equal(func.Neq(func.TypeOf(expr), nullStr))
     }
 
     "rewrite Neq(lhs, Null) into Neq(TypeOf(lhs), 'null')" in {
-      rewrite(neq(expr, NullLit())) must equal(neq(typeOf(expr), nullStr))
+      rewrite(func.Neq(expr, NullLit())) must equal(func.Neq(func.TypeOf(expr), nullStr))
     }
   }
 }

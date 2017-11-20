@@ -33,10 +33,12 @@ import scalaz._, Scalaz._
 final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[Fix] {
   import DeepShape._
 
+  import qstdsl._
+
   "DeepShape" >> {
 
     val shape: FreeShape[Fix] =
-      ProjectKeyR(freeShape[Fix](RootShape()), StrLit("quxx"))
+      func.ProjectKeyS(freeShape[Fix](RootShape()), "quxx")
 
     "QScriptCore" >> {
 
@@ -44,33 +46,34 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         implicitly[DeepShape[Fix, QScriptCore]].deepShapeƒ
 
       "Map" >> {
-        val func: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
-        val qs = Map(shape, func)
+        val fun: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val qs = Map(shape, fun)
 
-        deepShapeQS(qs) must equal(func >> shape)
+        deepShapeQS(qs) must equal(fun >> shape)
       }
 
       "LeftShift" >> {
-        val struct: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
+        val struct: FreeMap = func.ProjectIndexI(func.Hole, 3)
 
         val repair: JoinFunc =
-          ConcatArraysR(
-            MakeArrayR(AddR(LeftSideF[Fix], IntLit(9))),
-            MakeArrayR(SubtractR(RightSideF[Fix], IntLit(10))))
+          func.ConcatArrays(
+            func.MakeArray(func.Add(func.LeftSide, IntLit(9))),
+            func.MakeArray(func.Subtract(func.RightSide, IntLit(10))))
 
         val qs = LeftShift(shape, struct, IdOnly, repair)
 
         val expected: FreeShape[Fix] =
-          ConcatArraysR(
-            MakeArrayR(AddR(shape, IntLit(9))),
-            MakeArrayR(SubtractR(freeShape(Shifting(IdOnly, struct >> shape)), IntLit(10))))
+          func.ConcatArrays(
+            func.MakeArray(func.Add(shape, IntLit(9))),
+            func.MakeArray(func.Subtract(freeShape(Shifting(IdOnly, struct >> shape)), IntLit(10))))
 
         deepShapeQS(qs) must equal(expected)
       }
 
       "Sort" >> {
-        val bucket: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
-        val order: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(5))
+        import qsdsl.func
+        val bucket: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val order: FreeMap = func.ProjectIndexI(func.Hole, 5)
 
         val qs = Sort(shape, List(bucket), NonEmptyList[(FreeMap, SortDir)]((order, SortDir.Ascending)))
 
@@ -78,22 +81,23 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       }
 
       "Filter" >> {
-        val func: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
-        val qs = Filter(shape, func)
+        val fun: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val qs = Filter(shape, fun)
 
         deepShapeQS(qs) must equal(freeShape[Fix](UnknownShape()))
       }
 
       "Subset" >> {
+        import qstdsl._
         val from: FreeQS =
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("foo")))))
+          free.Map(
+            free.Hole,
+            func.ProjectKey(func.Hole, func.Constant(json.str("foo"))))
 
         val count: FreeQS =
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("bar")))))
+          free.Map(
+            free.Hole,
+            func.ProjectKey(func.Hole, func.Constant(json.str("bar"))))
 
         val qs = Subset(shape, from, Take, count)
 
@@ -102,14 +106,14 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
       "Union" >> {
         val lBranch: FreeQS =
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("foo")))))
+          free.Map(
+            free.Hole,
+            func.ProjectKeyS(func.Hole, "foo"))
 
         val rBranch: FreeQS =
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("bar")))))
+          free.Map(
+            free.Hole,
+            func.ProjectKeyS(func.Hole, "bar"))
 
         val qs = Union(shape, lBranch, rBranch)
 
@@ -117,22 +121,22 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       }
 
       "Reduce" >> {
-        val bucket: List[FreeMap] = List(ProjectIndexR(HoleF[Fix], IntLit(3)))
+        val bucket: List[FreeMap] = List(func.ProjectIndexI(func.Hole, 3))
 
         val reducers: List[ReduceFunc[FreeMap]] =
-          List(ReduceFuncs.Sum(ProjectKeyR(HoleF[Fix], StrLit("foobar"))))
+          List(ReduceFuncs.Sum(func.ProjectKeyS(func.Hole, "foobar")))
 
         val repair: FreeMapA[ReduceIndex] =
-          ConcatArraysR(
-            MakeArrayR(AddR(ReduceIndexF(0.left), IntLit(9))),
-            MakeArrayR(SubtractR(ReduceIndexF(0.right), IntLit(10))))
+          func.ConcatArrays(
+            func.MakeArray(func.Add(func.ReduceIndex(0.left), func.Constant(json.int(9)))),
+            func.MakeArray(func.Subtract(func.ReduceIndex(0.right), func.Constant(json.int(10)))))
 
         val qs = Reduce(shape, bucket, reducers, repair)
 
         val expected: FreeShape[Fix] =
-          ConcatArraysR(
-            MakeArrayR(AddR(bucket(0) >> shape, IntLit(9))),
-            MakeArrayR(SubtractR(freeShape(Reducing(reducers(0).map(_ >> shape))), IntLit(10))))
+          func.ConcatArrays(
+            func.MakeArray(func.Add(bucket(0) >> shape, func.Constant(json.int(9)))),
+            func.MakeArray(func.Subtract(freeShape(Reducing(reducers(0).map(_ >> shape))), func.Constant(json.int(10)))))
 
         deepShapeQS(qs) must equal(expected)
       }
@@ -174,19 +178,19 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       val deepShapePB: Algebra[ProjectBucket, FreeShape[Fix]] =
         implicitly[DeepShape[Fix, ProjectBucket]].deepShapeƒ
 
-      val value: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(7))
-      val access: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(5))
+      val value: FreeMap = func.ProjectIndexI(func.Hole, 7)
+      val access: FreeMap = func.ProjectIndexI(func.Hole, 5)
 
       "BucketKey" >> {
         val qs = BucketKey(shape, value, access)
-        val expected = ProjectKeyR(value >> shape, access >> shape)
+        val expected = func.ProjectKey(value >> shape, access >> shape)
 
         deepShapePB(qs) must equal(expected)
       }
 
       "BucketIndex" >> {
         val qs = BucketIndex(shape, value, access)
-        val expected = ProjectIndexR(value >> shape, access >> shape)
+        val expected = func.ProjectIndex(value >> shape, access >> shape)
 
         deepShapePB(qs) must equal(expected)
       }
@@ -195,27 +199,27 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
     "Joins" >> {
 
       val lBranch: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("foo"))))),
-          HoleF,
+        free.LeftShift(
+          free.Map(
+            free.Hole,
+            func.ProjectKeyS(func.Hole, "foo")),
+          func.Hole,
           IncludeId,
-          RightSideF)))
+          func.RightSide)
 
       val rBranch: FreeQS =
-        Free.roll(QCT.inj(LeftShift(
-          Free.roll(QCT.inj(Map(
-            Free.point(SrcHole),
-            ProjectKeyR(HoleF, StrLit("bar"))))),
-          HoleF,
+        free.LeftShift(
+          free.Map(
+            free.Hole,
+            func.ProjectKeyS(func.Hole, "bar")),
+          func.Hole,
           IncludeId,
-          LeftSideF)))
+          func.LeftSide)
 
       val combine: JoinFunc =
-        Free.roll(MFC(Add(
-          ProjectIndexR(LeftSideF, IntLit(1)),
-          ProjectIndexR(RightSideF, IntLit(2)))))
+        func.Add(
+          func.ProjectIndexI(func.LeftSide, 1),
+          func.ProjectIndexI(func.RightSide, 2))
 
       "ThetaJoin" >> {
 
@@ -226,18 +230,14 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           shape,
           lBranch,
           rBranch,
-          BoolLit[Fix, JoinSide](true),
+          func.Constant(json.bool(true)),
           JoinType.Inner,
           combine)
 
         val expected: FreeShape[Fix] =
-          Free.roll(MFC(Add(
-            ProjectIndexR(
-              freeShape(Shifting(IncludeId, ProjectKeyR(shape, StrLit("foo")))),
-              IntLit(1)),
-            ProjectIndexR(
-              ProjectKeyR(shape, StrLit("bar")),
-              IntLit(2)))))
+          func.Add(
+            func.ProjectIndexI(freeShape(Shifting(IncludeId, func.ProjectKeyS(shape, "foo"))), 1),
+            func.ProjectIndexI(func.ProjectKeyS(shape, "bar"), 2))
 
         deepShapeTJ(qs) must equal(expected)
       }
@@ -251,18 +251,14 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           shape,
           lBranch,
           rBranch,
-          List((BoolLit[Fix, Hole](true), BoolLit[Fix, Hole](true))),
+          List((func.Constant[Hole](json.bool(true)), func.Constant[Hole](json.bool(true)))),
           JoinType.Inner,
           combine)
 
         val expected: FreeShape[Fix] =
-          Free.roll(MFC(Add(
-            ProjectIndexR(
-              freeShape(Shifting(IncludeId, ProjectKeyR(shape, StrLit("foo")))),
-              IntLit(1)),
-            ProjectIndexR(
-              ProjectKeyR(shape, StrLit("bar")),
-              IntLit(2)))))
+          func.Add(
+            func.ProjectIndexI(freeShape(Shifting(IncludeId, func.ProjectKeyS(shape, "foo"))), 1),
+            func.ProjectIndexI(func.ProjectKeyS(shape, "bar"), 2))
 
         deepShapeEJ(qs) must equal(expected)
       }

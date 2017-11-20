@@ -1,18 +1,26 @@
 Chain
 ├─ $ReadF(db; foo)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ Arr
-│  │     │  ├─ Obj
-│  │     │  │  ╰─ Key(bar: _.bar)
-│  │     │  ╰─ Ident(_)
-│  │     ╰─ Obj
-│  │        ├─ Key(0: __val[1].bar / 10.0)
-│  │        ╰─ Key(src: __val)
-│  ╰─ Scope(Map())
+├─ $ProjectF
+│  ├─ Name("0" -> {
+│  │       "$cond": [
+│  │         { "$eq": [{ "$literal": 10.0 }, { "$literal": NumberInt("0") }] },
+│  │         {
+│  │           "$cond": [
+│  │             { "$eq": ["$bar", { "$literal": NumberInt("0") }] },
+│  │             { "$literal": NaN },
+│  │             {
+│  │               "$cond": [
+│  │                 { "$gt": ["$bar", { "$literal": NumberInt("0") }] },
+│  │                 { "$literal": Infinity },
+│  │                 { "$literal": -Infinity }]
+│  │             }]
+│  │         },
+│  │         { "$divide": ["$bar", { "$literal": 10.0 }] }]
+│  │     })
+│  ├─ Name("src" -> "$$ROOT")
+│  ╰─ ExcludeId
 ├─ $SortF
 │  ╰─ SortKey(0 -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("bar" -> "$src.bar")
    ╰─ ExcludeId

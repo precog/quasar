@@ -151,6 +151,29 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         (runT(run)(query.ls(d1)).runEither must beLeft(pathErr(pathNotFound(d1))))
       }
 
+      // fixes #2973
+      "moving a directory to not existing path should create it" >> {
+        val root = managePrefix </> dir("d1")
+        val d2 = root </> dir("d2")
+        val trash = root </> dir(".trash")
+        val trash_d2 = trash </> dir("d2")
+
+        val f = d2 </> file("f")
+
+        val expectedRoot = List[PathSegment](DirName(".trash").left)
+        val expectedTrash = List[PathSegment](DirName("d2").left)
+        val expectedFiles = List[PathSegment](FileName("f").right)
+
+        val p = write.save(f, oneDoc.toProcess).drain ++
+                manage.moveDir(d2, trash_d2, MoveSemantics.FailIfExists).liftM[Process]
+
+        (execT(run, p).runOption must beNone) and
+        (runT(run)(query.ls(root)).runEither must beRight(containTheSameElementsAs(expectedRoot))) and
+        (runT(run)(query.ls(trash)).runEither must beRight(containTheSameElementsAs(expectedTrash))) and
+        (runT(run)(query.ls(trash_d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
+        (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2))))
+      }
+
       "moving a nonexistent dir to another nonexistent dir fails with src NotFound" >> {
         val d1 = managePrefix </> dir("dirdnetodirdne") </> dir("d1")
         val d2 = managePrefix </> dir("dirdnetodirdne") </> dir("d2")

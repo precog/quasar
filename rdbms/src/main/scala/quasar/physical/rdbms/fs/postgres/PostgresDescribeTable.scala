@@ -74,10 +74,14 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
       .map(_.map(Schema.apply))
   }
 
+
   override def schemaExists(schema: Schema): ConnectionIO[Boolean] =
     if (schema.isRoot) true.point[ConnectionIO]
     else
-      descQuery(whereSchema(schema), _.nonEmpty)
+      sql"""SELECT 1 FROM information_schema.schemata WHERE SCHEMA_NAME=${schema.shows}"""
+      .query[Int]
+      .list
+      .map(_.nonEmpty)
 
   override def tableExists(
       tablePath: TablePath): ConnectionIO[Boolean] =

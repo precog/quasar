@@ -3,7 +3,28 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; baz)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$literal": true })
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             {
+│  │  │  │               "$lte": [
+│  │  │  │                 { "$literal": {  } },
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 }]
+│  │  │  │             },
+│  │  │  │             {
+│  │  │  │               "$lt": [
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 },
+│  │  │  │                 { "$literal": [] }]
+│  │  │  │             }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
@@ -32,7 +53,28 @@ Chain
 │     │  ├─ Chain
 │     │  │  ├─ $ReadF(db; foo)
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("0" -> { "$literal": true })
+│     │  │  │  ├─ Name("0" -> {
+│     │  │  │  │       "$cond": [
+│     │  │  │  │         {
+│     │  │  │  │           "$and": [
+│     │  │  │  │             {
+│     │  │  │  │               "$lte": [
+│     │  │  │  │                 { "$literal": {  } },
+│     │  │  │  │                 {
+│     │  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │  │  │  │                 }]
+│     │  │  │  │             },
+│     │  │  │  │             {
+│     │  │  │  │               "$lt": [
+│     │  │  │  │                 {
+│     │  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │  │  │  │                 },
+│     │  │  │  │                 { "$literal": [] }]
+│     │  │  │  │             }]
+│     │  │  │  │         },
+│     │  │  │  │         { "$literal": true },
+│     │  │  │  │         { "$literal": false }]
+│     │  │  │  │     })
 │     │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $MatchF
@@ -59,7 +101,28 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; bar)
 │     │     ├─ $ProjectF
-│     │     │  ├─ Name("0" -> { "$literal": true })
+│     │     │  ├─ Name("0" -> {
+│     │     │  │       "$cond": [
+│     │     │  │         {
+│     │     │  │           "$and": [
+│     │     │  │             {
+│     │     │  │               "$lte": [
+│     │     │  │                 { "$literal": {  } },
+│     │     │  │                 {
+│     │     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │     │  │                 }]
+│     │     │  │             },
+│     │     │  │             {
+│     │     │  │               "$lt": [
+│     │     │  │                 {
+│     │     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│     │     │  │                 },
+│     │     │  │                 { "$literal": [] }]
+│     │     │  │             }]
+│     │     │  │         },
+│     │     │  │         { "$literal": true },
+│     │     │  │         { "$literal": false }]
+│     │     │  │     })
 │     │     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │     │     │  ╰─ ExcludeId
 │     │     ├─ $MatchF
@@ -92,7 +155,32 @@ Chain
 │     │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
 │     │  ╰─ Scope(Map())
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> { "$literal": true })
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             {
+│     │  │               "$lte": [
+│     │  │                 { "$literal": {  } },
+│     │  │                 {
+│     │  │                   "$arrayElemAt": [
+│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│     │  │                     { "$literal": NumberInt("1") }]
+│     │  │                 }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$lt": [
+│     │  │                 {
+│     │  │                   "$arrayElemAt": [
+│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
+│     │  │                     { "$literal": NumberInt("1") }]
+│     │  │                 },
+│     │  │                 { "$literal": [] }]
+│     │  │             }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
 │     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF

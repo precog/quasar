@@ -119,4 +119,15 @@ package object matryoshka {
     (implicit T: Recursive.Aux[T, F], U: Corecursive.Aux[U, H], BF: Traverse[F])
   : M[U] =
     T.traverseR(t)(ψ(_) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ)
+
+  implicit def freeEqualT[A: Equal]: EqualT[Free[?[_], A]] = new EqualT[Free[?[_], A]] {
+    def equal[F[_]: Functor]
+    (tf1: Free[F, A], tf2: Free[F, A])
+    (implicit del: Delay[Equal, F]) =
+      (tf1.resume, tf2.resume) match {
+        case (-\/(l1), -\/(l2)) => del(equalT[F](del)).equal(l1, l2)
+        case (\/-(r1), \/-(r2)) => r1 ≟ r2
+        case _ => false
+      }
+  }
 }

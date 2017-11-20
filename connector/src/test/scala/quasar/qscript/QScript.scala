@@ -19,7 +19,7 @@ package quasar.qscript
 import slamdata.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
 import quasar.common.{JoinType, SortDir}
-import quasar.contrib.pathy.AFile
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}
@@ -27,11 +27,9 @@ import quasar.qscript.MapFuncsCore._
 import quasar.sql.{CompilerHelpers, JoinDir, SqlStringContext}
 import quasar.std.StdLib, StdLib._
 
-import scala.Predef.implicitly
 import scala.collection.immutable.{Map => ScalaMap}
 
 import matryoshka._
-import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -41,15 +39,18 @@ class QScriptSpec
     with CompilerHelpers
     with QScriptHelpers
     with TreeMatchers {
+
+  import qsdsl._
+
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
        convert(lc.some, lpf.constant(Data.Bool(true))) must
-         beSome(beTreeEqual(chain(
-           UnreferencedR,
-           QC.inj(Map((), BoolLit(true))))))
+         beSome(beTreeEqual(chainQS(
+           fix.Unreferenced,
+           fix.Map(_, func.Constant(json.bool(true))))))
     }
 
     "fail to convert a constant set" in {
@@ -63,176 +64,175 @@ class QScriptSpec
 
     "convert a simple read" in {
       convert(lc.some, lpRead("/foo/bar")) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> dir("foo") </> file("bar")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
+      beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide))))
     }
 
     // FIXME: This can be simplified to a Union of the Reads - the LeftShift
     //        cancels out the MakeMaps.
     "convert a directory read" in {
       convert(lc.some, lpRead("/foo")) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> dir("foo")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
+      beSome(beTreeEqual(chainQS(
+        fix.Read[ADir](rootDir </> dir("foo")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide))))
     }
 
     "convert a squashed read" in {
       // "select * from foo"
       convert(lc.some, identity.Squash(lpRead("/foo/bar")).embed) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> dir("foo") </> file("bar")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
+      beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide))))
     }
 
     "convert a basic select with type checking" in {
       val lp = fullCompileExp(sqlE"select foo as foo from bar")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("bar")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("bar")),
+        fix.LeftShift(_,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(MakeMap(
-            StrLit("foo"),
-            Free.roll(MFC(Guard(
-              RightSideF,
+          func.MakeMap(
+            func.Constant(json.str("foo")),
+            func.Guard(
+              func.RightSide,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              ProjectKeyR(RightSideF, StrLit("foo")),
-              Free.roll(MFC(Undefined())))))))))))))
+              func.ProjectKey(func.RightSide, func.Constant(json.str("foo"))),
+              func.Undefined))))))
     }
 
     // TODO: This would benefit from better normalization around Sort (#1545)
     "convert a basic order by" in {
       val lp = fullCompileExp(sqlE"select * from zips order by city")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(MakeArray(
-              Free.roll(MFC(Guard(
-                ProjectIndexR(RightSideF, IntLit(1)),
+          func.ConcatArrays(
+            func.MakeArray(
+              func.Guard(
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                 Type.Obj(scala.Predef.Map(), Type.Top.some),
-                ProjectIndexR(RightSideF, IntLit(1)),
-                Free.roll(MFC(Undefined())))))))),
-            Free.roll(MFC(MakeArray(
-              Free.roll(MFC(Guard(
-                ProjectIndexR(RightSideF, IntLit(1)),
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                func.Undefined)),
+            func.MakeArray(
+              func.Guard(
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                 Type.Obj(scala.Predef.Map(), Type.Top.some),
-                ProjectKeyR(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  StrLit("city")),
-                Free.roll(MFC(Undefined()))))))))))))),
-        QC.inj(Sort((),
+                func.ProjectKey(
+                  func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                  func.Constant(json.str("city"))),
+                func.Undefined)))),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(1))), SortDir.asc).wrapNel),
+        fix.Map(_, func.ProjectIndex(func.Hole, func.Constant(json.int(0)))))))
     }
 
     "convert a basic reduction" in {
       val lp = fullCompileExp(sqlE"select sum(pop) as pop from bar")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("bar")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-        QC.inj(Reduce((),
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("bar")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide),
+        fix.Reduce(_,
           Nil,
           List(ReduceFuncs.Sum(
-            Free.roll(MFC(Guard(
-              HoleF, Type.Obj(ScalaMap(), Type.Top.some),
-              Free.roll(MFC(Guard(
-                ProjectKeyR(HoleF, StrLit("pop")),
+            func.Guard(
+              func.Hole, Type.Obj(ScalaMap(), Type.Top.some),
+              func.Guard(
+                func.ProjectKey(func.Hole, func.Constant(json.str("pop"))),
                 Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
-                ProjectKeyR(HoleF, StrLit("pop")),
-                Free.roll(MFC(Undefined()))))),
-              Free.roll(MFC(Undefined()))))))),
-          Free.roll(MFC(MakeMap(StrLit("pop"), ReduceIndexF(0.right)))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+                func.ProjectKey(func.Hole, func.Constant(json.str("pop"))),
+                func.Undefined),
+              func.Undefined))),
+          func.MakeMap(func.Constant(json.str("pop")), func.ReduceIndex(0.right))))))
     }
 
     "convert a simple wildcard take" in {
       val lp = fullCompileExp(sqlE"select * from bar limit 10")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(
-        QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+        fix.Subset(
+          fix.Unreferenced,
+          free.LeftShift(free.Read[AFile](rootDir </> file("bar")), func.Hole, ExcludeId, func.RightSide),
           Take,
-          Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
+          free.Map(free.Unreferenced, func.Constant(json.int(10))))))
     }
 
     "convert a simple take through a path" in {
       convert(lc.some, StdLib.set.Take(lpRead("/foo/bar"), lpf.constant(Data.Int(10))).embed) must
         beSome(beTreeEqual(
-          QC.inj(Subset(
-            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-            Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+          fix.Subset(
+            fix.Unreferenced,
+            free.LeftShift(free.Read[AFile](rootDir </> dir("foo") </> file("bar")), func.Hole, ExcludeId, func.RightSide),
             Take,
-            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
+            free.Map(free.Unreferenced, func.Constant(json.int(10))))))
     }
 
     "convert a multi-field select" in {
       val lp = fullCompileExp(sqlE"select city, state from bar")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("bar")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("bar")),
+        fix.LeftShift(_,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(ConcatMaps(
-            Free.roll(MFC(MakeMap(
-              StrLit("city"),
-              Free.roll(MFC(Guard(
-                RightSideF,
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("city")),
+              func.Guard(
+                func.RightSide,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectKeyR(RightSideF, StrLit("city")),
-                Free.roll(MFC(Undefined())))))))),
-            Free.roll(MFC(MakeMap(
-              StrLit("state"),
-              Free.roll(MFC(Guard(
-                RightSideF,
+                func.ProjectKey(func.RightSide, func.Constant(json.str("city"))),
+                func.Undefined)),
+            func.MakeMap(
+              func.Constant(json.str("state")),
+              func.Guard(
+                func.RightSide,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectKeyR(RightSideF, StrLit("state")),
-                Free.roll(MFC(Undefined()))))))))))))))))
+                func.ProjectKey(func.RightSide, func.Constant(json.str("state"))),
+                func.Undefined)))))))
     }
 
     "convert a simple read with path projects" in {
       convert(lc.some, lpRead("/some/bar/car")) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> dir("some") </> file("bar")),
-        QC.inj(LeftShift((),
-          ProjectKeyR(HoleF, StrLit("car")),
+      beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> dir("some") </> file("bar")),
+        fix.LeftShift(_,
+          func.ProjectKey(func.Hole, func.Constant(json.str("car"))),
           ExcludeId,
-          RightSideF)))))
+          func.RightSide))))
     }
 
     "convert a basic invoke" in {
       convert(None, math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
-      beSome(beTreeEqual(chain(
-        RootR,
-        TJ.inj(ThetaJoin((),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(QCT.inj(Map(
-              Free.point(SrcHole),
-              ProjectKeyR(HoleF, StrLit("foo"))))),
-            HoleF,
-            IncludeId,
-            RightSideF))),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(QCT.inj(Map(
-              Free.point(SrcHole),
-              ProjectKeyR(HoleF, StrLit("bar"))))),
-            HoleF,
-            IncludeId,
-            RightSideF))),
-          BoolLit(true),
-          JoinType.Inner,
-          Free.roll(MFC(Add(
-            ProjectIndexR(LeftSideF, IntLit(1)),
-            ProjectIndexR(RightSideF, IntLit(1))))))))))
+        beSome(beTreeEqual(chainQS(
+          fix.Root,
+          fix.ThetaJoin(_,
+            free.LeftShift(
+              free.Map(
+                Free.point(SrcHole),
+                func.ProjectKey(func.Hole, func.Constant(json.str("foo")))),
+              func.Hole,
+              IncludeId,
+              func.RightSide),
+            free.LeftShift(
+              free.Map(
+                Free.point(SrcHole),
+                func.ProjectKey(func.Hole, func.Constant(json.str("bar")))),
+              func.Hole,
+              IncludeId,
+              func.RightSide),
+            func.Constant(json.bool(true)),
+            JoinType.Inner,
+            func.Add(
+              func.ProjectIndex(func.LeftSide, func.Constant(json.int(1))),
+              func.ProjectIndex(func.RightSide, func.Constant(json.int(1))))))))
     }
 
     "convert project object and make object" in {
@@ -243,28 +243,27 @@ class QScriptSpec
             "name" -> structural.MapProject(
               lpRead("/city"),
               lpf.constant(Data.Str("name"))).embed)).embed) must
-      beSome(beTreeEqual(chain(
-        RootR,
-        QC.inj(LeftShift((),
-          ProjectKeyR(HoleF, StrLit("city")),
+      beSome(beTreeEqual(chainQS(
+        fix.Root,
+        fix.LeftShift(_,
+          func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
           ExcludeId,
-          Free.roll(MFC(MakeMap[Fix, JoinFunc](
-            StrLit[Fix, JoinSide]("name"),
-            ProjectKeyR(RightSideF, StrLit("name"))))))))))
+          func.MakeMap(
+            func.Constant(json.str("name")),
+            func.ProjectKey(func.RightSide, func.Constant(json.str("name"))))))))
     }
 
     "convert a basic reduction" in {
       convert(
         lc.some,
         agg.Sum(lpRead("/person")).embed) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("person")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-        QC.inj(Reduce((),
+      beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("person")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide),
+        fix.Reduce(_,
           Nil,
-          List(ReduceFuncs.Sum[FreeMap](HoleF)),
-          ReduceIndexF(0.right))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          List(ReduceFuncs.Sum[FreeMap](func.Hole)),
+          func.ReduceIndex(0.right)))))
     }
 
     "convert a basic reduction wrapped in an object" in {
@@ -274,17 +273,16 @@ class QScriptSpec
         makeObj(
           "0" ->
             agg.Sum(structural.MapProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed).embed)) must
-      beSome(beTreeEqual(chain(
-        RootR,
-        QC.inj(LeftShift((),
-          ProjectKeyR(HoleF, StrLit("person")),
-          ExcludeId,
-          RightSideF)),
-        QC.inj(Reduce((),
-          Nil,
-          List(ReduceFuncs.Sum[FreeMap](ProjectKeyR(HoleF, StrLit("height")))),
-          Free.roll(MFC(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right))))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+        beSome(beTreeEqual(chainQS(
+          fix.Root,
+          fix.LeftShift(_,
+            func.ProjectKey(func.Hole, func.Constant(json.str("person"))),
+            ExcludeId,
+            func.RightSide),
+          fix.Reduce(_,
+            Nil,
+            List(ReduceFuncs.Sum[FreeMap](func.ProjectKey(func.Hole, func.Constant(json.str("height"))))),
+            func.MakeMap(func.Constant(json.str("0")), Free.point(ReduceIndex(0.right)))))))
     }
 
     "convert a flatten array" in {
@@ -295,17 +293,16 @@ class QScriptSpec
           "loc" ->
             structural.FlattenArray(
               structural.MapProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed)) must
-      beSome(beTreeEqual(chain(
-        RootR,
-        QC.inj(LeftShift((),
-          ProjectKeyR(HoleF, StrLit("zips")),
+      beSome(beTreeEqual(chainQS(
+        fix.Root,
+        fix.LeftShift(_,
+          func.ProjectKey(func.Hole, func.Constant(json.str("zips"))),
           ExcludeId,
-          ProjectKeyR(RightSideF, StrLit("loc")))),
-        QC.inj(LeftShift((),
-          HoleF,
+          func.ProjectKey(func.RightSide, func.Constant(json.str("loc")))),
+        fix.LeftShift(_,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(MakeMap(StrLit("loc"), RightSideF))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          func.MakeMap(func.Constant(json.str("loc")), func.RightSide)))))
     }
 
     "convert a constant shift array of size one" in {
@@ -316,12 +313,12 @@ class QScriptSpec
         identity.Squash(
           structural.ShiftArray(
             structural.MakeArrayN(lpf.constant(Data.Int(7))).embed).embed).embed) must
-      beSome(beTreeEqual(chain(
-        UnreferencedR,
-        QC.inj(LeftShift((),
-          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7))))),
+      beSome(beTreeEqual(chainQS(
+        fix.Unreferenced,
+        fix.LeftShift(_,
+          func.Constant(json.arr(List(json.int(7)))),
           ExcludeId,
-          RightSideF)))))
+          func.RightSide))))
     }
 
     "convert a constant shift array of size two" in {
@@ -334,13 +331,13 @@ class QScriptSpec
             structural.ArrayConcat(
               structural.MakeArrayN(lpf.constant(Data.Int(7))).embed,
               structural.MakeArrayN(lpf.constant(Data.Int(8))).embed).embed).embed).embed) must
-      beSome(beTreeEqual(chain(
-        QC.inj(Unreferenced[Fix, Fix[QS]]()),
-        QC.inj(LeftShift(
-          (),
-          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
+      beSome(beTreeEqual(chainQS(
+        fix.Unreferenced,
+        fix.LeftShift(
+          _,
+          func.Constant(json.arr(List(json.int(7), json.int(8)))),
           ExcludeId,
-          RightSideF)))))
+          func.RightSide))))
     }
 
     "convert a constant shift array of size three" in {
@@ -355,12 +352,12 @@ class QScriptSpec
                 structural.MakeArrayN(lpf.constant(Data.Int(7))).embed,
                 structural.MakeArrayN(lpf.constant(Data.Int(8))).embed).embed,
               structural.MakeArrayN(lpf.constant(Data.Int(9))).embed).embed).embed).embed) must
-      beSome(beTreeEqual(chain(
-        QC.inj(Unreferenced[Fix, Fix[QS]]()),
-        QC.inj(LeftShift((),
-          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8), ejsonInt(9))))),
+      beSome(beTreeEqual(chainQS(
+        fix.Unreferenced,
+        fix.LeftShift(_,
+          func.Constant(json.arr(List(json.int(7), json.int(8), json.int(9)))),
           ExcludeId,
-          RightSideF)))))
+          func.RightSide))))
     }
 
     "convert a read shift array" in {
@@ -374,18 +371,17 @@ class QScriptSpec
                 structural.MapProject(lpf.free('x), lpf.constant(Data.Str("baz"))).embed,
                 structural.MapProject(lpf.free('x), lpf.constant(Data.Str("quux"))).embed).embed,
               structural.MapProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed).embed) must
-      beSome(beTreeEqual(chain(
-        RootR,
-        QC.inj(LeftShift((),
-          ProjectKeyR(ProjectKeyR(HoleF, StrLit("foo")), StrLit("bar")),
+      beSome(beTreeEqual(chainQS(
+        fix.Root,
+        fix.LeftShift(_,
+          func.ProjectKey(func.ProjectKey(func.Hole, func.Constant(json.str("foo"))), func.Constant(json.str("bar"))),
           ExcludeId,
-          Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
-            Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
-              ProjectKeyR(RightSideF, StrLit("baz")),
-              ProjectKeyR(RightSideF, StrLit("quux"))))),
-            ProjectKeyR(RightSideF, StrLit("ducks"))))))),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.ProjectKey(func.RightSide, func.Constant(json.str("baz"))),
+              func.ProjectKey(func.RightSide, func.Constant(json.str("quux")))),
+            func.ProjectKey(func.RightSide, func.Constant(json.str("ducks"))))),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide))))
     }
 
     "convert a shift/unshift array" in {
@@ -399,36 +395,35 @@ class QScriptSpec
                 structural.ShiftArrayIndices(
                   structural.MapProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed,
                 lpf.constant(Data.Int(10))).embed).embed)) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(MakeArray(LeftSideF))),
-            Free.roll(MFC(MakeArray(RightSideF)))))))),
-        QC.inj(LeftShift((),
-          ProjectKeyR(
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
-            StrLit("loc")),
+          func.ConcatArrays(
+            func.MakeArray(func.LeftSide),
+            func.MakeArray(func.RightSide))),
+        fix.LeftShift(_,
+          func.ProjectKey(
+            func.ProjectIndex(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(1))),
+            func.Constant(json.str("loc"))),
           IdOnly,
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(MakeArray(LeftSideF))),
-            Free.roll(MFC(MakeArray(RightSideF)))))))),
-        QC.inj(Reduce((),
+          func.ConcatArrays(
+            func.MakeArray(func.LeftSide),
+            func.MakeArray(func.RightSide))),
+        fix.Reduce(_,
           List(
-            ProjectIndexR(
-              ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)),
-              IntLit(0))),
+            func.ProjectIndex(
+              func.ProjectIndex(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.int(1))),
+              func.Constant(json.int(0)))),
           List(
             ReduceFuncs.UnshiftArray(
-              Free.roll(MFC(Multiply(
-                ProjectIndexR(HoleF, IntLit(1)),
-                IntLit(10)))))),
-          Free.roll(MFC(MakeMap[Fix, FreeMapA[ReduceIndex]](
-            StrLit[Fix, ReduceIndex]("0"),
-            ReduceIndexF(0.right)))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+              func.Multiply(
+                func.ProjectIndex(func.Hole, func.Constant(json.int(1))),
+                func.Constant(json.int(10))))),
+          func.MakeMap(
+            func.Constant(json.str("0")),
+            func.ReduceIndex(0.right))))))
     }
 
     "convert a filter" in {
@@ -441,23 +436,22 @@ class QScriptSpec
             structural.MapProject(lpRead("/bar"), lpf.constant(Data.Str("baz"))).embed,
             lpf.constant(Data.Int(1)),
             lpf.constant(Data.Int(10))).embed).embed) must
-      beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("bar")),
-        QC.inj(LeftShift((),
-          HoleF,
-          IncludeId,
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(MakeArray(ProjectIndexR(RightSideF, IntLit(1))))),
-            Free.roll(MFC(MakeArray(
-              Free.roll(MFC(Between(
-                ProjectKeyR(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  StrLit("baz")),
-                IntLit(1),
-                IntLit(10)))))))))))),
-        QC.inj(Filter((), ProjectIndexR(HoleF, IntLit(1)))),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+        beSome(beTreeEqual(chainQS(
+          fix.Read[AFile](rootDir </> file("bar")),
+          fix.LeftShift(_,
+            func.Hole,
+            IncludeId,
+            func.ConcatArrays(
+              func.MakeArray(func.ProjectIndex(func.RightSide, func.Constant(json.int(1)))),
+              func.MakeArray(
+                func.Between(
+                  func.ProjectKey(
+                    func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                    func.Constant(json.str("baz"))),
+                  func.Constant(json.int(1)),
+                  func.Constant(json.int(10)))))),
+          fix.Filter(_, func.ProjectIndex(func.Hole, func.Constant(json.int(1)))),
+          fix.Map(_, func.ProjectIndex(func.Hole, func.Constant(json.int(0)))))))
     }
 
     // an example of how logical plan expects magical "left" and "right" keys to exist
@@ -475,24 +469,24 @@ class QScriptSpec
             structural.MapConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
               JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed).embed) must
-      beSome(beTreeEqual(chain(
-        QC.inj(Unreferenced[Fix, Fix[QS]]()),
-        TJ.inj(ThetaJoin((),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
-            HoleF,
+      beSome(beTreeEqual(chainQS(
+        fix.Unreferenced,
+        fix.ThetaJoin(_,
+          free.LeftShift(
+            free.Read[AFile](rootDir </> file("person")),
+            func.Hole,
             IncludeId,
-            RightSideF))),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
-            HoleF,
+            func.RightSide),
+          free.LeftShift(
+            free.Read[AFile](rootDir </> file("car")),
+            func.Hole,
             IncludeId,
-            RightSideF))),
-          BoolLit(true),
+            func.RightSide),
+          func.Constant(json.bool(true)),
           JoinType.Inner,
-          Free.roll(MFC(ConcatMaps(
-            ProjectIndexR(LeftSideF, IntLit(1)),
-            ProjectIndexR(RightSideF, IntLit(1))))))))))
+          func.ConcatMaps(
+            func.ProjectIndex(func.LeftSide, func.Constant(json.int(1))),
+            func.ProjectIndex(func.RightSide, func.Constant(json.int(1))))))))
     }
 
     "convert basic join with explicit join condition" in {
@@ -519,305 +513,299 @@ class QScriptSpec
                 lpf.constant(Data.Str("address"))).embed))
 
       convert(None, query) must
-        beSome(beTreeEqual(chain(
-          RootR,
-          TJ.inj(ThetaJoin((),
-            Free.roll(QCT.inj(LeftShift(
-              Free.roll(QCT.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("foo"))))),
-              HoleF,
+        beSome(beTreeEqual(chainQS(
+          fix.Root,
+          fix.ThetaJoin(_,
+            free.LeftShift(
+              free.Map(free.Hole, func.ProjectKey(func.Hole, func.Constant(json.str("foo")))),
+              func.Hole,
               IncludeId,
-              RightSideF))),
-            Free.roll(QCT.inj(LeftShift(
-              Free.roll(QCT.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("bar"))))),
-              HoleF,
+              func.RightSide),
+            free.LeftShift(
+              free.Map(free.Hole, func.ProjectKey(func.Hole, func.Constant(json.str("bar")))),
+              func.Hole,
               IncludeId,
-              RightSideF))),
-            Free.roll(MFC(Eq(
-              ProjectKeyR(
-                ProjectIndexR(LeftSideF, IntLit(1)),
-                StrLit("id")),
-              ProjectKeyR(
-                ProjectIndexR(RightSideF, IntLit(1)),
-                StrLit("foo_id"))))),
+              func.RightSide),
+            func.Eq(
+              func.ProjectKey(
+                func.ProjectIndex(func.LeftSide, func.Constant(json.int(1))),
+                func.Constant(json.str("id"))),
+              func.ProjectKey(
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                func.Constant(json.str("foo_id")))),
             JoinType.Inner,
-            ConcatMapsR(
-              MakeMapR(
-                StrLit("name"),
-                ProjectKeyR(
-                  ProjectIndexR(LeftSideF, IntLit(1)),
-                  StrLit("name"))),
-              MakeMapR(
-                StrLit("address"),
-                ProjectKeyR(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  StrLit("address")))))))))
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(json.str("name")),
+                func.ProjectKey(
+                  func.ProjectIndex(func.LeftSide, func.Constant(json.int(1))),
+                  func.Constant(json.str("name")))),
+              func.MakeMap(
+                func.Constant(json.str("address")),
+                func.ProjectKey(
+                  func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                  func.Constant(json.str("address")))))))))
     }
 
     "convert union" in {
       val lp = fullCompileExp(sqlE"select * from city union select * from person")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        QC.inj(Unreferenced[Fix, Fix[QS]]()),
-        QC.inj(Union((),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTF.inj(Const(Read(rootDir </> file("city"))))),
-            HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Unreferenced,
+        fix.Union(_,
+          free.LeftShift(
+            free.Read[AFile](rootDir </> file("city")),
+            func.Hole,
             ExcludeId,
-            Free.roll(MFC(ConcatArrays(
-              Free.roll(MFC(MakeArray(
-                ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0))))),
-              Free.roll(MFC(MakeArray(RightSideF))))))))),
-          Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
-            HoleF,
+            func.ConcatArrays(
+              func.MakeArray(
+                func.ProjectIndex(func.ProjectIndex(func.RightSide, func.Constant(json.int(1))), func.Constant(json.int(0)))),
+              func.MakeArray(func.RightSide))),
+          free.LeftShift(
+            free.Read[AFile](rootDir </> file("person")),
+            func.Hole,
             ExcludeId,
-            Free.roll(MFC(ConcatArrays(
-              Free.roll(MFC(MakeArray(
-                ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0))))),
-              Free.roll(MFC(MakeArray(RightSideF))))))))))),
-        QC.inj(Reduce((),
-          List(ProjectIndexR(HoleF, IntLit(1))),
+            func.ConcatArrays(
+              func.MakeArray(
+                func.ProjectIndex(func.ProjectIndex(func.RightSide, func.Constant(json.int(1))), func.Constant(json.int(0)))),
+              func.MakeArray(func.RightSide)))),
+        fix.Reduce(_,
+          List(func.ProjectIndex(func.Hole, func.Constant(json.int(1)))),
           // FIXME: This should be fetched from the bucket
-          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(1)))),
-          ReduceIndexF(0.right))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          List(ReduceFuncs.Arbitrary(func.ProjectIndex(func.Hole, func.Constant(json.int(1))))),
+          func.ReduceIndex(0.right)))))
     }
 
     "convert distinct by" in {
       val lp = fullCompileExp(sqlE"select distinct(city) from zips order by pop")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(MakeArray(
-              Free.roll(MFC(ConcatMaps(
-                Free.roll(MFC(MakeMap(
-                  StrLit("city"),
-                  Free.roll(MFC(Guard(
-                    ProjectIndexR(RightSideF, IntLit(1)),
+          func.ConcatArrays(
+            func.MakeArray(
+              func.ConcatMaps(
+                func.MakeMap(
+                  func.Constant(json.str("city")),
+                  func.Guard(
+                    func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
-                    ProjectKeyR(
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      StrLit("city")),
-                    Free.roll(MFC(Undefined())))))))),
-                Free.roll(MFC(MakeMap(
-                  StrLit("__sd__0"),
-                  Free.roll(MFC(Guard(
-                    ProjectIndexR(RightSideF, IntLit(1)),
+                    func.ProjectKey(
+                      func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                      func.Constant(json.str("city"))),
+                    func.Undefined)),
+                func.MakeMap(
+                  func.Constant(json.str("__sd__0")),
+                  func.Guard(
+                    func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
-                    ProjectKeyR(
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      StrLit("pop")),
-                    Free.roll(MFC(Undefined())))))))))))))),
-            Free.roll(MFC(MakeArray(
-              Free.roll(MFC(Guard(
-                ProjectIndexR(RightSideF, IntLit(1)),
+                    func.ProjectKey(
+                      func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                      func.Constant(json.str("pop"))),
+                    func.Undefined)))),
+            func.MakeArray(
+              func.Guard(
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectKeyR(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  StrLit("pop")),
-                Free.roll(MFC(Undefined()))))))))))))),
+                func.ProjectKey(
+                  func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                  func.Constant(json.str("pop"))),
+                func.Undefined)))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic key "__sd0__"
-        QC.inj(Sort((),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
-        QC.inj(Reduce((),
-          List(Free.roll(MFC(DeleteKey(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
-          List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(MFC(ConcatArrays(
-            Free.roll(MFC(ConcatArrays(
-              Free.roll(MFC(MakeArray(ReduceIndexF(0.left)))),
-              Free.roll(MFC(MakeArray(ReduceIndexF(0.right))))))),
-            Free.roll(MFC(MakeArray(
-              ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))))))),
-        QC.inj(Sort((),
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(1))) -> SortDir.asc).wrapNel),
+        fix.Reduce(_,
+          List(func.DeleteKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("__sd__0")))),
+          List(ReduceFuncs.First(func.ProjectIndex(func.Hole, func.Constant(json.int(0))))),
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.ReduceIndex(0.left)),
+              func.MakeArray(func.ReduceIndex(0.right))),
+            func.MakeArray(
+              func.ProjectKey(func.ReduceIndex(0.right), func.Constant(json.str("__sd__0")))))),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(2)) -> SortDir.asc).wrapNel)),
-        QC.inj(Map((),
-          Free.roll(MFC(DeleteKey(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(2))) -> SortDir.asc).wrapNel),
+        fix.Map(_,
+          func.DeleteKey(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.str("__sd__0")))))))
     }
 
     "convert a multi-key reduce" in {
       val lp = fullCompileExp(sqlE"select max(pop), min(city) from zips")
       val qs = convert(lc.some, lp)
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-        QC.inj(Reduce((),
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide),
+        fix.Reduce(_,
           Nil,
           List(
             ReduceFuncs.Max(
-              Free.roll(MFC(Guard(
-                Free.roll(MFC(Guard(
-                  HoleF,
+              func.Guard(
+                func.Guard(
+                  func.Hole,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectKeyR(HoleF, StrLit("pop")),
-                  Free.roll(MFC(Undefined()))))),
+                  func.ProjectKey(func.Hole, func.Constant(json.str("pop"))),
+                  func.Undefined),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                Free.roll(MFC(Guard(
-                  HoleF,
+                func.Guard(
+                  func.Hole,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectKeyR(HoleF, StrLit("pop")),
-                  Free.roll(MFC(Undefined()))))),
-                Free.roll(MFC(Undefined())))))),
+                  func.ProjectKey(func.Hole, func.Constant(json.str("pop"))),
+                  func.Undefined),
+                func.Undefined)),
             ReduceFuncs.Min(
-              Free.roll(MFC(Guard(
-                Free.roll(MFC(Guard(
-                  HoleF,
+              func.Guard(
+                func.Guard(
+                  func.Hole,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectKeyR(HoleF, StrLit("city")),
-                  Free.roll(MFC(Undefined()))))),
+                  func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
+                  func.Undefined),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                Free.roll(MFC(Guard(
-                  HoleF,
+                func.Guard(
+                  func.Hole,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectKeyR(HoleF, StrLit("city")),
-                  Free.roll(MFC(Undefined()))))),
-                Free.roll(MFC(Undefined()))))))),
-          Free.roll(MFC(ConcatMaps(
-            Free.roll(MFC(MakeMap(StrLit("0"), ReduceIndexF(0.right)))),
-            Free.roll(MFC(MakeMap(StrLit("1"), ReduceIndexF(1.right))))))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+                  func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
+                  func.Undefined),
+                func.Undefined))),
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(json.str("0")), func.ReduceIndex(0.right)),
+            func.MakeMap(func.Constant(json.str("1")), func.ReduceIndex(1.right)))))))
     }
 
     "convert a filter followed by a reduce" in {
       val lp = fullCompileExp(sqlE"select count(*) from zips where pop > 1000")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-           Free.roll(MFC(ConcatArrays(
-             Free.roll(MFC(MakeArray(
-               Free.roll(MFC(Guard(
-                 ProjectIndexR(RightSideF, IntLit(1)),
+           func.ConcatArrays(
+             func.MakeArray(
+               func.Guard(
+                 func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                 ProjectIndexR(RightSideF, IntLit(1)),
-                 Free.roll(MFC(Undefined())))))))),
-             Free.roll(MFC(MakeArray(
-               Free.roll(MFC(Guard(
-                 Free.roll(MFC(Guard(
-                   ProjectIndexR(RightSideF, IntLit(1)),
+                 func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                 func.Undefined)),
+             func.MakeArray(
+               func.Guard(
+                 func.Guard(
+                   func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
-                   Free.roll(MFC(ProjectKey(
-                     ProjectIndexR(RightSideF, IntLit(1)),
-                     StrLit("pop")))),
-                   Free.roll(MFC(Undefined()))))),
+                   func.ProjectKey(
+                     func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                     func.Constant(json.str("pop"))),
+                   func.Undefined),
                  Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                 Free.roll(MFC(Guard(
-                   ProjectIndexR(RightSideF, IntLit(1)),
+                 func.Guard(
+                   func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
-                   Free.roll(MFC(Gt(
-                     Free.roll(MFC(ProjectKey(
-                       ProjectIndexR(RightSideF, IntLit(1)),
-                       StrLit("pop")))),
-                     IntLit(1000)))),
-                   Free.roll(MFC(Undefined()))))),
-                 Free.roll(MFC(Undefined()))))))))))))),
-        QC.inj(Filter((),
-          Free.roll(MFC(ProjectIndex(HoleF, IntLit(1)))))),
-        QC.inj(Reduce((),
+                   func.Gt(
+                     func.ProjectKey(
+                       func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                       func.Constant(json.str("pop"))),
+                     func.Constant(json.int(1000))),
+                   func.Undefined),
+                 func.Undefined)))),
+        fix.Filter(_,
+          func.ProjectIndex(func.Hole, func.Constant(json.int(1)))),
+        fix.Reduce(_,
           Nil,
-          List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
-          ReduceIndexF(0.right))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          List(ReduceFuncs.Count[FreeMap](func.ProjectIndex(func.Hole, func.Constant(json.int(0))))),
+          func.ReduceIndex(0.right)))))
     }
 
     "convert a sort of a single value unary reduction" in {
       val lp = fullCompileExp(sqlE"select count(*) as cnt from zips order by cnt")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-        QC.inj(Reduce((),
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide),
+        fix.Reduce(_,
           Nil,
-          List(ReduceFuncs.Count[FreeMap](HoleF)),
-          ConcatArraysR(
-            MakeArrayR(MakeMapR(StrLit("cnt"), ReduceIndexF(0.right))),
-            MakeArrayR(ReduceIndexF(0.right))))),
-        QC.inj(Sort((),
+          List(ReduceFuncs.Count[FreeMap](func.Hole)),
+          func.ConcatArrays(
+            func.MakeArray(func.MakeMap(func.Constant(json.str("cnt")), func.ReduceIndex(0.right))),
+            func.MakeArray(func.ReduceIndex(0.right)))),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(1))), SortDir.asc).wrapNel),
+        fix.Map(_, func.ProjectIndex(func.Hole, func.Constant(json.int(0)))))))
     }
 
     "convert a sort of a single value binary reduction" in {
       val lp = fullCompileExp(sqlE"select {y : z ...} as x from zips order by x")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((), HoleF, IncludeId, RightSideF)),
-        QC.inj(Reduce((),
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_, func.Hole, IncludeId, func.RightSide),
+        fix.Reduce(_,
           Nil,
           List(ReduceFuncs.UnshiftMap[FreeMap](
-            ProjectIndexR(HoleF, IntLit(1)),
-            ProjectIndexR(
-              ConcatArraysR(
-                MakeArrayR(ProjectIndexR(HoleF, IntLit(0))),
-                MakeArrayR(ProjectIndexR(HoleF, IntLit(1)))),
-              IntLit(2)))),
-          ConcatArraysR(
-            MakeArrayR(MakeMapR(StrLit("x"), ReduceIndexF(0.right))),
-            MakeArrayR(ReduceIndexF(0.right))))),
-        QC.inj(Sort((),
+            func.ProjectIndex(func.Hole, func.Constant(json.int(1))),
+            func.ProjectIndex(
+              func.ConcatArrays(
+                func.MakeArray(func.ProjectIndex(func.Hole, func.Constant(json.int(0)))),
+                func.MakeArray(func.ProjectIndex(func.Hole, func.Constant(json.int(1))))),
+              func.Constant(json.int(2))))),
+          func.ConcatArrays(
+            func.MakeArray(func.MakeMap(func.Constant(json.str("x")), func.ReduceIndex(0.right))),
+            func.MakeArray(func.ReduceIndex(0.right)))),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(1))), SortDir.asc).wrapNel),
+        fix.Map(_, func.ProjectIndex(func.Hole, func.Constant(json.int(0)))))))
     }
 
     "convert a non-static array projection" in {
       val lp = fullCompileExp(sqlE"select (loc || [7, 8])[0] from zips")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(Guard(
-            RightSideF,
+          func.Guard(
+            func.RightSide,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            Free.roll(MFC(Guard(
-              ProjectKeyR(RightSideF, StrLit("loc")),
+            func.Guard(
+              func.ProjectKey(func.RightSide, func.Constant(json.str("loc"))),
               Type.FlexArr(0, None, Type.Top),
-              ProjectIndexR(
-                ConcatArraysR(
-                  ProjectKeyR(RightSideF, StrLit("loc")),
-                  Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8)))))),
-                IntLit(0)),
-              Free.roll(MFC(Undefined()))))),
-            Free.roll(MFC(Undefined()))))))))))
+              func.ProjectIndex(
+                func.ConcatArrays(
+                  func.ProjectKey(func.RightSide, func.Constant(json.str("loc"))),
+                  func.Constant(json.arr(List(json.int(7), json.int(8))))),
+                func.Constant(json.int(0))),
+              func.Undefined),
+            func.Undefined)))))
     }
 
     "convert a static array projection prefix" in {
       val lp = fullCompileExp(sqlE"select ([7, 8] || loc)[1] from zips")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           ExcludeId,
-          Free.roll(MFC(Guard(
-            RightSideF,
+          func.Guard(
+            func.RightSide,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            Free.roll(MFC(Guard(
-              ProjectKeyR(RightSideF, StrLit("loc")),
+            func.Guard(
+              func.ProjectKey(func.RightSide, func.Constant(json.str("loc"))),
               Type.FlexArr(0, None, Type.Top),
-              IntLit(8),
-              Free.roll(MFC(Undefined()))))),
-            Free.roll(MFC(Undefined()))))))))))
+              func.Constant(json.int(8)),
+              func.Undefined),
+            func.Undefined)))))
     }
 
     "convert a group by with reduction" in {
@@ -825,47 +813,45 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       val inner: FreeMap =
-        Free.roll(MFC(Guard(
-          Free.roll(MFC(Guard(
-            HoleF,
+        func.Guard(
+          func.Guard(
+            func.Hole,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            ProjectKeyR(HoleF, StrLit("loc")),
-            Free.roll(MFC(Undefined()))))),
+            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            func.Undefined),
           Type.FlexArr(0, None, Type.Top),
-          Free.roll(MFC(Guard(
-            Free.roll(MFC(Guard(
-              HoleF,
+          func.Guard(
+            func.Guard(
+              func.Hole,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              ProjectIndexR(ProjectKeyR(HoleF, StrLit("loc")), IntLit(0)),
-              Free.roll(MFC(Undefined()))))),
+              func.ProjectIndex(func.ProjectKey(func.Hole, func.Constant(json.str("loc"))), func.Constant(json.int(0))),
+              func.Undefined),
             Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-            Free.roll(MFC(Guard(
-              HoleF,
+            func.Guard(
+              func.Hole,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              Free.roll(MFC(Gt(
-                ProjectIndexR(ProjectKeyR(HoleF, StrLit("loc")), IntLit(0)),
-                DecLit(-78.0)))),
-              Free.roll(MFC(Undefined()))))),
-            Free.roll(MFC(Undefined()))))),
-          Free.roll(MFC(Undefined())))))
+              func.Gt(
+                func.ProjectIndex(func.ProjectKey(func.Hole, func.Constant(json.str("loc"))), func.Constant(json.int(0))),
+                DecLit(-78.0)),
+              func.Undefined),
+            func.Undefined),
+          func.Undefined)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-        QC.inj(Reduce((),
-          List(Free.roll(MFC(MakeArray(inner)))),
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_, func.Hole, ExcludeId, func.RightSide),
+        fix.Reduce(_,
+          List(func.MakeArray(inner)),
           List(
-            ReduceFuncs.Arbitrary[FreeMap](inner),
-            ReduceFuncs.Count[FreeMap](Free.roll(MFC(Guard(
-              HoleF,
+            ReduceFuncs.Arbitrary(inner),
+            ReduceFuncs.Count(func.Guard(
+              func.Hole,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              HoleF,
-              Free.roll(MFC(Undefined()))))))),
-          Free.roll(MFC(ConcatMaps(
-            Free.roll(MFC(MakeMap(StrLit("l"), ReduceIndexF(0.right)))),
-            Free.roll(MFC(MakeMap(StrLit("c"), ReduceIndexF(1.right))))))))))(
-        implicitly, Corecursive[Fix[QS], QS])))
-
+              func.Hole,
+              func.Undefined))),
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(json.str("l")), func.ReduceIndex(0.right)),
+            func.MakeMap(func.Constant(json.str("c")), func.ReduceIndex(1.right)))))))
     }
 
     "convert an ordered filtered distinct" in {
@@ -873,52 +859,51 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       def guard(jf: JoinFunc => JoinFunc): JoinFunc =
-        Free.roll(MFC(Guard(
-          ProjectIndexR(RightSideF, IntLit(1)),
+        func.Guard(
+          func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
           Type.Obj(ScalaMap(), Some(Type.Top)),
-          jf(ProjectIndexR(RightSideF, IntLit(1))),
-          Free.roll(MFC(Undefined())))))
+          jf(func.ProjectIndex(func.RightSide, func.Constant(json.int(1)))),
+          func.Undefined)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          ConcatArraysR(
-            MakeArrayR(guard(ι)),
-            MakeArrayR(Free.roll(MFC(Guard(
-              guard(ProjectKeyR(_, StrLit("pop"))),
+          func.ConcatArrays(
+            func.MakeArray(guard(ι)),
+            func.MakeArray(func.Guard(
+              guard(func.ProjectKey(_, func.Constant(json.str("pop")))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(MFC(Lte(ProjectKeyR(jf, StrLit("pop")), IntLit(10))))),
-              Free.roll(MFC(Undefined()))))))))),
-        QC.inj(Filter((),
-          ProjectIndexR(HoleF, IntLit(1)))),
+              guard(jf => func.Lte(func.ProjectKey(jf, func.Constant(json.str("pop"))), func.Constant(json.int(10)))),
+              func.Undefined)))),
+        fix.Filter(_,
+          func.ProjectIndex(func.Hole, func.Constant(json.int(1)))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic key "__sd0__"
-        QC.inj(Sort((),
+        fix.Sort(_,
           Nil,
-          (ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
-        QC.inj(Reduce((),
+          (func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("pop"))), SortDir.asc).wrapNel),
+        fix.Reduce(_,
           List(
-            MakeMapR(
-              StrLit("city"),
-              ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city")))),
+            func.MakeMap(
+              func.Constant(json.str("city")),
+              func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("city"))))),
           List(
-            ReduceFuncs.First(ConcatMapsR(
-              MakeMapR(StrLit("city"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
-              MakeMapR(StrLit("__sd__0"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(ReduceIndexF(0.left)),
-              MakeArrayR(ReduceIndexF(0.right))),
-            MakeArrayR(ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
+            ReduceFuncs.First(func.ConcatMaps(
+              func.MakeMap(func.Constant(json.str("city")), func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("city")))),
+              func.MakeMap(func.Constant(json.str("__sd__0")), func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("pop"))))))),
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.ReduceIndex(0.left)),
+              func.MakeArray(func.ReduceIndex(0.right))),
+            func.MakeArray(func.ProjectKey(func.ReduceIndex(0.right), func.Constant(json.str("__sd__0")))))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic key "__sd0__"
-        QC.inj(Sort((),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(2)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), DeleteKeyR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(2))), SortDir.asc).wrapNel),
+        fix.Map(_, func.DeleteKey(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.str("__sd__0")))))))
     }
 
     "convert an ordered filtered distinct with cases" in {
@@ -926,97 +911,95 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       def guard(jf: JoinFunc => JoinFunc): JoinFunc =
-        Free.roll(MFC(Guard(
-          ProjectIndexR(RightSideF, IntLit(1)),
+        func.Guard(
+          func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
           Type.Obj(ScalaMap(), Some(Type.Top)),
-          jf(ProjectIndexR(RightSideF, IntLit(1))),
-          Free.roll(MFC(Undefined())))))
+          jf(func.ProjectIndex(func.RightSide, func.Constant(json.int(1)))),
+          func.Undefined)
 
       val cond: FreeMap =
-        Free.roll(MFC(Cond(
-          Free.roll(MFC(Eq(ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA")))),
-          StrLit("Massachusetts"),
-          StrLit("unknown"))))
+        func.Cond(
+          func.Eq(func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("state"))), func.Constant(json.str("MA"))),
+          func.Constant(json.str("Massachusetts")),
+          func.Constant(json.str("unknown")))
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          ConcatArraysR(
-            MakeArrayR(guard(ι)),
-            MakeArrayR(Free.roll(MFC(Guard(
-              guard(ProjectKeyR(_, StrLit("pop"))),
+          func.ConcatArrays(
+            func.MakeArray(guard(ι)),
+            func.MakeArray(func.Guard(
+              guard(func.ProjectKey(_, func.Constant(json.str("pop")))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(MFC(Lte(ProjectKeyR(jf, StrLit("pop")), IntLit(10))))),
-              Free.roll(MFC(Undefined()))))))))),
-        QC.inj(Filter((),
-          ProjectIndexR(HoleF, IntLit(1)))),
+              guard(jf => func.Lte(func.ProjectKey(jf, func.Constant(json.str("pop"))), func.Constant(json.int(10)))),
+              func.Undefined)))),
+        fix.Filter(_,
+          func.ProjectIndex(func.Hole, func.Constant(json.int(1)))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic key "__sd0__"
-        QC.inj(Sort((),
+        fix.Sort(_,
           Nil,
-          (ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
-        QC.inj(Reduce((),
-          List(MakeMapR(StrLit("name"), cond)),
+          (func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("pop"))), SortDir.asc).wrapNel),
+        fix.Reduce(_,
+          List(func.MakeMap(func.Constant(json.str("name")), cond)),
           List(
-            ReduceFuncs.First(ConcatMapsR(
-              MakeMapR(StrLit("name"), cond),
-              MakeMapR(StrLit("__sd__0"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(ReduceIndexF(0.left)),
-              MakeArrayR(ReduceIndexF(0.right))),
-            MakeArrayR(ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
+            ReduceFuncs.First(func.ConcatMaps(
+              func.MakeMap(func.Constant(json.str("name")), cond),
+              func.MakeMap(func.Constant(json.str("__sd__0")), func.ProjectKey(func.ProjectIndex(func.Hole, func.Constant(json.int(0))), func.Constant(json.str("pop"))))))),
+          func.ConcatArrays(
+            func.ConcatArrays(
+              func.MakeArray(func.ReduceIndex(0.left)),
+              func.MakeArray(func.ReduceIndex(0.right))),
+            func.MakeArray(func.ProjectKey(func.ReduceIndex(0.right), func.Constant(json.str("__sd__0")))))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic key "__sd0__"
-        QC.inj(Sort((),
+        fix.Sort(_,
           Nil,
-          (ProjectIndexR(HoleF, IntLit(2)), SortDir.asc).wrapNel)),
-        QC.inj(Map((),
-          DeleteKeyR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+          (func.ProjectIndex(func.Hole, func.Constant(json.int(2))), SortDir.asc).wrapNel),
+        fix.Map(_,
+          func.DeleteKey(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.str("__sd__0")))))))
     }
 
     "convert a flattened array" in {
       val lp = fullCompileExp(sqlE"select city, loc[*] from zips")
       val qs = convert(lc.some, lp)
 
-      qs must beSome(beTreeEqual(chain(
-        ReadR(rootDir </> file("zips")),
-        QC.inj(LeftShift((),
-          HoleF,
+      qs must beSome(beTreeEqual(chainQS(
+        fix.Read[AFile](rootDir </> file("zips")),
+        fix.LeftShift(_,
+          func.Hole,
           IncludeId,
-          ConcatArraysR(
-            MakeArrayR(ProjectIndexR(RightSideF, IntLit(1))),
-            MakeArrayR(ConcatArraysR(
-              MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))),
-              MakeArrayR(Free.roll(MFC(Guard(
-                ProjectIndexR(RightSideF, IntLit(1)),
+          func.ConcatArrays(
+            func.MakeArray(func.ProjectIndex(func.RightSide, func.Constant(json.int(1)))),
+            func.MakeArray(func.ConcatArrays(
+              func.MakeArray(func.ProjectIndex(func.RightSide, func.Constant(json.int(0)))),
+              func.MakeArray(func.Guard(
+                func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
-                ProjectKeyR(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  StrLit("loc")),
-                Free.roll(MFC(Undefined()))))))))))),
-        QC.inj(LeftShift((),
-          Free.roll(MFC(Guard(
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
+                func.ProjectKey(
+                  func.ProjectIndex(func.RightSide, func.Constant(json.int(1))),
+                  func.Constant(json.str("loc"))),
+                func.Undefined)))))),
+        fix.LeftShift(_,
+          func.Guard(
+            func.ProjectIndex(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(1))),
             Type.FlexArr(0, None, Type.Top),
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
-            Free.roll(MFC(Undefined()))))),
+            func.ProjectIndex(func.ProjectIndex(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(1))),
+            func.Undefined),
           ExcludeId,
-          ConcatMapsR(
-            MakeMapR(
-              StrLit("city"),
-              Free.roll(MFC(Guard(
-                ProjectIndexR(LeftSideF, IntLit(0)),
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("city")),
+              func.Guard(
+                func.ProjectIndex(func.LeftSide, func.Constant(json.int(0))),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
-                ProjectKeyR(
-                  ProjectIndexR(LeftSideF, IntLit(0)),
-                  StrLit("city")),
-                Free.roll(MFC(Undefined())))))),
-            MakeMapR(StrLit("loc"), RightSideF)))))(
-        implicitly, Corecursive[Fix[QS], QS])))
+                func.ProjectKey(
+                  func.ProjectIndex(func.LeftSide, func.Constant(json.int(0))),
+                  func.Constant(json.str("city"))),
+                func.Undefined)),
+            func.MakeMap(func.Constant(json.str("loc")), func.RightSide))))))
     }
   }
 }

@@ -54,6 +54,11 @@ object Injectable {
     )
   )
 
+  def id[F[_]]: Aux[F, F] = make(
+    NaturalTransformation.refl[F],
+    λ[F ~> λ[A => Option[F[A]]]](Some(_))
+  )
+
   implicit def inject[F[_], G[_]](implicit IN: F :<: G): Aux[F, G] =
     make[F, G](IN, λ[G ~> λ[A => Option[F[A]]]](IN prj _))
 }

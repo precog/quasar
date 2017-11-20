@@ -69,6 +69,7 @@ object Repl {
       |  append [path] [value]
       |  rm [path]
       |  set debug = 0 | 1 | 2
+      |  set phaseFormat = tree | code
       |  set summaryCount = [rows]
       |  set format = table | precise | readable | csv
       |  set [var] = [value]
@@ -78,6 +79,7 @@ object Repl {
  final case class RunState(
     cwd:          ADir,
     debugLevel:   DebugLevel,
+    phaseFormat:  PhaseFormat,
     summaryCount: Int,
     format:       OutputFormat,
     variables:    Map[String, String]) {
@@ -140,7 +142,7 @@ object Repl {
       for {
         t <- T.time(query.run.run.run)
         ((log, v), elapsed) = t
-        _ <- printLog[S](state.debugLevel, log)
+        _ <- printLog[S](state.debugLevel, state.phaseFormat, log)
         _ <- v match {
           case -\/ (semErr)      => DF.fail(semErr.list.map(_.shows).toList.mkString("; "))
           case  \/-(-\/ (fsErr)) => DF.fail(fsErr.shows)
@@ -182,6 +184,10 @@ object Repl {
       case Format(fmt) =>
         RS.modify(_.copy(format = fmt)) *>
           P.println(s"Set output format: $fmt")
+
+      case SetPhaseFormat(fmt) =>
+        RS.modify(_.copy(phaseFormat = fmt)) *>
+          P.println(s"Set phase format: $fmt")
 
       case SetVar(n, v) =>
         RS.modify(state => state.copy(variables = state.variables + (n -> v))).void
@@ -247,7 +253,7 @@ object Repl {
           block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
           t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
           (log, result) = t
-          _     <- printLog(state.debugLevel, log)
+          _     <- printLog(state.debugLevel, state.phaseFormat, log)
           _     <- result.fold(
                     serr => DF.fail(serr.shows),
                     _.fold(
@@ -266,7 +272,7 @@ object Repl {
           //       to logical sections directly.
           log   = if (state.debugLevel === DebugLevel.Verbose) log0
                   else log0.dropWhile(_.name =/= "Logical Plan")
-          _     <- printLog(DebugLevel.Verbose, log)
+          _     <- printLog(DebugLevel.Verbose, state.phaseFormat, log)
           _     <- result.fold(
                     serr => DF.fail(serr.shows),
                     _.fold(
@@ -316,15 +322,18 @@ object Repl {
       MountingError.invalidMount.getOption(_) ∘ (_._1.fold(_.value, "view", "module")),
       _.fold(_.value, "view", "module").some)))
 
-  def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
+  def showPhaseResults(phaseFormat: PhaseFormat, results: PhaseResults): String = phaseFormat match {
+    case PhaseFormat.Tree => results.map(_.showTree).mkString("\n\n")
+    case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
+  }
 
-  def printLog[S[_]](debugLevel: DebugLevel, log: PhaseResults)(implicit
+  def printLog[S[_]](debugLevel: DebugLevel, phaseFormat: PhaseFormat, log: PhaseResults)(implicit
     P: ConsoleIO.Ops[S]
   ): Free[S, Unit] =
     debugLevel match {
       case DebugLevel.Silent  => ().point[Free[S, ?]]
-      case DebugLevel.Normal  => P.println(showPhaseResults(log.takeRight(1)) + "\n")
-      case DebugLevel.Verbose => P.println(showPhaseResults(log) + "\n")
+      case DebugLevel.Normal  => P.println(showPhaseResults(phaseFormat, log.takeRight(1)) + "\n")
+      case DebugLevel.Verbose => P.println(showPhaseResults(phaseFormat, log) + "\n")
     }
 
   def summarize[S[_]]

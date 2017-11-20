@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
+import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.qscript.MapFuncsCore._
@@ -30,6 +31,8 @@ import pathy._, Path._
 import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
+  val json = Fixed[Fix[EJson]]
+
   def projectKey[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
     implicit I: MapFunc[Fix, ?] :<: S
   ): Free[S, Hole] =

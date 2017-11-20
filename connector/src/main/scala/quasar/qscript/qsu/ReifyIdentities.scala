@@ -38,12 +38,12 @@ import quasar.qscript.{
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
-import matryoshka.CorecursiveT
+import matryoshka.BirecursiveT
 import monocle.Lens
 import scalaz.{Foldable, Free, Functor, IMap, ISet, Monad, NonEmptyList, StateT, Traverse}
 import scalaz.Scalaz._
 
-final class ReifyIdentities[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
+final class ReifyIdentities[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
   def apply[F[_]: Monad: NameGenerator](graph: QSUGraph): F[ResearchedQSU[T]] =
@@ -443,6 +443,6 @@ final class ReifyIdentities[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 object ReifyIdentities {
   final case class ResearchedQSU[T[_[_]]](refs: References[T], graph: QSUGraph[T])
 
-  def apply[T[_[_]]: CorecursiveT]: ReifyIdentities[T] =
+  def apply[T[_[_]]: BirecursiveT]: ReifyIdentities[T] =
     new ReifyIdentities[T]
 }

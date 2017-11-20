@@ -1,0 +1,16 @@
+{
+    "name": "join with oid func",
+    "backends": {
+        "couchbase":       "skip",
+        "marklogic_json":  "skip",
+        "marklogic_xml":   "skip",
+        "mimir":           "skip",
+        "spark_hdfs":      "skip",
+        "spark_local":     "skip",
+        "spark_cassandra": "skip"
+    },
+    "data": ["../oidtestchild.data", "../oidtestparent.data"],
+    "query": "select p.`_id` as parent_id, c.`_id` as child_id, p.a, c.b from `../oidtestparent` as p inner join `../oidtestchild` as c on p.`_id` = oid(c.parentid)",
+    "predicate": "exactly",
+    "expected": [{ "parent_id": { "$oid": "5a035d84a1180dcd84162e72" }, "child_id": { "$oid": "5a0b270d4e7b730b4b90ccf4" }, "a": 1.0, "b": 2.0 }]
+}

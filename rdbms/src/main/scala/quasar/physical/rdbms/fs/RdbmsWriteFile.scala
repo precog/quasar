@@ -24,49 +24,75 @@ import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.model.TableModel
 
 import doobie.imports.Meta
-import scalaz.Monad
-import scalaz.syntax.monad._
-import scalaz.std.vector._
+import scalaz._
+import Scalaz._
 
-trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreate {
+final case class WriteCursor(tablePath: TablePath, model: Option[TableModel])
+
+trait RdbmsWriteFile
+    extends RdbmsInsert
+    with RdbmsDescribeTable
+    with RdbmsCreate {
   this: Rdbms =>
 
   import WriteFile._
 
-  val writeKvs = KeyValueStore.Ops[WriteHandle, TablePath, Eff]
-
   implicit def MonadM: Monad[M]
   implicit def dataMeta: Meta[Data]
 
+  val writeKvs = KeyValueStore.Ops[WriteHandle, WriteCursor, Eff]
+
   override def WriteFileModule: WriteFileModule = new WriteFileModule {
 
-    private def getDbPath(h: WriteHandle) = ME.unattempt(
-      writeKvs
-        .get(h)
-        .toRight(FileSystemError.unknownWriteHandle(h))
-        .run
-        .liftB)
+    def prepareTable(c: WriteCursor,
+                     chunk: Vector[Data]): Backend[TableModel] = {
+      ME.unattempt(
+        TableModel
+          .fromData(chunk)
+          .flatMap { newModel =>
+            (c.model match {
+              case Some(prevModel) =>
+                TableModel
+                  .alter(prevModel, newModel)
+                  .map(alterTable(c.tablePath, _))
+              case None =>
+                createTable(c.tablePath, newModel).right
+            }).map(_.map(_ => newModel))
+          }
+          .sequence
+          .liftB)
+    }
 
     override def write(
         h: WriteHandle,
         chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+
       (for {
-        _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
-        dbPath <- getDbPath(h)
-        _ <- batchInsert(dbPath, chunk).liftB
+        c <- ME.unattempt(
+          writeKvs
+            .get(h)
+            .toRight(FileSystemError.unknownWriteHandle(h))
+            .run
+            .liftB)
+        dbPath = c.tablePath
+        newModel <- prepareTable(c, chunk)
+        _ <- batchInsert(dbPath, chunk, newModel).liftB
+        _ <- writeKvs.put(h, WriteCursor(dbPath, model = Some(newModel))).liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
 
-    override def open(file: AFile): Backend[WriteHandle] =
+    override def open(file: AFile): Backend[WriteHandle] = {
+      val dbPath = TablePath.create(file)
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
-        dbPath = TablePath.create(file)
-        _ <- createTable(dbPath).liftB
         handle = WriteHandle(file, i)
-        _ <- writeKvs.put(handle, dbPath).liftB
+        initialModel <- tableModel(dbPath).liftB
+        _ <- writeKvs.put(handle, WriteCursor(dbPath, initialModel)).liftB
       } yield handle
+    }
 
     override def close(h: WriteHandle): Configured[Unit] =
       writeKvs.delete(h).liftM[ConfiguredT]

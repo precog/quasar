@@ -16,15 +16,16 @@
 
 package quasar.physical.rdbms
 
+import slamdata.Predef._
 import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp.{:/:, :\:}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fs.impl.DataStream
-import quasar.physical.rdbms.common.TablePath
-import doobie.imports.{ConnectionIO, Transactor}
+import quasar.physical.rdbms.fs.WriteCursor
 
+import doobie.imports.{ConnectionIO, Transactor}
 import scalaz.Free
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -46,9 +47,17 @@ package object model {
       :\: MonotonicSeq
       :\: GenUUID
       :\: KeyValueStore[ReadHandle, DbDataStream, ?]
-      :/: KeyValueStore[WriteHandle, TablePath, ?]
+      :/: KeyValueStore[WriteHandle, WriteCursor, ?]
   )#M[A]
 
   type M[A] = Free[Eff, A]
+
+  implicit class StringTypeMapperOps(s: String) {
+    def mapToColumnType(implicit tm: TypeMapper): ColumnType = tm.comap(s)
+  }
+
+  implicit class ColumnTypeMapperOps(cte: ColumnType) {
+    def mapToStringName(implicit tm: TypeMapper): String = tm.map(cte)
+  }
 }
 

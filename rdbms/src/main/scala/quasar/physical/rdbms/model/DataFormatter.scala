@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs
+package quasar.physical.rdbms.model
 
+import slamdata.Predef._
 import quasar.Data
-import quasar.fs.FileSystemError
-import quasar.physical.rdbms.common.TablePath
-import quasar.physical.rdbms.model.TableModel
-import slamdata.Predef.Vector
 
-import doobie.free.connection.ConnectionIO
+trait DataFormatter {
 
-trait RdbmsInsert {
+  def apply(n: String, d: Data): String
 
-  def batchInsert(
-      dbPath: TablePath,
-      chunk: Vector[Data],
-      model: TableModel
-  ): ConnectionIO[Vector[FileSystemError]]
+}
+
+object DataFormatter {
+
+  def apply(f: (String, Data) => String): DataFormatter = new DataFormatter {
+    def apply(n: String, d: Data) = f(n, d)
+  }
+
 }

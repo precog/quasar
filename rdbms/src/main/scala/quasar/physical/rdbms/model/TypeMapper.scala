@@ -14,21 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs
+package quasar.physical.rdbms.model
 
-import quasar.Data
-import quasar.fs.FileSystemError
-import quasar.physical.rdbms.common.TablePath
-import quasar.physical.rdbms.model.TableModel
-import slamdata.Predef.Vector
+import slamdata.Predef._
 
-import doobie.free.connection.ConnectionIO
+trait TypeMapper {
 
-trait RdbmsInsert {
+  def map(ctpe: ColumnType): String
 
-  def batchInsert(
-      dbPath: TablePath,
-      chunk: Vector[Data],
-      model: TableModel
-  ): ConnectionIO[Vector[FileSystemError]]
+  def comap(colTypeStr: String): ColumnType
+
+}
+
+object TypeMapper {
+
+  def apply(mapping: ColumnType => String, inverse: String => ColumnType): TypeMapper = new TypeMapper {
+
+    def map(ctpe: ColumnType): String = mapping(ctpe)
+
+    def comap(colTypeStr: String): ColumnType = inverse(colTypeStr)
+  }
+
 }

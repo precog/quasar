@@ -105,6 +105,7 @@ object Dependencies {
       "org.tpolecat" %% "doobie-postgres"   % doobieVersion,
       "org.tpolecat" %% "doobie-hikari"     % doobieVersion,
       "org.tpolecat" %% "doobie-h2"         % doobieVersion,
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
       ("org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test)
         .exclude("org.specs2", "specs2-core_2.11") // conflicting version
     )

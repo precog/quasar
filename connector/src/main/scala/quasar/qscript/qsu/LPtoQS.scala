@@ -45,12 +45,12 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       debugG("RecognizeDistinct: ")  >==>
       ExtractFreeMap[T, F]           >=>
       debugG("ExtractFM: ")          >==>
-      MinimizeAutoJoins[T].apply[F]  >=>
-      debugG("MinimizeAJ: ")         >==>
       ApplyProvenance[T].apply[F]    >=>
       debugAG("ApplyProv: ")         >-
       ReifyBuckets[T]                >=>
       debugAG("ReifyBuckets: ")      >==>
+      MinimizeAutoJoins[T].apply[F]  >=>
+      debugAG("MinimizeAJ: ")        >==>
       ReifyAutoJoins[T].apply[F]     >=>
       debugAG("ReifyAutoJoins: ")    >-
       (_.graph)                      >==>
@@ -63,15 +63,21 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def debugG[F[_]: Applicative](prefix: String): K[F, QSUGraph, QSUGraph] =
     K { g =>
-      println("\n\n" + prefix + g.shows)    // uh... yeah do better
+      maybePrint("\n\n" + prefix + g.shows)    // uh... yeah do better
       g.point[F]
     }
 
   private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
     K { aqsu =>
-      println("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
+      maybePrint("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
       aqsu.point[F]
     }
+
+  private def maybePrint(str: => String): Unit = {
+    // println(str)
+
+    ()
+  }
 }
 
 object LPtoQS {

@@ -4,7 +4,7 @@
     "backends": {
         "couchbase": "skip",
         "marklogic_json": "pendingIgnoreFieldOrder",
-        "mimir": "pendingIgnoreFieldOrder"
+        "mimir": "ignoreFieldOrder"
     },
 
     "NB": "The qscript for this query can be improved with better deep shape source merging.",

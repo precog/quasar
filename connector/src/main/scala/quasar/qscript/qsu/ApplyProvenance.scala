@@ -103,7 +103,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case QSFilter(src, _) => src.point[F]
 
-      case QSReduce(src, _, _, _) => unexpectedError("QSReduce", root)
+      case QSReduce(src, _, _, _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
 
       case QSSort(src, _, _) => src.point[F]
 

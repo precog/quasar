@@ -18,7 +18,8 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
-import scalaz.{Bind, Functor, MonadState}
+import scalaz.{Bind, Functor, Monad, MonadState, StateT}
+import scalaz.syntax.monad._
 
 /** A version of MonadState that doesn't extend Monad to avoid ambiguous
   * implicits in the presence of multiple "mtl" constraints.
@@ -42,5 +43,12 @@ object MonadState_ {
     new MonadState_[F, S] {
       def get = F.get
       def put(s: S) = F.put(s)
+    }
+
+  implicit def monadStateWithinState[F[_]: Monad, S1, S2](implicit F: MonadState_[F, S1])
+      : MonadState_[StateT[F, S2, ?], S1] =
+    new MonadState_[StateT[F, S2, ?], S1] {
+      def get = F.get.liftM[StateT[?[_], S2, ?]]
+      def put(s: S1) = F.put(s).liftM[StateT[?[_], S2, ?]]
     }
 }

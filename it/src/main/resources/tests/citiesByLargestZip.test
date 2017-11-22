@@ -2,7 +2,6 @@
     "name": "cities with largest individual zip codes",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending"

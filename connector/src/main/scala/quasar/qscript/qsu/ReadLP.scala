@@ -31,6 +31,7 @@ import quasar.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
+import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
 import quasar.qscript.{
@@ -196,19 +197,19 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       QSUGraph[T](name, SMap()).point[G]
 
     case lp.Let(name, form, in) =>
-      for {
-        reverse <- MS.get
-        _ <- MS.put(reverse.updated(form.vertices(form.root), name))
-      } yield {
-        val root2 = name
+      val in2Vertices = in.vertices map {
+        case (key, value) =>
+          val value2 = value map { sym =>
+            if (sym === name)
+              form.root
+            else
+              sym
+          }
 
-        val vertices2 =
-          form.vertices.get(form.root).map(node => form.vertices - form.root + (name -> node)).getOrElse(form.vertices)
-
-        val updated = QSUGraph(root2, vertices2)
-
-        in :++ updated
+          key -> value2
       }
+
+      (in.copy(vertices = in2Vertices) :++ form).point[G]
 
     case lp.Sort(src, order) =>
       val node = QSU.LPSort[T, Symbol](src.root, order.map(_.leftMap(_.root)))

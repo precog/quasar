@@ -2,7 +2,6 @@
     "name": "shortest city names",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "pending",
         "mongodb_2_6":       "ignoreResultOrder",
         "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_read_only": "ignoreResultOrder"

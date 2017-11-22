@@ -150,17 +150,21 @@ final case class QSUGraph[T[_[_]]](
                     acc + (sym -> snapshot)
               }
 
+              rewritten = QSUGraph.refold[T](g.root, recursive.map(_._1))
+
               sum = index.values.reduceOption(_ union _).getOrElse(Set())
 
               // remove the keys which were touched from the original
-              preimage = g.vertices -- sum
+              preimage = rewritten.vertices -- sum
 
               collapsed = recursive.foldLeft[QSUVerts[T]](preimage) {
                 case (acc, (sg, _)) =>
-                  acc ++ (sg.vertices -- (sum &~ index(sg.root)))
+                  // we need to explicitly remove the rewritten.root
+                  // to avoid it being overwritten by an old version of itself
+                  acc ++ (sg.vertices -- (sum &~ index(sg.root)) - rewritten.root)
               }
 
-              self2 = QSUGraph(g.root, collapsed)
+              self2 = rewritten.copy(vertices = collapsed)
 
               applied <- if (pf.isDefinedAt(self2))
                 pf(self2).liftM[VisitedT]
@@ -213,6 +217,25 @@ object QSUGraph extends QSUGraphInstances {
   }
 
   type RevIdx[T[_[_]]] = SMap[QScriptUniform[T, Symbol], Symbol]
+
+  // we assume that the verticies of the constituents are the same
+  // refold is the inverse of unfold
+  def refold[T[_[_]]](sym: Symbol, qsu: QScriptUniform[T, QSUGraph[T]]): QSUGraph[T] = {
+    import scalaz.{Value, WriterT}
+
+    // left-Monoid, based on the assumption that all the vertices are the same
+    implicit val vm: Monoid[QSUVerts[T]] = new Monoid[QSUVerts[T]] {
+      val zero = SMap[Symbol, QScriptUniform[T, Symbol]]()
+      def append(left: QSUVerts[T], right: => QSUVerts[T]) = left
+    }
+
+    val collapse = qsu traverse { g =>
+      WriterT.put(Value(g.root))(g.vertices)
+    }
+
+    val (verts, pf) = collapse.run.value
+    QSUGraph[T](sym, verts + (sym -> pf))
+  }
 
   def withName[T[_[_]], F[_]: Monad: NameGenerator](
       node: QScriptUniform[T, Symbol])(

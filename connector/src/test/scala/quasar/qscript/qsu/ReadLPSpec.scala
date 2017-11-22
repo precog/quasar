@@ -32,10 +32,20 @@ import quasar.qscript.{
   RightSide3,
   Sample,
   SrcHole,
-  Take}
+  Take
+}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.sql.CompilerHelpers
-import quasar.std.{AggLib, IdentityLib, MathLib, RelationsLib, SetLib, StructuralLib, TemporalPart}
+import quasar.std.{
+  AggLib,
+  IdentityLib,
+  MathLib,
+  RelationsLib,
+  SetLib,
+  StringLib,
+  StructuralLib,
+  TemporalPart
+}
 import slamdata.Predef._
 
 import matryoshka.data.Fix
@@ -273,6 +283,107 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       result must beSome
       result.get.vertices must haveSize(3)
     }
+
+    "manage a straightforward query" in {
+      // select city from zips where city ~ "OULD.{0,2} CIT"
+      val input =
+        lpf.let(
+          '__tmp0,
+          lpf.let(
+            '__tmp1,
+            read("zips"),
+            lpf.typecheck(
+              lpf.free('__tmp1),
+              Type.AnyObject,
+              lpf.free('__tmp1),
+              lpf.constant(Data.NA))),
+          lpf.invoke2(
+            SetLib.Take,
+            lpf.invoke1(
+              IdentityLib.Squash,
+              lpf.invoke2(
+                StructuralLib.MapProject,
+                lpf.invoke2(
+                  SetLib.Filter,
+                  lpf.free('__tmp0),
+                  lpf.let(
+                    '__tmp2,
+                    lpf.invoke2(
+                      StructuralLib.MapProject,
+                      lpf.free('__tmp0),
+                      lpf.constant(Data.Str("city"))),
+                    lpf.typecheck(
+                      lpf.free('__tmp2),
+                      Type.Str,
+                      lpf.invoke3(
+                        StringLib.Search,
+                        lpf.free('__tmp2),
+                        lpf.constant(Data.Str("OULD.{0,2} CIT")),
+                        lpf.constant(Data.Bool(false))),
+                      lpf.constant(Data.NA)))),
+                lpf.constant(Data.Str("city")))),
+            lpf.constant(Data.Int(11))))
+
+      input must readQsuAs {
+        case Subset(
+          DimEdit(
+            AutoJoin2C(
+              LPFilter(
+                AutoJoin3C(   // '__tmp0
+                  Transpose(    // '__tmp1
+                    Read(_),
+                    QSU.Retain.Values,
+                    QSU.Rotation.ShiftMap),
+                  Transpose(
+                    Read(_),
+                    QSU.Retain.Values,
+                    QSU.Rotation.ShiftMap),
+                  _,
+                  MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                AutoJoin3C(
+                  AutoJoin2C(   // '__tmp2
+                    AutoJoin3C(   // '__tmp0
+                      Transpose(    // '__tmp1
+                        Read(_),
+                        QSU.Retain.Values,
+                        QSU.Rotation.ShiftMap),
+                      Transpose(
+                        Read(_),
+                        QSU.Retain.Values,
+                        QSU.Rotation.ShiftMap),
+                      _,
+                      MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                    DataConstant(Data.Str("city")),
+                    MapFuncsCore.ProjectKey(LeftSide, RightSide)),
+                  AutoJoin3C(
+                    AutoJoin2C(   // '__tmp2
+                      AutoJoin3C(   // '__tmp0
+                        Transpose(    // '__tmp1
+                          Read(_),
+                          QSU.Retain.Values,
+                          QSU.Rotation.ShiftMap),
+                        Transpose(
+                          Read(_),
+                          QSU.Retain.Values,
+                          QSU.Rotation.ShiftMap),
+                        _,
+                        MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                      DataConstant(Data.Str("city")),
+                      MapFuncsCore.ProjectKey(LeftSide, RightSide)),
+                    DataConstant(Data.Str("OULD.{0,2} CIT")),
+                    DataConstant(Data.Bool(false)),
+                    MapFuncsCore.Search(LeftSide3, Center, RightSide3)),
+                  _,
+                  MapFuncsCore.Guard(LeftSide3, Type.Str, Center, RightSide3))),
+              DataConstant(Data.Str("city")),
+              MapFuncsCore.ProjectKey(LeftSide, RightSide)),
+            QSU.DTrans.Squash()),
+          Take,
+          DataConstant(Data.Int(subsetTakeI))) =>
+
+        subsetTakeI mustEqual 11
+      }
+    }
   }
 
   def readQsuAs(pf: PartialFunction[QSUGraph, MatchResult[_]]): Matcher[Fix[LogicalPlan]] = {
@@ -293,7 +404,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
           // TODO Show[QSUGraph[Fix]]
           mapped.getOrElse(
-            failure(s"$qgraph did not match expected pattern", s))
+            failure(s"${qgraph.shows} did not match expected pattern", s))
         }
 
         continued.merge

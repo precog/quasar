@@ -42,7 +42,7 @@ trait PostgresScanTable extends RdbmsScanTable {
   }
 
   override def selectAllQuery(tablePath: TablePath, offset: Natural, limit: Option[Positive]): Fragment = {
-    fr"select * from" ++ Fragment.const(tablePath.shows) ++ limitFr(limit) ++ offsetFr(offset)
+    fr"select row_to_json(row) from" ++ Fragment.const(tablePath.shows) ++ fr"row" ++ limitFr(limit) ++ offsetFr(offset)
   }
 
 }

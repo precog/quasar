@@ -26,7 +26,6 @@ import quasar.fs.MonadFsErr
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
-
 import quasar.qscript.{EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
 import quasar.physical.rdbms.common.Config
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
@@ -106,5 +105,5 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
     ???
   } // TODO
 
-  def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
+  def parseConnectionUri(uri: ConnectionUri): DefinitionError \/ JdbcConnectionInfo
 }

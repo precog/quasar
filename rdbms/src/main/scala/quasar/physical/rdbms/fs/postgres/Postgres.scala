@@ -52,7 +52,7 @@ object Postgres
       s"Cannot extract credentials from URI [${uri.value}]. Expected format: $formatHint"))
 
   override def parseConnectionUri(
-      uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo] = {
+      uri: ConnectionUri): DefinitionError \/ JdbcConnectionInfo = {
 
     val jUri = new URI(uri.value.substring(jdbcPrefixLength + 1))
     val connectionInfo = (Option(jUri.getScheme),

@@ -21,27 +21,79 @@ import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.RdbmsInsert
+import quasar.physical.rdbms.model._
+import doobie.imports._
 
-import doobie.free.connection.ConnectionIO
-import doobie.imports.{Meta, Update}
-import doobie.syntax.string._
-import doobie.util.fragment.Fragment
-import scalaz.std.vector._
-import scalaz.syntax.show._
+import scalaz._
+import Scalaz._
 
 trait PostgresInsert extends RdbmsInsert {
 
   implicit def dataMeta: Meta[Data]
 
+  def toColValues(cols: Set[ColumnDesc])(
+      row: Data)(implicit formatter: DataFormatter): FileSystemError \/ Map[String, String] = {
+    row match {
+      case Data.Obj(fields) =>
+        fields.toVector
+          .filter(f => cols.exists(_.name === f._1))
+          .map {
+            case (n, v) =>
+              (n, formatter(n, v))
+          }
+          .toMap
+          .right
+      case _ =>
+        FileSystemError
+          .unsupportedOperation(
+            s"Unexpected data row $row not matching model $cols")
+          .left
+    }
+  }
+
+  def buildQuery(chunk: Vector[Data],
+                 cols: Set[ColumnDesc],
+                 dbPath: TablePath): FileSystemError \/ Vector[Fragment] = {
+    val insertIntoTable = fr"insert into " ++ Fragment.const(dbPath.shows)
+
+    chunk.traverse(toColValues(cols)).map { insertColVectors =>
+      insertColVectors.map { colMap =>
+
+        val colNamesFragment =
+          insertIntoTable ++ fr"(" ++ Fragment.const(
+            colMap.keys.mkString(",")) ++
+            fr")"
+
+        val colValsFragment =
+              fr"values (" ++
+          colMap.values.toList
+            .map(v => Fragment.const(v))
+            .intercalate(fr",") ++ fr")"
+
+        colNamesFragment ++ colValsFragment
+      }
+    }
+  }
+
   def batchInsert(
       dbPath: TablePath,
-      chunk: Vector[Data]
+      chunk: Vector[Data],
+      model: TableModel
   ): ConnectionIO[Vector[FileSystemError]] = {
 
-    val fQuery = fr"insert into " ++ Fragment.const(dbPath.shows) ++ fr"(data) values(?::JSON)"
-
-    Update[Data](fQuery.update.sql)
-      .updateMany(chunk)
-      .map(_ => Vector.empty[FileSystemError])
+    model match {
+      case JsonTable =>
+        val fQuery = fr"(data) values(?::JSON)"
+        Update[Data](fQuery.update.sql)
+          .updateMany(chunk)
+          .map(_ => Vector.empty[FileSystemError])
+      case ColumnarTable(cols) =>
+        buildQuery(chunk, cols, dbPath)
+          .traverse(_.foldMap(_.update.run.void))
+          .map {
+            case -\/(err) => Vector(err)
+            case _        => Vector.empty
+          }
+    }
   }
 }

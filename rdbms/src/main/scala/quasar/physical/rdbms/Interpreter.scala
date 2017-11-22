@@ -23,7 +23,7 @@ import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.free._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
-import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.fs.WriteCursor
 import quasar.physical.rdbms.model.DbDataStream
 
 import doobie.imports.Transactor
@@ -36,10 +36,10 @@ trait Interpreter {
 
   def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
     (
-      TaskRef(Map.empty[ReadHandle, DbDataStream])  |@|
-        TaskRef(Map.empty[WriteHandle, TablePath])  |@|
-        xa                                          |@|
-        TaskRef(0L)                                 |@|
+      TaskRef(Map.empty[ReadHandle, DbDataStream])   |@|
+        TaskRef(Map.empty[WriteHandle, WriteCursor]) |@|
+        xa                                           |@|
+        TaskRef(0L)                                  |@|
         GenUUID.type1[Task]
       )(
       (kvR, kvW, x, i, genUUID) =>

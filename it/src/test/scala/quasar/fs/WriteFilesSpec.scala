@@ -17,14 +17,15 @@
 package quasar.fs
 
 import slamdata.Predef._
-import quasar.BackendCapability
+import quasar.{BackendCapability, Data}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.fp._
 
 import monocle.std.{disjunction => D}
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 import scalaz.stream._
 
 class WriteFilesSpec extends FileSystemTest[BackendEffect](
@@ -76,6 +77,23 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
         val p = write.append(f, oneDoc.toProcess).drain ++ read.scanAll(f)
 
         runLogT(run, p).runEither must beRight(completelySubsume(oneDoc))
+      }
+
+      "append should write many different data objects to file" >> {
+        val docs: Vector[Data] =
+          Vector(
+            Data.Obj(ListMap("a" -> Data.Int(1))),
+            Data.Obj(ListMap("a" -> Data.Int(2), "b" -> Data.Str("3"))),
+            Data.Obj(ListMap("c" -> Data.Obj(
+              ListMap("inner" -> Data.Int(5))
+            ))),
+            Data.Obj(ListMap("c" -> Data.Arr(List(Data.Int(1), Data.Int(2)))))
+          )
+
+        val f = writesPrefix </> file("saveone")
+        val p = write.append(f, docs.toProcess).drain ++ read.scanAll(f)
+
+        runLogT(run, p).runEither must beRight(completelySubsume(docs))
       }
 
       "append two files, one in subdir of the other's parent, should succeed" >> {

@@ -76,13 +76,13 @@ object CassandraDDL {
         case TableExists(keyspace, table) =>
           tableExists(keyspace, table)
         case DropKeyspace(keyspace) =>
-          dropKeyspace(keyspace)
+          retry(dropKeyspace(keyspace), κ(keyspaceExists(keyspace).map(!(_))))
         case DropTable(keyspace, table) =>
-          dropTable(keyspace, table)
+          retry(dropTable(keyspace, table), κ(tableExists(keyspace, table).map(!(_))))
         case CreateTable(keyspace, table) =>
-          createTable(keyspace, table)
+          retry(createTable(keyspace, table), κ(tableExists(keyspace, table)))
         case CreateKeyspace(keyspace) =>
-          createKeyspace(keyspace)
+          retry(createKeyspace(keyspace), κ(keyspaceExists(keyspace)))
         case MoveTable(fromK, fromT, toK, toT) =>
           moveTable(fromK, fromT, toK, toT)
         case ListTables(keyspace) =>
@@ -94,6 +94,20 @@ object CassandraDDL {
         case InsertData(keyspace, table, data) =>
           insertData(keyspace, table, data)
       }
+  }
+
+  def retry[T](job: Task[T], check: T => Task[Boolean]): Task[T] = {
+    def wait: Task[Unit] = Task.delay {
+      java.lang.Thread.sleep(300)
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def checker(result: T, retries: Int): Task[Unit] =
+      if(retries === 0)
+        Task.fail(new RuntimeException("Failed executing cassandra"))
+      else check(result) >>= (passed => if(passed) ().point[Task] else (wait *> checker(result, retries - 1)))
+
+    job >>= (result => checker(result, 10).as(result))
   }
 
   def keyspaceExists[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
@@ -136,9 +150,16 @@ object CassandraDDL {
     }
   }.void
 
-  def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = Task.delay {
-    val rdd = sc.cassandraTable(fromK, fromT)
-    rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = toK, tableName = toT))
+  def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = {
+    def move: Task[Long] = for {
+      fromRdd <- Task.delay {sc.cassandraTable(fromK, fromT)}
+      _       <- Task.delay {
+        fromRdd.saveAsCassandraTableEx(fromRdd.tableDef.copy(keyspaceName = toK, tableName = toT))
+      }
+    } yield fromRdd.count
+
+    retry(move, (fromSize: Long) => Task.delay(sc.cassandraTable(toK, toT).count === fromSize)).as(())
+
   }
 
   def listTables[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {

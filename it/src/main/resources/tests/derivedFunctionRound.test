@@ -1,7 +1,7 @@
 {
     "name": "derived function round",
     "data": "divide.data",
-    "query": "select nr, round(val3) as round1 from divide",
+    "query": "select nr, round(val3) as round1 from divide order by nr",
     "predicate": "exactly",
     "expected": [
         { "nr":  1, "round1": 1.0 },

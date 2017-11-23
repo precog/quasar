@@ -2,10 +2,11 @@
   "name": "now() function is referentially transparent",
 
   "backends": {
-      "couchbase": "pending",
-      "mimir": "pending",
-      "spark_local": "pending",
-      "spark_hdfs": "pending"
+      "couchbase":       "pending",
+      "mimir":           "pending",
+      "spark_local":     "pending",
+      "spark_hdfs":      "pending",
+      "spark_cassandra": "pending"
   },
 
   "data": "../zips.data",

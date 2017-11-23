@@ -258,7 +258,6 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
     }
   }
 
-
   object ManagedWriteFileModule extends ManagedWriteFileModule {
 
     def writeCursor(file: AFile): Backend[AFile] = {
@@ -289,7 +288,7 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
       ().point[Configured]
   }
 
-  object ElasticManageFileModule extends SparkCoreManageFileModule {
+  object CassandraManageFileModule extends SparkCoreManageFileModule {
 
     def moveFile(source: AFile, destination: AFile): Free[Eff, Unit] = {
       val destinationKeyspace = common.keyspace(fileParent(destination))
@@ -358,7 +357,7 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
 
   }
 
-  def ManageFileModule: ManageFileModule = ElasticManageFileModule
+  def ManageFileModule: ManageFileModule = CassandraManageFileModule
 
 
 }

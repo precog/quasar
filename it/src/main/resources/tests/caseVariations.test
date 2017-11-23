@@ -7,8 +7,7 @@
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_2_6":       "ignoreResultOrder",
         "mongodb_3_0":       "ignoreResultOrder",
-        "mongodb_read_only": "ignoreResultOrder",
-        "spark_cassandra":   "pending"	
+        "mongodb_read_only": "ignoreResultOrder"
     },
 
     "NB": "This is probably pending on mimir for the same reason that shortCities.test is pending: namely, qscript using arrays rather than objects to carry around information.",

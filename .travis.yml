@@ -29,6 +29,7 @@ env:
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=spark_local_test
     - CONNECTOR=spark_hdfs
+    - CONNECTOR=spark_cassandra
   global:
     - COURSIER_PROGRESS=0
 
@@ -59,7 +60,7 @@ script:
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
 
-      spark_hdfs)
+      spark_*)
 
         ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
           'set every assemblyJarName in assembly := "sparkcore.jar"' \

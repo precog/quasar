@@ -271,8 +271,8 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
     def tempFile(near: APath): Backend[AFile] = lift(Task.delay {
       val parent: ADir = refineType(near).fold(d => d, fileParent(_))
-      val random = scala.util.Random.nextInt().toString
-        (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
+      val random = scala.util.Random.nextInt(1000000).toString
+        (parent </> file(s"quasar$random")).right[FileSystemError]
     }
     ).into[Eff].liftB.unattempt
   }

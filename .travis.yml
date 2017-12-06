@@ -81,7 +81,6 @@ script:
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-      it/sideEffectTestFSConfig \
       "it/testOnly -- xonly failtrace" \
       "$SPECIFIC_DELEGATE"
 
@@ -111,7 +110,6 @@ jobs:
       script:
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
 

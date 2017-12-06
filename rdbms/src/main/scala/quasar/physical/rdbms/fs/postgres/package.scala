@@ -29,12 +29,14 @@ package object postgres {
       case JsonCol   => "jsonb"
       case StringCol => "text"
       case IntCol    => "bigint"
+      case DecCol    => "decimal"
       case NullCol   => "int"
     },
     _.toLowerCase match {
       case "text" | "varchar" => StringCol
       case "int" | "bigint"   => IntCol
       case "jsonb" | "json"   => JsonCol
+      case "decimal" | "numeric" => DecCol
       // TODO more types
     }
   )
@@ -45,6 +47,7 @@ package object postgres {
         "'" + DataCodec.render(v).getOrElse("{}") + "'"
       case Data.Int(num) => s"$num"
       case Data.Str(txt) => s"'$txt'"
+      case Data.Dec(num) => s"$num"
       case _             => s"""'{"$n": "unsupported""}'""" // TODO
     })
 }

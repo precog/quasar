@@ -46,7 +46,7 @@ trait PostgresCreate extends RdbmsCreate {
     model match {
       case JsonTable => Fragment.const("data jsonb NOT NULL")
       case ColumnarTable(cols) =>
-        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${c.tpe.mapToStringName}"))
+        cols.toList.map(c => Fragment.const(s"${c.name} ${c.tpe.mapToStringName}")).intercalate(fr",")
     }
   }
 

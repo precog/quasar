@@ -88,7 +88,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
   def fromTable(
       name: String,
-      alias: Option[SqlExpr.Id[Fix[SqlExpr]]] = None): From[Fix[SqlExpr]] =
+      alias: SqlExpr.Id[Fix[SqlExpr]]): From[Fix[SqlExpr]] =
     From[Fix[SqlExpr]](Fix(Table(name)), alias)
 
   def select[T](selection: Selection[T],
@@ -104,8 +104,8 @@ class PlannerSpec extends Qspec with SqlExprSupport {
         beRepr({
           select(
             selection(Fix(id0), alias = None),
-            From(Fix(SelectRow(selection(*), fromTable("db.foo"))),
-              alias = id0.some))
+            From(Fix(SelectRow(selection(*), fromTable("db.foo", id0), orderBy = Nil, filter = None)),
+              alias = id0))
         })
     }
 
@@ -124,19 +124,19 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "build plan including ids" in {
       expectShiftedReadRepr(forIdStatus = IncludeId, expectedRepr = {
-        SelectRow(selection(Fix(WithIds(*))), fromTable("db.foo"))
+        SelectRow(selection(Fix(WithIds(*))), fromTable("db.foo", id0), orderBy = Nil, filter = None)
       })
     }
 
     "build plan only for ids" in {
       expectShiftedReadRepr(forIdStatus = IdOnly, expectedRepr = {
-        SelectRow(selection(Fix(RowIds())), fromTable("db.foo"))
+        SelectRow(selection(Fix(RowIds())), fromTable("db.foo", id0), orderBy = Nil, filter = None)
       })
     }
 
     "build plan only for excluded ids" in {
       expectShiftedReadRepr(forIdStatus = ExcludeId, expectedRepr = {
-        SelectRow(selection(*), fromTable("db.foo"))
+        SelectRow(selection(*), fromTable("db.foo", id0), orderBy = Nil, filter = None)
       })
     }
   }
@@ -157,5 +157,24 @@ class PlannerSpec extends Qspec with SqlExprSupport {
       qs(sqlE"select aa.bb.c.d from foo") must
         beSql("(select _0->'aa'->'bb'->'c'->>'d' from (select row_to_json(_0) _0 from db.foo _0) as _0)")
     }
+  }
+
+  "QScriptCore" should {
+
+    "represent simple ordering" in {
+      qs(sqlE"select name, surname from foo order by name") must
+        beSql("""(select _0->>'name' as "name", _0->>'surname' as "surname" from (select row_to_json(_0) _0 from db.foo _0 order by _0."name" asc) _0)""")
+    }
+
+    "represent simple filtering" in {
+      qs(sqlE"""select name from foo where surname="Kowalski"""") must
+        beSql("""(select _0->>'name' from (select row_to_json(_0) _0 from db.foo _0 WHERE (_0.surname = 'Kowalski')) _0)""")
+    }
+
+    "represent more complex filtering" in {
+      qs(sqlE"""select name from foo where surname="Kowalski" and age=25""") must
+        beSql("""(select _0->>'name' from (select row_to_json(_0) _0 from db.foo _0 WHERE ((_0.surname = 'Kowalski') and (_0.age = 25))) _0)""")
+    }
+
   }
 }

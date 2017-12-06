@@ -16,6 +16,7 @@
 
 package quasar.physical.rdbms.planner
 
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.qscript._
 import quasar.physical.rdbms.common.TablePath
@@ -43,13 +44,13 @@ class ShiftedReadPlanner[
       } yield {
         val from: From[R] = From(
           Table[R](TablePath.create(semantics.path).shows).embed,
-          alias = none)
+          alias = rowAlias)
         val fields: T[SqlExpr] = semantics.idStatus match {
           case IdOnly    => RowIds[R]().embed
           case ExcludeId => AllCols[R](rowAlias.v).embed
           case IncludeId => WithIds[R](AllCols[R](rowAlias.v).embed).embed
         }
-        SelectRow(Selection[R](fields, alias = rowAlias.some), from).embed
+        SelectRow(Selection[R](fields, alias = rowAlias.some), from, orderBy = Nil, filter = none).embed
       }
   }
 

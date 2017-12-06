@@ -84,23 +84,40 @@ trait SqlExprRenderTree {
             nonTerminal("And", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
+          case Eq(a1, a2) =>
+            nonTerminal("Equal", a1, a2)
+          case Lt(a1, a2) =>
+            nonTerminal("<", a1, a2)
+          case Lte(a1, a2) =>
+            nonTerminal("<=", a1, a2)
+          case Gt(a1, a2) =>
+            nonTerminal(">", a1, a2)
+          case Gte(a1, a2) =>
+            nonTerminal(">=", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
+          case RefsSelectRow(srcs) =>
+            nonTerminal("SelectRow References", srcs:_*)
           case Select(selection, from, filter) =>
             NonTerminal(
               "Select" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
-                nt("from", from.alias ∘ (_.v), from.v) ::
+                nt("from", from.alias.v.some, from.v) ::
                 (filter ∘ (f => nt("filter", none, f.v))).toList
             )
-          case SelectRow(selection, from) =>
+          case SelectRow(selection, from, order, filter) =>
 
             NonTerminal(
               "SelectRow" :: Nil,
               none,
               nt("selectionInRow", selection.alias ∘ (_.v), selection.v) ::
-                List(nt("fromInRow`", from.alias ∘ (_.v), from.v))
+                List(nt("fromInRow", from.alias.v.some, from.v)) ++
+                  order.map {
+                  o =>
+                    nt(s"OrderBy ${o.sortDir}", none, o.v)
+                } ++
+                (filter ∘ (f => nt("filter", none, f.v))).toList
             )
 
           case Case(wt, e) =>

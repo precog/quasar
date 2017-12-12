@@ -39,6 +39,8 @@ trait SqlExprRenderTree {
           NonTerminal(tpe :: Nil, label, List(r.render(child)))
 
         RenderTree.make {
+          case Unreferenced() =>
+            Terminal("Unreferenced" :: Nil, none)
           case Null() =>
             Terminal("Null" :: Nil, none)
           case Constant(d) =>
@@ -100,6 +102,7 @@ trait SqlExprRenderTree {
                       nt(s"OrderBy ${o.sortDir}", none, o.v)
                   }
             )
+          case Limit(from, count) => nonTerminal("Limit", from, count)
           case SelectRow(selection, from, order) =>
 
             NonTerminal(

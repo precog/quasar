@@ -43,11 +43,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
     val q = a.cataM(alg)
-
-    a.project match {
-      case s: Select[T[SqlExpr]] => q ∘ (s => s"select row_to_json(row) from $s row")
-      case _ => q ∘ ("" ⊹ _)
-    }
+    q ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -58,6 +54,7 @@ object PostgresRenderQuery extends RenderQuery {
     s"json_build_object($str)#>>'{}'"
 
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
+    case Unreferenced() => InternalError("Unexpected Unreferenced!", none).left
     case Null() => "null".right
     case SqlExpr.Id(v) =>
       s"""$v""".right
@@ -110,6 +107,7 @@ object PostgresRenderQuery extends RenderQuery {
     case Neg(str) => s"(-$str)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
+    case Limit(from, count) => s"$from LIMIT $count".right
     case Select(selection, from, filterOpt, order) =>
       val selectionStr = selection.v ⊹ alias(selection.alias)
       val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))

@@ -31,6 +31,7 @@ trait SqlExprTraverse {
     )(
         implicit G: Applicative[G]
     ): G[SqlExpr[B]] = fa match {
+      case Unreferenced()      => G.point(Unreferenced())
       case Null()              => G.point(Null())
       case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Constant(d)         => G.point(Constant(d))
@@ -88,6 +89,7 @@ trait SqlExprTraverse {
       case UnaryFunction(t, e) => f(e) ∘ (UnaryFunction(t, _))
       case BinaryFunction(t, a1, a2) => (f(a1) ⊛ f(a2))(BinaryFunction(t, _, _))
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))
+      case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
 
     }
   }

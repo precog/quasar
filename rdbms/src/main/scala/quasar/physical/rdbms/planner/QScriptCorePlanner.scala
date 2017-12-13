@@ -24,7 +24,7 @@ import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore}
+import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
 
 import matryoshka._
 import matryoshka.data._
@@ -33,7 +33,7 @@ import matryoshka.patterns._
 import scalaz.Scalaz._
 import scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT,
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
@@ -41,10 +41,17 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
   def processFreeMap(f: FreeMap[T],
-                     alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
+                     alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
 
+  private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
+        InternalError.fromMsg(s"unsupported QScriptCore"))
+
+  val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
+
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
+    case qscript.Map(`unref`, f) =>
+      processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F]
@@ -53,13 +60,14 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             case SqlExpr.Id(_) => *
             case other => other.embed
           })
-      } yield
+      } yield {
         Select(
           Selection(selection, none),
           From(src, fromAlias),
           filter = none,
           orderBy = nil
         ).embed
+      }
     case qscript.Sort(src, bucket, order) =>
       def createOrderBy(id: SqlExpr.Id[T[SqlExpr]]):
       ((FreeMap[T], SortDir)) => F[OrderBy[T[SqlExpr]]] = {
@@ -68,7 +76,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             OrderBy(expr, dir)
           }
       }
-
       for {
         fromAlias <- genId[T[SqlExpr], F]
         orderByExprs <- order.traverse(createOrderBy(fromAlias))
@@ -82,9 +89,24 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             orderBy = bucketExprs ++ orderByExprs.toList
           ).embed
         }
+    case qscript.Subset(src, from, sel, count) => sel match {
+      case qscript.Drop   => unsupported
+      case qscript.Take   =>
+        val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
-    case other =>
-      PlannerErrorME[F].raiseError(
+        val fromExp: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
+        val countExp: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
+
+        (fromExp |@| countExp)(Limit(_, _).embed)
+
+      case qscript.Sample => unsupported
+    }
+
+    case qscript.Unreferenced() => unref.point[F]
+
+    case other =>     PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))
+
+      
   }
 }

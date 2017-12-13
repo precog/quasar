@@ -1,0 +1,21 @@
+{
+    "name": "qa_subset-simple-limit",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+
+    "data": "subset.data",
+
+    "query": "select a, b from subset order by a limit 3",
+
+    "predicate": "exactly",
+    
+    "expected": [
+       {"a": 1, "b": 0},
+       {"a": 2, "b": 1},
+       {"a": 3, "b": 2}
+    ]
+}

@@ -151,17 +151,17 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent addition" in {
       qs(sqlE"select a+b from foo") must
-        beSql("select row_to_json(row) from (select ((_2.a)::text::numeric + (_2.b)::text::numeric) from (select * from db.foo) _2) row")
+        beSql("select row_to_json(row) from ((select ((_2.a)::text::numeric + (_2.b)::text::numeric) from (select * from db.foo) _2)) as row")
     }
 
     "represent single-level reference" in {
       qs(sqlE"select a from foo") must
-        beSql("select row_to_json(row) from (select _2.a from (select * from db.foo) _2) row")
+        beSql("select row_to_json(row) from ((select _2.a from (select * from db.foo) _2)) as row")
     }
 
     "represent nested refs" in {
       qs(sqlE"select aa.bb.c.d from foo") must
-        beSql("select row_to_json(row) from (select _2.aa->'bb'->'c'->'d' from (select * from db.foo) _2) row")
+        beSql("select row_to_json(row) from ((select _2.aa->'bb'->'c'->'d' from (select * from db.foo) _2)) as row")
     }
   }
 
@@ -169,7 +169,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent simple ordering" in {
       qs(sqlE"select name, surname from foo order by name") must
-        beSql("""select row_to_json(row) from (select * from (select _2.name as "name", _2.surname as "surname" from (select * from db.foo) _2) _3 order by _3.name asc) row""")
+        beSql("""select row_to_json(row) from ((select * from (select _2.name as "name", _2.surname as "surname" from (select * from db.foo) _2) _3 order by _3.name asc)) as row""")
     }
   }
 }

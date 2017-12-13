@@ -21,9 +21,9 @@ stages:
 env:
   matrix:
     - CONNECTOR=marklogic_json
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=mimir
     # - CONNECTOR=couchbase
-    # - CONNECTOR=marklogic_xml
-    # - CONNECTOR=mimir
     # - CONNECTOR=mongodb_3_2
     # - CONNECTOR=mongodb_3_4
     # - CONNECTOR=mongodb_read_only

@@ -2,8 +2,7 @@ FROM patrickmcelwee/marklogic-dependencies:8-latest
 
 ADD MarkLogic.rpm /tmp/MarkLogic.rpm
 
-RUN yum install -y yum-plugin-ovl
-RUN yum -y localinstall /tmp/MarkLogic.rpm
+RUN yum -y localinstall /tmp/MarkLogic.rpm; yum clean all
 RUN rm -rf /tmp/MarkLogic.rpm
 
 EXPOSE 7997 7998 7999 8000 8001 8002 8040 8041 8042

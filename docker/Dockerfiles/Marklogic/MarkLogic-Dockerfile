@@ -2,7 +2,7 @@ FROM patrickmcelwee/marklogic-dependencies:8-latest
 
 ADD MarkLogic.rpm /tmp/MarkLogic.rpm
 
-RUN yum install -y yum-plugin-ovl; yum clean all
+RUN yum install -y yum-plugin-ovl openldap2; yum clean all
 RUN yum -y localinstall /tmp/MarkLogic.rpm; yum clean all
 RUN rm -rf /tmp/MarkLogic.rpm
 

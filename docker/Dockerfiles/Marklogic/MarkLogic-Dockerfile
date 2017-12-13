@@ -2,6 +2,7 @@ FROM patrickmcelwee/marklogic-dependencies:8-latest
 
 ADD MarkLogic.rpm /tmp/MarkLogic.rpm
 
+RUN yum install -y yum-plugin-ovl
 RUN yum -y localinstall /tmp/MarkLogic.rpm
 RUN rm -rf /tmp/MarkLogic.rpm
 

@@ -2,7 +2,7 @@
     "name": "select unreduced grouped values from nested select with reduction",
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "ignoreFieldOrder"
+        "marklogic_json":    "skip"
     },
     "NB": "disabled on couchbase due to lack of general join",
     "data": "patients.data",

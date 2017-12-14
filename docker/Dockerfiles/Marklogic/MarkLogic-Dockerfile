@@ -1,7 +1,7 @@
 FROM patrickmcelwee/marklogic-dependencies:8-latest
 
 ADD MarkLogic.rpm /tmp/MarkLogic.rpm
-
+RUN touch /var/lib/rpm/*
 RUN yum -y localinstall /tmp/MarkLogic.rpm
 RUN rm -rf /tmp/MarkLogic.rpm
 

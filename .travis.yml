@@ -3,6 +3,7 @@ scala: 2.11.8
 jdk: oraclejdk8
 dist: trusty
 sudo: required
+#group: deprecated-2017Q4
 
 services:
   - docker
@@ -20,15 +21,14 @@ stages:
 # this all goes in the test stage
 env:
   matrix:
-    # - CONNECTOR=couchbase
     - CONNECTOR=marklogic_json
     - CONNECTOR=marklogic_xml
-    - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_2
-    - CONNECTOR=mongodb_3_4
-    - CONNECTOR=mongodb_read_only
-    - CONNECTOR=spark_local_test
-    - CONNECTOR=spark_hdfs
+    # - CONNECTOR=couchbase
+    # - CONNECTOR=mongodb_3_2
+    # - CONNECTOR=mongodb_3_4
+    # - CONNECTOR=mongodb_read_only
+    # - CONNECTOR=spark_local_test
+    # - CONNECTOR=spark_hdfs
   global:
     - COURSIER_PROGRESS=0
 

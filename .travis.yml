@@ -3,7 +3,7 @@ scala: 2.11.8
 jdk: oraclejdk8
 dist: trusty
 sudo: required
-group: deprecated-2017Q4
+#group: deprecated-2017Q4
 
 services:
   - docker

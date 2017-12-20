@@ -1,0 +1,14 @@
+{
+  "name": "[qa_s01] select single field",
+
+  "data": "basic.data",
+
+  "query": "select num from basic",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoreFieldOrder": false,
+
+  "expected": [4, 42]
+}

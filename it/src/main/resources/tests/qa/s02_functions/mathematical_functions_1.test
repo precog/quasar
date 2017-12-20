@@ -1,5 +1,5 @@
 {
-  "name": "basic mathematical functions postgres",
+  "name": "[qa_s02] mathematical functions 1",
 
   "backends": {
     "mongodb_read_only": "skip"
@@ -11,8 +11,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

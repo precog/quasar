@@ -1,5 +1,5 @@
 {
-  "name": "bug2228",
+  "name": "[reg] bug2228",
   "data": ["customers.data", "orders.data", "ordered_items.data", "inventory_items.data"],
   "backends": {
     "couchbase":         "skip",

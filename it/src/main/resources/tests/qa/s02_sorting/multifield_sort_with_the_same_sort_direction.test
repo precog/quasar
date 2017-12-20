@@ -1,8 +1,5 @@
 {
-  "name": "multi field order postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s03] multifield sort with the same sort direction",
 
   "data": "sort.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

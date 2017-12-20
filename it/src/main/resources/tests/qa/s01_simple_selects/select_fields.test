@@ -1,17 +1,13 @@
 {
-  "name": "multi-field read postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s01] select fields",
 
   "data": "basic.data",
 
   "query": "select num, name from basic",
 
   "predicate": "exactly",
+  
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

@@ -1,0 +1,20 @@
+{
+  "name": "[qa_s02] mathematical functions 2",
+
+  "backends": {
+      "mongodb_read_only": "skip"
+  },
+
+  "data": "math.data",
+
+  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from math",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "ignoreFieldOrder": true,
+
+  "expected": [
+    {"0": 0, "1": -1},
+    {"0": 2, "1": 2151}
+  ]
+}

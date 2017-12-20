@@ -1,5 +1,5 @@
 {
-    "name": "qa_subset-simple-limit",
+    "name": "[qa_s04] select with limit",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",

@@ -1,8 +1,5 @@
 {
-  "name": "subselect with 2 levels of ordering postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s03] sort subselect with 2 levels ordering",
 
   "data": "sort.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

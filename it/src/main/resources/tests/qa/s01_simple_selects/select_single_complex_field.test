@@ -1,5 +1,5 @@
 {
-  "name": "single complex field read postgres",
+  "name": "[qa_s01] select single complex field",
 
   "backends": {
           "couchbase":         "skip",
@@ -16,6 +16,8 @@
           "spark_cassandra":   "skip"
   },
 
+  "NB": "fix thix, it is postgres that needs to be skipped, expected changes and other connectors unskipped",
+
   "data": "basic.data",
 
   "query": "select name from basic",
@@ -23,12 +25,10 @@
   "predicate": "exactly",
   "ignoreResultOrder": true,
 
-  "ignoredFields": [],
-
   "ignoreFieldOrder": false,
 
   "expected": [
-  {"name": {"first": "John", "last": "Smith"}},
-  {"name": {"first": "Janina", "last": "Kowalska"}}
+      {"name": {"first": "John", "last": "Smith"}},
+      {"name": {"first": "Janina", "last": "Kowalska"}}
   ]
 }

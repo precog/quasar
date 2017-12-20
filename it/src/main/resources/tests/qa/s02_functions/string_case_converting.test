@@ -1,8 +1,5 @@
 {
-  "name": "case-converting string functions postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s02] string case converting",
 
   "data": "stringFunctionsCase.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": false,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

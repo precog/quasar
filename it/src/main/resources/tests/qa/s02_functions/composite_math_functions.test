@@ -1,5 +1,5 @@
 {
-  "name": "composite mathematical functions postgres",
+  "name": "[qa_s02] composite math functions",
 
   "backends": {
       "mongodb_read_only": "skip"
@@ -11,8 +11,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

@@ -1,8 +1,5 @@
 {
-  "name": "basic mathematical, algebraic operators postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s02] basic mathematical, algebraic operators",
 
   "data": "math.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

@@ -1,5 +1,5 @@
 {
-  "name": "bug-2226",
+  "name": "[reg] bug2226",
   "data": "revenue.data",
   "backends": {
     "couchbase":         "ignoreFieldOrder",

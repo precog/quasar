@@ -1,6 +1,6 @@
 {
-  "name": "bug2958",
-  "data": "bug2958.data",
+  "name": "[reg] bug2958",
+  "reg": "bug2958.data",
   "backends": {
     "couchbase":         "pending",
     "marklogic_xml":     "pending"

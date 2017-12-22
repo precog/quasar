@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs.cassandra
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.{Data, DataCodec}
 
@@ -48,7 +49,7 @@ final case class InsertData(keyspace: String, table: String, data: String) exten
 object CassandraDDL {
 
 
-  class Ops[S[_]](implicit s0: CassandraDDL :<: S) {
+  class Ops[S[_] <: ACopK](implicit s0: CassandraDDL :<: S) {
     def keyspaceExists(keyspace: String): Free[S, Boolean] = Free.liftF(s0.inj(KeyspaceExists(keyspace)))
     def tableExists(keyspace: String, table: String): Free[S, Boolean] = Free.liftF(s0.inj(TableExists(keyspace, table)))
     def dropKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(DropKeyspace(keyspace)))

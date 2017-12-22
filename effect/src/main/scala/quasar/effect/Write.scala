@@ -17,7 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
-import quasar.fp.TaskRef
+import quasar.fp._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -27,12 +27,12 @@ sealed abstract class Write[W, A]
 object Write {
   final case class Tell[W](w: W) extends Write[W, Unit]
 
-  final class Ops[W, S[_]](implicit S: Write[W, ?] :<: S) extends LiftedOps[Write[W, ?], S] {
+  final class Ops[W, S[_] <: ACopK](implicit S: Write[W, ?] :<<: S) extends LiftedOps[Write[W, ?], S] {
     def tell(w: W): FreeS[Unit] = lift(Tell(w))
   }
 
   object Ops {
-    implicit def apply[W, S[_]](implicit S: Write[W, ?] :<: S): Ops[W, S] = new Ops[W, S]
+    implicit def apply[W, S[_] <: ACopK](implicit S: Write[W, ?] :<<: S): Ops[W, S] = new Ops[W, S]
   }
 
   def fromTaskRef[W: Semigroup](tr: TaskRef[W]): Write[W, ?] ~> Task =

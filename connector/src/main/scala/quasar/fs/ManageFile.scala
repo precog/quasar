@@ -71,7 +71,7 @@ object ManageFile {
   final case class TempFile(near: APath)
     extends ManageFile[FileSystemError \/ AFile]
 
-  final class Ops[S[_]](implicit S: ManageFile :<: S)
+  final class Ops[S[_] <: ACopK](implicit S: ManageFile :<<: S)
     extends LiftedOps[ManageFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
@@ -118,7 +118,7 @@ object ManageFile {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: ManageFile :<: S): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: ManageFile :<<: S): Ops[S] =
       new Ops[S]
   }
 

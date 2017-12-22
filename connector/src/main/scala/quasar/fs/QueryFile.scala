@@ -105,7 +105,7 @@ object QueryFile {
   final case class FileExists(file: AFile)
     extends QueryFile[Boolean]
 
-  final class Ops[S[_]](implicit S: QueryFile :<: S)
+  final class Ops[S[_] <: ACopK](implicit S: QueryFile :<<: S)
     extends LiftedOps[QueryFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
@@ -220,14 +220,14 @@ object QueryFile {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: QueryFile :<: S): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: QueryFile :<<: S): Ops[S] =
       new Ops[S]
   }
 
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S: QueryFile :<: S)
+  final class Unsafe[S[_] <: ACopK](implicit S: QueryFile :<<: S)
     extends LiftedOps[QueryFile, S] {
 
     val transforms = Transforms[FreeS]
@@ -256,7 +256,7 @@ object QueryFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S: QueryFile :<: S): Unsafe[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: QueryFile :<<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

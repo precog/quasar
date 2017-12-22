@@ -33,7 +33,7 @@ sealed abstract class Read[R, A]
 object Read {
   final case class Ask[R, A](f: R => A) extends Read[R, A]
 
-  final class Ops[R, S[_]](implicit S: Read[R, ?] :<: S)
+  final class Ops[R, S[_] <: ACopK](implicit S: Read[R, ?] :<<: S)
     extends LiftedOps[Read[R, ?], S] { self =>
 
     /** Request a value from the environment. */
@@ -44,7 +44,7 @@ object Read {
 
     /** Evaluate a computation in a modified environment. */
     def local(f: R => R): FreeS ~> FreeS = {
-      val g: Read[R, ?] ~> FreeS = injectFT compose contramapR(f)
+      val g: Read[R, ?] ~> FreeS = injectFTI compose contramapR(f)
 
       val s: S ~> FreeS =
         new (S ~> FreeS) {
@@ -71,7 +71,7 @@ object Read {
   }
 
   object Ops {
-    implicit def apply[R, S[_]](implicit S: Read[R, ?] :<: S): Ops[R, S] =
+    implicit def apply[R, S[_] <: ACopK](implicit S: Read[R, ?] :<<: S): Ops[R, S] =
       new Ops[R, S]
   }
 
@@ -81,7 +81,7 @@ object Read {
   def toState[F[_], R](implicit F: MonadState[F, R])   = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
   def toReader[F[_], R](implicit F: MonadReader[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F asks f         }
 
-  def monadReader_[R, S[_]](implicit O: Ops[R, S]): MonadReader_[Free[S, ?], R] =
+  def monadReader_[R, S[_] <: ACopK](implicit O: Ops[R, S]): MonadReader_[Free[S, ?], R] =
     new MonadReader_[Free[S, ?], R] {
       def ask = O.ask
       def local[A](f: R => R)(fa: Free[S, A]) = O.local(f)(fa)

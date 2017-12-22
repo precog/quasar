@@ -18,6 +18,7 @@ package quasar.effect
 
 import slamdata.Predef._
 import quasar.contrib.scalaz._
+import quasar.fp._
 
 import scalaz.{Failure => _, _}
 import scalaz.syntax.monad._
@@ -33,7 +34,7 @@ sealed abstract class Failure[E, A]
 object Failure {
   final case class Fail[E, A](e: E) extends Failure[E, A]
 
-  final class Ops[E, S[_]](implicit S: Failure[E, ?] :<: S)
+  final class Ops[E, S[_] <: ACopK](implicit S: Failure[E, ?] :<<: S)
     extends LiftedOps[Failure[E, ?], S] {
 
     def attempt[A](fa: FreeS[A]): FreeS[E \/ A] =
@@ -86,7 +87,7 @@ object Failure {
   }
 
   object Ops {
-    implicit def apply[E, S[_]](implicit S: Failure[E, ?] :<: S): Ops[E, S] =
+    implicit def apply[E, S[_] <: ACopK](implicit S: Failure[E, ?] :<<: S): Ops[E, S] =
       new Ops[E, S]
   }
 
@@ -103,7 +104,7 @@ object Failure {
     toCatchable[F, RuntimeException]
       .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
 
-  def attempt[S[_], E](implicit S: Failure[E, ?] :<: S): S ~> EitherT[Free[S, ?], E, ?] = new (S ~> EitherT[Free[S, ?], E, ?]) {
+  def attempt[S[_] <: ACopK, E](implicit S: Failure[E, ?] :<<: S): S ~> EitherT[Free[S, ?], E, ?] = new (S ~> EitherT[Free[S, ?], E, ?]) {
     def apply[A](sa: S[A]) =
       S.prj(sa) match {
         case Some(Fail(err)) => EitherT.left(err.point[Free[S, ?]])
@@ -111,7 +112,7 @@ object Failure {
       }
   }
 
-  def monadError_[E, S[_]](implicit O: Ops[E, S]): MonadError_[Free[S, ?], E] =
+  def monadError_[E, S[_] <: ACopK](implicit O: Ops[E, S]): MonadError_[Free[S, ?], E] =
     new MonadError_[Free[S, ?], E] {
       def raiseError[A](e: E) = O.fail(e)
       def handleError[A](fa: Free[S, A])(f: E => Free[S, A]) = O.recover(fa, f)

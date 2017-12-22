@@ -18,8 +18,7 @@ package quasar.effect
 
 import slamdata.Predef._
 import quasar.fp.ski._
-import quasar.fp.TaskRef
-import quasar.fp.free
+import quasar.fp._
 
 import monocle.Lens
 import scalaz.{Lens => _, _}, Scalaz._
@@ -40,7 +39,7 @@ object AtomicRef {
   final case class Set[V](v: V) extends AtomicRef[V, Unit]
   final case class CompareAndSet[V](expect: V, update: V) extends AtomicRef[V, Boolean]
 
-  final class Ops[V, S[_]](implicit S: AtomicRef[V, ?] :<: S)
+  final class Ops[V, S[_] <: ACopK](implicit S: AtomicRef[V, ?] :<<: S)
     extends LiftedOps[AtomicRef[V, ?], S] {
 
     /** Set the value of the ref to `update` if the current value is `expect`,
@@ -77,7 +76,7 @@ object AtomicRef {
   }
 
   object Ops {
-    implicit def apply[V, S[_]](implicit S: AtomicRef[V, ?] :<: S): Ops[V, S] =
+    implicit def apply[V, S[_] <: ACopK](implicit S: AtomicRef[V, ?] :<<: S): Ops[V, S] =
       new Ops[V, S]
   }
 
@@ -122,11 +121,11 @@ object AtomicRef {
     final class Aux[V] {
       type Ref[A] = AtomicRef[V, A]
 
-      def apply[S[_], F[_]: Applicative]
+      def apply[S[_] <: ACopK, F[_]: Applicative]
           (f: V => F[Unit])
           (implicit
-            S0: F :<: S,
-            S1: Ref :<: S
+            S0: F :<<: S,
+            S1: Ref :<<: S
           ): AtomicRef[V, ?] ~> Free[S, ?] = {
         val R = Ops[V, S]
 
@@ -156,7 +155,7 @@ object AtomicRef {
     def apply[A, B: Equal](lens: Lens[A, B]) = new Aux(lens)
 
     final class Aux[A, B: Equal](lens: Lens[A, B]) {
-      def into[S[_]](implicit S: AtomicRef[A, ?] :<: S)
+      def into[S[_] <: ACopK](implicit S: AtomicRef[A, ?] :<<: S)
           : AtomicRef[B, ?] ~> Free[S, ?] = {
 
         val R = AtomicRef.Ops[A, S]

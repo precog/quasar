@@ -34,7 +34,7 @@ object MetaStoreLocation {
   final case class Set(conn: DbConnectionConfig, initialize: Boolean)
     extends MetaStoreLocation[String \/ Unit]
 
-  final class Ops[S[_]](implicit val ev: MetaStoreLocation :<: S) extends LiftedOps[MetaStoreLocation, S] {
+  final class Ops[S[_] <: ACopK](implicit val ev: MetaStoreLocation :<: S) extends LiftedOps[MetaStoreLocation, S] {
 
     def get: Free[S, DbConnectionConfig] =
       lift(Get)

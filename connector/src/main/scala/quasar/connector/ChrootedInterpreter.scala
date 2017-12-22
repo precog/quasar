@@ -31,7 +31,7 @@ trait ChrootedInterpreter extends BackendModule {
   override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
     val xformPaths =
       if (rootPrefix(cfg) === rootDir) liftFT[BackendEffect]
-      else chroot.backendEffect[BackendEffect](rootPrefix(cfg))
+      else chroot.backendEffect[BackendEffect](rootPrefix(cfg))(???, ???, ???, ???, ???)
 
     super.interpreter(cfg) map {
       case (f, c) => (foldMapNT(f) compose xformPaths, c)

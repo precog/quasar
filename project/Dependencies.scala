@@ -32,6 +32,7 @@ object Dependencies {
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
     "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
+    "io.frees"                   %% "iotaz-core"                % "0.3.3",
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,

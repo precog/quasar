@@ -21,7 +21,6 @@ import quasar.Planner.UnsupportedPlan
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.fp.free._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -32,6 +31,7 @@ import scalaz.syntax.equal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
+import impl._
 
 /** `FileSystem` interpreters for a filesystem that has no, and doesn't support
   * creating any, files.
@@ -98,7 +98,7 @@ object Empty {
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
   def backendEffect[F[_]: Applicative]: BackendEffect ~> F =
-    analyze :+: fileSystem
+    interpretBackendEffect(analyze, queryFile, readFile, writeFile, manageFile)
 
   ////
 

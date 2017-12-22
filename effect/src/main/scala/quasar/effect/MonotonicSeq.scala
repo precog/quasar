@@ -17,7 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
-import quasar.fp.TaskRef
+import quasar.fp._
 
 import monocle.Lens
 import scalaz.{Lens => _, _}
@@ -41,7 +41,7 @@ sealed abstract class MonotonicSeq[A]
 object MonotonicSeq {
   case object Next extends MonotonicSeq[Long]
 
-  final class Ops[S[_]](implicit S: MonotonicSeq :<: S)
+  final class Ops[S[_] <: ACopK](implicit S: MonotonicSeq :<<: S)
     extends LiftedOps[MonotonicSeq, S] {
 
     def next: FreeS[Long] =
@@ -49,7 +49,7 @@ object MonotonicSeq {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: MonotonicSeq :<: S): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: MonotonicSeq :<<: S): Ops[S] =
       new Ops[S]
   }
 

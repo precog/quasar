@@ -17,7 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
-import quasar.fp.TaskRef
+import quasar.fp._
 
 import monocle.Lens
 import scalaz.{Lens => _, _}, Scalaz._
@@ -48,7 +48,7 @@ object KeyValueStore {
   final case class Delete[K, V](k: K)
     extends KeyValueStore[K, V, Unit]
 
-  final class Ops[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S)
+  final class Ops[K, V, S[_] <: ACopK](implicit S: KeyValueStore[K, V, ?] :<<: S)
     extends LiftedOps[KeyValueStore[K, V, ?], S] {
 
     /** Atomically associates the given key with the first part of the result
@@ -111,7 +111,7 @@ object KeyValueStore {
   }
 
   object Ops {
-    implicit def apply[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S): Ops[K, V, S] =
+    implicit def apply[K, V, S[_] <: ACopK](implicit S: KeyValueStore[K, V, ?] :<<: S): Ops[K, V, S] =
       new Ops[K, V, S]
   }
 
@@ -161,12 +161,12 @@ object KeyValueStore {
       final class Aux[K, V] {
         type Ref[A] = AtomicRef[Map[K, V], A]
 
-        val R = AtomicRef.Ops[Map[K, V], Ref]
+        val R = AtomicRef.Ops[Map[K, V], JustK[Ref, ?]]
 
         // FIXME
         @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-        def apply(): KeyValueStore[K, V, ?] ~> Free[Ref, ?] =
-          new (KeyValueStore[K, V, ?] ~> Free[Ref, ?]) {
+        def apply(): KeyValueStore[K, V, ?] ~> Free[JustK[Ref, ?], ?] =
+          new (KeyValueStore[K, V, ?] ~> Free[JustK[Ref, ?], ?]) {
             def apply[A](m: KeyValueStore[K, V, A]) = m match {
               case Keys() =>
                 R.get.map(_.keys.toVector)

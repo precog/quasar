@@ -17,6 +17,7 @@
 package quasar.fs
 
 import slamdata.Predef._
+import quasar.fp._
 import quasar.effect.LiftedOps
 import quasar.frontend.logicalplan.LogicalPlan
 
@@ -29,12 +30,12 @@ object Analyze {
 
   final case class QueryCost(lp: Fix[LogicalPlan]) extends Analyze[FileSystemError \/ Int]
 
-  final class Ops[S[_]](implicit S: Analyze :<: S) extends LiftedOps[Analyze, S] {
+  final class Ops[S[_] <: ACopK](implicit S: Analyze :<<: S) extends LiftedOps[Analyze, S] {
     def queryCost(lp: Fix[LogicalPlan]): FileSystemErrT[Free[S, ?], Int] = EitherT(lift(QueryCost(lp)))
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: Analyze :<: S): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: Analyze :<<: S): Ops[S] =
       new Ops[S]
   }
 }

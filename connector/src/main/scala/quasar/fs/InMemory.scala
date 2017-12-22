@@ -33,6 +33,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import shapeless._
+import impl._
 
 /** In-Memory FileSystem interpreters, useful for testing/stubbing
   * when a "real" interpreter isn't needed or desired.

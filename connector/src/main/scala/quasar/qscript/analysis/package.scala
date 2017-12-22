@@ -25,6 +25,7 @@ import quasar.fs.{FileSystemError, FileSystemErrT, QueryFile}
 import quasar.fs.PathError.invalidPath
 import quasar.frontend.logicalplan.{Read => LPRead, LogicalPlan}
 import quasar.std.StdLib.agg
+import quasar.fp._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -32,7 +33,7 @@ import pathy.Path.{file, peel, file1}
 import scalaz._, Scalaz._
 
 package object analysis {
-  def pathCard[S[_]](
+  def pathCard[S[_] <: ACopK](
     implicit queryOps: QueryFile.Ops[S]
   ): APath => FileSystemErrT[Free[S, ?], Int] = (apath: APath) => {
     val afile: Option[AFile] = peel(apath).map {

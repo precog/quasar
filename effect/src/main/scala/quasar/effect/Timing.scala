@@ -22,12 +22,14 @@ import java.time.{Duration, Instant}
 import scalaz._
 import scalaz.concurrent.Task
 
+import quasar.fp._
+
 sealed abstract class Timing[A]
 object Timing {
   final case object Timestamp extends Timing[Instant]
   final case object Nanos extends Timing[Long]
 
-  final class Ops[S[_]](implicit S: Timing :<: S)
+  final class Ops[S[_] <: ACopK](implicit S: Timing :<<: S)
     extends LiftedOps[Timing, S] {
 
     private val lowLevel = LowLevel[S]
@@ -49,11 +51,11 @@ object Timing {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: Timing :<: S): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: Timing :<<: S): Ops[S] =
       new Ops[S]
   }
 
-  final class LowLevel[S[_]](implicit S: Timing :<: S)
+  final class LowLevel[S[_] <: ACopK](implicit S: Timing :<<: S)
     extends LiftedOps[Timing, S] {
 
     /** Raw nanoseconds value; note that these values are only meaningful when
@@ -64,7 +66,7 @@ object Timing {
   }
 
   object LowLevel {
-    implicit def apply[S[_]](implicit S: Timing :<: S): LowLevel[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: Timing :<<: S): LowLevel[S] =
       new LowLevel[S]
   }
 

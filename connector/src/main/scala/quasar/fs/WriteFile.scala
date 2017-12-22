@@ -50,7 +50,7 @@ object WriteFile {
   final case class Close(h: WriteHandle)
     extends WriteFile[Unit]
 
-  final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
+  final class Ops[S[_] <: ACopK](implicit val unsafe: Unsafe[S]) {
     import FileSystemError._, PathError._
 
     type F[A]    = unsafe.FreeS[A]
@@ -248,14 +248,14 @@ object WriteFile {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit U: Unsafe[S]): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit U: Unsafe[S]): Ops[S] =
       new Ops[S]
   }
 
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S: WriteFile :<: S)
+  final class Unsafe[S[_] <: ACopK](implicit S: WriteFile :<<: S)
     extends LiftedOps[WriteFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
@@ -284,7 +284,7 @@ object WriteFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S: WriteFile :<: S): Unsafe[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: WriteFile :<<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

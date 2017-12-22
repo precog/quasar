@@ -18,11 +18,12 @@ package quasar.effect
 
 import slamdata.Predef._
 import quasar.contrib.scalaz.MonadReader_
+import quasar.fp._
 
 import java.util.UUID
 
 import com.fasterxml.uuid._
-import scalaz.{:<:, ~>}
+import scalaz.~>
 import scalaz.std.anyVal._
 import scalaz.syntax.equal._
 
@@ -36,7 +37,7 @@ object uuid {
   type GenUUID[A] = Read[UUID, A]
 
   object GenUUID {
-    def Ops[S[_]](implicit S: GenUUID :<: S) =
+    def Ops[S[_] <: ACopK](implicit S: GenUUID :<<: S) =
       Read.Ops[UUID, S]
 
     def type1[F[_]: Capture]: F[GenUUID ~> F] =

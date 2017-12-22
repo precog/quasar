@@ -16,14 +16,14 @@
 
 package quasar.effect
 
-import quasar.fp.free
+import quasar.fp._
 
 import scalaz._
 
 /** Encapsulates boilerplate useful in defining lifted operations on free
   * monads over effect algebras.
   */
-abstract class LiftedOps[G[_], S[_]](implicit S: G :<: S) {
+abstract class LiftedOps[G[_], S[_] <: ACopK](implicit S: G :<<: S) {
   type FreeS[A] = Free[S, A]
 
   def lift[A](ga: G[A]): FreeS[A] =

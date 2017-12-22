@@ -34,21 +34,25 @@ import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{Writer => _, _}
+import iotaz._, TListK.:::
 
 package object fs {
   import BackendDef.DefErrT
+  type JustTask[A] = CopK[Task ::: TNilK, A]
   type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
 
   type MongoReadHandles[A] = KeyValueStore[ReadFile.ReadHandle, BsonCursor, A]
   type MongoWriteHandles[A] = KeyValueStore[WriteFile.WriteHandle, Collection, A]
 
-  type Eff[A] = (
-    MonotonicSeq :\:
-    MongoDbIO :\:
-    fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
-    fs.managefile.MongoManage :\:
-    MongoReadHandles :/:
-    MongoWriteHandles)#M[A]
+  type Eff[A] =
+    CopK[
+      MonotonicSeq :::
+      MongoDbIO :::
+      fs.queryfileTypes.MongoQuery[BsonCursor, ?] :::
+      fs.managefile.MongoManage :::
+      MongoReadHandles :::
+      MongoWriteHandles :::
+      TNilK, A]
 
   type MongoM[A] = Free[Eff, A]
 
@@ -70,14 +74,14 @@ package object fs {
 
   final case class TmpPrefix(run: String) extends scala.AnyVal
 
-  type PhysFsEff[A]  = Coproduct[Task, PhysErr, A]
+  type PhysFsEff[A]  = CopK[Task ::: PhysErr ::: TNilK, A]
 
   def parseConfig(uri: ConnectionUri)
       : DefErrT[Task, MongoConfig] =
     (for {
-      client <- asyncClientDef[Task](uri)
-      version <- free.lift(MongoDbIO.serverVersion.run(client)).into[Task].liftM[DefErrT]
-      defDb <- free.lift(findDefaultDb.run(client)).into[Task].liftM[DefErrT]
+      client <- asyncClientDef[JustTask](uri)
+      version <- free.lift(MongoDbIO.serverVersion.run(client)).into[JustTask].liftM[DefErrT]
+      defDb <- free.lift(findDefaultDb.run(client)).into[JustTask].liftM[DefErrT]
       wfExec <- wfExec(client)
     } yield MongoConfig(client, version, defDb, wfExec)).mapT(freeTaskToTask.apply)
 
@@ -106,8 +110,8 @@ package object fs {
 
   ////
 
-  private val freeTaskToTask: Free[Task, ?] ~> Task =
-    new Interpreter(NaturalTransformation.refl[Task]).interpret
+  private val freeTaskToTask: JustTask ~> Task =
+    CopK.NaturalTransformation.of[JustTask, Task](NaturalTransformation.refl[Task])
 
   def wfExec(client: MongoClient): DefErrT[Free[Task, ?], WorkflowExecutor[MongoDbIO, BsonCursor]] = {
     val run: EnvErrT[MongoDbIO, ?] ~> EnvErrT[Task, ?] = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
@@ -127,10 +131,12 @@ package object fs {
       KeyValueStore.impl.default[ReadFile.ReadHandle, BsonCursor] |@|
       KeyValueStore.impl.default[WriteFile.WriteHandle, Collection]
     )((seq, io, qfile, mfile, rh, wh) => {
-      (seq :+: io :+:
-        (freeFsEffToTask compose qfile) :+:
-        (freeFsEffToTask compose mfile) :+:
-        rh :+:
+      CopK.NaturalTransformation.of[Eff, Task](
+        seq,
+        io,
+        freeFsEffToTask compose qfile,
+        freeFsEffToTask compose mfile,
+        rh,
         wh)
     })
   }
@@ -154,7 +160,7 @@ package object fs {
   private[fs] def asyncClientDef[S[_]](
     uri: ConnectionUri
   )(implicit
-    S0: Task :<: S
+    S0: Task :<<: S
   ): DefErrT[Free[S, ?], MongoClient] = {
     import quasar.convertError
     type Eff[A] = (Task :\: EnvErr :/: CfgErr)#M[A]

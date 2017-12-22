@@ -17,6 +17,7 @@
 package quasar.fs
 
 import quasar.contrib.pathy._
+import quasar.fp._
 import quasar.fp.free.flatMapSNT
 
 import scalaz._, NaturalTransformation.refl
@@ -24,33 +25,33 @@ import scalaz._, NaturalTransformation.refl
 object chroot {
 
   /** Rebases all paths in `ReadFile` operations onto the given prefix. */
-  def readFile[S[_]](prefix: ADir)(implicit S: ReadFile :<: S): S ~> Free[S, ?] =
+  def readFile[S[_] <: ACopK](prefix: ADir)(implicit S: ReadFile :<<: S): S ~> Free[S, ?] =
     transformPaths.readFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases all paths in `WriteFile` operations onto the given prefix. */
-  def writeFile[S[_]](prefix: ADir)(implicit S: WriteFile :<: S): S ~> Free[S, ?] =
+  def writeFile[S[_] <: ACopK](prefix: ADir)(implicit S: WriteFile :<<: S): S ~> Free[S, ?] =
     transformPaths.writeFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases all paths in `ManageFile` operations onto the given prefix. */
-  def manageFile[S[_]](prefix: ADir)(implicit S: ManageFile :<: S): S ~> Free[S, ?] =
+  def manageFile[S[_] <: ACopK](prefix: ADir)(implicit S: ManageFile :<<: S): S ~> Free[S, ?] =
     transformPaths.manageFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases paths in `QueryFile` onto the given prefix. */
-  def queryFile[S[_]](prefix: ADir)(implicit S: QueryFile :<: S): S ~> Free[S, ?] =
+  def queryFile[S[_] <: ACopK](prefix: ADir)(implicit S: QueryFile :<<: S): S ~> Free[S, ?] =
     transformPaths.queryFile[S](rebaseA(prefix), stripPrefixA(prefix), refl)
 
     /** Rebases paths in `Analyze` onto the given prefix. */
-  def analyze[S[_]](prefix: ADir)(implicit S: Analyze :<: S): S ~> Free[S, ?] =
+  def analyze[S[_] <: ACopK](prefix: ADir)(implicit S: Analyze :<<: S): S ~> Free[S, ?] =
     transformPaths.analyze[S](rebaseA(prefix), stripPrefixA(prefix), refl)
 
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
-  def fileSystem[S[_]](
+  def fileSystem[S[_] <: ACopK](
     prefix: ADir
   )(implicit
-    S0: ReadFile :<: S,
-    S1: WriteFile :<: S,
-    S2: ManageFile :<: S,
-    S3: QueryFile :<: S
+    S0: ReadFile :<<: S,
+    S1: WriteFile :<<: S,
+    S2: ManageFile :<<: S,
+    S3: QueryFile :<<: S
   ): S ~> Free[S, ?] = {
     flatMapSNT(readFile[S](prefix))   compose
     flatMapSNT(writeFile[S](prefix))  compose
@@ -59,14 +60,14 @@ object chroot {
   }
 
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
-  def backendEffect[S[_]](
+  def backendEffect[S[_] <: ACopK](
     prefix: ADir
   )(implicit
-    S0: ReadFile :<: S,
-    S1: WriteFile :<: S,
-    S2: ManageFile :<: S,
-    S3: QueryFile :<: S,
-    S4: Analyze :<: S
+    S0: ReadFile :<<: S,
+    S1: WriteFile :<<: S,
+    S2: ManageFile :<<: S,
+    S3: QueryFile :<<: S,
+    S4: Analyze :<<: S
   ): S ~> Free[S, ?] = {
     flatMapSNT(fileSystem[S](prefix)) compose analyze[S](prefix)
   }

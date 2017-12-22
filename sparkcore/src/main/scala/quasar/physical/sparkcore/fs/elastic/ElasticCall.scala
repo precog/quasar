@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
+import quasar.fp._
 import quasar.fp.free._
 
 import delorean._
@@ -50,7 +51,7 @@ final case class IndexInto(indexType: IndexType, data: List[(String, String)]) e
 
 object ElasticCall {
 
-  class Ops[S[_]](implicit S: ElasticCall :<: S) {
+  class Ops[S[_] <: ACopK](implicit S: ElasticCall :<: S) {
     def createIndex(index: String): Free[S, Unit] = lift(CreateIndex(index)).into[S]
     def copyType(src: IndexType, dst: IndexType): Free[S, Unit] = lift(CopyType(src, dst)).into[S]
     def copyIndex(src: String, dst: String): Free[S, Unit] = lift(CopyIndex(src, dst)).into[S]

@@ -17,6 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
+import quasar.fp._
 
 import scalaz._, Scalaz._
 
@@ -57,7 +58,7 @@ sealed abstract class KvsInstances extends KvsInstances0 {
       def delete(k: K)                            = KeyValueStore.Delete(k)
     }
 
-  implicit def freeKvs[K, V, F[_], S[_]](implicit F: Kvs[F, K, V], I: F :<: S): Kvs[Free[S, ?], K, V] =
+  implicit def freeKvs[K, V, F[_], S[_] <: ACopK](implicit F: Kvs[F, K, V], I: F :<<: S): Kvs[Free[S, ?], K, V] =
     new Kvs[Free[S, ?], K, V] {
       def keys                                    = Free.liftF(I(F.keys))
       def get(k: K)                               = Free.liftF(I(F.get(k)))

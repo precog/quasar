@@ -17,6 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
+import quasar.fp._
 
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
@@ -55,7 +56,7 @@ sealed abstract class CaptureInstances extends CaptureInstances0 {
   implicit val taskCapture: Capture[Task] =
     new TaskCapture
 
-  implicit def freeCapture[F[_]: Capture, S[_]](implicit I: F :<: S): Capture[Free[S, ?]] =
+  implicit def freeCapture[F[_]: Capture, S[_] <: ACopK](implicit I: F :<<: S): Capture[Free[S, ?]] =
     new FreeCapture[F, S]
 }
 
@@ -82,7 +83,7 @@ private[effect] class TransCapture[F[_]: Monad: Capture, T[_[_], _]: MonadTrans]
   def capture[A](a: => A) = Capture[F].capture(a).liftM[T]
 }
 
-private[effect] class FreeCapture[F[_], S[_]](implicit F: Capture[F], I: F :<: S)
+private[effect] class FreeCapture[F[_], S[_] <: ACopK](implicit F: Capture[F], I: F :<<: S)
   extends Capture[Free[S, ?]] {
   def capture[A](a: => A) = Free.liftF(I(F.capture(a)))
 }

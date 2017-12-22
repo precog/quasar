@@ -19,6 +19,7 @@ package quasar.physical.sparkcore.fs
 import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 
@@ -35,7 +36,7 @@ object SparkConnectorDetails {
   final case class ListContents(dir: ADir) extends SparkConnectorDetails[FileSystemError \/ Set[PathSegment]]
   final case class RDDFrom(afile: AFile) extends SparkConnectorDetails[RDD[Data]]
 
-  class Ops[S[_]](implicit S: SparkConnectorDetails :<: S) {
+  class Ops[S[_] <: ACopK](implicit S: SparkConnectorDetails :<: S) {
     def fileExists(afile: AFile): Free[S, Boolean] =
       lift(FileExists(afile)).into[S]
     def readChunkSize: Free[S, Int] =

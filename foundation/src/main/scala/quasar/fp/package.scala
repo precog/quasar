@@ -136,12 +136,20 @@ package object fp
     with DebugOps {
 
   import ski._
+  import iotaz.{CopK, TNilK}, iotaz.TListK.:::
 
   /** An endomorphism is a mapping from a category to itself.
    *  It looks like scalaz already staked out "Endo" for the
    *  lower version.
    */
   type EndoK[F[X]] = scalaz.NaturalTransformation[F, F]
+
+  type ACopK = CopK[_, _]
+
+  // Iotaz's Inject (aka :<:) type.
+  type :<<:[F[_], G[_] <: ACopK] = CopK.Inject[F, G]
+
+  type JustK[F[_], A] = CopK[F ::: TNilK, A]
 
   // TODO generalize this and matryoshka.Delay into
   // `type KleisliK[M[_], F[_], G[_]] = F ~> (M ∘ G)#λ`

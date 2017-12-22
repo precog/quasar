@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.effect.MonotonicSeq
 
@@ -51,7 +52,7 @@ sealed abstract class NameGeneratorInstances extends NameGeneratorInstances0 {
       def freshName = F.bind(F.get)(n => F.put(n + 1) as n.toString)
     }
 
-  implicit def monotonicSeqNameGenerator[S[_]](implicit S: MonotonicSeq :<: S): NameGenerator[Free[S, ?]] =
+  implicit def monotonicSeqNameGenerator[S[_] <: ACopK](implicit S: MonotonicSeq :<<: S): NameGenerator[Free[S, ?]] =
     new NameGenerator[Free[S, ?]] {
       def freshName = MonotonicSeq.Ops[S].next map (_.toString)
     }

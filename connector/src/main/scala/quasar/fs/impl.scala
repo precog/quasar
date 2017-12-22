@@ -29,6 +29,7 @@ import quasar.frontend.logicalplan.LogicalPlan
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.{Writer => PWriter, Process}
+import iotaz.CopK
 
 object impl {
   import FileSystemError._
@@ -197,4 +198,24 @@ object impl {
       explain,
       listContents,
       fileExists)
+
+  @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny", "org.wartremover.warts.Throw"))
+  def interpretFileSystem[M[_]](
+                                 q: QueryFile ~> M,
+                                 r: ReadFile ~> M,
+                                 w: WriteFile ~> M,
+                                 m: ManageFile ~> M
+                               ): FileSystem ~> M =
+    CopK.NaturalTransformation.of[FileSystem, M](q, r, w, m)
+
+  @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny", "org.wartremover.warts.Throw"))
+  def interpretBackendEffect[M[_]](
+                                    a: Analyze ~> M,
+                                    q: QueryFile ~> M,
+                                    r: ReadFile ~> M,
+                                    w: WriteFile ~> M,
+                                    m: ManageFile ~> M
+                                  ): BackendEffect ~> M =
+    CopK.NaturalTransformation.of[BackendEffect, M](a, q, r, w, m)
+
 }

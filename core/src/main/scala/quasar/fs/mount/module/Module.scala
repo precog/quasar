@@ -18,6 +18,7 @@ package quasar.fs.mount.module
 
 import slamdata.Predef._
 import quasar._
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
@@ -121,7 +122,7 @@ object Module {
       new Unsafe[S]
   }
 
-  final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
+  final class Ops[S[_] <: ACopK](implicit val unsafe: Unsafe[S]) {
     type M[A] = unsafe.M[A]
 
     /** Returns the result of evaluating the function specified by the file path provided with the supplied

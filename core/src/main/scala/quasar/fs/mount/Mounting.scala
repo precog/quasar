@@ -21,6 +21,7 @@ import quasar.{QuasarError, Variables}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.sql.{ScopedExpr, Sql, Statement}
@@ -77,7 +78,7 @@ object Mounting {
       }
   }
 
-  final class Ops[S[_]](implicit S: Mounting :<: S)
+  final class Ops[S[_] <: ACopK](implicit S: Mounting :<: S)
     extends LiftedOps[Mounting, S] {
 
     import MountConfig._

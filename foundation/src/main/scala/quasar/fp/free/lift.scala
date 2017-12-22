@@ -16,12 +16,13 @@
 
 package quasar.fp.free
 
+import quasar.fp._
+
 import scalaz._
 
 object lift {
   final class LifterAux[F[_], A](fa: F[A]) {
-
-    def into[G[_]](implicit I: F :<: G): Free[G, A] =
+    def into[G[_] <: ACopK](implicit I: F :<<: G): Free[G, A] =
       Free.liftF(I.inj(fa))
   }
 

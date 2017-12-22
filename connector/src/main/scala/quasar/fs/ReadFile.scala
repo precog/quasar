@@ -19,12 +19,12 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
+import quasar.fp._
 import quasar.fp.numeric.{Natural, Positive}
 import eu.timepit.refined.auto._
 
 import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
-import quasar.fp._
 
 import monocle.Iso
 import scalaz._
@@ -59,7 +59,7 @@ object ReadFile {
   final case class Close(h: ReadHandle)
     extends ReadFile[Unit]
 
-  final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
+  final class Ops[S[_] <: ACopK](implicit val unsafe: Unsafe[S]) {
     type F[A] = unsafe.FreeS[A]
     type M[A] = unsafe.M[A]
 
@@ -89,21 +89,21 @@ object ReadFile {
     def scanAll(file: AFile): Process[M, Data] =
       scan(file, 0L, None)
 
-    def scanAll_(file: AFile)(implicit S0: Failure[FileSystemError, ?] :<: S): Process[Free[S, ?], Data] = {
+    def scanAll_(file: AFile)(implicit S0: Failure[FileSystemError, ?] :<<: S): Process[Free[S, ?], Data] = {
       val nat: M ~> Free[S, ?] = λ[M ~> Free[S, ?]] { x => Failure.Ops[FileSystemError, S].unattempt(x.run) }
       scanAll(file).translate(nat)
     }
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit U: Unsafe[S]): Ops[S] =
+    implicit def apply[S[_] <: ACopK](implicit U: Unsafe[S]): Ops[S] =
       new Ops[S]
   }
 
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  final class Unsafe[S[_]](implicit S: ReadFile :<: S)
+  final class Unsafe[S[_] <: ACopK](implicit S: ReadFile :<<: S)
     extends LiftedOps[ReadFile, S] {
 
     type M[A] = FileSystemErrT[FreeS, A]
@@ -132,7 +132,7 @@ object ReadFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S: ReadFile :<: S): Unsafe[S] =
+    implicit def apply[S[_] <: ACopK](implicit S: ReadFile :<<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

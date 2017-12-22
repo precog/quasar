@@ -19,16 +19,15 @@ package quasar
 import quasar.contrib.pathy.PathSegment
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure
-import quasar.fp._
-import quasar.fp.free._
 
 import pathy.Path.{FileName, DirName}
 import scalaz.{Failure => _, _}, Scalaz._
+import iotaz.{CopK, TNilK}, iotaz.TListK.:::
 
 package object fs extends PhysicalErrorPrisms {
-  type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
+  type FileSystem[A] = CopK[QueryFile ::: ReadFile ::: WriteFile ::: ManageFile ::: TNilK, A]
 
-  type BackendEffect[A] = Coproduct[Analyze, FileSystem, A]
+  type BackendEffect[A] = CopK[Analyze ::: QueryFile ::: ReadFile ::: WriteFile ::: ManageFile ::: TNilK, A]
 
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
@@ -86,22 +85,4 @@ package object fs extends PhysicalErrorPrisms {
   }
 
   type PhysErr[A] = Failure[PhysicalError, A]
-
-  def interpretFileSystem[M[_]](
-    q: QueryFile ~> M,
-    r: ReadFile ~> M,
-    w: WriteFile ~> M,
-    m: ManageFile ~> M
-  ): FileSystem ~> M =
-    q :+: r :+: w :+: m
-
-  def interpretBackendEffect[M[_]](
-    a: Analyze ~> M,
-    q: QueryFile ~> M,
-    r: ReadFile ~> M,
-    w: WriteFile ~> M,
-    m: ManageFile ~> M
-  ): BackendEffect ~> M =
-    a :+: q :+: r :+: w :+: m
-
 }

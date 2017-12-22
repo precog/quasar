@@ -38,11 +38,11 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def readFile[S[_]](
+  def readFile[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath]
   )(implicit
-    S: ReadFile :<: S
+    S: ReadFile :<<: S
   ): S ~> Free[S, ?] = {
     import ReadFile._
 
@@ -72,11 +72,11 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def writeFile[S[_]](
+  def writeFile[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath]
   )(implicit
-    S: WriteFile :<: S
+    S: WriteFile :<<: S
   ): S ~> Free[S, ?] = {
     import WriteFile._
 
@@ -104,11 +104,11 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def manageFile[S[_]](
+  def manageFile[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath]
   )(implicit
-    S: ManageFile :<: S
+    S: ManageFile :<<: S
   ): S ~> Free[S, ?] = {
     import ManageFile._, PathPair._
 
@@ -152,12 +152,12 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     * @param outPathR transforms relative output paths
     */
-  def queryFile[S[_]](
+  def queryFile[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath],
     outPathR: EndoK[RelPath]
   )(implicit
-    S: QueryFile :<: S
+    S: QueryFile :<<: S
   ): S ~> Free[S, ?] = {
     import QueryFile._
 
@@ -199,12 +199,12 @@ object transformPaths {
     transformIn(g, liftFT[S])
   }
 
-  def analyze[S[_]](
+  def analyze[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath],
     outPathR: EndoK[RelPath]
   )(implicit
-    S: Analyze :<: S
+    S: Analyze :<<: S
   ): S ~> Free[S, ?] = {
     import Analyze._
 
@@ -224,15 +224,15 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     * @param outPathR transforms relative output paths
     */
-  def fileSystem[S[_]](
+  def fileSystem[S[_] <: ACopK](
     inPath: EndoK[AbsPath],
     outPath: EndoK[AbsPath],
     outPathR: RelPath ~> RelPath
   )(implicit
-    S0: ReadFile :<: S,
-    S1: WriteFile :<: S,
-    S2: ManageFile :<: S,
-    S3: QueryFile :<: S
+    S0: ReadFile :<<: S,
+    S1: WriteFile :<<: S,
+    S2: ManageFile :<<: S,
+    S3: QueryFile :<<: S
   ): S ~> Free[S, ?] = {
     flatMapSNT(readFile[S](inPath, outPath))   compose
     flatMapSNT(writeFile[S](inPath, outPath))  compose

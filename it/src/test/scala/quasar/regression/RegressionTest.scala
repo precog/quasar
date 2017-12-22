@@ -27,12 +27,13 @@ import pathy.argonaut.PosixCodecJson._
 import scalaz._, Scalaz._
 
 case class RegressionTest(
-  name:      String,
-  backends:  Directives,
-  data:      List[RelFile[Unsandboxed]],
-  query:     String,
-  variables: Map[String, String],
-  expected:  ExpectedResult
+  name:          String,
+  backends:      Directives,
+  data:          List[RelFile[Unsandboxed]],
+  query:         String,
+  variables:     Map[String, String],
+  expected:      ExpectedResult,
+  explainQuery : Boolean
 )
 
 object RegressionTest {
@@ -61,9 +62,10 @@ object RegressionTest {
       ignoredFields     <- orElse(c --\ "ignoredFields", List.empty[String])
       ignoreFieldOrder  <- orElse(c --\ "ignoreFieldOrder", false)
       ignoreResultOrder <- orElse(c --\ "ignoreResultOrder", false)
+      explainQuery <- orElse(c --\ "explainQuery", false)
       rows              <- (c --\ "expected").as[List[Json]]
       predicate         <- (c --\ "predicate").as[Predicate]
     } yield RegressionTest(
       name, backends, data, query, variables,
-      ExpectedResult(rows, predicate, ignoredFields, ignoreFieldOrder, ignoreResultOrder, backends)))
+      ExpectedResult(rows, predicate, ignoredFields, ignoreFieldOrder, ignoreResultOrder, backends), explainQuery))
 }

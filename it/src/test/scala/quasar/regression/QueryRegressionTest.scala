@@ -128,6 +128,9 @@ abstract class QueryRegressionTest[S[_]](
 
   ////
 
+  private def queryExplain(expr: Fix[Sql], vars: Variables, basePath: ADir): Process[CompExecM, ExecutionPlan] =
+      fsQ.explainQuery(expr, vars, basePath).liftM[Process]
+
   /** Returns an `Example` verifying the given `RegressionTest`. */
   def regressionExample(
     loc: RFile,
@@ -140,7 +143,9 @@ abstract class QueryRegressionTest[S[_]](
       val data = testQuery(
         test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
         test.query,
-        test.variables)
+        test.variables,
+        test.explainQuery
+      )
 
       (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
        verifyResults(test.expected, data, run, backendName))
@@ -265,7 +270,8 @@ abstract class QueryRegressionTest[S[_]](
   def testQuery(
     loc: ADir,
     qry: String,
-    vars: Map[String, String]
+    vars: Map[String, String],
+    explain: Boolean
   ): Process[CompExecM, Data] = {
     val f: Task ~> CompExecM =
       toCompExec compose injectTask
@@ -275,7 +281,17 @@ abstract class QueryRegressionTest[S[_]](
         .fold(e => Task.fail(new RuntimeException(e.message)),
         _.mkPathsAbsolute(loc).point[Task])
 
-    Process.await(f(parseTask))(queryResults(_, Variables.fromMap(vars), loc))
+    val print: ExecutionPlan => Process[CompExecM, Unit] = ep =>  f(Task.delay {
+      println("helllo!!!!")
+      println(ep.shows)
+    }).liftM[Process]
+
+    val explainPlan: Fix[Sql] =>  Process[CompExecM, Nothing] =
+      s => if (explain) (queryExplain(s, Variables.fromMap(vars), loc) >>= print).drain else Process.halt
+
+    Process.await(f(parseTask)){ s =>
+      explainPlan(s) ++ queryResults(s, Variables.fromMap(vars), loc)
+    }
   }
 
   /** Load the contents of the test data file into the filesytem under test at

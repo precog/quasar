@@ -4,9 +4,9 @@
   "data": "stringFunctionsOther.data",
 
   "query": "select
-  substring(commaSeparated, 0, 5) as basicsubstring, substring(commaSeparated, 1, 3) as substringlim,
-  search(someText,\"fo.\", false) as searchcasesensitive, search(someText, \"dog\", flag) as searchcaseinsensitive,
-  split(commaSeparated, \",\") as commasplit
+   substring(commaSeparated, 0, 5) as basicSubstring, substring(commaSeparated, 1, 3) as substringLim,
+   search(someText,\"fo.\", false) as searchCaseSensitive, search(someText, \"dog\", flag) as searchCaseInsensitive,
+   split(commaSeparated, \",\") as commaSplit
    from stringFunctionsOther",
 
   "predicate": "exactly",
@@ -15,6 +15,6 @@
   "ignoreFieldOrder": true,
 
   "expected": [
-    {"basicsubstring": "a,b,c", "substringlim": ",b,", "searchcasesensitive": false, "searchcaseinsensitive": true, "commasplit": ["a","b","c"]}
+    {"basicSubstring": "a,b,c", "substringLim": ",b,", "searchCaseSensitive": false, "searchCaseInsensitive": true, "commaSplit": ["a","b","c"]}
   ]
 }

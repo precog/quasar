@@ -19,6 +19,7 @@ package quasar.server
 import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
+import quasar.fp.numeric.Natural
 
 import java.io.File
 import scala.collection.Seq     // uh, yeah
@@ -31,6 +32,8 @@ import scalaz.std.either._
 import scalaz.std.list._
 import scalaz.syntax.traverse._
 import scopt.OptionParser
+import eu.timepit.refined.refineMV
+import eu.timepit.refined.api.{RefType, Refined}
 
 /** Command-line options supported by Quasar. */
 @Lenses
@@ -42,11 +45,12 @@ final case class CliOptions(
     contentPath: Option[String],
     contentPathRelative: Boolean,
     openClient: Boolean,
-    port: Option[Int])
+    port: Option[Int],
+    recordedExecutions: Natural)
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None)
+    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(0L))
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
@@ -112,5 +116,12 @@ object CliOptions {
     opt[Int]('p', "port") action { (x, c) =>
       (l composeLens port).set(Some(x))(c)
     } text("the port to run Quasar on")
+
+    opt[Int]('x', "recorded-executions") validate { x =>
+      if (x < 0) Left(s"Recorded executions must be negative, but are set to $x")
+      else Right(())
+    } action { (x, c) =>
+      (l composeLens recordedExecutions).set(RefType[Refined].unsafeWrap(x.toLong))(c)
+    } text ("the number of query executions to keep recorded")
   }
 }

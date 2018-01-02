@@ -18,7 +18,7 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._
-import quasar.effect.{Read, Write}
+import quasar.effect.{Read, ScopeExecution, Write}
 import quasar.fp._, free._
 import quasar.main._
 import quasar.fs.mount.cache.VCache
@@ -32,13 +32,17 @@ import scalaz.concurrent.Task
 
 class RestApiSpecs extends quasar.Qspec {
 
+  implicit val scopeExecution: ScopeExecution[Free[CoreEffIORW, ?], Nothing] =
+    ScopeExecution.ignore[Free[CoreEffIORW, ?], Nothing]
+  val executionIdRef: TaskRef[Long] = TaskRef(0L).unsafePerformSync
+
   val service =
     (Fixture.inMemFSWeb() ⊛ TaskRef(Tags.Min(Option.empty[VCache.Expiration])))((runEff, r) =>
       RestApi.finalizeServices(RestApi.toHttpServices(
         (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
         (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
         runEff,
-        RestApi.coreServices[CoreEffIORW]
+        RestApi.coreServices[CoreEffIORW, Nothing](executionIdRef)
       )).orNotFound)
 
   "OPTIONS" should {

@@ -48,11 +48,6 @@ class PlannerQScriptSpec extends
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
 
-  // Some useful debugging objects
-  val rt  = RenderTree[Crystallized[WorkflowF]]
-  val rtq = RenderTree[Fix[fs.MongoQScript[Fix, ?]]]
-  val toMetalPlan: Crystallized[WorkflowF] => Option[String] = WorkflowExecutor.toJS(_).toOption
-
   import dsl._
 
   val json = Fixed[Fix[EJson]]

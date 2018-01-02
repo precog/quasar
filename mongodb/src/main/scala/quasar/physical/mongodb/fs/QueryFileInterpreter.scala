@@ -199,12 +199,15 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
       PhaseResult.detail("MongoDB", Js.Stmts(prog.toList).pprint(0))))
 
   private def moreResults(h: ResultHandle): OptionT[MQ, Vector[Data]] = {
+    val toData: Bson => Data =
+      (BsonCodec.toData _) <<< sigil.Sigil[Bson].elideQuasarSigil
+
     def pureNextChunk(bsons: List[Bson]) =
       if (bsons.isEmpty)
         Vector.empty[Data].point[MQ]
       else
         MongoQuery(resultsL(h) := some(List().left))
-          .as(bsons.map(BsonCodec.toData).toVector)
+          .as(bsons.map(toData).toVector)
 
     lookupCursor(h) flatMapF (_.fold(pureNextChunk, wc =>
       DataCursor[MongoDbIO, WorkflowCursor[C]]

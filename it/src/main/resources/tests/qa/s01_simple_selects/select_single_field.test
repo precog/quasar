@@ -3,6 +3,10 @@
 
   "data": "basic.data",
 
+  "backends": {
+    "postgres": "pending"
+  },
+
   "query": "select num from basic",
 
   "predicate": "exactly",

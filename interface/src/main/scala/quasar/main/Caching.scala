@@ -33,7 +33,7 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.{Process, time}
 
 object Caching {
-  type Eff[A] = (Task :\: ConnectionIO :/: CoreEff)#M[A]
+  type Eff[A] = Coproduct[Task, Coproduct[ConnectionIO, CoreEff, ?], A]
 
   val QT = QueryFile.Transforms[Free[Eff, ?]]
 

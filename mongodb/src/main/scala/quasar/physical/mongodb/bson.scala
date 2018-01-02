@@ -118,6 +118,10 @@ object Bson {
   object Binary {
     def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
+
+  val _doc =
+    Prism.partial[Bson, ListMap[String, Bson]] { case Bson.Doc(v) => v } (Bson.Doc(_))
+
   final case class Doc(value: ListMap[String, Bson])
       extends Bson with org.bson.conversions.Bson {
     def repr: BsonDocument =

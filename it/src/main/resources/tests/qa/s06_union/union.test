@@ -1,11 +1,12 @@
 {
-    "name": "union",
+    "name": "[qa_s06] union",
     "backends": {
         "mimir":"ignoreFieldOrder",
-        "couchbase": "pendingIgnoreFieldOrder"
+        "couchbase": "pendingIgnoreFieldOrder",
+        "postgres": "pending"
     },
-    "data": "zips.data",
-    "query": "select `_id` as zip from zips union select city, state from zips",
+    "data": "../zips.data",
+    "query": "select `_id` as zip from `../zips` union select city, state from `../zips`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
@@ -20,3 +21,4 @@
         { "city": "BELCHERTOWN", "state": "MA" },
         { "city": "BLANDFORD",   "state": "MA" }]
 }
+

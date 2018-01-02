@@ -146,7 +146,7 @@ object ExprOpCoreF {
           case ($toUpperF(v1), $toUpperF(v2))       => v1 ≟ v2
           case ($weekF(v1), $weekF(v2))             => v1 ≟ v2
           case ($yearF(v1), $yearF(v2))             => v1 ≟ v2
-          case _                                    => true
+          case _                                    => false
         }
       }
     }

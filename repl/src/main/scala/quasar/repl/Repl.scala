@@ -74,6 +74,7 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
+      |  set printTiming = true | false
       |  set summaryCount = [rows]
       |  set format = table | precise | readable | csv
       |  set [var] = [value]
@@ -86,7 +87,8 @@ object Repl {
     phaseFormat:  PhaseFormat,
     summaryCount: Option[Int Refined Positive],
     format:       OutputFormat,
-    variables:    Map[String, String]) {
+    variables:    Map[String, String],
+    printTiming:  Boolean) {
 
   def targetDir(path: Option[XDir]): ADir =
     path match {
@@ -110,7 +112,7 @@ object Repl {
 
   type RunStateT[A] = AtomicRef[RunState, A]
 
-  def command[S[_]](cmd: Command)(
+  def command[S[_], T](cmd: Command, executionIdRef: TaskRef[Long])(
     implicit
     Q:  QueryFile.Ops[S],
     M:  ManageFile.Ops[S],
@@ -121,7 +123,8 @@ object Repl {
     S1: RunStateT :<: S,
     S2: ReplFail :<: S,
     S3: Task :<: S,
-    S4: FileSystemFailure :<: S
+    S4: FileSystemFailure :<: S,
+    SE: ScopeExecution[Free[S, ?], T]
   ): Free[S, Unit] = {
     import Command._
 
@@ -199,6 +202,10 @@ object Repl {
         RS.modify(_.copy(phaseFormat = fmt)) *>
           P.println(s"Set phase format: $fmt")
 
+      case PrintTiming(print) =>
+        RS.modify(_.copy(printTiming = print)) *>
+          P.println(s"Set print timing: $print")
+
       case SetVar(n, v) =>
         RS.modify(state => state.copy(variables = state.variables + (n -> v))).void
 
@@ -233,24 +240,35 @@ object Repl {
         } yield ()
 
       case Select(n, q) =>
-        for {
-          state <- RS.get
-          expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
-          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
-          vars  = Variables.fromMap(state.variables)
-          _     <- n.cata(name =>
-                   {
-                     val out = state.cwd </> file(name)
-                     val query = fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
-                     runQuery(state, query)(κ(
-                       P.println("Wrote file: " + posixCodec.printPath(out))))
-                   },
-                   {
-                     val query = fsQ.queryResults(block, vars, state.cwd, 0L, state.summaryCount.map(widenPositive[Refined, _0]))
-                       .map(_.toVector)
-                     runQuery(state, query)(ds => summarize[S](state.summaryCount.map(_.value), state.format)(ds))
-                   })
-        } yield ()
+        Free.liftF(S3(ExecutionId.ofRef(executionIdRef))).flatMap(id => SE.newExecution[Unit](id, { ST =>
+          ST.newScope(
+            "total query pipeline (REPL)",
+            for {
+              state <- RS.get
+              expr  <- ST.newScope("parse SQL", DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message)))
+              block <- ST.newScope("resolve imports", DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message)))
+              vars  = Variables.fromMap(state.variables)
+              _     <- n.cata(name =>
+                         {
+                           val out = state.cwd </> file(name)
+                           for {
+                             query <- ST.newScope("plan query",
+                               fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out).pure[Free[S, ?]])
+                             results <- ST.newScope("evaluate query",
+                              runQuery(state, query)(κ(P.println("Wrote file: " + posixCodec.printPath(out)))))
+                           } yield results
+                         },
+                         {
+                           for {
+                             query <- ST.newScope("plan query",
+                               fsQ.queryResults(block, vars, state.cwd, 0L, state.summaryCount.map(widenPositive[Refined, _0]))
+                                 .map(_.toVector).pure[Free[S, ?]])
+                             results <- ST.newScope("evaluate query",
+                              runQuery(state, query)(ds => summarize[S](state.summaryCount.map(_.value), state.format)(ds)))
+                           } yield results
+                         })
+            } yield ())
+        }))
 
       case Explain(q) =>
         for {

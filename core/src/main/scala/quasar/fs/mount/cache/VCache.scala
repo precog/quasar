@@ -96,6 +96,7 @@ object VCache {
     case Keys() =>
       injectFT[ConnectionIO, S].apply(Queries.viewCachePaths.list ∘ (_.toVector))
     case Get(k) =>
+      println(s"getting key $k")
       injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= { vc =>
         val expirations =
           Tags.Min(
@@ -108,6 +109,8 @@ object VCache {
         W.tell(expirations).as(vc)
       }
     case Put(k, v) =>
+      println(s"putting key $k")
+      println(s"putting value $v")
       deleteVCacheFilesThen(k, insertOrUpdateViewCache(k, v))
     case CompareAndPut(k, expect, v) =>
       injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= (vc =>

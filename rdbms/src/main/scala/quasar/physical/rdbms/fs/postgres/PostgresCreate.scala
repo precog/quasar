@@ -34,6 +34,7 @@ trait PostgresCreate extends RdbmsCreate {
       if (s.isRoot)
         ().point[ConnectionIO]
       else
+        fr"LOCK TABLE pg_catalog.pg_namespace".update.run *>
         (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.shows)).update.run.void
     }.void
   }
@@ -46,7 +47,7 @@ trait PostgresCreate extends RdbmsCreate {
     model match {
       case JsonTable => Fragment.const("data jsonb NOT NULL")
       case ColumnarTable(cols) =>
-        cols.toList.map(c => Fragment.const(s"${c.name} ${c.tpe.mapToStringName}")).intercalate(fr",")
+        cols.toList.map(c => Fragment.const(s""""${c.name}" ${c.tpe.mapToStringName}""")).intercalate(fr",")
     }
   }
 

@@ -36,7 +36,7 @@ trait SqlExprTraverse {
       case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Constant(d)         => G.point(Constant(d))
       case Id(str)             => G.point(Id(str))
-      case RegexMatches(a1, a2) => (f(a1) ⊛ f(a2))(RegexMatches(_, _))
+      case RegexMatches(a1, a2, i) => (f(a1) ⊛ f(a2))(RegexMatches(_, _, i))
       case ExprWithAlias(e, a) => (f(e) ⊛ G.point(a))(ExprWithAlias.apply)
       case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
       case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
@@ -72,6 +72,7 @@ trait SqlExprTraverse {
           newOrder)(
           Select(_, _, _, _)
         )
+      case Union(left, right) => (f(left) ⊛ f(right))(Union.apply)
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
           f(e)

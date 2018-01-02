@@ -1,0 +1,18 @@
+{
+  "name": "[qa_s06] simple union",
+
+  "backends": {
+    "marklogic_json": "ignoreResultOrder",
+    "marklogic_xml": "ignoreResultOrder"
+  },
+
+  "data": ["simple_union.data", "simple_union2.data"],
+
+  "query": "select * from simple_union union select * from simple_union2",
+
+  "predicate": "exactly",
+
+  "expected": [{"a": "1", "b": 1},
+               {"a": "2", "b": 2},
+               {"a": "3", "b": 3}]
+}

@@ -25,9 +25,10 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{Read, Write}
+import quasar.effect.{Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fp.numeric.Natural
 import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW}
 import quasar.main._
 import quasar.server.Http4sUtils.{openBrowser, waitForUserEnter}
@@ -48,7 +49,9 @@ object Server {
       port: Option[Int],
       configPath: Option[FsFile],
       loadConfig: BackendConfig,
-      openClient: Boolean) {
+      openClient: Boolean,
+      recordedExecutions: Natural,
+      printExecutions: Boolean) {
 
     def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, loadConfig, cmd)
   }
@@ -76,7 +79,7 @@ object Server {
             .map(some)) ⊛
         loadConfigM.liftM[MainErrT]) ((content, cfgPath, loadConfig) =>
         WebCmdLineConfig(
-          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient))
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient, opts.recordedExecutions, true))
     }
   }
 
@@ -103,8 +106,10 @@ object Server {
     staticContent: List[StaticContent],
     redirect: Option[String],
     eval: CoreEff ~> QErrs_CRW_TaskM,
-    persistPortChange: Int => MainTask[Unit]
-  ): PortChangingServer.ServiceStarter = {
+    persistPortChange: Int => MainTask[Unit],
+    recordedExecutions: Natural,
+    printExecutions: Boolean
+  ): Task[PortChangingServer.ServiceStarter] = {
     import RestApi._
 
     def interp: Task[CoreEffIORW ~> ResponseOr] =
@@ -120,15 +125,25 @@ object Server {
           injectFT[Task, QErrs_CRW_Task]       :+:
           eval))
 
-    (reload: Int => Task[String \/ Unit]) =>
-    finalizeServices(
-      toHttpServicesF[CoreEffIORW](
-        λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
-          interp.liftM[ResponseT] >>= (fa foldMap _)
-        },
-        coreServices[CoreEffIORW]
-      ) ++ additionalServices
-    ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
+    val printAction = (s: String) =>
+      Free.liftF(Inject[Task, CoreEffIORW].inj(if (printExecutions) Task.delay(println(s)) else ().point[Task]))
+    for {
+      scopeExecution <- TimingRepository.empty(recordedExecutions).map(
+        ScopeExecution.forFreeTask[CoreEffIORW, Nothing](_, printAction)
+      )
+      executionIdRef <- TaskRef(0L)
+    } yield {
+      implicit val _ = scopeExecution
+      (reload: Int => Task[String \/ Unit]) =>
+        finalizeServices(
+          toHttpServicesF[CoreEffIORW](
+            λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
+              interp.liftM[ResponseT] >>= (fa foldMap _)
+            },
+            coreServices[CoreEffIORW, Nothing](executionIdRef)
+          ) ++ additionalServices
+        ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
+    }
   }
 
   /**
@@ -140,11 +155,15 @@ object Server {
     port: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    persistPortChange: Int => MainTask[Unit]
+    persistPortChange: Int => MainTask[Unit],
+    recordedExecutions: Natural,
+    printExecutions: Boolean
   ): Task[Task[Unit]] =
-    PortChangingServer.start(
-      initialPort = port,
-      serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange))
+    for {
+      starter <- serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange, recordedExecutions, printExecutions)
+      shutdown <- PortChangingServer.start(initialPort = port, starter)
+    } yield shutdown
+
 
   def persistMetaStore(configPath: Option[FsFile]): DbConnectionConfig => MainTask[Unit] =
     persistWebConfig(configPath, conn => _.copy(metastore = MetaStoreConfig(conn).some))
@@ -178,7 +197,14 @@ object Server {
                val port = webCmdLineCfg.port | wCfg.server.port
                val persistPort = persistPortChange(webCmdLineCfg.configPath)
                (for {
-                 shutdown <- startServer(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort)
+                 shutdown <- startServer(
+                  quasarInter,
+                  port,
+                  webCmdLineCfg.staticContent,
+                  webCmdLineCfg.redirect,
+                  persistPort,
+                  webCmdLineCfg.recordedExecutions,
+                  webCmdLineCfg.printExecutions)
                  _        <- openBrowser(port).whenM(webCmdLineCfg.openClient)
                  _        <- stdout("Press Enter to stop.")
                  // If user pressed enter (after this main thread has been blocked on it),

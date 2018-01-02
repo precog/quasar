@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.api.PathUtils._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
+import quasar.effect.ScopeExecution
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
@@ -41,6 +42,10 @@ object queryFixture {
     offset: Option[Natural] = None,
     limit: Option[Positive] = None,
     varNameAndValue: Option[(String, String)] = None)
+
+  implicit val scopeExecutionCoreEffIO: ScopeExecution[Free[CoreEffIO, ?], Nothing] =
+    ScopeExecution.ignore[Free[CoreEffIO, ?], Nothing]
+  val executionIdRef: TaskRef[Long] = TaskRef(0L).unsafePerformSync
 
   def get[A:EntityDecoder](service: (InMemState, Map[APath, MountConfig]) => Service[Request, Response])(path: ADir,
             query: Option[Query],
@@ -69,7 +74,7 @@ object queryFixture {
 
   def executeService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
     Fixture.inMemFSWeb(state, MountingsConfig(mounts)).map(inter =>
-      execute.service[CoreEffIO].toHttpService(inter).orNotFound).unsafePerformSync
+      execute.service[CoreEffIO, Nothing](executionIdRef).toHttpService(inter).orNotFound).unsafePerformSync
 
   def selectAll(from: FPath) = {
     val ast = SelectR(

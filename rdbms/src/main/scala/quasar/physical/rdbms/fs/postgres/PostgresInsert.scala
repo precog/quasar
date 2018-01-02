@@ -61,7 +61,7 @@ trait PostgresInsert extends RdbmsInsert {
 
         val colNamesFragment =
           insertIntoTable ++ fr"(" ++ Fragment.const(
-            colMap.keys.mkString(",")) ++
+            colMap.keys.toList.map(k => s""""$k"""").mkString(",")) ++
             fr")"
 
         val colValsFragment =

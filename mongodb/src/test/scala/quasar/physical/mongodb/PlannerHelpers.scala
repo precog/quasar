@@ -145,6 +145,11 @@ object PlannerHelpers {
     }
   }
 
+  // Some useful debugging objects
+  val rt  = RenderTree[Crystallized[WorkflowF]]
+  val rtq = RenderTree[Fix[fs.MongoQScript[Fix, ?]]]
+  val toMetalPlan: Crystallized[WorkflowF] => Option[String] = WorkflowExecutor.toJS(_).toOption
+
   val basePathDb = rootDir[Sandboxed] </> dir("db")
 
   val listContents: DiscoverPath.ListContents[EitherWriter] =
@@ -262,6 +267,12 @@ object PlannerHelpers {
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
+
+  def planMetal(query: Fix[Sql]): Option[String] =
+    plan(query) match {
+      case Left(_) => None
+      case Right(wf) => toMetalPlan(wf)
+    }
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     queryPlanner(query, basePathDb, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither

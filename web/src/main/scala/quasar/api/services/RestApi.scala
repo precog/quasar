@@ -20,8 +20,8 @@ import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam, VCacheMiddleware}
 import quasar.contrib.scalaz.catchable._
-import quasar.effect.Timing
-import quasar.fp.liftMT
+import quasar.effect.{ScopeExecution, Timing}
+import quasar.fp.{TaskRef, liftMT}
 import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
@@ -42,7 +42,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object RestApi {
-  def coreServices[S[_]]
+  def coreServices[S[_], T](executionIdRef: TaskRef[Long])
       (implicit
         S0: Task :<: S,
         S1: ReadFile :<: S,
@@ -59,7 +59,8 @@ object RestApi {
         S12: MetaStoreLocation :<: S,
         S13: VCacheKVS :<: S,
         S15: VCacheExpR :<: S,
-        S14: Timing :<: S
+        S14: Timing :<: S,
+        SE: ScopeExecution[Free[S, ?], T]
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"   -> query.compile.service[S],
@@ -67,7 +68,7 @@ object RestApi {
       "/data/fs"      -> data.service[S],
       "/metadata/fs"  -> metadata.service[S],
       "/mount/fs"     -> mount.service[S],
-      "/query/fs"     -> query.execute.service[S],
+      "/query/fs"     -> query.execute.service[S, T](executionIdRef),
       "/invoke/fs"    -> invoke.service[S],
       "/schema/fs"    -> analyze.schema.service[S],
       "/metastore"    -> metastore.service[S]

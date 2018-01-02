@@ -89,6 +89,41 @@ private[mongodb] object execution {
     }
   }
 
+  object SingleListMap {
+    def unapply[A, B](lm: ListMap[A, B]): Option[(A, B)] =
+      if (lm.size <= 1) lm.headOption else None
+  }
+
+  object SimpleRename {
+    /**
+     * Extractor that recognizes a $ProjectF reshaping a single `BsonField.Name` - `BsonField` entry.
+     * Conceptually this can be seen as a rename from a single `BsonField` to a `BsonField.Name`.
+     */
+    def unapply(op: PipelineOp): Option[(BsonField.Name, BsonField)] = op match {
+      case PipelineOpCore(proj @ $ProjectF((), Reshape(SingleListMap(bn @ BsonField.Name(_), \/-($var(DocField(bf))))), IgnoreId | ExcludeId)) =>
+        (bn, bf).some
+      case _ => None
+    }
+  }
+
+  object CountableRename {
+    /**
+     * Extractor that recognizes a Countable(field), optionally followed by a
+     * `SimpleRename` from that same `field` to a new name.
+     * In case there is such a rename then effectively that's the same as
+     * recognizing a Countable of that new name.
+     */
+    def unapply(pipeline: workflowtask.Pipeline): Option[BsonField.Name] =
+      pipeline match {
+        case List(Countable(field)) =>
+          field.some
+        case List(Countable(field), SimpleRename(name, f))
+            if (field: BsonField) ≟ f =>
+          name.some
+        case _ => None
+      }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def extractRange(pipeline: workflowtask.Pipeline):
       ((workflowtask.Pipeline, workflowtask.Pipeline),

@@ -51,7 +51,7 @@ object bsoncursor {
       ////
 
       val toData: BsonValue => Data =
-        (BsonCodec.toData _) <<< Bson.fromRepr <<< sigil.elideQuasarSigil
+        (BsonCodec.toData _) <<< Bson.fromRepr <<< sigil.Sigil[BsonValue].elideQuasarSigil
 
       def isClosed(cursor: BsonCursor): MongoDbIO[Boolean] =
         MongoDbIO.liftTask(Task.delay(cursor.isClosed))

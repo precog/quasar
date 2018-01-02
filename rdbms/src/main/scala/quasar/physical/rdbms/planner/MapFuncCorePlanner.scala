@@ -53,7 +53,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
         IsNotNull(toKeyValue(a1, key)).embed,
         a1),
       WhenThen(
-        RegexMatches(a1, str(regex.regex)).embed,
+        RegexMatches(a1, str(regex.regex), caseInsensitive = false).embed,
         Obj(List(str(key) -> a1)).embed)
     )(
       Else(SQL.Null[T[SQL]].embed)
@@ -129,7 +129,13 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Decimal(f) =>  SQL.Coercion(DecCol, f).embed.η[F]
     case MFC.Null(f) =>  SQL.Null[T[SQL]].embed.η[F]
     case MFC.ToString(f) =>  SQL.Coercion(StringCol, f).embed.η[F]
-    case MFC.Search(fStr, fPattern, fIsCaseInsensitive) => SQL.TernaryFunction(Search, fStr, fPattern, fIsCaseInsensitive).embed.η[F]
+    case MFC.Search(fStr, fPattern, fIsCaseInsensitive) =>
+      fIsCaseInsensitive.project match {
+        case Constant(Data.Bool(insensitive)) =>
+          SQL.RegexMatches(fStr, fPattern, insensitive).embed.η[F]
+        case _ =>
+          SQL.TernaryFunction(Search, fStr, fPattern, fIsCaseInsensitive).embed.η[F]
+      }
     case MFC.Substring(fStr, fFrom, fCount) => SQL.TernaryFunction(Substring, fStr, fFrom, fCount).embed.η[F]
     case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(StrSplit, fStr, fDelim).embed.η[F]
     case MFC.MakeArray(f) =>  SQL.ToArray(f).embed.η[F]

@@ -24,7 +24,7 @@ import quasar.qscript._
 
 import matryoshka._
 import matryoshka.implicits._
-import org.bson.BsonDocument
+import org.bson.{BsonDocument, BsonValue}
 import scalaz._, Scalaz._
 
 /** A QScript transformation that, given a function to retrieve a document
@@ -73,9 +73,9 @@ object elideQuasarSigil {
     }
 
   private def getValue[T[_[_]]: CorecursiveT](doc: BsonDocument): Option[FreeMap[T]] =
-    if (sigil.mapReduceQuasarSigilExists(doc))
+    if (sigil.Sigil[BsonValue].mapReduceQuasarSigilExists(doc))
       Some(sigil.projectMapReduceQuasarValue[T])
-    else if (sigil.quasarSigilExists(doc))
+    else if (sigil.Sigil[BsonValue].quasarSigilExists(doc))
       Some(sigil.projectQuasarValue[T])
     else
       None

@@ -20,18 +20,17 @@ import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
-import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
-
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.Scalaz._
 import scalaz._
+import Scalaz._
 
 class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -44,14 +43,16 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
                      alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
 
-  private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
-        InternalError.fromMsg(s"unsupported QScriptCore"))
-
-  private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+  private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] =
     (fromExpr |@| countExpr)(Limit(_, _).embed)
 
   private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
     (fromExpr |@| countExpr)(Offset(_, _).embed)
+
+  private def compile(expr: qscript.FreeQS[T], src: T[SqlExpr]): F[T[SqlExpr]] = {
+    val compiler = Planner[T, F, QScriptTotal[T, ?]].plan
+    expr.cataM(interpretM(κ(src.point[F]), compiler))
+  }
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
@@ -96,10 +97,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           ).embed
         }
     case qscript.Subset(src, from, sel, count) =>
-      val compile = Planner[T, F, QScriptTotal[T, ?]].plan
-
-      val fromExpr: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
-      val countExpr: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
+      val fromExpr: F[T[SqlExpr]]  = compile(from, src)
+      val countExpr: F[T[SqlExpr]] = compile(count, src)
 
       sel match {
         case qscript.Drop   => drop(fromExpr, countExpr)
@@ -131,9 +130,22 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       }
     }
 
+    case qUnion@qscript.Union(src, left, right) =>
+      val hole = qscript.HoleQS[T]
+      (src.project, left, right) match {
+        case (_: Select[_], `hole`, `hole`) => src.point[F]
+        case _ =>
+          (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
+      }
+
+    case reduce@qscript.Reduce(reduceSrc, _, _, _) =>
+      reduceSrc.project match {
+        case _: Union[_] | _: Select[_] => reduceSrc.point[F]
+        case _ =>                          notImplemented(s"$reduce", this)
+      }
+
     case other =>
-      PlannerErrorME[F].raiseError(
-        InternalError.fromMsg(s"unsupported QScriptCore: $other"))
+      notImplemented(s"QScriptCore: $other", this)
 
       
   }

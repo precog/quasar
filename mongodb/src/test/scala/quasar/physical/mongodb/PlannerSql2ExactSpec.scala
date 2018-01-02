@@ -170,6 +170,46 @@ class PlannerSql2ExactSpec extends
             ExcludeId)))
     }
 
+    "plan metal count(*)" in {
+      planMetal(sqlE"select count(*) from zips") must beSome("db.zips.count();\n")
+    }
+
+    "plan metal count(*) limit 10" in {
+      planMetal(sqlE"select count(*) from zips limit 10") must beSome("db.zips.count();\n")
+    }
+
+    "plan metal count(*) alias" in {
+      planMetal(sqlE"select count(*) as c from zips") must beSome("db.zips.count();\n")
+    }
+
+    "plan metal count(*) alias limit" in {
+      planMetal(sqlE"select count(*) as c from zips limit 10") must beSome("db.zips.count();\n")
+    }
+
+    "plan metal count(*) filter" in {
+      planMetal(sqlE"""select count(*) from zips where city = "HAMPDEN" """) must beSome(
+        """db.zips.count({ "city": "HAMPDEN" });
+          |""".stripMargin)
+    }
+
+    "plan metal count(*) filter limit 10" in {
+      planMetal(sqlE"""select count(*) from zips where city = "HAMPDEN" limit 10""") must beSome(
+        """db.zips.count({ "city": "HAMPDEN" });
+          |""".stripMargin)
+    }
+
+    "plan metal count(*) filter alias" in {
+      planMetal(sqlE"""select count(*) as c from zips where city = "HAMPDEN" """) must beSome(
+        """db.zips.count({ "city": "HAMPDEN" });
+          |""".stripMargin)
+    }
+
+    "plan metal count(*) filter alias limit" in {
+      planMetal(sqlE"""select count(*) as c from zips where city = "HAMPDEN" limit 10""") must beSome(
+        """db.zips.count({ "city": "HAMPDEN" });
+          |""".stripMargin)
+    }
+
     "plan simple field projection on single set" in {
       plan(sqlE"select cars.name from cars") must
         beWorkflow(chain[Workflow](

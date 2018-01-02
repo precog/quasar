@@ -101,7 +101,7 @@ object PostgresRenderQuery extends RenderQuery {
       srcs.map(_._2) match {
         case Vector(key, value) =>
           val valueStripped = value.stripPrefix("'").stripSuffix("'")
-          s"""$key.$valueStripped""".right
+          s"""$key."$valueStripped"""".right
         case key +: mid :+ last =>
           val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
           val midTail = mid.drop(1)
@@ -109,24 +109,22 @@ object PostgresRenderQuery extends RenderQuery {
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key.$firstValStripped$midStr->$last""".right
+          s"""$key."$firstValStripped"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
-    case RegexMatches(TextExpr(e), (_, pattern)) =>
-      s"($e ~ '$pattern')".right
+    case RegexMatches(TextExpr(e), TextExpr(pattern), caseInsensitive: Boolean) =>
+      val op = if (caseInsensitive) "~*" else "~"
+      s"($e $op $pattern)".right
     case IsNotNull((_, expr)) =>
       s"($expr notnull)".right
     case IfNull(exprs) =>
       s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
-      (if (expr === alias) s"$expr" else {
-        val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
-        s"$expr as $aliasStr"
-      }).right
+        s"""$expr as "$alias"""".right
     case ExprPair((_, s1), (_, s2)) =>
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
@@ -179,6 +177,7 @@ object PostgresRenderQuery extends RenderQuery {
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
+    case Union((_, left), (_, right)) => s"($left) UNION ($right)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right

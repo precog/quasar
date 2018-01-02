@@ -81,7 +81,7 @@ object SqlExpr extends SqlExprInstances {
   final case class BinaryFunction[T](t: BinaryFunctionType, a1: T, a2: T) extends SqlExpr[T]
   final case class TernaryFunction[T](t: TernaryFunctionType, a1: T, a2: T, a3: T) extends SqlExpr[T]
 
-  final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class RegexMatches[T](a1: T, a2: T, caseInsensitive: Boolean) extends SqlExpr[T]
 
   final case class Limit[T](from: T, count: T) extends SqlExpr[T]
   final case class Offset[T](from: T, count: T) extends SqlExpr[T]
@@ -93,6 +93,8 @@ object SqlExpr extends SqlExprInstances {
     final case class WithIds[T](v: T) extends SqlExpr[T]
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
+
+  final case class Union[T](left: T, right: T) extends SqlExpr[T]
 
   object IfNull {
     def build[T](a1: T, a2: T, a3: T*): IfNull[T] = IfNull(oneAnd(a1, nels(a2, a3: _*)))

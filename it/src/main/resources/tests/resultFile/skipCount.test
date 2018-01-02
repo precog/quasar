@@ -1,9 +1,9 @@
 {
     "name": "skip and count",
 
-    "data": "zips.data",
+    "data": "../zips.data",
 
-    "query": "select count(*) from (select * from zips offset 10) as x",
+    "query": "select count(*) from (select * from `../zips` offset 10) as x",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

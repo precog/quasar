@@ -43,12 +43,22 @@ package object postgres {
     }
   )
 
+  private def escapeStr(v: String) = v.replaceAllLiterally("'","''")
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def escapeData(d: Data): Data = d match {
+    case Data.Obj(es) => Data.Obj(es.map{ case (k,v) => (escapeStr(k), escapeData(v))})
+    case Data.Arr(es) => Data.Arr(es.map(escapeData))
+    case Data.Str(s) => Data.Str(escapeStr(s))
+    case _ => d
+  }
+
   implicit val dataFormatter: DataFormatter = DataFormatter((n, v) =>
     v match {
       case Data.Obj(_) | Data.Arr(_) =>
-        "'" + DataCodec.render(v).getOrElse("{}") + "'"
+        "'" + DataCodec.render(escapeData(v)).getOrElse("{}") + "'"
       case Data.Int(num) => s"$num"
-      case Data.Str(txt) => s"'$txt'"
+      case Data.Str(txt) => s"'${escapeStr(txt)}'"
       case Data.Dec(num) => s"$num"
       case Data.Bool(bool) => s"$bool"
       case _             => s"""'{"$n": "unsupported""}'""" // TODO

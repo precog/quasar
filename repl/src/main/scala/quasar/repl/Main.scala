@@ -113,16 +113,25 @@ object Main {
     S4: ManageFile :<: S,
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
-    TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map())).map { ref =>
-      val i: ReplEff[S, ?] ~> DriverEffM =
-        injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(ref)) :+:
+    for {
+      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), false))
+      executionIdRef <- TaskRef(0L)
+      timingRepository <- TimingRepository.empty(refineMV(1))
+      i =
+        injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(stateRef)) :+:
         injectFT[ConsoleIO, DriverEff]                                :+:
         injectFT[ReplFail, DriverEff]                                 :+:
         injectFT[Task, DriverEff].compose(Timing.toTask)              :+:
         injectFT[Task, DriverEff]                                     :+:
         fs
-
-      (cmd => Repl.command[ReplEff[S, ?]](cmd).foldMap(i))
+    } yield {
+      val timingPrint = (in: String) => for {
+        state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
+        _ <- if (state.printTiming) Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(in)))
+             else ().point[Free[ReplEff[S, ?], ?]]
+      } yield ()
+      implicit val SE = ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
+      (cmd => Repl.command[ReplEff[S, ?], Nothing](cmd, executionIdRef).foldMap(i))
     }
   }
 

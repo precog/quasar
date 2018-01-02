@@ -37,6 +37,7 @@ import org.specs2.matcher.MatchResult
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import eu.timepit.refined.refineMV
 
 class ServiceSpec extends quasar.Qspec {
   val schema = Schema.schema
@@ -61,7 +62,7 @@ class ServiceSpec extends quasar.Qspec {
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
       quasarFs   <- Quasar.initWithMeta(BackendConfig.Empty, metaRef, _ => ().point[MainTask])
-      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
+      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask], refineMV(0L), false).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }

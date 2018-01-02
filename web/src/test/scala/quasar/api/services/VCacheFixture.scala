@@ -48,16 +48,14 @@ trait VCacheFixture extends H2MetaStoreFixture {
   type Eff[A]  = Coproduct[Task, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
-  type ViewEff[A] = (
-    PathMismatchFailure :\:
-    MountingFailure     :\:
-    Mounting            :\:
-    view.State          :\:
-    MonotonicSeq        :\:
-    VCacheExpR          :\:
-    VCacheExpW          :/:
-    Eff
-  )#M[A]
+  type ViewEff[A] =
+    Coproduct[PathMismatchFailure,
+      Coproduct[MountingFailure,
+        Coproduct[Mounting,
+          Coproduct[view.State,
+            Coproduct[MonotonicSeq,
+              Coproduct[VCacheExpR,
+                Coproduct[VCacheExpW, Eff, ?], ?], ?], ?], ?], ?], A]
 
   val vcacheInterp: Task[VCacheKVS ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 

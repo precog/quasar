@@ -53,32 +53,51 @@ object sigil {
   val Id = "_id"
 
 
-  // Sigils in BsonValues
+  @simulacrum.typeclass
+  trait Sigil[A] {
+    /** Returns the value of the named field or `None` if the input isn't
+      * a document or the field doesn't exist.
+      */
+    def fieldValue(name: String): A => Option[A]
 
-  /** Returns the value under any Quasar sigil or the input if not found. */
-  def elideQuasarSigil: BsonValue => BsonValue =
-    v => (quasarValue(v) <+> mapReduceQuasarValue(v)) | v
+    // derived functions
 
-  /** The value under the MapReduce value field, if found. */
-  def mapReduceValue: BsonValue => Option[BsonValue] =
-    fieldValue(Value)
+    /** Returns the value under any Quasar sigil or the input if not found. */
+    def elideQuasarSigil: A => A =
+      v => (quasarValue(v) <+> mapReduceQuasarValue(v)) | v
 
-  /** The value under the Quasar sigil in a MapReduce result, if found. */
-  def mapReduceQuasarValue: BsonValue => Option[BsonValue] =
-    Kleisli(quasarValue) <==< mapReduceValue
+    /** The value under the MapReduce value field, if found. */
+    def mapReduceValue: A => Option[A] =
+      fieldValue(Value)
 
-  /** Whether the given `BsonValue` contains the Quasar sigil nested in a MapReduce result. */
-  def mapReduceQuasarSigilExists: BsonValue => Boolean =
-    mapReduceValue andThen (_ exists quasarSigilExists)
+    /** The value under the Quasar sigil in a MapReduce result, if found. */
+    def mapReduceQuasarValue: A => Option[A] =
+      Kleisli(quasarValue) <==< mapReduceValue
 
-  /** Whether the given `BsonValue` contains the Quasar sigil. */
-  def quasarSigilExists: BsonValue => Boolean =
-    bsonvalue.document.exist(_ containsKey Quasar)
+    /** Whether the given value contains the Quasar sigil nested in a MapReduce result. */
+    def mapReduceQuasarSigilExists: A => Boolean =
+      mapReduceValue andThen (_ exists quasarSigilExists)
 
-  /** The value under the Quasar sigil, if found. */
-  def quasarValue: BsonValue => Option[BsonValue] =
-    fieldValue(Quasar)
+    /** Whether the given value contains the Quasar sigil. */
+    def quasarSigilExists: A => Boolean =
+      quasarValue(_).isDefined
 
+    /** The value under the Quasar sigil, if found. */
+    def quasarValue: A => Option[A] =
+      fieldValue(Quasar)
+  }
+
+  object Sigil {
+    implicit val sigilBson: Sigil[Bson] = new Sigil[Bson] {
+      def fieldValue(name: String): Bson => Option[Bson] =
+        b => Bson._doc.getOption(b).flatMap(m => m.get(name))
+    }
+
+    implicit val sigilBsonValue: Sigil[BsonValue] = new Sigil[BsonValue] {
+      def fieldValue(name: String): BsonValue => Option[BsonValue] =
+        v => bsonvalue.document.getOption(v).flatMap(d => Option(d.get(name)))
+    }
+  }
 
   // Sigils in QScript
 
@@ -91,12 +110,6 @@ object sigil {
     projectQuasarValue[T] >> projectField(Value)
 
   ////
-
-  /** Returns the value of the named field or `None` if the input isn't
-    * a document or the field doesn't exist.
-    */
-  private def fieldValue(name: String): BsonValue => Option[BsonValue] =
-    v => bsonvalue.document.getOption(v).flatMap(d => Option(d.get(name)))
 
   private def projectField[T[_[_]]: CorecursiveT](f: String): FreeMap[T] =
     Free.roll(MFC(ProjectKey(HoleF, StrLit(f))))

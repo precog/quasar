@@ -146,9 +146,8 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
     partialTyper {
-      case Sized(Type.Bottom, fallback)                                    => fallback
-      case Sized(t1, t2) if t1.contains(Type.Top) || t2.contains(Type.Top) => Type.Top
-      case Sized(value, fallback)                                    => value ⨿ fallback
+      case Sized(Type.Const(Data.NA), fallback) => fallback
+      case Sized(value, fallback) => Type.TypeOrMonoid.append(value, fallback)
     },
     partialUntyper[nat._2] { case t => Func.Input2(t, t) })
 

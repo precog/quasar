@@ -218,7 +218,8 @@ trait TypeInstances {
     def append(v1: Type, v2: => Type) = (v1, v2) match {
       case (Type.Bottom, that) => that
       case (this0, Type.Bottom) => this0
-      case _ => v1 ⨿ v2
+      case (this0, that0) if this0.contains(Type.Top) || that0.contains(Type.Top) => Type.Top
+      case (_, _) => v1 ⨿ v2
     }
   }
 

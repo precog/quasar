@@ -83,7 +83,7 @@ script:
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
-      "it/testOnly -- xonly failtrace" \
+      "it/testOnly" \
       "$SPECIFIC_DELEGATE"
 
   - set +e

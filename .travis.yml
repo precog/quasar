@@ -56,7 +56,7 @@ script:
 
     case $CONNECTOR in
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
-      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
+      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
 
       spark_hdfs)
@@ -83,7 +83,7 @@ script:
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
-      "it/testOnly -- xonly failtrace" \
+      "it/testOnly" \
       "$SPECIFIC_DELEGATE"
 
   - set +e

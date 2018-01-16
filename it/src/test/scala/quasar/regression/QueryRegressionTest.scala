@@ -111,6 +111,7 @@ abstract class QueryRegressionTest[S[_]](
   //     Ideally, we'd have specs2 log each example in the suite as it finishes, but
   //     all attempts at doing this have been unsuccessful, if we succeed eventually
   //     this printing can be removed.
+  //
   fileSystemShould { (fs, fsNonChrooted) =>
     suiteName should {
       step(print(s"Running $suiteName ["))

@@ -95,7 +95,7 @@ class PlannerSql2ExactSpec extends
           JoinHandler.LeftName \ BsonField.Name("_id"),
           BsonField.Name("_id"),
           JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
+        $unwind(DocField(JoinHandler.RightName), None, None),
         $project(
           reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
           ExcludeId))),
@@ -140,7 +140,7 @@ class PlannerSql2ExactSpec extends
           JoinHandler.LeftName \ BsonField.Name("_id"),
           BsonField.Name("_id"),
           JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
+        $unwind(DocField(JoinHandler.RightName), None, None),
         $project(reshape(
           "name" -> $field(JoinDir.Left.name, "name"),
           "year" -> $field(JoinDir.Right.name, "year")),
@@ -595,7 +595,7 @@ class PlannerSql2ExactSpec extends
                     $field("loc"),
                     $arrayLit(List($literal(Bson.Undefined))))),
               ExcludeId),
-            $unwind(DocField(BsonField.Name("0"))),
+            $unwind(DocField(BsonField.Name("0")), None, None),
             $project(
               reshape(sigil.Quasar -> $field("0")),
               ExcludeId))
@@ -1192,7 +1192,7 @@ class PlannerSql2ExactSpec extends
                 "city" -> $push($field("city")),
                 "cnt"  -> $sum($literal(Bson.Int32(1)))),
               \/-($literal(Bson.Null))),
-            $unwind(DocField("city")),
+            $unwind(DocField("city"), None, None),
             $sort(NonEmptyList(BsonField.Name("cnt") -> SortDir.Descending)))
         }
     }.pendingWithActual(notOnPar, testFile("plan efficient count and field ref"))
@@ -1214,7 +1214,7 @@ class PlannerSql2ExactSpec extends
                 "cnt" -> $sum($literal(Bson.Int32(1))),
                 "1"   -> $push($field("1"))),
               \/-($literal(Bson.Null))),
-            $unwind(DocField("1")))
+            $unwind(DocField("1"), None, None))
         }
     }.pendingUntilFixed
 
@@ -1808,8 +1808,8 @@ class PlannerSql2ExactSpec extends
           $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
             JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
             JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-          $unwind(DocField(JoinHandler.RightName)),
-          $unwind(DocField(JoinHandler.LeftName)),
+          $unwind(DocField(JoinHandler.RightName), None, None),
+          $unwind(DocField(JoinHandler.LeftName), None, None),
           $project(
             reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
             ExcludeId)),

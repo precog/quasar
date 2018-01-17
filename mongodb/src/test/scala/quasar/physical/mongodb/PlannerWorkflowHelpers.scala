@@ -155,7 +155,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   val WC = Inject[WorkflowOpCoreF, WorkflowF]
 
   def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
-  def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
+  def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _, _, _)) => true })
   def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
 
   sealed trait OpType
@@ -215,7 +215,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($RedactF(s, _)) => RedactOp :: s
     case WC($LimitF(s, _)) => LimitOp :: s
     case WC($SkipF(s, _)) => SkipOp :: s
-    case WC($UnwindF(s, _)) => UnwindOp :: s
+    case WC($UnwindF(s, _, _, _)) => UnwindOp :: s
     case WC($GroupF(s, _, _)) => GroupOp :: s
     case WC($SortF(s, _)) => SortOp :: s
     case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => GeoNearOp :: s
@@ -237,7 +237,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($RedactF(s, _)) => redactOp.node(s)
     case WC($LimitF(s, _)) => limitOp.node(s)
     case WC($SkipF(s, _)) => skipOp.node(s)
-    case WC($UnwindF(s, _)) => unwindOp.node(s)
+    case WC($UnwindF(s, _, _, _)) => unwindOp.node(s)
     case WC($GroupF(s, _, _)) => groupOp.node(s)
     case WC($SortF(s, _)) => sortOp.node(s)
     case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => geoNearOp.node(s)

@@ -18,7 +18,7 @@ package quasar.physical.mongodb.workflow
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+import quasar.{RenderTree, RenderedTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
@@ -228,8 +228,13 @@ object $skip {
     src => Fix(Coalesce[F].coalesce(I.inj($SkipF(src, count))))
 }
 
-final case class $UnwindF[A](src: A, field: DocVar)
+final case class $UnwindF[A](
+  src: A,
+  field: DocVar,
+  includeArrayIndex: Option[BsonField.Name],
+  preserveNullAndEmptyArrays: Option[Boolean])
     extends WorkflowOpCoreF[A] { self =>
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def pipeline: PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
@@ -238,14 +243,18 @@ final case class $UnwindF[A](src: A, field: DocVar)
       def reparent[B](newSrc: B) = self.copy(src = newSrc).pipeline
 
       def op = "$unwind"
-      def rhs = field.bson
+      def rhs = Bson.Doc(List(
+        List("path" -> field.bson),
+        includeArrayIndex.toList.map(i => "includeArrayIndex" -> i.bson),
+        preserveNullAndEmptyArrays.toList.map(p => "preserveNullAndEmptyArrays" -> Bson.Bool(p))
+      ).flatten.toListMap)
     }
   lazy val flatmapop = $SimpleMapF(src, NonEmptyList(FlatExpr(field.toJs)), ListMap())
 }
 object $unwind {
-  def apply[F[_]: Coalesce](field: DocVar)
+  def apply[F[_]: Coalesce](field: DocVar, includeArrayIndex: Option[BsonField.Name], preserveNullAndEmptyArrays: Option[Boolean])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
-    src => Fix(Coalesce[F].coalesce(I.inj($UnwindF(src, field))))
+    src => Fix(Coalesce[F].coalesce(I.inj($UnwindF(src, field, includeArrayIndex, preserveNullAndEmptyArrays))))
 }
 
 final case class $GroupF[A](src: A, grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
@@ -828,7 +837,8 @@ object WorkflowOpCoreF {
         case $RedactF(src, value)      => G.apply(f(src))($RedactF(_, value))
         case $LimitF(src, count)       => G.apply(f(src))($LimitF(_, count))
         case $SkipF(src, count)        => G.apply(f(src))($SkipF(_, count))
-        case $UnwindF(src, field)      => G.apply(f(src))($UnwindF(_, field))
+        case $UnwindF(src, field, includeArrayIndex, preserveNullAndEmptyArrays) =>
+          G.apply(f(src))($UnwindF(_, field, includeArrayIndex, preserveNullAndEmptyArrays))
         case $GroupF(src, grouped, by) => G.apply(f(src))($GroupF(_, grouped, by))
         case $SortF(src, value)        => G.apply(f(src))($SortF(_, value))
         case $GeoNearF(src, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
@@ -858,7 +868,7 @@ object WorkflowOpCoreF {
         case op @ $RedactF(_, _)       => op.pipeline.widen[A].some
         case op @ $SkipF(_, _)         => op.shapePreserving.widen[A].some
         case op @ $LimitF(_, _)        => op.shapePreserving.widen[A].some
-        case op @ $UnwindF(_, _)       => op.pipeline.widen[A].some
+        case op @ $UnwindF(_, _, _, _) => op.pipeline.widen[A].some
         case op @ $GroupF(_, _, _)     => op.pipeline.widen[A].some
         case op @ $SortF(_, _)         => op.shapePreserving.widen[A].some
         case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => op.pipeline.widen[A].some
@@ -878,7 +888,7 @@ object WorkflowOpCoreF {
         case op @ $RedactF(_, _)     => op.pipeline.widen[A].some
         case op @ $SkipF(_, _)       => op.shapePreserving.widen[A].some
         case op @ $LimitF(_, _)      => op.shapePreserving.widen[A].some
-        case op @ $UnwindF(_, _)     => op.pipeline.widen[A].some
+        case op @ $UnwindF(_, _, _, _) => op.pipeline.widen[A].some
         case op @ $GroupF(_, _, _)   => op.pipeline.widen[A].some
         case op @ $SortF(_, _)       => op.shapePreserving.widen[A].some
         case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => op.pipeline.widen[A].some
@@ -917,7 +927,14 @@ object WorkflowOpCoreF {
             Nil)
         case $LimitF(_, count)  => Terminal("$LimitF" :: wfType, Some(count.shows))
         case $SkipF(_, count)   => Terminal("$SkipF" :: wfType, Some(count.shows))
-        case $UnwindF(_, field) => Terminal("$UnwindF" :: wfType, Some(field.shows))
+        case $UnwindF(_, field, includeArrayIndex, preserveNullAndEmptyArrays) =>
+          val nt = "$UnwindF" :: wfType
+          val opts: List[Option[RenderedTree]] =
+            Terminal.opt("IncludeArrayIndex" :: nt, includeArrayIndex.map(_.shows)) ::
+              Terminal.opt("PreserveNullAndEmptyArrays" :: nt, preserveNullAndEmptyArrays.map(_.shows)) ::
+              Nil
+          NonTerminal(nt, None,
+            Terminal("Path" :: nt, Some(field.shows)) :: opts.map(_.toList).flatten)
         case $GroupF(_, grouped, -\/(by)) =>
           val nt = "$GroupF" :: wfType
           NonTerminal(nt, None,

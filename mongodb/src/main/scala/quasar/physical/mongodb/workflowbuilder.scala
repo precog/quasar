@@ -456,7 +456,7 @@ object WorkflowBuilder {
         // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
         fields.foldRight(graph) {
           case (StructureType.Array(field, quasar.qscript.ExcludeId), acc) =>
-            $unwind[WF](base.toDocVar \\ field).apply(acc)
+            $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
           case (StructureType.Array(field, includeIndex), acc) =>
             $simpleMap[WF](
               includeIndex match {

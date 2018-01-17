@@ -28,7 +28,8 @@ Chain
 │  ├─ Name("left" -> "$left")
 │  ├─ Name("right" -> "$right")
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
    ├─ Name("state" -> "$right.state")

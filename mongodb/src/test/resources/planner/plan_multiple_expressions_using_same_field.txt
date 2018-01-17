@@ -133,13 +133,15 @@ Chain
 │     │        │                 });
 │     │        │               return result
 │     │        │             })
-│     │        ╰─ Scope(Map())
+│     │        ╰─ Scope(ListMap())
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ├─ NotExpr($left -> Size(0))
 │     │     ╰─ NotExpr($right -> Size(0))
-│     ├─ $UnwindF(DocField(BsonField.Name("right")))
-│     ├─ $UnwindF(DocField(BsonField.Name("left")))
+│     ├─ $UnwindF
+│     │  ╰─ Path(DocField(BsonField.Name("right")))
+│     ├─ $UnwindF
+│     │  ╰─ Path(DocField(BsonField.Name("left")))
 │     ├─ $ProjectF
 │     │  ├─ Name("left" -> "$left")
 │     │  ├─ Name("right" -> "$right")
@@ -148,7 +150,7 @@ Chain
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [{ "0": value.left.identities.qsu1 }, { "right": [], "left": [value] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "right": [], "left": [] };
@@ -159,13 +161,15 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($right -> Size(0))
 │     ╰─ NotExpr($left -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ╰─ $SimpleMapF
    ├─ Map
    │  ╰─ Obj
@@ -176,4 +180,4 @@ Chain
    │           ╰─ Obj
    │              ╰─ Key(2: ((isNumber(
    │                     (isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) || ((((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberInt) || (((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberLong))) && (isObject(_.right.value) && (! Array.isArray(_.right.value)))) ? _.right.value.pop / 1000 : undefined)
-   ╰─ Scope(Map())
+   ╰─ Scope(ListMap())

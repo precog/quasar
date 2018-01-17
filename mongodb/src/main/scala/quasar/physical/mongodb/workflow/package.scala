@@ -127,10 +127,10 @@ package object workflow {
         //         flatten, scope)))
         case I($GroupF(src, grouped, by)) if id != ExcludeId =>
           inlineProjectGroup(shape, grouped).map(gr => I.inj($GroupF(src, gr, by)))
-        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound))
+        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound, None, preserveNullAndEmptyArrays))
             if id != ExcludeId =>
           inlineProjectUnwindGroup(shape, unwound, grouped).map { case (unwound, grouped) =>
-            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound))
+            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound, None, preserveNullAndEmptyArrays))
           }
         case _ => None
       }
@@ -201,7 +201,7 @@ package object workflow {
         case wf @ $RedactF(_, _)          => rewriteRefs3_2(prefix).apply(wf).pipeline
         case wf @ $SkipF(_, _)            => rewriteRefs3_2(prefix).apply(wf).shapePreserving
         case wf @ $LimitF(_, _)           => rewriteRefs3_2(prefix).apply(wf).shapePreserving
-        case wf @ $UnwindF(_, _)          => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $UnwindF(_, _, _, _)    => rewriteRefs3_2(prefix).apply(wf).pipeline
         case wf @ $GroupF(_, _, _)        => rewriteRefs3_2(prefix).apply(wf).pipeline
         case wf @ $SortF(_, _)            => rewriteRefs3_2(prefix).apply(wf).shapePreserving
         case wf @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs3_2(prefix).apply(wf).pipeline
@@ -248,7 +248,7 @@ package object workflow {
             by.bimap(_.rewriteRefs(applyVar0), _.cata(exprOps.rewriteRefs(applyVar0))))
         case $MatchF(src, s)            => $MatchF(src, applySelector(s))
         case $RedactF(src, e)           => $RedactF(src, e.cata(exprOps.rewriteRefs(applyVar0)))
-        case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
+        case $UnwindF(src, f, i, p)     => $UnwindF(src, applyVar(f), i, p)
         case $SortF(src, l)             => $SortF(src, applyNel(l))
         case g: $GeoNearF[_]            =>
           g.copy(
@@ -284,7 +284,7 @@ package object workflow {
             }
           loop(sm.simpleExpr.expr).map(_.map(n => BsonField.Name(n.value)))
         case $GroupF(_, Grouped(value), _)    => (IdName :: value.keys.toList).some
-        case $UnwindF(src, _)                 => simpleShape(src)
+        case $UnwindF(src, _, name, _)        => simpleShape(src).map(l => l ::: name.toList)
         case IsShapePreserving(sp)            => simpleShape(sp.src)
         case $LookupF(_, _, _, _, _)          => ???
         case $SampleF(_, _)                   => ???
@@ -636,7 +636,7 @@ package object workflow {
 
       val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
         case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-          case I(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
+          case I(uw @ $UnwindF(_, _, _, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
             mr.singleSource.fmap(ι, I).reparentW(I.inj(uw.flatmapop).embed).project
           case _                        => I.inj(mr)
         }
@@ -662,7 +662,7 @@ package object workflow {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
         uw.src.project match {
-          case I(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
+          case I(uw1 @ $UnwindF(_, _, _, _)) => unwindSrc(uw1)
           case src => src
         }
 

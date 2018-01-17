@@ -49,8 +49,10 @@ Chain
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ SpliceObjects

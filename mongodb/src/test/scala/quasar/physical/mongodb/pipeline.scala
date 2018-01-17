@@ -61,7 +61,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
 
   def unwindGen = for {
     c <- Gen.alphaChar
-  } yield $UnwindF((), DocField(BsonField.Name(c.toString)))
+  } yield $UnwindF((), DocField(BsonField.Name(c.toString)), None, None)
 
   def genGroup = for {
     i <- Gen.chooseNum(1, 10)

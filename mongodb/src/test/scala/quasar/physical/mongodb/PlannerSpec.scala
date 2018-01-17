@@ -102,11 +102,11 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, MatchOp, GroupOp, ProjectOp)))
     }
 
-    trackPendingErr(
+    trackPending(
       "having with multiple projections",
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000"),
-      IList(ReadOp, GroupOp, MatchOp, ProjectOp),
-      { case QScriptPlanningFailed(_) => ok })
+      IList(ReadOp, GroupOp, MatchOp, ProjectOp)
+    )
 
     "select partially-applied substring" in {
       plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from extraSmallZips""") must
@@ -243,11 +243,10 @@ class PlannerSpec extends
       //         hence the two `UnwindOp`s
       IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
-    trackPendingErr(
+    trackPending(
       "group by flattened field",
       plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
-      IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp),
-      { case QScriptPlanningFailed(_) => ok })
+      IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
 
     "unify flattened fields with unflattened field" in {
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must

@@ -199,7 +199,7 @@ class PlannerLPSpec extends
               $literal(Bson.Arr(List(Bson.Undefined)))),
             "__tmp7" -> $field("__tmp5")),
           IgnoreId),
-        $unwind(DocField("__tmp6")),
+        $unwind(DocField("__tmp6"), None, None),
         $match(
           Selector.Doc(
             BsonField.Name("__tmp6") -> Selector.Regex("^.*MONT.*$", false, true, false, false))),

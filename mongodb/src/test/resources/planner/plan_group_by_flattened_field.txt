@@ -1,0 +1,288 @@
+Chain
+├─ $FoldLeftF
+│  ├─ Chain
+│  │  ├─ $ReadF(db; slamengine_commits)
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("f" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": [] }, "$parents"] },
+│  │  │  │             { "$lt": ["$parents", { "$literal": BinData(0, "") }] }]
+│  │  │  │         },
+│  │  │  │         "$parents",
+│  │  │  │         [{ "$literal": undefined }]]
+│  │  │  │     })
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $UnwindF
+│  │  │  ╰─ Path(DocField(BsonField.Name("f")))
+│  │  ├─ $GroupF
+│  │  │  ├─ Grouped
+│  │  │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
+│  │  │  ╰─ By
+│  │  │     ╰─ Name("0" -> {
+│  │  │             "$cond": [
+│  │  │               {
+│  │  │                 "$and": [
+│  │  │                   { "$lte": [{ "$literal": "" }, "$f.sha"] },
+│  │  │                   { "$lt": ["$f.sha", { "$literal": {  } }] }]
+│  │  │               },
+│  │  │               {
+│  │  │                 "$cond": [
+│  │  │                   {
+│  │  │                     "$or": [
+│  │  │                       {
+│  │  │                         "$lt": [
+│  │  │                           { "$literal": NumberInt("0") },
+│  │  │                           { "$literal": NumberInt("0") }]
+│  │  │                       },
+│  │  │                       {
+│  │  │                         "$gt": [{ "$literal": NumberInt("0") }, { "$strLenCP": "$f.sha" }]
+│  │  │                       }]
+│  │  │                   },
+│  │  │                   { "$literal": "" },
+│  │  │                   {
+│  │  │                     "$cond": [
+│  │  │                       {
+│  │  │                         "$lt": [
+│  │  │                           { "$literal": NumberInt("1") },
+│  │  │                           { "$literal": NumberInt("0") }]
+│  │  │                       },
+│  │  │                       {
+│  │  │                         "$substrCP": [
+│  │  │                           "$f.sha",
+│  │  │                           { "$literal": NumberInt("0") },
+│  │  │                           { "$strLenCP": "$f.sha" }]
+│  │  │                       },
+│  │  │                       {
+│  │  │                         "$substrCP": [
+│  │  │                           "$f.sha",
+│  │  │                           { "$literal": NumberInt("0") },
+│  │  │                           { "$literal": NumberInt("1") }]
+│  │  │                       }]
+│  │  │                   }]
+│  │  │               },
+│  │  │               { "$literal": undefined }]
+│  │  │           })
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("identities" -> { "qsu27_b0": "$_id.0" })
+│  │  │  ├─ Name("value" -> { "1": "$f0" })
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $GroupF
+│  │  │  ├─ Grouped
+│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│  │  │  ╰─ By
+│  │  │     ╰─ Name("0" -> "$identities.qsu27_b0")
+│  │  ╰─ $ProjectF
+│  │     ├─ Name("_id" -> "$_id")
+│  │     ├─ Name("value")
+│  │     │  ├─ Name("right" -> "$0")
+│  │     │  ├─ Name("left" -> { "$literal": [] })
+│  │     │  ╰─ Name("_id" -> "$_id")
+│  │     ╰─ IncludeId
+│  ╰─ Chain
+│     ├─ $ReadF(db; slamengine_commits)
+│     ├─ $ProjectF
+│     │  ├─ Name("s" -> "$$ROOT")
+│     │  ├─ Name("f" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": [] }, "$parents"] },
+│     │  │             { "$lt": ["$parents", { "$literal": BinData(0, "") }] }]
+│     │  │         },
+│     │  │         "$parents",
+│     │  │         [{ "$literal": undefined }]]
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $UnwindF
+│     │  ╰─ Path(DocField(BsonField.Name("f")))
+│     ├─ $ProjectF
+│     │  ├─ Name("s")
+│     │  │  ├─ Name("1" -> "$f")
+│     │  │  ╰─ Name("0" -> "$s")
+│     │  ├─ Name("f" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             {
+│     │  │               "$lte": [
+│     │  │                 { "$literal": [] },
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
+│     │  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$s.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$lt": [
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
+│     │  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$s.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 },
+│     │  │                 { "$literal": BinData(0, "") }]
+│     │  │             }]
+│     │  │         },
+│     │  │         {
+│     │  │           "$cond": [
+│     │  │             {
+│     │  │               "$and": [
+│     │  │                 { "$lte": [{ "$literal": {  } }, "$s"] },
+│     │  │                 { "$lt": ["$s", { "$literal": [] }] }]
+│     │  │             },
+│     │  │             "$s.parents",
+│     │  │             { "$literal": undefined }]
+│     │  │         },
+│     │  │         [{ "$literal": undefined }]]
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $SimpleMapF
+│     │  ├─ SubMap
+│     │  │  ├─ JsCore(_.f)
+│     │  │  ╰─ Let(m)
+│     │  │     ├─ JsCore(_.f)
+│     │  │     ╰─ Call
+│     │  │        ├─ JsCore(Object.keys(m).map)
+│     │  │        ╰─ Fun(Name(k))
+│     │  │           ╰─ JsCore([k, m[k]])
+│     │  ├─ Flatten
+│     │  │  ╰─ JsCore(_.f)
+│     │  ╰─ Scope(ListMap())
+│     ├─ $ProjectF
+│     │  ├─ Name("identities" -> { "qsu56": { "$arrayElemAt": ["$f", { "$literal": NumberInt("0") }] } })
+│     │  ├─ Name("value" -> {
+│     │  │       "original": "$s",
+│     │  │       "0": { "$arrayElemAt": ["$f", { "$literal": NumberInt("1") }] }
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $ProjectF
+│     │  ├─ Name("s" -> "$$ROOT")
+│     │  ├─ Name("f" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             {
+│     │  │               "$lte": [
+│     │  │                 { "$literal": [] },
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
+│     │  │                         { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$value.original.1.0.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$lt": [
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
+│     │  │                         { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$value.original.1.0.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 },
+│     │  │                 { "$literal": BinData(0, "") }]
+│     │  │             }]
+│     │  │         },
+│     │  │         {
+│     │  │           "$cond": [
+│     │  │             {
+│     │  │               "$and": [
+│     │  │                 { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
+│     │  │                 { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
+│     │  │             },
+│     │  │             "$value.original.1.0.parents",
+│     │  │             { "$literal": undefined }]
+│     │  │         },
+│     │  │         [{ "$literal": undefined }]]
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $SimpleMapF
+│     │  ├─ SubMap
+│     │  │  ├─ JsCore(_.f)
+│     │  │  ╰─ Let(m)
+│     │  │     ├─ JsCore(_.f)
+│     │  │     ╰─ Call
+│     │  │        ├─ JsCore(Object.keys(m).map)
+│     │  │        ╰─ Fun(Name(k))
+│     │  │           ╰─ JsCore([k, m[k]])
+│     │  ├─ Flatten
+│     │  │  ╰─ JsCore(_.f)
+│     │  ├─ Map
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(identities: _.s.identities)
+│     │  │     ╰─ Key(value)
+│     │  │        ╰─ Obj
+│     │  │           ├─ Key(grouped)
+│     │  │           │  ╰─ Obj
+│     │  │           │     ├─ Key(group_source: (isObject(
+│     │  │           │     │      ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"]) && (! Array.isArray(
+│     │  │           │     │      ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"]))) ? ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"] : undefined)
+│     │  │           │     ╰─ Key(group_key: isString(
+│     │  │           │            ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha) ? (0 < 0) ? "" : (1 < 0) ? ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.substr(
+│     │  │           │            0,
+│     │  │           │            ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.length) : ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.substr(
+│     │  │           │            0,
+│     │  │           │            1) : undefined)
+│     │  │           ╰─ Key(reduce_expr: isString(((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha) ? (0 < 0) ? "" : (1 < 0) ? ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.substr(
+│     │  │                  0,
+│     │  │                  ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.length) : ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.substr(0, 1) : undefined)
+│     │  ╰─ Scope(ListMap())
+│     ├─ $GroupF
+│     │  ├─ Grouped
+│     │  │  ╰─ Name("f0" -> { "$first": "$value.reduce_expr" })
+│     │  ╰─ By
+│     │     ╰─ Name("0" -> "$value.grouped.group_key")
+│     ├─ $ProjectF
+│     │  ├─ Name("identities" -> { "qsu24_b0": "$_id.0" })
+│     │  ├─ Name("value" -> { "0": "$f0" })
+│     │  ╰─ ExcludeId
+│     ├─ $MapF
+│     │  ├─ JavaScript(function (key, value) {
+│     │  │               return [{ "0": value.identities.qsu24_b0 }, { "right": [], "left": [value] }]
+│     │  │             })
+│     │  ╰─ Scope(ListMap())
+│     ╰─ $ReduceF
+│        ├─ JavaScript(function (key, values) {
+│        │               var result = { "right": [], "left": [] };
+│        │               values.forEach(
+│        │                 function (value) {
+│        │                   result.right = result.right.concat(value.right);
+│        │                   result.left = result.left.concat(value.left)
+│        │                 });
+│        │               return result
+│        │             })
+│        ╰─ Scope(ListMap())
+├─ $MatchF
+│  ╰─ Doc
+│     ├─ NotExpr($right -> Size(0))
+│     ╰─ NotExpr($left -> Size(0))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+╰─ $SimpleMapF
+   ├─ Map
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ JsCore(_.left.value)
+   │           ╰─ JsCore(_.right.value)
+   ╰─ Scope(ListMap())

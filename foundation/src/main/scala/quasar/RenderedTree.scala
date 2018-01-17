@@ -146,6 +146,10 @@ object Terminal {
   def apply(nodeType: List[String], label: Option[String])
       : RenderedTree =
     RenderedTree(nodeType, label, Nil)
+
+  def opt(nodeType: List[String], label: Option[String])
+      : Option[RenderedTree] =
+    label.map(l => Terminal(nodeType, Some(l)))
 }
 
 object NonTerminal {

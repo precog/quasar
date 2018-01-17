@@ -104,7 +104,7 @@ Chain
 │     │  │                 { "0": value.src.sha, "1": value.src.author.login },
 │     │  │                 { "left": [], "right": [value.src] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };
@@ -115,13 +115,15 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
    ├─ Name("child" -> {
    │       "$cond": [

@@ -7,7 +7,8 @@ Chain
 │  ├─ Name("left" -> "$$ROOT")
 │  ╰─ ExcludeId
 ├─ $LookupF(from bar with (this).left.id = (that).foo_id as right)
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($right -> Type(Doc))
@@ -34,7 +35,8 @@ Chain
 │  ├─ Name("left" -> "$src")
 │  ╰─ ExcludeId
 ├─ $LookupF(from baz with (this).left.right.id = (that).bar_id as right)
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ╰─ $ProjectF
    ├─ Name("name" -> {
    │       "$cond": [

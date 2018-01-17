@@ -177,7 +177,7 @@ Chain
 │  │  │     │  │  │     │  ├─ JavaScript(function (key, value) {
 │  │  │     │  │  │     │  │               return [{ "0": value.identities.qsu15_b0 }, { "left": [], "right": [value] }]
 │  │  │     │  │  │     │  │             })
-│  │  │     │  │  │     │  ╰─ Scope(Map())
+│  │  │     │  │  │     │  ╰─ Scope(ListMap())
 │  │  │     │  │  │     ╰─ $ReduceF
 │  │  │     │  │  │        ├─ JavaScript(function (key, values) {
 │  │  │     │  │  │        │               var result = { "left": [], "right": [] };
@@ -188,13 +188,15 @@ Chain
 │  │  │     │  │  │        │                 });
 │  │  │     │  │  │        │               return result
 │  │  │     │  │  │        │             })
-│  │  │     │  │  │        ╰─ Scope(Map())
+│  │  │     │  │  │        ╰─ Scope(ListMap())
 │  │  │     │  │  ├─ $MatchF
 │  │  │     │  │  │  ╰─ Doc
 │  │  │     │  │  │     ├─ NotExpr($left -> Size(0))
 │  │  │     │  │  │     ╰─ NotExpr($right -> Size(0))
-│  │  │     │  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-│  │  │     │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
+│  │  │     │  │  ├─ $UnwindF
+│  │  │     │  │  │  ╰─ Path(DocField(BsonField.Name("right")))
+│  │  │     │  │  ├─ $UnwindF
+│  │  │     │  │  │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  │     │  │  ├─ $ProjectF
 │  │  │     │  │  │  ├─ Name("left" -> "$left")
 │  │  │     │  │  │  ├─ Name("right" -> "$right")
@@ -210,7 +212,7 @@ Chain
 │  │  │     │  │  │  │        ╰─ Obj
 │  │  │     │  │  │  │           ├─ Key(leftAccess29: _.left.value)
 │  │  │     │  │  │  │           ╰─ Key(centerAccess30: _.right.value)
-│  │  │     │  │  │  ╰─ Scope(Map())
+│  │  │     │  │  │  ╰─ Scope(ListMap())
 │  │  │     │  │  ├─ $GroupF
 │  │  │     │  │  │  ├─ Grouped
 │  │  │     │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
@@ -287,13 +289,15 @@ Chain
 │  │  │     │        │                 });
 │  │  │     │        │               return result
 │  │  │     │        │             })
-│  │  │     │        ╰─ Scope(Map())
+│  │  │     │        ╰─ Scope(ListMap())
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ Doc
 │  │  │     │     ├─ NotExpr($left -> Size(0))
 │  │  │     │     ╰─ NotExpr($right -> Size(0))
-│  │  │     ├─ $UnwindF(DocField(BsonField.Name("right")))
-│  │  │     ├─ $UnwindF(DocField(BsonField.Name("left")))
+│  │  │     ├─ $UnwindF
+│  │  │     │  ╰─ Path(DocField(BsonField.Name("right")))
+│  │  │     ├─ $UnwindF
+│  │  │     │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  │     ├─ $ProjectF
 │  │  │     │  ├─ Name("0" -> { "$eq": ["$left.identities.qsu15_b0", "$right.identities.qsu17_b0"] })
 │  │  │     │  ├─ Name("1" -> { "$eq": ["$left.identities.qsu8_k0", "$right.identities.qsu17_b0"] })
@@ -320,7 +324,7 @@ Chain
 │  │  │     │  │                 },
 │  │  │     │  │                 { "left": [], "right": [value.src] }]
 │  │  │     │  │             })
-│  │  │     │  ╰─ Scope(Map())
+│  │  │     │  ╰─ Scope(ListMap())
 │  │  │     ╰─ $ReduceF
 │  │  │        ├─ JavaScript(function (key, values) {
 │  │  │        │               var result = { "left": [], "right": [] };
@@ -331,13 +335,15 @@ Chain
 │  │  │        │                 });
 │  │  │        │               return result
 │  │  │        │             })
-│  │  │        ╰─ Scope(Map())
+│  │  │        ╰─ Scope(ListMap())
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
 │  │  │     ├─ NotExpr($left -> Size(0))
 │  │  │     ╰─ NotExpr($right -> Size(0))
-│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
+│  │  ├─ $UnwindF
+│  │  │  ╰─ Path(DocField(BsonField.Name("right")))
+│  │  ├─ $UnwindF
+│  │  │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -352,7 +358,7 @@ Chain
 │  │  │  │           │     ├─ JsCore(_.right.left.identities)
 │  │  │  │           │     ╰─ JsCore(_.right.right.identities)
 │  │  │  │           ╰─ Key(value: "leftAccess29"[_.right.left.value] ? "centerAccess30"[_.right.left.value] : _.right.right.value)
-│  │  │  ╰─ Scope(Map())
+│  │  │  ╰─ Scope(ListMap())
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$eq": ["$left.identities.qsu8_k0", "$right.identities.qsu17_b0"] })
 │  │  │  ├─ Name("1" -> { "$eq": ["$left.identities.qsu8_k0", "$right.identities.qsu15_b0"] })
@@ -432,7 +438,7 @@ Chain
 │  │  │  │                 │     ├─ Key(leftAccess32: _.src.left.value)
 │  │  │  │                 │     ╰─ Key(centerAccess33: _.src.right.value)
 │  │  │  │                 ╰─ Ident(undefined)
-│  │  │  ╰─ Scope(Map())
+│  │  │  ╰─ Scope(ListMap())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
@@ -498,13 +504,15 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$eq": ["$left.identities.qsu17_b0", "$right.identities.qsu23_b0"] })
 │  ├─ Name("1" -> { "$eq": ["$left.identities.qsu15_b0", "$right.identities.qsu23_b0"] })
@@ -528,4 +536,4 @@ Chain
    │        ╰─ SpliceObjects
    │           ├─ JsCore(_.src.left.value)
    │           ╰─ JsCore(_.src.right.value)
-   ╰─ Scope(Map())
+   ╰─ Scope(ListMap())

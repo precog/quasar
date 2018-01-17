@@ -15,7 +15,7 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Flatten
 │  │  ╰─ JsCore(_["0"])
-│  ╰─ Scope(Map())
+│  ╰─ Scope(ListMap())
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$0")
    ╰─ ExcludeId

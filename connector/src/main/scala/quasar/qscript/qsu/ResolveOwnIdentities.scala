@@ -35,7 +35,8 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private (
   def apply(aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = {
     implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
     aqsu.copy(graph = aqsu.graph.rewrite {
-      case qg @ LeftShift(source, struct, idStatus, repair, rotation)
+      // TODO
+      case qg @ LeftShift(source, struct, idStatus, onUndefined, repair, rotation)
         if repair.element(QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(source.root), SrcHole))) =>
         val newRepair = repair.flatMap {
           case QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(symbol), _)) if symbol == qg.root =>
@@ -52,7 +53,7 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private (
         }
         val newIdStatus: IdStatus =
           if (idStatus === IdOnly) IdOnly else IncludeId
-        qg.overwriteAtRoot(QSU.LeftShift(source.root, struct, newIdStatus, newRepair, rotation))
+        qg.overwriteAtRoot(QSU.LeftShift(source.root, struct, newIdStatus, onUndefined, newRepair, rotation))
     })
   }
 }

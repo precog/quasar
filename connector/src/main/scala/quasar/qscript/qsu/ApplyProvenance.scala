@@ -25,7 +25,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.ι
-import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus}
+import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus, OnUndefined}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -61,7 +61,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeProvenance[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, rot)
+          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, func.RightTarget, rot)
         }
 
       case other =>
@@ -121,7 +121,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case JoinSideRef(_) => unexpectedError
 
-      case LeftShift(src, _, _, _, rot) =>
+      case LeftShift(src, _, _, _, _, rot) =>
         val tid = IdAccess.identity[dims.D](g.root)
         compute1[F](g, src) { sdims =>
           rot match {
@@ -130,7 +130,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           }
         }
 
-        case MultiLeftShift(src, shifts, _) =>
+        case MultiLeftShift(src, shifts, _, _) =>
           val tid = IdAccess.identity[dims.D](g.root)
           compute1[F](g, src) { sdims =>
             IList.fromList(shifts).sortBy(_._3).foldRight(sdims) {

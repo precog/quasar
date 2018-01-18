@@ -124,7 +124,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
             func.LeftSide,
             func.MakeArray(func.RightSide)))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, Rotation.ShiftArray)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, OnUndefined.Omit, arepair, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
 
         qgraph must graduateAs(qscript)
@@ -189,6 +189,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               qsu.read(root </> file("zips")),
               HoleF[Fix],
               IncludeId,
+              OnUndefined.Omit,
               aconcatArr,
               Rotation.FlattenArray),
             qsu.cint(1),

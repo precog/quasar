@@ -130,7 +130,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case QSU.Distinct(source) =>
         recordAccesses[Id](g.root, Access.value(source))
 
-      case QSU.LeftShift(source, _, _, repair, _) =>
+      case QSU.LeftShift(source, _, _, _, repair, _) =>
         recordAccesses(g.root, shiftTargetAccess(source, repair))
 
       case QSU.QSReduce(source, buckets, reducers, _) =>
@@ -258,7 +258,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case g @ E.Distinct(source) =>
         preserveIV(source, g) as g
 
-      case g @ E.LeftShift(source, struct, idStatus, repair, rot) =>
+      case g @ E.LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
         val idA = Access.id(IdAccess.identity[T[EJson]](g.root), g.root)
 
         (emitsIVMap(source) |@| isReferenced(idA)).tupled flatMap {
@@ -284,7 +284,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   )
               }
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), newStatus, newRepair, rot))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), newStatus, onUndefined, newRepair, rot))
             }
 
           case (true, false) =>
@@ -292,12 +292,12 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
               val newRepair =
                 makeIV(lookupIdentities >> func.LeftTarget, repair)
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, newRepair, rot))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, onUndefined, newRepair, rot))
             }
 
           case (false, true) =>
             onNeedsIV(g) as {
-              val newStatus = 
+              val newStatus =
                 if (idStatus === ExcludeId) IncludeId else idStatus
               val getValue =
                 if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
@@ -306,7 +306,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                 includeIdRepair(repair, idStatus)
               )
 
-              g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, newRepair, rot))
+              g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, onUndefined, newRepair, rot))
             }
 
           case (false, false) =>
@@ -578,10 +578,10 @@ object ReifyIdentities {
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
       Show.show { rqsu =>
-        Cord("ResearchedQSU\n======\n") ++ 
-        rqsu.graph.show ++ 
-        Cord("\n\n") ++ 
-        rqsu.refs.show ++ 
+        Cord("ResearchedQSU\n======\n") ++
+        rqsu.graph.show ++
+        Cord("\n\n") ++
+        rqsu.refs.show ++
         Cord("\n======")
       }
 }

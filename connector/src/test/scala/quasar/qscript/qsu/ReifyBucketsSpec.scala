@@ -66,7 +66,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       reifyBuckets(tree) must beLike {
         case \/-(QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap),
+            LeftShift(Read(_), _, ExcludeId, _, _, Rotation.ShiftMap),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -96,7 +96,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, _),
+            LeftShift(Read(_), _, ExcludeId, _, _, _),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -121,7 +121,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, _, _), fm),
             Nil,
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -186,6 +186,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                   Embed(CoEnv(-\/(SrcHole))),
                   ExcludeId,
                   _,
+                  _,
                   Rotation.ShiftMap),
                 List(arbBucket),
                 List(ReduceFuncs.Arbitrary(arbExpr)),
@@ -200,6 +201,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                     Embed(CoEnv(-\/(SrcHole))),
                     ExcludeId,
                     _,
+                    _,
                     Rotation.ShiftMap),
                   LeftShift(
                     AutoJoin2(
@@ -208,12 +210,14 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                         Embed(CoEnv(-\/(SrcHole))),
                         ExcludeId,
                         _,
+                        _,
                         Rotation.ShiftMap),
                       loc,
                       _),
                     Embed(CoEnv(-\/(SrcHole))),
                     ExcludeId,
                     tgt,
+                    _,
                     Rotation.FlattenArray),
                   _),
                 List(sumBucket),

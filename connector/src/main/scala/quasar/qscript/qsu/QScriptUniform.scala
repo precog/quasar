@@ -83,11 +83,11 @@ object QScriptUniform {
       case Transpose(source, retain, rotations) =>
         f(source).map(Transpose(_, retain, rotations))
 
-      case LeftShift(source, struct, idStatus, repair, rot) =>
-        f(source).map(LeftShift(_, struct, idStatus, repair, rot))
+      case LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
+        f(source).map(LeftShift(_, struct, idStatus, onUndefined, repair, rot))
 
-      case MultiLeftShift(source, shifts, mapper) =>
-        f(source).map(MultiLeftShift(_, shifts, mapper))
+      case MultiLeftShift(source, shifts, onUndefined, repair) =>
+        f(source).map(MultiLeftShift(_, shifts, onUndefined, repair))
 
       case LPReduce(source, reduce) =>
         f(source).map(LPReduce(_, reduce))
@@ -166,11 +166,11 @@ object QScriptUniform {
           case Transpose(source, retain, rotations) =>
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
 
-          case LeftShift(source, struct, idStatus, repair, rot) =>
-            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${rot.shows})"
+          case LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${onUndefined.shows}, ${repair.shows}, ${rot.shows})"
 
-          case MultiLeftShift(source, shifts, mapper) =>
-            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${mapper.shows})"
+          case MultiLeftShift(source, shifts, onUndefined, repair) =>
+            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${onUndefined.shows}, ${repair.shows})"
 
           case LPReduce(source, reduce) =>
             s"LPReduce(${source.shows}, ${reduce.shows})"
@@ -386,7 +386,7 @@ object QScriptUniform {
   object ShiftTarget {
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     implicit def equalShiftTarget[T[_[_]]: EqualT]: Equal[ShiftTarget[T]] = Equal.equal {
-      case (AccessLeftTarget(access1), AccessLeftTarget(access2)) => 
+      case (AccessLeftTarget(access1), AccessLeftTarget(access2)) =>
         implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
         access1 ≟ access2
       case (LeftTarget(), LeftTarget()) => true
@@ -413,6 +413,7 @@ object QScriptUniform {
       source: A,
       struct: FreeMap[T],
       idStatus: IdStatus,
+      onUndefined: OnUndefined,
       repair: FreeMapA[T, ShiftTarget[T]],
       rot: Rotation) extends QScriptUniform[T, A]
 
@@ -421,6 +422,7 @@ object QScriptUniform {
   final case class MultiLeftShift[T[_[_]], A](
       source: A,
       shifts: List[(FreeMap[T], IdStatus, Rotation)],
+      onUndefined: OnUndefined,
       repair: FreeMapA[T, QAccess[T, Hole] \/ Int]) extends QScriptUniform[T, A]
 
   // LPish
@@ -500,15 +502,15 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)] {
-        case LeftShift(s, fm, ids, jf, rot) => (s, fm, ids, jf, rot)
-      } { case (s, fm, ids, jf, rot) => LeftShift(s, fm, ids, jf, rot) }
+    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] {
+        case LeftShift(s, fm, ids, ou, jf, rot) => (s, fm, ids, ou, jf, rot)
+      } { case (s, fm, ids, ou, jf, rot) => LeftShift(s, fm, ids, ou, jf, rot) }
 
-    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])] =
-      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])] {
-        case MultiLeftShift(s, ss, map) => (s, ss, map)
-      } { case (s, ss, map) => MultiLeftShift(s, ss, map) }
+    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])] =
+      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])] {
+        case MultiLeftShift(s, ss, ou, map) => (s, ss, ou, map)
+      } { case (s, ss, ou, map) => MultiLeftShift(s, ss, ou, map) }
 
     def lpFilter[A]: Prism[QScriptUniform[A], (A, A)] =
       Prism.partial[QScriptUniform[A], (A, A)] {
@@ -654,12 +656,12 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)]] = {
-      composeLifting[(?, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)]] = {
+      composeLifting[(?, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)](O.leftShift[A])
     }
 
-    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])]] = {
-      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])](O.multiLeftShift[A])
+    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])]] = {
+      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])](O.multiLeftShift[A])
     }
 
     def lpFilter: Prism[A, F[(A, A)]] = {

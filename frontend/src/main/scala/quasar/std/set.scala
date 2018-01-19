@@ -18,7 +18,6 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
-import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
@@ -108,16 +107,15 @@ trait SetLib extends Library {
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
   val Range = BinaryFunc(
-    Expansion,
+    Mapping,
     "Creates a set of values in the range from `a` to `b`, inclusive.",
-    Type.Int,
+    Type.FlexArr(0, None, Type.Int),
     Func.Input2(Type.Int, Type.Int),
     noSimplification,
     partialTyper[nat._2] {
       case Sized(Type.Const(Data.Int(a)), Type.Const(Data.Int(b))) =>
         Type.Const(
-          if (a ≟ b) Data.Int(a)
-          else Data.Set(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
+          Data.Arr(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
       case Sized(_, _) => Type.Int
     },
     basicUntyper)

@@ -416,6 +416,18 @@ object MapFuncCore {
 
       case ConcatMaps(Embed(lhs), Embed(rhs)) if lhs ≟ rhs => lhs.some
 
+      case Guard(
+        inner @ ExtractFunc(Guard(_, _, eIn, ExtractFunc(Undefined()))),
+        tOut,
+        eOut,
+        undef @ ExtractFunc(Undefined()))
+          if eOut.elgotPara(count(inner)) > 0 =>
+        some(rollMF[T, A](MFC(Guard(
+          inner,
+          tOut,
+          eOut.elgotApo[FreeMapA[T, A]](substitute(inner, eIn) andThen (_.map(_.project))),
+          undef))))
+
       case _ => none
     }
 

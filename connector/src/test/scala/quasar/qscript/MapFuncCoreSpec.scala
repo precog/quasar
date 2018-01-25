@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.{Qspec, TreeMatchers}
+import quasar.{Qspec, TreeMatchers, Type}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}
@@ -282,6 +282,56 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
           func.ProjectKeyS(func.Hole, "baz"))
 
       normalize(expr) must beTreeEqual(expect)
+    }
+
+    "elide identical inner guard from defined expression of nested guards" >> {
+      val innerGuard =
+        func.Guard(
+          func.ProjectKeyS(func.Hole, "foo"),
+          Type.AnyObject,
+          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "foo"), "bar"),
+          func.Undefined)
+
+      val nestedGuards =
+        func.Guard(
+          innerGuard,
+          Type.Str,
+          func.Upper(innerGuard),
+          func.Undefined)
+
+      val expect =
+        func.Guard(
+          innerGuard,
+          Type.Str,
+          func.Upper(func.ProjectKeyS(func.ProjectKeyS(func.Hole, "foo"), "bar")),
+          func.Undefined)
+
+      normalize(nestedGuards) must beTreeEqual(expect)
+    }
+
+    "leave inner guard in defined expression when different from inner nested" >> {
+      val guardA =
+        func.Guard(
+          func.ProjectKeyS(func.Hole, "foo"),
+          Type.AnyObject,
+          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "foo"), "bar"),
+          func.Undefined)
+
+      val guardB =
+        func.Guard(
+          func.ProjectKeyS(func.Hole, "quux"),
+          Type.Numeric,
+          func.Add(func.ProjectKeyS(func.Hole, "quux"), func.Constant(ejs.int(3))),
+          func.Undefined)
+
+      val nestedGuards =
+        func.Guard(
+          guardA,
+          Type.Str,
+          guardB,
+          func.Undefined)
+
+      normalize(nestedGuards) must beTreeEqual(nestedGuards)
     }
   }
 }

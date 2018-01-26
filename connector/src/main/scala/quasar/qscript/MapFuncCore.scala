@@ -417,19 +417,54 @@ object MapFuncCore {
       case ConcatMaps(Embed(lhs), Embed(rhs)) if lhs ≟ rhs => lhs.some
 
       case Guard(
-        inner @ ExtractFunc(Guard(_, _, eIn, ExtractFunc(Undefined()))),
+        inner @ ExtractFunc(Guard(cIn, tIn, _, ExtractFunc(Undefined()))),
         tOut,
         eOut,
         undef @ ExtractFunc(Undefined()))
-          if eOut.elgotPara(count(inner)) > 0 =>
+          if eOut.elgotPara(containsGuarded(cIn, tIn)) =>
         some(rollMF[T, A](MFC(Guard(
           inner,
           tOut,
-          eOut.elgotApo[FreeMapA[T, A]](substitute(inner, eIn) andThen (_.map(_.project))),
+          eOut.elgotApo[FreeMapA[T, A]](substituteGuardedExpression(cIn, tIn)),
           undef))))
+
+      case Guard(c, t, e, u @ ExtractFunc(Undefined()))
+          if e.elgotPara(containsGuarded(c, t)) =>
+        some(rollMF[T, A](MFC(Guard(
+          c,
+          t,
+          e.elgotApo[FreeMapA[T, A]](substituteGuardedExpression(c, t)),
+          u))))
 
       case _ => none
     }
+
+  /** Returns the defined expression of a guard having the given type test and
+    * an alternative of `Undefined`.
+    */
+  private def guardedExpression[T[_[_]]: BirecursiveT: EqualT, A: Equal](
+      cond: FreeMapA[T, A],
+      tpe: Type)(
+      fm: FreeMapA[T, A])
+      : Option[FreeMapA[T, A]] =
+    some(fm) collect {
+      case ExtractFunc(Guard(c, t, expr, ExtractFunc(Undefined())))
+        if (c ≟ cond) && (t ≟ tpe) => expr
+    }
+
+  private def containsGuarded[T[_[_]]: BirecursiveT: EqualT, A: Equal](
+      cond: FreeMapA[T, A],
+      tpe: Type)
+      : ElgotAlgebra[(FreeMapA[T, A], ?), CoEnv[A, MapFunc[T, ?], ?], Boolean] = {
+    case (fm, mf) =>
+      guardedExpression(cond, tpe)(fm).isDefined || mf.any(ι)
+  }
+
+  private def substituteGuardedExpression[T[_[_]]: BirecursiveT: EqualT, A: Equal](
+      cond: FreeMapA[T, A],
+      tpe: Type)
+      : ElgotCoalgebra[FreeMapA[T, A] \/ ?, CoEnv[A, MapFunc[T, ?], ?], FreeMapA[T, A]] =
+    fm => guardedExpression(cond, tpe)(fm) <\/ fm.project
 
   implicit def traverse[T[_[_]]]: Traverse[MapFuncCore[T, ?]] =
     new Traverse[MapFuncCore[T, ?]] {

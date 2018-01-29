@@ -1,11 +1,11 @@
 {
-    "name": "filter, sort, and limit",
+    "name": "[qa_s09] filter, sort, and limit",
 
     "backends": {},
 
-    "data": "zips.data",
+    "data": "../zips.data",
 
-    "query": "select * from zips where city like \"BOU%\" order by pop limit 10",
+    "query": "select * from `../zips` where city like \"BOU%\" order by pop limit 10",
 
     "predicate": "exactly",
     "ignoredFields": ["_id"],

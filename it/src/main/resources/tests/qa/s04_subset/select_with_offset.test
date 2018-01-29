@@ -7,9 +7,9 @@
        "mimir":             "ignoreFieldOrder"
     },
 
-    "data": "subset.data",
+    "data": "../subset.data",
 
-    "query": "select a, b from subset order by a offset 3",
+    "query": "select a, b from `../subset` order by a offset 3",
 
     "predicate": "exactly",
     

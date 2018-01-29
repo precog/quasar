@@ -2,11 +2,11 @@
   "name": "[qa_s02] array manipulation tests",
 
   "backends": {},
-  "data": "basic.data",
+  "data": "../basic.data",
 
   "query": "select
   array_concat(array_concat(make_array(to_string(num)),make_array(name.last)),make_array(name.first))
-   as res from basic",
+   as res from `../basic`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

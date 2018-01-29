@@ -1,12 +1,12 @@
 {
-    "name": "cities with largest individual zip codes",
+    "name": "[qa_s08] cities with largest individual zip codes",
     "backends": {
         "couchbase": "pending"
     },
 
-    "data": "zips.data",
+    "data": "../zips.data",
 
-    "query": "select distinct city from zips order by pop desc limit 5",
+    "query": "select distinct city from `../zips` order by pop desc limit 5",
 
     "predicate": "exactly",
 

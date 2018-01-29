@@ -1,13 +1,13 @@
 {
   "name": "[qa_s02] other functions on string",
 
-  "data": "stringFunctionsOther.data",
+  "data": "../stringFunctionsOther.data",
 
   "query": "select
-   substring(commaSeparated, 0, 5) as basicSubstring, substring(commaSeparated, 1, 3) as substringLim,
-   search(someText,\"fo.\", false) as searchCaseSensitive, search(someText, \"dog\", flag) as searchCaseInsensitive,
-   split(commaSeparated, \",\") as commaSplit
-   from stringFunctionsOther",
+  substring(commaSeparated, 0, 5) as basicsubstring, substring(commaSeparated, 1, 3) as substringlim,
+  search(someText,\"fo.\", false) as searchcasesensitive, search(someText, \"dog\", flag) as searchcaseinsensitive,
+  split(commaSeparated, \",\") as commasplit
+   from `../stringFunctionsOther`",
 
   "predicate": "exactly",
   "ignoreResultOrder": false,

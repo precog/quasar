@@ -5,11 +5,11 @@
     "marklogic_json": "pending"
   },
 
-  "data": "functionsNested.data",
+  "data": "../functionsNested.data",
 
   "query": "select upper(n.first.word) as un,
                   (a.nested.deeper + plusAge) as aa
-                  from (select name as n, age as a, plusAge, aFlag, nestedFlag from functionsNested
+                  from (select name as n, age as a, plusAge, aFlag, nestedFlag from `../functionsNested`
                   where (aFlag and nestedFlag.level1.level2.level3))",
 
   "predicate": "exactly",

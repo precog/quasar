@@ -13,9 +13,9 @@
     "spark_hdfs":        "skip"
   },
 
-  "data": "coercions.data",
+  "data": "../coercions.data",
 
-  "query": "select boolean(str) as s2b, to_string(condition) as b2s, decimal(num) as i2d,integer(dec) as d2i, null(str) as s2n, to_string(dec) as d2s, to_string(nested) as j2s from coercions",
+  "query": "select boolean(str) as s2b, to_string(condition) as b2s, decimal(num) as i2d,integer(dec) as d2i, null(str) as s2n, to_string(dec) as d2s, to_string(nested) as j2s from `../coercions`",
 
   "predicate": "exactly",
   "ignoreResultOrder": false,

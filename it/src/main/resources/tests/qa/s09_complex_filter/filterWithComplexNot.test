@@ -1,9 +1,9 @@
 {
-    "name": "filter with complex query involving not",
+    "name": "[qa_s09] filter with complex query involving not",
 
-    "data": "largeZips.data",
+    "data": "../largeZips.data",
 
-    "query": "select `_id` as zip from largeZips where
+    "query": "select `_id` as zip from `../largeZips` where
                 not (city not like \"BOULD%\" or
                 state != \"CO\" or
                 (pop between 20000 and 40000 and loc[1] != 40.017235))",

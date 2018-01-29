@@ -1,9 +1,9 @@
 {
   "name": "[qa_s05] complex filter",
 
-  "data": "filter.data",
+  "data": "../filter.data",
 
-  "query": "select num, age from filter where num % 4 = 0 or age - 13 < 0",
+  "query": "select num, age from `../filter` where num % 4 = 0 or age - 13 < 0",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

@@ -1,0 +1,8 @@
+{
+    "name": "[qa_s09] filter on list membership",
+    "data": "../zips.data",
+    "query": "select count(*) as cnt from `../zips` where state in (\"AZ\", \"CO\")",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [{"cnt": 684}]
+}

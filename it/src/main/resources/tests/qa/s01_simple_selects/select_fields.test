@@ -1,9 +1,9 @@
 {
   "name": "[qa_s01] select fields",
 
-  "data": "basic.data",
+  "data": "../basic.data",
 
-  "query": "select num, name from basic",
+  "query": "select num, name from `../basic`",
 
   "predicate": "exactly",
 

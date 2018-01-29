@@ -4,9 +4,11 @@
   "backends": {
   },
 
-  "data": "basic.data",
+  "NB": "fix thix, it is postgres that needs to be skipped, expected changes and other connectors unskipped",
 
-  "query": "select name as name from basic",
+  "data": "../basic.data",
+
+  "query": "select name as name from `../basic`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

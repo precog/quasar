@@ -1,9 +1,9 @@
 {
   "name": "[qa_s03] sort single field",
 
-  "data": "sort.data",
+  "data": "../sort.data",
 
-  "query": "select num, name.first from sort order by age desc",
+  "query": "select num, name.first from `../sort` order by age desc",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

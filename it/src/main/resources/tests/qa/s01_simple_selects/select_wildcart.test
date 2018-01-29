@@ -1,9 +1,9 @@
 {
   "name": "[qa_s01] select wildcart",
 
-  "data": "basic.data",
+  "data": "../basic.data",
 
-  "query": "select * from basic",
+  "query": "select * from `../basic`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

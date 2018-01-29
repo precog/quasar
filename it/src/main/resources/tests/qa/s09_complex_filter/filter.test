@@ -1,0 +1,12 @@
+{
+    "name": "[qa_s09] filter with pipeline and JS",
+
+    "data": "../smallZips.data",
+
+    "query": "select count(*) as cnt from `../smallZips` where pop < 1000 and length(city) < 8",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "cnt": 7 }]
+}

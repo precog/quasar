@@ -1,18 +1,17 @@
 {
   "name": "[qa_s03] sort subselect with 2 levels ordering",
 
-  "data": "sort.data",
+  "data": "../sort.data",
 
-  "query": "select l1.num, l1.name.first from (select num, age, name from sort order by age desc) as l1 order by l1.name.first desc",
+  "query": "select l1.num, l1.name.first from (select num, age, name from `../sort` order by age desc) as l1 order by l1.name.level asc",
 
   "predicate": "exactly",
-  "ignoreResultOrder": true,
 
   "ignoreFieldOrder": true,
 
   "expected": [
-    {"num": 5, "first": "John"},
     {"num": 4, "first": "Bob"},
+    {"num": 5, "first": "John"},
     {"num": 6, "first": "Bob"}
   ]
 }

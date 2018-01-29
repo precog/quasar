@@ -1,10 +1,10 @@
 {
-    "name": "filter on field comparison",
+    "name": "[qa_s09] filter on field comparison",
     "backends": {
         "mimir":"ignoreFieldOrder"
     },
-    "data": "zips.data",
-    "query": "select * from zips where pop < loc[1] order by `_id` limit 10",
+    "data": "../zips.data",
+    "query": "select * from `../zips` where pop < loc[1] order by `_id` limit 10",
     "predicate": "exactly",
     "ignoreFieldOrder": true,
     "expected": [

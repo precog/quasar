@@ -1,14 +1,14 @@
 {
-    "name": "Retrieve array length and string length",
+    "name": "[qa_s02] Retrieve array length and string length",
 
     "backends": {
         "mimir": "pendingIgnoreFieldOrder",
         "couchbase": "ignoreFieldOrder"
     },
 
-    "data": "smallZips.data",
+    "data": "../smallZips.data",
 
-    "query": "select city, array_length(loc, 1) as loc_length, length(city) as city_length from smallZips",
+    "query": "select city, array_length(loc, 1) as loc_length, length(city) as city_length from `../smallZips`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
 

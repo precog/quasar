@@ -1,14 +1,14 @@
 {
-    "name": "filter, skip, limit, and count",
+    "name": "[qa_s09] filter, skip, limit, and count",
     "backends": {
         "couchbase":         "pending"
     },
 
     "NB": "Pending on couchbase due to #3158",
 
-    "data": "zips.data",
+    "data": "../zips.data",
 
-    "query": "select count(*) as cnt from (select * from zips where city like \"BOU%\" offset 15 limit 10) as x",
+    "query": "select count(*) as cnt from (select * from `../zips` where city like \"BOU%\" offset 15 limit 10) as x",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

@@ -5,9 +5,9 @@
       "mongodb_read_only": "skip"
   },
 
-  "data": "math.data",
+  "data": "../math.data",
 
-  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from math",
+  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from `../math`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

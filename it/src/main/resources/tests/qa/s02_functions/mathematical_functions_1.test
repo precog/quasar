@@ -5,9 +5,9 @@
     "mongodb_read_only": "skip"
   },
 
-  "data": "math.data",
+  "data": "../math.data",
 
-  "query": "select a % nums.b, nums.b ^ nums.c as p from math",
+  "query": "select a % nums.b, nums.b ^ nums.c as p from `../math`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

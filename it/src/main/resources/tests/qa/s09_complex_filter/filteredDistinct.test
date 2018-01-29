@@ -1,0 +1,8 @@
+{
+    "name": "[qa_s09] filtered distinct of one field",
+    "data": "../olympics.data",
+    "query": "select distinct discipline from `../olympics` where event like \"%pursuit\"",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": ["Speed skating", "Biathlon", "Cross Country S"]
+}

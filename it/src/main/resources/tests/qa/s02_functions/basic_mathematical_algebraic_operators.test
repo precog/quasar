@@ -1,9 +1,9 @@
 {
   "name": "[qa_s02] basic mathematical, algebraic operators",
 
-  "data": "math.data",
+  "data": "../math.data",
 
-  "query": "select a + nums.b, nums.b - nums.c as diff, nums.c*a as mult, nums.b/nums.c as div, -a as neg from math",
+  "query": "select a + nums.b, nums.b - nums.c as diff, nums.c*a as mult, nums.b/nums.c as div, -a as neg from `../math`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

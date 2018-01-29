@@ -4,9 +4,9 @@
   "backends": {
   },
 
-  "data": "basic.data",
+  "data": "../basic.data",
 
-  "query": "select * from basic where num = 4",
+  "query": "select * from `../basic` where num = 4",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

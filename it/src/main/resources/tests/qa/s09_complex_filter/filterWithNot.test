@@ -1,13 +1,13 @@
 {
-  "name": "filter with negated regex selector",
+  "name": "[qa_s09] filter with negated regex selector",
 
   "backends": {
         "mimir":"ignoreFieldOrder"
   },
 
-  "data": "zips.data",
+  "data": "../zips.data",
 
-  "query": "select city, state from zips where city not like \"BOULD%\" and pop = 18174",
+  "query": "select city, state from `../zips` where city not like \"BOULD%\" and pop = 18174",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

@@ -1,12 +1,12 @@
 {
-    "name": "filter on disjunction of expressions involving guards",
+    "name": "[qa_s09] filter on disjunction of expressions involving guards",
     "backends": {
         "couchbase":  "ignoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },
-    "data": "zips.data",
-    "query": "select `_id`, city from zips where city ~ \"IN$\" or pop ~ \"IN$\"",
+    "data": "../zips.data",
+    "query": "select `_id`, city from `../zips` where city ~ \"IN$\" or pop ~ \"IN$\"",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

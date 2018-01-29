@@ -1,7 +1,7 @@
 {
-    "name": "select aliased field sorted by original name",
-    "data": "zips.data",
-    "query": "SELECT state AS `ResultAlias`, COUNT(*) as cnt FROM zips GROUP BY state ORDER BY state",
+    "name": "[qa_s08] select aliased field sorted by original name",
+    "data": "../zips.data",
+    "query": "SELECT state AS `ResultAlias`, COUNT(*) as cnt FROM `../zips` GROUP BY state ORDER BY state",
     "predicate": "initial",
     "ignoreFieldOrder": true,
     "expected": [{ "ResultAlias": "AK", "cnt":  195 },

@@ -1,7 +1,0 @@
-{
-    "name": "filter with both index and key projections",
-    "data": "slamengine_commits.data",
-    "query": "select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = \"56d1caf5d082d1a6840090986e277d36d03f1859\"",
-    "predicate": "exactly",
-    "expected": [{ "count": 4 }]
-}

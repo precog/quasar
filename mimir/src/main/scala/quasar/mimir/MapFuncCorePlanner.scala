@@ -239,8 +239,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.Meta(a1) => ???
 
-      // this returns rows, rather than array; literally cannot be implemented in mimir at present
-      case MapFuncsCore.Range(from, to) => ???
+      case MapFuncsCore.Range(from, to) =>
+        (Map2[A](from, to, cake.Library.range): TransSpec[A]).point[F]
 
       case MapFuncsCore.Guard(src, tpe, a2, a3) =>
         (Cond(IsType(src, JType.fromType(tpe)), a2, a3): TransSpec[A]).point[F]

@@ -104,6 +104,7 @@ object MapFunc {
     case relations.IfUndefined => (a1, a2) => MFC(C.IfUndefined(a1, a2))
     case relations.And => (a1, a2) => MFC(C.And(a1, a2))
     case relations.Or => (a1, a2) => MFC(C.Or(a1, a2))
+    case set.Range => (a1, a2) => MFC(C.Range(a1, a2))
     case set.Within => (a1, a2) => MFC(C.Within(a1, a2))
     case string.Split => (a1, a2) => MFC(C.Split(a1, a2))
     case structural.MakeMap => (a1, a2) => MFC(C.MakeMap(a1, a2))

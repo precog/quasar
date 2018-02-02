@@ -44,9 +44,9 @@ sealed abstract class JoinSide3 {
       case RightSide3 => right
     }
 }
-final case object LeftSide3 extends JoinSide3
-final case object Center extends JoinSide3
-final case object RightSide3 extends JoinSide3
+case object LeftSide3 extends JoinSide3
+case object Center extends JoinSide3
+case object RightSide3 extends JoinSide3
 
 object JoinSide3 {
   implicit val equal: Equal[JoinSide3] = Equal.equalRef

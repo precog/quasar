@@ -229,6 +229,7 @@ object RenderQScriptDSL {
               case Floor(a1) => ("Floor", (fa(base, a1).right :: Nil).some)
               case Trunc(a1) => ("Trunc", (fa(base, a1).right :: Nil).some)
               case Round(a1) => ("Round", (fa(base, a1).right :: Nil).some)
+              case Typecheck(a, typ) => ("TypeCheck", (fa(base, a).right :: Nil).some)
 
               case FloorScale(a1, a2) => ("FloorScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case CeilScale(a1, a2)  => ("CeilScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)

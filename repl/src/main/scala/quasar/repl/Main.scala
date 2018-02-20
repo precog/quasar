@@ -175,7 +175,7 @@ object Main {
 
       _ <- initMetaStoreOrStart[CoreConfig](
         CmdLineConfig(cfgPath, backends, opts.cmd),
-        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
+        (_, quasarInter) => startRepl(quasarInter).as(true).liftM[MainErrT],
         // The REPL does not allow you to change metastore
         // so no need to supply a function to persist the metastore
         _ => ().point[MainTask])

@@ -13,6 +13,7 @@ stages:
   - name: compile
   - name: unit test
   - name: test
+  - name: testPublish
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
@@ -124,7 +125,9 @@ jobs:
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
 
-    - stage: publish
+    # Make sure we can generate scaladoc as well as build an assembly jar (no duplicate class conflicts) and
+    # test the jar (which makes sure the Quasar server starts and does not crash within 5 seconds)
+    - stage: testPublish
       env:
       script:
         - set -e
@@ -138,6 +141,16 @@ jobs:
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
         - scripts/testJar
+
+        - set +e
+
+    - stage: publish
+      env:
+      script:
+        # Uncomment this if uncommenting Spark block below
+        # - set -e
+
+        - ./sbt preBuild
 
         # release to sonatype
         - scripts/quasarPublishAndTag
@@ -153,7 +166,8 @@ jobs:
         # release to github
         - scripts/publishJar
 
-        - set +e
+        # Uncomment this if uncommenting Spark block above
+        # - set +e
 
 notifications:
   irc:

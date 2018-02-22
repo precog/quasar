@@ -105,8 +105,11 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
     O.optimize(reflNT[QSM[T, ?]])
   }
 
-  def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
-    Config(new java.io.File(uri.value)).point[BackendDef.DefErrT[Task, ?]]
+  def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] = {
+    val file = new java.io.File(uri.value)
+    if (!file.isAbsolute) EitherT.leftT(NonEmptyList("Mimir cannot be mounted to a relative path").left.point[Task])
+    else Config(file).point[BackendDef.DefErrT[Task, ?]]
+  }
 
   def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {

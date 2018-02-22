@@ -125,8 +125,8 @@ object MongoDbIO {
       .flatMap(c => iterableToProcess(c.listDatabaseNames).map(DatabaseName(_)))
       .onFailure {
         case t: MongoCommandException =>
-          credentials.liftM[Process]
-            .flatMap(ys => Process.emitAll(ys.map(y => DatabaseName(y.getSource)).distinct))
+          credential.liftM[Process]
+            .flatMap(y => Process.emit(DatabaseName(y.getSource)))
 
         case t =>
           Process.fail(t)
@@ -437,8 +437,8 @@ object MongoDbIO {
     MongoDbIO(ι)
 
   // TODO: Make a basic credential type in scala and expose this method.
-  private val credentials: MongoDbIO[List[MongoCredential]] =
-    MongoDbIO(_.getSettings.getCredentialList.asScala.toList)
+  private val credential: MongoDbIO[MongoCredential] =
+    MongoDbIO(_.getSettings.getCredential)
 
   private[mongodb] def collection(c: Collection): MongoDbIO[MongoCollection[BsonDocument]] =
     database(c.database).map(_.getCollection(c.collection.value, classOf[BsonDocument]))

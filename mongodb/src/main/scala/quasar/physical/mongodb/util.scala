@@ -104,7 +104,9 @@ object util {
         .applyConnectionString(cs)
         .build)
 
-      settings.credentialList(cs.getCredentialList)
+      val cred = cs.getCredential
+
+      if (cred != null) settings.credential(cred)
 
       settings.serverSettings(ServerSettings.builder
         .build)

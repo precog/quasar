@@ -499,7 +499,7 @@ package object main extends Logging {
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
-    * @param start The body of logic, should return true whether to shutdown quasar or not
+    * @param start The body of logic, should return true to shutdown quasar
     */
   def initMetaStoreOrStart[C: argonaut.DecodeJson](
     config: CmdLineConfig,

@@ -531,6 +531,7 @@ lazy val repl = project
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))
   .settings(excludeTypelevelScalaLibrary)
+  .settings(fork := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.

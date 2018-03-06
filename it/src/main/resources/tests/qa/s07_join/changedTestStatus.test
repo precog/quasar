@@ -17,12 +17,12 @@
         "postgres":          "pending"
     },
     "NB": "Mimir runs of out memory and the JVM dies when this test runs",
-    "data": ["../oldTests.data", "../newTests.data"],
+    "data": ["../../oldTests.data", "../../newTests.data"],
     "query": "select old.name ?? new.name as name,
                      old.backends{_:} ?? new.backends{_:} as backend,
                      old.backends{:_} ?? \"success\" as prevStatus,
                      new.backends{:_} ?? \"success\" as currStatus
-                from `../oldTests` as old full outer join `../newTests` as new
+                from `../../oldTests` as old full outer join `../../newTests` as new
                   on old.name = new.name and
                      old.backends{_:} = new.backends{_:} and
                      old.backends{_:} <> \"mongodb_q_3_2\" and

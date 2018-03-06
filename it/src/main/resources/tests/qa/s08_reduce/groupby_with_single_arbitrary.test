@@ -7,9 +7,9 @@
        "mimir":             "ignoreFieldOrder"
     },
 
-    "data": "../zips.data",
+    "data": "../../zips.data",
 
-    "query": "select city as city from `../zips` group by city order by city limit 4",
+    "query": "select city as city from `../../zips` group by city order by city limit 4",
 
     "predicate": "exactly",
     

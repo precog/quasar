@@ -13,10 +13,10 @@
 
     "NB2": "Skipping for mimir: to_string produces incorrect result.",
 
-    "data": "../slamengine_commits.data",
+    "data": "../../slamengine_commits.data",
 
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
-              from `../slamengine_commits` as l join `../slamengine_commits` as r
+              from `../../slamengine_commits` as l join `../../slamengine_commits` as r
               on r.sha = l.parents[0].sha and l.author.login = r.author.login
               where to_string(r.author.login) || \",\" || to_string(r.author.login) = \"jdegoes,jdegoes\"",
 

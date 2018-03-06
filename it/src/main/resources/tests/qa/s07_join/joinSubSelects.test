@@ -11,14 +11,14 @@
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
     "NB": "Skipping for postgres until there's support for SUM",
 
-    "data": ["../zips.data", "../largeZips.data"],
+    "data": ["../../zips.data", "../../largeZips.data"],
 
     "query": "select t1.city, t1.popCA, t2.popMA from
-            (select city, sum(pop) as popCA from `../zips`
+            (select city, sum(pop) as popCA from `../../zips`
               where state = \"CA\" group by city
               order by sum(pop) desc limit 200) as t1
             join
-            (select city, sum(pop) as popMA from `../largeZips`
+            (select city, sum(pop) as popMA from `../../largeZips`
               where state = \"MA\" group by city
               order by sum(pop) desc limit 200) as t2
             on t1.city = t2.city",

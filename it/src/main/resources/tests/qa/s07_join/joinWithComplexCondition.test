@@ -13,10 +13,10 @@
            Mongo backends not on par with master",
     "NB2": "Skipping for postgres: incorrenctly rendered 'where' clause",
 
-    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+    "data": ["../../slamengine_commits.data", "../../slamengine_commits_dup.data"],
 
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
-              from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
+              from `../../slamengine_commits` as l join `../../slamengine_commits_dup` as r
               on r.sha = l.parents[0].sha and l.author.login = r.author.login
               where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\"",
 

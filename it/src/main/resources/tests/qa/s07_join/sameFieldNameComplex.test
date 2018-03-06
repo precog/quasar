@@ -6,14 +6,13 @@
         "marklogic_json": "ignoreFieldOrder"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join.
-           Mimir not on par with master",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
     "NB2": "Skipping for postgres until there's support for ProjectIndex",
 
-    "data": ["../owners.data", "../cars.data"],
+    "data": ["../../owners.data", "../../cars.data"],
 
     "query": "SELECT owner.name, car.name
-              from `../owners` as owner join `../cars` as car
+              from `../../owners` as owner join `../../cars` as car
               on car.`_id` = owner.carId and owner.year = car.year[0]",
 
     "predicate": "exactly",

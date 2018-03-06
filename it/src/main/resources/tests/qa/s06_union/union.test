@@ -6,8 +6,8 @@
         "postgres": "skip"
     },
     "NB": "Skipping for Postgres, as both left and right union sides need to have the same number of columns",
-    "data": "../zips.data",
-    "query": "select `_id` as zip from `../zips` union select city, state from `../zips`",
+    "data": "../../zips.data",
+    "query": "select `_id` as zip from `../../zips` union select city, state from `../../zips`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

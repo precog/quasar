@@ -12,10 +12,10 @@
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
     "NB2": "Skipping for now, as postgres returns NULLs for missing columns",
 
-    "data": ["../smallZips.data", "../zips.data"],
+    "data": ["../../smallZips.data", "../../zips.data"],
 
     "query": "select smallZips.city, zips.state
-              from `../smallZips` right outer join `../zips`
+              from `../../smallZips` right outer join `../../zips`
               on smallZips.`_id` = zips.`_id`",
 
     "predicate": "atLeast",

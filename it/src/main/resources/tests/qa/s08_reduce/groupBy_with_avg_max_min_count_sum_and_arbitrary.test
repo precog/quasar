@@ -7,10 +7,10 @@
        "mimir":             "ignoreFieldOrder"
     },
 
-    "data": "../zips.data",
+    "data": "../../zips.data",
 
     "query": "select avg(pop) as aPop, max(pop) as maxPop, min(pop) as minPop, count(pop) as cPop,
-              sum(pop) as sPop, city from `../zips` group by city order by aPop desc limit 5",
+              sum(pop) as sPop, city from `../../zips` group by city order by aPop desc limit 5",
 
     "predicate": "exactly",
     

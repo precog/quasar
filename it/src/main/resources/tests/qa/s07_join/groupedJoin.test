@@ -7,10 +7,10 @@
         "mimir": "ignoreFieldOrder"
     },
 
-    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+    "data": ["../../slamengine_commits.data", "../../slamengine_commits_dup.data"],
 
     "query": "SELECT p.author.login, COUNT(*) as count
-              FROM `../slamengine_commits` as p INNER JOIN `../slamengine_commits_dup` as c
+              FROM `../../slamengine_commits` as p INNER JOIN `../../slamengine_commits_dup` as c
               ON p.sha = c.sha
               GROUP BY p.author.login",
 

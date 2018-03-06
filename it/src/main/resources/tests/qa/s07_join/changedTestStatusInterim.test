@@ -15,15 +15,15 @@
         "spark_cassandra":   "pending",
         "postgres":          "pending"
     },
-    "data": ["../oldTests.data", "../newTests.data"],
+    "data": ["../../oldTests.data", "../../newTests.data"],
     "query": "select old.name ?? new.name as name,
                      old.backend ?? new.backend as backend,
                      old.status ?? \"success\" as prevStatus,
                      new.status ?? \"success\" as currStatus
                 -- NB: this field order matters because of #1929
-                from (select backends{_:} as backend, backends{:_} as status, name from `../oldTests`) as old
+                from (select backends{_:} as backend, backends{:_} as status, name from `../../oldTests`) as old
                      full outer join
-                     (select backends{_:} as backend, backends{:_} as status, name from `../newTests`) as new
+                     (select backends{_:} as backend, backends{:_} as status, name from `../../newTests`) as new
                   on old.name = new.name and
                      old.backend = new.backend and
                      old.backend <> \"mongodb_q_3_2\" and

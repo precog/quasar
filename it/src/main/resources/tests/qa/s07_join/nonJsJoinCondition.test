@@ -12,9 +12,9 @@
         "postgres":        "pending"
     },
 
-    "data": "../zips.data",
+    "data": "../../zips.data",
 
-    "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop from `../zips` as z1 join `../zips` as z2 on z1.loc[*] = z2.pop",
+    "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop from `../../zips` as z1 join `../../zips` as z2 on z1.loc[*] = z2.pop",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

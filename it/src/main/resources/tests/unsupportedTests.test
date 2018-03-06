@@ -7,7 +7,6 @@
         "mongodb_3_4": "pending",
         "mongodb_read_only": "skip"
     },
-    "NB": "pending on mimir due to sparse arrays",
     "NB": "disabled on couchbase due to lack of general join",
     "NB": "skipped on mongodb_read_only because of 👻",
     "data": "newTests.data",

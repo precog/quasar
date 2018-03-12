@@ -7,9 +7,9 @@
        "mimir":             "ignoreFieldOrder"
     },
 
-    "data": "../zips.data",
+    "data": "../../zips.data",
 
-    "query": "select avg(pop) as pop from `../zips` group by city order by pop desc limit 5",
+    "query": "select avg(pop) as pop from `../../zips` group by city order by pop desc limit 5",
 
     "predicate": "exactly",
     

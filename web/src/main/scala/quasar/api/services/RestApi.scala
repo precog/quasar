@@ -95,13 +95,13 @@ object RestApi {
   }
 
   def toHttpServices[S[_]](
-    f: S ~> ResponseOr,
+    f: S ~> FailedResponseOr,
     svcs: Map[String, QHttpService[S]])
     : Map[String, HttpService] =
     toHttpServicesF(foldMapNT(f), svcs)
 
   def toHttpServicesF[S[_]](
-    f: Free[S, ?] ~> ResponseOr,
+    f: Free[S, ?] ~> FailedResponseOr,
     svcs: Map[String, QHttpService[S]])
     : Map[String, HttpService] =
     svcs.mapValues(_.toHttpServiceF(f))
@@ -135,6 +135,6 @@ object RestApi {
       case msgFail: MessageFailure =>
         msgFail.toApiError
           .toResponse[Task]
-          .toHttpResponse(liftMT[Task, ResponseT])
+          .toHttpResponse(liftMT[Task, FailedResponseT])
     })
 }

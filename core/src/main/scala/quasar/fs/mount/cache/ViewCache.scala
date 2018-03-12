@@ -49,6 +49,26 @@ object ViewCache {
     implicit val equal: Equal[Status] = Equal.equalRef
   }
 
+  def mk(
+    viewConfig: MountConfig.ViewConfig,
+    maxAgeSeconds: Long,
+    refreshAfter: Instant,
+    dataFile: AFile)
+      : ViewCache =
+    ViewCache(
+      viewConfig = viewConfig,
+      lastUpdate = none,
+      executionMillis = none,
+      cacheReads = 0,
+      assignee = none,
+      assigneeStart = none,
+      maxAgeSeconds = maxAgeSeconds,
+      refreshAfter = refreshAfter,
+      status = Status.Pending,
+      errorMsg = none,
+      dataFile = dataFile,
+      tmpDataFile = none)
+
   // Hard coded to 80% of maxAge for now
   def expireAt(ts: Instant, maxAge: Duration): Throwable \/ Instant =
     \/.fromTryCatchNonFatal(ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))

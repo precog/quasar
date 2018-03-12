@@ -23,6 +23,7 @@ object Dependencies {
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.18"
   private val scalazStreamVersion = "0.8.6a"
+  private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
@@ -71,9 +72,18 @@ object Dependencies {
   def ejson = Seq(
     "org.spire-math" %% "jawn-parser" % jawnVersion
   )
+
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
+
+  def datagen = Seq(
+    "co.fs2" %% "fs2-core"        % fs2Version,
+    "co.fs2" %% "fs2-io"          % fs2Version,
+    "co.fs2" %% "fs2-scalaz"      % fs2ScalazVersion,
+    "com.github.scopt" %% "scopt" % scoptVersion
+  )
+
   def core = Seq(
     "org.tpolecat"               %% "doobie-core"               % doobieVersion,
     "org.tpolecat"               %% "doobie-hikari"             % doobieVersion,
@@ -87,8 +97,9 @@ object Dependencies {
     "com.h2database"              % "h2"                        % "1.4.196",
     "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test
   )
+
   def interface = Seq(
-    "com.github.scopt" %% "scopt" % "3.5.0",
+    "com.github.scopt" %% "scopt" % scoptVersion,
     "org.jboss.aesh"    % "aesh"  % "0.66.17"
   )
 

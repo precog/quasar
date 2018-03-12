@@ -19,7 +19,8 @@ package quasar.tpe
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.foldable._
-import quasar.ejson.{Common, CommonEJson => C, Extension, ExtEJson => E, EJson, EncodeEJson, EncodeEJsonK}
+import quasar.ejson.{Decoded, DecodeEJson, DecodeEJsonK, EJson, EncodeEJson, EncodeEJsonK}
+import quasar.ejson.implicits._
 import quasar.fp.ski.κ
 
 import scala.Tuple2
@@ -149,14 +150,14 @@ object TypeF extends TypeFInstances {
     JR: Recursive.Aux[J, EJson]
   ): GCoalgebra[T \/ ?, TypeF[J, ?], (T, T)] = {
     type LR  = (T, T)
-    val T    = top[J, T]().embed
+    val ⊤    = top[J, T]().embed
     val ⊥    = bottom[J, T]().embed
 
     val arrayGlb: ((IList[T] \/ T, IList[T] \/ T)) => IList[LR] \/ LR = {
       case (\/-( x), \/-( y)) => (x, y).right
       case (\/-( x), -\/(ys)) => ys.map((x, _)).left
       case (-\/(xs), \/-( y)) => xs.map((_, y)).left
-      case (-\/(xs), -\/(ys)) => xs.alignWith(ys)(_.fold((_, T), (T, _), (_, _))).left
+      case (-\/(xs), -\/(ys)) => xs.alignWith(ys)(_.fold((_, ⊤), (⊤, _), (_, _))).left
     }
 
     // NB: We could do a bit better in the scenario where X includes known keys
@@ -168,13 +169,13 @@ object TypeF extends TypeFInstances {
     def mapGlb(xs: IMap[J, T], ux: Option[(T, T)], ys: IMap[J, T], uy: Option[(T, T)]): TypeF[J, LR] =
       map[J, LR](
         xs.alignWith(ys)(_.fold(
-          x      => (x, uy ? ⊥ | T),
-          y      => (ux ? ⊥ | T, y),
+          x      => (x, uy ? ⊥ | ⊤),
+          y      => (ux ? ⊥ | ⊤, y),
           (x, y) => (x, y)
         )),
         ux.alignWith(uy)(_.fold(
-          _.umap((_, T)),
-          _.umap((T, _)),
+          _.umap((_, ⊤)),
+          _.umap((⊤, _)),
           untupled({ case ((xk, xv), (yk, yv)) => ((xk, yk), (xv, yv)) })
         )))
 
@@ -356,51 +357,91 @@ private[quasar] sealed abstract class TypeFInstances {
       )
     }
 
+  implicit def decodeEJsonK[A](implicit A0: DecodeEJson[A], A1: Order[A]): DecodeEJsonK[TypeF[A, ?]] =
+    new DecodeEJsonK[TypeF[A, ?]] {
+      def decodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): CoalgebraM[Decoded, TypeF[A, ?], J] =
+        j => j.decodedKeyS[String](TypeKey) flatMap {
+          case Type.Bottom =>
+            TypeF.bottom[A, J]().point[Decoded]
+
+          case Type.Top =>
+            TypeF.top[A, J]().point[Decoded]
+
+          case Type.Const =>
+            j.decodedKeyS[A](OfKey) map (TypeF.const[A, J](_))
+
+          case Type.Union =>
+            j.decodeKeyS(OfKey) flatMap { u =>
+              Decoded.attempt(u, u.array.collect {
+                case x :: y :: zs => TypeF.union[A, J](x, y, zs.toIList)
+              } \/> "Union")
+            }
+
+          case Type.Arr =>
+            j.decodeKeyS(OfKey) map { a =>
+              TypeF.arr[A, J](a.array.map(_.toIList) <\/ a)
+            }
+
+          case Type.Map =>
+            val known = for {
+              m <- j.decodeKeyS(OfKey)
+              assocs <- Decoded.attempt(m, m.assoc \/> "Map")
+              keyed <- assocs.traverse { case (k, v) => k.decodeAs[A] strengthR v }
+            } yield IMap.fromFoldable(keyed)
+
+            val unknown =
+              j.keyS(OtherKey) traverse { unk =>
+                unk.decodeKeyS(KeysKey) tuple unk.decodeKeyS(ValuesKey)
+              }
+
+            (known |@| unknown)(TypeF.map[A, J](_, _))
+
+          case other =>
+            Decoded.attempt(j, SimpleType.name.getOption(other) \/> "TypeF")
+              .map(TypeF.simple[A, J](_))
+        }
+    }
+
   implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
     new EncodeEJsonK[TypeF[A, ?]] {
-      import Common.{Optics => CO}
-      import Extension.{Optics => EO}
-
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
-        case Bottom()        => tlabel("bottom")
-        case Top()           => tlabel("top")
+        case Bottom()        => tlabel(Type.Bottom)
+        case Top()           => tlabel(Type.Top)
         case Simple(s)       => tlabel(SimpleType.name(s))
-        case Const(a)        => tof("const", A.encode[J](a))
-        case Union(x, y, zs) => tof("sum", C(CO.arr((x :: y :: zs).toList)).embed)
+        case Const(a)        => tof(Type.Const, A.encode[J](a))
+        case Union(x, y, zs) => tof(Type.Union, EJson.arr((x :: y :: zs).toList : _*))
 
         case Arr(a) =>
-          tof("array", a.leftMap(js => C(CO.arr(js.toList)).embed).merge)
+          tof(Type.Arr, a.leftMap(js => EJson.arr(js.toList : _*)).merge)
 
         case Map(kvs, unk) =>
           val jjs   = kvs.toList.map(_.leftMap(A.encode[J](_)))
           val other = unk map { case (k, v) => (
-            C(CO.str[J]("other")).embed,
-            map1(
-              C(CO.str[J]("keys")).embed   -> k,
-              C(CO.str[J]("values")).embed -> v)
+            EJson.str(OtherKey),
+            map1(EJson.str(KeysKey) -> k, EJson.str(ValuesKey) -> v)
           )}
-          tof("map", E(EO.map(jjs)).embed, other.toList: _*)
+          tof(Type.Map, EJson.map(jjs : _*), other.toList: _*)
       }
 
       private def map1[J](assoc: (J, J), assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        E(EO.map(assoc :: assocs.toList)).embed
+        EJson.map(assoc :: assocs.toList : _*)
 
       private def tmap[J](v: J, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        map1(C(CO.str[J]("type")).embed -> v, assocs: _*)
+        map1(EJson.str(TypeKey) -> v, assocs: _*)
 
       private def tlabel[J](label: String, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        tmap(C(CO.str[J](label)).embed, assocs: _*)
+        tmap(EJson.str(label), assocs: _*)
 
       private def tof[J](label: String, of: J, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        tlabel(label, ((C(CO.str[J]("of")).embed -> of) :: assocs.toList): _*)
+        tlabel(label, ((EJson.str(OfKey) -> of) :: assocs.toList): _*)
     }
 
   implicit def traverse[J]: Traverse[TypeF[J, ?]] =
@@ -447,4 +488,21 @@ private[quasar] sealed abstract class TypeFInstances {
         }
       }
     }
+
+  ////
+
+  private val KeysKey = "keys"
+  private val OfKey = "of"
+  private val OtherKey = "other"
+  private val TypeKey = "type"
+  private val ValuesKey = "values"
+
+  private object Type {
+    val Bottom = "bottom"
+    val Top = "top"
+    val Const = "const"
+    val Union = "sum"
+    val Arr = "array"
+    val Map = "map"
+  }
 }

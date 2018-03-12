@@ -2,9 +2,9 @@
     "name": "select map keys",
     "backends": {
         "marklogic_xml":     "pending",
-        "mongodb_3_2":       "pending"
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending"
     },
-    "NB": "working on mongo_3_4 because it uses version >= 3.4.4. Expected to still fail on version < 3.4.4",
     "data": "newTests.data",
     "query": "select distinct backends{_:} from newTests",
     "predicate": "exactly",

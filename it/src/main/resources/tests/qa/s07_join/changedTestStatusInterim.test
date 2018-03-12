@@ -2,7 +2,6 @@
     "name": "[qa_s07] select tests that have changed status (interim)",
     "NB": "This is a workaround for a QScript issue in changedTestStatus.test
            and should be removed when some connectors start passing that test.",
-    "NB": "Working on mongo_3_4 because it uses version >= 3.4.4. Expected to still fail on version < 3.4.4",
     "NB": "Skipped on mimir due to timeout.",
     "backends": {
         "couchbase":         "pending",
@@ -10,20 +9,21 @@
         "marklogic_xml":     "pending",
         "mimir":             "skip",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
+        "mongodb_3_4":       "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
         "spark_cassandra":   "pending",
         "postgres":          "pending"
     },
-    "data": ["../oldTests.data", "../newTests.data"],
+    "data": ["../../oldTests.data", "../../newTests.data"],
     "query": "select old.name ?? new.name as name,
                      old.backend ?? new.backend as backend,
                      old.status ?? \"success\" as prevStatus,
                      new.status ?? \"success\" as currStatus
                 -- NB: this field order matters because of #1929
-                from (select backends{_:} as backend, backends{:_} as status, name from `../oldTests`) as old
+                from (select backends{_:} as backend, backends{:_} as status, name from `../../oldTests`) as old
                      full outer join
-                     (select backends{_:} as backend, backends{:_} as status, name from `../newTests`) as new
+                     (select backends{_:} as backend, backends{:_} as status, name from `../../newTests`) as new
                   on old.name = new.name and
                      old.backend = new.backend and
                      old.backend <> \"mongodb_q_3_2\" and

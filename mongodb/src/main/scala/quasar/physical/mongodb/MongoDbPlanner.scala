@@ -28,7 +28,6 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
-import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -69,32 +68,6 @@ object MongoDbPlanner {
   type Partial[T[_[_]], In, Out] = (PartialFunction[List[In], Out], List[InputFinder[T]])
 
   type OutputM[A]      = PlannerError \/ A
-  type ExecTimeR[F[_]] = MonadReader_[F, Instant]
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
-      Type => Option[In => Out] =
-        typ => f.lift(typ).fold(
-          typ match {
-            case Type.Interval => generateTypeCheck(or)(f)(Type.Dec)
-            case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
-            case Type.Timestamp
-               | Type.Timestamp ⨿ Type.Date
-               | Type.Timestamp ⨿ Type.Date ⨿ Type.Time =>
-              generateTypeCheck(or)(f)(Type.Date)
-            case Type.Timestamp ⨿ Type.Date ⨿ Type.Time ⨿ Type.Interval =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(Type.Interval ⨿ Type.Date)
-            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Timestamp ⨿ Type.Date ⨿ Type.Time) ⨿ Type.Bool =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(
-                Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Date ⨿ Type.Bool))
-            case a ⨿ b =>
-              (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
-                (a, b) => ((expr: In) => or(a(expr), b(expr))))
-            case _ => None
-          })(
-          Some(_))
 
   def processMapFuncExpr
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse, A]
@@ -132,10 +105,6 @@ object MongoDbPlanner {
       : M[JsCore] =
     fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
 
-  // FIXME: This is temporary. Should go away when the connector is complete.
-  def unimplemented[M[_]: MonadFsErr, A](label: String): M[A] =
-    raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"unimplemented $label")))
-
   // TODO: Should have a JsFn version of this for $reduce nodes.
   val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
     import quasar.qscript.ReduceFuncs._
@@ -154,9 +123,6 @@ object MongoDbPlanner {
     }
   }
 
-  private def unpack[T[_[_]]: BirecursiveT, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
-    t.cata(interpret[F, T[F], T[F]](ι, _.embed))
-
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
   val check = new Check[Fix[ExprOp], ExprOp]
@@ -166,13 +132,6 @@ object MongoDbPlanner {
       : M[Fix[ExprOp]] =
     ej.cataM(BsonCodec.fromEJson(v)).fold(pe => raiseErr(qscriptPlanningFailed(pe)), $literal(_).point[M])
 
-  // TODO: Use `JsonCodec.encode` and avoid failing.
-  def ejsonToJs[M[_]: Applicative: MonadFsErr, EJ: Show]
-    (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
-      : M[JsCore] =
-    ej.cata(Data.fromEJson).toJs.fold(
-      raiseErr[M, JsCore](qscriptPlanningFailed(NonRepresentableEJson(ej.shows))))(
-      _.point[M])
 
   def expression[
     T[_[_]]: RecursiveT: ShowT,
@@ -318,203 +277,9 @@ object MongoDbPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative: MonadFsErr: ExecTimeR]
-      : AlgebraM[M, MapFunc[T, ?], JsCore] = {
-    import jscore.{
-      Add => _, In => _,
-      Lt => _, Lte => _, Gt => _, Gte => _, Eq => _, Neq => _,
-      And => _, Or => _, Not => _,
-      _}
-
-    import MapFuncsCore._
-    import MapFuncsDerived._
-
-    val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
-    import mjs._
-
-    // NB: Math.trunc is not present in MongoDB.
-    def trunc(expr: JsCore): JsCore =
-      Let(Name("x"), expr,
-        BinOp(jscore.Sub,
-          ident("x"),
-          BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
-
-    def execTime(implicit ev: ExecTimeR[M]): M[JsCore] =
-      ev.ask map (ts => Literal(Js.Str(ts.toString)))
-
-    def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
-      JsFuncHandler.handle[MapFunc[T, ?]].apply(mf).map(unpack[Fix, JsCoreF])
-
-    val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
-      case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
-      case JoinSideName(n) =>
-        raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
-      case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
-      case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
-
-      // TODO: De-duplicate and move these to JsFuncHandler
-      case ExtractCentury(date) =>
-        Call(ident("NumberLong"), List(
-          Call(Select(ident("Math"), "ceil"), List(
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCFullYear"), Nil),
-              Literal(Js.Num(100, false))))))).point[M]
-      case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
-      case ExtractDecade(date) =>
-        Call(ident("NumberLong"), List(
-          trunc(
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCFullYear"), Nil),
-              Literal(Js.Num(10, false)))))).point[M]
-      case ExtractDayOfWeek(date) =>
-        Call(Select(date, "getUTCDay"), Nil).point[M]
-      case ExtractDayOfYear(date) =>
-        Call(ident("NumberInt"), List(
-          Call(Select(ident("Math"), "floor"), List(
-            BinOp(jscore.Add,
-              BinOp(jscore.Div,
-                BinOp(Sub,
-                  date,
-                  New(Name("Date"), List(
-                    Call(Select(date, "getFullYear"), Nil),
-                    Literal(Js.Num(0, false)),
-                    Literal(Js.Num(0, false))))),
-                Literal(Js.Num(86400000, false))),
-              Literal(Js.Num(1, false))))))).point[M]
-      case ExtractEpoch(date) =>
-        Call(ident("NumberLong"), List(
-          BinOp(jscore.Div,
-            Call(Select(date, "valueOf"), Nil),
-            Literal(Js.Num(1000, false))))).point[M]
-      case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
-      case ExtractIsoDayOfWeek(date) =>
-        Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
-          If(
-            BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
-            Literal(Js.Num(7, false)),
-            ident("x"))).point[M]
-      case ExtractIsoYear(date) =>
-        Call(Select(date, "getUTCFullYear"), Nil).point[M]
-      case ExtractMicroseconds(date) =>
-        BinOp(jscore.Mult,
-          BinOp(jscore.Add,
-            Call(Select(date, "getUTCMilliseconds"), Nil),
-            BinOp(jscore.Mult,
-              Call(Select(date, "getUTCSeconds"), Nil),
-              Literal(Js.Num(1000, false)))),
-          Literal(Js.Num(1000, false))).point[M]
-      case ExtractMillennium(date) =>
-        Call(ident("NumberLong"), List(
-          Call(Select(ident("Math"), "ceil"), List(
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCFullYear"), Nil),
-              Literal(Js.Num(1000, false))))))).point[M]
-      case ExtractMilliseconds(date) =>
-        BinOp(jscore.Add,
-          Call(Select(date, "getUTCMilliseconds"), Nil),
-          BinOp(jscore.Mult,
-            Call(Select(date, "getUTCSeconds"), Nil),
-            Literal(Js.Num(1000, false)))).point[M]
-      case ExtractMinute(date) =>
-        Call(Select(date, "getUTCMinutes"), Nil).point[M]
-      case ExtractMonth(date) =>
-        BinOp(jscore.Add,
-          Call(Select(date, "getUTCMonth"), Nil),
-          Literal(Js.Num(1, false))).point[M]
-      case ExtractQuarter(date) =>
-        Call(ident("NumberInt"), List(
-          BinOp(jscore.Add,
-            BinOp(jscore.BitOr,
-              BinOp(jscore.Div,
-                Call(Select(date, "getUTCMonth"), Nil),
-                Literal(Js.Num(3, false))),
-              Literal(Js.Num(0, false))),
-            Literal(Js.Num(1, false))))).point[M]
-      case ExtractSecond(date) =>
-        BinOp(jscore.Add,
-          Call(Select(date, "getUTCSeconds"), Nil),
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCMilliseconds"), Nil),
-            Literal(Js.Num(1000, false)))).point[M]
-      case ExtractWeek(date) =>
-        Call(ident("NumberInt"), List(
-          Call(Select(ident("Math"), "floor"), List(
-            BinOp(jscore.Add,
-              BinOp(jscore.Div,
-                Let(Name("startOfYear"),
-                  New(Name("Date"), List(
-                    Call(Select(date, "getFullYear"), Nil),
-                    Literal(Js.Num(0, false)),
-                    Literal(Js.Num(1, false)))),
-                  BinOp(jscore.Add,
-                    BinOp(Div,
-                      BinOp(Sub, date, ident("startOfYear")),
-                      Literal(Js.Num(86400000, false))),
-                    BinOp(jscore.Add,
-                      Call(Select(ident("startOfYear"), "getDay"), Nil),
-                      Literal(Js.Num(1, false))))),
-                Literal(Js.Num(7, false))),
-              Literal(Js.Num(1, false))))))).point[M]
-
-      case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
-      // TODO: pull out the literal, and handle this case in other situations
-      case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
-       Arr(List(Arr(List(a1, a2)))))).point[M]
-      case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
-        Arr(a1 |+| a2).point[M]
-      case ConcatArrays(a1, a2) =>
-        If(BinOp(jscore.Or, isArray(a1), isArray(a2)),
-          Call(Select(a1, "concat"), List(a2)),
-          BinOp(jscore.Add, a1, a2)).point[M]
-      case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
-        Obj(o1 ++ o2).point[M]
-      case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
-
-      case Guard(expr, typ, cont, fallback) =>
-        val jsCheck: Type => Option[JsCore => JsCore] =
-          generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
-            case Type.Null             => isNull
-            case Type.Dec              => isDec
-            case Type.Int
-               | Type.Int ⨿ Type.Dec
-               | Type.Int ⨿ Type.Dec ⨿ Type.Interval
-                => isAnyNumber
-            case Type.Str              => isString
-            case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _)
-                => isObjectOrArray
-            case Type.Obj(_, _)        => isObject
-            case Type.FlexArr(_, _, _) => isArray
-            case Type.Binary           => isBinary
-            case Type.Id               => isObjectId
-            case Type.Bool             => isBoolean
-            case Type.Date             => isDate
-            case Type.Syntaxed         => isSyntaxed
-          }
-        jsCheck(typ).fold[M[JsCore]](
-          raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
-          f => If(f(expr), cont, fallback).point[M])
-      // TODO: Specify the function name for pattern match failures
-      case _ => unimplemented[M, JsCore]("JS function")
-    }
-
-    val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
-      case Abs(a1)   => unimplemented[M, JsCore]("Abs JS")
-      case Ceil(a1)  => unimplemented[M, JsCore]("Ceil JS")
-      case Floor(a1) => unimplemented[M, JsCore]("Floor JS")
-      case Trunc(a1) => unimplemented[M, JsCore]("Trunc JS")
-      case Round(a1) => unimplemented[M, JsCore]("Round JS")
-      case FloorScale(a1, a2) => unimplemented[M, JsCore]("FloorScale JS")
-      case CeilScale(a1, a2) => unimplemented[M, JsCore]("CeilScale JS")
-      case RoundScale(a1, a2) => unimplemented[M, JsCore]("RoundScale JS")
-    }
-
-    val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {
-      case MFC(mfc) => handleSpecialCore(mfc)
-      case MFD(mfd) => handleSpecialDerived(mfd)
-    }
-
-    mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
-  }
+  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
+      : AlgebraM[M, MapFunc[T, ?], JsCore] =
+    JsFuncHandler.handle[MapFunc[T, ?], M]
 
   // TODO: Need this until the old connector goes away and we can redefine
   //       `Selector` as `Selector[A, B]`, where `A` is the field type

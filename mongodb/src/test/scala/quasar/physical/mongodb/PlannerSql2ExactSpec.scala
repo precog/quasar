@@ -49,6 +49,8 @@ class PlannerSql2ExactSpec extends
     PlannerHelpers with
     PendingWithActualTracking {
 
+  sequential
+
   //to write the new actuals:
   //override val mode = WriteMode
 

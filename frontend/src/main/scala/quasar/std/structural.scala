@@ -36,8 +36,6 @@ trait StructuralLib extends Library {
     Func.Input2(Str, Top),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Const(Data.Str(name)), Const(Data.Set(data))) =>
-        Const(Data.Set(data.map(d => Data.Obj(ListMap(name -> d)))))
       case Sized(Const(Data.Str(name)), Const(data)) => Const(Data.Obj(ListMap(name -> data)))
       case Sized(Const(Data.Str(name)), valueType)   => Obj(Map(name -> valueType), None)
       case Sized(_, valueType)                       => Obj(Map(), Some(valueType))
@@ -58,8 +56,6 @@ trait StructuralLib extends Library {
     Func.Input1(Top),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Const(Data.Set(data))) =>
-        Const(Data.Set(data.map(d => Data.Arr(d :: Nil))))
       case Sized(Const(data))           => Const(Data.Arr(data :: Nil))
       case Sized(valueType)             => Arr(List(valueType))
     },
@@ -207,8 +203,6 @@ trait StructuralLib extends Library {
     Func.Input2(AnyArray, Int),
     noSimplification,
     partialTyperV[nat._2] {
-      case Sized(v1, Const(Data.Set(elems))) =>
-        elems.traverse(e => v1.arrayElem(Const(e))).map(Coproduct.fromSeq)
       case Sized(v1, v2) => v1.arrayElem(v2)
     },
     basicUntyper)
@@ -236,8 +230,6 @@ trait StructuralLib extends Library {
     Func.Input1(AnyObject),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Const(Data.Obj(map))) =>
-        success(Const(Data.Set(map.values.toList)))
       case Sized(x) if x.objectLike =>
         x.objectType.fold[Func.VCodomain](
           failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
@@ -252,7 +244,6 @@ trait StructuralLib extends Library {
     Func.Input1(AnyArray),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
       case Sized(x) if x.arrayLike       =>
         x.arrayType.fold[Func.VCodomain](
           failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
@@ -267,7 +258,6 @@ trait StructuralLib extends Library {
     Func.Input1(AnyObject),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Const(Data.Obj(map))) => Const(Data.Set(map.keys.toList ∘ Data.Str))
       case Sized(x) if x.objectLike    => Str
     },
     untyper[nat._1](tpe => success(Func.Input1(Obj(Map(), Some(Top))))))
@@ -314,7 +304,6 @@ trait StructuralLib extends Library {
         }
     },
     partialTyperV[nat._1] {
-      case Sized(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
       case Sized(x) if x.arrayLike =>
         x.arrayType.fold[ValidationNel[SemanticError, Type]](
           failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
@@ -392,8 +381,6 @@ trait StructuralLib extends Library {
         }
     },
     partialTyper[nat._1] {
-      // case Sized(Const(Data.Set(vs))) => Const(Data.Arr(vs))
-      case Sized(Const(v))            => Const(Data.Arr(List(v)))
       case Sized(tpe)                 => FlexArr(0, None, tpe)
     },
     partialUntyperV[nat._1] {

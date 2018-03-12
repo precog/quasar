@@ -16,9 +16,23 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.fs.{FileSystemError, MonadFsErr}
+import slamdata.Predef._
+import quasar.{Planner, Type}, Planner._, Type._
+import quasar.contrib.scalaz._
+import quasar.fp.ski._
+import quasar.fs._, FileSystemError._
+
+import java.time.Instant
+
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
+import scalaz._, Scalaz._
 
 object common {
+  type ExecTimeR[F[_]] = MonadReader_[F, Instant]
+
   def raiseErr[M[_], A](err: FileSystemError)(
     implicit ev: MonadFsErr[M]
   ): M[A] = ev.raiseError(err)
@@ -26,4 +40,43 @@ object common {
   def handleErr[M[_], A](ma: M[A])(f: FileSystemError => M[A])(
     implicit ev: MonadFsErr[M]
   ): M[A] = ev.handleError(ma)(f)
+
+  def raisePlannerError[M[_]: MonadFsErr, A](err: PlannerError): M[A] =
+    raiseErr(qscriptPlanningFailed(err))
+
+  def raiseInternalError[M[_]: MonadFsErr, A](msg: String): M[A] =
+    raisePlannerError(InternalError.fromMsg(msg))
+
+  def unimplemented[M[_]: MonadFsErr, A](label: String): M[A] =
+    raiseInternalError(s"unimplemented $label")
+
+  def unpack[T[_[_]]: BirecursiveT, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
+    t.cata(interpret[F, T[F], T[F]](ι, _.embed))
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
+      Type => Option[In => Out] =
+        typ => f.lift(typ).fold(
+          typ match {
+            case Type.Interval => generateTypeCheck(or)(f)(Type.Dec)
+            case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
+            case Type.Timestamp
+               | Type.Timestamp ⨿ Type.Date
+               | Type.Timestamp ⨿ Type.Date ⨿ Type.Time =>
+              generateTypeCheck(or)(f)(Type.Date)
+            case Type.Timestamp ⨿ Type.Date ⨿ Type.Time ⨿ Type.Interval =>
+              // Just repartition to match the right cases
+              generateTypeCheck(or)(f)(Type.Interval ⨿ Type.Date)
+            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Timestamp ⨿ Type.Date ⨿ Type.Time) ⨿ Type.Bool =>
+              // Just repartition to match the right cases
+              generateTypeCheck(or)(f)(
+                Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Date ⨿ Type.Bool))
+            case a ⨿ b =>
+              (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
+                (a, b) => ((expr: In) => or(a(expr), b(expr))))
+            case _ => None
+          })(
+          Some(_))
+
+
 }

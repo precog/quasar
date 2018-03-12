@@ -40,6 +40,7 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
   implicit val params = Parameters(maxSize = 10)
 
   type J = Fix[EJson]
+  type JS = Fix[Json]
 
   checkAll("Common", order.laws[Common[String]])
   checkAll("Common", traverse.laws[Common])
@@ -80,5 +81,12 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
     "only match when type and size present" >> prop { (tt: TypeTag, ys: List[(J, J)]) =>
       SizedType.unapply(addAssoc(ys)(Type[J](tt)).project) ≟ None
     }
+  }
+
+  "embeds json" >> prop { js: JS =>
+    val str = Fixed[J].str
+
+    js.transCata[J](EJson.fromJson(str(_)))
+      .transAnaM[Option, JS, Json](EJson.toJson(str.getOption(_))) ≟ js.some
   }
 }

@@ -63,7 +63,6 @@ class DataCodecSpecs extends quasar.Qspec {
           beSome("""{ "$obj": { "$obj": { "$obj": { "$obj": 1 } } } }""")
       }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
-      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beNone }
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("""{ "$binary": "TE1OTw==" }""") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("""{ "$oid": "abc" }""") }
       "encode NA"        in { DataCodec.render(Data.NA) must beNone }
@@ -127,7 +126,6 @@ class DataCodecSpecs extends quasar.Qspec {
           beSome("""{ "$a": 1, "$date": "2015-01-31T10:30:00Z" }""")
         }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
-      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beNone }
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("\"TE1OTw==\"") }
       "encode empty binary" in { DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beSome("\"\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("\"abc\"") }

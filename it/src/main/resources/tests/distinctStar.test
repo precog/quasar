@@ -5,6 +5,8 @@
         "mimir":"ignoreFieldOrder",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
+        "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
+        "mongodb_3_6":       "pendingIgnoreFieldOrder",
         "mongodb_read_only": "pendingIgnoreFieldOrder"
     },
     "NB": "Skipped for couchbase due to #2329 failure to load test data.",

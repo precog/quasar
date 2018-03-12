@@ -60,7 +60,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                         original as access
                     })
 
-                  g.overwriteAtRoot(mkReduce(newSrc.root, buckets, reduce as reduceExpr.head)) :++ newSrc
+                  g.overwriteAtRoot(mkReduce(newSrc.root, buckets, reduce as reduceExpr.seconds.head)) :++ newSrc
               }
 
             case None =>

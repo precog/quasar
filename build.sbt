@@ -247,8 +247,8 @@ lazy val root = project.in(file("."))
         common,   // <--
 //     /       \        \
     effect, frontend,  precog,
-//   |         |    \    |
-                      blueeyes,
+//   |     /   |    \    |
+        datagen,      blueeyes,
 //   |         |         |
                       niflheim,
 //   |         |         |
@@ -370,6 +370,17 @@ lazy val frontend = project
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true)
   .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val datagen = project
+  .settings(name := "quasar-datagen")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    mainClass in Compile := Some("quasar.datagen.Main"),
+    libraryDependencies ++= Dependencies.datagen)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.

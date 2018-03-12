@@ -9,14 +9,14 @@
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
-    "data": ["../smallZips.data", "../extraSmallZips.data"],
+    "data": ["../../smallZips.data", "../../extraSmallZips.data"],
 
     "query": "SELECT smallZips.city AS CitySmall,
                      smallZips.state AS StateSmall,
                      extraSmallZips.city AS City,
                      extraSmallZips.state AS State,
                      extraSmallZips.pop AS Pop
-              FROM `../smallZips` JOIN `../extraSmallZips`
+              FROM `../../smallZips` JOIN `../../extraSmallZips`
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
 

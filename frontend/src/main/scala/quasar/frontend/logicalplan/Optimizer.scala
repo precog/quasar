@@ -139,16 +139,6 @@ final class Optimizer[T: Equal]
     case _ => None
   }
 
-  // TODO delete this when old mongo is deleted
-  val reconstructOldJoins: Algebra[LP, T] = {
-    case JoinSideName(name) => lpr.free(name)
-    case Join(left, right, tpe, JoinCondition(lName, rName, cond)) =>
-      lpr.let(lName, left,
-        lpr.let(rName, right,
-          lpr.invoke3(LP.funcFromJoinType(tpe), lpr.free(lName), lpr.free(rName), cond)))
-    case lp => lp.embed
-  }
-
   val namesƒ: Algebra[LP, Set[Symbol]] = {
     case Free(name) => Set(name)
     case x          => x.fold

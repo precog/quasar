@@ -18,12 +18,16 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.algebra._
+import quasar.ejson.{Decoded, DecodeEJson, EJson, EncodeEJson}
 
+import matryoshka.data.Fix
 import org.specs2.scalaz._
 import scalaz.Show
+import scalaz.std.anyVal._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import spire.laws.arb._
 import spire.math.Real
+import spire.std.double._
 
 final class TypeStatSpec extends Spec with ScalazMatchers with TypeStatArbitrary {
   import TypeStat._
@@ -47,5 +51,11 @@ final class TypeStatSpec extends Spec with ScalazMatchers with TypeStatArbitrary
     val expStat  = coll[Real](Real(5), Some(Real(2)), Some(Real(4)))
 
     (strStat + collStat) must equal(expStat)
+  }
+
+  "EJson codec" >> prop { ts: TypeStat[Double] =>
+    DecodeEJson[TypeStat[Double]].decode(
+      EncodeEJson[TypeStat[Double]].encode[Fix[EJson]](ts)
+    ) must equal(Decoded.success(ts))
   }
 }

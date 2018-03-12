@@ -119,7 +119,7 @@ trait Queries {
   def staleCachedViews(now: Instant): Query0[PathedViewCache] =
     sql"""SELECT *
           FROM view_cache
-          WHERE last_update IS NULL OR ($now > refresh_after)""".query[PathedViewCache]
+          WHERE $now > refresh_after""".query[PathedViewCache]
 
   def cacheRefreshAssigneStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): Update0 =
     sql"""UPDATE view_cache

@@ -22,7 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import monocle.Prism
+import monocle.{Iso, Prism}
 import scalaz.{Applicative, Cord, Equal, IMap, Order, Scalaz, Show, Traverse}, Scalaz._
 
 /** This is an extension to JSON that allows arbitrary expressions as map (née
@@ -51,6 +51,9 @@ object Extension extends ExtensionInstances {
     def int[A] =
       Prism.partial[Extension[A], BigInt] { case Int(i) => i } (Int(_))
 
+    def imap[A: Order] =
+      map[A] composeIso listMapIso[A]
+
     def map[A] =
       Prism.partial[Extension[A], List[(A, A)]] { case Map(m) => m } (Map(_))
 
@@ -58,6 +61,11 @@ object Extension extends ExtensionInstances {
       Prism.partial[Extension[A], (A, A)] {
         case Meta(v, m) => (v, m)
       } ((Meta(_: A, _: A)).tupled)
+
+    ////
+
+    private def listMapIso[A: Order]: Iso[List[(A, A)], IMap[A, A]] =
+      Iso(IMap.fromList[A, A])(_.toList)
   }
 }
 

@@ -18,7 +18,7 @@ package quasar.server
 
 import slamdata.Predef._
 import quasar.api.services._
-import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
+import quasar.api.{redirectService, staticFileService, FailedResponseOr, FailedResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.logErrors
@@ -110,12 +110,12 @@ object Server {
   ): Task[PortChangingServer.ServiceStarter] = {
     import RestApi._
 
-    def interp: Task[CoreEffIORW ~> ResponseOr] =
+    def interp: Task[CoreEffIORW ~> FailedResponseOr] =
       TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>
         foldMapNT(
-          (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
-          (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
-          liftMT[Task, ResponseT]                                :+:
+          (liftMT[Task, FailedResponseT] compose Read.fromTaskRef(r))  :+:
+          (liftMT[Task, FailedResponseT] compose Write.fromTaskRef(r)) :+:
+          liftMT[Task, FailedResponseT]                                :+:
           qErrsToResponseT[Task]
         ) compose (
           injectFT[VCacheExpR, QErrs_CRW_Task] :+:
@@ -131,8 +131,8 @@ object Server {
       (reload: Int => Task[String \/ Unit]) =>
         finalizeServices(
           toHttpServicesF[CoreEffIORW](
-            λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
-              interp.liftM[ResponseT] >>= (fa foldMap _)
+            λ[Free[CoreEffIORW, ?] ~> FailedResponseOr] { fa =>
+              interp.liftM[FailedResponseT] >>= (fa foldMap _)
             },
             coreServices[CoreEffIORW, Nothing](executionIdRef, timingRepo)
           ) ++ additionalServices
@@ -183,6 +183,7 @@ object Server {
 
   def safeMain(args: Vector[String]): Task[Unit] = {
     logErrors(for {
+      _ <- stdout(s"Quasar v${quasar.build.BuildInfo.version}").liftM[MainErrT]
       webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
       _ <- initMetaStoreOrStart[WebConfig](
              webCmdLineCfg.toCmdLineConfig,

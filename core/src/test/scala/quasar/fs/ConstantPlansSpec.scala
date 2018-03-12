@@ -24,10 +24,10 @@ import scalaz.Scalaz._
 
 class ConstantPlansSpec extends quasar.Qspec {
   "asConstant should identify plans that are constant" >> {
-    "literal set with negatives" >> {
-      val expr = sqlE"select max((0, 1, -2, 5)) as maxlit from cars"
+    "addition" >> {
+      val expr = sqlE"select 1 + 1 as maxlit from cars"
       constantPlans.asConstant(Fixture.unsafeToLP(expr)) must_=
-        List(Data.Obj(ListMap("maxlit" -> Data.Int(5)))).some
+        List(Data.Obj(ListMap("maxlit" -> Data.Int(2)))).some
     }
   }
 }

@@ -63,6 +63,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_2.name
   def is3_4(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_4.name
+  def is3_4_13(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_4_13.name
+  def is3_6(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_6.name
 
   MongoDbSpec.clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._

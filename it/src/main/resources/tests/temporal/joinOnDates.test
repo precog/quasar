@@ -1,0 +1,28 @@
+{
+    "name": "join on dates",
+
+    "backends": {
+        "mimir": "pending"
+    },
+
+    "data":  ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+
+    "query": "select a.commit.committer.name as name, b.commit.committer.name as namedup
+       from `../slamengine_commits` as a join `../slamengine_commits_dup` as b
+       on timestamp(a.commit.committer.date) = timestamp(b.commit.committer.date) and
+         timestamp(a.commit.committer.date) < timestamp(\"2015-01-16T22:00:49Z\")",
+
+    "predicate": "exactly",
+
+    "ignoreResultOrder": true,
+
+    "expected": [
+      { "name": "Moss Prescott", "namedup": "Moss Prescott" },
+      { "name": "Moss Prescott", "namedup": "Moss Prescott" },
+      { "name": "Moss Prescott", "namedup": "Moss Prescott" },
+      { "name": "John A. De Goes", "namedup": "John A. De Goes" },
+      { "name": "Moss Prescott", "namedup": "Moss Prescott" },
+      { "name": "John A. De Goes", "namedup": "John A. De Goes" },
+      { "name": "Moss Prescott", "namedup": "Moss Prescott" }
+    ]
+}

@@ -140,6 +140,13 @@ object RenderedTree {
   }
 
   implicit val renderTree: RenderTree[RenderedTree] = RenderTree.make(ι)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  implicit val equal: Equal[RenderedTree] =
+    new Equal[RenderedTree] {
+      def equal(x: RenderedTree, y: RenderedTree) =
+        (x.nodeType ≟ y.nodeType) && (x.label ≟ y.label) && (x.children ≟ y.children)
+    }
 }
 
 object Terminal {

@@ -83,13 +83,13 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
     f compose injectNT[S, T]
 
   def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
-    type RW[A] = ReadWriteT[ResponseOr, A]
-    val fs0: Task[CoreEffIO ~> ResponseOr] = inMemFSWeb(mem)
-    val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, CoreEffIO](i)))
-    val f: Task[CoreEffIO ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
-    val fsErrs: Task[CoreEffIO ~> ResponseOr] =
+    type RW[A] = ReadWriteT[FailedResponseOr, A]
+    val fs0: Task[CoreEffIO ~> FailedResponseOr] = inMemFSWeb(mem)
+    val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[FailedResponseOr, WriteFile, CoreEffIO](i)))
+    val f: Task[CoreEffIO ~> RW] = fs0 ∘ (liftMT[FailedResponseOr, ReadWriteT] compose _)
+    val fsErrs: Task[CoreEffIO ~> FailedResponseOr] =
       (f ⊛ g)((fʹ, gʹ) =>
-        evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
+        evalNT[FailedResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
 
     data.service[CoreEffIO].toHttpService(fsErrs.unsafePerformSync)
   }

@@ -67,7 +67,6 @@ abstract class BsonCodecSpecs(v: BsonVersion) extends quasar.Qspec {
         case Interval(_)      => false
         case Date(_)          => false
         case Time(_)          => false
-        case Set(_)           => false
         case Arr(value)       => value.forall(preserved)
         case Obj(value)       => value.values.forall(preserved)
         case _                => true

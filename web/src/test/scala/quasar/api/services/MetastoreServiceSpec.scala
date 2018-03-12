@@ -62,7 +62,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
         password = "bobIsAwesome",
         parameters = Map.empty)
       type Eff[A] = Coproduct[Task, MetaStoreLocation, A]
-      val inter = liftMT[Task, ResponseT] compose (reflNT[Task] :+: MetaStoreLocation.impl.constant(dbConfig))
+      val inter = liftMT[Task, FailedResponseT] compose (reflNT[Task] :+: MetaStoreLocation.impl.constant(dbConfig))
       val service = quasar.api.services.metastore.service[Eff].toHttpService(inter).orNotFound
       val get = Request()
       val resp = service(get).unsafePerformSync

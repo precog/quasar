@@ -44,25 +44,6 @@ object SemanticAnalysis {
       RenderTree.fromShow[Synthetic]("Synthetic")
   }
 
-  def normalizeProjectionsƒ[T](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
-      : CoalgebraM[State[Option[String], ?], Sql, T] =
-    _.project match {
-      case sel @ Select(_, _, Some(TableRelationAST(table, alias @ Some(_))), _, _, _) =>
-        constantState(sel, alias)
-      case sel @ Select(_, _, Some(TableRelationAST(table, None)), _, _, _) =>
-        val head: Option[String] = pathy.Path.peel(table).map {
-          case (_, -\/(pathy.Path.DirName(dir))) => dir
-          case (_, \/-(pathy.Path.FileName(file))) => file
-        }
-        constantState(sel, head)
-      case op @ Binop(Embed(Ident(name)), Embed(StringLiteral(expr)), KeyDeref) =>
-        gets {
-          case Some(head) => (head === name).fold(ident[T](expr), op)
-          case None => op
-        }
-      case other => state(other)
-    }
-
   private val syntheticPrefix = "__sd__"
 
   /** Inserts synthetic keys into the projections of each `select` stmt to
@@ -372,9 +353,6 @@ object SemanticAnalysis {
       ElgotAlgebraMZip[(Scope, ?), ValidSem, Sql].zip(
         synthElgotMƒ,
         inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
-
-  def normalizeProjections[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
-    expr.anaM[T](normalizeProjectionsƒ[T]).run(None)._2
 
   def projectSortKeys[T: Equal](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
     expr.transCata[T](orOriginal(projectSortKeysƒ[T]))

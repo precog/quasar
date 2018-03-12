@@ -66,29 +66,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           "b" -> lpf.constant(Data.Str("abc"))))
     }
 
-    "compile complex constant" in {
-      testTypedLogicalPlanCompile(sqlE"[1, 2, 3, 4, 5][*] limit 3 offset 1",
-        lpf.constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
-    }
-
-    "select complex constant" in {
-      testTypedLogicalPlanCompile(
-        sqlE"""select {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}{*} limit 3 offset 1""",
-        lpf.constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
-    }
-
-    "select complex constant 2" in {
-      testTypedLogicalPlanCompile(
-        sqlE"""select {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}{*:} limit 3 offset 1""",
-        lpf.constant(Data.Set(List(Data.Str("b"), Data.Str("c")))))
-    }
-
-    "compile reduced constant" in {
-      testTypedLogicalPlanCompile(
-        sqlE"""select count(*) as total from (select "Hello world") as lit""",
-        lpf.constant(Data.Obj("total" -> Data.Int(1))))
-    }
-
     "compile expression with timestamp, date, time, and interval" in {
       import java.time.{Instant, LocalDate, LocalTime}
 
@@ -728,16 +705,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.invoke2(Concat,
                 lpf.constant(Data.Str(" ")),
                 lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))))))))
-    }
-
-    "filter on constant false" in {
-      testTypedLogicalPlanCompile(sqlE"select * from zips where false",
-        lpf.constant(Data.Set(Nil)))
-    }
-
-    "filter with field in empty set" in {
-      testTypedLogicalPlanCompile(sqlE"select * from zips where state in ()",
-        lpf.constant(Data.Set(Nil)))
     }
 
     "compile between" in {
@@ -1826,42 +1793,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
-  }
-
-  "constant folding" >> {
-    def testFolding(name: String, query: String, expected: Fix[Sql]) = {
-      s"${name}" >> {
-        testTypedLogicalPlanCompile(unsafeParse(query), fullCompileExp(expected))
-      }
-
-      s"${name} with collection" >> {
-        testTypedLogicalPlanCompile(unsafeParse(s"$query from zips"), fullCompileExp(expected))
-      }
-    }
-
-    testFolding("ARBITRARY",
-      "select arbitrary((3, 4, 5))",
-  sqlE"select 3")
-
-    testFolding("AVG",
-      "select avg((0.5, 1.0, 4.5))",
-  sqlE"select 2.0")
-
-    testFolding("COUNT",
-      """select count(("foo", "quux", "baz"))""",
-    sqlE"select 3")
-
-    testFolding("MAX",
-      "select max((4, 2, 1001, 17))",
-  sqlE"select 1001")
-
-    testFolding("MIN",
-      "select min((4, 2, 1001, 17))",
-  sqlE"select 2")
-
-    testFolding("SUM",
-      "select sum((1, 1, 1, 1, 1, 3, 4))",
-  sqlE"select 12")
   }
 
   List("avg", "sum") foreach { fn =>

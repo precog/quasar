@@ -40,12 +40,12 @@ final case class QHttpService[S[_]] private (val f: PartialFunction[Request, Fre
   def orElse(other: QHttpService[S]): QHttpService[S] =
     new QHttpService(f orElse other.f)
 
-  def toHttpService(i: S ~> ResponseOr): HttpService =
+  def toHttpService(i: S ~> FailedResponseOr): HttpService =
     toHttpServiceF(free.foldMapNT(i))
 
-  def toHttpServiceF(i: Free[S, ?] ~> ResponseOr): HttpService = {
+  def toHttpServiceF(i: Free[S, ?] ~> FailedResponseOr): HttpService = {
     def mkResponse(prg: Free[S, QResponse[S]]): Task[Response] =
-      i(prg).map(_.toHttpResponseF(i)).merge
+      i(prg).map(_.toHttpResponseF(i)).valueOr(_.toResponse)
 
     HttpService(f andThen mkResponse)
   }

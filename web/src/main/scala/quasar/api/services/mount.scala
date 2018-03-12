@@ -148,13 +148,13 @@ object mount {
       maxAge =  req.headers.get(`Cache-Control`).flatMap(_.values.list.collectFirst {
                   case `max-age`(s) => s
                 })
-      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createNewViewCache[S])
+      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createOrUpdateViewCache[S])
                   .getOrElse(().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists
 
-  private def createNewViewCache[S[_]](
-    viewPath: AFile, 
-    viewConfig: MountConfig.ViewConfig, 
+  private def createOrUpdateViewCache[S[_]](
+    viewPath: AFile,
+    viewConfig: MountConfig.ViewConfig,
     maxAge: scala.concurrent.duration.Duration
   )(implicit
     MF: ManageFile.Ops[S],
@@ -163,30 +163,32 @@ object mount {
     S1: VCacheKVS :<: S
   ): EitherT[Free[S, ?], ApiError, Unit] =
     for {
-      tempFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
-      timeStamp     <- T.timestamp.liftM[ApiErrT]
-     
-      refreshAfter  <- free.lift(Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
-      newViewCache  = ViewCache(
-                       viewConfig = viewConfig,
-                       lastUpdate = none,
-                       executionMillis = none,
-                       cacheReads = 0,
-                       assignee = none,
-                       assigneeStart = none,
-                       maxAgeSeconds = maxAge.toSeconds,
-                       refreshAfter = refreshAfter,
-                       status = ViewCache.Status.Pending,
-                       errorMsg = none,
-                       dataFile = tempFile,
-                       tmpDataFile = none)
+      dataFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
+      refreshAfter  <- T.timestamp.liftM[ApiErrT]
+      newViewCache  =  ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, dataFile)
       _             <- vcache.get(viewPath).fold(
-                          κ(vcache.modify(viewPath, _.copy(
-                            viewConfig = newViewCache.viewConfig,
-                            maxAgeSeconds = newViewCache.maxAgeSeconds,
-                            refreshAfter = newViewCache.refreshAfter,
-                            status = newViewCache.status,
-                            dataFile = newViewCache.dataFile))),
+                          κ(vcache.modify(viewPath, modifyViewCache(newViewCache))),
                           vcache.put(viewPath, newViewCache)).join.liftM[ApiErrT]
     } yield ()
+
+  private def modifyViewCache(nw: ViewCache)(old: ViewCache): ViewCache =
+    // TODO we should not recreate the cache if the ViewConfig hasn't changed
+    // However, we first need to invalidate caches when an underlying view or
+    // module changes, otherwise caches don't get invalidated when they should.
+    // When this is implemented we can use something like this:
+    // if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
+    //   // only update maxAgeSeconds and refreshAfter (relative to maxAgeSeconds)
+    //   old.copy(
+    //     maxAgeSeconds = nw.maxAgeSeconds,
+    //     refreshAfter = old.refreshAfter.plusSeconds(nw.maxAgeSeconds - old.maxAgeSeconds))
+    // else
+    //   nw
+    if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
+      // Let's keep the old cacheReads & lastUpdate if toplevel definition
+      // is unchanged
+      nw.copy(
+        cacheReads = old.cacheReads,
+        lastUpdate = old.lastUpdate)
+    else
+      nw
 }

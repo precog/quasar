@@ -9,9 +9,9 @@
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
-    "data": ["../smallZips.data", "../zips.data"],
+    "data": ["../../smallZips.data", "../../zips.data"],
 
-    "query": "select smallZips.city, zips.state from `../smallZips`, `../zips`
+    "query": "select smallZips.city, zips.state from `../../smallZips`, `../../zips`
               where smallZips.`_id` = zips.`_id` and \"MA\" = zips.state",
 
     "predicate": "atLeast",

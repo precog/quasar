@@ -55,7 +55,6 @@ object data {
 
       case Data.Arr(elements) => jArray(elements map encodeJson)
       case Data.Obj(entries)  => jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
-      case Data.Set(elements) => typedObj(DT.Set      , encodeJson(Data.Arr(elements)))
     }
   }
 

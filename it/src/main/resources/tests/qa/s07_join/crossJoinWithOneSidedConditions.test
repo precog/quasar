@@ -10,10 +10,10 @@
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
     "NB2": "Disabled in mimir because it times out (on the qsu branch).",
 
-    "data": ["../largeZips.data", "../zips.data"],
+    "data": ["../largeZips.data", "../../zips.data"],
 
     "query": "select a.city as a, b.city as b, b.pop - a.pop as diff
-            from `../zips` as a, `../largeZips` as b
+            from `../../zips` as a, `../largeZips` as b
             where a.`_id` like \"80301\" and b.`_id` like \"95928\"",
 
     "predicate": "exactly",

@@ -81,7 +81,7 @@ abstract class BsonSpecs(v: BsonVersion) extends quasar.Qspec {
 
     "correspond to Data.toJs where toData is defined" >> prop { (bson: Bson) =>
       val data = BsonCodec.toData(bson)
-      (data != Data.NA && !data.isInstanceOf[Data.Set]) ==> {
+      (data != Data.NA) ==> {
         data match {
           case Data.Int(x) =>
             // NB: encoding int as Data loses size info

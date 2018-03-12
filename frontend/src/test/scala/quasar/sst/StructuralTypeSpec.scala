@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.{ejson => ejs}
-import quasar.ejson.EJsonArbitrary
+import quasar.ejson.{Decoded, DecodeEJson, EJson, EJsonArbitrary, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.tpe._
@@ -141,5 +141,11 @@ final class StructuralTypeSpec extends Spec
       val z = envT(2, TypeST(TypeF.coproduct[J, S](x, y))).embed
       (x |+| y) must equal(z)
     }
+  }
+
+  "EJson codec" >> prop { st: StructuralType[Fix[EJson], Int] =>
+    DecodeEJson[StructuralType[Fix[EJson], Int]].decode(
+      EncodeEJson[StructuralType[Fix[EJson], Int]].encode[Fix[EJson]](
+        st)) ≟ st.point[Decoded]
   }
 }

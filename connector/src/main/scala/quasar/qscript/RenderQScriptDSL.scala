@@ -129,7 +129,6 @@ object RenderQScriptDSL {
     case Data.NA => "Data.NA"
     case Data.Null => "Data.Null"
     case Data.Obj(o) => o.mapValues(showData).mkString("Data.Obj(", ", ", ")")
-    case Data.Set(s) => s.mkString("Data.Set(List(", ", ", "))")
     case Data.Str(s) => "Data.Str(\"" + s + "\")"
     case Data.Time(t) => "Data.Time(java.time.LocalTime.parse(\"" + t.toString + "\"))"
     case Data.Timestamp(ts) => "Data.Timestamp(java.time.Instant.parse(\"" + ts.toString + "\"))"

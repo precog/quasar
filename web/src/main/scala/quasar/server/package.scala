@@ -28,10 +28,10 @@ import scalaz.{~>, Monad}
 package object server {
   import Mounting.PathTypeMismatch
 
-  def qErrsToResponseT[F[_]: Monad]: QErrs ~> ResponseT[F, ?] =
-    failureResponseT[F, PhysicalError]    :+:
-    failureResponseT[F, Module.Error]     :+:
-    failureResponseT[F, PathTypeMismatch] :+:
-    failureResponseT[F, MountingError]    :+:
-    failureResponseT[F, FileSystemError]
+  def qErrsToResponseT[F[_]: Monad]: QErrs ~> FailedResponseT[F, ?] =
+    FailedResponse.fromFailure[F, PhysicalError](_.cause)  :+:
+    FailedResponse.fromFailureMessage[F, Module.Error]     :+:
+    FailedResponse.fromFailureMessage[F, PathTypeMismatch] :+:
+    FailedResponse.fromFailureMessage[F, MountingError]    :+:
+    FailedResponse.fromFailureMessage[F, FileSystemError]
 }

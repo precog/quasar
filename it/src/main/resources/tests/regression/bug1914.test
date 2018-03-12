@@ -1,0 +1,10 @@
+{
+  "name": "[reg] bug1914",
+  "data": [ "customers.data", "orders.data" ],
+  "backends": {
+  },
+  "query": "select * from customers join orders on false",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "expected": []
+}

@@ -50,21 +50,22 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
   def modifyHeaders(f: Headers => Headers): QResponse[S] =
     QResponse.headers.modify(f)(this)
 
-  def toHttpResponse(i: S ~> ResponseOr): Response =
+  def toHttpResponse(i: S ~> FailedResponseOr): Response =
     toHttpResponseF(free.foldMapNT(i))
 
-  def toHttpResponseF(i: Free[S, ?] ~> ResponseOr): Response = {
-    val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
-      def apply[A](ror: ResponseOr[A]) =
-        ror.fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)), _.point[Task]).join
-    }
+  def toHttpResponseF(i: Free[S, ?] ~> FailedResponseOr): Response = {
+    val failTask: FailedResponseOr ~> Task =
+      λ[FailedResponseOr ~> Task](
+        _.fold(
+          fr => Task.fail(new HttpResponseStreamFailureException(fr.toThrowable)),
+          _.point[Task]).join)
 
-    def handleBytes(bytes: Process[ResponseOr, ByteVector]): Response =
+    def handleBytes(bytes: Process[FailedResponseOr, ByteVector]): Response =
       Response(body = bytes.translate(failTask))
         .withStatus(status)
         .putHeaders(headers.toList: _*)
 
-    handleBytes(body.translate[ResponseOr](i))
+    handleBytes(body.translate[FailedResponseOr](i))
   }
 
   def withStatus(s: Status): QResponse[S] =
@@ -72,8 +73,8 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
 }
 
 object QResponse {
-  final class HttpResponseStreamFailureException(alternate: Response)
-    extends java.lang.Exception
+  final class HttpResponseStreamFailureException(cause: Throwable)
+    extends java.lang.Exception(cause)
 
   def empty[S[_]]: QResponse[S] =
     QResponse(NoContent, Headers.empty, Process.halt)

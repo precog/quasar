@@ -78,9 +78,6 @@ final class DataEncodingSpec extends quasar.Qspec {
       encodeXml[Result](d) must be_\/-(Utility.trim(elem))
     }
 
-    "error for Data.Set" >> {
-      encodeXml[Result](Data.Set(List(Data.Str("a")))) must be_-\/
-    }
   }
 
   "Data <-> JSON Encoding" >> {

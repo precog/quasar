@@ -17,7 +17,7 @@
 package quasar.sst
 
 import slamdata.Predef.{Byte => SByte, Char => SChar, _}
-import quasar.{ejson => ejs}, ejs.{CommonEJson => C, EJson, ExtEJson => E, EncodeEJson}
+import quasar.{ejson => ejs}, ejs.{CommonEJson => C, Decoded, DecodeEJson, EJson, ExtEJson => E, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp.numeric.SampleStats
 import quasar.tpe.TypeF
@@ -167,6 +167,71 @@ object TypeStat extends TypeStatInstances {
 sealed abstract class TypeStatInstances {
   import TypeStat._
 
+  implicit def decodeEJson[A](implicit A: DecodeEJson[A]): DecodeEJson[TypeStat[A]] =
+    new DecodeEJson[TypeStat[A]] {
+      def decode[J](j: J)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) = {
+        def minmax[B: DecodeEJson](m: J): Decoded[(A, B, B)] =
+          (m.decodedKeyS[A](CountKey) |@| m.decodedKeyS[B](MinKey) |@| m.decodedKeyS[B](MaxKey)).tupled
+
+        def dist[B: DecodeEJson](m: J): Decoded[(SampleStats[A], B, B)] = {
+          val ss = for {
+            dmap <- m.decodeKeyS(DistributionKey)
+            smap <- dmap.decodeKeyS(StateKey)
+            size <- smap.decodedKeyS[A](SizeKey)
+            m1   <- smap.decodedKeyS[A](M1Key)
+            m2   <- smap.decodedKeyS[A](M2Key)
+            m3   <- smap.decodedKeyS[A](M3Key)
+            m4   <- smap.decodedKeyS[A](M4Key)
+          } yield SampleStats(size, m1, m2, m3, m4)
+
+          (ss |@| m.decodedKeyS[B](MinKey) |@| m.decodedKeyS[B](MaxKey)).tupled
+        }
+
+        for {
+          kind <- j.decodedKeyS[String](KindKey)
+
+          ts <- kind match {
+            case Kind.Boolean =>
+              (j.decodedKeyS[A](TrueKey) |@| j.decodedKeyS[A](FalseKey))(TypeStat.bool(_, _))
+
+            case Kind.Byte =>
+              minmax[SByte](j) map (TypeStat.byte(_))
+
+            case Kind.Char =>
+              minmax[SChar](j) map (TypeStat.char(_))
+
+            case Kind.Int =>
+              dist[BigInt](j) map (TypeStat.int(_))
+
+            case Kind.Dec =>
+              dist[BigDecimal](j) map (TypeStat.dec(_))
+
+            case Kind.Count =>
+              j.decodedKeyS[A](CountKey) map (TypeStat.count(_))
+
+            case Kind.Coll =>
+              (
+                j.decodedKeyS[A](CountKey)                |@|
+                j.keyS(MinLenKey).traverse(_.decodeAs[A]) |@|
+                j.keyS(MaxLenKey).traverse(_.decodeAs[A])
+              )(TypeStat.coll(_, _, _))
+
+            case Kind.Str =>
+              (
+                j.decodedKeyS[A](CountKey)    |@|
+                j.decodedKeyS[A](MinLenKey)   |@|
+                j.decodedKeyS[A](MaxLenKey)   |@|
+                j.decodedKeyS[String](MinKey) |@|
+                j.decodedKeyS[String](MaxKey)
+              )(TypeStat.str(_, _, _, _, _))
+
+            case other =>
+              Decoded.failureFor[TypeStat[A]](j, s"Unknown TypeStat: $kind.")
+          }
+        } yield ts
+      }
+    }
+
   implicit def encodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A]] =
     new EncodeEJson[TypeStat[A]] {
       def encode[J](ts: TypeStat[A])(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
@@ -206,6 +271,37 @@ sealed abstract class TypeStatInstances {
 
   ////
 
+  private val CountKey = "count"
+  private val DistributionKey = "distribution"
+  private val FalseKey = "false"
+  private val KindKey = "kind"
+  private val KurtosisKey = "kurtosis"
+  private val M1Key = "centralMoment1"
+  private val M2Key = "centralMoment2"
+  private val M3Key = "centralMoment3"
+  private val M4Key = "centralMoment4"
+  private val MaxKey = "max"
+  private val MaxLenKey = "maxLength"
+  private val MeanKey = "mean"
+  private val MinKey = "min"
+  private val MinLenKey = "minLength"
+  private val SizeKey = "size"
+  private val SkewnessKey = "skewness"
+  private val StateKey = "state"
+  private val TrueKey = "true"
+  private val VarianceKey = "variance"
+
+  private object Kind {
+    val Boolean = "boolean"
+    val Byte = "byte"
+    val Char = "char"
+    val Coll = "collection"
+    val Count = "count"
+    val Dec = "decimal"
+    val Int = "integer"
+    val Str = "string"
+  }
+
   private[sst] def encodeEJson0[A: EncodeEJson: Equal: Field: NRoot, J](
     ts: TypeStat[A],
     isPopulation: Boolean
@@ -217,64 +313,83 @@ sealed abstract class TypeStatInstances {
       ejs.Fixed[J].map(xs.toList.map(_.leftMap(_.asEJson[J])))
 
     def kmap(kind: String, rest: (String, J)*): J =
-      emap(("kind" -> kind.asEJson[J]) +: rest : _*)
+      emap((KindKey -> kind.asEJson[J]) +: rest : _*)
 
     def optEntry[B: EncodeEJson](k: String, b: Option[B]): List[(String, J)] =
       b.map(x => (k, x.asEJson[J])).toList
 
     def minmax[B: EncodeEJson](kind: String, c: A, mn: B, mx: B): J =
       kmap(
-        kind,
-        "count" -> c.asEJson[J],
-        "min"   -> mn.asEJson[J],
-        "max"   -> mx.asEJson[J])
+        kind
+      , CountKey -> c.asEJson[J]
+      , MinKey   -> mn.asEJson[J]
+      , MaxKey   -> mx.asEJson[J])
 
-    def sstats(ss: SampleStats[A]): J =
+    def sstats(ss: SampleStats[A]): J = {
+			val state =
+				emap(
+					SizeKey -> ss.size.asEJson[J]
+				, M1Key   -> ss.m1.asEJson[J]
+				, M2Key   -> ss.m2.asEJson[J]
+				, M3Key   -> ss.m3.asEJson[J]
+				, M4Key   -> ss.m4.asEJson[J])
+
       emap(
-        ("mean", ss.mean.asEJson[J])                             ::
-        optEntry("variance",
+				(StateKey, state)                                         ::
+        (MeanKey, ss.mean.asEJson[J])                             ::
+        optEntry(VarianceKey,
           isPopulation.fold(ss.variance, ss.populationVariance)) :::
-        optEntry("skewness",
+        optEntry(SkewnessKey,
           isPopulation.fold(ss.skewness, ss.populationSkewness)) :::
-        optEntry("kurtosis",
+        optEntry(KurtosisKey,
           isPopulation.fold(ss.kurtosis, ss.populationKurtosis)) : _*)
+    }
 
     def dist[B: EncodeEJson](kind: String, ss: SampleStats[A], mn: B, mx: B): J =
       kmap(
-        kind,
-        "count"        -> ss.size.asEJson[J],
-        "distribution" -> sstats(ss),
-        "min"          -> mn.asEJson[J],
-        "max"          -> mx.asEJson[J])
+        kind
+      , CountKey        -> ss.size.asEJson[J]
+      , DistributionKey -> sstats(ss)
+      , MinKey          -> mn.asEJson[J]
+      , MaxKey          -> mx.asEJson[J])
 
     ts match {
-      case Bool(t, f)               =>
+      case Bool(t, f) =>
         kmap(
-          "boolean",
-          "true"  -> t.asEJson[J],
-          "false" -> f.asEJson[J])
-      case Byte(c, mn, mx)          => minmax("byte", c, mn, mx)
-      case Char(c, mn, mx)          => minmax("char", c, mn, mx)
-      case Int(s, mn, mx)           => dist("integer", s, mn, mx)
-      case Dec(s, mn, mx)           => dist("decimal", s, mn, mx)
-      case Count(c)                 => kmap("count", "count" -> c.asEJson[J])
+          Kind.Boolean
+        , TrueKey  -> t.asEJson[J]
+        , FalseKey -> f.asEJson[J])
 
-      case Coll(c, mnl, mxl)        =>
+      case Byte(c, mn, mx) =>
+        minmax(Kind.Byte, c, mn, mx)
+
+      case Char(c, mn, mx) =>
+        minmax(Kind.Char, c, mn, mx)
+
+      case Int(s, mn, mx) =>
+        dist(Kind.Int, s, mn, mx)
+
+      case Dec(s, mn, mx) =>
+        dist(Kind.Dec, s, mn, mx)
+
+      case Count(c) =>
+        kmap(Kind.Count, CountKey -> c.asEJson[J])
+
+      case Coll(c, mnl, mxl) =>
         kmap(
-          "collection",
-          ("count" -> c.asEJson[J])  ::
-          optEntry("minLength", mnl) :::
-          optEntry("maxLength", mxl) : _*)
-
+          Kind.Coll,
+          (CountKey -> c.asEJson[J]) ::
+          optEntry(MinLenKey, mnl)   :::
+          optEntry(MaxLenKey, mxl) : _*)
 
       case Str(c, mnl, mxl, mn, mx) =>
         kmap(
-          "string",
-          "count"     -> c.asEJson[J],
-          "minLength" -> mnl.asEJson[J],
-          "maxLength" -> mxl.asEJson[J],
-          "min"       -> mn.asEJson[J],
-          "max"       -> mx.asEJson[J])
+          Kind.Str
+        , CountKey  -> c.asEJson[J]
+        , MinLenKey -> mnl.asEJson[J]
+        , MaxLenKey -> mxl.asEJson[J]
+        , MinKey    -> mn.asEJson[J]
+        , MaxKey    -> mx.asEJson[J])
     }
   }
 }

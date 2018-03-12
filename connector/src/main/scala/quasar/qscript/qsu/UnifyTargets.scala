@@ -27,9 +27,9 @@ import scalaz.{ICons, IList, INil, Monad, NonEmptyList, Scalaz, WriterT}, Scalaz
 /** Given a graph, source and targets vertices, unifies access to the target
   * values via `FreeMap`s over a common source.
   *
-  * Returns the new source graph, a unary function to access the original source
-  * value and a list of unary functions to access the values of each of the
-  * provided targets.
+  * Returns the new source graph, a unary function to access the
+  * original source value and a list of symbols tupled with unary
+  * functions to access the values of each of the provided targets.
   */
 final class UnifyTargets[T[_[_]]: BirecursiveT, F[_]: Monad] private (
     sourceName: String,
@@ -40,20 +40,23 @@ final class UnifyTargets[T[_[_]]: BirecursiveT, F[_]: Monad] private (
   import QScriptUniform.AutoJoin2
 
   def apply(graph: QSUGraph, source: Symbol, targets: NonEmptyList[Symbol])
-      : F[(QSUGraph, FreeMap, NonEmptyList[FreeMap])] = {
+      : F[(QSUGraph, FreeMap, NonEmptyList[(Symbol, FreeMap)])] = {
 
-    val (roots, targetExprs) =
-      targets.traverse(t =>
-        MappableRegion(_ === source, graph refocus t) traverse { g =>
-          if (g.root === source)
-            WriterT.writer((IList[Symbol](), source))
-          else
-            WriterT.writer((IList(g.root), g.root))
-        }).run
+    val targetMap = targets map (t => (t, MappableRegion(_ === source, graph refocus t)))
+    val targetExprs = targetMap.seconds map (_ map (_.root))
+
+    val roots = targetExprs.traverse(_.traverse { g =>
+      if (g === source)
+        WriterT.writer((IList[Symbol](), source))
+      else
+        WriterT.writer((IList(g), g))
+      }).written
 
     roots.distinct.zipWithIndex match {
       case INil() =>
-        (graph refocus source, func.Hole, targetExprs map (_ >> func.Hole)).point[F]
+        (graph refocus source,
+          func.Hole,
+          targetMap map { case (sym, fm) => (sym, fm.map(_.root) >> func.Hole) }).point[F]
 
       case ICons(h @ (head, _), tail) =>
         val targetAccesses = (h :: tail) map (_ map targetAccess)
@@ -76,7 +79,9 @@ final class UnifyTargets[T[_[_]]: BirecursiveT, F[_]: Monad] private (
             }
           }
 
-        autojoinedM map (g => (g :++ graph, sourceAccess, targetExprs map (_ >>= accessIndex)))
+        val targetMap0 = targetMap map { case (sym, fm) => (sym, fm map (_.root) >>= accessIndex) }
+
+        autojoinedM map (g => (g :++ graph, sourceAccess, targetMap0))
     }
   }
 
@@ -102,6 +107,6 @@ object UnifyTargets {
       targets: NonEmptyList[Symbol])(
       sourceName: String,
       targetPrefix: String)
-      : F[(QSUGraph[T], FM[T], NonEmptyList[FM[T]])] =
+      : F[(QSUGraph[T], FM[T], NonEmptyList[(Symbol, FM[T])])] =
     new UnifyTargets[T, F](sourceName, targetPrefix, buildGraph).apply(graph, source, targets)
 }

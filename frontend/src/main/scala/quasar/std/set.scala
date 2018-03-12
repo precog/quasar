@@ -18,7 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
-import quasar.fp.ski._
+import quasar.common.JoinType
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
 
@@ -45,14 +45,7 @@ trait SetLib extends Library {
           case _ => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
-        Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
-        Type.Const(Data.Set(s.take(n.intValue)))
-      case Sized(t, _) => t
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
   val Sample: BinaryFunc = BinaryFunc(
@@ -70,14 +63,7 @@ trait SetLib extends Library {
           case _ => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
-        Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
-        Type.Const(Data.Set(s.take(n.intValue)))
-      case Sized(t, _) => t
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
   val Drop: BinaryFunc = BinaryFunc(
@@ -98,12 +84,7 @@ trait SetLib extends Library {
           case _ => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
-          if n.isValidInt =>
-        Type.Const(Data.Set(s.drop(n.intValue)))
-      case Sized(t, _) => t
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
   val Range = BinaryFunc(
@@ -135,88 +116,32 @@ trait SetLib extends Library {
           case _ => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(_ , Type.Const(Data.False)) => Type.Const(Data.Set(Nil))
-      case Sized(set, _) => set
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Bool))))
 
-  object JoinFunc {
-    def unapply(func: TernaryFunc): Option[TernaryFunc] =
-      func match {
-        case (InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin) => Some(func)
-        case _ => None
-      }
-  }
-
-  // TODO: deprecated - delete when old mongo is deleted
-  val InnerJoin = TernaryFunc(
-    Transformation,
-    "Returns a new set containing the pairs values from the two sets that satisfy the condition.",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Bool),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(_, _, Type.Const(Data.Bool(false))) => Type.Const(Data.Set(Nil))
-      case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
-      case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
-    },
-    untyper[nat._3](t =>
-      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
-
-  // TODO: deprecated - delete when old mongo is deleted
-  val LeftOuterJoin = TernaryFunc(
-    Transformation,
-    "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the left set.",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Bool),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(s1, _, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> Type.Null), None)
-      case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
+  def joinTyper(ty: JoinType): Func.Typer[nat._3] = ty match {
+    case JoinType.Inner      => partialTyper[nat._3] {
+      case Sized(s1, s2, _) =>
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
+    }
+    case JoinType.LeftOuter  => partialTyper[nat._3] {
       case Sized(s1, s2, _) =>
         Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
-    },
-    untyper[nat._3](t =>
-      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
-
-  // TODO: deprecated - delete when old mongo is deleted
-  val RightOuterJoin = TernaryFunc(
-    Transformation,
-    "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the right set.",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Bool),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(_, s2, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map(JoinDir.Left.name -> Type.Null, JoinDir.Right.name -> s2), None)
-      case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
-    },
-    untyper[nat._3](t =>
-      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
-
-  // TODO: deprecated - delete when old mongo is deleted
-  val FullOuterJoin = TernaryFunc(
-    Transformation,
-    "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from either set.",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Bool),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(Type.Const(Data.Set(Nil)), Type.Const(Data.Set(Nil)), _) =>
-        Type.Const(Data.Set(Nil))
+    }
+    case JoinType.RightOuter => partialTyper[nat._3] {
+      case Sized(s1, s2, _) =>
+        Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
+    }
+    case JoinType.FullOuter  => partialTyper[nat._3] {
       case Sized(s1, s2, _) =>
         Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
-    },
+    }
+  }
+
+  def joinUntyper: Func.Untyper[nat._3] =
     untyper[nat._3](t =>
       (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool))))
+        Func.Input3(l, r, Type.Bool)))
 
   val GroupBy = BinaryFunc(
     Transformation,
@@ -224,9 +149,7 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    partialTyper[nat._2] {
-      case Sized(s1, _) => s1
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
   val Union = BinaryFunc(
@@ -236,8 +159,6 @@ trait SetLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Set(Nil)), s2)           => s2
-      case Sized(s1, Type.Const(Data.Set(Nil)))           => s1
       case Sized(s1, s2)
         if s1.contains(Type.Top) || s2.contains(Type.Top) => Type.Top
       case Sized(s1, s2)                                  => s1 ⨿ s2
@@ -250,8 +171,8 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    partialTyper[nat._2] {
-      case Sized(s1, s2) => if (s1 == s2) s1 else Type.Const(Data.Set(Nil))
+    partialTyperV {
+      case Sized(t1, t2) => success(Type.TypeOrMonoid.append(t1.widenConst, t2.widenConst))
     },
     untyper[nat._2](t => success(Func.Input2(t, t))))
 
@@ -260,19 +181,8 @@ trait SetLib extends Library {
     "Removes the elements of the second set from the first set.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
-    new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
-        orig match {
-          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Set(Nil))))) =>
-            set.some
-          case _ => None
-        }
-    },
-    partialTyper[nat._2] {
-      case Sized(s1, _) => s1
-    },
+    noSimplification,
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
   // TODO: Handle “normal” functions without creating Funcs. They should be in
@@ -290,22 +200,13 @@ trait SetLib extends Library {
         (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
           case Invoke(_, Sized(item, set)) => set.project match {
-            case Constant(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
-            case Constant(_)           => RelationsLib.Eq(item, set).some
+            case Constant(_)            => RelationsLib.Eq(item, set).some
             case lp                     => Within(item, StructuralLib.UnshiftArray(set).embed).some
           }
           case _ => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(_, Type.Const(Data.Set(Nil))) =>
-        Type.Const(Data.Bool(false))
-      case Sized(Type.Const(x), Type.Const(Data.Set(set))) =>
-        Type.Const(Data.Bool(set.contains(x)))
-      case Sized(Type.Const(x), Type.Const(y)) =>
-        Type.Const(Data.Bool(x == y))
-      case Sized(_, _) => Type.Bool
-    },
+    basicTyper,
     basicUntyper)
 
   val Within = BinaryFunc(
@@ -329,11 +230,7 @@ trait SetLib extends Library {
     Type.Bottom,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    partialTyper[nat._2] {
-      case Sized(Type.Const(const), Type.Const(Data.Set(s))) =>
-        Type.Const(Data.Set(s.map(κ(const))))
-      case Sized(const, _) => const
-    },
+    widenConstTyper[nat._2](_(0)),
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 }
 

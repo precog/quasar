@@ -9,17 +9,31 @@ services:
 
   quasar_mongodb_3_2:
     container_name: quasar_mongodb_3_2
-    image: mongo:3.2
+    image: mongo:3.2.19
     command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
     ports:
       - "27021:27017"
 
   quasar_mongodb_3_4:
     container_name: quasar_mongodb_3_4
-    image: mongo:3.4
+    image: mongo:3.4.3
     command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
     ports:
       - "27022:27017"
+
+  quasar_mongodb_3_4_13:
+    container_name: quasar_mongodb_3_4_13
+    image: mongo:3.4.13
+    command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
+    ports:
+      - "27023:27017"
+
+  quasar_mongodb_3_6:
+    container_name: quasar_mongodb_3_6
+    image: mongo:3.6.3
+    command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
+    ports:
+      - "27024:27017"
 
   quasar_metastore:
     container_name: quasar_metastore

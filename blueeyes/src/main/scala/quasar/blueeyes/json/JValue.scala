@@ -63,7 +63,6 @@ object JValue {
     case Data.Int(value) => JNumStr(value.toString)
     case Data.Obj(fields) => JObject(fields.mapValues(fromData))
     case Data.Arr(values) => JArray(values.map(fromData))
-    case Data.Set(values) => JArray(values.map(fromData))
     case Data.Timestamp(value) => JString(value.toString)
     case Data.Date(value) => JString(value.toString)
     case Data.Time(value) => JString(value.toString)

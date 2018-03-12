@@ -20,7 +20,17 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.zipper._
 import quasar.ejson
-import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Type => EType, TypeTag}
+import quasar.ejson.{
+  Decoded,
+  DecodeEJsonK,
+  DecodeEJson,
+  EJson,
+  EncodeEJson,
+  EncodeEJsonK,
+  ExtEJson => E,
+  Type => EType,
+  TypeTag
+}
 import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}
 import quasar.fp.ski.κ
@@ -230,6 +240,10 @@ object StructuralType extends StructuralTypeInstances {
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
   import StructuralType.{ST, STF, TypeST, TagST}
 
+  private val MeasureKey = "measure"
+  private val StructureKey = "structure"
+  private val TagKey = "tag"
+
   // We can't use final here due to SI-4440 - it results in warning
   private case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
 
@@ -242,9 +256,32 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
         envT(v, TTags(t :: ts, tpe))
     }
 
-    implicit def functor[L]: Functor[TTags[L, ?]] =
-      new Functor[TTags[L, ?]] {
-        def map[A, B](fa: TTags[L, A])(f: A => B) = fa.copy(tpe = fa.tpe.map(f))
+    def disperseTags[V, L]: Transform[Cofree[TTags[L, ?], V], EnvT[V, TTags[L, ?], ?], STF[L, V, ?]] = {
+      case EnvT((v, TTags(Nil, tpe))) =>
+        envT(v, TypeST(tpe))
+
+      case EnvT((v, TTags(t :: ts, tpe))) =>
+        envT(v, TagST[L](Tagged(t, envT(v, TTags(ts, tpe)).embed)))
+    }
+
+    implicit def traverse[L]: Traverse[TTags[L, ?]] =
+      new Traverse[TTags[L, ?]] {
+        def traverseImpl[F[_]: Applicative, A, B](fa: TTags[L, A])(f: A => F[B]) =
+          fa.tpe.traverse(f) map (TTags(fa.tags, _))
+      }
+
+    implicit def decodeEJsonK[L: DecodeEJson: Order]: DecodeEJsonK[TTags[L, ?]] =
+      new DecodeEJsonK[TTags[L, ?]] {
+        val decType = DecodeEJsonK[TypeF[L, ?]]
+
+        def decodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) =
+          j => {
+            val tags = j.keyS(TagKey).cata(
+              tj => tj.decodeAs[TypeTag].map(List(_)) orElse tj.decodeAs[List[TypeTag]],
+              List().point[Decoded])
+
+            (tags |@| decType.decodeK[J].apply(j))(TTags(_, _))
+          }
       }
 
     // TODO{ejson}: Lift tags back to metadata once we're using EJson everywhere.
@@ -264,14 +301,23 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
           JR: Recursive.Aux[J, EJson]
         ): J = {
           val j = ejson.Fixed[J]
-          j.map.modifyOption((j.str("tag"), tejs) :: _)(v) | j.arr(List(tejs, v))
+          j.map.modifyOption((j.str(TagKey), tejs) :: _)(v) | j.arr(List(tejs, v))
         }
       }
   }
 
+  implicit def decodeEJson[L: DecodeEJson: Order, V: DecodeEJson]: DecodeEJson[StructuralType[L, V]] =
+    new DecodeEJson[StructuralType[L, V]] {
+      implicit val decodeEnvT = DecodeEJsonK.envT[V, TTags[L, ?]](MeasureKey, StructureKey)
+
+      def decode[J](j: J)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) =
+        j.anaM[Cofree[TTags[L, ?], V]](decodeEnvT.decodeK[J])
+          .map(_.transAna[StructuralType[L, V]](TTags.disperseTags))
+    }
+
   implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] =
     new EncodeEJson[StructuralType[L, V]] {
-      implicit val encodeEnvT = EncodeEJsonK.envT[V, TTags[L, ?]]("measure", "structure")
+      implicit val encodeEnvT = EncodeEJsonK.envT[V, TTags[L, ?]](MeasureKey, StructureKey)
 
       def encode[J](st: StructuralType[L, V])(
         implicit

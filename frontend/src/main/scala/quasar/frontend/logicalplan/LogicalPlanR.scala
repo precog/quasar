@@ -18,12 +18,12 @@ package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar._, SemanticError.TypeError
-import quasar.common.{JoinType, SortDir}
+import quasar.common.{JoinType, PhaseResult, PhaseResultW, SortDir}
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{SemanticErrsT, logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
 import quasar.sql.CIName
 
@@ -221,8 +221,7 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
       case JoinSideName(n) => success(lp.joinSideName[Typed[LP]](n))
 
       case Join(l, r, joinType, JoinCondition(lName, rName, cond)) =>
-        LP.funcFromJoinType(joinType).untpe(typ).flatMap { types =>
-          inferTypes(types(2), cond).flatMap { cond0 =>
+        inferTypes(Type.Bool, cond).flatMap { cond0 =>
             // FIXME: single pass for both names
             val lTyp = cond0.collect {
               case Cofree(typ0, JoinSideName(`lName`)) => typ0
@@ -230,10 +229,9 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
             val rTyp = cond0.collect {
               case Cofree(typ0, JoinSideName(`rName`)) => typ0
             }.concatenate(Type.TypeGlbMonoid)
-            (inferTypes(Type.glb(lTyp, types(0)), l) |@| inferTypes(Type.glb(rTyp, types(1)), r))(
+          (inferTypes(Type.glb(lTyp, typ), l) |@| inferTypes(Type.glb(rTyp, typ), r))(
               lp.join(_, _, joinType, JoinCondition(lName, rName, cond0)))
           }
-        }
 
       case Free(n) => success(lp.free[Typed[LP]](n))
 
@@ -433,7 +431,7 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
           emit(ConstrainedPlan(inf, Nil, joinSideName(v)))
 
         case Join(l, r, tpe, JoinCondition(lName, rName, c)) =>
-          checkJoin(inf, LP.funcFromJoinType(tpe), Func.Input3(l, r, c), lName, rName, tpe)
+          checkJoin(inf, Func.Input3(l, r, c), lName, rName, tpe)
 
         // TODO: Get the possible type from the LetF
         case Free(v) =>
@@ -488,21 +486,20 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
 
   private def checkJoin(
     inf: Type,
-    func: GenericFunc[nat._3],
     args: Func.Input[ConstrainedPlan[T], nat._3],
     lName: Symbol,
     rName: Symbol,
     tpe: JoinType)
       : NameT[SemDisj, ConstrainedPlan[T]] = {
     val const = args.map(appConst(_, constant(Data.NA)))
-    lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
+    lift(set.joinTyper(tpe)(args.map(_.inferred)).getOrElse(success(Type.Top)).disjunction).flatMap(
       unifyOrCheck(inf, _, join(const(0), const(1), tpe, JoinCondition(lName, rName, const(2)))))
   }
 
   type SemNames[A] = NameT[SemDisj, A]
 
   def ensureCorrectTypes(term: T):
-      ValidationNel[SemanticError, T] = {
+      SemanticErrsT[PhaseResultW, T] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import StateT.stateTMonadState
 
@@ -527,8 +524,11 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
     // to the knowledge that the function's parameters are constants, because
     // there is no way to know a function returns a constant unless you already know
     // the parameters are constants!
-    inferTypes(Type.Top, term).flatMap(
-      _.cataM(liftTM(checkTypesƒ)).map(appConst(_, constant(Data.NA))).evalZero.validation)
+    EitherT(inferTypes(Type.Top, term).disjunction.pure[PhaseResultW]).flatMap { ty =>
+      val phaseResult = PhaseResult.tree("Inferred Types", ty)
+      EitherT.rightT[PhaseResultW, NonEmptyList[SemanticError], Unit](WriterT.tell(Vector(phaseResult))) *>
+        EitherT.either(ty.cataM(liftTM(checkTypesƒ)).map(appConst(_, constant(Data.NA))).evalZero)
+    }
   }
 
   /** The set of paths referenced in the given plan. */

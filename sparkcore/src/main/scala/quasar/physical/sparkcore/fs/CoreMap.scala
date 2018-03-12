@@ -340,7 +340,7 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case Range(fFrom, fTo) => ((x: A) => (fFrom(x), fTo(x)) match {
-      case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
+      case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Arr((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2, ff3) => f2.right
     case TypeOf(f) =>

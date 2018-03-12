@@ -34,6 +34,9 @@ object TypeTag {
   val stringIso: Iso[TypeTag, String] =
     Iso[TypeTag, String](_.value)(TypeTag(_))
 
+  implicit val decodeEJson: DecodeEJson[TypeTag] =
+    DecodeEJson[String].map(TypeTag(_))
+
   implicit val encodeEJson: EncodeEJson[TypeTag] =
     EncodeEJson[String].contramap(_.value)
 

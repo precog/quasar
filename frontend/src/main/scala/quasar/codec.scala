@@ -93,7 +93,6 @@ object DataCodec {
           value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
 
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
-        case Set(_)     => None
 
         case Timestamp(value) => Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
         case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
@@ -159,7 +158,6 @@ object DataCodec {
 
         case Obj(value) => Json.obj(value.toList.map({ case (k, v) => encode(v) strengthL k }).unite: _*).some
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
-        case Set(_)     => None
 
         case Timestamp(value) => jString(value.toString).some
         case Date(value)      => jString(value.toString).some
@@ -200,14 +198,13 @@ object DataCodec {
   // Identify the sub-set of values that can be represented in Precise JSON in
   // such a way that the parser recovers the original type. These are:
   // - integer values that don't fit into Long, which Argonaut does not allow us to distinguish from decimals
-  // - Data.Set
   // - Data.NA
   // NB: For Readable, this does not account for Str values that will be confused with
   // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
   @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
   def representable(data: Data, codec: DataCodec): Boolean = data match {
     case (Data.Binary(_) | Data.Id(_)) if codec == Readable => false
-    case Data.Set(_) | Data.NA                              => false
+    case Data.NA                                            => false
     case Data.Int(x)                                        => x.isValidLong
     case Data.Arr(list)                                     => list.forall(representable(_, codec))
     case Data.Obj(map)                                      => map.values.forall(representable(_, codec))

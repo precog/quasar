@@ -41,8 +41,8 @@ class RestApiSpecs extends quasar.Qspec {
   val service =
     (Fixture.inMemFSWeb() ⊛ TaskRef(Tags.Min(Option.empty[VCache.Expiration])))((runEff, r) =>
       RestApi.finalizeServices(RestApi.toHttpServices(
-        (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
-        (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
+        (liftMT[Task, FailedResponseT] compose Read.fromTaskRef(r))  :+:
+        (liftMT[Task, FailedResponseT] compose Write.fromTaskRef(r)) :+:
         runEff,
         RestApi.coreServices[CoreEffIORW, Nothing](executionIdRef, timingRepo)
       )).orNotFound)

@@ -5,6 +5,7 @@
         "marklogic_json":    "pendingIgnoreFieldOrder",
         "marklogic_xml":     "pending",
         "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
         "spark_cassandra":   "pending"

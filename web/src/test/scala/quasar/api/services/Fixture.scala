@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import quasar.api.{ResponseOr, ResponseT}
+import quasar.api.{FailedResponseOr, FailedResponseT}
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
@@ -91,7 +91,7 @@ object Fixture {
     mounts: MountingsConfig = MountingsConfig.empty,
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
-  ): Task[CoreEffIO ~> ResponseOr] =
+  ): Task[CoreEffIO ~> FailedResponseOr] =
     inMemFSWebInspect(state, mounts, metaRefT, persist).map{ case (inter, ref) => inter }
 
   def inMemFSWebInspect(
@@ -99,8 +99,8 @@ object Fixture {
     mounts: MountingsConfig = MountingsConfig.empty,
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
-  ): Task[(CoreEffIO ~> ResponseOr, Task[(InMemState, Map[APath, MountConfig])])] =
+  ): Task[(CoreEffIO ~> FailedResponseOr, Task[(InMemState, Map[APath, MountConfig])])] =
     inMemFSEvalInspect(state, mounts, metaRefT, persist).map { case (inter, ref) =>
-      (foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]) compose (injectFT[Task, QErrs_Task] :+: inter), ref)
+      (foldMapNT(liftMT[Task, FailedResponseT] :+: qErrsToResponseT[Task]) compose (injectFT[Task, QErrs_Task] :+: inter), ref)
     }
 }

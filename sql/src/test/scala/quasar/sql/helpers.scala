@@ -50,8 +50,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     fixParser.parseScopedExpr(query).valueOr(err => scala.sys.error(
     s"False assumption in test, could not parse due to parse error: $err"))
   val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
-    val normed = normalizeProjections(query)
-    val sorted   = projectSortKeys(normed)
+    val sorted   = projectSortKeys(query)
     annotate(sorted)
   }
 
@@ -69,7 +68,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
       // but we need to remove core's dependency on sql first
       val optimized = optimizer.optimize(lp)
       for {
-        typechecked <- lpr.ensureCorrectTypes(optimized).disjunction
+        typechecked <- lpr.ensureCorrectTypes(optimized).run.run._2
         rewritten <- optimizer.rewriteJoins(typechecked).right
       } yield rewritten
     }
@@ -92,7 +91,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
 
   def testLogicalPlanDoesNotTypeCheck(query: Fix[Sql]) =
-    compile(query).map(lpr.ensureCorrectTypes(_).toEither must beLeft).toEither must beRight
+    compile(query).map(lpr.ensureCorrectTypes(_).run.run._2.toEither must beLeft).toEither must beRight
 
   def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))

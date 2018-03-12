@@ -18,7 +18,19 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.{EJson, CommonEJson => C, ExtEJson => E, EncodeEJson, Meta, Null, SizedType, Str, TypeTag, Type => EType}
+import quasar.ejson.{
+  DecodeEJson,
+  EJson,
+  CommonEJson => C,
+  ExtEJson => E,
+  EncodeEJson,
+  Meta,
+  Null,
+  SizedType,
+  Str,
+  TypeTag,
+  Type => EType
+}
 import quasar.ejson.implicits._
 import quasar.fp.ski.κ
 import quasar.fp._
@@ -125,6 +137,9 @@ package object sst {
     }
 
   // NB: Defined here as adding the tag causes the compiler not to consider the TypeStat companion.
+  implicit def populationTypeStatDecodeEJson[A: DecodeEJson: Equal: Field: NRoot]: DecodeEJson[TypeStat[A] @@ Population] =
+    Population.subst(DecodeEJson[TypeStat[A]])
+
   implicit def populationTypeStatEncodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A] @@ Population] =
     new EncodeEJson[TypeStat[A] @@ Population] {
       def encode[J](ts: TypeStat[A] @@ Population)(

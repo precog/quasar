@@ -44,6 +44,12 @@ trait Library {
   def partialTyperV[N <: Nat](f: PartialFunction[Domain[N], VCodomain]): Typer[N] =
     partialTyperOV[N](f.lift)
 
+  def basicTyper[N <: Nat]: Typer[N] = { _ => None }
+
+  def widenConstTyper[N <: Nat](select: Domain[N] => Type): Typer[N] = {
+    domain => Some(success(select(domain).widenConst))
+  }
+
   protected def partialTyper[N <: Nat](f: PartialFunction[Domain[N], Codomain]): Typer[N] =
     partialTyperOV[N](g => f.lift(g).map(success))
 
@@ -51,7 +57,7 @@ trait Library {
     case ((funcDomain, _), _) => Some(success(funcDomain))
   }
 
-  protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] =
+  def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] =
     partialUntyperOV[N](f.andThen(Some(_)))
 
   protected def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {

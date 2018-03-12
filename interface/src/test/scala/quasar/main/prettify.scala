@@ -218,7 +218,6 @@ class PrettifySpecs extends quasar.Qspec {
       case Data.Str("")     => false
       case Data.Obj(_)      => false
       case Data.Arr(_)      => false
-      case Data.Set(_)      => false
       case Data.Binary(_)   => false
       case Data.Id(_)       => false
       case Data.NA          => false

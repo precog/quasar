@@ -116,11 +116,6 @@ object Data {
   val _arr =
     Prism.partial[Data, List[Data]] { case Data.Arr(l) => l } (Data.Arr(_))
 
-  final case class Set(value: List[Data]) extends Data {
-    def dataType = value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
-    def toJs = None
-  }
-
   final case class Timestamp(value: Instant) extends Data {
     def dataType = Type.Timestamp
     def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
@@ -241,6 +236,12 @@ object Data {
   implicit val dataShow: Show[Data] = Show.showFromToString
 
   implicit val dataEqual: Equal[Data] = Equal.equalA
+
+  implicit val dataCorecursive: Corecursive.Aux[Data, EJson] =
+    new Corecursive[Data] {
+      type Base[T] = EJson[T]
+      def embed(t: EJson[Data])(implicit BF: Functor[Base]) = fromEJson(t)
+    }
 
   /** NB: For parsing arbitrary JSON into `Data`, _not_ for deserializing `Data`
     *     previously serialized as JSON. For that, see `DataCodec`.
@@ -403,7 +404,7 @@ object Data {
         EJsonType(TypeTag.Time))).right
       case Interval(value)  =>
         E.inj(ejson.Meta(
-          Obj(ListMap("seconds" -> Dec(value.toNanos / nanosPerSec))),
+          Obj(ListMap("seconds" -> Dec(BigDecimal(value.toNanos) / BigDecimal(nanosPerSec)))),
           EJsonType(TypeTag.Interval))).right
       case Binary(value)    =>
         E.inj(ejson.Meta(

@@ -79,13 +79,6 @@ final case class Typecheck[A](expr: A, typ: Type, cont: A, fallback: A)
 object LogicalPlan {
   import quasar.std.StdLib._
 
-  def funcFromJoinType(tpe: JoinType) = tpe match {
-    case JoinType.Inner => set.InnerJoin
-    case JoinType.LeftOuter => set.LeftOuterJoin
-    case JoinType.RightOuter => set.RightOuterJoin
-    case JoinType.FullOuter => set.FullOuterJoin
-  }
-
   implicit val traverse: Traverse[LogicalPlan] =
     new Traverse[LogicalPlan] {
       def traverseImpl[G[_], A, B](

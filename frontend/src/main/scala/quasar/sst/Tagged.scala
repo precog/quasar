@@ -18,11 +18,10 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.{ejson => ejs}
-import quasar.ejson.{EJson, EncodeEJsonK, ExtEJson => E, TypeTag}
+import quasar.ejson.{Decoded, DecodeEJsonK, EJson, EncodeEJsonK, ExtEJson => E, TypeTag}
 import quasar.ejson.implicits._
 
 import matryoshka._
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 final case class Tagged[A](tag: TypeTag, value: A)
@@ -37,10 +36,21 @@ object Tagged {
         f(fa.value) map (b => fa.copy(value = b))
     }
 
+  implicit val decodeEJsonK: DecodeEJsonK[Tagged] =
+    new DecodeEJsonK[Tagged] {
+      def decodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): CoalgebraM[Decoded, Tagged, J] = {
+        case Embed(E(ejs.Meta(v, Embed(ejs.Type(t))))) =>
+          Decoded.success(Tagged(t, v))
+
+        case other =>
+          Decoded.failureFor[Tagged[J]](other, "Tagged")
+      }
+    }
+
   implicit val encodeEJsonK: EncodeEJsonK[Tagged] =
     new EncodeEJsonK[Tagged] {
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[Tagged, J] = {
-        case Tagged(t, j) => E(ejs.Meta(j, ejs.Type(t))).embed
+        case Tagged(t, j) => EJson.meta(j, ejs.Type(t))
       }
     }
 

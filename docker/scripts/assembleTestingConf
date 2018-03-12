@@ -79,6 +79,8 @@ configure_mongo() {
   if [[ $CONTAINERNAME == "mongodb_read_only" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27020\"" >> $CONFIGFILE; fi
   if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi
   if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_4_13"    ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27023\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27024\"" >> $CONFIGFILE; fi
 }
 
 

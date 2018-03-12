@@ -11,10 +11,10 @@
 
     "NB2": "Skipping for now, as postgres returns NULLs for missing columns",
 
-    "data": ["../cars.data", "../cars2.data"],
+    "data": ["../../cars.data", "../../cars2.data"],
 
     "query": "select cars.name as c1, cars2.name as c2
-              from `../cars2` left outer join `../cars`
+              from `../../cars2` left outer join `../../cars`
               on cars.`_id` = cars2.`_id`",
 
     "predicate": "exactly",

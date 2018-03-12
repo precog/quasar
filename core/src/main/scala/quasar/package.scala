@@ -59,8 +59,7 @@ package object quasar {
       ast      <- phase("SQL AST", query.right)
       substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
       absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
-      normed   <- phase("Normalized Projections", normalizeProjections[Fix[Sql]](absAst).right)
-      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](normed).right)
+      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](absAst).right)
       annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
       logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
     } yield logical
@@ -74,7 +73,9 @@ package object quasar {
   def preparePlan(lp: Fix[LP]): CompileM[Fix[LP]] =
     for {
       optimized   <- phase("Optimized", optimizer.optimize(lp).right)
-      typechecked <- phase("Typechecked", lpr.ensureCorrectTypes(optimized).disjunction)
+      typechecked <- lpr.ensureCorrectTypes(optimized) flatMap { a =>
+        (a.set(Vector(PhaseResult.tree("Typechecked", a)))).liftM[SemanticErrsT]
+      }
       rewritten   <- phase("Rewritten Joins", optimizer.rewriteJoins(typechecked).right)
     } yield rewritten
 

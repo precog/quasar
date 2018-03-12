@@ -177,7 +177,7 @@ class TypesSpec extends quasar.Qspec {
 
     "descend into singleton type with missing field" in {
       val obj = const("foo" -> Data.Str("bar"))
-      obj.mapKey(const("baz")).toOption should beNone
+      obj.mapKey(const("baz")).toOption should beSome(Const(Data.NA))
     }
 
     "descend into singleton type with Str field and return type of field value" in {
@@ -198,7 +198,7 @@ class TypesSpec extends quasar.Qspec {
 
     "descend into obj field type with missing field" in {
       val field = Obj(Map("foo" -> Str), None)
-      field.mapKey(const("bar")).toOption should beNone
+      field.mapKey(const("bar")).toOption should beSome(Const(Data.NA))
     }
 
     "descend into product with const field" in {
@@ -697,7 +697,7 @@ class TypesSpec extends quasar.Qspec {
     }
 
     "descend into Arr with wrong index" in {
-      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(5))) should beFailing
+      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(5))) should beSuccessful(Const(Data.NA))
     }
 
     "descend into multiple Arr" in {

@@ -47,16 +47,20 @@ class QHttpServiceSpec extends quasar.Qspec {
 
   val errHost: Host = Host("example.com", 443)
 
-  def evalStr(errs: String*): StrIO ~> ResponseOr = {
-    val f = new (Str ~> ResponseOr) {
+  def evalStr(errs: String*): StrIO ~> FailedResponseOr = {
+    val f = new (Str ~> FailedResponseOr) {
       def apply[A](a: Str[A]) =
         if (errs.toSet contains a.s)
-          EitherT.leftT(BadRequest(a.s).putHeaders(errHost).withBody("FAIL"))
+          EitherT.leftT(
+            BadRequest(a.s)
+              .putHeaders(errHost)
+              .withBody("FAIL")
+              .map(FailedResponse(new RuntimeException(a.s), _)))
         else
-          a.k(a.s).point[ResponseOr]
+          a.k(a.s).point[FailedResponseOr]
     }
 
-    f :+: liftMT[Task, ResponseT]
+    f :+: liftMT[Task, FailedResponseT]
   }
 
   val request = Request(uri = Uri(CaseInsensitiveString.empty.some))

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson.{EJson, EJsonArbitrary, Fixed}
+import quasar.ejson.{Decoded, DecodeEJson, EncodeEJson, EJson, EJsonArbitrary, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
 
@@ -163,5 +163,9 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
       val emptyStr = const[J, T](J.str("")).embed
       emptyArr ≟ emptyStr
     }
+  }
+
+  "EJson codec" >> prop { t: T =>
+    DecodeEJson[T].decode(EncodeEJson[T].encode[J](t)) ≟ t.point[Decoded]
   }
 }

@@ -29,15 +29,20 @@ import scalaz.syntax.std.option._
 import spire.algebra.{AdditiveMonoid, Field, NRoot, Rig}
 import spire.implicits._
 
-/** Statistics based on a sample from a population. */
-final class SampleStats[A] private (
-  val size: A,
-  // Sums of powers (1-4) of differences from the mean.
-  val m1: A,
-  val m2: A,
-  val m3: A,
-  val m4: A
-) {
+/** Statistics based on a sample from a population.
+  *
+  * @param size the number of observations
+  * @param m1 the first central moment
+  * @param m2 the second central moment
+  * @param m3 the third central moment
+  * @param m4 the fourth central moment
+  */
+final case class SampleStats[A](
+    size: A,
+    m1: A,
+    m2: A,
+    m3: A,
+    m4: A) {
 
   // Sample Statistics
 
@@ -99,7 +104,7 @@ final class SampleStats[A] private (
     val `δ²/n²` = `δ/n` * `δ/n`
     val t1      = δ * `δ/n` * size
 
-    new SampleStats(
+    SampleStats(
       n,
 
       m1 + `δ/n`,
@@ -140,7 +145,7 @@ final class SampleStats[A] private (
       val `δ³`  = `δ²` *  δ
       val `δ⁴`  = `δ²` * `δ²`
 
-      new SampleStats(
+      SampleStats(
         n,
 
         ((`n₁` * m1) + (`n₂` * b.m1)) / n,
@@ -183,7 +188,7 @@ object SampleStats extends SampleStatsInstances {
 
   /** Stats over the frequency of an observation. */
   def freq[A](count: A, a: A)(implicit A: AdditiveMonoid[A]): SampleStats[A] =
-    new SampleStats[A](count, a, A.zero, A.zero, A.zero)
+    SampleStats[A](count, a, A.zero, A.zero, A.zero)
 
   /** Stats over a `Foldable` of samples. */
   def fromFoldable[F[_]: Foldable, A: Field](fa: F[A]): SampleStats[A] =

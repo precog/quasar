@@ -7,9 +7,9 @@
         "mimir": "ignoreFieldOrder"
     },
 
-    "data": ["../../demo/patients.data", "../extraSmallZips.data"],
+    "data": ["../../demo/patients.data", "../../extraSmallZips.data"],
 
-    "query": "select p.ssn, p.state, z.State from `../../demo/patients` as p join (select distinct state as State from `../extraSmallZips`) as z on p.state = z.State",
+    "query": "select p.ssn, p.state, z.State from `../../demo/patients` as p join (select distinct state as State from `../../extraSmallZips`) as z on p.state = z.State",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,

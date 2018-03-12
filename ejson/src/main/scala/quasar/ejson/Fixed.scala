@@ -18,9 +18,11 @@ package quasar.ejson
 
 import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
 import quasar.contrib.matryoshka.birecursiveIso
+import quasar.ejson.implicits._
 
 import matryoshka._
 import monocle.Prism
+import scalaz.==>>
 
 final class Fixed[J] private ()(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) {
   private val iso = birecursiveIso[J, EJson]
@@ -42,6 +44,9 @@ final class Fixed[J] private ()(implicit JC: Corecursive.Aux[J, EJson], JR: Recu
 
   val int: Prism[J, BigInt] =
     iso composePrism optics.int
+
+  val imap: Prism[J, J ==>> J] =
+    iso composePrism optics.imap[J]
 
   val map: Prism[J, List[(J, J)]] =
     iso composePrism optics.map

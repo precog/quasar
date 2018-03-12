@@ -19,20 +19,20 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.Planner.PlannerError
-import quasar.common.SortDir
+import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.construction
-import quasar.qscript.MapFuncsCore
+import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.data.free._
 import pathy.Path
-import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT, Free}
 import scalaz.Scalaz._
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
@@ -54,6 +54,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       right -> func.RightSide)
 
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
+  val customers: AFile = Path.rootDir </> Path.dir("client") </> Path.file("customers")
 
   def extractFM(graph: QSUGraph) = ExtractFreeMap[Fix, F](graph)
 
@@ -313,6 +314,147 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           outerAutojoinCondition must beTreeEqual(func.ConcatMaps(
             func.LeftSide,
             func.MakeMap(func.Constant(ejs.str("sort_key_1")), func.RightSide)))
+        }
+      }
+    }
+
+    "convert a partially mappable join condition on both sides" >> {
+      val projectCustomersKey = projectStrKey("customers_key")
+      val projectCustomersKey2 = projectStrKey("customers_key_2")
+      val projectFoo = projectStrKey("foo")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(
+          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
+          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu._autojoin2(
+            qsu.map(qsu.union(qsu.joinSideRef('leftJoin), qsu.joinSideRef('rightJoin)), projectFoo),
+            qsu._autojoin2(
+              qsu.transpose(qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey), Retain.Values, Rotation.ShiftArray),
+              qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey2),
+              func.Add(func.LeftSide, func.RightSide)),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, 'leftJoin, 'rightJoin))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(ThetaJoin(
+          AutoJoin2(
+            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+            Union(
+              Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+              Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap)),
+            autojoinConditionOrders),
+          AutoJoin2(
+            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap), structCustomers), Retain.Values, Rotation.ShiftArray),
+            autojoinConditionCustomers),
+          on, JoinType.Inner, repair)) => {
+
+          autojoinConditionOrders must beTreeEqual(makeMap("left_source", "left_target_0"))
+          autojoinConditionCustomers must beTreeEqual(makeMap("right_source", "right_target_0"))
+
+          repair must beTreeEqual(
+            makeMap("left", "right") >>= {
+              case LeftSide => func.ProjectKeyS(func.LeftSide, "left_source")
+              case RightSide => func.ProjectKeyS(func.RightSide, "right_source")
+            })
+
+          on must beTreeEqual(
+            func.Eq(
+              func.ProjectKeyS(
+                func.ProjectKeyS(func.LeftSide, "left_target_0"), "foo"),
+              func.Add(
+                func.ProjectKeyS(func.RightSide, "right_target_0"),
+                func.ProjectKeyS(func.RightSide, "customers_key_2"))))
+
+          structCustomers must beTreeEqual(projectCustomersKey)
+        }
+      }
+    }
+
+    "convert a non-mappable join condition on both sides" >> {
+      val projectOrdersKey = projectStrKey("orders_key")
+      val projectCustomersKey = projectStrKey("customers_key")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(
+          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
+          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu._autojoin2(
+            qsu.transpose(qsu.map(qsu.joinSideRef('leftJoin), projectOrdersKey), Retain.Values, Rotation.ShiftArray),
+            qsu.transpose(qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey), Retain.Values, Rotation.ShiftArray),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, 'leftJoin, 'rightJoin))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(ThetaJoin(
+          AutoJoin2(
+            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap), structOrders), Retain.Values, Rotation.ShiftArray),
+            autojoinConditionOrders),
+          AutoJoin2(
+            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap), structCustomers), Retain.Values, Rotation.ShiftArray),
+            autojoinConditionCustomers),
+          on, JoinType.Inner, repair)) => {
+
+          autojoinConditionOrders must beTreeEqual(makeMap("left_source", "left_target_0"))
+          autojoinConditionCustomers must beTreeEqual(makeMap("right_source", "right_target_0"))
+
+          structOrders must beTreeEqual(projectOrdersKey)
+          structCustomers must beTreeEqual(projectCustomersKey)
+
+          on must beTreeEqual(
+            func.Eq(
+              func.ProjectKeyS(func.LeftSide, "left_target_0"),
+              func.ProjectKeyS(func.RightSide, "right_target_0")))
+
+          repair must beTreeEqual(
+            makeMap("left", "right") >>= {
+              case LeftSide => func.ProjectKeyS(func.LeftSide, "left_source")
+              case RightSide => func.ProjectKeyS(func.RightSide, "right_source")
+            })
+        }
+      }
+    }
+
+    "convert a non-mappable join condition on the left" >> {
+      val projectOrdersKey = projectStrKey("orders_key")
+      val projectCustomersKey = projectStrKey("customers_key")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(
+          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
+          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu._autojoin2(
+            qsu.transpose(qsu.map(qsu.joinSideRef('leftJoin), projectOrdersKey), Retain.Values, Rotation.ShiftArray),
+            qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, 'leftJoin, 'rightJoin))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(ThetaJoin(
+          AutoJoin2(
+            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap), struct), Retain.Values, Rotation.ShiftArray),
+            autojoinCondition),
+          Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+          on, JoinType.Inner, repair)) => {
+
+          autojoinCondition must beTreeEqual(makeMap("left_source", "left_target_0"))
+
+          struct must beTreeEqual(projectOrdersKey)
+
+          on must beTreeEqual(
+            func.Eq(
+              func.ProjectKeyS(func.LeftSide, "left_target_0"),
+              projectCustomersKey.as[JoinSide](RightSide)))
+
+          repair must beTreeEqual(
+            makeMap("left", "right") >>= {
+              case LeftSide => func.ProjectKeyS(func.LeftSide, "left_source")
+              case side => Free.pure(side)
+            })
         }
       }
     }

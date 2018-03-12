@@ -196,24 +196,24 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
 object SchemaServiceSpec {
   type SchemaEff[A] = (Mounting :\: QueryFile :\: FileSystemFailure :/: Task)#M[A]
 
-  def runQueryFile(mem: InMemState): Task[QueryFile ~> ResponseOr] =
+  def runQueryFile(mem: InMemState): Task[QueryFile ~> FailedResponseOr] =
     InMemory.runStatefully(mem) map { eval =>
-      liftMT[Task, ResponseT] compose eval compose InMemory.queryFile
+      liftMT[Task, FailedResponseT] compose eval compose InMemory.queryFile
     }
 
-  val runMounting: Task[Mounting ~> ResponseOr] =
+  val runMounting: Task[Mounting ~> FailedResponseOr] =
     KeyValueStore.impl.default[APath, MountConfig] map { eval =>
-      liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
+      liftMT[Task, FailedResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
     }
 
   def service(mem: InMemState): Service[Request, Response] =
     HttpService.lift(req => runQueryFile(mem).tuple(runMounting) flatMap {
       case (runQF, runM) =>
         schema.service[SchemaEff].toHttpService(
-          runM                               :+:
-          runQF                              :+:
-          failureResponseOr[FileSystemError] :+:
-          liftMT[Task, ResponseT]
+          runM                                                     :+:
+          runQF                                                    :+:
+          FailedResponse.fromFailureMessage[Task, FileSystemError] :+:
+          liftMT[Task, FailedResponseT]
         )(req)
     }).orNotFound
 }

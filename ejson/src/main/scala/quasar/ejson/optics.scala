@@ -20,6 +20,7 @@ import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
 import quasar.fp.PrismNT
 
 import monocle.Prism
+import scalaz.{==>>, Order}
 
 object optics {
   import Common.{Optics => CO}
@@ -48,6 +49,9 @@ object optics {
 
   def int[A]: Prism[EJson[A], BigInt] =
     ext composePrism EO.int
+
+  def imap[A: Order]: Prism[EJson[A], A ==>> A] =
+    ext composePrism EO.imap
 
   def map[A]: Prism[EJson[A], List[(A, A)]] =
     ext composePrism EO.map

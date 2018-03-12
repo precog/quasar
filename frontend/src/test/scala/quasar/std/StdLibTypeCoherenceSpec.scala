@@ -52,9 +52,9 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
           case Left(_) =>
             failure
           case Right(is) =>
-            input.zip(is.unsized).map { case (exp, res) =>
+            input.zip(is.unsized).foldMap { case (exp, res) =>
               Type.typecheck(res, exp).toEither.fold[Result](κ(failure), κ(success))
-            }.suml
+            }
         }
       }
     }.right.getOrElse(success)

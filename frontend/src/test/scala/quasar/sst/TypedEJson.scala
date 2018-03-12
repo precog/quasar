@@ -17,7 +17,20 @@
 package quasar.sst
 
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson.{EJson, Common, Extension, CommonEJson, ExtEJson, Meta, Type => EType, SizedType => ESizedType, EJsonArbitrary, Null => ENull}
+import quasar.ejson.{
+  DecodeEJson,
+  EJson,
+  EncodeEJson,
+  Common,
+  Extension,
+  CommonEJson,
+  ExtEJson,
+  Meta,
+  Type => EType,
+  SizedType => ESizedType,
+  EJsonArbitrary,
+  Null => ENull
+}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.pkg.tests._
@@ -56,6 +69,12 @@ sealed abstract class TypedEJsonInstances extends TypedEJsonInstances0 {
     corecursiveArbitrary[T[TypedEJson.TEJson], TypedEJson.TEJson] map { v =>
       TypedEJson(v.transCata[T[EJson]](TypedEJson.absorbMetadata[T[EJson]]))
     }
+
+  implicit def decodeEJson[T[_[_]]: BirecursiveT]: DecodeEJson[TypedEJson[T]] =
+    DecodeEJson.decodeEJsonC[TypedEJson[T], EJson]
+
+  implicit def encodeEJson[T[_[_]]: BirecursiveT]: EncodeEJson[TypedEJson[T]] =
+    EncodeEJson.encodeEJsonR[TypedEJson[T], EJson]
 
   implicit def order[T[_[_]]: BirecursiveT]: Order[TypedEJson[T]] =
     Order[T[EJson]].contramap(_.ejson)

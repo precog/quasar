@@ -29,7 +29,7 @@ import pathy.Path.{file, rootDir}
 class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
-  
+
   "ensureCorrectTypes" should  {
 
     "leave untouched if is free variable" in {
@@ -182,7 +182,7 @@ class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
   }
 
   private def ensure(lp: Fix[LogicalPlan])(eval: Fix[LogicalPlan] => ResultLike): Result =
-    lpf.ensureCorrectTypes(lp).fold(κ(failure), eval(_).toResult)
+    lpf.ensureCorrectTypes(lp).run.run._2.fold(κ(failure), eval(_).toResult)
 
   implicit def strToFile(str: String): AFile =
     rootDir </> file(str)

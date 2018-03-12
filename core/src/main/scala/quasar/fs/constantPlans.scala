@@ -32,7 +32,6 @@ object constantPlans {
   /** Identify plans which reduce to a (set of) constant value(s). */
   def asConstant(lp: Fix[LogicalPlan]): Option[List[Data]] =
     lp.project match {
-      case Constant(Data.Set(records)) => records.some
       case Constant(value)             => List(value).some
       case _                           => none
     }

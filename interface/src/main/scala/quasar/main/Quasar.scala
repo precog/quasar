@@ -34,8 +34,7 @@ import quasar.fs.mount.module.Module
 import quasar.metastore.MetaStore.ShouldInitialize
 import quasar.metastore._
 
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 /**
@@ -102,7 +101,7 @@ object Quasar {
   def initWithMeta(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       _ <- shift.liftM[MainErrT]
-      fsThing  <- CompositeFileSystem.initWithMountsInMetaStore(loadConfig,metaRef)
+      fsThing  <- CompositeFileSystem.initWithMountsInMetaStore(loadConfig, metaRef)
       _ <- shift.liftM[MainErrT]
       quasarFS <- initWithFS(fsThing, metaRef, persist).liftM[MainErrT]
       _ <- shift.liftM[MainErrT]
@@ -112,12 +111,13 @@ object Quasar {
     for {
       finalEval  <- CoreEff.defaultImpl(fsThing, metaRef, persist)
       tTask      <- toTask
+      loggedEval =  flatMapSNT(QErrs_CRW_Task.logFatalErrors) compose finalEval
       cacheCtx   <- Caching.viewCacheRefreshCtx(foldMapNT(
                       reflNT[Task]                :+:
                       connectionIOToTask(metaRef) :+:
-                      (finalEval andThen tTask)))
+                      (loggedEval andThen tTask)))
       _          <- cacheCtx.start
-    } yield Quasar(finalEval, cacheCtx.shutdown)
+    } yield Quasar(loggedEval, cacheCtx.shutdown)
 
   val toTask: Task[QErrs_CRW_TaskM ~> Task] =
     TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>

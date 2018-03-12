@@ -20,12 +20,12 @@ import slamdata.Predef._
 import quasar.common.PrimaryType
 import quasar.fp._
 import quasar.fp.ski._
-import SemanticError.{TypeError, MissingField, MissingIndex}
+import SemanticError.TypeError
 
 import scala.Any
 
 import argonaut._, Argonaut._, ArgonautScalaz._
-import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
+import scalaz._, Scalaz._, Validation.{success, failureNel}
 
 sealed abstract class Type extends Product with Serializable { self =>
   import Type._
@@ -113,7 +113,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     case Const(Data.Arr(value)) => Some(value.length)
     case Arr(value)             => Some(value.length)
     case FlexArr(minLen, _, _)  => Some(minLen)
-    case x @ Coproduct(_, _) =>
+    case x @ Coproduct(_, _)    =>
       x.flatten.toList.foldLeft[Option[Int]](None)((a, n) =>
         (a |@| n.arrayMinLength)(_ min _))
     case _ => None
@@ -138,7 +138,7 @@ sealed abstract class Type extends Product with Serializable { self =>
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
         val rez = x.flatten.map(_.mapKey(key))
         rez.foldMap(_.getOrElse(Bottom)) match {
-          case x if simplify(x) ≟ Bottom => rez.concatenate
+          case x if simplify(x) ≟ Bottom || simplify(x) ≟ Const(Data.NA) => rez.concatenate
           case x                         => success(x)
         }
       }
@@ -149,13 +149,12 @@ sealed abstract class Type extends Product with Serializable { self =>
           success)
 
       case (Const(Data.Str(key)), Const(Data.Obj(map))) =>
-        // TODO: import toSuccess as method on Option (via ToOptionOps)?
-        toSuccess(map.get(key).map(Const(_)))(nels(MissingField(key)))
+        success(Type.Const(map.get(key).getOrElse(Data.NA)))
 
       case (Const(Data.Str(key)), Obj(map, uk)) =>
         map.get(key).fold(
           uk.fold[SemanticResult[Type]](
-            failureNel(MissingField(key)))(
+            success(Type.Const(Data.NA)))(
             success))(
           success)
 
@@ -168,7 +167,7 @@ sealed abstract class Type extends Product with Serializable { self =>
     if (Type.lub(index, Int) ≠ Int) failureNel(TypeError(Int, index, None))
     else (index, this) match {
       case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
-        arr.lift(index.toInt).map(data => success(Const(data))).getOrElse(failureNel(MissingIndex(index.toInt)))
+        success(Const(arr.lift(index.toInt).getOrElse(Data.NA)))
 
       case (_, x @ Coproduct(_, _)) =>
         implicit val lub: Monoid[Type] = Type.TypeLubMonoid
@@ -179,19 +178,20 @@ sealed abstract class Type extends Product with Serializable { self =>
           failureNel(TypeError(AnyArray, this, None)))(
           success)
 
-      case (Const(Data.Int(index)), FlexArr(min, max, value)) =>
-        lazy val succ =
+      case (_, FlexArr(_, _, value)) =>
           success(value)
-        max.fold[SemanticResult[Type]](
-          succ)(
-          max => if (index < max) succ else failureNel(MissingIndex(index.toInt)))
 
       case (Const(Data.Int(index)), Arr(value)) =>
-        if (index < value.length)
-          success(value(index.toInt))
-        else failureNel(MissingIndex(index.toInt))
+        success(value.lift(index.toInt).getOrElse(Const(Data.NA)))
 
       case (_, _) => failureNel(TypeError(AnyArray, this, None))
+    }
+  }
+
+  final def widenConst: Type = {
+    this match {
+      case Type.Const(value) => value.dataType
+      case t => t
     }
   }
 }
@@ -203,8 +203,8 @@ trait TypeInstances {
     def zero = Type.Bottom
 
     def append(v1: Type, v2: => Type) = (v1, v2) match {
-      case (Type.Bottom, that) => that
-      case (this0, Type.Bottom) => this0
+      case (Type.Const(Data.NA) | Type.Bottom, that) => that
+      case (this0, Type.Const(Data.NA) | Type.Bottom) => this0
       case (this0, that0) if this0.contains(Type.Top) || that0.contains(Type.Top) => Type.Top
       case (_, _) => v1 ⨿ v2
     }
@@ -316,8 +316,12 @@ object Type extends TypeInstances {
 
   def simplify(tpe: Type): Type = mapUp(tpe) {
     case x @ Coproduct(_, _) => {
-      val ts = x.flatten.toList.filter(_ != Bottom)
-      if (ts.contains(Top)) Top else Coproduct.fromSeq(ts.distinct)
+      val xs = x.flatten.toList
+      val ts = xs.filter(t => t != Bottom && t != Type.Const(Data.NA))
+      val hasNA = xs.contains(Const(Data.NA))
+      if (ts.contains(Top)) Top
+      else if (hasNA && ts == Nil) Const(Data.NA)
+      else Coproduct.fromSeq(ts.distinct)
     }
     case x => x
   }
@@ -334,6 +338,14 @@ object Type extends TypeInstances {
         v1.unionWith(v2)(lub),
         u1.fold(u2)(unk => u2.fold(u1)(lub(unk, _).some)))
     case _                          => Top
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def constructiveLub(left: Type, right: Type): Type = (left, right) match {
+    case _ if left contains right   => left
+    case _ if right contains left   => right
+    case (Const(l), Const(r))       => lub(l.dataType, r.dataType)
+    case _                          => left ⨿ right
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

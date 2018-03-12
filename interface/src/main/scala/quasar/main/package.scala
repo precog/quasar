@@ -493,6 +493,16 @@ package object main extends Logging {
           (liftMT[Task, MainErrT] compose Write.fromTaskRef(r)) :+:
           liftMT[Task, MainErrT]                                :+:
           QErrs.toCatchable[MainTask]))
+
+    val logFatalErrors: QErrs_CRW_Task ~> QErrs_CRW_TaskM =
+      injectFT[VCacheExpR, QErrs_CRW_Task] :+:
+      injectFT[VCacheExpW, QErrs_CRW_Task] :+:
+      injectFT[Task, QErrs_CRW_Task] :+:
+      logging.logPhysicalError[Task, QErrs_CRW_Task](log) :+:
+      logging.logFatalModuleError[Task, QErrs_CRW_Task](log) :+:
+      injectFT[PathMismatchFailure, QErrs_CRW_Task] :+:
+      logging.logFatalMountingError[Task, QErrs_CRW_Task](log) :+:
+      logging.logFatalFileSystemError[Task, QErrs_CRW_Task](log)
   }
 
   final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: BackendConfig, cmd: Cmd)

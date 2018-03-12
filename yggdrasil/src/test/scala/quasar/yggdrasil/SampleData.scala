@@ -51,8 +51,7 @@ object SampleData extends CValueGenerators {
       depth   <- choose(0, 1)
       jschema <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
-    }
-    yield {
+    } yield {
       SampleData(
         data.sorted.toStream flatMap {
           // Sometimes the assembly process will generate overlapping values which will
@@ -60,10 +59,8 @@ object SampleData extends CValueGenerators {
           // out here than prevent it from happening in the first place.
           case (ids, jv) => try { Some(toRecord(ids, assemble(jv))) } catch { case _ : RuntimeException => None }
         },
-        Some((idCount, jschema))
-      )
-    }
-  )
+        Some((idCount, jschema)))
+    })
 
   def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
@@ -95,8 +92,7 @@ object SampleData extends CValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(sampleData.data.sorted, sampleData.schema)
-      }
-    )
+      })
   }
 
   def shuffle(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
@@ -116,8 +112,7 @@ object SampleData extends CValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(sampleData.data.distinct, sampleData.schema)
-      }
-    )
+      })
   }
 
   def distinctKeys(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
@@ -126,8 +121,7 @@ object SampleData extends CValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(distinctBy(sampleData.data)(_ \ "keys"), sampleData.schema)
-      }
-    )
+      })
   }
 
   def distinctValues(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
@@ -136,8 +130,7 @@ object SampleData extends CValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(distinctBy(sampleData.data)(_ \ "value"), sampleData.schema)
-      }
-    )
+      })
   }
 
   def duplicateRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
@@ -185,6 +178,3 @@ object SampleData extends CValueGenerators {
     Arbitrary(gen)
   }
 }
-
-
-

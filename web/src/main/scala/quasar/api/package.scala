@@ -17,9 +17,7 @@
 package quasar
 
 import slamdata.Predef.{ -> => _, _ }
-import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
-import quasar.effect.Failure
 
 import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
@@ -35,26 +33,10 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object api {
-  type ResponseT[F[_], A]   = EitherT[F, Response, A]
-  type ResponseOr[A]        = ResponseT[Task, A]
+  type FailedResponseT[F[_], A] = EitherT[F, FailedResponse, A]
+  type FailedResponseOr[A]      = FailedResponseT[Task, A]
 
   type ApiErrT[F[_], A] = EitherT[F, ApiError, A]
-
-  /** Interpret a `Failure` effect into `ResponseOr` given evidence the
-    * failure type can be converted to a `QResponse`.
-    */
-  def failureResponseOr[E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> ResponseOr =
-    failureResponseT[Task, E]
-
-  def failureResponseT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> ResponseT[F, ?] = {
-
-    def errToResp(e: E): Response =
-      e.toResponse[ResponseOr].toHttpResponse(NaturalTransformation.refl)
-
-    convertError[F](errToResp) compose Failure.toError[EitherT[F, E, ?], E]
-  }
 
   // https://tools.ietf.org/html/rfc7234#section-4.2.4
   val StaleHeader = Header(Warning.name.value, """110 - "Response is Stale"""")

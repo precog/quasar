@@ -8,10 +8,10 @@
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
-    "data": ["../owners.data", "../cars.data"],
+    "data": ["../../owners.data", "../../cars.data"],
 
     "query": "SELECT owner.name, car.name
-              from `../owners` as owner join `../cars` as car
+              from `../../owners` as owner join `../../cars` as car
               on car.`_id` = owner.carId",
 
     "predicate": "exactly",

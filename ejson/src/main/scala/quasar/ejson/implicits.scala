@@ -16,11 +16,16 @@
 
 package quasar.ejson
 
-import quasar.contrib.matryoshka._
+import slamdata.Predef._
+import quasar.contrib.matryoshka.{project => projectg, _}
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.Order
+import scalaz.{==>>, Equal, Order}
+import scalaz.std.list._
+import scalaz.syntax.equal._
+import scalaz.syntax.foldable._
+import scalaz.syntax.std.option._
 
 object implicits {
   // NB: This is defined here as we need to elide metadata from args before
@@ -36,6 +41,32 @@ object implicits {
         x.transCata[T](EJson.elideMetadata[T]),
         y.transCata[T](EJson.elideMetadata[T]))
     }
+
+  implicit final class EJsonOps[J](val j: J) extends scala.AnyVal {
+    def array(implicit JR: Recursive.Aux[J, EJson]): Option[List[J]] =
+      projectg[J, EJson].composePrism(optics.arr).headOption(j)
+
+    def assoc(implicit JR: Recursive.Aux[J, EJson]): Option[List[(J, J)]] =
+      projectg[J, EJson].composePrism(optics.map).headOption(j)
+
+    def decodeAs[A](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson], A: DecodeEJson[A]): Decoded[A] =
+      A.decode[J](j)
+
+    def decodeKeyS(k: String)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Decoded[J] =
+      Decoded.attempt(j, keyS(k) \/> s"Map[$k]")
+
+    def decodedKeyS[A: DecodeEJson](k: String)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Decoded[A] =
+      decodeKeyS(k) flatMap (_.decodeAs[A])
+
+    def key(k: J)(implicit JR: Recursive.Aux[J, EJson], J: Equal[J]): Option[J] =
+      assoc flatMap (_ findLeft (_._1 ≟ k)) map (_._2)
+
+    def keyS(k: String)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Option[J] =
+      key(EJson.str(k))
+
+    def map(implicit JR: Recursive.Aux[J, EJson], J: Order[J]): Option[J ==>> J] =
+      projectg[J, EJson].composePrism(optics.imap).headOption(j)
+  }
 
   implicit final class EncodeEJsonOps[A](val self: A) extends scala.AnyVal {
     def asEJson[J](

@@ -84,7 +84,7 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       TypeStat.coll(2.0, 1.0.some, 1.0.some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.coll(1.0, 6.0.some, 6.0.some),
+          TypeStat.str(1.0, 6.0, 6.0, "", ""),
           TypeST(TypeF.arr[J, S](envT(
             TypeStat.count(1.0),
             TypeST(TypeF.simple[J, S](SimpleType.Char))

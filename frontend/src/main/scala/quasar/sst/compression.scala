@@ -125,8 +125,11 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
     case EnvT((ts, TypeF.Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
-      val (cnt, len) = (ts.size, A fromInt s.length)
-      envT(TypeStat.coll(cnt, some(len), some(len)), charArr(cnt))
+      val newStats = TypeStat.str[A].modify {
+        case (c, n, m, _, _) => (c, n, m, "", "")
+      } (ts)
+
+      envT(newStats, charArr(newStats.size))
   }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of

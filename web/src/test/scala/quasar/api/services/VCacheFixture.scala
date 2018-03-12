@@ -69,7 +69,7 @@ trait VCacheFixture extends H2MetaStoreFixture {
   def evalViewTest[A](
     now: Instant, mounts: Map[APath, MountConfig], inMemState: InMemState
   )(
-    p: (ViewEff ~> Task, ViewEff ~> ResponseOr) => Task[A]
+    p: (ViewEff ~> Task, ViewEff ~> FailedResponseOr) => Task[A]
   ): Task[A] = {
     def viewFs: Task[ViewEff ~> Task] =
       (runFs(inMemState)                                         ⊛
@@ -125,7 +125,7 @@ trait VCacheFixture extends H2MetaStoreFixture {
         foldMapNT(viewInterp) compose viewInterpF
       }
 
-    viewFs >>= (fs => p(fs, liftMT[Task, ResponseT] compose fs))
+    viewFs >>= (fs => p(fs, liftMT[Task, FailedResponseT] compose fs))
   }
 }
 

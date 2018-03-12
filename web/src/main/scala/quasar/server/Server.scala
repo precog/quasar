@@ -21,7 +21,7 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, FailedResponseOr, FailedResponseT}
 import quasar.cli.Cmd
 import quasar.config._
-import quasar.console.logErrors
+import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig

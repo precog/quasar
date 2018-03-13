@@ -85,7 +85,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
   type Repr = MimirRepr
   type M[A] = CakeM[A]
-  //type M[A] = Kleisli[Task, (Cake, lwc.FS), A]
+  //type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
+  //type M[A] = MT[Task, A]
 
   import Cost._
   import Cardinality._
@@ -264,6 +265,12 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
         back <- precog.fs.listContents(dir).liftM[MT].liftB
       } yield back
     }
+
+    // TODO keep these old impls around and private
+    // have a new imple that calls that and is the real impl
+
+    // redefine def cake so we can auto lift into the tuple, or something like that
+    // for all the cases where we don't need to delegate
 
     // TODO call to lwc `exists`
     def fileExists(file: AFile): Configured[Boolean] =

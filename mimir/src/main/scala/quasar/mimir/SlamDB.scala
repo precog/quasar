@@ -85,6 +85,7 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
   type Repr = MimirRepr
   type M[A] = CakeM[A]
+  //type M[A] = Kleisli[Task, (Cake, lwc.FS), A]
 
   import Cost._
   import Cardinality._
@@ -266,7 +267,10 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
     // TODO call to lwc `exists`
     def fileExists(file: AFile): Configured[Boolean] =
-      cake[M].flatMap(_.fs.exists(file).liftM[MT]).liftM[ConfiguredT]
+      cake[M].flatMap { x =>
+        val res: Task[Boolean] = x.fs.exists(file)// |@| lwc.exists(file) { _ || _ }
+        res.liftM[MT]
+      }.liftM[ConfiguredT]
   }
 
   object ReadFileModule extends ReadFileModule {

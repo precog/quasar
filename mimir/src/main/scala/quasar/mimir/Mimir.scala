@@ -24,7 +24,7 @@ import quasar.fs.mount.ConnectionUri
 import fs2.Stream
 import scalaz.concurrent.Task
 
-object MimirFileSystem extends LightweightFileSystem {
+trait MimirFileSystem extends LightweightFileSystem {
   def children(dir: ADir): Task[List[RPath]] =
     Task.now(List[RPath]())
 
@@ -35,11 +35,15 @@ object MimirFileSystem extends LightweightFileSystem {
     Task.now(None)
 }
 
+object MimirFS extends MimirFileSystem
+
 object MimirLightweight extends LightweightConnector {
+  type FS = MimirFileSystem
+
   val Type: FileSystemType = FileSystemType("mimir")
 
-  def init(uri: ConnectionUri): Task[(LightweightFileSystem, Task[Unit])] =
-    Task.now((MimirFileSystem, Task.now(())))
+  def init(uri: ConnectionUri): Task[(MimirFileSystem, Task[Unit])] =
+    Task.now((MimirFS, Task.now(())))
 }
 
 object Mimir extends SlamDB {

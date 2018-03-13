@@ -40,6 +40,7 @@ object MimirCake {
   type MT[F[_], A] = Kleisli[F, Cake, A]
   type CakeM[A] = MT[Task, A]
 
+  // MonadReader_[Kleisli[Task, Cake, ?], Cake]
   def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both

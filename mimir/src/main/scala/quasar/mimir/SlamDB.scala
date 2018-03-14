@@ -84,9 +84,11 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr
-  type M[A] = CakeM[A]
-  //type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
-  //type M[A] = MT[Task, A]
+  //type M[A] = CakeM[A]
+  type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
+  type M[A] = MT[Task, A]
+
+  def cake[F[_]](implicit F: MonadReader_[F, (Cake, lwc.FS)]): F[(Cake, lwc.FS)] = F.ask
 
   import Cost._
   import Cardinality._
@@ -110,18 +112,26 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     O.optimize(reflNT[QSM[T, ?]])
   }
 
-  // TODO call to lwc `init`
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] = {
     val file = new java.io.File(uri.value)
-    if (!file.isAbsolute) EitherT.leftT(NonEmptyList("Mimir cannot be mounted to a relative path").left.point[Task])
-    else Config(file).point[BackendDef.DefErrT[Task, ?]]
+
+    if (!file.isAbsolute)
+      EitherT.leftT(NonEmptyList("Mimir cannot be mounted to a relative path").left.point[Task])
+    else
+      Config(file).point[BackendDef.DefErrT[Task, ?]]
   }
 
   // TODO call to lwc `init`
   def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
       cake <- Precog(cfg.dataDir)
-    } yield (λ[M ~> Task](_.run(cake)), cake.shutdown.toTask)
+      lw <- lwc.init
+    } yield {
+      val (fs, shutdown) = lw
+      (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.toTask >> shutdown)
+    }
+  //type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
+  //type M[A] = MT[Task, A]
 
     t.liftM[BackendDef.DefErrT]
   }
@@ -253,7 +263,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     // TODO call to lwc `children`
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       for {
-        precog <- cake[Backend]
+        connectors <- cake[Backend]
+        (precog, _) = connectors
 
         exists <- precog.fs.exists(dir).liftM[MT].liftB
 
@@ -272,11 +283,10 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     // redefine def cake so we can auto lift into the tuple, or something like that
     // for all the cases where we don't need to delegate
 
-    // TODO call to lwc `exists`
     def fileExists(file: AFile): Configured[Boolean] =
-      cake[M].flatMap { x =>
-        val res: Task[Boolean] = x.fs.exists(file)// |@| lwc.exists(file) { _ || _ }
-        res.liftM[MT]
+      cake[M].flatMap {
+        case (precog, lwfs) =>
+          ((precog.fs.exists(file) |@| lwfs.exists(file))(_ || _)).liftM[MT]
       }.liftM[ConfiguredT]
   }
 
@@ -288,7 +298,9 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
-        precog <- cake[Backend]
+        connectors <- cake[Backend]
+        (precog, _) = connectors
+
         handle <- Task.delay(ReadHandle(file, cur.getAndIncrement())).liftM[MT].liftB
 
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
@@ -363,7 +375,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
           path = fileToPath(file)
           jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
 
-          precog <- cake[M]
+          connectors <- cake[Backend]
+          (precog, _) = connectors
 
           ingestion = for {
             _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
@@ -430,7 +443,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
       scenario.fold(
         d2d = { (from, to) =>
           for {
-            precog <- cake[Backend]
+            connectors <- cake[Backend]
+            (precog, _) = connectors
 
             exists <- precog.fs.exists(from).liftM[MT].liftB
 
@@ -455,7 +469,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
         },
         f2f = { (from, to) =>
           for {
-            precog <- cake[Backend]
+            connectors <- cake[Backend]
+            (precog, _) = connectors
 
             exists <- precog.fs.exists(from).liftM[MT].liftB
 
@@ -485,7 +500,8 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def delete(path: APath): Backend[Unit] = {
       for {
-        precog <- cake[Backend]
+        connectors <- cake[Backend]
+        (precog, _) = connectors
 
         exists <- precog.fs.exists(path).liftM[MT].liftB
 

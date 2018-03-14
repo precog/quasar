@@ -33,5 +33,5 @@ trait LightweightFileSystem {
 trait LightweightConnector {
   type FS <: LightweightFileSystem
   val Type: FileSystemType
-  def init(uri: ConnectionUri): Task[(FS, Task[Unit])]
+  def init: Task[(FS, Task[Unit])]
 }

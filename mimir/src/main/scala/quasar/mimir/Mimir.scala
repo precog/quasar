@@ -42,7 +42,7 @@ object MimirLightweight extends LightweightConnector {
 
   val Type: FileSystemType = FileSystemType("mimir")
 
-  def init(uri: ConnectionUri): Task[(MimirFileSystem, Task[Unit])] =
+  def init: Task[(MimirFileSystem, Task[Unit])] =
     Task.now((MimirFS, Task.now(())))
 }
 

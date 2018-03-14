@@ -375,7 +375,7 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
           path = fileToPath(file)
           jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
 
-          connectors <- cake[Backend]
+          connectors <- cake[M]
           (precog, _) = connectors
 
           ingestion = for {

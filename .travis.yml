@@ -33,6 +33,7 @@ env:
     # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:
     - COURSIER_PROGRESS=0
+    - SBT="./sbt"
 
 # this is also the test stage :eyeroll:
 script:

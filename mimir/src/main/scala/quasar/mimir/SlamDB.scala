@@ -298,56 +298,63 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
-    private val map = new ConcurrentHashMap[ReadHandle, Precog#TablePager]
+    private val readMap =
+      new ConcurrentHashMap[ReadHandle, Precog#TablePager \/ Option[Stream[Task, Data]]]
+
     private val cur = new AtomicLong(0L)
 
-    // TODO call to lwc `read`
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
         connectors <- cake[Backend, lwc.FS]
-        (precog, _) = connectors
+        (precog, lwfs) = connectors
 
         handle <- Task.delay(ReadHandle(file, cur.getAndIncrement())).liftM[MT].liftB
 
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
 
         // apparently read on a non-existent file is equivalent to reading the empty file??!!
+        // if the file doesn't exist in mimir we delegate to the lightweight connector
         eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
-        table = eitherTable.fold(_ => precog.Table.empty, table => table)
 
-        limited = if (offset.value === 0L && !limit.isDefined)
-          table
-        else
-          table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+        reader <- eitherTable.bitraverse(
+          _ => lwfs.read(file),
+          table => {
+            val limited = if (offset.value === 0L && !limit.isDefined)
+              table
+            else
+              table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
 
-        projected = limited.transform(precog.trans.constants.SourceValue.Single)
+            val projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
-        pager <- precog.TablePager(projected).liftM[MT].liftB
-        _ <- Task.delay(map.put(handle, pager)).liftM[MT].liftB
+            precog.TablePager(projected)
+          }).liftM[MT].liftB
+
+        _ <- Task.delay(readMap.put(handle, reader.swap)).liftM[MT].liftB
       } yield handle
     }
 
     def read(h: ReadHandle): Backend[Vector[Data]] = {
       for {
-        maybePager <- Task.delay(Option(map.get(h))).liftM[MT].liftB
+        maybeReader <- Task.delay(Option(readMap.get(h))).liftM[MT].liftB
 
-        pager <- maybePager match {
-          case Some(pager) =>
-            pager.point[Backend]
+        reader <- maybeReader match {
+          case Some(reader) =>
+            reader.point[Backend]
 
           case None =>
             MonadError_[Backend, FileSystemError].raiseError(unknownReadHandle(h))
         }
 
-        chunk <- pager.more.liftM[MT].liftB
+        chunk <- reader.fold(_.more, _.fold(Task.now(Vector[Data]()))(_.runLog)).liftM[MT].liftB
       } yield chunk
     }
 
+    // TODO close stuff for lwc
     def close(h: ReadHandle): Configured[Unit] = {
       val t = for {
-        pager <- Task.delay(Option(map.get(h)).get)
-        check <- Task.delay(map.remove(h, pager))
-        _ <- if (check) pager.close else Task.now(())
+        reader <- Task.delay(Option(readMap.get(h)).get)
+        check <- Task.delay(readMap.remove(h, reader))
+        _ <- if (check) reader.fold(_.close, _ => Task.now(())) else Task.now(())
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]

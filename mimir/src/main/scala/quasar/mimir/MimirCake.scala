@@ -40,9 +40,6 @@ object MimirCake {
   type CakeMT[F[_], A <: LightweightFileSystem, B] = Kleisli[F, (Cake, A), B]
   type CakeM[A <: LightweightFileSystem, B] = CakeMT[Task, A, B]
 
-  // MonadReader_[Kleisli[Task, Cake, ?], Cake]
-  //def cake0[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
-
   def cake[F[_], A <: LightweightFileSystem](implicit F: MonadReader_[F, (Cake, A)])
       : F[(Cake, A)] =
     F.ask

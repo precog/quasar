@@ -120,17 +120,14 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
       Config(file).point[BackendDef.DefErrT[Task, ?]]
   }
 
-  // TODO call to lwc `init`
   def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
       cake <- Precog(cfg.dataDir)
-      lw <- lwc.init
+      connector <- lwc.init
     } yield {
-      val (fs, shutdown) = lw
+      val (fs, shutdown) = connector
       (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.toTask >> shutdown)
     }
-  //type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
-  //type M[A] = MT[Task, A]
 
     t.liftM[BackendDef.DefErrT]
   }

@@ -32,25 +32,28 @@ import scalaz._, Scalaz._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    lift: FileSystemErrT[CakeM, ?] ~> F) {
+final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad, FS <: LightweightFileSystem](
+    lift: FileSystemErrT[CakeM[FS, ?], ?] ~> F) {
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(path, status)) => {
+      type X[A] = EitherT[CakeM[FS, ?], FileSystemError, A]
+
       val pathStr: String = pathy.Path.posixCodec.printPath(path)
 
-      val loaded: EitherT[CakeM, FileSystemError, MimirRepr] =
+      val loaded: X[MimirRepr] =
         for {
-          precog <- cake[EitherT[CakeM, FileSystemError, ?]]
+          connectors <- cake[X, FS]
+          (precog, _) = connectors
 
           repr <-
-            MimirRepr.meld[EitherT[CakeM, FileSystemError, ?]](
-              new DepFn1[Cake, λ[`P <: Cake` => EitherT[CakeM, FileSystemError, P#Table]]] {
-                def apply(P: Cake): EitherT[CakeM, FileSystemError, P.Table] = {
+            MimirRepr.meld[X, FS](
+              new DepFn1[Cake, λ[`P <: Cake` => X[P#Table]]] {
+                def apply(P: Cake): X[P.Table] = {
                   val et =
                     P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
 
-                  et.mapT(_.liftM[MT]) leftMap { err =>
+                  et.mapT(_.liftM[CakeMT[?[_], FS, ?]]) leftMap { err =>
                     val msg = err.messages.toList.reduce(_ + ";" + _)
                     FileSystemError.readFailed(posixCodec.printPath(path), msg)
                   }

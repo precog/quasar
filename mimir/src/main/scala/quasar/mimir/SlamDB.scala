@@ -259,21 +259,30 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def explain(repr: Repr): Backend[String] = "🤹".point[Backend]
 
-    // TODO call to lwc `children`
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       for {
         connectors <- cake[Backend, lwc.FS]
-        (precog, _) = connectors
+        (precog, lwfs) = connectors
 
-        exists <- precog.fs.exists(dir).liftM[MT].liftB
+        existsPrecog <- precog.fs.exists(dir).liftM[MT].liftB
+        existsLwfs <- lwfs.exists(dir).liftM[MT].liftB
 
-        _ <- if (exists)
+        _ <- if (existsPrecog || existsLwfs)
           ().point[Backend]
         else
           MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(dir)))
 
-        back <- precog.fs.listContents(dir).liftM[MT].liftB
-      } yield back
+        backPrecog <- if (existsPrecog)
+          precog.fs.listContents(dir).liftM[MT].liftB
+        else
+          Set[PathSegment]().point[Backend]
+
+        backLwfs <- if (existsLwfs)
+          lwfs.children(dir).liftM[MT].liftB
+        else
+          Set[PathSegment]().point[Backend]
+
+      } yield backPrecog ++ backLwfs
     }
 
     // TODO keep these old impls around and private
@@ -295,6 +304,7 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     private val map = new ConcurrentHashMap[ReadHandle, Precog#TablePager]
     private val cur = new AtomicLong(0L)
 
+    // TODO call to lwc `read`
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
         connectors <- cake[Backend, lwc.FS]
@@ -320,7 +330,6 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
       } yield handle
     }
 
-    // TODO call to lwc `read`
     def read(h: ReadHandle): Backend[Vector[Data]] = {
       for {
         maybePager <- Task.delay(Option(map.get(h))).liftM[MT].liftB

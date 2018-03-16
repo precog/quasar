@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import quasar.Data
-import quasar.contrib.pathy.{ADir, AFile, RPath}
+import quasar.contrib.pathy.{ADir, AFile, APath, PathSegment}
 import quasar.fs.FileSystemType
 import quasar.fs.mount.ConnectionUri
 
@@ -25,8 +25,8 @@ import fs2.Stream
 import scalaz.concurrent.Task
 
 trait LightweightFileSystem {
-  def children(dir: ADir): Task[List[RPath]]
-  def exists(file: AFile): Task[Boolean]
+  def children(dir: ADir): Task[Set[PathSegment]]
+  def exists(file: APath): Task[Boolean]
   def read(file: AFile): Task[Option[Stream[Task, Data]]]
 }
 

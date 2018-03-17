@@ -66,7 +66,6 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
   import PathError._
   import Precog.startTask
 
-  // TODO call to lwc in `ShiftedRead`
   val lwc: LightweightConnector
 
   type QS[T[_[_]]] = MimirQScriptCP[T]
@@ -84,8 +83,6 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
     Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr
-  //type M[A] = CakeM[A]
-  //type MT[F[_], A] = Kleisli[F, (Cake, lwc.FS), A]
   type MT[F[_], A] = CakeMT[F, lwc.FS, A]
   type M[A] = CakeM[lwc.FS, A]
 
@@ -345,11 +342,12 @@ trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
             MonadError_[Backend, FileSystemError].raiseError(unknownReadHandle(h))
         }
 
+        // #unreadable
         chunk <- reader.fold(_.more, _.fold(Task.now(Vector[Data]()))(_.runLog)).liftM[MT].liftB
       } yield chunk
     }
 
-    // TODO close stuff for lwc
+    // TODO close stuff for lwc?
     def close(h: ReadHandle): Configured[Unit] = {
       val t = for {
         reader <- Task.delay(Option(readMap.get(h)).get)

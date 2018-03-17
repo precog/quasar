@@ -18,10 +18,12 @@ package quasar.mimir
 
 import slamdata.Predef._
 
+import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fs._
 import quasar.mimir.MimirCake._
+import quasar.precog.common.Path
 import quasar.qscript._
 import quasar.yggdrasil.bytecode.JType
 
@@ -29,6 +31,7 @@ import delorean._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -44,19 +47,39 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       val loaded: X[MimirRepr] =
         for {
           connectors <- cake[X, FS]
-          (precog, _) = connectors
+          (_, lwfs) = connectors
 
           repr <-
             MimirRepr.meld[X, FS](
               new DepFn1[Cake, λ[`P <: Cake` => X[P#Table]]] {
                 def apply(P: Cake): X[P.Table] = {
-                  val et =
-                    P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
+                  // read, if it fails ingest and then read again
+                  def read: EitherT[Task, FileSystemError, P.Table] =
+                    P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask).leftMap { err =>
+                      val msg = err.messages.toList.reduce(_ + ";" + _)
+                      FileSystemError.readFailed(posixCodec.printPath(path), msg)
+                    }
 
-                  et.mapT(_.liftM[CakeMT[?[_], FS, ?]]) leftMap { err =>
-                    val msg = err.messages.toList.reduce(_ + ";" + _)
-                    FileSystemError.readFailed(posixCodec.printPath(path), msg)
-                  }
+
+                  val et = for {
+                    precogRead <- read.run
+
+                    et <- precogRead match {
+                      case -\/(_) =>
+                        lwfs.read(path) flatMap {
+                          case Some(stream) =>
+                            (P.ingest(Path(pathStr), stream.map(JValue.fromData)).run >> read.run): Task[FileSystemError \/ P.Table]
+                          case None =>
+                            Task.now(FileSystemError.readFailed(
+                              posixCodec.printPath(path),
+                              "read from lightweight connector failed").left[P.Table])
+                        }
+
+                      case right @ \/-(_) => Task.now(right: FileSystemError \/ P.Table)
+                    }
+                  } yield et
+
+                  EitherT.eitherT(et.liftM[CakeMT[?[_], FS, ?]])// leftMap { err =>
                 }
               })
         } yield {

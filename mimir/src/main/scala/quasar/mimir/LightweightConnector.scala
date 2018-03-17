@@ -24,28 +24,14 @@ import quasar.fs.mount.ConnectionUri
 import fs2.Stream
 import scalaz.concurrent.Task
 
-trait MimirFileSystem extends LightweightFileSystem {
-  def children(dir: ADir): Task[Set[PathSegment]] =
-    Task.now(Set[PathSegment]())
-
-  def exists(file: APath): Task[Boolean] =
-    Task.now(false)
-
-  def read(file: AFile): Task[Option[Stream[Task, Data]]] =
-    Task.now(None)
+trait LightweightFileSystem {
+  def children(dir: ADir): Task[Set[PathSegment]]
+  def exists(file: APath): Task[Boolean]
+  def read(file: AFile): Task[Option[Stream[Task, Data]]]
 }
 
-object MimirFS extends MimirFileSystem
-
-object MimirLightweight extends LightweightConnector {
-  type FS = MimirFileSystem
-
-  val Type: FileSystemType = FileSystemType("mimir")
-
-  def init: Task[(MimirFileSystem, Task[Unit])] =
-    Task.now((MimirFS, Task.now(())))
-}
-
-object Mimir extends SlamDB {
-  val lwc: LightweightConnector = MimirLightweight
+trait LightweightConnector {
+  type FS <: LightweightFileSystem
+  val Type: FileSystemType
+  def init: Task[(FS, Task[Unit])]
 }

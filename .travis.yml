@@ -29,6 +29,7 @@ env:
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
+    - CONNECTOR=postgres
     # - CONNECTOR=spark_local_test # no spark for 2.12
     # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:

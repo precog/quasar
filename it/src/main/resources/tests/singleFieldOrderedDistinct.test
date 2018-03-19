@@ -1,7 +1,9 @@
 {
     "name": "distinct of one ordered field",
     "backends": {
+        "postgres": "pending"
     },
+    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "olympics.data",
 
     "NB": "The lack of alias on this field is important, as it triggers the

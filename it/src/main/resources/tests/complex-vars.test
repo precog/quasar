@@ -2,9 +2,10 @@
     "name": "variable with a non-trivial value",
 
     "backends": {
-        "mimir":"pending"
+        "mimir":"pending",
+        "postgres":"pending"
     },
-
+    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "days.data",
 
     "variables": {

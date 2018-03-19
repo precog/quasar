@@ -6,11 +6,12 @@
         "couchbase":      "pending",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
+        "postgres": "pending",
         "spark_hdfs": "pending",
         "spark_local": "pending",
 	"spark_cassandra": "pending"	
     },
-
+    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "../days.data",
 
     "query": "select day, (ts - timestamp(\"2014-08-17T00:00:00.000Z\")) / interval(\"PT1H0M0S\") as hoursSinceSunday

@@ -2,8 +2,10 @@
     "name": "flatten object",
     "backends": {
         "couchbase":  "ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "postgres": "pending"
     },
+    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",
     "predicate": "exactly",

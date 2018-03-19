@@ -2,8 +2,9 @@
     "name": "filter flattened field",
 
     "backends": {
+        "postgres": "pending"
     },
-
+    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "demo/patients.data",
 
     "query": "select codes[*] as codes, state from `demo/patients` where city = \"BOULDER\" and state = \"UT\"",

@@ -9,11 +9,11 @@
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
         "mongodb_read_only": "pending",
+        "postgres":          "pending",
         "spark_cassandra":   "pending"
     },
-
     "NB": "Legacy MongoDB did not have to ignore field order.",
-
+    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",
     "predicate": "atLeast",

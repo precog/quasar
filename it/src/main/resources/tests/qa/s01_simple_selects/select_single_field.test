@@ -3,9 +3,7 @@
 
   "data": "basic.data",
 
-  "backends": {
-    "postgres": "pending"
-  },
+  "backends": {},
 
   "query": "select num from basic",
 

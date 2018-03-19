@@ -4,7 +4,8 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "postgres": "ignoreFieldOrder"
     },
 
     "data": "olympics.data",

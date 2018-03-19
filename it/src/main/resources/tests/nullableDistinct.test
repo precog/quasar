@@ -2,8 +2,9 @@
   "name": "distinct of a nullable field",
 
   "backends": {
+    "postgres": "pending"
   },
-
+  "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
   "data": "nullable_distinct.data",
 
   "query": "select distinct foo from nullable_distinct",

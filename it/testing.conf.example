@@ -1,6 +1,8 @@
 #postgresql_metastore = "{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore_test\",\"userName\":\"postgres\",\"password\":\"postgres\"}"
 #mongodb_3_2       ="mongodb://<host>:<port>"
 #mongodb_3_4       ="mongodb://<host>:<port>"
+#mongodb_3_4_13    ="mongodb://<host>:<port>"
+#mongodb_3_6       ="mongodb://<host>:<port>"
 #mongodb_read_only ="mongodb://<host>:<port>"
 #spark_local       ="<path_to_folder>"
 #spark_hdfs        ="spark://<spark_host>:<spark_port>?hdfsUrl=hdfs://<hdfs_host>:<hdfs_port>&rootPath=<root_path>"

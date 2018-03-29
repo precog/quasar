@@ -60,6 +60,8 @@ Quasar supports the following datastores:
 quasar_mongodb_read_only
 quasar_mongodb_3_2
 quasar_mongodb_3_4
+quasar_mongodb_3_4_13
+quasar_mongodb_3_6
 quasar_metastore
 quasar_marklogic_xml
 quasar_marklogic_json
@@ -75,7 +77,8 @@ if you wanted to run integration tests with mongo, marklogic, and couchbase you 
 ./setupContainers -u quasar_metastore,quasar_mongodb_3_4,quasar_marklogic_xml,quasar_couchbase
 ```
 
-Note: `quasar_metastore` is always needed to run integration tests.
+Note: `quasar_metastore` is always needed to run integration
+tests. `quasar_mongodb_3_4` refers to MongoDB ≤ 3.4.4
 
 This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
 

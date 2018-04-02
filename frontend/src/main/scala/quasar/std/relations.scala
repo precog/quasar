@@ -31,7 +31,15 @@ trait RelationsLib extends Library {
     "Determines if two values are equal",
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
-    noSimplification,
+    new Func.Simplifier {
+      def apply[T]
+      (orig: LP[T])
+      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case Invoke(_, Sized(Embed(Constant(x)), Embed(Constant(y)))) => constant(Data.Bool(x === y)).some
+          case _                                                       => None
+        }
+    },
     partialTyper[nat._2] {
       case Sized(Type.Const(data1), Type.Const(data2)) =>
         Type.Const(Data.Bool(data1 == data2))

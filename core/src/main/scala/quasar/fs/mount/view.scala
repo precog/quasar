@@ -274,6 +274,7 @@ object view {
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.
+    // JR: Why is this easier to manage exactly? Perhaps we could add a more detailed explanation here
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
     // The `Set[FPath]` is to ensure we don't expand the same view within the SAME AST
